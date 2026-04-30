@@ -488,6 +488,13 @@ async def run_quality_checks(
         if not isinstance(r, dict):
             continue
         payload = r.get("payload") or r
+        # Skip records that were rejected at the staging gate.
+        # domestic_only and parser_error courses are intentionally excluded
+        # from scraped_courses; flagging them for missing_international_fee /
+        # missing_course_name etc. is noise that swamps CRITICAL counts and
+        # obscures real data-quality problems in the courses that DID stage.
+        if payload.get("domestic_only") or payload.get("parser_error"):
+            continue
         url = r.get("url") or r.get("source_url") or ""
         payloads_with_urls.append((payload, url))
         course_issues = _check_course(payload, url)

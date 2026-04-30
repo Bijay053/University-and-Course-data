@@ -1091,9 +1091,17 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # mode is verification only. Cutover (new path becomes authoritative)
         # is a separate explicit step via SHADOW_CUTOVER_UNI_IDS.
         #
-        # Both paths share the same vision_image_cache so each unique image
-        # is OCR-decoded once. Any Gemini LLM calls are cached at the
-        # http-client layer so both paths see the same AI response.
+        # Both paths share the same vision_image_cache (asyncio Future dict).
+        # Old path runs first (its gather completes before this block); every
+        # image URL it processes is stored as a settled Future. When the new
+        # path gather runs, those URLs are already cached → it awaits the same
+        # Future and gets identical OCR values without a new Gemini call.
+        # This makes the within-run diff immune to vision-OCR non-determinism
+        # (Gemini returning different values for the same image on different days
+        # cannot affect a single shadow run — both paths see the same cache hit).
+        # Cross-run non-determinism (different values across the 5-run streak)
+        # is expected and acceptable: each run's old↔new diff will still be
+        # clean as long as the new code path is equivalent to the old one.
         from app.services.scraper.shadow.mode import is_shadow_enabled as _shadow_on
         if _shadow_on(uni_id):
             from app.services.scraper.shadow.diff import diff_staged_runs as _diff_runs
