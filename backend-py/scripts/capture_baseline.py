@@ -203,15 +203,17 @@ async def snapshot_university(db, uni: University) -> dict:
 
 def _print_row(slug: str, snap: dict) -> None:
     lj = snap.get("last_job") or {}
+    elapsed = lj.get('elapsed_seconds')
+    elapsed_str = f"{elapsed:>7.1f}" if elapsed is not None else "      ?"
     print(
         f"  {slug:30s}  "
         f"courses={snap['course_count']:4d}  "
-        f"disc={lj.get('discovered', '?'):>4}  "
-        f"staged={lj.get('staged', '?'):>4}  "
-        f"skip={lj.get('skipped', '?'):>4}  "
-        f"err={lj.get('errors', '?'):>3}  "
-        f"cost=${lj.get('gemini_cost_usd', 0):.4f}  "
-        f"elapsed={lj.get('elapsed_seconds', '?'):>7}s"
+        f"disc={lj.get('discovered') if lj.get('discovered') is not None else '?':>4}  "
+        f"staged={lj.get('staged') if lj.get('staged') is not None else '?':>4}  "
+        f"skip={lj.get('skipped') if lj.get('skipped') is not None else '?':>4}  "
+        f"err={lj.get('errors') if lj.get('errors') is not None else '?':>3}  "
+        f"cost=${lj.get('gemini_cost_usd') or 0:.4f}  "
+        f"elapsed={elapsed_str}s"
     )
 
 

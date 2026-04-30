@@ -1,0 +1,33 @@
+root@university-and-course-data:~/University-and-Course-data/backend-py# cd ~/University-and-Course-data/backend-py
+set -a && source .env && set +a
+PYTHONPATH=. venv/bin/python3 scripts/capture_baseline.py --dry-run
+INFO capture_baseline: Snapshotting 22 universities...
+
+Baseline dry-run — 20260430_061237
+  slug                            courses     disc  staged    skip   err  cost          elapsed
+  -----------------------------------------------------------------------------------------------
+  aibi                            courses=   8  disc=  11  staged=   8  skip=   3  err=  0  cost=$0.0000  elapsed=   99.1s
+  ait                             courses=   6  disc=   8  staged=   6  skip=   2  err=  0  cost=$0.0017  elapsed=  118.1s
+  apicollege                      courses=  25  disc=  27  staged=  25  skip=   2  err=  0  cost=$0.0000  elapsed=  169.7s
+  atmc                            courses=   4  disc=   6  staged=   4  skip=   2  err=  0  cost=$0.0000  elapsed=   89.6s
+  aut                             courses=  13  disc=  36  staged=  13  skip=  20  err=  0  cost=$0.0035  elapsed=  604.3s
+  acu                             courses=  99  disc= 165  staged=  99  skip=  62  err=  0  cost=$0.0234  elapsed= 3410.1s
+Traceback (most recent call last):
+  File "/root/University-and-Course-data/backend-py/scripts/capture_baseline.py", line 318, in <module>
+    asyncio.run(main(parsed))
+  File "/usr/lib/python3.12/asyncio/runners.py", line 194, in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/scripts/capture_baseline.py", line 265, in main
+    _print_row(slug, snapshot)
+  File "/root/University-and-Course-data/backend-py/scripts/capture_baseline.py", line 214, in _print_row
+    f"elapsed={lj.get('elapsed_seconds', '?'):>7}s"
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: unsupported format string passed to NoneType.__format__
+root@university-and-course-data:~/University-and-Course-data/backend-py# 
