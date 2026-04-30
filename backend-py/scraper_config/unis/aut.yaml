@@ -22,3 +22,7 @@ extraction:
   text_cleaning:
     duration:
       split_on_slash: true    # Handles 'X year / Y year' composite patterns
+
+  filters:
+    domestic_only:
+      enabled: true   # Preserve current prod behaviour: filter runs for all unis.

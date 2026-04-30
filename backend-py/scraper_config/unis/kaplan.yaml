@@ -18,3 +18,7 @@
 extraction:
   english:
     trust_vision_ocr: false   # KITE scores sometimes read from decorative imagery
+
+  filters:
+    domestic_only:
+      enabled: true   # Preserve current prod behaviour: filter runs for all unis.

@@ -15,3 +15,8 @@
 
 discovery:
   always_sitemap_supplement: true   # Supplement BFS with sitemap to catch SPA-only URLs
+
+extraction:
+  filters:
+    domestic_only:
+      enabled: true   # Preserve current prod behaviour: filter runs for all unis.

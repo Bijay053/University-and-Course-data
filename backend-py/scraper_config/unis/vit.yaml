@@ -11,3 +11,8 @@
 # TODO: confirm hostname from DB.
 # TODO (Week 2): investigate whether Playwright pass is already triggered or
 #   needs explicit browser_required: true flag.
+
+extraction:
+  filters:
+    domestic_only:
+      enabled: true   # Preserve current prod behaviour: filter runs for all unis.

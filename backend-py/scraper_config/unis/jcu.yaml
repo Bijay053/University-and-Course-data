@@ -22,3 +22,8 @@ discovery:
   allow_url_patterns:
     - '/study/courses'
     - '/courses/'
+
+extraction:
+  filters:
+    domestic_only:
+      enabled: true   # Preserve current prod behaviour: filter runs for all unis.

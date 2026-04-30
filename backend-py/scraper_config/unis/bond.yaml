@@ -13,3 +13,7 @@
 extraction:
   english:
     central_page: "https://bond.edu.au/international-students/english-language-requirements"
+
+  filters:
+    domestic_only:
+      enabled: true   # Preserve current prod behaviour: filter runs for all unis.

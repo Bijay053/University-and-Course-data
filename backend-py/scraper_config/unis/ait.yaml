@@ -12,3 +12,8 @@
 #
 # TODO: confirm hostname and university ID from DB.
 # TODO (Week 2): add duration_max_years to schema and wire into duration extractor.
+
+extraction:
+  filters:
+    domestic_only:
+      enabled: true   # Preserve current prod behaviour: filter runs for all unis.

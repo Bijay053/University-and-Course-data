@@ -18,3 +18,7 @@ discovery:
 extraction:
   english:
     central_page: "https://www.uow.edu.au/study/apply/english-requirements/"
+
+  filters:
+    domestic_only:
+      enabled: true   # Preserve current prod behaviour: filter runs for all unis.
