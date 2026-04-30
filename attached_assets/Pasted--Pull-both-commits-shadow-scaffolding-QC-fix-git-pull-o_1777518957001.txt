@@ -1,0 +1,111 @@
+
+# Pull both commits (shadow scaffolding + QC fix)
+git pull origin main
+
+# Confirm shadow mode is set (should already be in .env from earlier)
+grep SHADOW backend-py/.env
+
+# If not set:
+echo "SHADOW_MODE_UNI_IDS=41" >> backend-py/.env
+
+sudo systemctl restart uni-celery
+
+# Trigger an ACAP scrape from the admin UI, then check for the shadow report:
+ls -la backend-py/shadow_reports/
+cat backend-py/shadow_reports/*.json | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+print('is_clean:', d['is_clean'])
+print('summary:', d['summary'])
+print('streak:', d['clean_streak'], '/', d['cutover_threshold'])
+"
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+Already up to date.
+SHADOW_MODE_UNI_IDS=41
+total 8
+drwxr-xr-x  2 root root 4096 Apr 30 03:09 .
+drwxr-xr-x 13 root root 4096 Apr 30 03:09 ..
+-rw-r--r--  1 root root    0 Apr 30 03:09 .gitkeep
+cat: 'backend-py/shadow_reports/*.json': No such file or directory
+Traceback (most recent call last):
+  File "<string>", line 3, in <module>
+  File "/usr/lib/python3.12/json/__init__.py", line 293, in load
+    return loads(fp.read(),
+           ^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/decoder.py", line 337, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/decoder.py", line 355, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+root@university-and-course-data:~/University-and-Course-data# cd /root/University-and-Course-data
+
+# Pull all three commits: shadow scaffolding + QC fix + startup log
+git pull origin main
+
+# Confirm env var is set
+grep SHADOW backend-py/.env
+# If missing: echo "SHADOW_MODE_UNI_IDS=41" >> backend-py/.env
+
+# Restart worker — this triggers the startup log
+sudo systemctl restart uni-celery
+
+# Immediately confirm the [SHADOW] line appears in the worker log
+sudo journalctl -u uni-celery -n 20 --no-pager | grep -E "SHADOW|worker_ready"
+remote: Enumerating objects: 6, done.
+remote: Counting objects: 100% (6/6), done.
+remote: Compressing objects: 100% (6/6), done.
+remote: Total 6 (delta 0), reused 0 (delta 0), pack-reused 0 (from 0)
+Unpacking objects: 100% (6/6), 6.05 KiB | 3.03 MiB/s, done.
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+   ef2e6b5..e9daac1  main       -> origin/main
+Updating ef2e6b5..e9daac1
+Fast-forward
+ backend-py/app/tasks/celery_app.py | 53 ++++++++++++++++++++++++++++++++++++-----------------
+ 1 file changed, 36 insertions(+), 17 deletions(-)
+SHADOW_MODE_UNI_IDS=41
+SHADOW_MODE_UNI_IDS=41
+root@university-and-course-data:~/University-and-Course-data# # Wait for the scrape to finish, then check the report
+ls -la backend-py/shadow_reports/
+
+cat backend-py/shadow_reports/$(ls -t backend-py/shadow_reports/*.json | head -1 | xargs basename) \
+  | python3 -m json.tool | grep -E "is_clean|summary|clean_streak|matched"
+total 20
+drwxr-xr-x  2 root root  4096 Apr 30 03:15 .
+drwxr-xr-x 13 root root  4096 Apr 30 03:09 ..
+-rw-r--r--  1 root root     0 Apr 30 03:09 .gitkeep
+-rw-r--r--  1 root root 12063 Apr 30 03:15 20260430031517_acap_41_run001.json
+    "is_clean": false,
+    "summary": "DIFF \u00e2\u0080\u0094 27 courses with 40 field diffs",
+    "clean_streak": 0,
+        "is_clean": false,
+        "summary": "DIFF \u00e2\u0080\u0094 27 courses with 40 field diffs",
+        "matched": 0,
+root@university-and-course-data:~/University-and-Course-data# cat /etc/systemd/system/uni-celery.service | grep -E "Environ|ExecStart|WorkingDir"
+# Fix: add EnvironmentFile=/root/University-and-Course-data/backend-py/.env
+# Then: systemctl daemon-reload && systemctl restart uni-celery
+WorkingDirectory=/root/University-and-Course-data/backend-py
+EnvironmentFile=/root/University-and-Course-data/backend-py/.env
+ExecStart=/root/University-and-Course-data/backend-py/venv/bin/celery \
+root@university-and-course-data:~/University-and-Course-data# # Wait for the scrape to finish, then check the report
+ls -la backend-py/shadow_reports/
+
+cat backend-py/shadow_reports/$(ls -t backend-py/shadow_reports/*.json | head -1 | xargs basename) \
+  | python3 -m json.tool | grep -E "is_clean|summary|clean_streak|matched"
+total 20
+drwxr-xr-x  2 root root  4096 Apr 30 03:15 .
+drwxr-xr-x 13 root root  4096 Apr 30 03:09 ..
+-rw-r--r--  1 root root     0 Apr 30 03:09 .gitkeep
+-rw-r--r--  1 root root 12063 Apr 30 03:15 20260430031517_acap_41_run001.json
+    "is_clean": false,
+    "summary": "DIFF \u00e2\u0080\u0094 27 courses with 40 field diffs",
+    "clean_streak": 0,
+        "is_clean": false,
+        "summary": "DIFF \u00e2\u0080\u0094 27 courses with 40 field diffs",
+        "matched": 0,
+root@university-and-course-data:~/University-and-Course-data# 

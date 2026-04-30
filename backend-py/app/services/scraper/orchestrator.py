@@ -1108,34 +1108,27 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             from app.services.scraper.shadow.new_path import extract_new_path as _new_path
             from app.services.scraper.shadow.report import write_shadow_report as _write_report
 
-            async def _bounded_new(link: dict) -> dict:
-                async with sem:
-                    if stop_flag[0]:
-                        return {"url": link.get("url"), "error": "stopped", "payload": {}, "evidence": []}
-                    return await _new_path(
-                        link,
-                        country=uni_country,
-                        uni_pdf_data=uni_pdf_data or None,
-                        emit=None,  # new path doesn't emit progress lines during shadow
-                        vision_image_cache=vision_image_cache,
-                        central_data=central_data,
-                        uni_id=uni_id,
-                    )
-
             try:
-                log.info("shadow[%s/%d] starting new-path gather for %d links", _uni_cfg.slug, uni_id, len(links))
-                shadow_results = await asyncio.gather(
-                    *[_bounded_new(lk) for lk in links], return_exceptions=True
-                )
                 old_dicts = [r for r in results if isinstance(r, dict)]
-                new_dicts = [r for r in shadow_results if isinstance(r, dict)]
+                log.info(
+                    "shadow[%s/%d] applying new-path transformation to %d extracted results",
+                    _uni_cfg.slug, uni_id, len(old_dicts),
+                )
+                # New path transforms the already-extracted old results — no re-fetch,
+                # no second Playwright session, no second Gemini call. This is "Option A"
+                # correctly implemented: one network fetch, both code paths run on the
+                # same already-fetched content. Initially a no-op (deep copy), diverging
+                # only when per-uni config transformations are added in new_path.py.
+                new_dicts = [
+                    await _new_path(r, uni_id=uni_id) for r in old_dicts
+                ]
                 shadow_diff = _diff_runs(old_dicts, new_dicts)
                 _write_report(
                     shadow_diff,
                     uni_id=uni_id,
                     slug=_uni_cfg.slug,
                     old_job_id=runtime_job_id,
-                    new_job_id=f"{runtime_job_id}:shadow",
+                    new_job_id=f"{runtime_job_id}:new_path",
                 )
             except Exception as _shadow_exc:
                 log.warning("shadow[%s/%d] failed (non-fatal): %s", _uni_cfg.slug, uni_id, _shadow_exc)

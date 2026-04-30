@@ -1,87 +1,83 @@
 """New extraction code path for shadow-mode comparison.
 
-This module is the injection point for per-uni migration work.
+IMPORTANT — this module must NOT re-fetch course URLs.
 
-Initial state (Week 2 step 1): ``extract_new_path`` is functionally identical
-to the old path. Running shadow mode against this produces a byte-identical
-diff, which proves the harness is wired correctly before we make any changes.
+The shadow comparison needs both paths to operate on the same already-fetched
+page content. If the new path re-runs extract_course(), it triggers a second
+Playwright browser session and possibly a second Gemini API call. Those are
+non-deterministic: even for the same URL, a second JS-render or a second LLM
+call can return different values, causing spurious diffs that have nothing to
+do with the code path change being tested.
 
-Week 2 step 2 (ACAP domestic_only migration): override the UniConfig
-contextvar here so ACAP scrapes use the YAML-driven domestic_only filter
-instead of the shared if-block. Shadow mode will then run 5 fresh scrapes
-and confirm the outputs are identical before cutover.
+Correct pattern (Option A — single-process, single fetch):
+  1. Old path fetches + extracts → produces result dict (payload, evidence, url)
+  2. New path receives the old result and applies any config-driven transformation
+  3. diff_staged_runs(old_results, new_results) compares the two
 
-Week 2 step 3 (re NameError fix): applied to shared code after the
-regression sweep over all 23 baselined unis passes.
+Initially (Phase 1 — harness validation): no transformation at all. The new
+path returns a deep copy of the old result. The diff will always be clean, which
+proves the harness is wired correctly before any ACAP-specific changes are made.
 
-To add a new uni to the new path:
-  1. Set ``SHADOW_MODE_UNI_IDS=<uni_id>`` in the environment.
-  2. Modify ``extract_new_path`` to apply the new UniConfig for that uni.
-  3. Run shadow mode for 5 fresh scrapes.
-  4. When the streak reaches 5, set ``SHADOW_CUTOVER_UNI_IDS=<uni_id>``
-     and remove it from ``SHADOW_MODE_UNI_IDS``.
+Week 2 step 2 (ACAP domestic_only migration): apply the YAML-driven domestic_only
+filter to the already-extracted payload. The diff will show whether the new filter
+produces the same staging decisions as the old shared-code filter.
+
+Week 2 step 3 (re NameError fix in shared code): applied directly to shared code;
+shadow mode is not needed for a pure import fix with no behaviour change.
+
+Adding a new uni transformation:
+  1. Set SHADOW_MODE_UNI_IDS=<uni_id> in the environment.
+  2. Add a block under ``# Per-uni transformations`` below, keyed by uni_id.
+  3. Run shadow mode for 5 fresh scrapes (each ≥1 hour apart against live site).
+  4. When clean_streak reaches 5, set SHADOW_CUTOVER_UNI_IDS=<uni_id>
+     and remove it from SHADOW_MODE_UNI_IDS.
 """
 
 from __future__ import annotations
 
+import copy
 import logging
-from typing import TYPE_CHECKING, Any
-
-from app.services.scraper.pipelines.single_course import extract_course
-
-if TYPE_CHECKING:
-    from app.services.scraper.per_course_vision import VisionImageCache
+from typing import Any
 
 log = logging.getLogger(__name__)
 
 
 async def extract_new_path(
-    link: dict[str, Any],
+    old_result: dict[str, Any],
     *,
-    country: str | None,
-    uni_pdf_data: dict | None = None,
-    emit: Any = None,
-    vision_image_cache: "VisionImageCache | None" = None,
-    central_data: dict | None = None,
     uni_id: int | None = None,
 ) -> dict[str, Any]:
-    """Run the new (migration target) extraction code path for one course.
+    """Apply new code path transformations to an already-extracted course result.
 
-    Initially identical to _extract_only() in orchestrator.py.
-    Per-uni behavioural changes are added here as each uni migrates.
+    Both old and new paths operate on the same fetched content (the old result),
+    eliminating all network and LLM non-determinism from the shadow comparison.
 
     Args:
-        link:              {"url": ..., "name": ...} dict from discovery
-        country:           University country string
-        uni_pdf_data:      Pre-fetched PDF payload
-        emit:              Async emit hook (for AI fallback log lines)
-        vision_image_cache: Per-run vision cache for sibling coalescing
-        central_data:      Pre-fetched central-pages payload
-        uni_id:            University ID (used to select per-uni overrides)
+        old_result: result dict from the old extraction path (_extract_only).
+                    Shape: {"url": ..., "name": ..., "payload": {...}, "evidence": [...]}
+        uni_id:     University ID — used to select per-uni transformations below.
 
     Returns:
-        Same shape as _extract_only(): {"url", "name", "payload", "evidence", ...}
+        Transformed copy of old_result. Initially identical (no-op).
     """
-    name = (link.get("name") or "").strip() or "Unknown course"
-    url = link["url"]
+    new_result = copy.deepcopy(old_result)
 
-    try:
-        out = await extract_course(
-            url,
-            country=country,
-            uni_pdf_data=uni_pdf_data,
-            emit=emit,
-            vision_image_cache=vision_image_cache,
-            central_data=central_data,
-        )
-        out["name"] = name
-        return out
-    except Exception as exc:
-        log.warning("extract_new_path failed for %s: %s", url, exc)
-        return {
-            "name": name,
-            "url": url,
-            "error": f"new_path_exception:{type(exc).__name__}",
-            "payload": {},
-            "evidence": [],
-        }
+    # ── Per-uni transformations ────────────────────────────────────────────────
+    # Add uni-specific logic here as each uni migrates.
+    # Each block should only transform new_result["payload"] — leave url, name,
+    # evidence, and error alone unless the transformation explicitly changes them.
+    #
+    # Example for ACAP domestic_only YAML migration (Week 2 step 2):
+    #
+    # if uni_id == 41:  # ACAP
+    #     from app.services.scraper.config.context import require_uni_config
+    #     uc = require_uni_config()
+    #     if uc.domestic_only and uc.domestic_only.text_must_appear_in:
+    #         payload = new_result.get("payload") or {}
+    #         page_section = payload.get("_domestic_only_check_section", "")
+    #         required_section = uc.domestic_only.text_must_appear_in
+    #         if page_section and page_section != required_section:
+    #             new_result["payload"]["domestic_only"] = True
+    # ──────────────────────────────────────────────────────────────────────────
+
+    return new_result
