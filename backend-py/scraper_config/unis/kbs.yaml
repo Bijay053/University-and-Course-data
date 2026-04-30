@@ -17,6 +17,13 @@
 # TODO: confirm hostname and set central_page once DB is queried.
 
 extraction:
+  english:
+    # KBS vision OCR consistently hallucinates IELTS/PTE scores from decorative
+    # images on cdn.kbs.edu.au (e.g. IELTS=9, IELTS=4 on individual course pages).
+    # Mirrors Phase 5 for ACAP.  English requirements come from the central
+    # /admissions/entry-requirements/english-entry-requirements page (Option D).
+    trust_vision_ocr: false
+
   text_cleaning:
     duration:
       split_on_slash: true
