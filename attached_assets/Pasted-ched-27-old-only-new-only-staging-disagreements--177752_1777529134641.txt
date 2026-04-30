@@ -1,0 +1,104 @@
+ched": 27,
+        "old_only": [],
+        "new_only": [],
+        "staging_disagreements": [],
+        "field_regressions": []
+    }
+}
+root@university-and-course-data:~/University-and-Course-data# cd ~/University-and-Course-data
+git pull origin main
+sudo systemctl restart uni-celery
+remote: Enumerating objects: 50, done.
+remote: Counting objects: 100% (50/50), done.
+remote: Compressing objects: 100% (26/26), done.
+remote: Total 26 (delta 22), reused 0 (delta 0), pack-reused 0 (from 0)
+Unpacking objects: 100% (26/26), 8.41 KiB | 783.00 KiB/s, done.
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+   08f9db9..f201deb  main       -> origin/main
+Updating 08f9db9..f201deb
+Fast-forward
+ backend-py/scraper_config/unis/acpe.yaml    |   5 +
+ backend-py/scraper_config/unis/acu.yaml     |   5 +
+ backend-py/scraper_config/unis/ait.yaml     |   5 +
+ backend-py/scraper_config/unis/asa.yaml     |   4 +
+ backend-py/scraper_config/unis/aut.yaml     |   4 +
+ backend-py/scraper_config/unis/bmihms.yaml  |   4 +
+ backend-py/scraper_config/unis/bond.yaml    |   4 +
+ backend-py/scraper_config/unis/cdu.yaml     |   5 +
+ backend-py/scraper_config/unis/csu.yaml     |   5 +
+ backend-py/scraper_config/unis/ecu.yaml     |   5 +
+ backend-py/scraper_config/unis/jcu.yaml     |   5 +
+ backend-py/scraper_config/unis/kaplan.yaml  |   4 +
+ backend-py/scraper_config/unis/kbs.yaml     |   4 +
+ backend-py/scraper_config/unis/latrobe.yaml |   5 +
+ backend-py/scraper_config/unis/saibt.yaml   |   5 +
+ backend-py/scraper_config/unis/torrens.yaml |   4 +
+ backend-py/scraper_config/unis/uel.yaml     |   5 +
+ backend-py/scraper_config/unis/uow.yaml     |   4 +
+ backend-py/scraper_config/unis/vit.yaml     |   5 +
+ backend-py/scripts/regression_sweep.py      | 393 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 20 files changed, 480 insertions(+)
+ create mode 100644 backend-py/scripts/regression_sweep.py
+root@university-and-course-data:~/University-and-Course-data# sudo journalctl -u uni-celery -n 20 --no-pager | grep -E "worker_ready|SHADOW|domestic"
+Apr 30 05:45:02 university-and-course-data celery[1234298]: [2026-04-30 05:45:02,888: INFO/MainProcess] [SHADOW] shadow mode ENABLED for uni_ids: 41
+root@university-and-course-data:~/University-and-Course-data# cat $(ls -t backend-py/shadow_reports/*.json | head -1) | python3 -m json.tool
+{
+    "schema_version": 1,
+    "timestamp": "2026-04-30T05:39:06.995667+00:00",
+    "uni_id": 41,
+    "slug": "acap",
+    "run_number": 14,
+    "old_job_id": "job_85ec0c6a7a06",
+    "new_job_id": "job_85ec0c6a7a06:new_path",
+    "is_clean": true,
+    "summary": "CLEAN \u00e2\u0080\u0094 27 courses matched exactly",
+    "clean_streak": 12,
+    "cutover_threshold": 5,
+    "cutover_ready": true,
+    "diff": {
+        "is_clean": true,
+        "summary": "CLEAN \u00e2\u0080\u0094 27 courses matched exactly",
+        "matched": 27,
+        "old_only": [],
+        "new_only": [],
+        "staging_disagreements": [],
+        "field_regressions": []
+    }
+}
+root@university-and-course-data:~/University-and-Course-data# cd ~/University-and-Course-data
+git pull origin main
+sudo systemctl restart uni-celery
+remote: Enumerating objects: 15, done.
+remote: Counting objects: 100% (15/15), done.
+remote: Compressing objects: 100% (8/8), done.
+remote: Total 8 (delta 6), reused 0 (delta 0), pack-reused 0 (from 0)
+Unpacking objects: 100% (8/8), 1.53 KiB | 156.00 KiB/s, done.
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+   f201deb..f839eda  main       -> origin/main
+Updating f201deb..f839eda
+Fast-forward
+ backend-py/app/services/scraper/pipelines/single_course.py | 23 +++++++++++++++++++++--
+ 1 file changed, 21 insertions(+), 2 deletions(-)
+root@university-and-course-data:~/University-and-Course-data# sudo journalctl -u uni-celery -n 20 --no-pager | grep -E "worker_ready|SHADOW"
+root@university-and-course-data:~/University-and-Course-data# cd ~/University-and-Course-data/backend-py
+PYTHONPATH=. python scripts/capture_baseline.py --dry-run
+# Check the "elapsed" column — jobs with recent completed_at timestamps are usable
+Command 'python' not found, did you mean:
+  command 'python3' from deb python3
+  command 'python' from deb python-is-python3
+root@university-and-course-data:~/University-and-Course-data/backend-py# cd ~/University-and-Course-data/backend-py
+PYTHONPATH=. python scripts/capture_baseline.py --out-dir baselines/after/
+Command 'python' not found, did you mean:
+  command 'python3' from deb python3
+  command 'python' from deb python-is-python3
+root@university-and-course-data:~/University-and-Course-data/backend-py# cd ~/University-and-Course-data/backend-py
+PYTHONPATH=. python scripts/regression_sweep.py \
+    --before baselines/before/ \
+    --after  baselines/after/  \
+    --expected-slugs acap
+Command 'python' not found, did you mean:
+  command 'python3' from deb python3
+  command 'python' from deb python-is-python3
+root@university-and-course-data:~/University-and-Course-data/backend-py# 
