@@ -182,3 +182,37 @@ def test_labeled_duration_unaffected_by_completion_deadline_fix():
         f"Pattern-0 (duration label) must fire on 'Course duration: 2 years' "
         f"regardless of the completion-deadline clause. Got {n!r}."
     )
+
+
+def test_complete_intervening_words_within_years_is_anti_context():
+    """KBS grad cert bug: 'complete their qualification within 8 years' has
+    1-4 words between 'complete' and 'within' — the old pattern required
+    zero intervening words so it silently failed to block the deadline
+    sentence, letting 8 Year beat the real '8 months' duration.
+
+    The fix extends the pattern to (?:\\s+\\w+){0,4} before 'within'."""
+    html = (
+        "<p>Typical Duration / Standard Study Option 8 months / 4 subjects / 2 trimesters.</p>"
+        "<p>Students must complete their qualification within 8 years of commencement.</p>"
+    )
+    out = _run(duration.extract(html, "https://www.kbs.edu.au/courses/grad-cert/"))
+    assert out, "extractor must find a duration"
+    n = out[0].normalized
+    assert n["duration"] == 8.0 and n["duration_term"] == "Month", (
+        f"'complete their qualification within 8 years' must be blocked by "
+        f"anti-context; expected 8 Month but got {n!r}."
+    )
+
+
+def test_complete_all_subjects_within_years_is_anti_context():
+    """Variant: 'complete all subjects within 8 years' — two intervening words."""
+    html = (
+        "<p>8 months full-time study.</p>"
+        "<p>You must complete all subjects within 8 years.</p>"
+    )
+    out = _run(duration.extract(html, "https://www.kbs.edu.au/courses/test/"))
+    assert out, "extractor must find a duration"
+    n = out[0].normalized
+    assert n["duration"] == 8.0 and n["duration_term"] == "Month", (
+        f"'complete all subjects within 8 years' must be blocked; got {n!r}."
+    )

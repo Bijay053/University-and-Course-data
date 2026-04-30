@@ -1,0 +1,720 @@
+Worker claimed queued scrape job
+Cleared 29 stale pending/rejected scraped_courses rows (>10m old) for university 29
+Fetching https://www.kbs.edu.au/courses...
+Discovering candidate course pages...
+[DISCOVER] Crawling from https://www.kbs.edu.au/courses (max 25 pages, max 200 candidates)
+[DISCOVER] classified https://www.kbs.edu.au/courses: detail (course content present, only 0 outbound links)
+[DISCOVER] added self as candidate https://www.kbs.edu.au/courses
+[DISCOVER] added child course https://www.kbs.edu.au/ultimate-guide-doing-mba-australia
+[DISCOVER] Page 1/25: +2 candidates (total 2) — https://www.kbs.edu.au/courses
+[DISCOVER] classified https://www.kbs.edu.au/admissions/course-delivery-options: detail (course content present, only 0 outbound links)
+[DISCOVER] added self as candidate https://www.kbs.edu.au/admissions/course-delivery-options
+[DISCOVER] Page 2/25: +1 candidates (total 3) — https://www.kbs.edu.au/admissions/course-delivery-options
+[DISCOVER] blocked campus_page: https://www.kbs.edu.au/student-life/study-in-australia
+[DISCOVER] blocked campus_page: https://www.kbs.edu.au/student-life/academic-support
+[DISCOVER] blocked campus_page: https://www.kbs.edu.au/student-life/academic-internships
+[DISCOVER] classified https://www.kbs.edu.au/study-australia-complete-guide-international-students: unknown (no course links or degree content detected)
+[DISCOVER] Page 6/25: +0 candidates (total 3) — https://www.kbs.edu.au/study-australia-complete-guide-international-students
+[DISCOVER] classified https://www.kbs.edu.au/courses/non-award-single-subject-enrolment: detail (course content present, only 0 outbound links)
+[DISCOVER] added self as candidate https://www.kbs.edu.au/courses/non-award-single-subject-enrolment
+[DISCOVER] Page 7/25: +1 candidates (total 4) — https://www.kbs.edu.au/courses/non-award-single-subject-enrolment
+[DISCOVER] blocked blog_page: https://www.kbs.edu.au/blog/study-in-australia
+[DISCOVER] blocked blog_page: https://www.kbs.edu.au/blog/study-australia/top-10-reasons-to-live-and-study-adelaide
+[DISCOVER] blocked blog_page: https://www.kbs.edu.au/blog/study-australia/top-11-reasons-live-and-study-brisbane
+[DISCOVER] blocked blog_page: https://www.kbs.edu.au/blog/study-australia/top-8-reasons-live-and-study-gold-coast
+[DISCOVER] blocked blog_page: https://www.kbs.edu.au/blog/study-australia/8-great-reasons-study-in-melbourne
+[DISCOVER] blocked blog_page: https://www.kbs.edu.au/blog/study-australia/top-10-reasons-live-and-study-perth
+[DISCOVER] blocked blog_page: https://www.kbs.edu.au/blog/study-australia/top-9-reasons-live-and-study-sydney
+[DISCOVER] classified https://www.kbs.edu.au/documents/studying-australia-ebook: unknown (no course links or degree content detected)
+[DISCOVER] blocked blog_page: https://www.kbs.edu.au/blog/study-australia/4-life-changing-reasons-study-abroad
+[DISCOVER] blocked blog_page: https://www.kbs.edu.au/blog/study-australia/top-8-study-methods-help-you-remember-more-faster
+[DISCOVER] blocked blog_page: https://www.kbs.edu.au/blog/study-australia/how-has-teaching-changed-in-the-last-10-years
+[DISCOVER] blocked blog_page: https://www.kbs.edu.au/blog/study-australia/best-student-cities-australia-what-does-each-have-offer
+[DISCOVER] blocked blog_page: https://www.kbs.edu.au/blog/study-australia/how-save-money-student-australia
+[DISCOVER] blocked blog_page: https://www.kbs.edu.au/blog/study-australia/new-students-guide-australia-key-tasks-first-month
+[DISCOVER] blocked blog_page: https://www.kbs.edu.au/blog/study-australia/how-balance-study-and-work-australia
+[DISCOVER] blocked blog_page: https://www.kbs.edu.au/blog/study-australia/what-does-student-support-mean-international-students
+[DISCOVER] blocked blog_page: https://www.kbs.edu.au/blog/study-australia/why-wellness-important-academic-success
+[DISCOVER] blocked blog_page: https://www.kbs.edu.au/blog/study-australia/what-are-benefits-mentoring
+[DISCOVER] Crawl yielded only 4 candidate(s) (< 5); trying sitemap fallback
+[DISCOVER] sitemap: probing 4 URL(s) at https://www.kbs.edu.au
+[DISCOVER] sitemap index https://www.kbs.edu.au/sitemap.xml: 1 sub-sitemap(s)
+[DISCOVER] sub-sitemap https://www.kbs.edu.au/sitemap.xml: +33 candidates (total 33)
+[DISCOVER] sitemap: done — 33 unique candidates
+Discovered 37 candidate course links
+[CENTRAL] auto-discovered fee page: https://www.kbs.edu.au/admissions/fees
+[CENTRAL] fee page parsed → 0 program record(s) from https://www.kbs.edu.au/admissions/fees
+[EXTRACT] gate dropped (info_page): Courses
+[EXTRACT] gate dropped 1 non-course candidate(s) â info_page=1
+Extracting course details (36 pages)...
+[EXTRACT] 1/36: MBA
+[EXTRACT] 2/36: Course Delivery Options
+[EXTRACT] 3/36: Non Award Single Subject Enrolment
+[EXTRACT] 4/36: Mba Master Of Business Administration
+Fetching 3/36: Non Award Single Subject Enrolment
+Fetching 2/36: Course Delivery Options
+Fetching 1/36: MBA
+Fetching 4/36: Mba Master Of Business Administration
+[FIELD SUMMARY] Course Delivery Options Fee: ❌ not found IELTS: ❌ not found Duration: ❌ not found Intake: ✅ "['May']" [regex conf=0.40] StudyMode: ✅ 'Online' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Non-award Single Subject Enrolment Fee: ❌ not found IELTS: ❌ not found Duration: ❌ not found Intake: ✅ "['May']" [regex conf=0.40] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] The Ultimate Guide to Doing An MBA in Australia Fee: ✅ '67000' [regex conf=1.00] IELTS: ❌ not found Duration: ❌ not found Intake: ✅ "['January']" [regex conf=0.40] StudyMode: ✅ 'Online' [study_mode:rule conf=0.50]
+[FIELD SUMMARY] MBA - Master of Business Administration Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '2.0' [regex conf=0.75] Intake: ✅ "['March', 'May', 'July', 'Sept" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.50]
+[GP-DEBUG] static=186846B rendered=0B using=static text_len=10190
+[GP-DEBUG] text[:500]='MBA – Master of Business Administration COURSE CRICOS code 078565G / AQF level 9 My saved courses (0) Typical Duration / Standard Study Option 2 years / 12 subjects / 6 trimesters Structure / 12 subjects: 6 core + 6 electives CAREER OUTCOMES / Management consultant / Entrepreneur / Leadership trainer / Research analyst START DATE / March, May, July, September + November TAP BELOW FOR MORE INFORMATION Overview The Master of Business Administration (MBA) is widely regarded as the preferred qualifi'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null,\n "fee_term": null,\n "duration_value": 2,\n "duration_unit": "years",\n "duration_text": "2 years",\n "ielts_overall": null,\n "pte_overall": null,\n "toefl_overall": null,\n "cambridge_overall": null,\n "duolingo_overall": null,\n "sub_category": "Business Administration",\n "category": "Business & Management",\n "mode": "On Campus",'
+[GEMINI] https://www.kbs.edu.au/courses/mba-master-of-business-admini → 11 field(s) (cost=$0.000340, in=3987 out=135)
+[per-course browser ↻] https://www.kbs.edu.au/courses/mba-master-of-business-administration
+[GP-DEBUG] static=79636B rendered=0B using=static text_len=3110
+[GP-DEBUG] text[:500]="Non-Award Single Subject Enrolment If you have other commitments that prevent you from undertaking a full degree or you simply want to investigate an area that interests you, consider our Non-Award Single Subject Enrolment. This means you can study one of the hundreds of subjects on offer at Kaplan Business School without the need to take on a full course load. What is a 'Non-Award Single Subject Enrolment'? A 'Non-Award Single Subject Enrolment' means you will be able to choose a single subject"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null,\n "fee_term": null,\n "duration_value": null,\n "duration_unit": null,\n "duration_text": null,\n "ielts_overall": null,\n "pte_overall": null,\n "toefl_overall": null,\n "cambridge_overall": null,\n "duolingo_overall": null,\n "sub_category": null,\n "category": null,\n "mode": "Blended",\n "intake_text": null,\n "location_text": null'
+[GEMINI] https://www.kbs.edu.au/courses/non-award-single-subject-enro → 1 field(s) (cost=$0.000197, in=2216 out=101)
+[per-course browser ↻] https://www.kbs.edu.au/courses/non-award-single-subject-enrolment
+[GP-DEBUG] static=150939B rendered=0B using=static text_len=20894
+[GP-DEBUG] text[:500]='IN MBA / 14 Jan, 2020 The ultimate guide to doing an MBA in Australia Updated: April 2026 Thinking of doing an MBA? Here we cover the what, when, how and why of studying an MBA in Australia. Your choice to pursue an MBA degree will be determined by various factors including your current position, where you want your career to go in the future, how much time you can apply to study, along with your desired expectations in terms of industry and experience. The Master of Business Administration (MBA'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 67000,\n "domestic_fee": 57000,\n "fee_term": "Annual",\n "duration_value": 2,\n "duration_unit": "years",\n "duration_text": "two years",\n "ielts_overall": null,\n "pte_overall": null,\n "toefl_overall": null,\n "cambridge_overall": null,\n "duolingo_overall": null,\n "sub_category": "Master of Business Administration",\n "category": "Business & Management",\n "m'
+[GEMINI] https://www.kbs.edu.au/ultimate-guide-doing-mba-australia → 11 field(s) (cost=$0.000535, in=6660 out=117)
+[per-course browser ↻] https://www.kbs.edu.au/ultimate-guide-doing-mba-australia
+[GP-DEBUG] static=72401B rendered=0B using=static text_len=1444
+[GP-DEBUG] text[:500]='Course Delivery Options There are a number of reasons why you may want to enrol in individual subjects rather than in an entire qualification. For example, you may want to trial a specific course by undertaking one subject first. Or it may be that a qualification completed at another institution lacked a subject you thought was especially important. Perhaps you are just interested in studying one of the many compelling subjects we offer. It could be a key undergraduate subject like Strategic Man'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null,\n "fee_term": null,\n "duration_value": null,\n "duration_unit": null,\n "duration_text": null,\n "ielts_overall": null,\n "pte_overall": null,\n "toefl_overall": null,\n "cambridge_overall": null,\n "duolingo_overall": null,\n "sub_category": null,\n "category": null,\n "mode": "Online",\n "intake_text": null,\n "location_text": null\n'
+[GEMINI] https://www.kbs.edu.au/admissions/course-delivery-options → 1 field(s) (cost=$0.000165, in=1798 out=101)
+[per-course browser ↻] https://www.kbs.edu.au/admissions/course-delivery-options
+[per-course browser ✓] https://www.kbs.edu.au/courses/non-award-single-subject-enrolment — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[VISION] 1 candidate image(s) found — starting OCR pass
+[per-course vision img 0/1] https://www.kbs.edu.au/courses/non-award-single-subject-enrolment — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.kbs.edu.au/courses/non-award-single-subject-enrolment (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Online' location=None method=study_mode:no_location_online_override url=https://www.kbs.edu.au/courses/non-award-single-subject-enrolment
+❌ [LOW 55/100] Non-award Single Subject Enrolment — missing: english, duration | non-award-single-subject-enrolment
+[EXTRACT] 5/36: Diploma Of Business
+Fetching 5/36: Diploma Of Business
+[FIELD SUMMARY] Diploma of Business Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '1.0' [regex conf=0.75] Intake: ✅ "['March', 'July', 'November']" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.50]
+[per-course browser ✓] https://www.kbs.edu.au/admissions/course-delivery-options — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[VISION] 1 candidate image(s) found — starting OCR pass
+[per-course vision img 0/1 (cache hits 1)] https://www.kbs.edu.au/admissions/course-delivery-options — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.kbs.edu.au/admissions/course-delivery-options (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Online' location=None method=study_mode:rule url=https://www.kbs.edu.au/admissions/course-delivery-options
+❌ [LOW 55/100] Course Delivery Options — missing: english, duration | course-delivery-options
+[EXTRACT] 6/36: Bachelor Of Business
+Fetching 6/36: Bachelor Of Business
+[GP-DEBUG] static=186137B rendered=0B using=static text_len=9196
+[GP-DEBUG] text[:500]='Diploma of Business COURSE CRICOS code 086332B / AQF level 5 My saved courses (0) Typical Duration / Standard Study Option 1 year/ 8 subjects/ 3 trimesters Structure / 8 subjects: 5 core + 3 electives CAREER OUTCOMES / Office assistant / Administrator / Business associate / Program consultant START DATE / March, July + November TAP BELOW FOR MORE INFORMATION Overview Ideal as a stand-alone qualification or a stepping stone to further study, our Diploma of Business equips you with the fundamental'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null,\n "fee_term": null,\n "duration_value": 1,\n "duration_unit": "years",\n "duration_text": "1 year/ 8 subjects/ 3 trimesters",\n "ielts_overall": null,\n "pte_overall": null,\n "toefl_overall": null,\n "cambridge_overall": null,\n "duolingo_overall": null,\n "sub_category": "Business Administration",\n "category": "Business & Management'
+[GEMINI] https://www.kbs.edu.au/courses/diploma-of-business → 11 field(s) (cost=$0.000320, in=3734 out=134)
+[per-course browser ↻] https://www.kbs.edu.au/courses/diploma-of-business
+[FIELD SUMMARY] Bachelor of Business Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '3.0' [regex conf=0.75] Intake: ✅ "['March', 'May', 'July', 'Sept" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.50]
+[GP-DEBUG] static=226343B rendered=0B using=static text_len=11610
+[GP-DEBUG] text[:500]='Bachelor of Business COURSE CRICOS code 067756B / AQF level 7 My saved courses (0) Typical Duration / Standard Study Option 3 years/ 24 subjects/ 9 trimesters Structure / 24 subjects: 6 core + 18 electives CAREER OUTCOMES / Administration manager / Quality Assurance supervisor / Customer service leader / Business coach START DATE / March, May, July, September + November TAP BELOW FOR MORE INFORMATION Overview Our Bachelor of Business provides the theoretical and practical skills necessary to sta'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null,\n "fee_term": null,\n "duration_value": 3,\n "duration_unit": "years",\n "duration_text": "3 years/ 24 subjects/ 9 trimesters",\n "ielts_overall": null,\n "pte_overall": null,\n "toefl_overall": null,\n "cambridge_overall": null,\n "duolingo_overall": null,\n "sub_category": "Business",\n "category": "Business & Management",\n "mode": '
+[GEMINI] https://www.kbs.edu.au/courses/bachelor-of-business → 12 field(s) (cost=$0.000365, in=4338 out=131)
+[per-course browser ↻] https://www.kbs.edu.au/courses/bachelor-of-business
+[per-course browser ✓] https://www.kbs.edu.au/courses/diploma-of-business — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[VISION] 3 candidate image(s) found — starting OCR pass
+[per-course browser ✓] https://www.kbs.edu.au/courses/bachelor-of-business — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[VISION] 2 candidate image(s) found — starting OCR pass
+[per-course browser ✓] https://www.kbs.edu.au/courses/mba-master-of-business-administration — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course vision img 1/2 (cache hits 1)] https://www.kbs.edu.au/courses/bachelor-of-business — IELTS=6.5 PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.kbs.edu.au/courses/bachelor-of-business (missing: international_fee, domestic_fee)
+[VISION] 3 candidate image(s) found — starting OCR pass
+[per-course vision img 2/3 (cache hits 1)] https://www.kbs.edu.au/courses/diploma-of-business — IELTS=6.5 PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.kbs.edu.au/courses/diploma-of-business (missing: international_fee, domestic_fee)
+[per-course browser ✓] https://www.kbs.edu.au/ultimate-guide-doing-mba-australia — IELTS=— PTE=— TOEFL=— CAE=— fee=67000 filled=[]
+[VISION] 6 candidate image(s) found — starting OCR pass
+[FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/diploma-of-business: duration_value, duration_unit
+[FIELD TRACE] study_mode='On Campus' location='Adelaide, Brisbane, Melbourne, Sydney, Perth, Australia' method=study_mode:location_derived url=https://www.kbs.edu.au/courses/diploma-of-business
+[WARN] Diploma of Business — Fee section detected but fee is blank
+[FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/bachelor-of-business: duration_value, duration_unit
+✅ [PASS 100/100] Diploma of Business | diploma-of-business
+[FIELD TRACE] study_mode='Online' location='Adelaide, Melbourne, Sydney' method=study_mode:rule url=https://www.kbs.edu.au/courses/bachelor-of-business
+[EXTRACT] 7/36: Bachelor Of Business Accounting
+[WARN] Bachelor of Business — Fee section detected but fee is blank
+Fetching 7/36: Bachelor Of Business Accounting
+✅ [PASS 100/100] Bachelor of Business | bachelor-of-business
+[EXTRACT] 8/36: Bachelor Of Business Hospitality And Tourism Management
+Fetching 8/36: Bachelor Of Business Hospitality And Tourism Management
+[VISION FAIL] https://www.kbs.edu.au/sites/default/files/2022-09/course-structure-di: Gemini skipped — None (likely quota exhausted)
+[FIELD SUMMARY] Bachelor of Business (Accounting) Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '3.0' [regex conf=0.75] Intake: ✅ "['March', 'May', 'July', 'Sept" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.50]
+[FIELD SUMMARY] Bachelor of Business (Hospitality and Tourism Mana Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '3.0' [regex conf=0.75] Intake: ✅ "['March', 'May', 'July', 'Sept" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.50]
+[GP-DEBUG] static=227686B rendered=0B using=static text_len=11516
+[GP-DEBUG] text[:500]='Bachelor of Business (Accounting) COURSE CRICOS code 085958J / AQF level 7 My saved courses (0) Typical Duration / Standard Study Option 3 years/ 24 subjects/ 9 trimesters Structure / 24 subjects: 18 core + 6 electives CAREER OUTCOMES / Corporate accountant / Tax accountant / Business analyst / Management accountant / Financial officer START DATE / March, May, July, September + November TAP BELOW FOR MORE INFORMATION Overview The Bachelor of Business (Accounting) will provide you with key busine'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null,\n "fee_term": null,\n "duration_value": 3,\n "duration_unit": "years",\n "duration_text": "3 years/ 24 subjects/ 9 trimesters",\n "ielts_overall": null,\n "pte_overall": null,\n "toefl_overall": null,\n "cambridge_overall": null,\n "duolingo_overall": null,\n "sub_category": "Accounting",\n "category": "Business & Management",\n "mode"'
+[GEMINI] https://www.kbs.edu.au/courses/bachelor-of-business-accounti → 11 field(s) (cost=$0.000365, in=4317 out=136)
+[per-course browser ↻] https://www.kbs.edu.au/courses/bachelor-of-business-accounting
+[VISION FAIL] https://www.kbs.edu.au/sites/default/files/our-mba-guide-cover.jpg?fid: Gemini skipped — None (likely quota exhausted)
+[GP-DEBUG] static=228600B rendered=0B using=static text_len=11802
+[GP-DEBUG] text[:500]='Bachelor of Business (Hospitality & Tourism Management) COURSE CRICOS code 085961C / AQF level 7 My saved courses (0) Typical Duration / Standard Study Option 3 years/ 24 subjects/ 9 trimesters Structure / 24 subjects: 14 core + 10 electives CAREER OUTCOMES / Hospitality manager / Events and community manager / Hotel supervisor / Tourism operator / Travel industry entrepreneur START DATE / March, May, July, September + November TAP BELOW FOR MORE INFORMATION Overview In today’s increasingly mobi'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null,\n "fee_term": null,\n "duration_value": 3,\n "duration_unit": "years",\n "duration_text": "3 years",\n "ielts_overall": null,\n "pte_overall": null,\n "toefl_overall": null,\n "cambridge_overall": null,\n "duolingo_overall": null,\n "sub_category": "Hospitality and Tourism Management",\n "category": "Hospitality, Tourism & Events",\n "'
+[GEMINI] https://www.kbs.edu.au/courses/bachelor-of-business-hospital → 11 field(s) (cost=$0.000371, in=4394 out=137)
+[per-course browser ↻] https://www.kbs.edu.au/courses/bachelor-of-business-hospitality-and-tourism-management
+[per-course vision img 2/3 (cache hits 1)] https://www.kbs.edu.au/courses/mba-master-of-business-administration — IELTS=6.5 PTE=59.0 TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.kbs.edu.au/courses/mba-master-of-business-administration (missing: international_fee, domestic_fee)
+[FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/mba-master-of-business-administration: duration_value, duration_unit
+[FIELD TRACE] study_mode='On Campus' location='Adelaide / Brisbane / Gold Coast / Melbourne / Perth / Sydney /' method=study_mode:location_derived url=https://www.kbs.edu.au/courses/mba-master-of-business-administration
+[CATEGORY det] MBA - Master of Business Administration → Business & Management / MBA
+[WARN] MBA - Master of Business Administration — Fee section detected but fee is blank
+✅ [PASS 100/100] MBA - Master of Business Administration | mba-master-of-business-administration
+[EXTRACT] 9/36: Bachelor Of Business Management
+Fetching 9/36: Bachelor Of Business Management
+[FIELD SUMMARY] Bachelor of Business (Management) Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '3.0' [regex conf=0.75] Intake: ✅ "['March', 'May', 'July', 'Sept" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.50]
+[GP-DEBUG] static=227969B rendered=0B using=static text_len=11656
+[GP-DEBUG] text[:500]='Bachelor of Business (Management) COURSE CRICOS code 085959G / AQF level 7 My saved courses (0) Typical Duration / Standard Study Option 3 years/ 24 subjects/ 9 trimesters Structure / 24 subjects: 15 core + 9 electives CAREER OUTCOMES / Management consultant / Business strategist / Corporate manager / Human resources adviser / Small business owner START DATE / March, May, July, September + November TAP BELOW FOR MORE INFORMATION Overview Our Bachelor of Business (Management) degree equips you wi'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null,\n "fee_term": null,\n "duration_value": 3,\n "duration_unit": "years",\n "duration_text": "3 years/ 24 subjects/ 9 trimesters",\n "ielts_overall": null,\n "pte_overall": null,\n "toefl_overall": null,\n "cambridge_overall": null,\n "duolingo_overall": null,\n "sub_category": "Management",\n "category": "Business & Management",\n "mode"'
+[GEMINI] https://www.kbs.edu.au/courses/bachelor-of-business-manageme → 11 field(s) (cost=$0.000366, in=4352 out=131)
+[per-course browser ↻] https://www.kbs.edu.au/courses/bachelor-of-business-management
+[per-course browser ✓] https://www.kbs.edu.au/courses/bachelor-of-business-accounting — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[VISION] 2 candidate image(s) found — starting OCR pass
+[per-course browser ✓] https://www.kbs.edu.au/courses/bachelor-of-business-hospitality-and-tourism-management — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[VISION] 3 candidate image(s) found — starting OCR pass
+[per-course vision img 1/2 (cache hits 1)] https://www.kbs.edu.au/courses/bachelor-of-business-accounting — IELTS=6.5 PTE=59.0 TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.kbs.edu.au/courses/bachelor-of-business-accounting (missing: international_fee, domestic_fee)
+[FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/bachelor-of-business-accounting: duration_value, duration_unit
+[FIELD TRACE] study_mode='On Campus' location='Adelaide, Brisbane, Melbourne, Sydney, Perth, Australia' method=study_mode:location_derived url=https://www.kbs.edu.au/courses/bachelor-of-business-accounting
+[CATEGORY det] Bachelor of Business (Accounting) → Business & Management / Accounting
+[WARN] Bachelor of Business (Accounting) — Fee section detected but fee is blank
+✅ [PASS 100/100] Bachelor of Business (Accounting) | bachelor-of-business-accounting
+[EXTRACT] 10/36: Bachelor Of Business Marketing
+Fetching 10/36: Bachelor Of Business Marketing
+[FIELD SUMMARY] Bachelor of Business (Marketing) Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '3.0' [regex conf=0.75] Intake: ✅ "['March', 'May', 'July', 'Sept" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.50]
+[per-course vision img 6/6] https://www.kbs.edu.au/ultimate-guide-doing-mba-australia — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.kbs.edu.au/ultimate-guide-doing-mba-australia (missing: ielts_overall, intake_text, location_text)
+[FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/ultimate-guide-doing-mba-australia: duration_value, duration_unit
+[FIELD TRACE] study_mode='Online' location=None method=study_mode:rule url=https://www.kbs.edu.au/ultimate-guide-doing-mba-australia
+[CATEGORY det] The Ultimate Guide to Doing An MBA in Au → Business & Management / MBA
+[GP-DEBUG] static=226975B rendered=0B using=static text_len=11084
+[WARN] The Ultimate Guide to Doing An MBA in Au — English section detected in HTML but all scores blank
+[GP-DEBUG] text[:500]='Bachelor of Business (Marketing) COURSE CRICOS code 087660M / AQF level 7 My saved courses (0) Typical Duration / Standard Study Option 3 years/ 24 subjects/ 9 trimesters Structure / 24 subjects: 15 core + 9 electives CAREER OUTCOMES / Public relations / Advertising / Events management / E-Commerce / Digital marketing START DATE / March, May, July, September + November TAP BELOW FOR MORE INFORMATION Overview The Bachelor of Business (Marketing) is ideal if you wish to embark on a career as a mar'
+⚠️ [WARN 75/100] The Ultimate Guide to Doing An MBA in Australia — missing: english | ultimate-guide-doing-mba-australia
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null,\n "fee_term": null,\n "duration_value": 3,\n "duration_unit": "years",\n "duration_text": "3 years",\n "ielts_overall": null,\n "pte_overall": null,\n "toefl_overall": null,\n "cambridge_overall": null,\n "duolingo_overall": null,\n "sub_category": "Marketing",\n "category": "Business & Management",\n "mode": "On Campus",\n "intake_tex'
+[EXTRACT] 11/36: Graduate Certificate In Accounting
+[GEMINI] https://www.kbs.edu.au/courses/bachelor-of-business-marketin → 11 field(s) (cost=$0.000353, in=4209 out=124)
+Fetching 11/36: Graduate Certificate In Accounting
+[per-course browser ↻] https://www.kbs.edu.au/courses/bachelor-of-business-marketing
+[FIELD SUMMARY] Graduate Certificate in Accounting Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '8.0' [regex conf=0.75] Intake: ✅ "['March', 'July', 'November']" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.50]
+[per-course vision img 2/3 (cache hits 1)] https://www.kbs.edu.au/courses/bachelor-of-business-hospitality-and-tourism-management — IELTS=6.5 PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.kbs.edu.au/courses/bachelor-of-business-hospitality-and-tourism-management (missing: international_fee, domestic_fee)
+[per-course browser ✓] https://www.kbs.edu.au/courses/bachelor-of-business-management — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[VISION] 2 candidate image(s) found — starting OCR pass
+[GP-DEBUG] static=120362B rendered=0B using=static text_len=6003
+[GP-DEBUG] text[:500]='Graduate Certificate in Accounting COURSE CRICOS code 063299K / AQF level 8 My saved courses (0) Typical Duration / Standard Study Option 8 months / 4 subjects / 2 trimesters Structure / 4 subjects: 4 core CAREER OUTCOMES / Accounts clerk / Payroll officer / Bookkeeper / Budget analyst START DATE / March, July + November TAP BELOW FOR MORE INFORMATION Overview The Graduate Certificate in Accounting provides an understanding of the framework and fundamental principles of the accounting profession'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null,\n "fee_term": null,\n "duration_value": 0,\n "duration_unit": "years",\n "duration_text": "8 months",\n "ielts_overall": null,\n "pte_overall": null,\n "toefl_overall": null,\n "cambridge_overall": null,\n "duolingo_overall": null,\n "sub_category": "Accounting",\n "category": "Accounting & Finance",\n "mode": "On Campus",\n "intake_te'
+[GEMINI] https://www.kbs.edu.au/courses/graduate-certificate-in-accou → 9 field(s) (cost=$0.000259, in=2939 out=128)
+[per-course browser ↻] https://www.kbs.edu.au/courses/graduate-certificate-in-accounting
+[FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/bachelor-of-business-hospitality-and-tourism-management: duration_value, duration_unit
+[FIELD TRACE] study_mode='On Campus' location='Adelaide, Brisbane, Melbourne, Sydney, Perth, Australia' method=study_mode:location_derived url=https://www.kbs.edu.au/courses/bachelor-of-business-hospitality-and-tourism-management
+[CATEGORY det] Bachelor of Business (Hospitality and To → Hospitality, Tourism & Events / Tourism Management
+[WARN] Bachelor of Business (Hospitality and To — Fee section detected but fee is blank
+✅ [PASS 100/100] Bachelor of Business (Hospitality and Tourism Mana | bachelor-of-business-hospitality-and-tou
+[EXTRACT] 12/36: Master Of Professional Accounting
+Fetching 12/36: Master Of Professional Accounting
+[FIELD SUMMARY] Master of Professional Accounting Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '20.0' [regex conf=0.75] Intake: ✅ "['March', 'May', 'July', 'Sept" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.50]
+[per-course vision img 1/2 (cache hits 1)] https://www.kbs.edu.au/courses/bachelor-of-business-management — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.kbs.edu.au/courses/bachelor-of-business-management (missing: international_fee, domestic_fee, ielts_overall)
+[FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/bachelor-of-business-management: duration_value, duration_unit
+[FIELD TRACE] study_mode='On Campus' location='Adelaide, Melbourne, Sydney, Australia' method=study_mode:location_derived url=https://www.kbs.edu.au/courses/bachelor-of-business-management
+[WARN] Bachelor of Business (Management) — English section detected in HTML but all scores blank
+[WARN] Bachelor of Business (Management) — Fee section detected but fee is blank
+⚠️ [WARN 75/100] Bachelor of Business (Management) — missing: english | bachelor-of-business-management
+[EXTRACT] 13/36: Master Of Accounting
+Fetching 13/36: Master Of Accounting
+[FIELD SUMMARY] Master of Accounting Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '2.0' [regex conf=0.75] Intake: ✅ "['March', 'May', 'July', 'Sept" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.50]
+[GP-DEBUG] static=134994B rendered=0B using=static text_len=7024
+[GP-DEBUG] text[:500]='Master of Professional Accounting COURSE CRICOS code 063297A / AQF level 9 My saved courses (0) Typical Duration / Standard Study Option 1 year, 8 months / 12 subjects / 5 trimesters Structure / 12 subjects: 12 core CAREER OUTCOMES / Business risk manager / External auditor and assurance specialist / Financial analyst / Insolvency and reconstruction specialist START DATE / March, May, July, September + November TAP BELOW FOR MORE INFORMATION Overview The Master of Professional Accounting is an i'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null,\n "fee_term": null,\n "duration_value": 1,\n "duration_unit": "years",\n "duration_text": "1 year, 8 months",\n "ielts_overall": null,\n "pte_overall": null,\n "toefl_overall": null,\n "cambridge_overall": null,\n "duolingo_overall": null,\n "sub_category": "Professional Accounting",\n "category": "Accounting & Finance",\n "mode": "On '
+[GEMINI] https://www.kbs.edu.au/courses/master-of-professional-accoun → 11 field(s) (cost=$0.000281, in=3194 out=137)
+[per-course browser ↻] https://www.kbs.edu.au/courses/master-of-professional-accounting
+[per-course browser ✓] https://www.kbs.edu.au/courses/bachelor-of-business-marketing — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[VISION] 2 candidate image(s) found — starting OCR pass
+[GP-DEBUG] static=157258B rendered=0B using=static text_len=8715
+[GP-DEBUG] text[:500]='Master of Accounting COURSE CRICOS code 078568D / AQF level 9 My saved courses (0) Typical Duration / Standard Study Option 2 years / 16 subjects / 6 trimesters Structure / 16 subjects: 13 core + 3 electives CAREER OUTCOMES / Investigative accounting / Strategic management / Management consulting START DATE / March, May, July, September + November TAP BELOW FOR MORE INFORMATION Overview The Master of Accounting is ideal if you wish to extend your studies beyond traditional accounting to also enc'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null,\n "fee_term": null,\n "duration_value": 2,\n "duration_unit": "years",\n "duration_text": "2 years",\n "ielts_overall": null,\n "pte_overall": null,\n "toefl_overall": null,\n "cambridge_overall": null,\n "duolingo_overall": null,\n "sub_category": "Accounting",\n "category": "Accounting & Finance",\n "mode": "On Campus",\n "intake_tex'
+[GEMINI] https://www.kbs.edu.au/courses/master-of-accounting → 11 field(s) (cost=$0.000311, in=3614 out=132)
+[per-course browser ↻] https://www.kbs.edu.au/courses/master-of-accounting
+[per-course browser ✓] https://www.kbs.edu.au/courses/graduate-certificate-in-accounting — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[VISION] 2 candidate image(s) found — starting OCR pass
+[per-course vision img 1/2 (cache hits 1)] https://www.kbs.edu.au/courses/bachelor-of-business-marketing — IELTS=6.5 PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.kbs.edu.au/courses/bachelor-of-business-marketing (missing: international_fee, domestic_fee)
+[FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/bachelor-of-business-marketing: duration_value, duration_unit
+[FIELD TRACE] study_mode='On Campus' location='Adelaide, Melbourne, Sydney, Australia' method=study_mode:location_derived url=https://www.kbs.edu.au/courses/bachelor-of-business-marketing
+[CATEGORY det] Bachelor of Business (Marketing) → Business & Management / Marketing
+[WARN] Bachelor of Business (Marketing) — Fee section detected but fee is blank
+✅ [PASS 100/100] Bachelor of Business (Marketing) | bachelor-of-business-marketing
+[EXTRACT] 14/36: Graduate Certificate In Business Administration
+Fetching 14/36: Graduate Certificate In Business Administration
+[FIELD SUMMARY] Graduate Certificate in Business Administration Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '8.0' [regex conf=0.75] Intake: ✅ "['March', 'July', 'November']" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.50]
+[per-course vision img 1/2 (cache hits 1)] https://www.kbs.edu.au/courses/graduate-certificate-in-accounting — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.kbs.edu.au/courses/graduate-certificate-in-accounting (missing: international_fee, domestic_fee, ielts_overall)
+[FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/graduate-certificate-in-accounting: duration_value, duration_unit
+[FIELD TRACE] study_mode='On Campus' location='Adelaide, Brisbane, Gold Coast, Melbourne, Sydney, Perth, Australia' method=study_mode:location_derived url=https://www.kbs.edu.au/courses/graduate-certificate-in-accounting
+[CATEGORY det] Graduate Certificate in Accounting → Business & Management / Accounting
+[GP-DEBUG] static=121127B rendered=0B using=static text_len=6602
+[WARN] Graduate Certificate in Accounting — English section detected in HTML but all scores blank
+[GP-DEBUG] text[:500]='Graduate Certificate in Business Administration COURSE CRICOS code 078567E / AQF level 8 My saved courses (0) Typical Duration / Standard Study Option 8 months / 4 subjects / 2 trimesters. Structure / 4 subjects: 4 core CAREER OUTCOMES / Team leader / Marketing officer / HR consultant / Business manager START DATE / March, July + November TAP BELOW FOR MORE INFORMATION Overview Whether you are a busy professional wanting to enhance your career prospects, or have just finished your undergraduate '
+[WARN] Graduate Certificate in Accounting — Fee section detected but fee is blank
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null,\n "fee_term": null,\n "duration_value": 0.67,\n "duration_unit": "years",\n "duration_text": "8 months",\n "ielts_overall": null,\n "pte_overall": null,\n "toefl_overall": null,\n "cambridge_overall": null,\n "duolingo_overall": null,\n "sub_category": "Business Administration",\n "category": "Business & Management",\n "mode": "On Camp'
+⚠️ [WARN 75/100] Graduate Certificate in Accounting — missing: english | graduate-certificate-in-accounting
+[EXTRACT] 15/36: Graduate Diploma Of Business Administration
+[GEMINI] https://www.kbs.edu.au/courses/graduate-certificate-in-busin → 11 field(s) (cost=$0.000271, in=3092 out=132)
+[per-course browser ↻] https://www.kbs.edu.au/courses/graduate-certificate-in-business-administration
+Fetching 15/36: Graduate Diploma Of Business Administration
+[FIELD SUMMARY] Graduate Diploma of Business Administration Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '16.0' [regex conf=0.75] Intake: ✅ "['March', 'July', 'November']" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.50]
+[per-course browser ✓] https://www.kbs.edu.au/courses/master-of-professional-accounting — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[VISION] 2 candidate image(s) found — starting OCR pass
+[GP-DEBUG] static=181661B rendered=0B using=static text_len=9487
+[GP-DEBUG] text[:500]='Graduate Diploma of Business Administration COURSE CRICOS code 078566F / AQF level 8 My saved courses (0) Typical Duration / Standard Study Option 1 year, 4 months / 8 subjects / 4 trimesters Structure / 8 subjects: 6 core + 2 electives CAREER OUTCOMES / Operations manager / Corporate strategist / Administration manager / Corporate leader START DATE / March, July + November TAP BELOW FOR MORE INFORMATION Overview The Graduate Diploma of Business Administration builds upon the Graduate Certificat'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null,\n "fee_term": null,\n "duration_value": 1,\n "duration_unit": "years",\n "duration_text": "1 year, 4 months",\n "ielts_overall": null,\n "pte_overall": null,\n "toefl_overall": null,\n "cambridge_overall": null,\n "duolingo_overall": null,\n "sub_category": "Business Administration",\n "category": "Business & Management",\n "mode": "On'
+[GEMINI] https://www.kbs.edu.au/courses/graduate-diploma-of-business- → 11 field(s) (cost=$0.000326, in=3813 out=133)
+[per-course browser ↻] https://www.kbs.edu.au/courses/graduate-diploma-of-business-administration
+[per-course vision img 1/2 (cache hits 1)] https://www.kbs.edu.au/courses/master-of-professional-accounting — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.kbs.edu.au/courses/master-of-professional-accounting (missing: international_fee, domestic_fee, ielts_overall)
+[FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/master-of-professional-accounting: duration_value, duration_unit
+[FIELD TRACE] study_mode='On Campus' location='Adelaide, Brisbane, Gold Coast, Melbourne, Sydney, Perth, Australia' method=study_mode:location_derived url=https://www.kbs.edu.au/courses/master-of-professional-accounting
+[CATEGORY det] Master of Professional Accounting → Business & Management / Accounting
+[WARN] Master of Professional Accounting — English section detected in HTML but all scores blank
+[WARN] Master of Professional Accounting — Fee section detected but fee is blank
+[NULLIFIED] Master of Professional Accounting — duration 20.0 year (20.0 yrs) exceeds sanity limit; cleared
+❌ [LOW 55/100] Master of Professional Accounting — missing: english, duration | master-of-professional-accounting
+[EXTRACT] 16/36: Graduate Certificate In Business Analytics
+Fetching 16/36: Graduate Certificate In Business Analytics
+[FIELD SUMMARY] Graduate Certificate in Business Analytics Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '8.0' [regex conf=0.75] Intake: ✅ "['March', 'July', 'November']" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.50]
+[GP-DEBUG] static=134431B rendered=0B using=static text_len=7140
+[GP-DEBUG] text[:500]='Graduate Certificate in Business Analytics COURSE CRICOS code 0100431 / AQF level 8 My saved courses (0) Typical Duration / Standard Study Option 8 months / 2 trimesters Structure / 4 subjects: 3 core + 1 elective CAREER OUTCOMES / Business supervisor / Project officer / Communications consultant / Information systems operator START DATE / March, July + November TAP BELOW FOR MORE INFORMATION Overview The Graduate Certificate in Business Analytics is suitable for students already employed in bus'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null,\n "fee_term": null,\n "duration_value": 0.6666666666666666,\n "duration_unit": "years",\n "duration_text": "8 months",\n "ielts_overall": null,\n "pte_overall": null,\n "toefl_overall": null,\n "cambridge_overall": null,\n "duolingo_overall": null,\n "sub_category": "Business Analytics",\n "category": "Business & Management",\n "mode":'
+[GEMINI] https://www.kbs.edu.au/courses/graduate-certificate-in-busin → 11 field(s) (cost=$0.000282, in=3226 out=134)
+[per-course browser ↻] https://www.kbs.edu.au/courses/graduate-certificate-in-business-analytics
+[per-course browser ✓] https://www.kbs.edu.au/courses/graduate-certificate-in-business-analytics — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[VISION] 2 candidate image(s) found — starting OCR pass
+[per-course vision img 1/2 (cache hits 1)] https://www.kbs.edu.au/courses/graduate-certificate-in-business-analytics — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.kbs.edu.au/courses/graduate-certificate-in-business-analytics (missing: international_fee, domestic_fee, ielts_overall)
+[FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/graduate-certificate-in-business-analytics: duration_value, duration_unit
+[FIELD TRACE] study_mode='On Campus' location='Adelaide, Brisbane, Gold Coast, Melbourne, Perth, Sydney, Australia' method=study_mode:location_derived url=https://www.kbs.edu.au/courses/graduate-certificate-in-business-analytics
+[CATEGORY det] Graduate Certificate in Business Analyti → Business & Management / Business Analytics
+[WARN] Graduate Certificate in Business Analyti — English section detected in HTML but all scores blank
+[WARN] Graduate Certificate in Business Analyti — Fee section detected but fee is blank
+⚠️ [WARN 75/100] Graduate Certificate in Business Analytics — missing: english | graduate-certificate-in-business-analyti
+[EXTRACT] 17/36: Graduate Diploma Of Business Analytics
+Fetching 17/36: Graduate Diploma Of Business Analytics
+[FIELD SUMMARY] Graduate Diploma of Business Analytics Fee: ❌ not found IELTS: ❌ not found Duration: ❌ not found Intake: ✅ "['March', 'July', 'November']" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.50]
+[GP-DEBUG] static=137992B rendered=0B using=static text_len=7565
+[GP-DEBUG] text[:500]='Graduate Diploma of Business Analytics COURSE CRICOS code 0100429 / AQF level 8 My saved courses (0) Typical Duration / Standard Study Option 1 year / 3 trimesters An accelerated study option is available depending on subject options. Structure / 8 subjects: 6 core + 2 electives CAREER OUTCOMES / Business insights adviser / Service desk operator / Commercial analyst / Process improvement consultant START DATE / March, July + November TAP BELOW FOR MORE INFORMATION Overview The Graduate Diploma o'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null,\n "fee_term": null,\n "duration_value": 1,\n "duration_unit": "years",\n "duration_text": "1 year",\n "ielts_overall": null,\n "pte_overall": null,\n "toefl_overall": null,\n "cambridge_overall": null,\n "duolingo_overall": null,\n "sub_category": "Business Analytics",\n "category": "Business & Management",\n "mode": "On Campus",\n "in'
+[GEMINI] https://www.kbs.edu.au/courses/graduate-diploma-of-business- → 11 field(s) (cost=$0.000289, in=3331 out=130)
+[per-course browser ↻] https://www.kbs.edu.au/courses/graduate-diploma-of-business-analytics
+[per-course browser ✓] https://www.kbs.edu.au/courses/master-of-accounting — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[VISION] 2 candidate image(s) found — starting OCR pass
+[per-course vision img 1/2 (cache hits 1)] https://www.kbs.edu.au/courses/master-of-accounting — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.kbs.edu.au/courses/master-of-accounting (missing: international_fee, domestic_fee, ielts_overall)
+[FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/master-of-accounting: duration_value, duration_unit
+[FIELD TRACE] study_mode='On Campus' location='Adelaide, Brisbane, Gold Coast, Melbourne, Sydney, Perth, Australia' method=study_mode:location_derived url=https://www.kbs.edu.au/courses/master-of-accounting
+[CATEGORY det] Master of Accounting → Business & Management / Accounting
+[WARN] Master of Accounting — English section detected in HTML but all scores blank
+[WARN] Master of Accounting — Fee section detected but fee is blank
+⚠️ [WARN 75/100] Master of Accounting — missing: english | master-of-accounting
+[EXTRACT] 18/36: Master Of Business Analytics
+Fetching 18/36: Master Of Business Analytics
+[FIELD SUMMARY] Master of Business Analytics Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '20.0' [regex conf=0.75] Intake: ✅ "['March', 'May', 'July', 'Sept" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.50]
+[GP-DEBUG] static=140609B rendered=0B using=static text_len=7816
+[GP-DEBUG] text[:500]='Master of Business Analytics COURSE CRICOS code 0100427 / AQF level 9 My saved courses (0) Typical Duration / Standard Study Option 1 year, 8 months / 5 trimesters Structure / 12 subjects: 9 core + 3 electives CAREER OUTCOMES / Business analyst / Social media specialist / Reporting analyst / Business consultant START DATE / March, May, July, September + November TAP BELOW FOR MORE INFORMATION Overview The Master of Business Analytics is for students who have an objective to become genuine specia'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null,\n "fee_term": null,\n "duration_value": 1,\n "duration_unit": "years",\n "duration_text": "1 year, 8 months",\n "ielts_overall": null,\n "pte_overall": null,\n "toefl_overall": null,\n "cambridge_overall": null,\n "duolingo_overall": null,\n "sub_category": "Business Analytics",\n "category": "Business & Management",\n "mode": "On Camp'
+[GEMINI] https://www.kbs.edu.au/courses/master-of-business-analytics → 11 field(s) (cost=$0.000295, in=3391 out=136)
+[per-course browser ↻] https://www.kbs.edu.au/courses/master-of-business-analytics
+[per-course browser ✓] https://www.kbs.edu.au/courses/graduate-certificate-in-business-administration — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[VISION] 2 candidate image(s) found — starting OCR pass
+[per-course vision img 0/2 (cache hits 2)] https://www.kbs.edu.au/courses/graduate-certificate-in-business-administration — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.kbs.edu.au/courses/graduate-certificate-in-business-administration (missing: international_fee, domestic_fee, ielts_overall)
+[FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/graduate-certificate-in-business-administration: duration_value, duration_unit
+[FIELD TRACE] study_mode='On Campus' location='Adelaide, Brisbane, Gold Coast, Melbourne, Perth, Sydney, Australia' method=study_mode:location_derived url=https://www.kbs.edu.au/courses/graduate-certificate-in-business-administration
+[WARN] Graduate Certificate in Business Adminis — English section detected in HTML but all scores blank
+[WARN] Graduate Certificate in Business Adminis — Fee section detected but fee is blank
+⚠️ [WARN 75/100] Graduate Certificate in Business Administration — missing: english | graduate-certificate-in-business-adminis
+[EXTRACT] 19/36: Master Of Business Analytics Extension
+Fetching 19/36: Master Of Business Analytics Extension
+[FIELD SUMMARY] Master of Business Analytics (Extension) Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '2.0' [regex conf=0.75] Intake: ✅ "['March', 'May', 'July', 'Sept" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.50]
+[per-course browser ✓] https://www.kbs.edu.au/courses/graduate-diploma-of-business-administration — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[VISION] 2 candidate image(s) found — starting OCR pass
+[GP-DEBUG] static=162484B rendered=0B using=static text_len=9291
+[GP-DEBUG] text[:500]='Master of Business Analytics (Extension) COURSE CRICOS code 0100426 / AQF level 9 My saved courses (0) Typical Duration / Standard Study Option 2 years / 6 trimesters Structure / 15 subjects: 13 core + 2 electives CAREER OUTCOMES / Business analytics team leader / Social media manager / Corporate reporting supervisor / Management consultant START DATE / March, May, July, September + November TAP BELOW FOR MORE INFORMATION Overview The Master of Business Analytics (Extension) is designed for stud'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null,\n "fee_term": null,\n "duration_value": 2,\n "duration_unit": "years",\n "duration_text": "2 years / 6 trimesters",\n "ielts_overall": null,\n "pte_overall": null,\n "toefl_overall": null,\n "cambridge_overall": null,\n "duolingo_overall": null,\n "sub_category": "Business Analytics",\n "category": "Business & Management",\n "mode": "O'
+[GEMINI] https://www.kbs.edu.au/courses/master-of-business-analytics- → 11 field(s) (cost=$0.000324, in=3762 out=138)
+[per-course browser ↻] https://www.kbs.edu.au/courses/master-of-business-analytics-extension
+[per-course vision img 1/2 (cache hits 1)] https://www.kbs.edu.au/courses/graduate-diploma-of-business-administration — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.kbs.edu.au/courses/graduate-diploma-of-business-administration (missing: international_fee, domestic_fee, ielts_overall)
+[per-course browser ✓] https://www.kbs.edu.au/courses/master-of-business-analytics — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[VISION] 3 candidate image(s) found — starting OCR pass
+[FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/graduate-diploma-of-business-administration: duration_value, duration_unit
+[FIELD TRACE] study_mode='On Campus' location='Adelaide, Brisbane, Gold Coast, Melbourne, Perth, Sydney, Australia' method=study_mode:location_derived url=https://www.kbs.edu.au/courses/graduate-diploma-of-business-administration
+[WARN] Graduate Diploma of Business Administrat — English section detected in HTML but all scores blank
+[WARN] Graduate Diploma of Business Administrat — Fee section detected but fee is blank
+[NULLIFIED] Graduate Diploma of Business Administrat — duration 16.0 year (16.0 yrs) exceeds sanity limit; cleared
+❌ [LOW 55/100] Graduate Diploma of Business Administration — missing: english, duration | graduate-diploma-of-business-administrat
+[EXTRACT] 20/36: Digital Management
+Fetching 20/36: Digital Management
+[FIELD SUMMARY] MBA – Digital Management Fee: ❌ not found IELTS: ❌ not found Duration: ❌ not found Intake: ✅ "['March', 'May', 'July', 'Sept" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.50]
+[GP-DEBUG] static=186611B rendered=0B using=static text_len=9346
+[GP-DEBUG] text[:500]='MBA – (Digital Management) COURSE CRICOS code 078565G / AQF level 9 My saved courses (0) Typical Duration / Standard Study Option 2 years / 12 subjects / 6 trimesters An accelerated study option is available depending on subject options. Structure / 12 subjects: 6 core + 3 electives (any level) + 3 electives (Level 600) CAREER OUTCOMES / Marketing consultant / Information resources manager / Business analyst START DATE / March, May, July, September + November TAP BELOW FOR MORE INFORMATION Overv'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null,\n "fee_term": null,\n "duration_value": 2,\n "duration_unit": "years",\n "duration_text": "2 years",\n "ielts_overall": null,\n "pte_overall": null,\n "toefl_overall": null,\n "cambridge_overall": null,\n "duolingo_overall": null,\n "sub_category": "Digital Management",\n "category": "Business & Management",\n "mode": "On Campus",\n "i'
+[GEMINI] https://www.kbs.edu.au/courses/mba-master-of-business-admini → 11 field(s) (cost=$0.000324, in=3781 out=134)
+[per-course browser ↻] https://www.kbs.edu.au/courses/mba-master-of-business-administration/digital-management
+[per-course vision img 2/3 (cache hits 1)] https://www.kbs.edu.au/courses/master-of-business-analytics — IELTS=7.0 PTE=65.0 TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.kbs.edu.au/courses/master-of-business-analytics (missing: international_fee, domestic_fee)
+[FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/master-of-business-analytics: duration_value, duration_unit
+[FIELD TRACE] study_mode='On Campus' location='Adelaide, Brisbane, Gold Coast, Melbourne, Perth, Sydney, Australia' method=study_mode:location_derived url=https://www.kbs.edu.au/courses/master-of-business-analytics
+[CATEGORY det] Master of Business Analytics → Business & Management / Business Analytics
+[WARN] Master of Business Analytics — Fee section detected but fee is blank
+[NULLIFIED] Master of Business Analytics — duration 20.0 year (20.0 yrs) exceeds sanity limit; cleared
+✅ [PASS 80/100] Master of Business Analytics — missing: duration | master-of-business-analytics
+[EXTRACT] 21/36: Health Services Management
+Fetching 21/36: Health Services Management
+[FIELD SUMMARY] MBA – Health Services Management Fee: ❌ not found IELTS: ❌ not found Duration: ❌ not found Intake: ✅ "['March', 'May', 'July', 'Sept" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.50]
+[GP-DEBUG] static=186382B rendered=0B using=static text_len=9009
+[GP-DEBUG] text[:500]='MBA – (Health Services Management) COURSE CRICOS code 078565G / AQF level 9 My saved courses (0) Typical Duration / Standard Study Option 2 years / 12 subjects / 6 trimesters An accelerated study option is available depending on subject options. Structure / 12 subjects: 6 core + 6 electives CAREER OUTCOMES / Nursing manager / Practice manager / Health care administrator START DATE / March, May, July, September + November TAP BELOW FOR MORE INFORMATION Overview The Master of Business Administrati'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null,\n "fee_term": null,\n "duration_value": 2,\n "duration_unit": "years",\n "duration_text": "2 years",\n "ielts_overall": null,\n "pte_overall": null,\n "toefl_overall": null,\n "cambridge_overall": null,\n "duolingo_overall": null,\n "sub_category": "Health Services Management",\n "category": "Business & Management",\n "mode": "On Campu'
+[GEMINI] https://www.kbs.edu.au/courses/mba-master-of-business-admini → 11 field(s) (cost=$0.000318, in=3698 out=136)
+[per-course browser ↻] https://www.kbs.edu.au/courses/mba-master-of-business-administration/health-services-management
+[per-course browser ✓] https://www.kbs.edu.au/courses/mba-master-of-business-administration/digital-management — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[VISION] 3 candidate image(s) found — starting OCR pass
+[VISION FAIL] https://www.kbs.edu.au/sites/default/files/2022-09/course-structure-di: Gemini skipped — None (likely quota exhausted)
+[per-course browser ✓] https://www.kbs.edu.au/courses/graduate-diploma-of-business-analytics — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[VISION] 2 candidate image(s) found — starting OCR pass
+[per-course vision img 2/3 (cache hits 1)] https://www.kbs.edu.au/courses/mba-master-of-business-administration/digital-management — IELTS=6.5 PTE=58.0 TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.kbs.edu.au/courses/mba-master-of-business-administration/digital-management (missing: international_fee, domestic_fee)
+[FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/mba-master-of-business-administration/digital-management: duration_value, duration_unit
+[FIELD TRACE] study_mode='On Campus' location='Adelaide / Brisbane / Gold Coast / Melbourne / Perth / Sydney /' method=study_mode:location_derived url=https://www.kbs.edu.au/courses/mba-master-of-business-administration/digital-management
+[CATEGORY det] MBA – Digital Management → Business & Management / MBA
+[WARN] MBA – Digital Management — Fee section detected but fee is blank
+✅ [PASS 100/100] MBA – Digital Management | digital-management
+[EXTRACT] 22/36: International Leadership
+Fetching 22/36: International Leadership
+[FIELD SUMMARY] MBA – International Leadership Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '2.0' [regex conf=0.75] Intake: ✅ "['March', 'May', 'July', 'Sept" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.50]
+[per-course vision img 1/2 (cache hits 1)] https://www.kbs.edu.au/courses/graduate-diploma-of-business-analytics — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.kbs.edu.au/courses/graduate-diploma-of-business-analytics (missing: international_fee, domestic_fee, ielts_overall)
+[FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/graduate-diploma-of-business-analytics: duration_value, duration_unit
+[FIELD TRACE] study_mode='On Campus' location='Adelaide, Brisbane, Gold Coast, Melbourne, Perth, Sydney, Australia' method=study_mode:location_derived url=https://www.kbs.edu.au/courses/graduate-diploma-of-business-analytics
+[CATEGORY det] Graduate Diploma of Business Analytics → Business & Management / Business Analytics
+[WARN] Graduate Diploma of Business Analytics — English section detected in HTML but all scores blank
+[WARN] Graduate Diploma of Business Analytics — Fee section detected but fee is blank
+⚠️ [WARN 75/100] Graduate Diploma of Business Analytics — missing: english | graduate-diploma-of-business-analytics
+[EXTRACT] 23/36: Project Management
+Fetching 23/36: Project Management
+[FIELD SUMMARY] MBA – Project Management Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '2.0' [regex conf=0.75] Intake: ✅ "['March', 'May', 'July', 'Sept" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.50]
+[GP-DEBUG] static=186413B rendered=0B using=static text_len=9035
+[GP-DEBUG] text[:500]='MBA – (International Leadership) COURSE CRICOS code 078565G / AQF level 9 My saved courses (0) Typical Duration / Standard Study Option 2 years / 12 subjects / 6 trimesters Structure / 12 subjects: 6 core + 6 electives CAREER OUTCOMES / Global director of strategy / Remote/Virtual Leader / Change manager START DATE / March, May, July, September + November TAP BELOW FOR MORE INFORMATION Overview The Master of Business Administration (MBA) is widely regarded as the preferred qualification for prof'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null,\n "fee_term": null,\n "duration_value": 2,\n "duration_unit": "years",\n "duration_text": "2 years",\n "ielts_overall": null,\n "pte_overall": null,\n "toefl_overall": null,\n "cambridge_overall": null,\n "duolingo_overall": null,\n "sub_category": "International Leadership",\n "category": "Business & Management",\n "mode": "On Campus"'
+[GEMINI] https://www.kbs.edu.au/courses/mba-master-of-business-admini → 11 field(s) (cost=$0.000318, in=3704 out=135)
+[per-course browser ↻] https://www.kbs.edu.au/courses/mba-master-of-business-administration/international-leadership
+[GP-DEBUG] static=186362B rendered=0B using=static text_len=9106
+[GP-DEBUG] text[:500]='MBA – (Project Management) COURSE CRICOS code 078565G / AQF level 9 My saved courses (0) Typical Duration / Standard Study Option 2 years / 12 subjects / 6 trimesters Structure / 12 subjects: 6 core + 6 electives CAREER OUTCOMES / Risk consultant / Project manager / Implementation manager START DATE / March, May, July, September + November TAP BELOW FOR MORE INFORMATION Overview The Master of Business Administration (MBA) is widely regarded as the preferred qualification for professionals wantin'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null,\n "fee_term": null,\n "duration_value": 2,\n "duration_unit": "years",\n "duration_text": "2 years",\n "ielts_overall": null,\n "pte_overall": null,\n "toefl_overall": null,\n "cambridge_overall": null,\n "duolingo_overall": null,\n "sub_category": "Project Management",\n "category": "Business & Management",\n "mode": "On Campus",\n "i'
+[GEMINI] https://www.kbs.edu.au/courses/mba-master-of-business-admini → 11 field(s) (cost=$0.000319, in=3721 out=134)
+[per-course browser ↻] https://www.kbs.edu.au/courses/mba-master-of-business-administration/project-management
+[per-course browser ✓] https://www.kbs.edu.au/courses/master-of-business-analytics-extension — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[VISION] 3 candidate image(s) found — starting OCR pass
+[per-course browser ✓] https://www.kbs.edu.au/courses/mba-master-of-business-administration/project-management — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[VISION] 2 candidate image(s) found — starting OCR pass
+[per-course vision img 2/3 (cache hits 1)] https://www.kbs.edu.au/courses/master-of-business-analytics-extension — IELTS=6.5 PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.kbs.edu.au/courses/master-of-business-analytics-extension (missing: international_fee, domestic_fee)
+[VISION FAIL] https://www.kbs.edu.au/sites/default/files/2022-09/course-structure-di: Gemini skipped — None (likely quota exhausted)
+[per-course vision img 1/2 (cache hits 1)] https://www.kbs.edu.au/courses/mba-master-of-business-administration/project-management — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.kbs.edu.au/courses/mba-master-of-business-administration/project-management (missing: international_fee, domestic_fee, ielts_overall)
+[FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/master-of-business-analytics-extension: duration_value, duration_unit
+[FIELD TRACE] study_mode='On Campus' location='Adelaide, Brisbane, Gold Coast, Melbourne, Perth, Sydney, Australia' method=study_mode:location_derived url=https://www.kbs.edu.au/courses/master-of-business-analytics-extension
+[CATEGORY det] Master of Business Analytics (Extension) → Business & Management / Business Analytics
+[WARN] Master of Business Analytics (Extension) — Fee section detected but fee is blank
+✅ [PASS 100/100] Master of Business Analytics (Extension) | master-of-business-analytics-extension
+[EXTRACT] 24/36: Tourism And Hospitality Leadership
+Fetching 24/36: Tourism And Hospitality Leadership
+[FIELD SUMMARY] MBA – Tourism and Hospitality Leadership Fee: ❌ not found IELTS: ❌ not found Duration: ❌ not found Intake: ✅ "['March', 'May', 'July', 'Sept" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.50]
+[FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/mba-master-of-business-administration/project-management: duration_value, duration_unit
+[FIELD TRACE] study_mode='On Campus' location='Adelaide / Brisbane / Gold Coast / Melbourne / Perth / Sydney /' method=study_mode:location_derived url=https://www.kbs.edu.au/courses/mba-master-of-business-administration/project-management
+[CATEGORY det] MBA – Project Management → Business & Management / MBA
+[WARN] MBA – Project Management — English section detected in HTML but all scores blank
+[WARN] MBA – Project Management — Fee section detected but fee is blank
+⚠️ [WARN 75/100] MBA – Project Management — missing: english | project-management
+[EXTRACT] 25/36: Women In Leadership
+Fetching 25/36: Women In Leadership
+[FIELD SUMMARY] MBA – (Women in Leadership) Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '2.0' [regex conf=0.75] Intake: ✅ "['March', 'May', 'July', 'Sept" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.50]
+[GP-DEBUG] static=186187B rendered=0B using=static text_len=8869
+[GP-DEBUG] text[:500]='MBA – (Tourism and Hospitality Leadership) COURSE CRICOS code 078565G / AQF level 9 My saved courses (0) Typical Duration / Standard Study Option 2 years / 12 subjects / 6 trimesters An accelerated study option is available depending on subject options. Structure / 12 subjects: 6 core + 6 electives CAREER OUTCOMES / Tourism executive / Hotel general manager / Events planner START DATE / March, May, July, September + November TAP BELOW FOR MORE INFORMATION Overview The Master of Business Administ'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null,\n "fee_term": null,\n "duration_value": 2,\n "duration_unit": "years",\n "duration_text": "2 years",\n "ielts_overall": null,\n "pte_overall": null,\n "toefl_overall": null,\n "cambridge_overall": null,\n "duolingo_overall": null,\n "sub_category": "Tourism and Hospitality Leadership",\n "category": "Business & Management",\n "mode": "'
+[GEMINI] https://www.kbs.edu.au/courses/mba-master-of-business-admini → 11 field(s) (cost=$0.000316, in=3665 out=138)
+[per-course browser ↻] https://www.kbs.edu.au/courses/mba-master-of-business-administration/tourism-and-hospitality-leadership
+[GP-DEBUG] static=186350B rendered=0B using=static text_len=9139
+[GP-DEBUG] text[:500]='MBA – (Women In Leadership) COURSE CRICOS code 078565G / AQF level 9 My saved courses (0) Typical Duration / Standard Study Option 2 years / 12 subjects / 6 trimesters Structure / 12 subjects: 6 core + 6 electives CAREER OUTCOMES / Corporate leader / Diversity manager / Executive coach START DATE / March, May, July, September + November TAP BELOW FOR MORE INFORMATION Overview The Master of Business Administration (MBA) is widely regarded as the preferred qualification for professionals wanting t'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null,\n "fee_term": null,\n "duration_value": 2,\n "duration_unit": "years",\n "duration_text": "2 years",\n "ielts_overall": null,\n "pte_overall": null,\n "toefl_overall": null,\n "cambridge_overall": null,\n "duolingo_overall": null,\n "sub_category": "Women In Leadership",\n "category": "Business & Management",\n "mode": "On Campus",\n "'
+[GEMINI] https://www.kbs.edu.au/courses/mba-master-of-business-admini → 11 field(s) (cost=$0.000320, in=3729 out=134)
+[per-course browser ↻] https://www.kbs.edu.au/courses/mba-master-of-business-administration/women-in-leadership
+[per-course browser ✓] https://www.kbs.edu.au/courses/mba-master-of-business-administration/health-services-management — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[VISION] 4 candidate image(s) found — starting OCR pass
+[per-course browser ✓] https://www.kbs.edu.au/courses/mba-master-of-business-administration/tourism-and-hospitality-leadership — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[VISION] 2 candidate image(s) found — starting OCR pass
+[per-course vision img 0/2 (cache hits 2)] https://www.kbs.edu.au/courses/mba-master-of-business-administration/tourism-and-hospitality-leadership — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.kbs.edu.au/courses/mba-master-of-business-administration/tourism-and-hospitality-leadership (missing: international_fee, domestic_fee, ielts_overall)
+[FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/mba-master-of-business-administration/tourism-and-hospitality-leadership: duration_value, duration_unit
+[FIELD TRACE] study_mode='On Campus' location='Adelaide / Brisbane / Gold Coast / Melbourne / Perth / Sydney /' method=study_mode:location_derived url=https://www.kbs.edu.au/courses/mba-master-of-business-administration/tourism-and-hospitality-leadership
+[CATEGORY det] MBA – Tourism and Hospitality Leadership → Hospitality, Tourism & Events / Tourism Management
+[WARN] MBA – Tourism and Hospitality Leadership — English section detected in HTML but all scores blank
+[WARN] MBA – Tourism and Hospitality Leadership — Fee section detected but fee is blank
+⚠️ [WARN 75/100] MBA – Tourism and Hospitality Leadership — missing: english | tourism-and-hospitality-leadership
+[EXTRACT] 26/36: Data Driven Leadership
+Fetching 26/36: Data Driven Leadership
+[FIELD SUMMARY] MBA – Data-driven Leadership Fee: ❌ not found IELTS: ❌ not found Duration: ❌ not found Intake: ✅ "['March', 'May', 'July', 'Sept" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.50]
+[per-course vision img 3/4 (cache hits 1)] https://www.kbs.edu.au/courses/mba-master-of-business-administration/health-services-management — IELTS=6.5 PTE=62.0 TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.kbs.edu.au/courses/mba-master-of-business-administration/health-services-management (missing: international_fee, domestic_fee)
+[per-course browser ✓] https://www.kbs.edu.au/courses/mba-master-of-business-administration/women-in-leadership — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[VISION] 3 candidate image(s) found — starting OCR pass
+[GP-DEBUG] static=186869B rendered=0B using=static text_len=9026
+[FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/mba-master-of-business-administration/health-services-management: duration_value, duration_unit
+[GP-DEBUG] text[:500]='MBA – (Data-driven Leadership) COURSE CRICOS code 078565G / AQF level 9 My saved courses (0) Typical Duration / Standard Study Option 2 years / 12 subjects / 6 trimesters An accelerated study option is available depending on subject options. Structure / 12 subjects: 6 core + 6 electives CAREER OUTCOMES / Management consultant / Data strategist / Corporate reporting manager / Research consultant / Design thinking catalyst START DATE / March, May, July, September + November TAP BELOW FOR MORE INFO'
+[FIELD TRACE] study_mode='On Campus' location='Adelaide / Brisbane / Gold Coast / Melbourne / Perth / Sydney /' method=study_mode:location_derived url=https://www.kbs.edu.au/courses/mba-master-of-business-administration/health-services-management
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null,\n "fee_term": null,\n "duration_value": 2,\n "duration_unit": "years",\n "duration_text": "2 years",\n "ielts_overall": null,\n "pte_overall": null,\n "toefl_overall": null,\n "cambridge_overall": null,\n "duolingo_overall": null,\n "sub_category": "Data-driven Leadership",\n "category": "Business & Management",\n "mode": "On Campus",\n'
+[CATEGORY det] MBA – Health Services Management → Business & Management / MBA
+[GEMINI] https://www.kbs.edu.au/courses/mba-master-of-business-admini → 11 field(s) (cost=$0.000318, in=3702 out=135)
+[WARN] MBA – Health Services Management — Fee section detected but fee is blank
+[per-course browser ↻] https://www.kbs.edu.au/courses/mba-master-of-business-administration/data-driven-leadership
+✅ [PASS 100/100] MBA – Health Services Management | health-services-management
+[EXTRACT] 27/36: Bachelor Of Information Technology
+Fetching 27/36: Bachelor Of Information Technology
+[FIELD SUMMARY] Bachelor of Information Technology Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '3.0' [regex conf=0.75] Intake: ✅ "['March', 'May', 'July', 'Sept" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.50]
+[per-course vision img 1/3 (cache hits 2)] https://www.kbs.edu.au/courses/mba-master-of-business-administration/women-in-leadership — IELTS=6.5 PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.kbs.edu.au/courses/mba-master-of-business-administration/women-in-leadership (missing: international_fee, domestic_fee)
+[FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/mba-master-of-business-administration/women-in-leadership: duration_value, duration_unit
+[FIELD TRACE] study_mode='On Campus' location='Adelaide / Brisbane / Gold Coast / Melbourne / Perth / Sydney /' method=study_mode:location_derived url=https://www.kbs.edu.au/courses/mba-master-of-business-administration/women-in-leadership
+[CATEGORY det] MBA – (Women in Leadership) → Business & Management / MBA
+[WARN] MBA – (Women in Leadership) — Fee section detected but fee is blank
+✅ [PASS 100/100] MBA – (Women in Leadership) | women-in-leadership
+[EXTRACT] 28/36: Diploma Of Information Technology
+Fetching 28/36: Diploma Of Information Technology
+[GP-DEBUG] static=165561B rendered=0B using=static text_len=8529
+[GP-DEBUG] text[:500]='Bachelor of Information Technology COURSE CRICOS code 110277M / AQF level 7 My saved courses (0) Typical Duration / Standard Study Option 3 years/ 24 subjects/ 9 trimesters Structure / 24 subjects: 10 core + 7 IT electives + 7 IT or Business electives CAREER OUTCOMES / Network Analyst / Web Designer / Cyber Intelligence Specialist / Programmer START DATE / March, May, July, September + November TAP BELOW FOR MORE INFORMATION Overview The Bachelor of Information Technology will help students achi'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null,\n "fee_term": null,\n "duration_value": 3,\n "duration_unit": "years",\n "duration_text": "3 years",\n "ielts_overall": null,\n "pte_overall": null,\n "toefl_overall": null,\n "cambridge_overall": null,\n "duolingo_overall": null,\n "sub_category": "Information Technology",\n "category": "Computer Science & IT",\n "mode": "On Campus",\n'
+[GEMINI] https://www.kbs.edu.au/courses/bachelor-of-information-techn → 11 field(s) (cost=$0.000307, in=3571 out=132)
+[per-course browser ↻] https://www.kbs.edu.au/courses/bachelor-of-information-technology
+[FIELD SUMMARY] Diploma of Information Technology Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '1.0' [regex conf=0.75] Intake: ✅ "['March', 'July', 'November']" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.50]
+[per-course browser ✓] https://www.kbs.edu.au/courses/mba-master-of-business-administration/international-leadership — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[VISION] 3 candidate image(s) found — starting OCR pass
+[GP-DEBUG] static=127309B rendered=0B using=static text_len=6200
+[GP-DEBUG] text[:500]='Diploma of Information Technology COURSE CRICOS code 110279J / AQF level 5 My saved courses (0) Typical Duration / Standard Study Option 1 year/ 8 subjects/ 3 trimesters Structure / 8 subjects: 8 core CAREER OUTCOMES / IT Support Operator / Computer Service Technician / IT Trainer / Helpdesk Assistant START DATE / March, July + November TAP BELOW FOR MORE INFORMATION Overview The Diploma of Information Technology is suitable for students who would like to understand and leverage a range of techn'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null,\n "fee_term": null,\n "duration_value": 1,\n "duration_unit": "years",\n "duration_text": "1 year",\n "ielts_overall": null,\n "pte_overall": null,\n "toefl_overall": null,\n "cambridge_overall": null,\n "duolingo_overall": null,\n "sub_category": "Information Technology",\n "category": "Computer Science & IT",\n "mode": "On Campus",\n '
+[GEMINI] https://www.kbs.edu.au/courses/diploma-of-information-techno → 11 field(s) (cost=$0.000262, in=2988 out=128)
+[per-course browser ↻] https://www.kbs.edu.au/courses/diploma-of-information-technology
+[per-course vision img 1/3 (cache hits 2)] https://www.kbs.edu.au/courses/mba-master-of-business-administration/international-leadership — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.kbs.edu.au/courses/mba-master-of-business-administration/international-leadership (missing: international_fee, domestic_fee, ielts_overall)
+[FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/mba-master-of-business-administration/international-leadership: duration_value, duration_unit
+[FIELD TRACE] study_mode='On Campus' location='Adelaide / Brisbane / Gold Coast / Melbourne / Perth / Sydney /' method=study_mode:location_derived url=https://www.kbs.edu.au/courses/mba-master-of-business-administration/international-leadership
+[CATEGORY det] MBA – International Leadership → Business & Management / MBA
+[WARN] MBA – International Leadership — English section detected in HTML but all scores blank
+[WARN] MBA – International Leadership — Fee section detected but fee is blank
+⚠️ [WARN 75/100] MBA – International Leadership — missing: english | international-leadership
+[EXTRACT] 29/36: Master Of Information Technology
+Fetching 29/36: Master Of Information Technology
+[FIELD SUMMARY] Master of Information Technology Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '20.0' [regex conf=0.75] Intake: ✅ "['March', 'July', 'September'," [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.50]
+[GP-DEBUG] static=153104B rendered=0B using=static text_len=8649
+[GP-DEBUG] text[:500]='Master of Information Technology COURSE CRICOS code 110274C / AQF level 9 My saved courses (0) Typical Duration / Standard Study Option 1 year, 8 months / 12 subjects / 5 trimesters Structure / 12 subjects / 9 core + 3 IT electives CAREER OUTCOMES / Systems Analyst / Web Administrator / Blockchain Developer / Software Engineer START DATE / March, July, September + November TAP BELOW FOR MORE INFORMATION Overview The Master of Information Technology is suitable for students who want to develop th'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null,\n "fee_term": null,\n "duration_value": 2,\n "duration_unit": "years",\n "duration_text": "1 year, 8 months",\n "ielts_overall": null,\n "pte_overall": null,\n "toefl_overall": null,\n "cambridge_overall": null,\n "duolingo_overall": null,\n "sub_category": "Information Technology",\n "category": "Computer Science & IT",\n "mode": "On '
+[GEMINI] https://www.kbs.edu.au/courses/master-of-information-technol → 11 field(s) (cost=$0.000311, in=3600 out=136)
+[per-course browser ↻] https://www.kbs.edu.au/courses/master-of-information-technology
+[per-course browser ✓] https://www.kbs.edu.au/courses/diploma-of-information-technology — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[VISION] 3 candidate image(s) found — starting OCR pass
+[per-course browser ✓] https://www.kbs.edu.au/courses/master-of-information-technology — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course vision img 2/3 (cache hits 1)] https://www.kbs.edu.au/courses/diploma-of-information-technology — IELTS=6.0 PTE=— TOEFL=— CAE=—
+[VISION] 3 candidate image(s) found — starting OCR pass
+[FALLBACK] AI enriching https://www.kbs.edu.au/courses/diploma-of-information-technology (missing: international_fee, domestic_fee)
+[FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/diploma-of-information-technology: duration_value, duration_unit
+[FIELD TRACE] study_mode='On Campus' location='Adelaide, Brisbane, Melbourne, Perth, Sydney, Australia' method=study_mode:location_derived url=https://www.kbs.edu.au/courses/diploma-of-information-technology
+[CATEGORY det] Diploma of Information Technology → Computer Science & IT / Information Systems
+[WARN] Diploma of Information Technology — Fee section detected but fee is blank
+✅ [PASS 100/100] Diploma of Information Technology | diploma-of-information-technology
+[EXTRACT] 30/36: Graduate Certificate In Information Technology
+Fetching 30/36: Graduate Certificate In Information Technology
+[FIELD SUMMARY] Graduate Certificate in Information Technology Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '8.0' [regex conf=0.75] Intake: ✅ "['March', 'July', 'November']" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.50]
+[GP-DEBUG] static=120338B rendered=0B using=static text_len=5979
+[GP-DEBUG] text[:500]='Graduate Certificate in Information Technology COURSE CRICOS code 110276A / AQF level 8 My saved courses (0) Typical Duration / Standard Study Option 8 months / 2 trimesters Structure / 4 subjects: 4 core CAREER OUTCOMES / IT Coordinator / Desktop Support Specialist / Helpdesk Operator / Technical Operations Officer START DATE / March, July + November TAP BELOW FOR MORE INFORMATION Overview The Graduate Certificate in Information Technology will give students who want to specialise in IT the opp'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null,\n "fee_term": null,\n "duration_value": 0,\n "duration_unit": "years",\n "duration_text": "8 months",\n "ielts_overall": null,\n "pte_overall": null,\n "toefl_overall": null,\n "cambridge_overall": null,\n "duolingo_overall": null,\n "sub_category": "Information Technology",\n "category": "Computer Science & IT",\n "mode": "On Campus",'
+[GEMINI] https://www.kbs.edu.au/courses/graduate-certificate-in-infor → 9 field(s) (cost=$0.000260, in=2936 out=131)
+[per-course browser ↻] https://www.kbs.edu.au/courses/graduate-certificate-in-information-technology
+[per-course vision img 2/3 (cache hits 1)] https://www.kbs.edu.au/courses/master-of-information-technology — IELTS=6.5 PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.kbs.edu.au/courses/master-of-information-technology (missing: international_fee, domestic_fee)
+[FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/master-of-information-technology: duration_value, duration_unit
+[FIELD TRACE] study_mode='On Campus' location='Adelaide, Brisbane, Gold Coast, Melbourne, Perth, Sydney, Australia' method=study_mode:location_derived url=https://www.kbs.edu.au/courses/master-of-information-technology
+[CATEGORY det] Master of Information Technology → Computer Science & IT / Information Systems
+[WARN] Master of Information Technology — Fee section detected but fee is blank
+[NULLIFIED] Master of Information Technology — duration 20.0 year (20.0 yrs) exceeds sanity limit; cleared
+✅ [PASS 80/100] Master of Information Technology — missing: duration | master-of-information-technology
+[EXTRACT] 31/36: Graduate Diploma Information Technology
+Fetching 31/36: Graduate Diploma Information Technology
+[FIELD SUMMARY] Graduate Diploma of Information Technology Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '1.0' [regex conf=0.75] Intake: ✅ "['March', 'July', 'November']" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.50]
+[GP-DEBUG] static=127275B rendered=0B using=static text_len=6506
+[GP-DEBUG] text[:500]='Graduate Diploma of Information Technology COURSE CRICOS code 110275B / AQF level 8 My saved courses (0) Typical Duration / Standard Study Option 1 year / 8 subjects / 3 trimesters Structure / 8 subjects: 8 core CAREER OUTCOMES / Computer Network Engineer / Computer Systems Engineer / IT Support Engineer / IT Test Engineer START DATE / March, July + November TAP BELOW FOR MORE INFORMATION Overview The Graduate Diploma of Information Technology is suitable for students who want to build on founda'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null,\n "fee_term": null,\n "duration_value": 1,\n "duration_unit": "years",\n "duration_text": "1 year",\n "ielts_overall": null,\n "pte_overall": null,\n "toefl_overall": null,\n "cambridge_overall": null,\n "duolingo_overall": null,\n "sub_category": "Information Technology",\n "category": "Computer Science & IT",\n "mode": "On Campus",\n '
+[GEMINI] https://www.kbs.edu.au/courses/graduate-diploma-information- → 11 field(s) (cost=$0.000269, in=3066 out=131)
+[per-course browser ↻] https://www.kbs.edu.au/courses/graduate-diploma-information-technology
+[per-course browser ✓] https://www.kbs.edu.au/courses/mba-master-of-business-administration/data-driven-leadership — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[VISION] 3 candidate image(s) found — starting OCR pass
+[per-course vision img 1/3 (cache hits 2)] https://www.kbs.edu.au/courses/mba-master-of-business-administration/data-driven-leadership — IELTS=7.0 PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.kbs.edu.au/courses/mba-master-of-business-administration/data-driven-leadership (missing: international_fee, domestic_fee)
+[per-course browser ✓] https://www.kbs.edu.au/courses/bachelor-of-information-technology — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[VISION] 3 candidate image(s) found — starting OCR pass
+[FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/mba-master-of-business-administration/data-driven-leadership: duration_value, duration_unit
+[FIELD TRACE] study_mode='On Campus' location='Adelaide / Brisbane / Gold Coast / Melbourne / Perth / Sydney /' method=study_mode:location_derived url=https://www.kbs.edu.au/courses/mba-master-of-business-administration/data-driven-leadership
+[CATEGORY det] MBA – Data-driven Leadership → Business & Management / MBA
+[WARN] MBA – Data-driven Leadership — Fee section detected but fee is blank
+✅ [PASS 100/100] MBA – Data-driven Leadership | data-driven-leadership
+[EXTRACT] 32/36: Master Of Information Technology Extension
+Fetching 32/36: Master Of Information Technology Extension
+[FIELD SUMMARY] Master of Information Technology (Extension) Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '2.0' [regex conf=0.75] Intake: ✅ "['March', 'May', 'July', 'Sept" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.50]
+[GP-DEBUG] static=182397B rendered=0B using=static text_len=10322
+[GP-DEBUG] text[:500]='Master of Information Technology (Extension) COURSE CRICOS code 110273D / AQF level 9 My saved courses (0) Typical Duration / Standard Study Option 2 years / 15 Subjects / 6 trimesters Structure / 15 subjects: 9 core + 4 IT electives + 2 MBA electives CAREER OUTCOMES / Data Engineer / Multimedia Specialist / Security Architect / Software Developer START DATE / March, May, July, September + November TAP BELOW FOR MORE INFORMATION Overview The Master of Information Technology (Extension) is suitab'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null,\n "fee_term": null,\n "duration_value": 2,\n "duration_unit": "years",\n "duration_text": "2 years",\n "ielts_overall": null,\n "pte_overall": null,\n "toefl_overall": null,\n "cambridge_overall": null,\n "duolingo_overall": null,\n "sub_category": "Information Technology",\n "category": "Computer Science & IT",\n "mode": "On Campus",\n'
+[GEMINI] https://www.kbs.edu.au/courses/master-of-information-technol → 11 field(s) (cost=$0.000342, in=4021 out=135)
+[per-course browser ↻] https://www.kbs.edu.au/courses/master-of-information-technology-extension
+[per-course browser ✓] https://www.kbs.edu.au/courses/graduate-diploma-information-technology — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[VISION] 1 candidate image(s) found — starting OCR pass
+[per-course vision img 0/1 (cache hits 1)] https://www.kbs.edu.au/courses/graduate-diploma-information-technology — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.kbs.edu.au/courses/graduate-diploma-information-technology (missing: international_fee, domestic_fee, ielts_overall)
+[FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/graduate-diploma-information-technology: duration_value, duration_unit
+[FIELD TRACE] study_mode='On Campus' location='Adelaide, Brisbane, Gold Coast, Melbourne, Perth, Sydney, Australia' method=study_mode:location_derived url=https://www.kbs.edu.au/courses/graduate-diploma-information-technology
+[CATEGORY det] Graduate Diploma of Information Technolo → Computer Science & IT / Information Systems
+[WARN] Graduate Diploma of Information Technolo — English section detected in HTML but all scores blank
+[WARN] Graduate Diploma of Information Technolo — Fee section detected but fee is blank
+⚠️ [WARN 75/100] Graduate Diploma of Information Technology — missing: english | graduate-diploma-information-technology
+[EXTRACT] 33/36: Master Of Business Analytics Information Technology
+Fetching 33/36: Master Of Business Analytics Information Technology
+[FIELD SUMMARY] Master of Business Analytics (Information Technolo Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '2.0' [regex conf=0.75] Intake: ✅ "['March', 'May', 'July', 'Sept" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.50]
+[per-course vision img 2/3 (cache hits 1)] https://www.kbs.edu.au/courses/bachelor-of-information-technology — IELTS=7.5 PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.kbs.edu.au/courses/bachelor-of-information-technology (missing: international_fee, domestic_fee)
+[GP-DEBUG] static=200845B rendered=0B using=static text_len=11664
+[GP-DEBUG] text[:500]='Master of Business Analytics (Information Technology) COURSE CRICOS code 116554B / AQF level 9 My saved courses (0) Typical Duration / Standard Study Option 2 years / 6 trimesters Structure / 15 subjects: 10 core + 2 IT electives + 1 IT or Business Analytics elective + 2 MBA electives CAREER OUTCOMES / ICT security specialist / Analyst programmer / Systems engineer / IT project manager START DATE / March, May, July, September + November TAP BELOW FOR MORE INFORMATION Overview The Master of Busin'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null,\n "fee_term": null,\n "duration_value": 2,\n "duration_unit": "years",\n "duration_text": "2 years / 6 trimesters",\n "ielts_overall": null,\n "pte_overall": null,\n "toefl_overall": null,\n "cambridge_overall": null,\n "duolingo_overall": null,\n "sub_category": "Business Analytics",\n "category": "Business & Management",\n "mode": "O'
+[GEMINI] https://www.kbs.edu.au/courses/master-of-business-analytics- → 11 field(s) (cost=$0.000368, in=4359 out=138)
+[per-course browser ↻] https://www.kbs.edu.au/courses/master-of-business-analytics-information-technology
+[FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/bachelor-of-information-technology: duration_value, duration_unit
+[FIELD TRACE] study_mode='On Campus' location='Adelaide, Brisbane, Melbourne, Perth, Sydney, Australia' method=study_mode:location_derived url=https://www.kbs.edu.au/courses/bachelor-of-information-technology
+[CATEGORY det] Bachelor of Information Technology → Computer Science & IT / Information Systems
+[WARN] Bachelor of Information Technology — Fee section detected but fee is blank
+✅ [PASS 100/100] Bachelor of Information Technology | bachelor-of-information-technology
+[EXTRACT] 34/36: English For Academic Purposes
+Fetching 34/36: English For Academic Purposes
+[FIELD SUMMARY] Business Administration Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '10.0' [regex conf=0.75] Intake: ✅ "['February']" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.50]
+[GP-DEBUG] static=107433B rendered=0B using=static text_len=5589
+[GP-DEBUG] text[:500]='English for Academic Purposes COURSE CRICOS code 105225K / AQF level N/A My saved courses (0) Typical Duration / 10 weeks per level Structure / 20 hours of class per week ARTICULATION INTO / Business / Analytics / Accounting / IT START DATE / EAP 1, EAP1&2 - February, June, September EAP2 - April, August, December TAP BELOW FOR MORE INFORMATION Overview Kaplan Business School offers Academic English programs for those students who need to improve their English proficiency before commencing their'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null,\n "fee_term": null,\n "duration_value": 10,\n "duration_unit": "weeks",\n "duration_text": "10 weeks per level",\n "ielts_overall": null,\n "pte_overall": null,\n "toefl_overall": null,\n "cambridge_overall": null,\n "duolingo_overall": null,\n "sub_category": "English for Academic Purposes",\n "category": "Education",\n "mode": "On Ca'
+[GEMINI] https://www.kbs.edu.au/courses/english-for-academic-purposes → 12 field(s) (cost=$0.000255, in=2835 out=140)
+[per-course browser ↻] https://www.kbs.edu.au/courses/english-for-academic-purposes
+[per-course browser ✓] https://www.kbs.edu.au/courses/master-of-business-analytics-information-technology — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[VISION] 2 candidate image(s) found — starting OCR pass
+[per-course vision img 1/2 (cache hits 1)] https://www.kbs.edu.au/courses/master-of-business-analytics-information-technology — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.kbs.edu.au/courses/master-of-business-analytics-information-technology (missing: international_fee, domestic_fee, ielts_overall)
+[per-course browser ✓] https://www.kbs.edu.au/courses/graduate-certificate-in-information-technology — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[VISION] 1 candidate image(s) found — starting OCR pass
+[per-course vision img 0/1 (cache hits 1)] https://www.kbs.edu.au/courses/graduate-certificate-in-information-technology — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.kbs.edu.au/courses/graduate-certificate-in-information-technology (missing: international_fee, domestic_fee, ielts_overall)
+[FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/graduate-certificate-in-information-technology: duration_value, duration_unit
+[FIELD TRACE] study_mode='On Campus' location='Adelaide, Brisbane, Gold Coast, Melbourne, Perth, Sydney, Australia' method=study_mode:location_derived url=https://www.kbs.edu.au/courses/graduate-certificate-in-information-technology
+[CATEGORY det] Graduate Certificate in Information Tech → Computer Science & IT / Information Systems
+[WARN] Graduate Certificate in Information Tech — English section detected in HTML but all scores blank
+[WARN] Graduate Certificate in Information Tech — Fee section detected but fee is blank
+⚠️ [WARN 75/100] Graduate Certificate in Information Technology — missing: english | graduate-certificate-in-information-tech
+[EXTRACT] 35/36: It Specialisations System Requirements
+Fetching 35/36: It Specialisations System Requirements
+[FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/master-of-business-analytics-information-technology: duration_value, duration_unit
+[FIELD TRACE] study_mode='On Campus' location='Adelaide, Brisbane, Gold Coast, Melbourne, Perth, Sydney, Australia' method=study_mode:location_derived url=https://www.kbs.edu.au/courses/master-of-business-analytics-information-technology
+[CATEGORY det] Master of Business Analytics (Informatio → Computer Science & IT / Information Systems
+[FIELD SUMMARY] IT Specialisations and System Requirements Fee: ❌ not found IELTS: ❌ not found Duration: ❌ not found Intake: ✅ "['May']" [regex conf=0.40] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[WARN] Master of Business Analytics (Informatio — English section detected in HTML but all scores blank
+[WARN] Master of Business Analytics (Informatio — Fee section detected but fee is blank
+⚠️ [WARN 75/100] Master of Business Analytics (Information Technolo — missing: english | master-of-business-analytics-information
+[EXTRACT] 36/36: Study Abroad Program
+Fetching 36/36: Study Abroad Program
+[FIELD SUMMARY] Study Abroad Program Fee: ✅ '11520' [regex conf=0.90] IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '2.0' [regex conf=0.75] Intake: ✅ "['May']" [regex conf=0.40] StudyMode: ✅ 'Online' [study_mode:rule conf=0.50]
+[GP-DEBUG] static=99877B rendered=0B using=static text_len=5301
+[GP-DEBUG] text[:500]='IT Specialisations and System Requirements Learn more about our IT specialisations and find out the specific system requirements of your device when studying an IT course. SPECIALISATIONS BRING YOUR OWN DEVICE (BYOD) SYSTEM REQUIREMENTS SPECIALISATIONS Our range of IT specialisations have been designed to meet the forecasted skill shortage for IT professionals in Australia, and globally. If you are studying a Master of Information Technology (Extension) or Master of Information Technology you wi'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null,\n "fee_term": null,\n "duration_value": null,\n "duration_unit": null,\n "duration_text": null,\n "ielts_overall": null,\n "pte_overall": null,\n "toefl_overall": null,\n "cambridge_overall": null,\n "duolingo_overall": null,\n "sub_category": "Information Technology",\n "category": "Computer Science & IT",\n "mode": "On Campus",\n "in'
+[GEMINI] https://www.kbs.edu.au/courses/master-of-information-technol → 3 field(s) (cost=$0.000241, in=2773 out=111)
+[per-course browser ↻] https://www.kbs.edu.au/courses/master-of-information-technology/it-specialisations-system-requirements
+[GP-DEBUG] static=86112B rendered=0B using=static text_len=4850
+[GP-DEBUG] text[:500]='Study Abroad Program The Kaplan Business School Study Abroad Program offers you the opportunity to study in Australia for one or two trimesters. You can choose from a wide range of subjects in specialised areas across all KBS programs. The KBS Study Abroad Program is specially designed for international students to study with us for 1 (30 ECTS) or 2 (60 ECTS) trimesters, taking 3 or 4 subjects each trimester. You are in control, and you can customise your academic study pathways to suit your own'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null,\n "fee_term": null,\n "duration_value": null,\n "duration_unit": null,\n "duration_text": "1 or 2 trimesters / 4 or 8 months",\n "ielts_overall": 6.0,\n "pte_overall": null,\n "toefl_overall": null,\n "cambridge_overall": null,\n "duolingo_overall": null,\n "sub_category": "Study Abroad",\n "category": "Business & Management",\n "mode"'
+[GEMINI] https://www.kbs.edu.au/courses/study-abroad-program → 7 field(s) (cost=$0.000238, in=2648 out=130)
+[VISION] 1 candidate image(s) found — starting OCR pass
+[per-course vision img 1/1] https://www.kbs.edu.au/courses/study-abroad-program — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.kbs.edu.au/courses/study-abroad-program (missing: domestic_fee, intake_text)
+[FALLBACK] AI filled 1 field(s) on https://www.kbs.edu.au/courses/study-abroad-program: fee_currency
+[FIELD TRACE] study_mode='Online' location='Adelaide, Brisbane, Melbourne, Perth, Sydney, Gold Coast' method=study_mode:rule url=https://www.kbs.edu.au/courses/study-abroad-program
+✅ [PASS 100/100] Study Abroad Program | study-abroad-program
+[per-course browser ✓] https://www.kbs.edu.au/courses/master-of-information-technology/it-specialisations-system-requirements — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[VISION] 1 candidate image(s) found — starting OCR pass
+[per-course vision img 0/1 (cache hits 1)] https://www.kbs.edu.au/courses/master-of-information-technology/it-specialisations-system-requirements — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.kbs.edu.au/courses/master-of-information-technology/it-specialisations-system-requirements (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Online' location=None method=study_mode:no_location_online_override url=https://www.kbs.edu.au/courses/master-of-information-technology/it-specialisations-system-requirements
+❌ [LOW 55/100] IT Specialisations and System Requirements — missing: english, duration | it-specialisations-system-requirements
+[per-course browser ✓] https://www.kbs.edu.au/courses/master-of-information-technology-extension — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[VISION] 3 candidate image(s) found — starting OCR pass
+[per-course vision img 2/3 (cache hits 1)] https://www.kbs.edu.au/courses/master-of-information-technology-extension — IELTS=6.5 PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.kbs.edu.au/courses/master-of-information-technology-extension (missing: international_fee, domestic_fee)
+[FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/master-of-information-technology-extension: duration_value, duration_unit
+[FIELD TRACE] study_mode='On Campus' location='Adelaide, Brisbane, Gold Coast, Melbourne, Perth, Sydney, Australia' method=study_mode:location_derived url=https://www.kbs.edu.au/courses/master-of-information-technology-extension
+[CATEGORY det] Master of Information Technology (Extens → Computer Science & IT / Information Systems
+[WARN] Master of Information Technology (Extens — Fee section detected but fee is blank
+✅ [PASS 100/100] Master of Information Technology (Extension) | master-of-information-technology-extensi
+[per-course browser ✓] https://www.kbs.edu.au/courses/english-for-academic-purposes — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[VISION] 5 candidate image(s) found — starting OCR pass
+[VISION FAIL] https://www.kbs.edu.au/sites/default/files/2020-09/PQP_TILE_1.jpg: Gemini skipped — None (likely quota exhausted)
+[VISION FAIL] https://www.kbs.edu.au/sites/default/files/2020-09/PQP_TILE_2.jpg: Gemini skipped — None (likely quota exhausted)
+[VISION FAIL] https://www.kbs.edu.au/sites/default/files/2020-09/PQP_TILE_3.jpg: Gemini skipped — None (likely quota exhausted)
+[VISION FAIL] https://www.kbs.edu.au/sites/default/files/2023-03/PQP_TILE_4.jpg: Gemini skipped — None (likely quota exhausted)
+[per-course vision img 4/5 (cache hits 1)] https://www.kbs.edu.au/courses/english-for-academic-purposes — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.kbs.edu.au/courses/english-for-academic-purposes (missing: international_fee, domestic_fee, ielts_overall)
+[FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/english-for-academic-purposes: duration_value, duration_unit
+[FIELD TRACE] study_mode='Online' location='Melbourne, Perth, Sydney, Adelaide, Brisbane, Gold Coast' method=study_mode:rule url=https://www.kbs.edu.au/courses/english-for-academic-purposes
+[WARN] Business Administration — English section detected in HTML but all scores blank
+[WARN] Business Administration — Fee section detected but fee is blank
+[NULLIFIED] Business Administration — duration 10.0 week (0.2 yrs) exceeds sanity limit; cleared
+❌ [LOW 55/100] Business Administration — missing: english, duration | english-for-academic-purposes
+[EXTRACT] [sibling cache ↻ build postgraduate] ielts_listening=6.0 ielts_overall=6.5 ielts_reading=6.0 ielts_speaking=6.0 ielts_writing=6.0
+[EXTRACT] [sibling cache ↻ build unknown] ielts_overall=6.0
+[EXTRACT] [sibling cache ↻ build undergraduate] ielts_listening=6.0 ielts_overall=6.5 ielts_reading=6.0 ielts_speaking=6.0 ielts_writing=6.0
+[EXTRACT] [sibling cache ↻ backfill postgraduate] 70 slot(s) filled across siblings
+[EXTRACT] [sibling cache ↻ backfill unknown] 4 slot(s) filled across siblings
+[EXTRACT] [sibling cache ↻ backfill undergraduate] 5 slot(s) filled across siblings
+[STAGE] skipped The Ultimate Guide to Doing An MBA in Australia: rejected: category_landing_page
+[STAGE] skipped Course Delivery Options: rejected: category_landing_page
+[STAGE] skipped Non-award Single Subject Enrolment: rejected: category_landing_page
+[STAGE] saved: MBA - Master of Business Administration
+[STAGE] saved: Diploma of Business
+[STAGE] skipped Bachelor of Business: rejected: online_only
+[STAGE] saved: Bachelor of Business (Accounting)
+[STAGE] saved: Bachelor of Business (Hospitality and Tourism Management)
+[STAGE] saved: Bachelor of Business (Management)
+[STAGE] saved: Bachelor of Business (Marketing)
+[STAGE] saved: Graduate Certificate in Accounting
+[STAGE] saved: Master of Professional Accounting
+[STAGE] saved: Master of Accounting
+[STAGE] saved: Graduate Certificate in Business Administration
+[STAGE] saved: Graduate Diploma of Business Administration
+[STAGE] saved: Graduate Certificate in Business Analytics
+[STAGE] saved: Graduate Diploma of Business Analytics
+[STAGE] saved: Master of Business Analytics
+[STAGE] saved: Master of Business Analytics (Extension)
+[STAGE] saved: MBA – Digital Management
+[STAGE] saved: MBA – Health Services Management
+[STAGE] saved: MBA – International Leadership
+[STAGE] saved: MBA – Project Management
+[STAGE] saved: MBA – Tourism and Hospitality Leadership
+[STAGE] saved: MBA – (Women in Leadership)
+[STAGE] saved: MBA – Data-driven Leadership
+[STAGE] saved: Bachelor of Information Technology
+[STAGE] saved: Diploma of Information Technology
+[STAGE] saved: Master of Information Technology
+[STAGE] saved: Graduate Certificate in Information Technology
+[STAGE] saved: Graduate Diploma of Information Technology
+[STAGE] saved: Master of Information Technology (Extension)
+[STAGE] saved: Master of Business Analytics (Information Technology)
+[STAGE] skipped Business Administration: rejected: category_landing_page
+[STAGE] skipped IT Specialisations and System Requirements: rejected: category_landing_page
+[STAGE] skipped Study Abroad Program: rejected: category_landing_page
+[DATA QUALITY] 36 course(s) checked â 0 critical / 47 warning / 4 info
+[DATA QUALITY][WARN] missing_degree_level Ã 5: Degree level not extracted. (and 4 more)
+[DATA QUALITY][WARN] missing_duration Ã 8: Duration not extracted. (and 7 more)
+[DATA QUALITY][WARN] missing_international_fee_central_page Ã 34: International fee absent â marked for central fee page review. (and 33 more)
+[GEMINI] Total cost: $0.0111 USD across 29 course(s) (~$0.00038/course)
+[TIMING] Total: 7m 10s | Courses: 29 | Avg: 14.8s/course | Concurrency: HTTP=4 Browser=10
+ââ DONE ââ Found:37 | Staged:29 | Skipped:7 (rejected:_category_landing_page=6, rejected:_online_only=1) | Errors:0
+Staged 29 courses, 7 skipped, 0 fetch errors

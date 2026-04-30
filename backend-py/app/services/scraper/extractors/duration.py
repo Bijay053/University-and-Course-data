@@ -99,15 +99,23 @@ _DURATION_ANTI_CONTEXT = re.compile(
     #   "must complete the qualification within 8 years of commencement"
     #   "candidates must complete within 8 years of enrolment"
     #   "within 8 years of commencement of studies"
+    #   "complete their qualification within 8 years"   ← no "of commencement"
+    #   "complete all subjects within 8 years"
     # These are academic time limits, not program lengths.  The year value
     # in the deadline sentence scores much higher than an 8-month program
     # duration (8 Year → 41,604 vs 8 Month → 3,202) and wins the tournament
     # incorrectly.  The gate is Pattern-2-only so Pattern-0 labeled sentences
     # (e.g. "Duration: 2 years full-time. Must complete within 4 years.") are
     # unaffected — Pattern-0 priority (×100) dominates regardless.
+    #
+    # NOTE: The original pattern required "complete" to be immediately before
+    # "within" (only whitespace between them).  KBS uses phrasing like
+    # "complete their qualification within 8 years" — 1–4 intervening words —
+    # which the old pattern missed.  Allow up to 4 intervening words so all
+    # common phrasings are covered while keeping the pattern precise.
     r"within\s+\d+\s+years?\s+of\s+(?:commencement|commencing|enrol(?:ment|ling)?|"
     r"starting|graduation|admission|candidature|award)|"
-    r"complet(?:e|ed|ing|ion)\s+within\s+\d+\s+years?)\b",
+    r"complet(?:e|ed|ing|ion)(?:\s+\w+){0,4}\s+within\s+\d+\s+years?)\b",
     re.I,
 )
 
