@@ -1,0 +1,32 @@
+root@university-and-course-data:~/University-and-Course-data/backend-py# cd ~/University-and-Course-data
+git pull --rebase origin main
+error: cannot pull with rebase: You have unstaged changes.
+error: Please commit or stash them.
+root@university-and-course-data:~/University-and-Course-data# git diff --stat
+ app/services/scraper/pipelines/single_course.py | 2077 -------------------------------------------------------------------------------------------------------------
+ 1 file changed, 2077 deletions(-)
+root@university-and-course-data:~/University-and-Course-data# git stash
+git pull --rebase origin main
+git stash pop
+Saved working directory and index state WIP on main: a7c825b fix(duration): same-N cross-check + grad-cert sanity cap (KBS/Torrens 8Year bug)
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+Auto-merging backend-py/app/services/scraper/extractors/duration.py
+CONFLICT (content): Merge conflict in backend-py/app/services/scraper/extractors/duration.py
+error: could not apply ccca51c... fix(duration): extend complete...within anti-context to allow intervening words (KBS grad cert 8 Year bug)
+hint: Resolve all conflicts manually, mark them as resolved with
+hint: "git add/rm <conflicted_files>", then run "git rebase --continue".
+hint: You can instead skip this commit: run "git rebase --skip".
+hint: To abort and get back to the state before "git rebase", run "git rebase --abort".
+Could not apply ccca51c... fix(duration): extend complete...within anti-context to allow intervening words (KBS grad cert 8 Year bug)
+backend-py/app/services/scraper/extractors/duration.py: needs merge
+The stash entry is kept in case you need it again.
+root@university-and-course-data:~/University-and-Course-data# git stash drop
+Dropped refs/stash@{0} (f1795c18bfe8e14c4acb1ded4df04d0c0dac7765)
+root@university-and-course-data:~/University-and-Course-data# cd ~/University-and-Course-data/backend-py
+PYTHONPATH=. python3 -m alembic upgrade head
+/usr/bin/python3: No module named alembic.__main__; 'alembic' is a package and cannot be directly executed
+root@university-and-course-data:~/University-and-Course-data/backend-py# systemctl list-units --type=service | grep -iE "fastapi|celery|uvicorn|gunicorn|worker|university"
+  uni-api-py.service                             loaded active running University Portal Python API (FastAPI + Uvicorn)
+  uni-celery.service                             loaded active running University Portal Celery Worker (scraper)
+root@university-and-course-data:~/University-and-Course-data/backend-py# 
