@@ -1,0 +1,725 @@
+Welcome to Ubuntu 24.04.4 LTS (GNU/Linux 6.8.0-110-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/pro
+
+ System information as of Thu Apr 30 13:04:48 UTC 2026
+
+  System load:           0.19
+  Usage of /:            3.6% of 231.44GB
+  Memory usage:          25%
+  Swap usage:            0%
+  Processes:             204
+  Users logged in:       1
+  IPv4 address for eth0: 159.65.152.72
+  IPv4 address for eth0: 10.47.0.13
+  IPv6 address for eth0: 2400:6180:100:d0:0:1:3615:5001
+
+Expanded Security Maintenance for Applications is not enabled.
+
+5 updates can be applied immediately.
+To see these additional updates run: apt list --upgradable
+
+1 additional security update can be applied with ESM Apps.
+Learn more about enabling ESM Apps service at https://ubuntu.com/esm
+
+
+Last login: Thu Apr 30 10:04:23 2026 from 162.243.188.66
+root@university-and-course-data:~# cd ~/University-and-Course-data
+git pull origin main
+remote: Enumerating objects: 23, done.
+remote: Counting objects: 100% (23/23), done.
+remote: Compressing objects: 100% (12/12), done.
+remote: Total 12 (delta 10), reused 0 (delta 0), pack-reused 0 (from 0)
+Unpacking objects: 100% (12/12), 3.61 KiB | 410.00 KiB/s, done.
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+   f95d75f..ede9354  main       -> origin/main
+hint: You have divergent branches and need to specify how to reconcile them.
+hint: You can do so by running one of the following commands sometime before
+hint: your next pull:
+hint: 
+hint:   git config pull.rebase false  # merge
+hint:   git config pull.rebase true   # rebase
+hint:   git config pull.ff only       # fast-forward only
+hint: 
+hint: You can replace "git config" with "git config --global" to set a default
+hint: preference for all repositories. You can also pass --rebase, --no-rebase,
+hint: or --ff-only on the command line to override the configured default per
+hint: invocation.
+fatal: Need to specify how to reconcile divergent branches.
+root@university-and-course-data:~/University-and-Course-data# sudo systemctl restart uni-celery && sleep 3
+sudo journalctl -u uni-celery -n 2 --no-pager | grep "celery@"
+root@university-and-course-data:~/University-and-Course-data# # 1. Pull all three commits
+cd ~/University-and-Course-data
+git pull origin main
+
+# 2. Run the Alembic migration (rounds existing float32 values to 2dp)
+cd backend-py
+set -a && source .env && set +a
+PYTHONPATH=. venv/bin/python3 -m alembic upgrade head
+
+# 3. Verify the migration worked (expect 1.70, not 1.7000000476837158)
+PYTHONPATH=. venv/bin/python3 -c "
+import os, psycopg2
+conn = psycopg2.connect(os.environ['DATABASE_URL'].replace('postgresql+asyncpg://', 'postgresql://'))
+cur = conn.cursor()
+cur.execute(\"INSERT INTO courses (university_id,name,duration,duration_term,status,eligibility_status,approval_status) VALUES (1,'_test_float32',1.7,'Year','active','unknown','approved') RETURNING id\")
+row_id = cur.fetchone()[0]
+conn.commit()
+cur.execute('SELECT duration FROM courses WHERE id=%s', (row_id,))
+val = cur.fetchone()[0]
+cur.execute('DELETE FROM courses WHERE id=%s', (row_id,))
+conn.commit()
+print('Stored 1.7, read back:', val, '← must be 1.70 not 1.7000000476837158')
+conn.close()
+"
+
+# 4. Restart Celery
+sudo systemctl restart uni-celery && sleep 4
+sudo journalctl -u uni-celery -n 3 --no-pager | grep "celery@"
+remote: Enumerating objects: 32, done.
+remote: Counting objects: 100% (32/32), done.
+remote: Compressing objects: 100% (19/19), done.
+remote: Total 19 (delta 16), reused 0 (delta 0), pack-reused 0 (from 0)
+Unpacking objects: 100% (19/19), 4.03 KiB | 458.00 KiB/s, done.
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+   ede9354..629e5de  main       -> origin/main
+hint: You have divergent branches and need to specify how to reconcile them.
+hint: You can do so by running one of the following commands sometime before
+hint: your next pull:
+hint: 
+hint:   git config pull.rebase false  # merge
+hint:   git config pull.rebase true   # rebase
+hint:   git config pull.ff only       # fast-forward only
+hint: 
+hint: You can replace "git config" with "git config --global" to set a default
+hint: preference for all repositories. You can also pass --rebase, --no-rebase,
+hint: or --ff-only on the command line to override the configured default per
+hint: invocation.
+fatal: Need to specify how to reconcile divergent branches.
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/__main__.py", line 4, in <module>
+    main(prog="alembic")
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/config.py", line 1047, in main
+    CommandLine(prog=prog).main(argv=argv)
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/config.py", line 1037, in main
+    self.run_cmd(cfg, options)
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/config.py", line 971, in run_cmd
+    fn(
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/command.py", line 483, in upgrade
+    script.run_env()
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/script/base.py", line 545, in run_env
+    util.load_python_file(self.dir, "env.py")
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/util/pyfiles.py", line 116, in load_python_file
+    module = load_module_py(module_id, path)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/util/pyfiles.py", line 136, in load_module_py
+    spec.loader.exec_module(module)  # type: ignore
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "/root/University-and-Course-data/backend-py/alembic/env.py", line 17, in <module>
+    config.set_main_option("sqlalchemy.url", settings.database_url)
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/config.py", line 358, in set_main_option
+    self.set_section_option(self.config_ini_section, name, value)
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/config.py", line 391, in set_section_option
+    self.file_config.set(section, name, value)
+  File "/usr/lib/python3.12/configparser.py", line 1184, in set
+    super().set(section, option, value)
+  File "/usr/lib/python3.12/configparser.py", line 872, in set
+    value = self._interpolation.before_set(self, section, option,
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/configparser.py", line 374, in before_set
+    raise ValueError("invalid interpolation syntax in %r at "
+ValueError: invalid interpolation syntax in 'postgresql+asyncpg://uniportal:Bij%40y12345@127.0.0.1:5432/university_portal' at position 34
+Stored 1.7, read back: 1.7 ← must be 1.70 not 1.7000000476837158
+Apr 30 13:19:22 university-and-course-data celery[1247025]: [2026-04-30 13:19:22,929: INFO/MainProcess] celery@university-and-course-data ready.
+root@university-and-course-data:~/University-and-Course-data/backend-py# # 1. Pull from GitHub
+cd /path/to/project          # wherever the repo is checked out on prod
+git pull origin main
+
+# 2. Run the Alembic migration (Fix 2 — Float → Numeric)
+cd backend-py
+PYTHONPATH=. python -m alembic upgrade head
+
+# 3. Restart the FastAPI and Celery workers
+sudo systemctl restart fastapi     # or whatever your service name is
+sudo systemctl restart celery      # or your Celery service name
+-bash: cd: /path/to/project: No such file or directory
+remote: Enumerating objects: 49, done.
+remote: Counting objects: 100% (49/49), done.
+remote: Compressing objects: 100% (34/34), done.
+Unpacking objects: 100% (34/34), 6.36 KiB | 500.00 KiB/s, done.
+remote: Total 34 (delta 28), reused 0 (delta 0), pack-reused 0 (from 0)
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+   629e5de..0279075  main       -> origin/main
+hint: You have divergent branches and need to specify how to reconcile them.
+hint: You can do so by running one of the following commands sometime before
+hint: your next pull:
+hint: 
+hint:   git config pull.rebase false  # merge
+hint:   git config pull.rebase true   # rebase
+hint:   git config pull.ff only       # fast-forward only
+hint: 
+hint: You can replace "git config" with "git config --global" to set a default
+hint: preference for all repositories. You can also pass --rebase, --no-rebase,
+hint: or --ff-only on the command line to override the configured default per
+hint: invocation.
+fatal: Need to specify how to reconcile divergent branches.
+-bash: cd: backend-py: No such file or directory
+Command 'python' not found, did you mean:
+  command 'python3' from deb python3
+  command 'python' from deb python-is-python3
+Failed to restart fastapi.service: Unit fastapi.service not found.
+Failed to restart celery.service: Unit celery.service not found.
+root@university-and-course-data:~/University-and-Course-data/backend-py# cd ~/University-and-Course-data
+git pull --rebase origin main
+error: cannot pull with rebase: You have unstaged changes.
+error: Please commit or stash them.
+root@university-and-course-data:~/University-and-Course-data# git diff --stat
+ app/services/scraper/pipelines/single_course.py | 2077 -------------------------------------------------------------------------------------------------------------
+ 1 file changed, 2077 deletions(-)
+root@university-and-course-data:~/University-and-Course-data# git stash
+git pull --rebase origin main
+git stash pop
+Saved working directory and index state WIP on main: a7c825b fix(duration): same-N cross-check + grad-cert sanity cap (KBS/Torrens 8Year bug)
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+Auto-merging backend-py/app/services/scraper/extractors/duration.py
+CONFLICT (content): Merge conflict in backend-py/app/services/scraper/extractors/duration.py
+error: could not apply ccca51c... fix(duration): extend complete...within anti-context to allow intervening words (KBS grad cert 8 Year bug)
+hint: Resolve all conflicts manually, mark them as resolved with
+hint: "git add/rm <conflicted_files>", then run "git rebase --continue".
+hint: You can instead skip this commit: run "git rebase --skip".
+hint: To abort and get back to the state before "git rebase", run "git rebase --abort".
+Could not apply ccca51c... fix(duration): extend complete...within anti-context to allow intervening words (KBS grad cert 8 Year bug)
+backend-py/app/services/scraper/extractors/duration.py: needs merge
+The stash entry is kept in case you need it again.
+root@university-and-course-data:~/University-and-Course-data# git stash drop
+Dropped refs/stash@{0} (f1795c18bfe8e14c4acb1ded4df04d0c0dac7765)
+root@university-and-course-data:~/University-and-Course-data# cd ~/University-and-Course-data/backend-py
+PYTHONPATH=. python3 -m alembic upgrade head
+/usr/bin/python3: No module named alembic.__main__; 'alembic' is a package and cannot be directly executed
+root@university-and-course-data:~/University-and-Course-data/backend-py# systemctl list-units --type=service | grep -iE "fastapi|celery|uvicorn|gunicorn|worker|university"
+  uni-api-py.service                             loaded active running University Portal Python API (FastAPI + Uvicorn)
+  uni-celery.service                             loaded active running University Portal Celery Worker (scraper)
+root@university-and-course-data:~/University-and-Course-data/backend-py# cd ~/University-and-Course-data
+git checkout --theirs backend-py/app/services/scraper/extractors/duration.py
+git add backend-py/app/services/scraper/extractors/duration.py
+git rebase --continue
+Updated 1 path from the index
+[detached HEAD 7654088] fix(duration): extend complete...within anti-context to allow intervening words (KBS grad cert 8 Year bug)
+ 1 file changed, 1 insertion(+), 38 deletions(-)
+Auto-merging backend-py/app/services/scraper/pipelines/single_course.py
+CONFLICT (content): Merge conflict in backend-py/app/services/scraper/pipelines/single_course.py
+error: could not apply a7c825b... fix(duration): same-N cross-check + grad-cert sanity cap (KBS/Torrens 8Year bug)
+hint: Resolve all conflicts manually, mark them as resolved with
+hint: "git add/rm <conflicted_files>", then run "git rebase --continue".
+hint: You can instead skip this commit: run "git rebase --skip".
+hint: To abort and get back to the state before "git rebase", run "git rebase --abort".
+Could not apply a7c825b... fix(duration): same-N cross-check + grad-cert sanity cap (KBS/Torrens 8Year bug)
+root@university-and-course-data:~/University-and-Course-data# find ~/University-and-Course-data -name "alembic" -type f 2>/dev/null | head -5
+/root/University-and-Course-data/backend-py/venv/bin/alembic
+root@university-and-course-data:~/University-and-Course-data# # Most likely one of these — run whichever exists:
+~/University-and-Course-data/backend-py/venv/bin/alembic -c backend-py/alembic.ini upgrade head
+# or
+/opt/venv/bin/python3 -m alembic upgrade head
+  FAILED: Path doesn't exist: alembic.  Please use the 'init' command to create a new scripts folder.
+-bash: /opt/venv/bin/python3: No such file or directory
+root@university-and-course-data:~/University-and-Course-data# cd ~/University-and-Course-data
+git status
+interactive rebase in progress; onto 0279075
+Last commands done (2 commands done):
+   pick ccca51c fix(duration): extend complete...within anti-context to allow intervening words (KBS grad cert 8 Year bug)
+   pick a7c825b fix(duration): same-N cross-check + grad-cert sanity cap (KBS/Torrens 8Year bug)
+No commands remaining.
+You are currently rebasing branch 'main' on '0279075'.
+  (fix conflicts and then run "git rebase --continue")
+  (use "git rebase --skip" to skip this patch)
+  (use "git rebase --abort" to check out the original branch)
+
+Changes to be committed:
+  (use "git restore --staged <file>..." to unstage)
+        modified:   backend-py/app/services/scraper/extractors/duration.py
+
+Unmerged paths:
+  (use "git restore --staged <file>..." to unstage)
+  (use "git add <file>..." to mark resolution)
+        both modified:   backend-py/app/services/scraper/pipelines/single_course.py
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+        =
+        backend-py/baselines/
+        drizzle-kit
+
+root@university-and-course-data:~/University-and-Course-data# git checkout --theirs backend-py/app/services/scraper/extractors/duration.py
+git add backend-py/app/services/scraper/extractors/duration.py
+git rebase --continue
+Updated 0 paths from the index
+backend-py/app/services/scraper/pipelines/single_course.py: needs merge
+You must edit all merge conflicts and then
+mark them as resolved using git add
+root@university-and-course-data:~/University-and-Course-data# cd ~/University-and-Course-data/backend-py
+../backend-py/venv/bin/alembic upgrade head
+Traceback (most recent call last):
+  File "/root/University-and-Course-data/backend-py/../backend-py/venv/bin/alembic", line 6, in <module>
+    sys.exit(main())
+             ^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/config.py", line 1047, in main
+    CommandLine(prog=prog).main(argv=argv)
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/config.py", line 1037, in main
+    self.run_cmd(cfg, options)
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/config.py", line 971, in run_cmd
+    fn(
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/command.py", line 483, in upgrade
+    script.run_env()
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/script/base.py", line 545, in run_env
+    util.load_python_file(self.dir, "env.py")
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/util/pyfiles.py", line 116, in load_python_file
+    module = load_module_py(module_id, path)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/util/pyfiles.py", line 136, in load_module_py
+    spec.loader.exec_module(module)  # type: ignore
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "/root/University-and-Course-data/backend-py/alembic/env.py", line 17, in <module>
+    config.set_main_option("sqlalchemy.url", settings.database_url)
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/config.py", line 358, in set_main_option
+    self.set_section_option(self.config_ini_section, name, value)
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/config.py", line 391, in set_section_option
+    self.file_config.set(section, name, value)
+  File "/usr/lib/python3.12/configparser.py", line 1184, in set
+    super().set(section, option, value)
+  File "/usr/lib/python3.12/configparser.py", line 872, in set
+    value = self._interpolation.before_set(self, section, option,
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/configparser.py", line 374, in before_set
+    raise ValueError("invalid interpolation syntax in %r at "
+ValueError: invalid interpolation syntax in 'postgresql+asyncpg://uniportal:Bij%40y12345@127.0.0.1:5432/university_portal' at position 34
+root@university-and-course-data:~/University-and-Course-data/backend-py# cd ~/University-and-Course-data/backend-py
+venv/bin/alembic upgrade head
+Traceback (most recent call last):
+  File "/root/University-and-Course-data/backend-py/venv/bin/alembic", line 6, in <module>
+    sys.exit(main())
+             ^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/config.py", line 1047, in main
+    CommandLine(prog=prog).main(argv=argv)
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/config.py", line 1037, in main
+    self.run_cmd(cfg, options)
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/config.py", line 971, in run_cmd
+    fn(
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/command.py", line 483, in upgrade
+    script.run_env()
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/script/base.py", line 545, in run_env
+    util.load_python_file(self.dir, "env.py")
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/util/pyfiles.py", line 116, in load_python_file
+    module = load_module_py(module_id, path)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/util/pyfiles.py", line 136, in load_module_py
+    spec.loader.exec_module(module)  # type: ignore
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "/root/University-and-Course-data/backend-py/alembic/env.py", line 17, in <module>
+    config.set_main_option("sqlalchemy.url", settings.database_url)
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/config.py", line 358, in set_main_option
+    self.set_section_option(self.config_ini_section, name, value)
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/config.py", line 391, in set_section_option
+    self.file_config.set(section, name, value)
+  File "/usr/lib/python3.12/configparser.py", line 1184, in set
+    super().set(section, option, value)
+  File "/usr/lib/python3.12/configparser.py", line 872, in set
+    value = self._interpolation.before_set(self, section, option,
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/configparser.py", line 374, in before_set
+    raise ValueError("invalid interpolation syntax in %r at "
+ValueError: invalid interpolation syntax in 'postgresql+asyncpg://uniportal:Bij%40y12345@127.0.0.1:5432/university_portal' at position 34
+root@university-and-course-data:~/University-and-Course-data/backend-py# sudo systemctl restart uni-api-py.service uni-celery.service
+sudo systemctl status uni-api-py.service
+● uni-api-py.service - University Portal Python API (FastAPI + Uvicorn)
+     Loaded: loaded (/etc/systemd/system/uni-api-py.service; enabled; preset: enabled)
+     Active: active (running) since Thu 2026-04-30 13:50:32 UTC; 2s ago
+   Main PID: 1249144 (python)
+      Tasks: 8 (limit: 9483)
+     Memory: 151.3M (peak: 151.5M)
+        CPU: 3.682s
+     CGroup: /system.slice/uni-api-py.service
+             ├─1249144 /root/University-and-Course-data/backend-py/venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 2 --access-log --lo>
+             ├─1249145 /root/University-and-Course-data/backend-py/venv/bin/python -c "from multiprocessing.resource_tracker import main;main(6)"
+             ├─1249146 /root/University-and-Course-data/backend-py/venv/bin/python -c "from multiprocessing.spawn import spawn_main; spawn_main(tracker_fd=7, pipe_ha>
+             └─1249147 /root/University-and-Course-data/backend-py/venv/bin/python -c "from multiprocessing.spawn import spawn_main; spawn_main(tracker_fd=7, pipe_ha>
+
+Apr 30 13:50:32 university-and-course-data systemd[1]: Started uni-api-py.service - University Portal Python API (FastAPI + Uvicorn).
+root@university-and-course-data:~/University-and-Course-data/backend-py# cd ~/University-and-Course-data
+git checkout --theirs backend-py/app/services/scraper/pipelines/single_course.py
+git add backend-py/app/services/scraper/pipelines/single_course.py
+git rebase --continue
+Updated 1 path from the index
+[detached HEAD d06bf06] fix(duration): same-N cross-check + grad-cert sanity cap (KBS/Torrens 8Year bug)
+ 2 files changed, 12 insertions(+), 4 deletions(-)
+Successfully rebased and updated refs/heads/main.
+root@university-and-course-data:~/University-and-Course-data# PGPASSWORD='Bij@y12345' psql -h 127.0.0.1 -U uniportal -d university_portal -c \
+  "SELECT version_num FROM alembic_version;"
+ERROR:  permission denied for table alembic_version
+root@university-and-course-data:~/University-and-Course-data# PGPASSWORD='Bij@y12345' psql -h 127.0.0.1 -U uniportal -d university_portal << 'SQL'
+ALTER TABLE courses
+  ALTER COLUMN duration
+  TYPE NUMERIC(6, 2)
+  USING ROUND(duration::numeric, 2);
+INSERT INTO alembic_version VALUES ('012_duration_numeric');
+SQL
+ERROR:  cannot alter type of a column used by a view or rule
+DETAIL:  rule _RETURN on materialized view course_search_view depends on column "duration"
+ERROR:  permission denied for table alembic_version
+root@university-and-course-data:~/University-and-Course-data# sudo -u postgres bash << 'OUTER'
+echo "=== 1: Saving view DDL ==="
+pg_dump university_portal --schema-only -t course_search_view 2>/dev/null \
+  | grep -Ev "^--|^SET |^SELECT pg_catalog" \
+  | sed '/^[[:space:]]*$/d' \
+  > /tmp/view_ddl.sql
+cat /tmp/view_ddl.sql
+
+echo "=== 2: Dropping view ==="
+psql university_portal -c "DROP MATERIALIZED VIEW IF EXISTS course_search_view;"
+
+echo "=== 3: Altering column ==="
+psql university_portal -c "ALTER TABLE courses ALTER COLUMN duration TYPE NUMERIC(6, 2) USING ROUND(duration::numeric, 2);"
+
+echo "=== 4: Recreating view ==="
+psql university_portal -f /tmp/view_ddl.sql
+
+echo "=== 5: Grants + alembic version ==="
+psql university_portal -c "GRANT SELECT ON course_search_view TO uniportal;"
+psql university_portal -c "UPDATE alembic_version SET version_num = '012_duration_numeric';"
+
+echo "=== 6: Verify ==="
+psql university_portal -c "SELECT column_name, data_type, numeric_precision, numeric_scale FROM information_schema.columns WHERE table_name='courses' AND column_name='duration';"
+psql university_portal -c "SELECT version_num FROM alembic_version;"
+OUTER
+=== 1: Saving view DDL ===
+\restrict lH0lFuXta1B0h7bnJsvOstVJZ3YfuuQPlWfMkHAKTlJUnP32a1Y4VtMOo4la7qa
+CREATE MATERIALIZED VIEW public.course_search_view AS
+ SELECT c.id,
+    c.name AS course_name,
+    c.category,
+    c.sub_category,
+    c.degree_level,
+    c.duration,
+    c.duration_term,
+    c.study_mode,
+    c.course_website,
+    c.course_location,
+    c.university_id,
+    (setweight(to_tsvector('simple'::regconfig, COALESCE(c.name, ''::text)), 'A'::"char") || setweight(to_tsvector('simple'::regconfig, COALESCE(u.name, ''::text)), 'B'::"char")) AS name_tsv,
+    ((((((setweight(to_tsvector('english'::regconfig, COALESCE(c.name, ''::text)), 'A'::"char") || setweight(to_tsvector('english'::regconfig, COALESCE(u.name, ''::text)), 'B'::"char")) || setweight(to_tsvector('english'::regconfig, COALESCE(c.category, ''::text)), 'C'::"char")) || setweight(to_tsvector('english'::regconfig, COALESCE(c.course_location, ''::text)), 'C'::"char")) || setweight(to_tsvector('english'::regconfig, COALESCE(u.city, ''::text)), 'C'::"char")) || setweight(to_tsvector('english'::regconfig, COALESCE(u.country, ''::text)), 'C'::"char")) || setweight(to_tsvector('english'::regconfig, COALESCE(c.sub_category, ''::text)), 'D'::"char")) AS search_tsv,
+    u.name AS university_name,
+    u.logo_url,
+    u.city AS university_city,
+    u.country AS university_country,
+    u.website AS university_website,
+    COALESCE(u.featured, false) AS featured,
+    COALESCE(u.featured_priority, 0) AS featured_priority,
+    ( SELECT fees.international_fee
+           FROM public.fees
+          WHERE (fees.course_id = c.id)
+          ORDER BY fees.id DESC
+         LIMIT 1) AS international_fee,
+    ( SELECT fees.currency
+           FROM public.fees
+          WHERE (fees.course_id = c.id)
+          ORDER BY fees.id DESC
+         LIMIT 1) AS currency,
+    ( SELECT fees.fee_term
+           FROM public.fees
+          WHERE (fees.course_id = c.id)
+          ORDER BY fees.id DESC
+         LIMIT 1) AS fee_term,
+    NULL::real AS application_fee,
+    ( SELECT array_agg(DISTINCT intakes.intake_month ORDER BY intakes.intake_month) AS array_agg
+           FROM public.intakes
+          WHERE ((intakes.course_id = c.id) AND (intakes.intake_month IS NOT NULL))) AS intakes,
+    ( SELECT english_requirements.overall
+           FROM public.english_requirements
+          WHERE ((english_requirements.course_id = c.id) AND (english_requirements.test_type = 'IELTS'::text))
+         LIMIT 1) AS ielts_overall,
+    ( SELECT english_requirements.overall
+           FROM public.english_requirements
+          WHERE ((english_requirements.course_id = c.id) AND (english_requirements.test_type = 'PTE'::text))
+         LIMIT 1) AS pte_overall,
+    ( SELECT english_requirements.overall
+           FROM public.english_requirements
+          WHERE ((english_requirements.course_id = c.id) AND (english_requirements.test_type = 'TOEFL'::text))
+         LIMIT 1) AS toefl_overall,
+    ( SELECT english_requirements.overall
+           FROM public.english_requirements
+          WHERE ((english_requirements.course_id = c.id) AND (english_requirements.test_type = ANY (ARRAY['CAE'::text, 'Cambridge'::text])))
+         LIMIT 1) AS cae_overall,
+    ( SELECT english_requirements.overall
+           FROM public.english_requirements
+          WHERE ((english_requirements.course_id = c.id) AND (english_requirements.test_type = ANY (ARRAY['Duolingo'::text, 'DET'::text])))
+         LIMIT 1) AS duolingo_overall,
+        CASE
+            WHEN (c.duration IS NULL) THEN NULL::double precision
+            WHEN (c.duration_term ~~* 'month%'::text) THEN (c.duration / (12.0)::double precision)
+            WHEN (c.duration_term ~~* 'week%'::text) THEN (c.duration / (52.0)::double precision)
+            ELSE (c.duration)::double precision
+        END AS duration_years
+   FROM (public.courses c
+     JOIN public.universities u ON ((u.id = c.university_id)))
+  WHERE ((COALESCE(c.status, 'active'::text) = 'active'::text) AND (COALESCE(c.approval_status, 'approved'::text) = 'approved'::text))
+  WITH NO DATA;
+ALTER MATERIALIZED VIEW public.course_search_view OWNER TO uniportal;
+CREATE INDEX idx_csv_category ON public.course_search_view USING btree (category);
+CREATE INDEX idx_csv_city ON public.course_search_view USING btree (university_city);
+CREATE INDEX idx_csv_city_trgm ON public.course_search_view USING gin (lower(university_city) public.gin_trgm_ops);
+CREATE INDEX idx_csv_country ON public.course_search_view USING btree (university_country);
+CREATE INDEX idx_csv_country_trgm ON public.course_search_view USING gin (lower(university_country) public.gin_trgm_ops);
+CREATE INDEX idx_csv_course_name_lower_trgm ON public.course_search_view USING gin (lower(course_name) public.gin_trgm_ops);
+CREATE INDEX idx_csv_degree_level ON public.course_search_view USING btree (degree_level);
+CREATE INDEX idx_csv_duration_years ON public.course_search_view USING btree (duration_years);
+CREATE INDEX idx_csv_featured ON public.course_search_view USING btree (featured DESC, featured_priority DESC) WHERE (featured = true);
+CREATE UNIQUE INDEX idx_csv_id ON public.course_search_view USING btree (id);
+CREATE INDEX idx_csv_intakes ON public.course_search_view USING gin (intakes);
+CREATE INDEX idx_csv_intl_fee ON public.course_search_view USING btree (international_fee);
+CREATE INDEX idx_csv_loc_trgm ON public.course_search_view USING gin (lower(COALESCE(course_location, ''::text)) public.gin_trgm_ops);
+CREATE INDEX idx_csv_name_trgm ON public.course_search_view USING gin (course_name public.gin_trgm_ops);
+CREATE INDEX idx_csv_name_tsv ON public.course_search_view USING gin (name_tsv);
+CREATE INDEX idx_csv_search_tsv ON public.course_search_view USING gin (search_tsv);
+CREATE INDEX idx_csv_uni_name_lower_trgm ON public.course_search_view USING gin (lower(university_name) public.gin_trgm_ops);
+CREATE INDEX idx_csv_uni_name_trgm ON public.course_search_view USING gin (university_name public.gin_trgm_ops);
+CREATE INDEX idx_csv_university_id ON public.course_search_view USING btree (university_id);
+\unrestrict lH0lFuXta1B0h7bnJsvOstVJZ3YfuuQPlWfMkHAKTlJUnP32a1Y4VtMOo4la7qa
+=== 2: Dropping view ===
+DROP MATERIALIZED VIEW
+=== 3: Altering column ===
+ALTER TABLE
+=== 4: Recreating view ===
+CREATE MATERIALIZED VIEW
+ALTER MATERIALIZED VIEW
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+=== 5: Grants + alembic version ===
+GRANT
+UPDATE 1
+=== 6: Verify ===
+ column_name | data_type | numeric_precision | numeric_scale 
+-------------+-----------+-------------------+---------------
+ duration    | numeric   |                 6 |             2
+(1 row)
+
+     version_num      
+----------------------
+ 012_duration_numeric
+(1 row)
+
+root@university-and-course-data:~/University-and-Course-data# sudo -u postgres bash << 'OUTER'
+echo "=== 1: Saving view DDL ==="
+pg_dump university_portal --schema-only -t course_search_view 2>/dev/null \
+  | grep -Ev "^--|^SET |^SELECT pg_catalog" \
+  | sed '/^[[:space:]]*$/d' \
+  > /tmp/view_ddl.sql
+cat /tmp/view_ddl.sql
+
+echo "=== 2: Dropping view ==="
+psql university_portal -c "DROP MATERIALIZED VIEW IF EXISTS course_search_view;"
+
+echo "=== 3: Altering column ==="
+psql university_portal -c "ALTER TABLE courses ALTER COLUMN duration TYPE NUMERIC(6, 2) USING ROUND(duration::numeric, 2);"
+
+echo "=== 4: Recreating view ==="
+psql university_portal -f /tmp/view_ddl.sql
+
+echo "=== 5: Grants + mark migration done ==="
+psql university_portal -c "GRANT SELECT ON course_search_view TO uniportal;"
+psql university_portal -c "UPDATE alembic_version SET version_num = '012_duration_numeric';"
+
+echo "=== 6: Verify ==="
+psql university_portal -c "SELECT column_name, data_type, numeric_precision, numeric_scale FROM information_schema.columns WHERE table_name='courses' AND column_name='duration';"
+psql university_portal -c "SELECT version_num FROM alembic_version;"
+OUTER
+=== 1: Saving view DDL ===
+\restrict OwcL89S9uGZbA1ddqlAhhhS3HLMbRWVQwf3SKcmyJo4QtfZWBRbFmmzxg8b7vAr
+CREATE MATERIALIZED VIEW public.course_search_view AS
+ SELECT c.id,
+    c.name AS course_name,
+    c.category,
+    c.sub_category,
+    c.degree_level,
+    c.duration,
+    c.duration_term,
+    c.study_mode,
+    c.course_website,
+    c.course_location,
+    c.university_id,
+    (setweight(to_tsvector('simple'::regconfig, COALESCE(c.name, ''::text)), 'A'::"char") || setweight(to_tsvector('simple'::regconfig, COALESCE(u.name, ''::text)), 'B'::"char")) AS name_tsv,
+    ((((((setweight(to_tsvector('english'::regconfig, COALESCE(c.name, ''::text)), 'A'::"char") || setweight(to_tsvector('english'::regconfig, COALESCE(u.name, ''::text)), 'B'::"char")) || setweight(to_tsvector('english'::regconfig, COALESCE(c.category, ''::text)), 'C'::"char")) || setweight(to_tsvector('english'::regconfig, COALESCE(c.course_location, ''::text)), 'C'::"char")) || setweight(to_tsvector('english'::regconfig, COALESCE(u.city, ''::text)), 'C'::"char")) || setweight(to_tsvector('english'::regconfig, COALESCE(u.country, ''::text)), 'C'::"char")) || setweight(to_tsvector('english'::regconfig, COALESCE(c.sub_category, ''::text)), 'D'::"char")) AS search_tsv,
+    u.name AS university_name,
+    u.logo_url,
+    u.city AS university_city,
+    u.country AS university_country,
+    u.website AS university_website,
+    COALESCE(u.featured, false) AS featured,
+    COALESCE(u.featured_priority, 0) AS featured_priority,
+    ( SELECT fees.international_fee
+           FROM public.fees
+          WHERE (fees.course_id = c.id)
+          ORDER BY fees.id DESC
+         LIMIT 1) AS international_fee,
+    ( SELECT fees.currency
+           FROM public.fees
+          WHERE (fees.course_id = c.id)
+          ORDER BY fees.id DESC
+         LIMIT 1) AS currency,
+    ( SELECT fees.fee_term
+           FROM public.fees
+          WHERE (fees.course_id = c.id)
+          ORDER BY fees.id DESC
+         LIMIT 1) AS fee_term,
+    NULL::real AS application_fee,
+    ( SELECT array_agg(DISTINCT intakes.intake_month ORDER BY intakes.intake_month) AS array_agg
+           FROM public.intakes
+          WHERE ((intakes.course_id = c.id) AND (intakes.intake_month IS NOT NULL))) AS intakes,
+    ( SELECT english_requirements.overall
+           FROM public.english_requirements
+          WHERE ((english_requirements.course_id = c.id) AND (english_requirements.test_type = 'IELTS'::text))
+         LIMIT 1) AS ielts_overall,
+    ( SELECT english_requirements.overall
+           FROM public.english_requirements
+          WHERE ((english_requirements.course_id = c.id) AND (english_requirements.test_type = 'PTE'::text))
+         LIMIT 1) AS pte_overall,
+    ( SELECT english_requirements.overall
+           FROM public.english_requirements
+          WHERE ((english_requirements.course_id = c.id) AND (english_requirements.test_type = 'TOEFL'::text))
+         LIMIT 1) AS toefl_overall,
+    ( SELECT english_requirements.overall
+           FROM public.english_requirements
+          WHERE ((english_requirements.course_id = c.id) AND (english_requirements.test_type = ANY (ARRAY['CAE'::text, 'Cambridge'::text])))
+         LIMIT 1) AS cae_overall,
+    ( SELECT english_requirements.overall
+           FROM public.english_requirements
+          WHERE ((english_requirements.course_id = c.id) AND (english_requirements.test_type = ANY (ARRAY['Duolingo'::text, 'DET'::text])))
+         LIMIT 1) AS duolingo_overall,
+        CASE
+            WHEN (c.duration IS NULL) THEN NULL::double precision
+            WHEN (c.duration_term ~~* 'month%'::text) THEN ((c.duration)::double precision / (12.0)::double precision)
+            WHEN (c.duration_term ~~* 'week%'::text) THEN ((c.duration)::double precision / (52.0)::double precision)
+            ELSE (c.duration)::double precision
+        END AS duration_years
+   FROM (public.courses c
+     JOIN public.universities u ON ((u.id = c.university_id)))
+  WHERE ((COALESCE(c.status, 'active'::text) = 'active'::text) AND (COALESCE(c.approval_status, 'approved'::text) = 'approved'::text))
+  WITH NO DATA;
+ALTER MATERIALIZED VIEW public.course_search_view OWNER TO uniportal;
+CREATE INDEX idx_csv_category ON public.course_search_view USING btree (category);
+CREATE INDEX idx_csv_city ON public.course_search_view USING btree (university_city);
+CREATE INDEX idx_csv_city_trgm ON public.course_search_view USING gin (lower(university_city) public.gin_trgm_ops);
+CREATE INDEX idx_csv_country ON public.course_search_view USING btree (university_country);
+CREATE INDEX idx_csv_country_trgm ON public.course_search_view USING gin (lower(university_country) public.gin_trgm_ops);
+CREATE INDEX idx_csv_course_name_lower_trgm ON public.course_search_view USING gin (lower(course_name) public.gin_trgm_ops);
+CREATE INDEX idx_csv_degree_level ON public.course_search_view USING btree (degree_level);
+CREATE INDEX idx_csv_duration_years ON public.course_search_view USING btree (duration_years);
+CREATE INDEX idx_csv_featured ON public.course_search_view USING btree (featured DESC, featured_priority DESC) WHERE (featured = true);
+CREATE UNIQUE INDEX idx_csv_id ON public.course_search_view USING btree (id);
+CREATE INDEX idx_csv_intakes ON public.course_search_view USING gin (intakes);
+CREATE INDEX idx_csv_intl_fee ON public.course_search_view USING btree (international_fee);
+CREATE INDEX idx_csv_loc_trgm ON public.course_search_view USING gin (lower(COALESCE(course_location, ''::text)) public.gin_trgm_ops);
+CREATE INDEX idx_csv_name_trgm ON public.course_search_view USING gin (course_name public.gin_trgm_ops);
+CREATE INDEX idx_csv_name_tsv ON public.course_search_view USING gin (name_tsv);
+CREATE INDEX idx_csv_search_tsv ON public.course_search_view USING gin (search_tsv);
+CREATE INDEX idx_csv_uni_name_lower_trgm ON public.course_search_view USING gin (lower(university_name) public.gin_trgm_ops);
+CREATE INDEX idx_csv_uni_name_trgm ON public.course_search_view USING gin (university_name public.gin_trgm_ops);
+CREATE INDEX idx_csv_university_id ON public.course_search_view USING btree (university_id);
+\unrestrict OwcL89S9uGZbA1ddqlAhhhS3HLMbRWVQwf3SKcmyJo4QtfZWBRbFmmzxg8b7vAr
+=== 2: Dropping view ===
+DROP MATERIALIZED VIEW
+=== 3: Altering column ===
+ALTER TABLE
+=== 4: Recreating view ===
+CREATE MATERIALIZED VIEW
+ALTER MATERIALIZED VIEW
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+=== 5: Grants + mark migration done ===
+GRANT
+UPDATE 1
+=== 6: Verify ===
+ column_name | data_type | numeric_precision | numeric_scale 
+-------------+-----------+-------------------+---------------
+ duration    | numeric   |                 6 |             2
+(1 row)
+
+     version_num      
+----------------------
+ 012_duration_numeric
+(1 row)
+
+root@university-and-course-data:~/University-and-Course-data# cd ~/University-and-Course-data
+git pull --rebase origin main
+sudo systemctl restart uni-api-py.service uni-celery.service
+sudo systemctl status uni-api-py.service
+remote: Enumerating objects: 17, done.
+remote: Counting objects: 100% (17/17), done.
+remote: Compressing objects: 100% (11/11), done.
+remote: Total 11 (delta 7), reused 0 (delta 0), pack-reused 0 (from 0)
+Unpacking objects: 100% (11/11), 3.27 KiB | 1.09 MiB/s, done.
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+   0279075..9b95125  main       -> origin/main
+Successfully rebased and updated refs/heads/main.
+● uni-api-py.service - University Portal Python API (FastAPI + Uvicorn)
+     Loaded: loaded (/etc/systemd/system/uni-api-py.service; enabled; preset: enabled)
+     Active: active (running) since Thu 2026-04-30 13:57:51 UTC; 1s ago
+   Main PID: 1249375 (python)
+      Tasks: 8 (limit: 9483)
+     Memory: 151.3M (peak: 151.7M)
+        CPU: 3.320s
+     CGroup: /system.slice/uni-api-py.service
+             ├─1249375 /root/University-and-Course-data/backend-py/venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 2 --access-log --lo>
+             ├─1249377 /root/University-and-Course-data/backend-py/venv/bin/python -c "from multiprocessing.resource_tracker import main;main(6)"
+             ├─1249378 /root/University-and-Course-data/backend-py/venv/bin/python -c "from multiprocessing.spawn import spawn_main; spawn_main(tracker_fd=7, pipe_ha>
+             └─1249379 /root/University-and-Course-data/backend-py/venv/bin/python -c "from multiprocessing.spawn import spawn_main; spawn_main(tracker_fd=7, pipe_ha>
+
+Apr 30 13:57:51 university-and-course-data systemd[1]: Started uni-api-py.service - University Portal Python API (FastAPI + Uvicorn).
+lines 1-14/14 (END)

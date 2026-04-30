@@ -1,0 +1,29 @@
+23:38Claude responded: Good — Option C is built correctly with the no-op-by-default behaviour locked in by teststrippatternsnotappliedwithoutconfig.Good — Option C is built correctly with the no-op-by-default behaviour locked in by test_strip_patterns_not_applied_without_config. The pattern fix from ^\s*\^.*$ to whatever you adjusted it to (the previous wouldn't have matched because ^ is a regex metachar that needs escaping at the start of a string-search context) is the kind of thing that would have broken silently in prod. Catching it via test before deploy is exactly the discipline working.
+On your two-options question: Option 1 (cherry-pick C, sweep, ship; then handle the others) is the right call.
+Reasoning:
+Option 2 sounds tidy ("do all the validation, then pull the whole stack") but it's actually riskier. It bundles four independent migrations into one prod deploy. If anything in Fix 1, 2, or 3 produces an unexpected diff during sweep, you can't ship Option C either — even though Option C is independent and ready. The user-visible location cruft sits broken for however long the duration-regex sweep takes to debug.
+Option 1 keeps the migrations independent. C ships, location cruft cleared, dashboard improves. Then you tackle Fixes 1+3 (Option B's actual scope) and Fix 2 (DB schema) as separate workstreams with their own sweeps and their own merge gates. If the duration regex sweep surfaces issues, that's a B problem, not a C problem.
+Concrete recommended sequence:
+
+Cherry-pick be3df6700db3 onto a branch from current prod HEAD (which is whatever was on prod before the four problematic commits, presumably some commit predating ede935448ea1). Confirm the cherry-pick applies cleanly — Option C touched location.py, schema.py, acap.yaml, and the test file. None of those files should have intermediate changes from Fixes 1-3.
+Capture fresh post-Phase-5 baseline from current prod state (the state without C, without Fixes 1-3). This becomes the "before" snapshot.
+Apply C cherry-pick to a staging copy, run ACAP scrape, capture "after" baseline.
+Run regression sweep with --expected-slugs acap. Expected: 22 clean, ACAP acknowledged-dirty (location values for the 4 affected courses change from Perth^ ^Available in Perth from Trimester 3, 2026 to Perth).
+If sweep is clean, ship C to prod. Pull just the cherry-picked commit, restart, scrape ACAP, spot-check the 4 courses in the dashboard.
+Then start the staging DB work for Fix 2 (clone prod DB → migrate → baseline diff against current prod). Fix 2 is independent of B's scope, so it can run in parallel with B's sweep planning.
+Then multi-uni sweep for Fixes 1+3 (Option B). Treat as one PR — both fixes are duration-regex-related shared-code changes, so they share blast radius and should sweep together. Enumerate affected courses across all 22 baselined unis using the data query I suggested earlier (duration_value >= 5 AND duration_unit = 'years' AND degree_level IN ('Graduate Certificate', 'Graduate Diploma')). Run sweep with the enumerated --expected-slugs list.
+
+Two things worth confirming before you start step 1:
+The cherry-pick will work cleanly if Fixes 1, 2, 3 didn't touch the same lines as C. Worth a quick git show be3df6700db3 --stat and confirming none of those files have been changed by ede935448ea1, fba79b1cb3d2, or 629e5de001ce. If there's overlap (unlikely given the descriptions, but worth checking), the cherry-pick needs manual conflict resolution. Probably no conflict, but check.
+The KBS run from earlier showed that KBS has the same vision OCR hallucination problem ACAP had — IELTS=9, IELTS=4, etc. Worth queuing a Phase-5-style trust_vision_ocr: false for KBS as the next migration after C ships. That's a per-uni override identical in shape to the ACAP one, half a day of work, and it'll clean up obviously wrong IELTS values across all 29 staged KBS courses. It's lower-risk than B's sweep and produces immediate visible improvement.
+So the actual queue post-C is:
+
+C ships (today, after sweep)
+KBS vision OCR override (next per-uni override, mirrors Phase 5 pattern, no sweep needed)
+Fix 2 staging DB validation (parallel track with #2)
+Fixes 1+3 multi-uni sweep (Option B, biggest sweep test yet)
+KBS link-out following for fees + IELTS (Option D, the broader rule)
+ACAP international tab/modal interaction (Option E, originally surfaced in the screenshot review)
+
+Pick "ACAP sweep to promote Option C" for now. That's the clean win. Once C is live and the dashboard reflects clean ACAP locations, queue KBS vision OCR override as the next 30-minute win, then tackle the heavier Fix 2 / B sweep work with the architecture's full discipline.
+Go for the C sweep.
