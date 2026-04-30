@@ -115,7 +115,19 @@ _DURATION_ANTI_CONTEXT = re.compile(
     # common phrasings are covered while keeping the pattern precise.
     r"within\s+\d+\s+years?\s+of\s+(?:commencement|commencing|enrol(?:ment|ling)?|"
     r"starting|graduation|admission|candidature|award)|"
-    r"complet(?:e|ed|ing|ion)(?:\s+\w+){0,4}\s+within\s+\d+\s+years?)\b",
+    r"complet(?:e|ed|ing|ion)(?:\s+\w+){0,4}\s+within\s+\d+\s+years?|"
+    # Admission-requirements boilerplate.  These sentences contain "completed"
+    # which triggers _DURATION_CONTEXT, so Pattern-2 would otherwise fire on
+    # "12 years" and beat the real program duration (e.g. Torrens grad certs
+    # showing "12 years of schooling required" → 12 Year wins over 20 Month).
+    #   "completed Year 12 or equivalent"
+    #   "12 years of schooling"
+    #   "12 years of secondary/high-school education"
+    #   "equivalent to Year 12"
+    r"year\s+12\b|"
+    r"\d+\s+years?\s+of\s+(?:schooling|secondary|high\s?school|education)|"
+    r"equivalent\s+to\s+year\s+\d+|"
+    r"completed?\s+year\s+\d+)\b",
     re.I,
 )
 

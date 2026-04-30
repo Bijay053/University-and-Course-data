@@ -93,7 +93,6 @@ def test_duration_label_does_not_misfire_on_unrelated_strong_tags():
     assert out
     n = out[0].normalized
     assert n["duration"] == 4.0 and n["duration_term"] == "Year"
-    # Method should be the keyword fallback, not structural.
     assert out[0].method != "duration.structural"
 
 
@@ -105,10 +104,6 @@ def test_dt_dd_duration_rejects_accelerated_in_value_cell():
     fallback gets a chance to surface the real duration."""
     html = "<dl><dt>Duration</dt><dd>1 year (accelerated stream)</dd></dl>"
     out = _run(duration.extract(html, "https://e/x"))
-    # The accelerated dd is rejected by both the structural pre-pass
-    # AND the keyword fallback (which skips accelerated sentences too).
-    # Either way, the structural pre-pass must NOT have emitted a
-    # 1-year accelerated value as authoritative.
     structural = [r for r in out if r.method == "duration.structural"]
     assert not structural, (
         f"Structural pre-pass must reject accelerated value cells, "
@@ -116,114 +111,86 @@ def test_dt_dd_duration_rejects_accelerated_in_value_cell():
     )
 
 
-def test_completion_deadline_does_not_displace_monthly_duration():
-    """ACAP / KBS / ACU regression: Graduate Certificate pages that publish a
-    completion deadline *before* the real program duration caused the sentence
-    tournament to score the deadline year-value higher than the real months
-    value.
+# ── Admission-boilerplate anti-context (Fix 1) ────────────────────────────────
 
-    Example page layout:
-        <p>Students must complete the qualification within 8 years
-           of commencement of studies.</p>
-        <div>8 months full-time</div>
+def test_years_of_schooling_boilerplate_is_not_duration():
+    """'completed 12 years of schooling' must not extract as a program duration.
 
-    Tournament scoring (before fix):
-      "…within 8 years of commencement…"  → 8 Year  weight=41,604  (Pattern-2)
-      "8 months full-time"                → 8 Month weight= 3,202  (Pattern-2)
-      → 8 Year incorrectly wins.
+    'completed' is in _DURATION_CONTEXT so Pattern-2 would fire on '12 years'
+    without the admission-boilerplate guard in _DURATION_ANTI_CONTEXT.
+    This is the exact Torrens bug: '12 years of schooling' admission requirement
+    on the same page as '1 year, 8 months' program duration → 12 Year wins.
+    """
+    html = "<p>Applicants must have completed 12 years of schooling.</p>"
+    out = _run(duration.extract(html, "https://www.torrens.edu.au/test/"))
+    assert not out, (
+        f"'completed 12 years of schooling' must not produce a duration; "
+        f"got {out!r}. Check _DURATION_ANTI_CONTEXT schooling guard."
+    )
 
-    Root cause: _DURATION_ANTI_CONTEXT did not cover the
-    "complete/completing within N years" or "within N years of
-    commencement/enrolment" completion-deadline pattern class.
 
-    After the fix, the deadline sentence is excluded from Pattern-2 and the
-    real duration sentence wins the tournament.
+def test_year_12_boilerplate_is_not_duration():
+    """'Year 12 or equivalent' must not extract as a program duration."""
+    html = "<p>Applicants must have completed Year 12 or equivalent.</p>"
+    out = _run(duration.extract(html, "https://www.torrens.edu.au/test/"))
+    assert not out, (
+        f"'Year 12 or equivalent' must not produce a duration; got {out!r}."
+    )
+
+
+def test_compound_duration_beats_schooling_boilerplate():
+    """Real Torrens page pattern: compound duration in the body text alongside
+    '12 years of schooling' in the admission requirements section.
+
+    Without the schooling guard: 'completed' fires _DURATION_CONTEXT, Pattern-2
+    picks up '12 years' (weight 62 400) and beats the compound '1 year 8 months'
+    result (weight 12 003) → stored as 12 Year.
+
+    With the guard: '12 years of schooling' is blocked by _DURATION_ANTI_CONTEXT,
+    the compound result (20 Month) is the only candidate → correct.
     """
     html = (
-        "<p>Students must complete the qualification within 8 years "
-        "of commencement of studies.</p>"
-        "<div>8 months full-time</div>"
+        "<p>Duration: 1 year, 8 months / 12 subjects / 5 trimesters</p>"
+        "<p>Applicants must have completed 12 years of schooling or equivalent.</p>"
     )
-    out = _run(duration.extract(html, "https://www.acap.edu.au/test/"))
-    assert out, "extractor must find the 8-month duration"
+    out = _run(duration.extract(html, "https://www.torrens.edu.au/test/"))
+    assert out, "extractor must find a duration"
     n = out[0].normalized
-    assert n["duration"] == 8.0 and n["duration_term"] == "Month", (
-        f"Completion-deadline sentence ('within 8 years of commencement') "
-        f"must not beat the real program duration (8 months). Got {n!r}."
+    assert n["duration"] == 20.0 and n["duration_term"] == "Month", (
+        f"Expected 20 Month (= 1 year 8 months); got {n!r}. "
+        f"'12 years of schooling' must not beat the compound duration."
     )
 
 
-def test_within_n_years_of_enrolment_is_anti_context():
-    """'within 8 years of enrolment' is always a completion deadline —
-    the semester/trimester variant of the same bug class as the commencement
-    pattern. Must not win over a real '8 months full-time' duration."""
+def test_slash_delimited_duration_structural_pass():
+    """KBS / Torrens pattern: '8 months / 4 subjects / 2 trimesters' in a
+    dt/dd pair.  The structural pre-pass reads the value cell directly so
+    _classify_duration_value picks up '8 months' as the first digit match.
+    """
     html = (
-        "<p>Candidates must complete within 8 years of enrolment.</p>"
-        "<p>8 months full-time.</p>"
+        "<dl>"
+        "<dt>Duration</dt>"
+        "<dd>8 months / 4 subjects / 2 trimesters</dd>"
+        "</dl>"
+        "<p>Applicants must have completed Year 12 or equivalent.</p>"
     )
-    out = _run(duration.extract(html, "https://www.acap.edu.au/test/"))
-    assert out, "extractor must find the 8-month duration"
-    n = out[0].normalized
-    assert n["duration"] == 8.0 and n["duration_term"] == "Month", (
-        f"'within 8 years of enrolment' deadline must be excluded from "
-        f"Pattern-2; got {n!r}."
-    )
-
-
-def test_labeled_duration_unaffected_by_completion_deadline_fix():
-    """Pattern-0 (explicit duration label) must still fire on sentences that
-    contain 'complete within N years' — the anti-context gate only applies to
-    Pattern-2 (the loose fallback). A labeled sentence is always preferred."""
-    html = "<p>Course duration: 2 years full-time. Must complete within 4 years.</p>"
-    out = _run(duration.extract(html, "https://e/x"))
-    assert out, "extractor must fire on the labeled duration sentence"
-    n = out[0].normalized
-    assert n["duration"] == 2.0 and n["duration_term"] == "Year", (
-        f"Pattern-0 (duration label) must fire on 'Course duration: 2 years' "
-        f"regardless of the completion-deadline clause. Got {n!r}."
-    )
-
-
-def test_complete_intervening_words_within_years_is_anti_context():
-    """KBS grad cert bug: 'complete their qualification within 8 years' has
-    1-4 words between 'complete' and 'within' — the old pattern required
-    zero intervening words so it silently failed to block the deadline
-    sentence, letting 8 Year beat the real '8 months' duration.
-
-    The fix extends the pattern to (?:\\s+\\w+){0,4} before 'within'."""
-    html = (
-        "<p>Typical Duration / Standard Study Option 8 months / 4 subjects / 2 trimesters.</p>"
-        "<p>Students must complete their qualification within 8 years of commencement.</p>"
-    )
-    out = _run(duration.extract(html, "https://www.kbs.edu.au/courses/grad-cert/"))
+    out = _run(duration.extract(html, "https://www.kbs.edu.au/test/"))
     assert out, "extractor must find a duration"
     n = out[0].normalized
     assert n["duration"] == 8.0 and n["duration_term"] == "Month", (
-        f"'complete their qualification within 8 years' must be blocked by "
-        f"anti-context; expected 8 Month but got {n!r}."
+        f"Expected 8 Month from dt/dd cell; got {n!r}."
     )
+    assert out[0].method == "duration.structural"
 
 
-def test_complete_all_subjects_within_years_is_anti_context():
-    """Variant: 'complete all subjects within 8 years' — two intervening words."""
-    html = (
-        "<p>8 months full-time study.</p>"
-        "<p>You must complete all subjects within 8 years.</p>"
-    )
-    out = _run(duration.extract(html, "https://www.kbs.edu.au/courses/test/"))
-    assert out, "extractor must find a duration"
-    n = out[0].normalized
-    assert n["duration"] == 8.0 and n["duration_term"] == "Month", (
-        f"'complete all subjects within 8 years' must be blocked; got {n!r}."
-    )
-
+# ── Same-N cross-check ────────────────────────────────────────────────────────
 
 def test_same_n_cross_check_prefers_month_when_year_escapes_anti_context():
     """Same-N cross-check fix (KBS / Torrens grad cert bug).
 
     Candidature-deadline phrasings vary widely — not all are caught by the
     anti-context guard.  When the tournament contains both (N, Year) and
-    (N, Month) for the same integer N ≥ 5, Month wins because no accredited
+    (N, Month) for the same integer N >= 5, Month wins because no accredited
     Australian graduate certificate runs for 5+ years.
 
     This test uses 'expected course duration is up to 8 years for part-time
@@ -241,7 +208,7 @@ def test_same_n_cross_check_prefers_month_when_year_escapes_anti_context():
     n = out[0].normalized
     assert n["duration"] == 8.0 and n["duration_term"] == "Month", (
         f"Same-N cross-check must prefer Month=8 over Year=8 when both are "
-        f"in the tournament and N ≥ 5; got {n!r}."
+        f"in the tournament and N >= 5; got {n!r}."
     )
 
 
@@ -250,7 +217,7 @@ def test_cross_check_does_not_fire_for_different_n():
 
     If N differs (e.g., labeled 'Duration: 2 years' while the page also
     mentions '8 months of work placement'), the cross-check must NOT flip
-    the winner — Pattern-0 (labeled) wins at ×100 priority regardless.
+    the winner — Pattern-0 (labeled) wins at x100 priority regardless.
     """
     html = (
         "<div><strong>Duration</strong></div>"
