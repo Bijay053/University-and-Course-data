@@ -14,7 +14,12 @@ from app.database import Base
 from app import models  # noqa: F401  -- ensures all models are imported
 
 config = context.config
-config.set_main_option("sqlalchemy.url", settings.database_url)
+# ConfigParser treats bare '%' as interpolation syntax and raises ValueError
+# when the DATABASE_URL contains percent-encoded characters (e.g. %40 for '@'
+# in the password).  Escape every '%' to '%%' so ConfigParser stores it safely;
+# it unescapes '%%' back to '%' when the value is read, so SQLAlchemy receives
+# the correctly percent-encoded URL.
+config.set_main_option("sqlalchemy.url", settings.database_url.replace("%", "%%"))
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)

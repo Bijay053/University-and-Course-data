@@ -1,0 +1,270 @@
+hint: your next pull:
+hint: 
+hint:   git config pull.rebase false  # merge
+hint:   git config pull.rebase true   # rebase
+hint:   git config pull.ff only       # fast-forward only
+hint: 
+hint: You can replace "git config" with "git config --global" to set a default
+hint: preference for all repositories. You can also pass --rebase, --no-rebase,
+hint: or --ff-only on the command line to override the configured default per
+hint: invocation.
+fatal: Need to specify how to reconcile divergent branches.
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/__main__.py", line 4, in <module>
+    main(prog="alembic")
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/config.py", line 1047, in main
+    CommandLine(prog=prog).main(argv=argv)
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/config.py", line 1037, in main
+    self.run_cmd(cfg, options)
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/config.py", line 971, in run_cmd
+    fn(
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/command.py", line 483, in upgrade
+    script.run_env()
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/script/base.py", line 545, in run_env
+    util.load_python_file(self.dir, "env.py")
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/util/pyfiles.py", line 116, in load_python_file
+    module = load_module_py(module_id, path)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/util/pyfiles.py", line 136, in load_module_py
+    spec.loader.exec_module(module)  # type: ignore
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "/root/University-and-Course-data/backend-py/alembic/env.py", line 17, in <module>
+    config.set_main_option("sqlalchemy.url", settings.database_url)
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/config.py", line 358, in set_main_option
+    self.set_section_option(self.config_ini_section, name, value)
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/config.py", line 391, in set_section_option
+    self.file_config.set(section, name, value)
+  File "/usr/lib/python3.12/configparser.py", line 1184, in set
+    super().set(section, option, value)
+  File "/usr/lib/python3.12/configparser.py", line 872, in set
+    value = self._interpolation.before_set(self, section, option,
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/configparser.py", line 374, in before_set
+    raise ValueError("invalid interpolation syntax in %r at "
+ValueError: invalid interpolation syntax in 'postgresql+asyncpg://uniportal:Bij%40y12345@127.0.0.1:5432/university_portal' at position 34
+Stored 1.7, read back: 1.7 ← must be 1.70 not 1.7000000476837158
+Apr 30 13:19:22 university-and-course-data celery[1247025]: [2026-04-30 13:19:22,929: INFO/MainProcess] celery@university-and-course-data ready.
+root@university-and-course-data:~/University-and-Course-data/backend-py# # 1. Pull from GitHub
+cd /path/to/project          # wherever the repo is checked out on prod
+git pull origin main
+
+# 2. Run the Alembic migration (Fix 2 — Float → Numeric)
+cd backend-py
+PYTHONPATH=. python -m alembic upgrade head
+
+# 3. Restart the FastAPI and Celery workers
+sudo systemctl restart fastapi     # or whatever your service name is
+sudo systemctl restart celery      # or your Celery service name
+-bash: cd: /path/to/project: No such file or directory
+remote: Enumerating objects: 49, done.
+remote: Counting objects: 100% (49/49), done.
+remote: Compressing objects: 100% (34/34), done.
+Unpacking objects: 100% (34/34), 6.36 KiB | 500.00 KiB/s, done.
+remote: Total 34 (delta 28), reused 0 (delta 0), pack-reused 0 (from 0)
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+   629e5de..0279075  main       -> origin/main
+hint: You have divergent branches and need to specify how to reconcile them.
+hint: You can do so by running one of the following commands sometime before
+hint: your next pull:
+hint: 
+hint:   git config pull.rebase false  # merge
+hint:   git config pull.rebase true   # rebase
+hint:   git config pull.ff only       # fast-forward only
+hint: 
+hint: You can replace "git config" with "git config --global" to set a default
+hint: preference for all repositories. You can also pass --rebase, --no-rebase,
+hint: or --ff-only on the command line to override the configured default per
+hint: invocation.
+fatal: Need to specify how to reconcile divergent branches.
+-bash: cd: backend-py: No such file or directory
+Command 'python' not found, did you mean:
+  command 'python3' from deb python3
+  command 'python' from deb python-is-python3
+Failed to restart fastapi.service: Unit fastapi.service not found.
+Failed to restart celery.service: Unit celery.service not found.
+root@university-and-course-data:~/University-and-Course-data/backend-py# cd ~/University-and-Course-data
+git pull --rebase origin main
+error: cannot pull with rebase: You have unstaged changes.
+error: Please commit or stash them.
+root@university-and-course-data:~/University-and-Course-data# git diff --stat
+ app/services/scraper/pipelines/single_course.py | 2077 -------------------------------------------------------------------------------------------------------------
+ 1 file changed, 2077 deletions(-)
+root@university-and-course-data:~/University-and-Course-data# git stash
+git pull --rebase origin main
+git stash pop
+Saved working directory and index state WIP on main: a7c825b fix(duration): same-N cross-check + grad-cert sanity cap (KBS/Torrens 8Year bug)
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+Auto-merging backend-py/app/services/scraper/extractors/duration.py
+CONFLICT (content): Merge conflict in backend-py/app/services/scraper/extractors/duration.py
+error: could not apply ccca51c... fix(duration): extend complete...within anti-context to allow intervening words (KBS grad cert 8 Year bug)
+hint: Resolve all conflicts manually, mark them as resolved with
+hint: "git add/rm <conflicted_files>", then run "git rebase --continue".
+hint: You can instead skip this commit: run "git rebase --skip".
+hint: To abort and get back to the state before "git rebase", run "git rebase --abort".
+Could not apply ccca51c... fix(duration): extend complete...within anti-context to allow intervening words (KBS grad cert 8 Year bug)
+backend-py/app/services/scraper/extractors/duration.py: needs merge
+The stash entry is kept in case you need it again.
+root@university-and-course-data:~/University-and-Course-data# git stash drop
+Dropped refs/stash@{0} (f1795c18bfe8e14c4acb1ded4df04d0c0dac7765)
+root@university-and-course-data:~/University-and-Course-data# cd ~/University-and-Course-data/backend-py
+PYTHONPATH=. python3 -m alembic upgrade head
+/usr/bin/python3: No module named alembic.__main__; 'alembic' is a package and cannot be directly executed
+root@university-and-course-data:~/University-and-Course-data/backend-py# systemctl list-units --type=service | grep -iE "fastapi|celery|uvicorn|gunicorn|worker|university"
+  uni-api-py.service                             loaded active running University Portal Python API (FastAPI + Uvicorn)
+  uni-celery.service                             loaded active running University Portal Celery Worker (scraper)
+root@university-and-course-data:~/University-and-Course-data/backend-py# cd ~/University-and-Course-data
+git checkout --theirs backend-py/app/services/scraper/extractors/duration.py
+git add backend-py/app/services/scraper/extractors/duration.py
+git rebase --continue
+Updated 1 path from the index
+[detached HEAD 7654088] fix(duration): extend complete...within anti-context to allow intervening words (KBS grad cert 8 Year bug)
+ 1 file changed, 1 insertion(+), 38 deletions(-)
+Auto-merging backend-py/app/services/scraper/pipelines/single_course.py
+CONFLICT (content): Merge conflict in backend-py/app/services/scraper/pipelines/single_course.py
+error: could not apply a7c825b... fix(duration): same-N cross-check + grad-cert sanity cap (KBS/Torrens 8Year bug)
+hint: Resolve all conflicts manually, mark them as resolved with
+hint: "git add/rm <conflicted_files>", then run "git rebase --continue".
+hint: You can instead skip this commit: run "git rebase --skip".
+hint: To abort and get back to the state before "git rebase", run "git rebase --abort".
+Could not apply a7c825b... fix(duration): same-N cross-check + grad-cert sanity cap (KBS/Torrens 8Year bug)
+root@university-and-course-data:~/University-and-Course-data# find ~/University-and-Course-data -name "alembic" -type f 2>/dev/null | head -5
+/root/University-and-Course-data/backend-py/venv/bin/alembic
+root@university-and-course-data:~/University-and-Course-data# # Most likely one of these — run whichever exists:
+~/University-and-Course-data/backend-py/venv/bin/alembic -c backend-py/alembic.ini upgrade head
+# or
+/opt/venv/bin/python3 -m alembic upgrade head
+  FAILED: Path doesn't exist: alembic.  Please use the 'init' command to create a new scripts folder.
+-bash: /opt/venv/bin/python3: No such file or directory
+root@university-and-course-data:~/University-and-Course-data# cd ~/University-and-Course-data
+git status
+interactive rebase in progress; onto 0279075
+Last commands done (2 commands done):
+   pick ccca51c fix(duration): extend complete...within anti-context to allow intervening words (KBS grad cert 8 Year bug)
+   pick a7c825b fix(duration): same-N cross-check + grad-cert sanity cap (KBS/Torrens 8Year bug)
+No commands remaining.
+You are currently rebasing branch 'main' on '0279075'.
+  (fix conflicts and then run "git rebase --continue")
+  (use "git rebase --skip" to skip this patch)
+  (use "git rebase --abort" to check out the original branch)
+
+Changes to be committed:
+  (use "git restore --staged <file>..." to unstage)
+        modified:   backend-py/app/services/scraper/extractors/duration.py
+
+Unmerged paths:
+  (use "git restore --staged <file>..." to unstage)
+  (use "git add <file>..." to mark resolution)
+        both modified:   backend-py/app/services/scraper/pipelines/single_course.py
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+        =
+        backend-py/baselines/
+        drizzle-kit
+
+root@university-and-course-data:~/University-and-Course-data# git checkout --theirs backend-py/app/services/scraper/extractors/duration.py
+git add backend-py/app/services/scraper/extractors/duration.py
+git rebase --continue
+Updated 0 paths from the index
+backend-py/app/services/scraper/pipelines/single_course.py: needs merge
+You must edit all merge conflicts and then
+mark them as resolved using git add
+root@university-and-course-data:~/University-and-Course-data# cd ~/University-and-Course-data/backend-py
+../backend-py/venv/bin/alembic upgrade head
+Traceback (most recent call last):
+  File "/root/University-and-Course-data/backend-py/../backend-py/venv/bin/alembic", line 6, in <module>
+    sys.exit(main())
+             ^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/config.py", line 1047, in main
+    CommandLine(prog=prog).main(argv=argv)
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/config.py", line 1037, in main
+    self.run_cmd(cfg, options)
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/config.py", line 971, in run_cmd
+    fn(
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/command.py", line 483, in upgrade
+    script.run_env()
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/script/base.py", line 545, in run_env
+    util.load_python_file(self.dir, "env.py")
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/util/pyfiles.py", line 116, in load_python_file
+    module = load_module_py(module_id, path)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/util/pyfiles.py", line 136, in load_module_py
+    spec.loader.exec_module(module)  # type: ignore
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "/root/University-and-Course-data/backend-py/alembic/env.py", line 17, in <module>
+    config.set_main_option("sqlalchemy.url", settings.database_url)
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/config.py", line 358, in set_main_option
+    self.set_section_option(self.config_ini_section, name, value)
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/config.py", line 391, in set_section_option
+    self.file_config.set(section, name, value)
+  File "/usr/lib/python3.12/configparser.py", line 1184, in set
+    super().set(section, option, value)
+  File "/usr/lib/python3.12/configparser.py", line 872, in set
+    value = self._interpolation.before_set(self, section, option,
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/configparser.py", line 374, in before_set
+    raise ValueError("invalid interpolation syntax in %r at "
+ValueError: invalid interpolation syntax in 'postgresql+asyncpg://uniportal:Bij%40y12345@127.0.0.1:5432/university_portal' at position 34
+root@university-and-course-data:~/University-and-Course-data/backend-py# cd ~/University-and-Course-data/backend-py
+venv/bin/alembic upgrade head
+Traceback (most recent call last):
+  File "/root/University-and-Course-data/backend-py/venv/bin/alembic", line 6, in <module>
+    sys.exit(main())
+             ^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/config.py", line 1047, in main
+    CommandLine(prog=prog).main(argv=argv)
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/config.py", line 1037, in main
+    self.run_cmd(cfg, options)
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/config.py", line 971, in run_cmd
+    fn(
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/command.py", line 483, in upgrade
+    script.run_env()
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/script/base.py", line 545, in run_env
+    util.load_python_file(self.dir, "env.py")
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/util/pyfiles.py", line 116, in load_python_file
+    module = load_module_py(module_id, path)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/util/pyfiles.py", line 136, in load_module_py
+    spec.loader.exec_module(module)  # type: ignore
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "/root/University-and-Course-data/backend-py/alembic/env.py", line 17, in <module>
+    config.set_main_option("sqlalchemy.url", settings.database_url)
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/config.py", line 358, in set_main_option
+    self.set_section_option(self.config_ini_section, name, value)
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/config.py", line 391, in set_section_option
+    self.file_config.set(section, name, value)
+  File "/usr/lib/python3.12/configparser.py", line 1184, in set
+    super().set(section, option, value)
+  File "/usr/lib/python3.12/configparser.py", line 872, in set
+    value = self._interpolation.before_set(self, section, option,
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/configparser.py", line 374, in before_set
+    raise ValueError("invalid interpolation syntax in %r at "
+ValueError: invalid interpolation syntax in 'postgresql+asyncpg://uniportal:Bij%40y12345@127.0.0.1:5432/university_portal' at position 34
+root@university-and-course-data:~/University-and-Course-data/backend-py# sudo systemctl restart uni-api-py.service uni-celery.service
+sudo systemctl status uni-api-py.service
+● uni-api-py.service - University Portal Python API (FastAPI + Uvicorn)
+     Loaded: loaded (/etc/systemd/system/uni-api-py.service; enabled; preset: enabled)
+     Active: active (running) since Thu 2026-04-30 13:50:32 UTC; 2s ago
+   Main PID: 1249144 (python)
+      Tasks: 8 (limit: 9483)
+     Memory: 151.3M (peak: 151.5M)
+        CPU: 3.682s
+     CGroup: /system.slice/uni-api-py.service
+             ├─1249144 /root/University-and-Course-data/backend-py/venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 2 --access-log --lo>
+             ├─1249145 /root/University-and-Course-data/backend-py/venv/bin/python -c "from multiprocessing.resource_tracker import main;main(6)"
+             ├─1249146 /root/University-and-Course-data/backend-py/venv/bin/python -c "from multiprocessing.spawn import spawn_main; spawn_main(tracker_fd=7, pipe_ha>
+             └─1249147 /root/University-and-Course-data/backend-py/venv/bin/python -c "from multiprocessing.spawn import spawn_main; spawn_main(tracker_fd=7, pipe_ha>
+
+Apr 30 13:50:32 university-and-course-data systemd[1]: Started uni-api-py.service - University Portal Python API (FastAPI + Uvicorn).
+lines 1-14/14 (END)
