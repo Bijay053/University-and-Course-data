@@ -173,6 +173,25 @@ def on_worker_ready(**kwargs) -> None:  # noqa: ANN003
 
     Runs once per worker process start — harmless if there are no stuck rows.
     """
+    # ── Shadow-mode startup log ───────────────────────────────────────────────
+    # Emitted at boot so operators can confirm SHADOW_MODE_UNI_IDS /
+    # SHADOW_CUTOVER_UNI_IDS are being read by the worker process.
+    # If this line is absent from the worker log, the worker is not loading
+    # the env var (e.g. .env not sourced at startup) — fix before triggering
+    # a shadow scrape or the shadow report will never be written.
+    try:
+        import os
+        _shadow_ids = os.environ.get("SHADOW_MODE_UNI_IDS", "").strip()
+        _cutover_ids = os.environ.get("SHADOW_CUTOVER_UNI_IDS", "").strip()
+        if _shadow_ids:
+            log.info("[SHADOW] shadow mode ENABLED for uni_ids: %s", _shadow_ids)
+        else:
+            log.info("[SHADOW] shadow mode OFF (SHADOW_MODE_UNI_IDS not set)")
+        if _cutover_ids:
+            log.info("[SHADOW] cutover ACTIVE for uni_ids: %s", _cutover_ids)
+    except Exception as _shadow_exc:
+        log.warning("[SHADOW] startup config log failed: %s", _shadow_exc)
+    # ── Ghost-job reset ───────────────────────────────────────────────────────
     try:
         reset = asyncio.run(_reset_ghost_running_jobs())
         if reset:
