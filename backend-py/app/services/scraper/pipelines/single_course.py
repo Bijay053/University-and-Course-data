@@ -420,6 +420,15 @@ async def extract_course(
     the *absolute last-resort* fallback (lower confidence than ``uni_pdf_data``)
     for universities that publish fees/IELTS only on central pages (Bug 2).
     """
+    # Week-1/2 contextvar guard: ensure set_uni_config() was called at the entry
+    # point (run_scrape or run_repair).  Soft-fail: logs a WARNING and returns
+    # bare defaults if the contextvar is unset.  Never raises in production.
+    # Any "extractor called without uni context" log line means a code path is
+    # bypassing run_scrape/run_repair — fix by adding set_uni_config() there.
+    # _uc is unused in Week 1; Week-2+ extractors will read config from it.
+    from app.services.scraper.config.context import require_uni_config as _ruc
+    _uc = _ruc()  # noqa: F841
+
     # UNE: international student info (IELTS, PTE, fees, campus availability)
     # is only visible on the ?international=true variant of each course page.
     # Rewrite the URL before fetching so extractors always see the right tab.

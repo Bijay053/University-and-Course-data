@@ -239,6 +239,27 @@ async def run_repair(db: AsyncSession, runtime_job_id: str) -> dict:
         if not uni:
             raise RuntimeError("University not found")
         uni_country = uni.country
+
+        # ── Load per-university config and set contextvar ──────────────────
+        # Mirrors the same block in orchestrator.run_scrape().
+        # repair.py is a separate entry point — it would silently receive
+        # whatever UniConfig was last set in this worker process (or None)
+        # without this explicit call.
+        from urllib.parse import urlparse as _urlparse_repair
+        from app.services.scraper.config import get_config_for_host, set_uni_config
+        _repair_scrape_url = (uni.scrape_url or "").strip()
+        _repair_host = (_urlparse_repair(_repair_scrape_url).netloc or "").lower()
+        _repair_cfg = get_config_for_host(
+            hostname=_repair_host,
+            name=uni.name,
+            scrape_url=_repair_scrape_url,
+            university_id=uni.id,
+            db_scrape_config=dict(uni.scrape_config) if uni.scrape_config else None,
+        )
+        set_uni_config(_repair_cfg)
+        log.debug("UniConfig set for repair job: slug=%r", _repair_cfg.slug)
+        # ──────────────────────────────────────────────────────────────────
+
         total = len(targets)
         if total == 0:
             await emit(

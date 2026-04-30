@@ -238,3 +238,41 @@ class UniConfig(BaseModel):
 
     discovery: DiscoveryConfig = Field(default_factory=DiscoveryConfig)
     extraction: ExtractionConfig = Field(default_factory=ExtractionConfig)
+
+    def for_tier3_replay(self) -> "UniConfig":
+        """Return a config containing ONLY the discovery section.
+
+        Safe to replay against unknown universities in Tier-3 playbook matching.
+
+        The returned config has:
+          - ``discovery``: copied from self (URL filters, sitemap options, etc.)
+          - ``extraction``: bare defaults (no fees config, no english config, no
+            filters, no text_cleaning overrides)
+
+        Why this matters
+        ----------------
+        ACAP's ``filters.domestic_only.enabled = true`` was tuned specifically
+        for ACAP's page structure, where "domestic students only" appears in the
+        main content.  On an unknown university's page that same text might live
+        in a sidebar, footer, or not exist at all — silently rejecting all courses
+        and making the result look like a discovery failure.
+
+        The ``for_tier3_replay()`` boundary makes this exclusion explicit in code
+        rather than relying on developer discipline.  Any code that builds a Tier-3
+        temporary playbook config MUST call this method — not use the raw UniConfig.
+
+        The ``filters`` section is under ``extraction:`` (applied at extraction time
+        for all currently implemented filters) and is excluded here along with the
+        rest of ``extraction:``.  This choice is documented explicitly so it survives
+        refactoring: if ``filters`` is ever moved to a third top-level section, that
+        section must also be excluded from the Tier-3 replay payload.
+        """
+        return UniConfig(
+            slug=self.slug,
+            name=self.name,
+            university_id=self.university_id,
+            base_url=self.base_url,
+            scrape_url=self.scrape_url,
+            discovery=self.discovery.model_copy(),
+            # extraction intentionally omitted — ExtractionConfig() defaults apply.
+        )

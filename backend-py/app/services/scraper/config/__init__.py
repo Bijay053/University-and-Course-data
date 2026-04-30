@@ -38,6 +38,7 @@ from app.services.scraper.config.schema import (
 from app.services.scraper.config.context import (
     get_uni_config,
     set_uni_config,
+    require_uni_config,
     current_uni_config,
 )
 from app.services.scraper.config.loader import (
@@ -56,6 +57,7 @@ __all__ = [
     "StagingConfig",
     "get_uni_config",
     "set_uni_config",
+    "require_uni_config",
     "current_uni_config",
     "load_uni_config",
     "get_config_for_host",

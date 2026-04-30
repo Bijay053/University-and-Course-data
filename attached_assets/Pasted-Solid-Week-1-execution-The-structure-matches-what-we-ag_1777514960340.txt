@@ -1,0 +1,83 @@
+Solid Week 1 execution. The structure matches what we agreed on — discovery/extraction split in the schema, ContextVar for plumbing, conservative defaults.yaml, 20 stub configs with known overrides already populated, and the baseline capture script in place.
+
+Three things worth confirming before Week 2 starts touching anything.
+
+---
+
+**1. The ContextVar choice — make sure it's set in EVERY worker entry point, not just `run_scrape()`.**
+
+The risk with ContextVar is exactly what we discussed: hidden global state. If any code path reaches an extractor *without* going through `run_scrape()` — a manual re-extraction from the dashboard, a backfill job, a test fixture, a CLI tool that calls extractors directly, the per-course-browser fallback if it spawns a separate task or thread, the vision OCR pass if it runs on a separate worker — that extractor will see whatever UniConfig was last set in that worker process (or `None`, or worse, the wrong uni's config from a prior job in the same worker if pooling is involved).
+
+Two things to add:
+
+(a) Audit every entry point that eventually calls an extractor. Confirm `set_uni_config()` is called at each one. Likely candidates to check:
+- The per-course-browser fallback (does it inherit context or run in a separate task?)
+- The vision OCR pass
+- The Gemini AI enrichment fallback
+- Any FastAPI endpoint that triggers a re-extraction
+- The CLI / scripts directory
+- Test fixtures
+
+(b) Add a guard at the top of each extractor that raises if the contextvar is unset:
+
+```python
+def _classify_duration_value(value, unit):
+    cfg = get_uni_config()
+    assert cfg is not None, "extractor called without uni context — missing set_uni_config() at entry point"
+    ...
+```
+
+This turns silent wrong-config bugs into loud crashes during testing rather than quiet wrong data in prod. The assert can be downgraded to a warning + fall-back-to-defaults in production if you want a soft-fail mode, but during Weeks 2–4 it should hard-crash so missing entry points get found.
+
+---
+
+**2. Capture the baseline NOW, before Week 2 starts touching anything.**
+
+The baseline script exists. Has it been *run*? Run it today, commit the snapshot somewhere immutable (S3, the repo, dedicated DB table — doesn't matter as long as it can't be silently mutated), and timestamp it.
+
+The window to capture a clean baseline is closing the moment the next prod fix merges. If you wait even one day after starting Week 2, every divergence becomes ambiguous: "is this from the migration, or did the uni website change between the snapshot and Week 2 start?" Right now you can answer that question. Tomorrow you can't.
+
+One addition worth making to the snapshot — it should include not just staged course data but also:
+- Per-course `[FIELD SUMMARY]` lines (what each extractor returned, with confidence scores)
+- `[FIELD TRACE]` lines (which method produced the final value)
+- Discovery counts (candidates found per stage: BFS, sitemap, browser, Wayback)
+- Filter rejections (domestic_only, online_only, category_landing_page counts)
+- Total cost and timing
+
+Without provenance, a regression that changes *how* a value was extracted (e.g. regex hit vs vision OCR vs Gemini fallback) but produces the same final value will pass the diff while masking a real behavioural change. If KBS Bachelor of Business goes from "regex hit IELTS=6.5" to "vision OCR hit IELTS=6.5", the staged value is identical but the underlying behaviour has changed and you've lost the ability to detect it later. The provenance matters as much as the value.
+
+---
+
+**3. One question on the schema split: where do `filters` live?**
+
+The discovery/extraction boundary is clean for most things, but `filters` (domestic_only, online_only, category_landing_page) sit between them. A domestic_only check might run on the course-list page (discovery time) or on the per-course page (extraction time) depending on the uni — the ACAP log shows it's being applied at extraction time (`[DOMESTIC ONLY] https://www.acap.edu.au/courses/... — course page states domestic-students-only`).
+
+If filters are under `extraction:` in the schema, that's fine — BUT make sure Tier 3 playbook replay genuinely doesn't pick them up when matching a new uni against existing playbooks. ACAP's `domestic_only.text_must_appear_in: main_content` rule applied to a different uni's page structure (where the equivalent text might live in a sidebar) could silently reject every course on the new uni and look like a discovery failure rather than a misconfigured filter.
+
+Worth either (a) explicitly excluding `filters:` from the Tier 3 replay payload alongside the rest of `extraction:`, or (b) adding a third top-level section `filters:` that's also excluded from Tier 3 replay. Either works — just make the boundary explicit in the code that builds the temporary playbook config, not just in developer discipline.
+
+---
+
+**Recommended Week 2 sequencing**
+
+When you start Week 2, suggest this order:
+
+1. Run baseline capture today. Commit the snapshot. Confirm done before any Week 2 work starts.
+2. Pick ONE uni — ACAP is the obvious choice since it's already broken, so any "regression" relative to current prod is moot. Move ONE override from shared code into `acap.yaml`.
+3. Run shadow mode: both old shared-code path and new config-driven path in parallel. Assert byte-identical staged output for 5 consecutive runs.
+4. Cut over. Retire the shared-code branch for that one override.
+5. Repeat for the next override on the same uni, then move to the next uni.
+
+Do NOT migrate multiple overrides per uni in the same PR. The whole point of Week 2 is each migration is small enough to verify in isolation. If a single PR moves 5 overrides across 3 unis and the diff goes weird, you can't tell which migration caused it.
+
+---
+
+**Last thing — prod regression check**
+
+The `re` NameError is *still* in shared code as of this Week 1 commit (since Week 1 was infrastructure-only by design). ACAP is still broken in prod, KBS still has fee/IELTS gaps, JCU still stages zero. That's expected and fine.
+
+But: verify the contextvar wire-up itself didn't accidentally make anything worse. Run one full scrape of a previously-working uni (UOW or Bond would be good — they were stable in earlier reports) and confirm the staged output is identical to what it would have been pre-Week-1. If something in the new config-loading path also references an unimported module or has a typo in a YAML override, you've added a second failure mode on top of the existing ACAP one and Week 2 will be debugging Week 1 instead of moving the needle.
+
+If that prod sanity-check passes — green light for Week 2.
+
+Go for it.
