@@ -5,11 +5,18 @@ The location cascade already handled `<dt>/<dd>` and `<th>/<td>` via
 `<strong>Label</strong>` parent-sibling case (the ASA-style adjacent
 divs idiom that `_from_headings` misses) — these tests lock the
 expanded coverage in.
+
+Option C (ACAP location strip_patterns) tests are at the bottom of
+this file: they verify that per-uni strip_patterns from the contextvar
+are applied before sanitisation so ACAP's footnote cruft is cleaned.
 """
 from __future__ import annotations
 
 import asyncio
 
+from app.services.scraper.config import set_uni_config
+from app.services.scraper.config.context import get_uni_config
+from app.services.scraper.config.schema import UniConfig
 from app.services.scraper.extractors import location
 
 
@@ -150,3 +157,66 @@ class TestCampusCodeExpansion:
         assert out[0].value == "Sydney, Melbourne, Brisbane, Australia", (
             f"Campus codes must be expanded to city names (with country suffix); got {out[0].value!r}"
         )
+
+
+# ── Option C: per-uni strip_patterns (ACAP footnote cruft) ───────────────────
+
+_BARE_CFG = UniConfig.model_validate({
+    "slug": "_test",
+    "name": "_test uni",
+    "base_url": "https://test.edu.au",
+    "scrape_url": "https://test.edu.au/courses/",
+})
+
+_ACAP_CFG = UniConfig.model_validate({
+    "slug": "acap",
+    "name": "ACAP",
+    "base_url": "https://www.acap.edu.au",
+    "scrape_url": "https://www.acap.edu.au/courses/",
+    "extraction": {
+        "text_cleaning": {
+            "location": {"strip_patterns": [r'\^\s*\^.*$']}
+        }
+    },
+})
+
+
+def test_strip_patterns_remove_acap_footnote_suffix():
+    """ACAP footnote pattern: 'Perth^ ^Available in Perth from Trimester 3, 2026'.
+
+    The '^' is a superscript footnote marker that the HTML extractor reads as
+    literal text.  The strip_pattern r'\\^\\s*\\^.*$' must remove everything
+    from the first '^ ^' sequence to end-of-string, leaving only 'Perth'.
+
+    This covers courses with multiple campuses like
+    'Adelaide, Melbourne, Sydney, Perth^ ^Available in Perth from Trimester 3, 2026'.
+    """
+    set_uni_config(_ACAP_CFG)
+    try:
+        html = (
+            "<dl><dt>Location</dt>"
+            "<dd>Adelaide, Melbourne, Sydney, Perth^ ^Available in Perth from Trimester 3, 2026</dd></dl>"
+        )
+        out = _run(location.extract(html, "https://www.acap.edu.au/test/"))
+        assert out, "Location must be extracted"
+        assert out[0].value == "Adelaide, Melbourne, Sydney, Perth, Australia", (
+            f"strip_patterns must remove ACAP footnote suffix; got {out[0].value!r}"
+        )
+    finally:
+        set_uni_config(_BARE_CFG)
+
+
+def test_strip_patterns_not_applied_without_config():
+    """When strip_patterns is empty (bare defaults), location values pass
+    through unchanged — verifying that no other uni is affected."""
+    set_uni_config(_BARE_CFG)  # bare defaults — strip_patterns = []
+    try:
+        html = (
+            "<dl><dt>Location</dt>"
+            "<dd>Sydney, Melbourne</dd></dl>"
+        )
+        out = _run(location.extract(html, "https://www.someuni.edu.au/test/"))
+        assert out, "Location must still be extracted with bare config"
+        assert out[0].value == "Sydney, Melbourne, Australia"
+    finally:
+        set_uni_config(_BARE_CFG)
