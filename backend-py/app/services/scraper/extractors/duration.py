@@ -99,15 +99,23 @@ _DURATION_ANTI_CONTEXT = re.compile(
     #   "must complete the qualification within 8 years of commencement"
     #   "candidates must complete within 8 years of enrolment"
     #   "within 8 years of commencement of studies"
+    #   "complete their qualification within 8 years"   ← no "of commencement"
+    #   "complete all subjects within 8 years"
     # These are academic time limits, not program lengths.  The year value
     # in the deadline sentence scores much higher than an 8-month program
     # duration (8 Year → 41,604 vs 8 Month → 3,202) and wins the tournament
     # incorrectly.  The gate is Pattern-2-only so Pattern-0 labeled sentences
     # (e.g. "Duration: 2 years full-time. Must complete within 4 years.") are
     # unaffected — Pattern-0 priority (×100) dominates regardless.
+    #
+    # NOTE: The original pattern required "complete" to be immediately before
+    # "within" (only whitespace between them).  KBS uses phrasing like
+    # "complete their qualification within 8 years" — 1–4 intervening words —
+    # which the old pattern missed.  Allow up to 4 intervening words so all
+    # common phrasings are covered while keeping the pattern precise.
     r"within\s+\d+\s+years?\s+of\s+(?:commencement|commencing|enrol(?:ment|ling)?|"
     r"starting|graduation|admission|candidature|award)|"
-    r"complet(?:e|ed|ing|ion)\s+within\s+\d+\s+years?)\b",
+    r"complet(?:e|ed|ing|ion)(?:\s+\w+){0,4}\s+within\s+\d+\s+years?)\b",
     re.I,
 )
 
@@ -500,6 +508,23 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
         return []
     parsed.sort(key=lambda t: t[0], reverse=True)
     _, amount, unit, snippet = parsed[0]
+
+    # ── Same-N cross-check (KBS / Torrens grad cert bug) ─────────────────────
+    # If the tournament winner is (N, "Year") for N ≥ 5, and the same integer N
+    # also appears as a "Month" candidate, prefer Month.  Course pages frequently
+    # show "N months" (real duration) alongside "complete/enrolled within N years"
+    # (candidature deadline).  The deadline sentence wins the weight tournament
+    # even when the anti-context guards fire because deadline phrasings vary
+    # widely ("maximum enrolment duration", "must finish by", "no longer than",
+    # etc.).  For N ≥ 5, "N months" is a plausible grad-cert duration while
+    # "N years" is not — no accredited Australian grad cert runs for 5+ years.
+    if unit == "Year" and 5.0 <= amount <= 24.0:
+        _month_same_n = next(
+            (p for p in parsed if p[2] == "Month" and p[1] == amount), None
+        )
+        if _month_same_n is not None:
+            _, amount, unit, snippet = _month_same_n
+
     amount, unit = _convert_weeks(amount, unit)  # Issue 4: week→year/month
     return [
         ExtractionResult(
