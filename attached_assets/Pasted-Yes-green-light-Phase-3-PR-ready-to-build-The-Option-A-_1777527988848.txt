@@ -1,0 +1,26 @@
+Yes — green light. Phase 3 PR ready to build.
+The Option A pattern you have is correct. One small refinement worth applying before you write the code:
+Verify both guard sites use the exact same code, not paraphrased. Lines 520 and 1447 should have byte-identical guard blocks (same variable name uc, same condition, same call structure). Two guards with subtly different shapes (one uses uc.extraction.filters.domestic_only.enabled, the other writes it as uc.extraction.filters.domestic_only and uc.extraction.filters.domestic_only.enabled) is the kind of detail that produces a phantom shadow-mode divergence later. Copy-paste the same three lines.
+If you want to be extra-defensive, extract the guard into a one-liner helper:
+pythondef _domestic_only_filter_enabled() -> bool:
+    uc = get_uni_config()
+    return uc is None or uc.extraction.filters.domestic_only.enabled
+Then the two call sites both become if _domestic_only_filter_enabled() and _is_domestic_only_page(html):. Three benefits: identical behaviour at both sites by construction (not by discipline), one place to change the fail-open policy if it ever needs revising, and easier to grep for "where do we gate domestic_only" later. Optional — your inline pattern is also fine.
+On the sweep run after the PR ships: the agreed shape is shared-code change → run sweep across all 23 baselined unis → diff against snapshot → block merge if any regression isn't acknowledged. For Phase 3 specifically:
+
+Expected diff: ACAP unchanged (its YAML has enabled: true, function still runs, behaviour identical to current prod). All 19 other stubs unchanged for the same reason. The sweep should show zero diffs across all 23 unis.
+If any uni shows a diff: that's a real regression and must be debugged before merge. Most likely cause would be a stub that didn't get the enabled: true line correctly, or a uni without a stub picking up the schema default in some path you didn't expect.
+
+The sweep producing zero diffs is the strongest possible signal that Option A is truly behaviour-preserving. If it produces unexpected diffs, the YAML changes from blockers 1+2 are the prime suspect, not the gate code itself.
+Order of operations for the PR:
+
+Write the gate code (both call sites + optional helper)
+Run the existing ACAP shadow sequence locally — should still be clean since ACAP behaviour is unchanged
+Push to a branch, run the multi-uni sweep against main vs branch
+Confirm zero unexpected diffs across 23 unis
+Merge
+
+If step 4 fails: post the diff payload, don't try to fix blind. The shape of the diff tells you which uni's path bypassed the gate or merged the wrong default.
+After Phase 3 merges and ACAP shadow stays clean for 5 more runs with the gate active, you've completed the first end-to-end shared-code cutover. That's the proof point for the whole architecture — every subsequent migration follows the same template.
+Then the queue opens up: re NameError fix (shared code, regression sweep), vision OCR trust_vision_ocr per-uni override, ^ ^Available in Perth text-cleaning override, duration regex fix (shared code, regression sweep). Each one its own PR, its own sweep, its own streak.
+Go write Phase 3.

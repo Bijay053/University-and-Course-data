@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     from app.services.scraper.per_course_vision import VisionImageCache  # noqa: F401
 
 from app.services.scraper.category import classify_category, map_course_to_category
+from app.services.scraper.config.context import get_uni_config
 from app.services.scraper.guards import should_trust_generic_university_fee_fallback
 from app.services.scraper.extractors import (
     ai_fallback,
@@ -87,6 +88,22 @@ def _is_domestic_only_page(html: str) -> bool:
     text = _re.sub(r"<[^>]+>", " ", html)
     text = _re.sub(r"\s+", " ", text)
     return bool(_DOMESTIC_ONLY_RE.search(text))
+
+
+def _domestic_only_filter_enabled() -> bool:
+    """Phase 3 gate: return True when the domestic-only filter should run.
+
+    Reads ``extraction.filters.domestic_only.enabled`` from the current
+    per-university config contextvar.
+
+    Fail-open policy: if the contextvar is not set (no uni context — e.g. a
+    direct CLI call or test that hasn't called set_uni_config), the function
+    returns True so that _is_domestic_only_page() still runs.  This matches
+    current prod behaviour (filter always ran before this gate was added) and
+    prevents a missing contextvar from silently bypassing the filter.
+    """
+    uc = get_uni_config()
+    return uc is None or uc.extraction.filters.domestic_only.enabled
 
 
 # Degree-level values that indicate a postgraduate course.
@@ -517,7 +534,8 @@ async def extract_course(
     # If the page text explicitly states the course is not available to
     # international students, flag it immediately.  The staging guard will
     # reject it with reason "domestic_only" without running any more extractors.
-    if _is_domestic_only_page(html):
+    # Phase 3: gated on extraction.filters.domestic_only.enabled (fail-open).
+    if _domestic_only_filter_enabled() and _is_domestic_only_page(html):
         payload["domestic_only"] = True
         await emit(
             "status",
@@ -1441,10 +1459,11 @@ async def extract_course(
             or payload.get("toefl_overall")
         )
     )
+    # Phase 3: gated on extraction.filters.domestic_only.enabled (fail-open).
     if (
         not payload.get("domestic_only")
         and rendered_html
-        and _is_domestic_only_page(rendered_html)
+        and _domestic_only_filter_enabled() and _is_domestic_only_page(rendered_html)
         and not _url_signals_international
         and not _browser_confirmed_intl
     ):
