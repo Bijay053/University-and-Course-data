@@ -216,3 +216,51 @@ def test_complete_all_subjects_within_years_is_anti_context():
     assert n["duration"] == 8.0 and n["duration_term"] == "Month", (
         f"'complete all subjects within 8 years' must be blocked; got {n!r}."
     )
+
+
+def test_same_n_cross_check_prefers_month_when_year_escapes_anti_context():
+    """Same-N cross-check fix (KBS / Torrens grad cert bug).
+
+    Candidature-deadline phrasings vary widely — not all are caught by the
+    anti-context guard.  When the tournament contains both (N, Year) and
+    (N, Month) for the same integer N ≥ 5, Month wins because no accredited
+    Australian graduate certificate runs for 5+ years.
+
+    This test uses 'expected course duration is up to 8 years for part-time
+    students' — duration_context fires (course/duration/part-time), it is NOT
+    a cap sentence, and it does NOT match the completion-deadline anti-context
+    guard, so (8, Year) enters the tournament.  Without the cross-check it
+    would win; with it, Month is preferred.
+    """
+    html = (
+        "<p>8 months of full-time study required.</p>"
+        "<p>The expected course duration is up to 8 years for part-time students.</p>"
+    )
+    out = _run(duration.extract(html, "https://www.kbs.edu.au/courses/test/"))
+    assert out, "extractor must find a duration"
+    n = out[0].normalized
+    assert n["duration"] == 8.0 and n["duration_term"] == "Month", (
+        f"Same-N cross-check must prefer Month=8 over Year=8 when both are "
+        f"in the tournament and N ≥ 5; got {n!r}."
+    )
+
+
+def test_cross_check_does_not_fire_for_different_n():
+    """Cross-check only fires when Year and Month have the SAME numeric value N.
+
+    If N differs (e.g., labeled 'Duration: 2 years' while the page also
+    mentions '8 months of work placement'), the cross-check must NOT flip
+    the winner — Pattern-0 (labeled) wins at ×100 priority regardless.
+    """
+    html = (
+        "<div><strong>Duration</strong></div>"
+        "<div>2 years full-time.</div>"
+        "<p>The program includes 8 months of industry placement.</p>"
+    )
+    out = _run(duration.extract(html, "https://e/x"))
+    assert out, "extractor must find a duration"
+    n = out[0].normalized
+    assert n["duration"] == 2.0 and n["duration_term"] == "Year", (
+        f"Cross-check must NOT fire: Year N=2 differs from Month N=8. "
+        f"Labeled 'Duration: 2 years' must win unchanged; got {n!r}."
+    )

@@ -2768,7 +2768,19 @@ async def extract_course(
                 _dur_years = _dur_f  # assume years
             _degree_l = (payload.get("degree_level") or "").lower()
             _is_bachelor_master = any(x in _degree_l for x in ("bachelor", "master", "honours"))
-            _SUSPICIOUS_MAX = 7.0 if _is_bachelor_master else 12.0
+            # Graduate certificates and diplomas are short courses (≤ 1 year typically,
+            # absolute max ~2 years).  Any "Year" value ≥ 4 is certainly a scrape error
+            # (e.g. a candidature-deadline number that slipped through the extractor).
+            # Cap at 4.0 so these are nullified rather than stored as plausible data.
+            _is_grad_short = any(x in _degree_l for x in (
+                "graduate certificate", "graduate diploma",
+                "postgraduate certificate", "postgraduate diploma",
+            ))
+            _SUSPICIOUS_MAX = (
+                7.0 if _is_bachelor_master
+                else 4.0 if _is_grad_short
+                else 12.0
+            )
             if _dur_years > _SUSPICIOUS_MAX or _dur_years < 0.25:
                 # Nullify the value so bad data never reaches staging.
                 # A missing duration is better than a wrong one — operators

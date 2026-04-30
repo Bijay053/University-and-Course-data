@@ -508,6 +508,23 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
         return []
     parsed.sort(key=lambda t: t[0], reverse=True)
     _, amount, unit, snippet = parsed[0]
+
+    # ── Same-N cross-check (KBS / Torrens grad cert bug) ─────────────────────
+    # If the tournament winner is (N, "Year") for N ≥ 5, and the same integer N
+    # also appears as a "Month" candidate, prefer Month.  Course pages frequently
+    # show "N months" (real duration) alongside "complete/enrolled within N years"
+    # (candidature deadline).  The deadline sentence wins the weight tournament
+    # even when the anti-context guards fire because deadline phrasings vary
+    # widely ("maximum enrolment duration", "must finish by", "no longer than",
+    # etc.).  For N ≥ 5, "N months" is a plausible grad-cert duration while
+    # "N years" is not — no accredited Australian grad cert runs for 5+ years.
+    if unit == "Year" and 5.0 <= amount <= 24.0:
+        _month_same_n = next(
+            (p for p in parsed if p[2] == "Month" and p[1] == amount), None
+        )
+        if _month_same_n is not None:
+            _, amount, unit, snippet = _month_same_n
+
     amount, unit = _convert_weeks(amount, unit)  # Issue 4: week→year/month
     return [
         ExtractionResult(

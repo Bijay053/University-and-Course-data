@@ -1,0 +1,38 @@
+The Torrens scrape is now in and it confirms the previous diagnosis was wrong. Three real bugs to fix, none of them the "complete within X years" regex you patched last round.
+Bug 1 — Unit lost in regex path (the real KBS/Torrens bug)
+Look at these log lines from the Torrens scrape:
+
+KBS Graduate Certificate in Accounting page text: 8 months / 4 subjects / 2 trimesters → stored as 8.0 Year
+Torrens Master of Information Technology page text: 1 year, 8 months / 12 subjects / 5 trimesters → regex output 1.7, stored as Year (correct unit by accident, see Bug 3)
+Torrens Diploma of Information Technology page text: 1 year/ 8 subjects/ 3 trimesters → stored as 12 Year
+Torrens Master of Professional Accounting page text: 1 year, 8 months / 12 subjects / 5 trimesters → 12.0 Year → nullified
+Torrens Master of Business Administration page text: 12 subjects / 6 trimesters → 12.0 Year → nullified
+Torrens Master of Business Analytics page text: 1 year, 8 months / 5 trimesters → 1.7 Year (correct)
+
+Pattern: the regex is matching whichever number it sees first that's near a duration-ish word, and the unit handling is broken. In the 12 Year cases, it's grabbing 12 from 12 subjects and labeling it Year. The regex needs to either:
+
+Anchor unit detection to the same numeric token (so 12 subjects never matches the duration pattern at all), OR
+Default unit to null and trigger AI fallback when ambiguous, instead of defaulting to Year
+
+The previous session's "complete their qualification within X years" patch is a phantom fix — that phrase doesn't exist on any of these pages. Grep KBS and Torrens HTML for complete.*within to confirm before keeping that test case.
+Bug 2 — Sanity check is inconsistent across degree levels
+Same log shows the sanity check firing for some courses and not others:
+[NULLIFIED] Master of Business Administration — duration 12.0 year exceeds sanity limit
+[NULLIFIED] Master of Professional Accounting — duration 12.0 year exceeds sanity limit
+[NULLIFIED] Bachelor of Business (Event Management) — duration 12.0 year exceeds sanity limit
+But Diploma of Information Technology with 12.0 Year passed through and is now displayed in the UI as "12 Year". And the KBS grad certs with 8.0 Year never trigger the sanity check at all because 8 is below whatever threshold is set.
+The fix is to widen the sanity rule: any duration ≥ 1.5 with unit = Year AND degree_level in (diploma, advanced diploma, graduate certificate, graduate diploma) should be flagged. Those degree levels max out at ~2 years; anything higher is an extraction error.
+Bug 3 — float32 round-trip in stored duration values
+The Torrens table shows values like 1.7000000476837158 Year and 0.699999988079071 Year across 13 courses. That 1.7000000476837158 is the canonical signature of np.float32(1.7) cast back to Python float. Something in the duration write path is going through a 32-bit float — likely numpy, a Pydantic confloat, or a SQLAlchemy Float column that should be Numeric / DOUBLE PRECISION.
+Two ways to fix:
+
+Cheap: round(duration_value, 2) at write time. Display becomes clean, underlying type still wrong.
+Right: store duration in integer months, convert to years for display. Eliminates the precision class entirely.
+
+What I want done in this session:
+
+Open the duration extractor where [regex conf=0.75] is emitted. Show me the function — specifically the part that returns (value, unit). Don't patch yet, just paste it back so I can see the unit-resolution logic.
+Grep the codebase for complete.*within and confirm whether the previous test case in test_duration.py is testing against a real string or a hallucinated one. If hallucinated, remove that test.
+Grep for float32, confloat, and Float( in any file touching duration storage or the scraped_courses model.
+
+Don't run another scrape until we've looked at #1 — the regex unit handling is the root cause and we need to see the code before deciding whether to patch the regex, the sanity check, or both.
