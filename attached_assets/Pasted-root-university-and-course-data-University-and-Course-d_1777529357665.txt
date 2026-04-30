@@ -1,0 +1,30 @@
+root@university-and-course-data:~/University-and-Course-data/backend-py# cd ~/University-and-Course-data/backend-py
+set -a && source .env && set +a
+PYTHONPATH=. venv/bin/python3 scripts/capture_baseline.py --out-dir baselines/before/
+ls baselines/before/ | wc -l
+INFO capture_baseline: Snapshotting 22 universities...
+INFO capture_baseline: Saved: 20260430_060935_aibi_47.json  (courses=8  disc=11  staged=8  cost=$0.0000  99.1)
+INFO capture_baseline: Saved: 20260430_060935_ait_37.json  (courses=6  disc=8  staged=6  cost=$0.0017  118.1)
+INFO capture_baseline: Saved: 20260430_060935_apicollege_30.json  (courses=25  disc=27  staged=25  cost=$0.0000  169.7)
+INFO capture_baseline: Saved: 20260430_060935_atmc_93.json  (courses=4  disc=6  staged=4  cost=$0.0000  89.6)
+INFO capture_baseline: Saved: 20260430_060935_aut_87.json  (courses=13  disc=36  staged=13  cost=$0.0035  604.3)
+INFO capture_baseline: Saved: 20260430_060935_acu_51.json  (courses=99  disc=165  staged=99  cost=$0.0234  3410.1)
+INFO capture_baseline: Saved: 20260430_060935_bond_22.json  (courses=126  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260430_060935_study_4.json  (courses=694  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260430_060935_flinders_12.json  (courses=105  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260430_060935_kbs_8.json  (courses=30  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260430_060935_kbs_29.json  (courses=29  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260430_060935_scu_17.json  (courses=6  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260430_060935_une_14.json  (courses=12  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260430_060935_uow_13.json  (courses=3  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260430_060935_unisq_1.json  (courses=167  disc=147  staged=0  cost=$0.0000  257.6)
+INFO capture_baseline: Saved: 20260430_060935_utas_5.json  (courses=13  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260430_060935_vit_38.json  (courses=19  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260430_060935_asahe_2.json  (courses=8  disc=9  staged=0  cost=$0.0000  81.1)
+INFO capture_baseline: Saved: 20260430_060935_aut_20.json  (courses=92  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260430_060935_cqu_18.json  (courses=4  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260430_060935_torrens_3.json  (courses=178  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260430_060935_vit_6.json  (courses=30  disc=38  staged=0  cost=$0.0000  260.7)
+INFO capture_baseline: Done. 22 universities, 1671 courses total. Baselines written to baselines/before/
+22
+root@university-and-course-data:~/University-and-Course-data/backend-py# 
