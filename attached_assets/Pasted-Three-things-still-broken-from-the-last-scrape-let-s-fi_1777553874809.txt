@@ -1,0 +1,41 @@
+Three things still broken from the last scrape — let's fix them this session, but don't patch anything until you've shown me the source code first.
+Issue 1 — Show me the diff from last session
+Last round you "fixed" the KBS grad cert duration bug. Three of four grad certs now show 8 Month correctly, but Graduate Certificate in Accounting is still blank, and the Torrens masters with compound durations like "1 year, 8 months" are all blank too. Before patching anything new, paste back:
+
+The diff that fixed the grad cert unit handling
+The function that emits [regex conf=0.75] for duration — full source, including the part that returns (value, unit)
+
+I need to see whether you fixed the actual unit-resolution logic or patched something narrower that only catches certain page templates.
+Issue 2 — Compound durations still broken
+These pages all say "1 year, 8 months / 12 subjects / 5 trimesters" or similar:
+
+Master of Information Technology
+Master of Business Analytics
+Master of Professional Accounting
+Graduate Diploma of Business Administration
+
+In the last scrape they extracted as 12.0 Year (grabbed 12 from 12 subjects, labeled it Year) and got nullified by the sanity check. The Master of Business Analytics from earlier logs extracted correctly as 1.7 Year — so somewhere the compound regex works, somewhere it doesn't. Find out why and unify the path.
+The correct value for "1 year, 8 months" is 1.67 years (20 months). The regex needs to:
+
+Detect both year and month tokens in the same phrase
+Sum them as months
+Convert to years (or store as months — see Issue 4)
+
+Issue 3 — Diploma sanity check missing
+Last scrape: Diploma of Information Technology shipped with 12 Year and never triggered the sanity check, even though the masters with the same value got nullified.
+Widen the rule: any duration ≥ 1.5 years on degree_level in (diploma, advanced diploma, graduate certificate, graduate diploma) should auto-flag. These programs max out at ~2 years.
+Issue 4 — Float32 leak
+Values like 1.7000000476837158 Year and 0.699999988079071 Year appeared on multiple Torrens courses last scrape. That's the signature of a float32 round-trip somewhere in the duration write path.
+Grep for float32, confloat, Float( (with capital F — SQLAlchemy column type) in any file touching duration storage or the scraped_courses model. Two ways to fix:
+
+Quick: round(duration_value, 2) at write time
+Right: store duration as integer months, convert to years for display
+
+What I want this session:
+
+Paste the diff from last session — what actually got fixed
+Paste the duration regex function — full source
+Paste any matches for float32 / confloat / Float( in the duration write path
+Don't patch yet. Don't run a scrape yet. Just show me the code.
+
+Once I've seen the source we'll decide whether to fix the regex, the storage layer, or both.
