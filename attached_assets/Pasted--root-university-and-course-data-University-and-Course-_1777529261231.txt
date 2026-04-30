@@ -1,0 +1,528 @@
+}
+root@university-and-course-data:~/University-and-Course-data# cat $(ls -t backend-py/shadow_reports/*.json | head -1) | python3 -m json.tool
+{
+    "schema_version": 1,
+    "timestamp": "2026-04-30T05:17:56.982331+00:00",
+    "uni_id": 41,
+    "slug": "acap",
+    "run_number": 13,
+    "old_job_id": "job_df47370d4a0b",
+    "new_job_id": "job_df47370d4a0b:new_path",
+    "is_clean": true,
+    "summary": "CLEAN \u00e2\u0080\u0094 27 courses matched exactly",
+    "clean_streak": 11,
+    "cutover_threshold": 5,
+    "cutover_ready": true,
+    "diff": {
+        "is_clean": true,
+        "summary": "CLEAN \u00e2\u0080\u0094 27 courses matched exactly",
+        "matched": 27,
+        "old_only": [],
+        "new_only": [],
+        "staging_disagreements": [],
+        "field_regressions": []
+    }
+}
+root@university-and-course-data:~/University-and-Course-data# cd ~/University-and-Course-data
+git pull origin main
+sudo systemctl restart uni-celery
+remote: Enumerating objects: 50, done.
+remote: Counting objects: 100% (50/50), done.
+remote: Compressing objects: 100% (26/26), done.
+remote: Total 26 (delta 22), reused 0 (delta 0), pack-reused 0 (from 0)
+Unpacking objects: 100% (26/26), 8.41 KiB | 783.00 KiB/s, done.
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+   08f9db9..f201deb  main       -> origin/main
+Updating 08f9db9..f201deb
+Fast-forward
+ backend-py/scraper_config/unis/acpe.yaml    |   5 +
+ backend-py/scraper_config/unis/acu.yaml     |   5 +
+ backend-py/scraper_config/unis/ait.yaml     |   5 +
+ backend-py/scraper_config/unis/asa.yaml     |   4 +
+ backend-py/scraper_config/unis/aut.yaml     |   4 +
+ backend-py/scraper_config/unis/bmihms.yaml  |   4 +
+ backend-py/scraper_config/unis/bond.yaml    |   4 +
+ backend-py/scraper_config/unis/cdu.yaml     |   5 +
+ backend-py/scraper_config/unis/csu.yaml     |   5 +
+ backend-py/scraper_config/unis/ecu.yaml     |   5 +
+ backend-py/scraper_config/unis/jcu.yaml     |   5 +
+ backend-py/scraper_config/unis/kaplan.yaml  |   4 +
+ backend-py/scraper_config/unis/kbs.yaml     |   4 +
+ backend-py/scraper_config/unis/latrobe.yaml |   5 +
+ backend-py/scraper_config/unis/saibt.yaml   |   5 +
+ backend-py/scraper_config/unis/torrens.yaml |   4 +
+ backend-py/scraper_config/unis/uel.yaml     |   5 +
+ backend-py/scraper_config/unis/uow.yaml     |   4 +
+ backend-py/scraper_config/unis/vit.yaml     |   5 +
+ backend-py/scripts/regression_sweep.py      | 393 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 20 files changed, 480 insertions(+)
+ create mode 100644 backend-py/scripts/regression_sweep.py
+root@university-and-course-data:~/University-and-Course-data# sudo journalctl -u uni-celery -n 20 --no-pager | grep -E "worker_ready|SHADOW|domestic"
+Apr 30 05:45:02 university-and-course-data celery[1234298]: [2026-04-30 05:45:02,888: INFO/MainProcess] [SHADOW] shadow mode ENABLED for uni_ids: 41
+root@university-and-course-data:~/University-and-Course-data# cat $(ls -t backend-py/shadow_reports/*.json | head -1) | python3 -m json.tool
+{
+    "schema_version": 1,
+    "timestamp": "2026-04-30T05:39:06.995667+00:00",
+    "uni_id": 41,
+    "slug": "acap",
+    "run_number": 14,
+    "old_job_id": "job_85ec0c6a7a06",
+    "new_job_id": "job_85ec0c6a7a06:new_path",
+    "is_clean": true,
+    "summary": "CLEAN \u00e2\u0080\u0094 27 courses matched exactly",
+    "clean_streak": 12,
+    "cutover_threshold": 5,
+    "cutover_ready": true,
+    "diff": {
+        "is_clean": true,
+        "summary": "CLEAN \u00e2\u0080\u0094 27 courses matched exactly",
+        "matched": 27,
+        "old_only": [],
+        "new_only": [],
+        "staging_disagreements": [],
+        "field_regressions": []
+    }
+}
+root@university-and-course-data:~/University-and-Course-data# cd ~/University-and-Course-data
+git pull origin main
+sudo systemctl restart uni-celery
+remote: Enumerating objects: 15, done.
+remote: Counting objects: 100% (15/15), done.
+remote: Compressing objects: 100% (8/8), done.
+remote: Total 8 (delta 6), reused 0 (delta 0), pack-reused 0 (from 0)
+Unpacking objects: 100% (8/8), 1.53 KiB | 156.00 KiB/s, done.
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+   f201deb..f839eda  main       -> origin/main
+Updating f201deb..f839eda
+Fast-forward
+ backend-py/app/services/scraper/pipelines/single_course.py | 23 +++++++++++++++++++++--
+ 1 file changed, 21 insertions(+), 2 deletions(-)
+root@university-and-course-data:~/University-and-Course-data# sudo journalctl -u uni-celery -n 20 --no-pager | grep -E "worker_ready|SHADOW"
+root@university-and-course-data:~/University-and-Course-data# cd ~/University-and-Course-data/backend-py
+PYTHONPATH=. python scripts/capture_baseline.py --dry-run
+# Check the "elapsed" column — jobs with recent completed_at timestamps are usable
+Command 'python' not found, did you mean:
+  command 'python3' from deb python3
+  command 'python' from deb python-is-python3
+root@university-and-course-data:~/University-and-Course-data/backend-py# cd ~/University-and-Course-data/backend-py
+PYTHONPATH=. python scripts/capture_baseline.py --out-dir baselines/after/
+Command 'python' not found, did you mean:
+  command 'python3' from deb python3
+  command 'python' from deb python-is-python3
+root@university-and-course-data:~/University-and-Course-data/backend-py# cd ~/University-and-Course-data/backend-py
+PYTHONPATH=. python scripts/regression_sweep.py \
+    --before baselines/before/ \
+    --after  baselines/after/  \
+    --expected-slugs acap
+Command 'python' not found, did you mean:
+  command 'python3' from deb python3
+  command 'python' from deb python-is-python3
+root@university-and-course-data:~/University-and-Course-data/backend-py# cd ~/University-and-Course-data/backend-py
+PYTHONPATH=. python3 scripts/capture_baseline.py --out-dir baselines/before/
+ls baselines/before/ | wc -l   # confirm N files written
+Traceback (most recent call last):
+  File "/root/University-and-Course-data/backend-py/scripts/capture_baseline.py", line 87, in <module>
+    from sqlalchemy import select, func, desc
+ModuleNotFoundError: No module named 'sqlalchemy'
+ls: cannot access 'baselines/before/': No such file or directory
+0
+root@university-and-course-data:~/University-and-Course-data/backend-py# sudo systemctl status uni-celery --no-pager | head -5
+sudo journalctl -u uni-celery -n 40 --no-pager | grep -E "worker_ready|SHADOW|MainProcess"
+● uni-celery.service - University Portal Celery Worker (scraper)
+     Loaded: loaded (/etc/systemd/system/uni-celery.service; enabled; preset: enabled)
+     Active: active (running) since Thu 2026-04-30 05:57:05 UTC; 9min ago
+   Main PID: 1234433 (celery)
+      Tasks: 118 (limit: 9483)
+root@university-and-course-data:~/University-and-Course-data/backend-py# # Find which Python the celery service uses
+cat /etc/systemd/system/uni-celery.service | grep -E "ExecStart|WorkingDir|Environment|python"
+WorkingDirectory=/root/University-and-Course-data/backend-py
+EnvironmentFile=/root/University-and-Course-data/backend-py/.env
+ExecStart=/root/University-and-Course-data/backend-py/venv/bin/celery \
+root@university-and-course-data:~/University-and-Course-data/backend-py# # Replace /path/to/venv with whatever the service shows, e.g. /root/venv or /root/.venv
+cd ~/University-and-Course-data/backend-py
+PYTHONPATH=. /path/to/venv/bin/python3 scripts/capture_baseline.py --out-dir baselines/before/
+-bash: /path/to/venv/bin/python3: No such file or directory
+root@university-and-course-data:~/University-and-Course-data/backend-py# cd ~/University-and-Course-data/backend-py
+PYTHONPATH=. venv/bin/python3 scripts/capture_baseline.py --out-dir baselines/before/
+ls baselines/before/ | wc -l
+Traceback (most recent call last):
+  File "/root/University-and-Course-data/backend-py/scripts/capture_baseline.py", line 318, in <module>
+    asyncio.run(main(parsed))
+  File "/usr/lib/python3.12/asyncio/runners.py", line 194, in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/scripts/capture_baseline.py", line 238, in main
+    unis_q = await db.execute(
+             ^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/ext/asyncio/session.py", line 449, in execute
+    result = await greenlet_spawn(
+             ^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/util/_concurrency_py3k.py", line 201, in greenlet_spawn
+    result = context.throw(*sys.exc_info())
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 2351, in execute
+    return self._execute_internal(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 2239, in _execute_internal
+    conn = self._connection_for_bind(bind)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 2108, in _connection_for_bind
+    return trans._connection_for_bind(engine, execution_options)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<string>", line 2, in _connection_for_bind
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/orm/state_changes.py", line 137, in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 1187, in _connection_for_bind
+    conn = bind.connect()
+           ^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 3293, in connect
+    return self._connection_cls(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 143, in __init__
+    self._dbapi_connection = engine.raw_connection()
+                             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 3317, in raw_connection
+    return self.pool.connect()
+           ^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 448, in connect
+    return _ConnectionFairy._checkout(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 1272, in _checkout
+    fairy = _ConnectionRecord.checkout(pool)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 712, in checkout
+    rec = pool._do_get()
+          ^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/impl.py", line 177, in _do_get
+    with util.safe_reraise():
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/util/langhelpers.py", line 121, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/impl.py", line 175, in _do_get
+    return self._create_connection()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 389, in _create_connection
+    return _ConnectionRecord(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 674, in __init__
+    self.__connect()
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 900, in __connect
+    with util.safe_reraise():
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/util/langhelpers.py", line 121, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 896, in __connect
+    self.dbapi_connection = connection = pool._invoke_creator(self)
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/create.py", line 667, in connect
+    return dialect.connect(*cargs_tup, **cparams)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 630, in connect
+    return self.loaded_dbapi.connect(*cargs, **cparams)  # type: ignore[no-any-return]  # NOQA: E501
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 955, in connect
+    await_only(creator_fn(*arg, **kw)),
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/util/_concurrency_py3k.py", line 132, in await_only
+    return current.parent.switch(awaitable)  # type: ignore[no-any-return,attr-defined] # noqa: E501
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/util/_concurrency_py3k.py", line 196, in greenlet_spawn
+    value = await result
+            ^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/asyncpg/connection.py", line 2443, in connect
+    return await connect_utils._connect(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/asyncpg/connect_utils.py", line 1249, in _connect
+    raise last_error or exceptions.TargetServerAttributeNotMatched(
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/asyncpg/connect_utils.py", line 1218, in _connect
+    conn = await _connect_addr(
+           ^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/asyncpg/connect_utils.py", line 1054, in _connect_addr
+    return await __connect_addr(params, True, *args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/asyncpg/connect_utils.py", line 1099, in __connect_addr
+    tr, pr = await connector
+             ^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/asyncpg/connect_utils.py", line 969, in _create_ssl_connection
+    tr, pr = await loop.create_connection(
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 1080, in create_connection
+    infos = await self._ensure_resolved(
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 1456, in _ensure_resolved
+    return await loop.getaddrinfo(host, port, family=family, type=type,
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 901, in getaddrinfo
+    return await self.run_in_executor(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/concurrent/futures/thread.py", line 58, in run
+    result = self.fn(*self.args, **self.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/socket.py", line 963, in getaddrinfo
+    for res in _socket.getaddrinfo(host, port, family, type, proto, flags):
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+socket.gaierror: [Errno -5] No address associated with hostname
+0
+root@university-and-course-data:~/University-and-Course-data/backend-py# # After before/ is captured, trigger scrapes, then:
+PYTHONPATH=. venv/bin/python3 scripts/capture_baseline.py --dry-run
+
+# Once scrapes complete:
+PYTHONPATH=. venv/bin/python3 scripts/capture_baseline.py --out-dir baselines/after/
+
+PYTHONPATH=. venv/bin/python3 scripts/regression_sweep.py \
+    --before baselines/before/ \
+    --after  baselines/after/  \
+    --expected-slugs acap
+Traceback (most recent call last):
+  File "/root/University-and-Course-data/backend-py/scripts/capture_baseline.py", line 318, in <module>
+    asyncio.run(main(parsed))
+  File "/usr/lib/python3.12/asyncio/runners.py", line 194, in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/scripts/capture_baseline.py", line 238, in main
+    unis_q = await db.execute(
+             ^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/ext/asyncio/session.py", line 449, in execute
+    result = await greenlet_spawn(
+             ^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/util/_concurrency_py3k.py", line 201, in greenlet_spawn
+    result = context.throw(*sys.exc_info())
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 2351, in execute
+    return self._execute_internal(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 2239, in _execute_internal
+    conn = self._connection_for_bind(bind)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 2108, in _connection_for_bind
+    return trans._connection_for_bind(engine, execution_options)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<string>", line 2, in _connection_for_bind
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/orm/state_changes.py", line 137, in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 1187, in _connection_for_bind
+    conn = bind.connect()
+           ^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 3293, in connect
+    return self._connection_cls(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 143, in __init__
+    self._dbapi_connection = engine.raw_connection()
+                             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 3317, in raw_connection
+    return self.pool.connect()
+           ^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 448, in connect
+    return _ConnectionFairy._checkout(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 1272, in _checkout
+    fairy = _ConnectionRecord.checkout(pool)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 712, in checkout
+    rec = pool._do_get()
+          ^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/impl.py", line 177, in _do_get
+    with util.safe_reraise():
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/util/langhelpers.py", line 121, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/impl.py", line 175, in _do_get
+    return self._create_connection()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 389, in _create_connection
+    return _ConnectionRecord(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 674, in __init__
+    self.__connect()
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 900, in __connect
+    with util.safe_reraise():
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/util/langhelpers.py", line 121, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 896, in __connect
+    self.dbapi_connection = connection = pool._invoke_creator(self)
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/create.py", line 667, in connect
+    return dialect.connect(*cargs_tup, **cparams)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 630, in connect
+    return self.loaded_dbapi.connect(*cargs, **cparams)  # type: ignore[no-any-return]  # NOQA: E501
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 955, in connect
+    await_only(creator_fn(*arg, **kw)),
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/util/_concurrency_py3k.py", line 132, in await_only
+    return current.parent.switch(awaitable)  # type: ignore[no-any-return,attr-defined] # noqa: E501
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/util/_concurrency_py3k.py", line 196, in greenlet_spawn
+    value = await result
+            ^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/asyncpg/connection.py", line 2443, in connect
+    return await connect_utils._connect(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/asyncpg/connect_utils.py", line 1249, in _connect
+    raise last_error or exceptions.TargetServerAttributeNotMatched(
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/asyncpg/connect_utils.py", line 1218, in _connect
+    conn = await _connect_addr(
+           ^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/asyncpg/connect_utils.py", line 1054, in _connect_addr
+    return await __connect_addr(params, True, *args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/asyncpg/connect_utils.py", line 1099, in __connect_addr
+    tr, pr = await connector
+             ^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/asyncpg/connect_utils.py", line 969, in _create_ssl_connection
+    tr, pr = await loop.create_connection(
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 1080, in create_connection
+    infos = await self._ensure_resolved(
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 1456, in _ensure_resolved
+    return await loop.getaddrinfo(host, port, family=family, type=type,
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 901, in getaddrinfo
+    return await self.run_in_executor(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/concurrent/futures/thread.py", line 58, in run
+    result = self.fn(*self.args, **self.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/socket.py", line 963, in getaddrinfo
+    for res in _socket.getaddrinfo(host, port, family, type, proto, flags):
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+socket.gaierror: [Errno -5] No address associated with hostname
+Traceback (most recent call last):
+  File "/root/University-and-Course-data/backend-py/scripts/capture_baseline.py", line 318, in <module>
+    asyncio.run(main(parsed))
+  File "/usr/lib/python3.12/asyncio/runners.py", line 194, in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/scripts/capture_baseline.py", line 238, in main
+    unis_q = await db.execute(
+             ^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/ext/asyncio/session.py", line 449, in execute
+    result = await greenlet_spawn(
+             ^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/util/_concurrency_py3k.py", line 201, in greenlet_spawn
+    result = context.throw(*sys.exc_info())
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 2351, in execute
+    return self._execute_internal(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 2239, in _execute_internal
+    conn = self._connection_for_bind(bind)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 2108, in _connection_for_bind
+    return trans._connection_for_bind(engine, execution_options)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<string>", line 2, in _connection_for_bind
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/orm/state_changes.py", line 137, in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 1187, in _connection_for_bind
+    conn = bind.connect()
+           ^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 3293, in connect
+    return self._connection_cls(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 143, in __init__
+    self._dbapi_connection = engine.raw_connection()
+                             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 3317, in raw_connection
+    return self.pool.connect()
+           ^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 448, in connect
+    return _ConnectionFairy._checkout(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 1272, in _checkout
+    fairy = _ConnectionRecord.checkout(pool)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 712, in checkout
+    rec = pool._do_get()
+          ^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/impl.py", line 177, in _do_get
+    with util.safe_reraise():
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/util/langhelpers.py", line 121, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/impl.py", line 175, in _do_get
+    return self._create_connection()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 389, in _create_connection
+    return _ConnectionRecord(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 674, in __init__
+    self.__connect()
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 900, in __connect
+    with util.safe_reraise():
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/util/langhelpers.py", line 121, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 896, in __connect
+    self.dbapi_connection = connection = pool._invoke_creator(self)
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/create.py", line 667, in connect
+    return dialect.connect(*cargs_tup, **cparams)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 630, in connect
+    return self.loaded_dbapi.connect(*cargs, **cparams)  # type: ignore[no-any-return]  # NOQA: E501
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 955, in connect
+    await_only(creator_fn(*arg, **kw)),
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/util/_concurrency_py3k.py", line 132, in await_only
+    return current.parent.switch(awaitable)  # type: ignore[no-any-return,attr-defined] # noqa: E501
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/util/_concurrency_py3k.py", line 196, in greenlet_spawn
+    value = await result
+            ^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/asyncpg/connection.py", line 2443, in connect
+    return await connect_utils._connect(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/asyncpg/connect_utils.py", line 1249, in _connect
+    raise last_error or exceptions.TargetServerAttributeNotMatched(
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/asyncpg/connect_utils.py", line 1218, in _connect
+    conn = await _connect_addr(
+           ^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/asyncpg/connect_utils.py", line 1054, in _connect_addr
+    return await __connect_addr(params, True, *args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/asyncpg/connect_utils.py", line 1099, in __connect_addr
+    tr, pr = await connector
+             ^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/asyncpg/connect_utils.py", line 969, in _create_ssl_connection
+    tr, pr = await loop.create_connection(
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 1080, in create_connection
+    infos = await self._ensure_resolved(
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 1456, in _ensure_resolved
+    return await loop.getaddrinfo(host, port, family=family, type=type,
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 901, in getaddrinfo
+    return await self.run_in_executor(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/concurrent/futures/thread.py", line 58, in run
+    result = self.fn(*self.args, **self.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/socket.py", line 963, in getaddrinfo
+    for res in _socket.getaddrinfo(host, port, family, type, proto, flags):
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+socket.gaierror: [Errno -5] No address associated with hostname
+ERROR: No snapshot files found in either directory.
+root@university-and-course-data:~/University-and-Course-data/backend-py# 
