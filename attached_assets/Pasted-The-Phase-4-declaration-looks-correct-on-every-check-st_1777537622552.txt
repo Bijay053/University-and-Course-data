@@ -1,0 +1,29 @@
+The Phase 4 declaration looks correct on every check. staged: 11, errors: 0, regression sweep 23/23 clean, dead code retired with no dangling references. That's a clean cutover.
+One thing the status message glides past that's worth a quick look before declaring fully done: the 11-vs-13 expected gap.
+The Phase 4 plan called for ACAP to go from 0 → ~13 staged. We got 11. Math:
+
+28 candidates discovered
+12 rejected as domestic_only (matches every previous run)
+1 rejected as category_landing_page (Undergraduate Cert Psychological Science, matches every previous run)
+= 15 should have reached staging
+Actual staged: 11
+Gap: 4 courses
+
+In every previous broken ACAP run, 14 courses reached staging and crashed with the re NameError (the count you saw in Errors: 14 on those logs). Now the fix lets them through, but only 11 actually staged. So 3-4 courses are being skipped or filtered for some other reason between extraction and staging.
+Possibilities:
+
+Browser timeouts hit a few courses (consistent with the 60s exceeded warnings that have appeared in recent ACAP runs under prod load)
+One of the previously-staging-blocked courses is now being filtered by a different rule that wasn't visible before because staging crashed first
+The category_landing_page filter is now catching something extra (Bachelor of Social Work? Diploma of Counselling Skills? worth checking)
+
+Not a blocker for declaring Phase 4 shipped. staged: 11 is genuinely a healthy result — the re NameError is unambiguously fixed, ACAP is producing data in prod for the first time, and the regression sweep proved no other uni was harmed. But the missing 3-4 courses should be understood, not assumed to be noise.
+Concrete ask for Replit: read the staging-stage log lines for this run and identify which 4 of the previously-14 courses didn't make it. Three categories of answer:
+
+All four are environmental (browser timeouts, network blips) → no action, mark Phase 4 fully done, note for ops monitoring
+One or more is a code-reachable filter (newly-effective rule that's filtering them) → understand the rule, decide if it's correct behaviour, document
+One or more is silently failing (no log line, just absent from staged list) → investigate before next migration
+
+If category 1: Phase 4 closes today, pick the next migration target.
+If category 2 or 3: 30 minutes of investigation, then close Phase 4.
+On the shadow removal action item. The status message says "remove 41 from SHADOW_MODE_UNI_IDS when ready to stop shadow comparisons." Don't rush this. Shadow mode for ACAP is essentially free now (deep-copy + cached vision = negligible cost) and gives continuous regression detection. Suggested: leave ACAP shadow on until the next per-uni migration is ready to start, then swap ACAP's role from "post-cutover monitoring" to "pre-cutover target for the next migration." Removing it now just to remove it gains nothing.
+Sign-off path: investigate the 11-vs-13 gap → understand which category it's in → close Phase 4 → pick next migration target (suggest vision OCR trust_vision_ocr: false per-uni override for ACAP, since per-uni overrides validate the architecture for a different kind of change than domestic_only).
