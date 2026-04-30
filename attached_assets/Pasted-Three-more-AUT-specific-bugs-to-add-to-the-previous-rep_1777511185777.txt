@@ -1,0 +1,84 @@
+Three more AUT-specific bugs to add to the previous report. All three are visible on the staged Master of Architecture (Professional) record but the pattern is across multiple courses.
+
+---
+
+**Bug 9: fee_term is wrong for AUT — fee is per-120-points (one year), not full course**
+
+The Master of Architecture (Professional) record shows `A$46,621/Full Course`. The actual page (https://www.aut.ac.nz/study/study-options/architecture-and-built-environment/courses/master-of-architecture-professional) states:
+
+> International: $46,621.60 (for 120 points) ($45,400 tuition fees + $1,221.60 student services levy)
+
+The "Quick facts" panel on the same page also says:
+> Points: 240
+> Duration: 2 years full-time
+
+So:
+- 120 points = 1 year of full-time study
+- The $46,621.60 is the fee for **one year** (120 points), not the full course
+- The full course is 240 points / 2 years, which would be ~$93,243.20 in tuition
+
+The regex/AI is correctly extracting the dollar amount but mis-tagging `fee_term` as `Full Course` when it should be `Annual`. AUT's fee structure (and most NZ universities') is points-based with per-year fees — every "$X for 120 points" line is an annual fee for a full-time student.
+
+This affects all the AUT records in the staged output. Looking at the table:
+- Bachelor of Architecture and Future Environments: A$47,121/Full Course — actually $47,121/year for a 3-year programme
+- Bachelor of Construction: A$47,521/Full Course — actually annual, 3-year programme
+- Graduate Diploma in Architecture: A$47,121/Full Course — annual (1-year programme so happens to coincide with full course)
+- Master of Architecture (Professional): A$46,621/Full Course — annual, 2-year programme → actual full-course is ~$93,243
+- Master of Architectural Design Management: A$52,321/Full Course — 1-year programme
+- Master of Construction Management: A$52,321/Full Course — 1-year programme
+- Master of Engineering Project Management: A$50,321/Full Course — 1-year programme
+
+The ones with 1-year duration coincidentally have the right total, but `fee_term` is still mis-tagged. The 2-3 year programmes are actually showing the wrong total fee.
+
+**Fix:** when fee text contains "per X points", "for X points", "per year", or "per annum", set `fee_term = 'Annual'`. Only set `Full Course` when the page text explicitly says "total", "full programme", "complete course", or similar. For NZ universities specifically, default to `Annual` since that's the convention.
+
+---
+
+**Bug 10: currency tagged as A$ (AUD) instead of NZ$ (NZD) — AUT is in New Zealand**
+
+Every AUT record in the table shows `A$` prefix. AUT is Auckland University of Technology, in New Zealand. Their fees are in NZD. The page shows just `$` (which on an .ac.nz domain means NZD), but the staged record is treating it as AUD.
+
+This is significant because:
+- $46,621 NZD ≈ $43,000 AUD (about 8% difference)
+- For users comparing fees across AU/NZ unis, this would make AUT look more expensive than it actually is in AUD terms
+
+**Fix:** infer currency from the university's country, not from the `$` symbol alone. Universities on `.ac.nz` domains → NZD. `.edu.au` → AUD. `.ac.uk` → GBP. `.edu` (US) → USD. The `university_id` table presumably has a country field already — use that to set the currency at staging time, overriding any guess from the page.
+
+Alternatively, look for explicit currency markers in the surrounding text — "NZ$", "NZD", "New Zealand dollars", "NZ government funding". The Master of Architecture (Professional) page mentions "a proportion of the tuition fees being funded by the New Zealand Government" — that's a strong currency signal.
+
+---
+
+**Bug 11: intake months are undercounted — Master of Architecture (Professional) shows 1 intake, should be 2**
+
+The staged Master of Architecture (Professional) record shows `Feb` as the only intake. The actual programme has two intakes per year:
+- Semester 1 starts late February
+- Semester 2 starts mid-July
+
+The page's "Quick Facts" panel shows "Starts: 22 Feb 2027" — just the next upcoming start date, not all available intakes. But the programme structure section shows both Year 1 Semester 1 courses AND Year 1 Semester 2 courses (ARCH800 then ARCH801, ARCH802 then ARCH805/806), confirming a mid-year intake exists.
+
+The extractor is keying off the Quick Facts "Starts" line and missing the actual semester-based intake structure. This affects multiple AUT courses:
+- Master of Architecture (Professional): shows Feb only — should be Feb, Jul
+- Bachelor of Architecture and Future Environments: shows Feb only — should be Feb, Jul (most AUT bachelor's accept mid-year intake)
+- Graduate Diploma in Architecture: shows Feb only — should likely be Feb, Jul
+- Diploma in Design / Diploma in Visual Arts: shows Feb only — worth checking
+
+Compare to Bachelor of Construction which correctly shows `Jul, Feb` and Master of Construction Management with `Jul, Feb`. Those probably picked up intakes from the body text rather than just Quick Facts.
+
+**Fix:** when extracting intakes from AUT pages, don't rely solely on the Quick Facts "Starts:" date. Check for semester-based course structure (Semester 1, Semester 2 listings under Year N) and infer Feb + Jul if both semesters have courses, since that's the standard NZ academic year. Also worth checking the `[Key semester dates](https://www.aut.ac.nz/study/semester-dates)` link from each page for the canonical intake schedule.
+
+---
+
+**Cross-cutting note**
+
+All three bugs share a theme: the extractor is doing a literal read of the most prominent surface element on each page (the dollar number, the $ symbol, the next start date) without applying domain-level context (NZ unis use annual point-based fees in NZD with two semester intakes). Adding a per-university or per-country profile that sets defaults for these fields would catch a lot of these errors at staging time even when the page text is ambiguous.
+
+E.g., for any university where `country='NZ'`:
+- Default currency: NZD
+- Default fee_term when value matches "X for Y points" or "X per year": Annual
+- Default intakes: include Feb if any Semester 1 content present, include Jul if any Semester 2 content present
+
+Similar profiles for AU, UK, US would help the other unis too.
+
+---
+
+These are all relatively easy fixes once the staging pipeline knows AUT is in NZ. The data is on the pages — it's just being misinterpreted.

@@ -56,8 +56,11 @@ _YEAR_RE = re.compile(r"\b(20\d{2})\b")
 
 _COUNTRY_CURRENCY = {
     "australia": "AUD",
+    "au": "AUD",
     "new zealand": "NZD",
+    "nz": "NZD",
     "canada": "CAD",
+    "ca": "CAD",
     "united states": "USD",
     "usa": "USD",
     "us": "USD",
@@ -67,11 +70,33 @@ _COUNTRY_CURRENCY = {
     "scotland": "GBP",
     "wales": "GBP",
     "singapore": "SGD",
+    "sg": "SGD",
     "ireland": "EUR",
     "germany": "EUR",
     "netherlands": "EUR",
     "france": "EUR",
 }
+
+
+def _infer_currency_from_url(url: str) -> str | None:
+    """Infer default currency from URL TLD when context text carries no explicit
+    currency marker (e.g. AUT uses bare '$' with no 'NZ$' prefix).
+
+    Only used as a last-resort override when ``_detect_currency`` would
+    otherwise fall back to AUD (the code's global default).
+    """
+    from urllib.parse import urlparse as _up
+
+    host = (_up(url).hostname or "").lower()
+    if host.endswith(".nz"):
+        return "NZD"
+    if host.endswith(".ac.uk") or host.endswith(".co.uk") or host.endswith(".uk"):
+        return "GBP"
+    if host.endswith(".ca"):
+        return "CAD"
+    if host.endswith(".sg") or host.endswith(".edu.sg"):
+        return "SGD"
+    return None
 
 
 def _detect_currency(ctx: str, country: str | None) -> str:
@@ -170,6 +195,12 @@ def _normalize_fee_term(ctx: str) -> str:
         return "Session"
     if re.search(r"per\s*(?:credit\s*)?(?:unit|point|credit)", ctx, re.I):
         return "Per Unit"
+    # "for/per N points" → Annual. NZ/AU universities quote per-year fees as
+    # "$X for 120 points" (120 credit-points = 1 FTE year of full-time study).
+    # This must be checked BEFORE the Full Course block so that a fee page
+    # saying "for 120 points" is not accidentally tagged as Full Course.
+    if re.search(r"\b(?:for|per)\s+\d{2,4}\s+(?:credit\s+)?points?\b", ctx, re.I):
+        return "Annual"
     if re.search(
         r"total\s*(?:course|program|tuition)|full\s*course|complete\s*(?:course|program)",
         ctx,
@@ -415,6 +446,12 @@ async def extract(
     if structural is not None:
         amount, value_ctx = structural
         currency = _detect_currency(value_ctx, country)
+        # Bug 10: bare "$" on .ac.nz pages resolves to AUD by default; override
+        # with TLD-inferred currency so NZ universities always emit NZD.
+        if currency == "AUD":
+            _url_cur = _infer_currency_from_url(url)
+            if _url_cur:
+                currency = _url_cur
         fee_term = _normalize_fee_term(value_ctx)
         method = "fee.structural"
         rollup = _maybe_compute_full_course(
@@ -457,6 +494,11 @@ async def extract(
     if not (_TUITION_CTX.search(ctx) or _INTL_CTX.search(ctx)):
         return []
     currency = _detect_currency(ctx, country)
+    # Bug 10: same TLD-based override for the keyword path.
+    if currency == "AUD":
+        _url_cur = _infer_currency_from_url(url)
+        if _url_cur:
+            currency = _url_cur
     fee_term = _normalize_fee_term(ctx)
     method = "regex"
     # Per-Unit → Full Course rollup (T203). Mirrors Node's behaviour at

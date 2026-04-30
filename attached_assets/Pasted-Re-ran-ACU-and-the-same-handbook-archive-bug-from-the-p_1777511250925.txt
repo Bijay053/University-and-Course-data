@@ -1,0 +1,97 @@
+Re-ran ACU and the same handbook-archive bug from the previous report is still happening. Plus a few new issues to add. Sharing here together.
+
+---
+
+**Bug 1 (blocker, recurring): handbook archive pages are still being scraped instead of live course pages**
+
+This was bug 1 in my previous ACU report and it's not fixed. The output table has two clearly distinct populations of records:
+
+- **Population A (~13 records):** course names end with `| Acu Courses` suffix. These have real fees (A$16,160-A$104,184), specific campus locations (e.g. "North Sydney", "Melbourne Strathfield", "Ballarat Blacktown Brisbane Canberra Melbourne North Sydney"), real PTE/TOEFL/CAE values, and eligibility=ready 77%. These came from URLs like `https://www.acu.edu.au/course/bachelor-of-nursing?type=International` (no handbook prefix).
+
+- **Population B (~86 records):** no suffix on the name. Every single one has blank international fee, identical generic location "Sydney, Melbourne, Brisbane, Canberra, Townsville, Ballarat, Australia" (or sometimes "Location"), identical IELTS 6.5 / PTE 79 institutional minimums hallucinated via sibling cache backfill. These came from URLs like `https://www.acu.edu.au/handbook/handbook-2025/course/{slug}` or `https://www.acu.edu.au/handbook/handbook-2026/course/{slug}`.
+
+The handbook URLs are an archive of past course catalogues. They render very minimal HTML — every fetch returns `text_len=0` after Gemini parsing — and don't contain fee/location/English data. The course detail data lives on the live `/course/{slug}` URLs.
+
+Looking at the discover log:
+- Crawl from `https://acu.edu.au/courses` only found 4 candidates (the `/courses` page is mostly nav, hits the 25-page cap quickly without reaching real course pages)
+- Sitemap fallback then dumped 590 URLs into the queue, most of which are handbook archives
+- Result: 161 candidates extracted, but only 13 are from `/course/{slug}` paths
+
+**Fix:** at discover stage, hard-block any URL matching `/handbook/handbook-20\d\d/` — these are archive pages, not live course detail. Then either:
+  - (a) Use the 17 study-area pages on `https://www.acu.edu.au/study-at-acu/find-a-course` as seed URLs (Allied health, Business, Creative arts, Global studies and international development, Humanities and social sciences, IT, Law and criminology, Nursing/midwifery/paramedicine, Nutrition and biomedical science, Philosophy, Psychology, Public health and administration, Sport and exercise science, Teaching, Theology, Youth work). Each lists all live `/course/{slug}` URLs in its area.
+  - (b) Use the 4 course-type browse endpoints: `https://www.acu.edu.au/study-at-acu/find-a-course/course-search-result?CourseType=Undergraduate` (and Postgraduate, Research, Other). These hit ACU's underlying course API.
+
+Note: I checked `https://www.acu.edu.au/study-at-acu/find-a-course/business` directly — the page is an Angular template, course list rendered by JS from a backend call. The visible HTML contains template placeholders like `{{course.CourseName}}` and `{{filterResult.length}}`. So the extractor needs to use the per-course-browser fetch on those study-area pages (or find/intercept the underlying API call) — a static fetch will return empty.
+
+Recommended order: drop handbook entirely, use the per-course-browser to render each study-area page, harvest the live `/course/{slug}` URLs from the rendered DOM, then feed those to the existing extractor (which works correctly — Population A proves it).
+
+---
+
+**Bug 2: literal 'Location' text appearing in location_text on Population A records**
+
+Several of the `| Acu Courses` records have `location_text=Location` (the literal word, not a real location). E.g. `Master of Family and Systemic Therapy | Acu Courses`, `Master of Spiritual Direction | Acu Courses`, `Certificate in Philosophy | Acu Courses`, `Certificate in Theology | Acu Courses`, `Graduate Diploma in Theological Studies | Acu Courses`, `Graduate Certificate in Public Health | Acu Courses`, etc.
+
+Looking at the GP-DEBUG snippets, these pages contain the text "Offered at 0 locations Location Duration" — the page literally says "Offered at 0 locations" because these courses are domestic-only or online-only and the location list is empty. The extractor is grabbing the next word after "Offered at 0 locations" which happens to be the heading "Location" itself.
+
+**Fix:** when `Offered at 0 locations` appears in the source, set location_text to NULL (don't grab the next token). Or add a stoplist that rejects single-word location values matching field-label tokens ("Location", "Duration", "Fees", "Campus").
+
+---
+
+**Bug 3: Doctor of Philosophy duration=12 Year (recurring regex bug)**
+
+The `Doctor of Philosophy | Acu Courses` row shows `duration=12 Year` and the data quality report flagged it: `[WARN] suspicious_duration: Duration 12.0 year(s) is outside the expected range (0 < duration ≤ 10.0)`.
+
+The page text is:
+> Duration Three years full-time, with the possibility of a six to 12 month extension, or Six years part-time, with the possibility of a 12 to 24 month extension.
+
+The regex grabbed "12 month" and turned it into 12 years. Same bug pattern from previous reports (AIT 15-year ICT50220, ACU 10-year Master of Psychology, CDU 12-year, AUT misc).
+
+**Fix:** when duration regex hits a number, also capture the unit token immediately after. "12 month" → 1.0 years (or 12 months, expressed correctly), not 12 years. Better still, prefer the structural extractor's first hit (Three years full-time = 3.0) and skip the rest of the duration text once a primary value is found.
+
+The data quality CRITICAL system already detected this — that check should fail the staging if duration > 10 years for non-PhD records. (PhDs are typically 3-4 years full-time, max ~6 part-time, never 12.)
+
+---
+
+**Bug 4: duplicate records**
+
+The table shows several courses appearing twice:
+- `Bachelor of Physiotherapy` × 2 (both from handbook URLs, no | Acu Courses suffix on either)
+- `Master of Spiritual Direction` × 2 (one with `| Acu Courses` from `/course/`, one without from `/handbook/handbook-2026/course/`)
+- `Doctor of Philosophy` appears as both `Doctor of Philosophy | Acu Courses` (Population A) and `Doctor of Philosophy` (Population B)
+
+The scraper's `duplicate_url_in_job` check caught one (line: `STAGE skipped Diploma in Biomedical Science | Acu Courses: rejected: duplicate_url_in_job`) but only the URL-level duplicate. Once Bug 1 is fixed (drop handbook URLs), most of these duplicates disappear automatically.
+
+**Fix as a safety net:** after staging, if two records have the same normalised course name + same university, prefer the one with non-blank fees and merge or reject the duplicate. The data quality report already flagged this as `duplicate_course_name × 2` warning.
+
+---
+
+**Bug 5: Graduate Diploma → Graduate Certificate degree_level miscoding (recurring)**
+
+Many courses with "Graduate Diploma" in their name show up as `Graduate Certificate` level in the output:
+- Graduate Diploma in Education → shows Graduate Certificate
+- Graduate Diploma in Information Technology → shows Graduate Certificate
+- Graduate Diploma in Spiritual Direction → shows Graduate Certificate
+- Graduate Diploma in Religious Education → shows Graduate Certificate
+- Graduate Diploma in Business Administration → shows Graduate Certificate
+- Graduate Diploma in Family and Systemic Therapy → shows Graduate Certificate
+- ...about 10+ records affected
+
+Same bug from previous AUT and ACAP reports. The degree-level classifier sees "Graduate" and "Diploma" or "Certificate" tokens and picks the wrong category. Graduate Certificate (0.5 yr) and Graduate Diploma (1 yr) are different qualifications — collapsing them is a real data quality issue for prospective students comparing course types.
+
+**Fix:** match on the full phrase `"Graduate Diploma"` first before falling back to Graduate Certificate. If course title contains "Graduate Diploma" → degree_level = "Graduate Diploma". Same for "Master of" vs "Bachelor of" — substring match the longer phrase first.
+
+---
+
+**Other observations**
+
+- 31 courses rejected as `online_only` (mostly correct — Master of Mental Health (Acu Online), Graduate Diploma in High Performance Sport (Acu Online), etc.). Those have "(Acu Online)" or "-online" in the URL slug and are correctly classified.
+- 29 rejected as `category_landing_page` — mostly Major: / Minor: / Handbook: pages, which is correct
+- `Master of Psychology (Educational and Developmental)` shows `5 Year` duration — worth verifying, ACU's Master of Psychology programs are typically 2-3 years
+- `Doctor of Philosophy` (the duplicate Handbook one, not the | Acu Courses one) shows `3 Year` duration — that's correct, just verifying the regex worked sometimes
+- 60s per-course browser timeouts continue to be very common (recurring from AUT report) — affects throughput badly. Total run was 56m 50s for 161 candidates = 21s/course average, but the actual per-course-browser fallback path takes 60s+ each time it fires. The Gemini 503 "experiencing high demand" errors hit ~50% of vision OCR calls in this run too.
+
+---
+
+**Bottom line**
+
+Fix Bug 1 (drop /handbook/ URLs, use study-area pages or course-search-result endpoints as seeds) and ~85% of the bad output goes away. The 13 records that did work prove the extractor downstream is solid — it's a discovery problem, not an extraction problem.

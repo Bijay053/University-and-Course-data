@@ -438,7 +438,29 @@ _SESSION_LABEL_RE = re.compile(
 )
 
 
-async def extract(html: str, url: str) -> list[ExtractionResult]:
+def _nz_semester_supplement(months: list[str], text: str) -> list[str]:
+    """Bug 11: AUT (and other NZ unis) have two intakes per year — Semester 1
+    (February) and Semester 2 (July) — but Quick Facts shows only the *next*
+    start date. When the page body contains course listings for BOTH Semester 1
+    AND Semester 2 (e.g. "Year 1 Semester 1: ARCH800" and "Year 1 Semester 2:
+    ARCH801"), the programme accepts mid-year entry and both months must appear.
+
+    Safe for any host — returns ``months`` unchanged when the page does not
+    mention both semesters (single-intake programmes are unaffected).
+    """
+    sem1 = bool(re.search(r"\bSemester\s+1\b", text, re.I))
+    sem2 = bool(re.search(r"\bSemester\s+2\b", text, re.I))
+    if not (sem1 and sem2):
+        return months
+    supplemented: list[str] = list(months)
+    if "February" not in supplemented:
+        supplemented.append("February")
+    if "July" not in supplemented:
+        supplemented.append("July")
+    return [mo for mo in _MONTHS if mo in set(supplemented)]
+
+
+async def _extract_raw(html: str, url: str) -> list[ExtractionResult]:
     from urllib.parse import urlparse as _up
     _host = (_up(url).netloc or "").lower()
     _is_uow = _host in _UOW_HOSTS
@@ -628,3 +650,39 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
             method="regex",
         )
     ]
+
+
+async def extract(html: str, url: str) -> list[ExtractionResult]:
+    """Public entry point. Runs all extraction passes via ``_extract_raw``,
+    then applies the NZ-semester supplement (Bug 11) for ``.ac.nz`` hosts.
+
+    The supplement adds February and July whenever the page body contains
+    course listings for BOTH Semester 1 AND Semester 2, ensuring that
+    programmes with mid-year intake are not reported as February-only.
+    """
+    results = await _extract_raw(html, url)
+    from urllib.parse import urlparse as _up
+
+    _host = (_up(url).netloc or "").lower()
+    if results and _host.endswith(".ac.nz"):
+        from app.services.scraper.extractors._text import compact, html_to_text
+
+        _full_text = compact(html_to_text(html)) or ""
+        _r = results[0]
+        _months = list(_r.normalized.get("intake_months") or [])
+        _supplemented = _nz_semester_supplement(_months, _full_text)
+        if len(_supplemented) > len(_months):
+            results = [
+                ExtractionResult(
+                    field_key="intake_months",
+                    value=_supplemented,
+                    normalized={
+                        "intake_months": _supplemented,
+                        "intake_days": _r.normalized.get("intake_days"),
+                    },
+                    confidence=_r.confidence,
+                    snippet=_r.snippet,
+                    method=_r.method + "+nz_semester_supplement",
+                )
+            ]
+    return results
