@@ -93,7 +93,21 @@ _DURATION_ANTI_CONTEXT = re.compile(
     r"over\s+\d+\s+years?\s+(?:of|in|as)|"
     # "received within", "awarded within", "granted within" — qualification
     # currency checks that reference time elapsed, not program length.
-    r"received\s+within|awarded\s+within|granted\s+within|obtained\s+within)\b",
+    r"received\s+within|awarded\s+within|granted\s+within|obtained\s+within|"
+    # Completion-deadline clauses that appear on Graduate Certificate / Diploma
+    # pages alongside the real program duration:
+    #   "must complete the qualification within 8 years of commencement"
+    #   "candidates must complete within 8 years of enrolment"
+    #   "within 8 years of commencement of studies"
+    # These are academic time limits, not program lengths.  The year value
+    # in the deadline sentence scores much higher than an 8-month program
+    # duration (8 Year → 41,604 vs 8 Month → 3,202) and wins the tournament
+    # incorrectly.  The gate is Pattern-2-only so Pattern-0 labeled sentences
+    # (e.g. "Duration: 2 years full-time. Must complete within 4 years.") are
+    # unaffected — Pattern-0 priority (×100) dominates regardless.
+    r"within\s+\d+\s+years?\s+of\s+(?:commencement|commencing|enrol(?:ment|ling)?|"
+    r"starting|graduation|admission|candidature|award)|"
+    r"complet(?:e|ed|ing|ion)\s+within\s+\d+\s+years?)\b",
     re.I,
 )
 

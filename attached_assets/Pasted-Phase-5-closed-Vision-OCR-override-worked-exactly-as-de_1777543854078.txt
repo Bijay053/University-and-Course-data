@@ -1,0 +1,35 @@
+Phase 5 closed. Vision OCR override worked exactly as designed — 22 clean, ACAP acknowledged-dirty with every change being a hallucination removal. PTE 59 gone (twice), TOEFL 100 gone, IELTS 7.0 → 6.5 corrected. That's not just a behaviour change, that's a data quality improvement across the board.
+The method-only diffs on Master of Professional Psychology / Master of Social Work are the kind of noise the regression sweep is designed to surface. Worth a 30-second think before declaring fully done: are those acceptable noise (non-deterministic AI fallback ordering, no real impact) or do they hint at something? Reading what you wrote, they look like provenance reshuffling — same value, different extraction_method JSONB key — which is benign. Note them, move on.
+Quick architecture-validation check:
+Phase 5 was the first migration to validate the per-uni override pattern for a behaviour toggle (not a boolean filter like Phase 2). The extraction.english.trust_vision_ocr accessor path worked, the gate fired for all 14 courses, the sweep found zero unexpected diffs, the spot-check showed the ACAP changes were all improvements. That validates the pattern for any future per-uni behaviour toggle (e.g., disable Gemini fallback for one uni, force PDF brochure parsing for another, skip browser refetch for a third). Three migration shapes now proven: filter (Phase 2), behaviour toggle (Phase 5), shared-code gate (Phase 3).
+On Option B as next.
+Right pick. It's the next big test for two reasons:
+
+First multi-uni expected-dirty sweep. Up to now, every sweep has had ≤1 expected-dirty uni. Option B will have four (KBS, ACU, AIT, ACAP). That exercises the --expected-slugs flag with multiple values, and it's the first time the workflow has to distinguish "expected diffs on these four unis" from "unexpected diffs on these eighteen." Worth running the sweep tooling locally first with a synthetic expected-dirty list of 3+ slugs to confirm the comma-separated parsing works.
+Shared-code change with high blast radius. The duration regex lives in shared code and runs on every uni's path. Phase 3 was also shared-code but only affected one downstream behaviour (the domestic_only filter call). Option B changes the regex itself, which means every uni's duration extraction recomputes. Expected outcome: 18 unis show identical duration values (regex fix is a no-op for them because their durations don't trigger the bug), 4 unis show corrected durations.
+
+Pre-build for Option B — three things worth confirming:
+
+Identify the bug precisely first. "8 months → 8 Year" is the symptom. The actual root cause is somewhere in how the structural duration regex parses "X months" / "Y trimesters" patterns. Before writing the fix, write a unit test that demonstrates the bug in isolation (input: "8 Months Full Time (2 Trimesters)" → expected: 8 months, actual: 8 years). The test gives you a tight feedback loop and serves as regression coverage going forward.
+Audit how many unis are actually affected. You said KBS, ACU, AIT, ACAP. Is that exhaustive or estimated? Run a quick query against the current staged data: which courses across the 22 baselined unis have duration_value >= 5 AND duration_unit = 'years' AND degree_level IN ('Graduate Certificate', 'Graduate Diploma')? That returns the full list of bug-affected courses. If it's only those four unis, sweep is straightforward. If it's six or seven, scope expands and the expected-slugs list needs to grow.
+Pre-fix baseline vs post-fix baseline diff scope. The sweep diff for Option B will be bigger than Phase 4 or Phase 5 — multiple unis, multiple courses per uni, multiple field changes per course (duration_value, duration_unit, possibly duration_text reformatted). Make sure the sweep output is readable at that scale. If the diff payload becomes thousands of lines, you may need a --summary-only mode showing per-uni course count changes plus a sample of detailed changes, with the full diff available on demand.
+
+Suggested sequencing for Option B:
+
+Capture fresh post-Phase-5 baseline (current prod state)
+Write a unit test in isolation that demonstrates the duration regex bug
+Query the staged data to enumerate every affected course across all baselined unis (this is your "expected-dirty enumeration")
+Fix the regex
+Verify the unit test now passes
+Run regression sweep with --expected-slugs <full enumerated list>
+Diff should show exactly the affected courses changing duration values, no other field changes anywhere, no other unis dirty
+If sweep matches expectation: merge, monitor, done
+If sweep shows duration changes on a uni you didn't expect: investigate — that uni had the bug and you didn't know
+If sweep shows non-duration changes anywhere: that's a real regression, debug before merge
+
+The unit test step (2) and the data query step (3) are new vs. previous migrations. They're worth doing because Option B's blast radius is genuinely larger and "what we expect to change" needs to be enumerated explicitly rather than assumed. Phases 2-5 had ≤1 dirty uni so the expectation was implicit; Option B needs the expectation to be explicit and queryable.
+Bottom line:
+Phase 5 done cleanly, three migration patterns now proven (filter, behaviour toggle, shared-code gate). Option B is the right next target and it's the first migration where pre-flight enumeration matters more than reactive debugging. Pre-build steps: fresh baseline, isolation unit test, full bug-affected-course enumeration. Then write the regex fix and run the multi-uni sweep.
+Tracking update:
+Phase 5 (vision OCR per-uni override): DONE.
+Phase 6 (duration regex shared-code fix): NEXT.

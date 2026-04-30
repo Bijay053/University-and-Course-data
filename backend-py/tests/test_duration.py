@@ -114,3 +114,71 @@ def test_dt_dd_duration_rejects_accelerated_in_value_cell():
         f"Structural pre-pass must reject accelerated value cells, "
         f"got {structural!r}."
     )
+
+
+def test_completion_deadline_does_not_displace_monthly_duration():
+    """ACAP / KBS / ACU regression: Graduate Certificate pages that publish a
+    completion deadline *before* the real program duration caused the sentence
+    tournament to score the deadline year-value higher than the real months
+    value.
+
+    Example page layout:
+        <p>Students must complete the qualification within 8 years
+           of commencement of studies.</p>
+        <div>8 months full-time</div>
+
+    Tournament scoring (before fix):
+      "…within 8 years of commencement…"  → 8 Year  weight=41,604  (Pattern-2)
+      "8 months full-time"                → 8 Month weight= 3,202  (Pattern-2)
+      → 8 Year incorrectly wins.
+
+    Root cause: _DURATION_ANTI_CONTEXT did not cover the
+    "complete/completing within N years" or "within N years of
+    commencement/enrolment" completion-deadline pattern class.
+
+    After the fix, the deadline sentence is excluded from Pattern-2 and the
+    real duration sentence wins the tournament.
+    """
+    html = (
+        "<p>Students must complete the qualification within 8 years "
+        "of commencement of studies.</p>"
+        "<div>8 months full-time</div>"
+    )
+    out = _run(duration.extract(html, "https://www.acap.edu.au/test/"))
+    assert out, "extractor must find the 8-month duration"
+    n = out[0].normalized
+    assert n["duration"] == 8.0 and n["duration_term"] == "Month", (
+        f"Completion-deadline sentence ('within 8 years of commencement') "
+        f"must not beat the real program duration (8 months). Got {n!r}."
+    )
+
+
+def test_within_n_years_of_enrolment_is_anti_context():
+    """'within 8 years of enrolment' is always a completion deadline —
+    the semester/trimester variant of the same bug class as the commencement
+    pattern. Must not win over a real '8 months full-time' duration."""
+    html = (
+        "<p>Candidates must complete within 8 years of enrolment.</p>"
+        "<p>8 months full-time.</p>"
+    )
+    out = _run(duration.extract(html, "https://www.acap.edu.au/test/"))
+    assert out, "extractor must find the 8-month duration"
+    n = out[0].normalized
+    assert n["duration"] == 8.0 and n["duration_term"] == "Month", (
+        f"'within 8 years of enrolment' deadline must be excluded from "
+        f"Pattern-2; got {n!r}."
+    )
+
+
+def test_labeled_duration_unaffected_by_completion_deadline_fix():
+    """Pattern-0 (explicit duration label) must still fire on sentences that
+    contain 'complete within N years' — the anti-context gate only applies to
+    Pattern-2 (the loose fallback). A labeled sentence is always preferred."""
+    html = "<p>Course duration: 2 years full-time. Must complete within 4 years.</p>"
+    out = _run(duration.extract(html, "https://e/x"))
+    assert out, "extractor must fire on the labeled duration sentence"
+    n = out[0].normalized
+    assert n["duration"] == 2.0 and n["duration_term"] == "Year", (
+        f"Pattern-0 (duration label) must fire on 'Course duration: 2 years' "
+        f"regardless of the completion-deadline clause. Got {n!r}."
+    )
