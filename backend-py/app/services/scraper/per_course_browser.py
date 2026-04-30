@@ -102,6 +102,14 @@ _SKIP_BROWSER_HOSTS: tuple[str, ...] = (
     # zero data loss; the static extractors + central fee page handle all that
     # AIT does publish on its public course detail pages.
     "ait.edu.au",
+    # AUT (Auckland University of Technology): static HTML is 60–100KB of
+    # fully-rendered SSR content that already contains fees, IELTS, and other
+    # fields. The per-course browser times out on every AUT page (13/13 timeouts
+    # at 60s in the first full run = 13 min wasted) because AUT embeds heavy
+    # third-party trackers and analytics that prevent networkidle from settling.
+    # Skipping saves ~60s × n_courses per run with zero data loss — the static
+    # extractors already capture all data AUT publishes on course detail pages.
+    "aut.ac.nz",
 )
 
 
