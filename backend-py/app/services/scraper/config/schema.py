@@ -173,7 +173,7 @@ class LocationCleaningConfig(BaseModel):
             "Regex patterns applied to raw location strings before parsing. "
             "Each matching fragment is stripped.  Order matters — patterns are "
             "applied left to right.  "
-            "E.g. ACAP: [r'^\\s*\\^.*$'] strips '^ ^Available in Perth' cruft."
+            "E.g. ACAP: [r'\\^\\s*\\^.*$'] strips '^ ^Available in Perth' cruft."
         ),
     )
 

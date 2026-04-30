@@ -16,7 +16,7 @@
 #
 # DONE (Phase 3): domestic_only filter wired into staging gate.
 # DONE (Phase 5): trust_vision_ocr: false wired — vision OCR skipped for ACAP.
-# TODO (Phase 6): wire strip_patterns into location extractor.
+# DONE (Phase 6): strip_patterns wired into location.extract() — ACAP footnote cruft removed.
 
 extraction:
   english:
@@ -29,5 +29,11 @@ extraction:
   text_cleaning:
     location:
       strip_patterns:
-        - '^\s*\^.*$'                   # '^Available in Perth' prefix
+        # ACAP footnote pattern: "Perth^ ^Available in Perth from Trimester 3, 2026"
+        # The '^' is a CSS superscript footnote marker that the HTML extractor reads
+        # as literal text.  This regex strips from the first "^ ^" sequence to
+        # end-of-string, leaving only the real campus city names before the marker.
+        # Also handles the degenerate case where the entire string IS the footnote
+        # (e.g. "^ ^Available in Perth" with no leading city name → empty → null).
+        - '\^\s*\^.*$'
         - '\(\s*domestic\s+only\s*\)'   # inline '(domestic only)' markers

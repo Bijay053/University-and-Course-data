@@ -1,0 +1,130 @@
+Hold on — worth re-aligning on what C and B mean before any more commits ship. Going back to the migration queue we agreed on after Phase 5:
+
+---
+
+## Option C — Location cruft strip (per-uni text-cleaning override for ACAP)
+
+**What's broken:** 4 of the 11 staged ACAP courses currently render their location with a literal annotation suffix. From the most recent staged data:
+
+```
+Master of Social Work (Qualifying)            Adelaide, Melbourne, Sydney, Perth^ ^Available in Perth from Trimester 3, 2026
+Graduate Diploma of Professional Accounting   Perth^ ^Available in Perth from Trimester 3, 2026
+Graduate Certificate of Professional Accounting   Perth^ ^Available in Perth from Trimester 3, 2026
+Graduate Certificate of Human Services        Adelaide, Melbourne, Sydney, Perth^ ^Available in Perth from Trimester 3, 2026
+```
+
+The `^ ^Available in Perth from Trimester 3, 2026` is a footnote annotation on ACAP's website (the `^` is rendered as a superscript footnote marker in CSS, but the static HTML extractor reads it as literal text). It's been in every ACAP scrape log for the past three weeks but only became visible in user-facing data after Phase 4 (when ACAP started staging non-zero courses).
+
+**Why this is C:**
+- Per-uni only — ACAP is the only uni with this specific footnote pattern
+- No shared-code change — the fix is a YAML override that adds a regex strip pattern to ACAP's text-cleaning config
+- No regression sweep needed — by definition only ACAP is affected
+- Validates a third per-uni override shape (text-cleaning regex) after Phase 2 (boolean filter) and Phase 5 (behaviour toggle)
+- Half-day of work
+
+**What the fix looks like:**
+
+In `acap_41.yaml`:
+```yaml
+extraction:
+  text_cleaning:
+    location:
+      strip_patterns:
+        - '\^\s*\^.*$'    # ACAP footnote: "^ ^Available in Perth from Trimester 3, 2026"
+```
+
+In `defaults.yaml`:
+```yaml
+extraction:
+  text_cleaning:
+    location:
+      strip_patterns: []    # default: no stripping
+```
+
+In shared code (the location text post-processor): apply each `strip_patterns` regex to the extracted location text before it gets staged. Read from `uc.extraction.text_cleaning.location.strip_patterns` via the contextvar.
+
+**Validation:**
+1. Capture fresh post-Phase-5 baseline
+2. Add the YAML override + the strip code in shared code
+3. Run regression sweep with `--expected-slugs acap`. Expected: 22 clean, 1 acknowledged-dirty (ACAP location values for those 4 courses change from `Perth^ ^...` to `Perth`)
+4. Spot-check the 4 ACAP courses in the review UI
+5. Merge
+
+---
+
+## Option B — Duration regex shared-code fix
+
+**What's broken:** the structural duration regex misclassifies values across multiple unis. Specific known instances from the bug reports:
+
+- KBS Graduate Certificate in Accounting → page text says "8 months / 4 subjects / 2 trimesters", regex extracted as `8 Year` (the `[NULLIFIED]` sanity check then cleared it, leaving duration blank)
+- KBS Master of Information Technology → page text says "1 year, 8 months / 12 subjects / 5 trimesters", regex extracted as `20 Year` (also nullified)
+- ACU Doctor of Philosophy → 12-year duration value extracted from "4 years"
+- AIT ICT50220 → 15-year duration value extracted
+- ACAP Graduate Diploma of Business Administration → currently displays `16 Month` (the page says "1 year, 4 months")
+- ACAP Graduate Diploma of Legal Practice → currently displays `3 Month` (the page says "14 Weeks Full Time")
+
+**Common root cause:** the duration regex grabs numbers without their units, or grabs the wrong number from "X years / Y subjects / Z trimesters" patterns. The regex needs to:
+- Always capture both number AND unit together (no orphan numbers defaulting to years)
+- Prefer `\d+\s+(year|years|month|months|week|weeks)` matches over `\d+\s+(subject|trimester|semester)` matches
+- Split on `/` when the format is `X years / Y subjects` and only take the first segment for years
+
+**Why this is B (not C):**
+- Shared code — the regex lives in the structural duration extractor used by every uni
+- Multi-uni blast radius — KBS, ACU, AIT, ACAP all show the bug. Other unis without the bug also run through this code path, so the fix could accidentally regress them.
+- Requires the regression sweep with `--expected-slugs kbs,acu,ait,acap` (or however many unis turn out to actually be affected when you query the data)
+- This is the **first multi-uni expected-dirty sweep test** — every previous migration had ≤1 expected-dirty uni
+
+**Suggested validation order for B:**
+1. Capture fresh post-Phase-5 baseline
+2. Write a unit test that demonstrates the bug in isolation (input: "8 months / 4 subjects / 2 trimesters" → expected: 8 months, current actual: 8 years)
+3. Query the staged data across all 22 baselined unis to enumerate every course with `duration_value >= 5 AND duration_unit = 'years' AND degree_level IN ('Graduate Certificate', 'Graduate Diploma')`. That returns the full list of bug-affected courses across the fleet — don't guess at which unis are affected, query and find out.
+4. Fix the regex
+5. Verify the unit test passes
+6. Run regression sweep with `--expected-slugs <full enumerated list from step 3>`
+7. Diff should show ONLY duration_value/duration_unit changes on the enumerated courses, no other field changes anywhere, no other unis dirty
+8. If sweep matches expectation: merge
+9. If sweep shows duration changes on a uni you didn't expect: investigate — that uni had the bug and you didn't know. Add to enumerated list, re-run.
+10. If sweep shows non-duration changes anywhere: real regression, debug before merge
+
+---
+
+## Why C should ship before B
+
+Two reasons:
+
+1. **C is visibly broken in production right now.** ACAP went from 0 staged to 11 staged with Phase 4. Four of those eleven have `Perth^ ^Available in Perth from Trimester 3, 2026` in their location field. Users see this. The longer it sits there, the worse the dashboard looks.
+
+2. **C is half a day. B is 2-3 days.** Two visible wins close together is better than one in a week. Doing C first means: ship today, location cruft gone tomorrow, then start the bigger B work with the per-uni text-cleaning override pattern already proven.
+
+---
+
+## On the three commits you just shipped (`fba79b1cb3d2`, `629e5de001ce`, `ede935448ea1`)
+
+None of these are C or B as scoped above. Reading the descriptions:
+
+- **Fix 3** — "Grad-cert sanity cap + same-N cross-check" — sounds like a guardrail in the duration code. Could be related to B but isn't the regex fix.
+- **Fix 1** — "Schooling/Year-12 anti-context + test cleanup" — sounds like an English requirements / entry requirements fix. Not B, not C.
+- **Fix 2** — "Float → Numeric(6,2) + Alembic migration" — schema migration affecting every duration row of every uni. NOT C, NOT B as scoped — this is a separate global database change.
+
+Fix 2 is the concerning one. It's a global schema change affecting every uni's data simultaneously. Per the architecture: shared-code/schema changes require a regression sweep before merge. The verification you described (single INSERT/SELECT confirming `1.7` round-trips to `1.70`) is a unit test for the column type, not a behavioural regression check across the 22 baselined unis.
+
+**Before pulling Fix 2 on prod:**
+1. Capture pre-migration baseline (current prod state)
+2. Run `alembic upgrade head` on a staging DB, not prod
+3. Capture post-migration baseline from staging
+4. Run regression sweep — expected: zero diffs everywhere (since `Numeric(6,2)` of `1.7` equals `1.7000000476837158` within rounding tolerance, no uni's data should *behaviourally* change)
+5. If zero diffs: promote to prod with confidence
+6. If unexpected diffs: investigate which uni's downstream logic depended on the float-precision artefacts
+
+The migration is probably safe. But "probably safe" without sweep evidence is exactly the heuristic the architecture work was designed to replace. Phases 1-5 each ran the sweep before merge. Fix 2 should too.
+
+---
+
+## Recommended path forward
+
+1. **Don't pull Fix 2 on prod yet.** Run sweep on staging first, paste result, then promote.
+2. **Do C as a small focused PR.** Half a day. Single per-uni YAML override + small shared-code change to apply strip_patterns. Sweep with `--expected-slugs acap`. Ship.
+3. **Then return to B.** Enumerate affected courses by querying staged data, write the unit test, fix the regex, run multi-uni sweep with the enumerated list. 2-3 days.
+4. **Fixes 1 and 3 — what are they actually for?** If they're related to B, fold them into B's PR with proper sweep validation. If they're standalone fixes, treat each as its own migration with its own sweep.
+
+The architecture only protects you if you use it for every shared-code change. Skipping the sweep on "small" changes is how regressions sneak in.

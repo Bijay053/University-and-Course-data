@@ -1,0 +1,44 @@
+1. Fees: completely missing on every staged KBS course.
+Same bug from the earlier KBS report. The fee link-out router pattern is unfixed. KBS course pages don't have fees inline — they link to /admissions/fees/international-fees. The scraper auto-discovered /admissions/fees (a router page with 0 records) and stopped there. This is the "follow the link if value isn't inline" rule that's still in the queue. Affects all 29 staged KBS courses. Visible in the dashboard as blank Intl. Fee column.
+2. Duration: misclassified across the board.
+Three failure modes visible:
+
+Master of Information Technology, Master of Business Analytics, Master of Professional Accounting: page says "1 year, 8 months / 12 subjects / 5 trimesters" → regex extracted 20 Year → sanity check nullified → duration blank. Should display "1 Year 8 Months" or "20 Months".
+Graduate Certificate values (Accounting, Business Administration, Information Technology): page says "8 months / 4 subjects / 2 trimesters" → regex extracted 8 Year → nullified → duration blank. Should display "8 Month".
+Graduate Diploma of Business Administration: page says "1 year, 4 months" → regex extracted 16 Year → nullified → duration blank. Should display "1 Year 4 Months" or "16 Months".
+
+These are the textbook examples of the duration regex bug we discussed (Option B). The structural extractor sees "X months / Y subjects / Z trimesters" and grabs the first number with the unit "years" defaulted, ignoring the actual unit on the page. The [NULLIFIED] sanity check cleared the values but couldn't recover the correct ones.
+Critically: durations that should be like "1 year 8 months" need to render as compound durations, not single-unit. This is a display formatting issue beyond just fixing the regex.
+3. IELTS: wrong values from sibling cache backfill.
+[EXTRACT] [sibling cache ↻ build postgraduate] ielts_listening=6.0 ielts_overall=6.5 ...
+[EXTRACT] [sibling cache ↻ backfill postgraduate] 79 slot(s) filled across siblings
+[EXTRACT] [sibling cache ↻ build undergraduate] ielts_listening=6.0 ielts_overall=6.5 ...
+[EXTRACT] [sibling cache ↻ backfill undergraduate] 25 slot(s) filled across siblings
+The sibling cache is filling 104 slots (79 + 25) across all KBS courses with the same IELTS=6.5 value. Almost every course in the dashboard now shows IELTS 6.5 regardless of whether KBS actually requires that for the specific course. KBS doesn't put English requirements on individual course pages — they link to /admissions/entry-requirements/english-entry-requirements (the same router pattern as fees).
+Two specific outliers also visible:
+
+Master of Information Technology: dashboard shows IELTS=9 (vision OCR hallucinated from cdn.kbs.edu.au image at 9.0/59 — KBS doesn't have trust_vision_ocr: false set yet)
+Graduate Certificate in Business Analytics: dashboard shows IELTS=4 (vision OCR pulled IELTS=4.0 — physically impossible, no university requires below 5.5)
+
+4. Plus a couple of smaller issues:
+
+Sibling cache cross-level leakage: the postgraduate sibling cache (IELTS 6.5) is being applied to undergraduate courses too — which is wrong even if the value happens to match. Bachelor of Information Technology shouldn't be reading from the postgraduate cache.
+MBA – Master of Business Administration: showing IELTS=7 in the dashboard. Probably correct (MBA requires 7.0) but came from vision OCR rather than the page text — same hallucination pattern.
+Locations slash format: MBA courses show Adelaide / Brisbane / Gold Coast / Melbourne / Perth / Sydney / with trailing slash. Other courses show comma-separated. Same uni, two formats. Cosmetic, KBS-specific normalisation.
+
+The bigger picture: KBS needs the same treatment ACAP got.
+Three separate fixes need to apply to KBS:
+
+Disable vision OCR (per-uni override, mirrors Phase 5 for ACAP): add extraction.english.trust_vision_ocr: false to kbs_29.yaml. This kills the IELTS=9 / IELTS=4 hallucinations immediately.
+Follow link-outs for fees and English requirements (shared-code rule, applies to every uni): when fee/IELTS isn't inline and the course page has a link matching /fees/, /tuition/, /english/, /entry-requirements/, follow it one level deep and parse. This is the broader "follow the link" rule from the KBS bug report two weeks ago — still queued, still not implemented.
+Fix the duration regex (Option B in the queue): the "X months / Y subjects / Z trimesters" parsing. KBS is one of the 4+ unis affected.
+
+Tracking implication:
+KBS being broken on three of these dimensions simultaneously means it's now the second-highest-priority uni after ACAP. The migration queue I outlined earlier needs reordering:
+
+ACAP location cruft (Option C) — 4 of 11 staged courses affected
+KBS vision OCR disable (Option A2 — same shape as Phase 5) — affects all 29 staged KBS courses
+KBS duration regex fix (Option B) — affects 11+ KBS courses currently showing blank duration
+KBS link-out following (Option D) — fixes fees on all 29 KBS + IELTS on most KBS + has cross-uni leverage
+
+Doing KBS vision OCR first is cheap (mirror of Phase 5, half a day, per-uni override pattern proven). It removes the impossible IELTS=4 and IELTS=9 values immediately. Then the queue continues as planned.

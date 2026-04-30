@@ -652,6 +652,20 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:  # noqa: ARG00
     if not html:
         return []
     soup = BeautifulSoup(html, "html.parser")
+
+    # Per-uni text-cleaning strip_patterns (Option C).
+    # Loaded from the contextvar set by set_uni_config() before extraction.
+    # Fail-open: if the contextvar is unset (tests / ad-hoc calls), no stripping.
+    from app.services.scraper.config.context import get_uni_config  # local import avoids circular dep
+    _uni_cfg = get_uni_config()
+    _strip_patterns: list[re.Pattern[str]] = []
+    if _uni_cfg:
+        for _pat_str in _uni_cfg.extraction.text_cleaning.location.strip_patterns:
+            try:
+                _strip_patterns.append(re.compile(_pat_str, re.IGNORECASE))
+            except re.error:
+                pass  # bad pattern in YAML — skip rather than crash
+
     cascade = (
         # Structural pre-pass FIRST — see _from_strong_dom_walk for the
         # rationale. Reads `<strong>Location</strong>` style values out
@@ -666,6 +680,13 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:  # noqa: ARG00
         ("text_block", _from_text_block(html_to_text(html)), 0.5),
     )
     for method, raw, conf in cascade:
+        if not raw:
+            continue
+        # Apply per-uni strip_patterns before sanitise so cruft (e.g. ACAP
+        # footnote annotations "^ ^Available in Perth from Trimester 3, 2026")
+        # is removed from the raw location text before any normalisation check.
+        for _pat in _strip_patterns:
+            raw = _pat.sub("", raw).strip()
         if not raw:
             continue
         display = _sanitise_for_display(raw)
