@@ -1,0 +1,19 @@
+Three crisp answers, all the right calls:
+Signal 1 — (a) confirmed. The contextvar is exercised on every extract call, just stored in _uc and not yet read. That's the right state for end of Week 1: wire-up validated, behaviour unchanged. The first Week 2 PR that reads from _uc will be backed by a known-working contextvar pipeline.
+Signal 2 — QC fix is good. The skip on domestic_only=True and parser_error=True is the right scope. Worth a small mental note: the rule generalises. Any future filter that produces a rejected:_* status (e.g. a future regional_only or vet_provider_only filter) needs the same skip. If parser_error is currently a hardcoded check, consider whether a single check on payload.status.startswith("rejected:") would be more durable than maintaining a list. Not a fix needed now — just something to flag for the next time someone adds a new filter.
+Signal 3 — this is the cleanest answer of the three. The shared vision_image_cache with old-path-first then new-path-cache-hits is exactly the right pattern. Within a single shadow run: byte-identical guaranteed by cache hit. Across the 5-streak runs: each run's internal old↔new diff is independent of cross-run vision drift. The comment in the shadow hook means the next person reading it won't accidentally remove the cache sharing thinking it's redundant.
+One small thing on Signal 3 worth confirming because it'll matter the moment shadow mode goes live: does the cache survive across the per-course-browser re-fetch path? The log shows lines like:
+[per-course browser ↻] https://www.acap.edu.au/courses/...
+[per-course browser ✓] https://www.acap.edu.au/courses/... — IELTS=— ...
+[VISION] N candidate image(s) found — starting OCR pass
+The ↻ re-fetch happens because the static fetch didn't yield enough fields. If the re-fetch also triggers a fresh vision pass on the same URLs (rather than reusing the original vision results), there's a chance the cache gets bypassed on the re-fetch path and the new code path could see different vision values on ↻ than the old code path did. Worth one targeted check that the vision_image_cache is the same dict object regardless of whether vision is invoked from the initial extract or from the per-course-browser fallback.
+If they're the same dict — green light, you're done.
+If they're separate dicts (one per fetch attempt) — the cross-path determinism still holds within a single attempt, but a re-fetch could see a different OCR result than the original. Probably fine in practice (same image, same prompt, similar response) but worth knowing whether the immunity is "guaranteed by cache hit" or "guaranteed in practice but not by construction."
+Beyond that — no objections. Commit ef2e6b5 looks good. The QC noise will be gone on the next ACAP run, the contextvar is validated, and the shadow-mode design is robust to vision non-determinism.
+Ready for shadow scaffolding to start. The actual scaffolding work is the next deliverable. Same Week 2 sequencing as before:
+
+Build shadow scaffolding. Validate it works on the current-broken ACAP state (both old + new paths produce identical Errors:14 failure).
+Migrate domestic_only to acap_41.yaml. Shadow 5 runs. Cut over.
+Fix re NameError in shared code. Run regression sweep across 23 baselined unis. Diff. Merge.
+
+Go.
