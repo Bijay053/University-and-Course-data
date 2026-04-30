@@ -1,0 +1,44 @@
+root@university-and-course-data:~/University-and-Course-data# sudo journalctl -u uni-celery -f --no-pager | grep shadow
+# You should see: shadow[acap/41] applying new-path transformation to 27 extracted results
+Apr 30 03:26:17 university-and-course-data celery[1229421]: [2026-04-30 03:26:17,340: INFO/ForkPoolWorker-4] shadow[acap/41] applying new-path transformation to 27 extracted results
+
+^C
+root@university-and-course-data:~/University-and-Course-data# sudo systemctl status uni-celery | grep -E "Active:|Main PID:|since"
+# Confirm "since" timestamp is AFTER your last systemctl restart call (≥ 03:22)
+# If the PID is the same old process, it didn't fully restart:
+#   sudo systemctl stop uni-celery && sleep 3 && sudo systemctl start uni-celery
+     Active: active (running) since Thu 2026-04-30 03:22:56 UTC; 4min 17s ago
+   Main PID: 1229412 (celery)
+root@university-and-course-data:~/University-and-Course-data# sudo journalctl -u uni-celery -n 30 --no-pager | grep -E "SHADOW|worker_ready"
+# Must see BOTH:
+#   [SHADOW] shadow mode ENABLED for uni_ids: 41
+#   worker_ready: no ghost running jobs found
+# If you see "shadow mode OFF" — check for shell quotes in .env:
+#   grep SHADOW backend-py/.env
+#   Should be: SHADOW_MODE_UNI_IDS=41  (no quotes)
+#   NOT:       SHADOW_MODE_UNI_IDS="41"
+root@university-and-course-data:~/University-and-Course-data# cat $(ls -t backend-py/shadow_reports/*.json | head -1) | python3 -m json.tool
+{
+    "schema_version": 1,
+    "timestamp": "2026-04-30T03:26:17.341436+00:00",
+    "uni_id": 41,
+    "slug": "acap",
+    "run_number": 3,
+    "old_job_id": "job_8680df208c21",
+    "new_job_id": "job_8680df208c21:new_path",
+    "is_clean": true,
+    "summary": "CLEAN \u00e2\u0080\u0094 27 courses matched exactly",
+    "clean_streak": 1,
+    "cutover_threshold": 5,
+    "cutover_ready": false,
+    "diff": {
+        "is_clean": true,
+        "summary": "CLEAN \u00e2\u0080\u0094 27 courses matched exactly",
+        "matched": 27,
+        "old_only": [],
+        "new_only": [],
+        "staging_disagreements": [],
+        "field_regressions": []
+    }
+}
+root@university-and-course-data:~/University-and-Course-data# 
