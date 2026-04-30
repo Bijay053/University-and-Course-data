@@ -1,0 +1,17 @@
+# Charles Sturt University
+# Hostname: www.csu.edu.au  (now possibly www.charlesturt.edu.au post-rebrand)
+#
+# Bug history / rationale:
+#   - SPA browser discovery: CSU's course listing is a React/Next.js SPA.
+#     BFS static HTML sees only the shell HTML; actual course links are loaded
+#     via XHR.  A browser discovery pass (playwright) is needed.
+#   - 'Actual rows mismatch' bug: the number of courses staged does not match
+#     the count shown on the CSU website.  Root cause may be pagination (BFS
+#     misses pages 2+) or the SPA rendering issue above.
+#   - CSU rebranded to 'Charles Sturt University' but domain may still use csu.
+#
+# TODO: confirm current hostname (csu.edu.au vs charlesturt.edu.au).
+# TODO: investigate whether csu_browser_discover.py already handles the SPA.
+
+discovery:
+  always_sitemap_supplement: true   # Supplement BFS with sitemap to catch SPA-only URLs

@@ -1,0 +1,13 @@
+# Australian College of Physical Education
+# Hostname: check DB — likely www.acpe.edu.au
+#
+# Bug history / rationale:
+#   - ACPE is a specialist sport and exercise science college.
+#   - Domestic-only filter consideration: some ACPE programs are domestic-only
+#     (e.g. TAFE-pathway programs).  Pending confirmation from admin whether
+#     these should be filtered.
+#   - Small course catalogue (~10–15 programs) — BFS discovery should be
+#     straightforward with no SPA issues.
+#
+# TODO: confirm hostname from DB.
+# TODO: confirm whether domestic-only filter is needed.

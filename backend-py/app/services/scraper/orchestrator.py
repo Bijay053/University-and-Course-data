@@ -629,6 +629,32 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         if not scrape_url:
             raise RuntimeError("University missing scrape_url")
 
+        # ── Week-1: Load per-university config and set contextvar ─────────────
+        # The UniConfig is built from:
+        #   defaults.yaml → DB scrape_config translation → per-uni YAML
+        # The contextvar is set here and available to all coroutines for the
+        # duration of this job.  No extractor reads it yet (Week 1 is pure
+        # infrastructure / no behaviour change).  Week-2 migrations will wire
+        # it into discovery, fee extraction, english extraction, and filters.
+        from urllib.parse import urlparse as _urlparse_cfg
+        from app.services.scraper.config import get_config_for_host, set_uni_config
+        _cfg_host = (_urlparse_cfg(scrape_url).netloc or "").lower()
+        _uni_cfg = get_config_for_host(
+            hostname=_cfg_host,
+            name=uni_name,
+            scrape_url=scrape_url,
+            university_id=uni_id,
+            db_scrape_config=uni_scrape_config,
+        )
+        set_uni_config(_uni_cfg)
+        log.debug(
+            "UniConfig loaded: slug=%r yaml_file=%r always_sitemap=%r",
+            _uni_cfg.slug,
+            f"scraper_config/unis/{_uni_cfg.slug}.yaml",
+            _uni_cfg.discovery.always_sitemap_supplement,
+        )
+        # ─────────────────────────────────────────────────────────────────────
+
         max_pages = 12 if job.fast_mode else 25
         max_courses = 20 if job.fast_mode else _MAX_COURSES_PER_JOB
         # Per-university overrides for BFS page/course budgets.

@@ -1,0 +1,14 @@
+# Australian Institute of Technology (or AIT — verify in DB)
+# Hostname: check DB — likely www.ait.edu.au or similar
+#
+# Bug history / rationale:
+#   - Duration bug (code comment reference): a course with code ICT50220 was
+#     extracting a 15-year duration — this is clearly a parsing error.
+#     Root cause: the course page includes a year '2020' somewhere in the page
+#     content (e.g. the CRICOS registration year or a publication date) which the
+#     numeric duration extractor mistakenly picks up as '20' (years).
+#   - The fix should be a cap on extracted duration values (max 6 years for
+#     vocational courses) applied in the duration extractor.
+#
+# TODO: confirm hostname and university ID from DB.
+# TODO (Week 2): add duration_max_years to schema and wire into duration extractor.

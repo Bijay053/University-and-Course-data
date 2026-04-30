@@ -1,0 +1,34 @@
+# Australian College of Applied Professions (ACAP)
+# Hostname: www.acap.edu.au
+#
+# Bug history / rationale:
+#   - Domestic-only filter: ACAP's course listing includes domestic-only programs
+#     that are not marked as such.  Enabling the filter drops courses whose name
+#     or metadata matches the _DOMESTIC_ONLY_RE patterns (domestic campus codes,
+#     "domestic students only" text, etc.).
+#   - Vision OCR hallucinations: Gemini consistently hallucinates IELTS/PTE scores
+#     from ACAP's decorative counselling images.  trust_vision_ocr: false forces
+#     the extractor to use HTML-only parsing for English requirements.
+#   - Location string noise: ACAP emits '^Available in Perth' prefix cruft in some
+#     location fields.  strip_patterns removes these before location parsing.
+#   - Current live bug (as of April 2026): NameError in single_course.py during
+#     ACAP scrapes — root cause under investigation, may be related to the
+#     domestic-only detection path.
+#
+# TODO (Week 2): wire domestic_only filter into staging gate.
+# TODO (Week 2): wire trust_vision_ocr into fee/english extractors.
+# TODO (Week 2): wire strip_patterns into location extractor.
+
+extraction:
+  english:
+    trust_vision_ocr: false
+
+  filters:
+    domestic_only:
+      enabled: true
+
+  text_cleaning:
+    location:
+      strip_patterns:
+        - '^\s*\^.*$'                   # '^Available in Perth' prefix
+        - '\(\s*domestic\s+only\s*\)'   # inline '(domestic only)' markers

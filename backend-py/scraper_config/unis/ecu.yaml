@@ -1,0 +1,13 @@
+# Edith Cowan University
+# Hostname: www.ecu.edu.au
+#
+# Bug history / rationale:
+#   - ECU has a dedicated static-extract module (ecu_static_extract.py) that
+#     handles ECU-specific page structures.  The module uses setdefault() so
+#     standard extractors can override its values.
+#   - ECU course pages have a distinct table layout for fees that the generic
+#     fee extractor sometimes misreads.  The static extractor handles these.
+#   - English requirements are published on individual course pages via an
+#     embedded accordion — Playwright pass needed for some courses.
+#
+# TODO: add ecu_static_extract.py behaviour flag if/when migrated to config.

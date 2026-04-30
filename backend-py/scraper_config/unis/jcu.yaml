@@ -1,0 +1,24 @@
+# James Cook University
+# Hostname: www.jcu.edu.au
+#
+# Bug history / rationale:
+#   - Cloudflare WAF blocks the scraper on some paths, returning 403/503.
+#   - The scrape_url may need to use a 'www' prefix explicitly — JCU has had
+#     issues where the bare domain (jcu.edu.au) redirects to a Cloudflare
+#     challenge page while www.jcu.edu.au serves the expected content.
+#   - 0 staged courses reported in some runs; likely caused by BFS being blocked
+#     before it can collect course-page URLs.
+#
+# Discovery notes:
+#   - JCU's course catalogue is at /study/courses — confirm this is still the
+#     correct scrape_url entry point.
+#   - Consider adding /study/courses to allow_url_patterns to constrain BFS to
+#     only the course subtree (reduces Cloudflare exposure).
+#
+# TODO: investigate Cloudflare bypass options (User-Agent rotation, JS challenge).
+# TODO: verify that www.jcu.edu.au is set as the scrape_url base.
+
+discovery:
+  allow_url_patterns:
+    - '/study/courses'
+    - '/courses/'

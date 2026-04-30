@@ -1,0 +1,21 @@
+# SA Institute of Business and Technology / PIBT / QIBT (Navitas network)
+# These are three related colleges operating under the Navitas group:
+#   - SAIBT (SA): www.saibt.sa.edu.au or similar
+#   - PIBT (WA): www.pibt.wa.edu.au or similar
+#   - QIBT (QLD): www.qibt.qld.edu.au or similar
+#
+# Bug history / rationale:
+#   - All three colleges use similar Navitas CMS templates.
+#   - Course listings may cross-link between colleges, causing duplicate staging
+#     if not filtered to the specific college's domain.
+#   - English requirements often link to a Navitas central requirements page
+#     rather than per-college or per-course pages.
+#
+# TODO: confirm each college's hostname and whether separate DB entries exist.
+# TODO: add allow_url_patterns to constrain BFS to the specific college domain.
+# NOTE: Each college should ideally have its own YAML stub if their configs differ.
+
+discovery:
+  allow_url_patterns:
+    - '/courses/'
+    - '/study/'

@@ -1,0 +1,19 @@
+# Australian Catholic University
+# Hostname: www.acu.edu.au
+#
+# Bug history / rationale:
+#   - BFS from /courses yields only ~4 candidates (two marketing sub-pages, one
+#     research-school page, and the start URL).  This is below the sitemap-fallback
+#     threshold, so the sitemap already fires.  always_sitemap_supplement ensures the
+#     sitemap runs even in edge cases where BFS finds slightly more pages.
+#   - The _dedup_year_variants canonical-URL rewrite converts handbook-prefixed
+#     sitemap URLs → live /course/<slug> URLs.  Old handbook URLs are blocked to
+#     prevent duplicate staging of historical course versions.
+#   - 0-locations false-positive reported: some courses show "No Australian campuses"
+#     which is not a scraper error (ACU closed several campuses).
+
+discovery:
+  always_sitemap_supplement: true
+  block_url_patterns:
+    - '/handbook/handbook-20'    # Reject old versioned handbooks (2010–2023 era)
+    - '/handbook/current'        # Canonical redirects to live /course/... URLs already
