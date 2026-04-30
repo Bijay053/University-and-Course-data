@@ -1,0 +1,32 @@
+Solid execution. Schema and YAML already in place from earlier work, single call site confirmed, gate strategy is minimal (stub vision_filled = {} and vision_evidence = [] inside the try) so no 280-line re-indent. That's the cheap correct fix.
+Three things worth flagging before you run the sweep, two of them new this round:
+1. The accessor path matters more than it looks.
+You confirmed uc.extraction.english.trust_vision_ocr is the correct path (not uc.extraction.trust_vision_ocr as I'd written in the previous reply — apologies, schema sat under english: not at the root of extraction:). Worth a 30-second double-check on the helper:
+pythondef _vision_ocr_trusted() -> bool:
+    uc = get_uni_config()
+    return uc is None or uc.extraction.english.trust_vision_ocr
+If the helper accesses .english but the YAML override is at a different path, the gate silently always returns the schema default (probably True) and the override is a no-op. Confirm both the YAML structure and helper line up — should be extraction: english: trust_vision_ocr: false in acap_41.yaml matching the helper accessor exactly.
+If they're already aligned (likely, given you confirmed the schema path), ignore. But this is the kind of thing that produces "everything looks right but the override doesn't apply" mystery bugs.
+2. Kaplan and ASA already have trust_vision_ocr: false and aren't in the sweep baseline — that's a hidden gotcha.
+You flagged this correctly: their behaviour will silently change on next scrape, undetected by the sweep. That's fine for ACAP/Kaplan/ASA where you've explicitly decided vision OCR is not trustworthy. But it surfaces a more general issue worth noting:
+The 23-uni baseline isn't comprehensive coverage of the production fleet. Any uni outside the baseline experiences silent behaviour changes when shared-code or schema changes ship. For this PR it's three unis (ACAP in baseline, Kaplan + ASA not), all of them deliberately changing in the same direction. Acceptable.
+But for future shared-code changes, this becomes a real gap. The duration regex fix (Option B) will silently change behaviour on every non-baselined uni too. Worth adding to the Week 4 backlog: "expand baseline to cover all production unis, not just bug-reported ones." Not a blocker for Option A, just something to note.
+3. The [VISION SKIP] log line is the single most important diagnostic for this PR.
+Your expected output:
+[VISION SKIP] trust_vision_ocr=false for this uni — skipping vision OCR pass on https://www.acap.edu.au/courses/...
+Two failure modes to watch for:
+(a) Line never appears in the log — gate isn't firing. Helper might be returning True when it should be False. Check that set_uni_config() is actually loading acap_41.yaml (not just the schema default) when ACAP scrape runs. Quick verify: add a one-time debug log in the helper showing the resolved value from contextvar, run scrape once, check value is False, remove debug log. Or grep the YAML loader logs for "loaded acap_41.yaml."
+(b) Line appears but [VISION] N candidate images ALSO appears — gate is wrapping the wrong block. The log should show one or the other, never both for the same course. If both fire, the gate is logging the skip but the vision pass runs anyway downstream.
+Both failure modes will show up cleanly in the ACAP scrape log right after pull. Read the log before running the sweep — if the gate isn't firing correctly, the sweep will show diff anyway and you'll waste cycles debugging at the wrong layer.
+Order:
+
+Pull + restart (your sequence)
+Trigger ACAP scrape
+Read the log: confirm [VISION SKIP] lines appear for each ACAP course, and [VISION] N candidate images lines do NOT appear. This is the gate-firing check.
+If gate is firing correctly: capture after-baseline, run sweep
+Sweep should show 22 clean + ACAP expected-dirty
+Spot-check 3-5 ACAP courses in review UI: confirm IELTS values that previously came from vision OCR (Master of Psych Clinical IELTS=7.0, etc.) are now null or regex-sourced
+If everything checks out: this PR is done, queue Option B
+
+If step 3 shows the gate isn't firing, stop there and fix before running the sweep. Sweep on a non-firing gate just produces a confusing all-clean result that hides the real problem.
+Go.
