@@ -40,7 +40,7 @@ def _strip_provider_name_from_title(
     """Remove trailing '- Provider' or '| Provider' suffixes that universities
     embed in their course page H1 elements.
 
-    Example: "Bachelor of Business - Aibi" → "Bachelor of Business"
+    Example: "Bachelor of Business - Aibi" â "Bachelor of Business"
 
     The course_name extractor in extractors/course_name.py strips well-known
     suffixes ("- Charles Sturt University", "| USQ") but cannot catch every
@@ -62,7 +62,7 @@ def _strip_provider_name_from_title(
     # Full university name (e.g. "AIBI" or "Aibi Institute")
     if uni_name:
         tokens.append(uni_name.strip())
-        # First word of the name — often the short identifier
+        # First word of the name â often the short identifier
         first = uni_name.strip().split()[0]
         if first and first != uni_name.strip() and len(first) >= 2:
             tokens.append(first)
@@ -77,7 +77,7 @@ def _strip_provider_name_from_title(
         except Exception:
             pass
 
-    _sep_pat = r"\s*[\-\u2013\u2014|:•]\s*"
+    _sep_pat = r"\s*[\-\u2013\u2014|:â¢]\s*"
     for token in tokens:
         if not token or len(token) < 2:
             continue
@@ -87,10 +87,10 @@ def _strip_provider_name_from_title(
         )
         m = pat.search(course_name)
         if m and m.start() > 0:
-            stripped = course_name[: m.start()].strip(" -–—|:•")
+            stripped = course_name[: m.start()].strip(" -ââ|:â¢")
             if stripped and len(stripped) >= 5:
                 log.info(
-                    "[COURSE NAME] stripped provider suffix %r from %r → %r",
+                    "[COURSE NAME] stripped provider suffix %r from %r â %r",
                     course_name[m.start() :].strip(),
                     course_name,
                     stripped,
@@ -102,8 +102,8 @@ def _strip_provider_name_from_title(
 
 # Bug E: ordered (prefix-or-keyword, level) pairs the UI uses to colour
 # log lines. We tag every emit with one of these so the front-end can
-# style errors red, warnings amber, [SAMPLE✓] green, etc., without
-# having to re-parse messages in the browser. The order matters —
+# style errors red, warnings amber, [SAMPLEâ] green, etc., without
+# having to re-parse messages in the browser. The order matters â
 # more-specific tags must be checked before generic ones (a "[STAGE]
 # error" line should be red, not the neutral "stage" colour).
 _LEVEL_RULES: tuple[tuple[str, str], ...] = (
@@ -130,7 +130,7 @@ def infer_log_level(message: str) -> str:
 
     Lower-cased, substring match. Public so the level-inference unit test
     can call it directly without standing up a runtime job. Returns
-    ``"info"`` when no rule matches — the UI default.
+    ``"info"`` when no rule matches â the UI default.
     """
     if not message:
         return "info"
@@ -144,7 +144,7 @@ def infer_log_level(message: str) -> str:
 async def _emit(db, runtime_job_id: str, sequence: int, event: str, message: str, payload: dict | None = None) -> None:
     """Write a row to ``scrape_runtime_logs`` so the UI can show progress.
 
-    The ``db`` argument is intentionally ignored — emits originate from many
+    The ``db`` argument is intentionally ignored â emits originate from many
     concurrent extract coroutines and SQLAlchemy ``AsyncSession`` is not safe
     for concurrent use on a single connection. Opening a fresh session per
     emit keeps the orchestrator's main session free for other work and lets
@@ -180,8 +180,8 @@ _STALE_DEDUP_MINUTES = 10
 
 # How often the background poller re-reads ``stop_requested`` from the DB
 # while a scrape is running. The UI's POST to /api/scrape/stop/{jobId}
-# only flips a flag — the worker has to notice. 3s is the same cadence
-# the UI polls /status with, so a stop click typically takes 3–6s to
+# only flips a flag â the worker has to notice. 3s is the same cadence
+# the UI polls /status with, so a stop click typically takes 3â6s to
 # observably halt new work.
 _STOP_POLL_INTERVAL_SEC = 3
 
@@ -195,7 +195,7 @@ _STOP_POLL_INTERVAL_SEC = 3
 # staging phase, because either phase alone can exceed 5 minutes on
 # Torrens-scale unis (~152 courses). Without this, the in-memory mutations
 # of ``job.heartbeat_at`` inside the orchestrator's main session are
-# invisible to the reaper until they're committed — which during a long
+# invisible to the reaper until they're committed â which during a long
 # extract phase never happens, so the reaper kills the job mid-flight.
 _HEARTBEAT_PULSE_INTERVAL_SEC = 30
 
@@ -221,7 +221,7 @@ async def _heartbeat_pulser(runtime_job_id: str, stop_flag: list[bool]) -> None:
                     {"j": runtime_job_id},
                 )
                 await pulse_db.commit()
-        except Exception as exc:  # noqa: BLE001 — never crash the pulser
+        except Exception as exc:  # noqa: BLE001 â never crash the pulser
             log.warning("heartbeat pulser write failed for %s: %s", runtime_job_id, exc)
         try:
             await asyncio.sleep(_HEARTBEAT_PULSE_INTERVAL_SEC)
@@ -252,7 +252,7 @@ async def _stop_poller(runtime_job_id: str, stop_flag: list[bool]) -> None:
                 stop_flag[0] = True
                 log.info("stop_requested observed for job %s", runtime_job_id)
                 return
-        except Exception as exc:  # noqa: BLE001 — never crash the poller
+        except Exception as exc:  # noqa: BLE001 â never crash the poller
             log.warning("stop poller read failed for %s: %s", runtime_job_id, exc)
         try:
             await asyncio.sleep(_STOP_POLL_INTERVAL_SEC)
@@ -268,7 +268,7 @@ async def _extract_only(
     vision_image_cache: VisionImageCache | None = None,
     central_data: dict | None = None,
 ) -> dict:
-    """Network-bound work — safe to parallelise across coroutines.
+    """Network-bound work â safe to parallelise across coroutines.
 
     ``vision_image_cache`` is a per-scrape-run dict (created by the
     caller before the ``asyncio.gather`` over courses) that lets the
@@ -276,7 +276,7 @@ async def _extract_only(
     reuse the parsed values across sibling courses that link the same
     screenshot. See :func:`per_course_vision.maybe_vision_refetch` for
     why this matters (eliminates the per-course non-determinism that
-    left 3/4 ASA Master pages with IELTS=— while one sibling came back
+    left 3/4 ASA Master pages with IELTS=â while one sibling came back
     with IELTS=6.5 from the same MaSTER.png).
 
     ``central_data`` is the pre-fetched central-pages payload (Bug 2).
@@ -296,7 +296,7 @@ async def _extract_only(
         )
     except Exception as exc:  # noqa: BLE001
         return {"name": name, "url": url, "error": f"extract: {exc}"}
-    # Prefer the course_name the extractor produced (e.g. "MBA – Digital
+    # Prefer the course_name the extractor produced (e.g. "MBA â Digital
     # Management") over the discovery-phase slug-derived name (e.g.
     # "Digital Management").  The extractor has access to the page's H1,
     # <title>, and URL-based MBA-prefix logic; the discovery name is a
@@ -318,7 +318,7 @@ async def _clear_stale_dedup(
     retries after a crash are not blocked.
 
     Why ``pending`` only: Bug #7 (``stage_course``) blocks re-staging a course
-    name that was previously *rejected* within ``rejection_block_days`` —
+    name that was previously *rejected* within ``rejection_block_days`` â
     that lock represents a reviewer decision and must be preserved. Failed
     scrape runs only ever leave ``pending`` rows behind (status defaults to
     ``'pending'`` and the scraper never auto-rejects), so narrowing to
@@ -344,7 +344,7 @@ async def _clear_stale_dedup(
     # This ensures that when a new scrape starts it replaces stale pending rows
     # from previous runs so reviewers always see fresh data.
     #
-    # Only currently RUNNING jobs are protected — their rows are mid-flight and
+    # Only currently RUNNING jobs are protected â their rows are mid-flight and
     # must not be wiped from under the active scrape worker.
     #
     # Previous versions also excluded 'completed' jobs from deletion to avoid
@@ -375,7 +375,7 @@ async def _clear_stale_dedup(
 async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
     """Execute one scrape job.
 
-    Note: ``db`` is used only for the job-lifecycle bookkeeping (running →
+    Note: ``db`` is used only for the job-lifecycle bookkeeping (running â
     completed/failed). Per-course staging uses a fresh AsyncSession from
     AsyncSessionLocal so we never share a session across coroutines.
     """
@@ -385,7 +385,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
     # Two Celery workers can both dequeue the same Celery task message when
     # Redis delivers it at-least-once (e.g. redelivery after an ack timeout).
     # Without this guard both workers set status='running' and run a full
-    # duplicate scrape in parallel — producing duplicate scraped_courses rows
+    # duplicate scrape in parallel â producing duplicate scraped_courses rows
     # and duplicate log streams that confuse the UI.
     #
     # The UPDATE returns the claimed row. If it returns 0 rows the job was
@@ -403,7 +403,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
     await db.commit()
     if not claimed.first():
         log.warning(
-            "run_scrape: job %s already claimed or not queued — aborting duplicate run",
+            "run_scrape: job %s already claimed or not queued â aborting duplicate run",
             runtime_job_id,
         )
         return {"ok": False, "reason": "already_claimed"}
@@ -444,7 +444,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             window_minutes=_STALE_DEDUP_MINUTES,
         )
     except Exception as exc:  # noqa: BLE001
-        # Cleanup is best-effort — a failure here must never abort the scrape.
+        # Cleanup is best-effort â a failure here must never abort the scrape.
         log.warning("stale dedup cleanup failed for uni %s: %s", job.university_id, exc)
         await emit(
             "status",
@@ -464,12 +464,12 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
     # silently did nothing past flipping a DB flag.
     stop_flag: list[bool] = [False]
     stop_poll_task = asyncio.create_task(_stop_poller(runtime_job_id, stop_flag))
-    # Dedicated heartbeat pulser — see ``_heartbeat_pulser`` docstring.
+    # Dedicated heartbeat pulser â see ``_heartbeat_pulser`` docstring.
     # Spans extract + stage phases so /active never reaps a still-working
     # job just because the orchestrator's main session hasn't committed.
     heartbeat_task = asyncio.create_task(_heartbeat_pulser(runtime_job_id, stop_flag))
 
-    # Per-university Redis lock state — initialised here so the finally
+    # Per-university Redis lock state â initialised here so the finally
     # block can always reference them regardless of where we exit.
     _uni_lock_redis: Any | None = None
     _uni_lock_key: str | None = None
@@ -480,14 +480,14 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         log.info("Scrape %s stopped by user request", runtime_job_id)
         await emit(
             "status",
-            "Stopped by user — no further courses will be processed",
+            "Stopped by user â no further courses will be processed",
             phase="complete",
             kind="stopped",
             level="warn",
         )
         await emit(
             "done",
-            f"══ STOPPED ══ Found:{summary.get('discovered', 0)} | "
+            f"ââ STOPPED ââ Found:{summary.get('discovered', 0)} | "
             f"Staged:{summary.get('staged', 0)} | "
             f"Skipped:{summary.get('skipped', 0)} | "
             f"Errors:{summary.get('errors', 0)}",
@@ -508,14 +508,14 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         return {"ok": True, "stopped": True, **summary}
 
     try:
-        # ── Per-university Redis distributed lock ────────────────────────────
+        # ââ Per-university Redis distributed lock ââââââââââââââââââââââââââââ
         # Prevents multiple Celery workers from scraping the same university
         # concurrently.  This can happen because:
-        #   • task_acks_late=True keeps the Celery message unacked until the
+        #   â¢ task_acks_late=True keeps the Celery message unacked until the
         #     task returns; a Redis blip or a Node-reaper status reset (queued
-        #     → running) can let a second worker claim a different job_id for
+        #     â running) can let a second worker claim a different job_id for
         #     the same university and both clear the DB atomic-claim guard.
-        #   • The user may submit while a previous job is still running.
+        #   â¢ The user may submit while a previous job is still running.
         # Strategy: SET NX (only if not exists) with a 4-hour TTL that matches
         # the Celery soft-time-limit ceiling.  The lock value is the job_id so
         # the rightful holder can identify and release it.  If Redis is
@@ -536,7 +536,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             log.warning(
                 "Could not connect to Redis for uni lock (failing open): %s", _lock_err
             )
-            _uni_lock_acquired = True  # fail open — allow the scrape
+            _uni_lock_acquired = True  # fail open â allow the scrape
 
         if not _uni_lock_acquired:
             _holder = "unknown"
@@ -546,9 +546,9 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             except Exception:  # noqa: BLE001
                 pass
 
-            # ── Stale-lock detection ─────────────────────────────────────────
+            # ââ Stale-lock detection âââââââââââââââââââââââââââââââââââââââââ
             # If the job that holds the lock is no longer active in the DB
-            # (completed, stopped, failed, etc.) the lock is stale — steal it
+            # (completed, stopped, failed, etc.) the lock is stale â steal it
             # so the new scrape can proceed rather than being falsely blocked.
             _lock_is_stale = False
             if _holder != "unknown" and _uni_lock_redis is not None:
@@ -564,7 +564,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     if _holder_status not in (None, "running", "queued"):
                         _lock_is_stale = True
                         log.warning(
-                            "Uni lock %s held by %s has status=%s — "
+                            "Uni lock %s held by %s has status=%s â "
                             "treating as stale, stealing lock for %s",
                             _uni_lock_key, _holder, _holder_status, runtime_job_id,
                         )
@@ -587,13 +587,13 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
 
             if not _uni_lock_acquired:
                 log.warning(
-                    "University %d already being scraped (lock held by %s) — "
+                    "University %d already being scraped (lock held by %s) â "
                     "aborting duplicate job %s",
                     job.university_id, _holder, runtime_job_id,
                 )
                 await emit(
                     "status",
-                    f"Duplicate scrape aborted — university {job.university_id} "
+                    f"Duplicate scrape aborted â university {job.university_id} "
                     f"is already being scraped by job {_holder}",
                     phase="queue",
                     level="warn",
@@ -611,7 +611,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 await db.commit()
                 return {"ok": False, "reason": "concurrent_university_scrape"}
 
-        # ── Snapshot uni fields to plain locals ──────────────────────────────
+        # ââ Snapshot uni fields to plain locals ââââââââââââââââââââââââââââââ
         # The session will be used by other coroutines during gather() and we
         # must NOT touch `uni` after that point.
         uni = (
@@ -629,9 +629,9 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         if not scrape_url:
             raise RuntimeError("University missing scrape_url")
 
-        # ── Week-1: Load per-university config and set contextvar ─────────────
+        # ââ Week-1: Load per-university config and set contextvar âââââââââââââ
         # The UniConfig is built from:
-        #   defaults.yaml → DB scrape_config translation → per-uni YAML
+        #   defaults.yaml â DB scrape_config translation â per-uni YAML
         # The contextvar is set here and available to all coroutines for the
         # duration of this job.  No extractor reads it yet (Week 1 is pure
         # infrastructure / no behaviour change).  Week-2 migrations will wire
@@ -653,7 +653,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             f"scraper_config/unis/{_uni_cfg.slug}.yaml",
             _uni_cfg.discovery.always_sitemap_supplement,
         )
-        # ─────────────────────────────────────────────────────────────────────
+        # âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
         max_pages = 12 if job.fast_mode else 25
         max_courses = 20 if job.fast_mode else _MAX_COURSES_PER_JOB
@@ -661,7 +661,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         from urllib.parse import urlparse as _urlparse_mp
         _scrape_host = (_urlparse_mp(scrape_url).netloc or "").lower()
         if not job.fast_mode:
-            # UOW has ~62 listing pages — raise the BFS page budget so all
+            # UOW has ~62 listing pages â raise the BFS page budget so all
             # pre-seeded pagination URLs (?page=N) can be visited in one pass.
             if _scrape_host in ("www.uow.edu.au", "uow.edu.au"):
                 max_pages = 80
@@ -679,12 +679,12 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         await emit("status", f"Fetching {scrape_url}...", phase="fetch")
         await emit("status", "Discovering candidate course pages...", phase="discover")
 
-        # CSU international listing is a React SPA — plain HTTP returns 0 links
+        # CSU international listing is a React SPA â plain HTTP returns 0 links
         # and the sitemap only has domestic /courses/ URLs.  Use Playwright to
         # render the listing page and extract /international/courses/<slug> links
         # before falling back to the normal BFS discovery.
         # Bug 7: collect fee-page URLs that discovery blocked (they are real fee
-        # pages, just not course pages — we want to send them to the central fee
+        # pages, just not course pages â we want to send them to the central fee
         # parser later instead of discarding them).
         _discover_blocked_fee_urls: list[str] = []
         links: list[dict] = []
@@ -698,7 +698,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     max_courses=max_courses,
                 )
             except Exception as _csu_disc_exc:  # noqa: BLE001
-                log.warning("CSU browser discovery failed: %s — falling back to BFS", _csu_disc_exc)
+                log.warning("CSU browser discovery failed: %s â falling back to BFS", _csu_disc_exc)
 
         if not links:
             links = await discover_course_links(
@@ -709,7 +709,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 _blocked_fee_urls_sink=_discover_blocked_fee_urls,
             )
 
-        # ── Fallback 1: Generic Playwright browser discovery ─────────────────
+        # ââ Fallback 1: Generic Playwright browser discovery âââââââââââââââââ
         # Fires when the plain-HTTP BFS crawler returns 0 results, which
         # happens on Cloudflare-protected or JS-rendered sites (e.g. UEL).
         # A real Chromium browser renders the page, passes JS challenges,
@@ -721,7 +721,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 )
                 await emit(
                     "status",
-                    "[DISCOVER] BFS returned 0 links — trying browser-based discovery "
+                    "[DISCOVER] BFS returned 0 links â trying browser-based discovery "
                     "(handles Cloudflare / JS-heavy sites)...",
                     phase="discover",
                 )
@@ -735,21 +735,21 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     )
             except Exception as _br_exc:  # noqa: BLE001
                 log.warning(
-                    "browser_discover_generic failed for %s: %s — trying Wayback CDX",
+                    "browser_discover_generic failed for %s: %s â trying Wayback CDX",
                     uni_name, _br_exc,
                 )
 
-        # ── Fallback 2: Wayback Machine CDX API ──────────────────────────────
+        # ââ Fallback 2: Wayback Machine CDX API ââââââââââââââââââââââââââââââ
         # If even the browser is blocked (aggressive bot detection, CAPTCHA,
         # IP bans), the Internet Archive CDX index gives us the full set of
-        # URLs Wayback has ever crawled for this domain — completely free,
+        # URLs Wayback has ever crawled for this domain â completely free,
         # no API key, and cannot be blocked because we query archive.org.
         if not links:
             try:
                 from app.services.scraper.wayback_discover import wayback_discover
                 await emit(
                     "status",
-                    "[DISCOVER] Browser discovery returned 0 links — "
+                    "[DISCOVER] Browser discovery returned 0 links â "
                     "trying Wayback Machine CDX archive...",
                     phase="discover",
                 )
@@ -778,7 +778,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # crawler (403/Cloudflare), misconfigured, or the URL changed.
         # Marking as "completed" with 0 found hides the real error and
         # causes the UI to silently show the job as successful even though
-        # nothing was scraped — and any automated retry loop will keep
+        # nothing was scraped â and any automated retry loop will keep
         # spinning up new jobs that all fail the same way.
         if len(links) == 0:
             err_msg = (
@@ -795,7 +795,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             )
             await emit(
                 "done",
-                f"══ FAILED ══ Found:0 | Staged:0 | Skipped:0 | Errors:0",
+                f"ââ FAILED ââ Found:0 | Staged:0 | Skipped:0 | Errors:0",
                 phase="complete",
                 totalFound=0,
                 imported=0,
@@ -811,7 +811,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             return {"ok": False, "reason": "discovery_failed", **summary}
 
         # University-level PDF data (fee schedule, admissions/IELTS policy)
-        # — fetched ONCE per job, used as last-resort fallback for every course.
+        # â fetched ONCE per job, used as last-resort fallback for every course.
         try:
             uni_pdf_data = await load_university_pdf_data(uni_scrape_config, uni_country)
         except Exception as exc:  # noqa: BLE001
@@ -826,7 +826,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 pdf_english=bool(uni_pdf_data.get("english")),
             )
 
-        # Bug 2: central-pages pre-fetch — scrape_config['uniPages']['feePage'] /
+        # Bug 2: central-pages pre-fetch â scrape_config['uniPages']['feePage'] /
         # ['entryPage'] ONCE before the course loop, cache results in memory for
         # the duration of this job.  Universities like KBS publish fees and IELTS
         # requirements on a single central page rather than per course.
@@ -844,8 +844,8 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
 
             effective_config = dict(uni_scrape_config or {})
 
-            # ── Priority 0: host-based defaults (injected before UI overrides
-            # so the UI can still override them if needed) ───────────────────
+            # ââ Priority 0: host-based defaults (injected before UI overrides
+            # so the UI can still override them if needed) âââââââââââââââââââ
             # UOW does not persist its english-requirements URL in scrape_config
             # but publishes a stable central page that we can hard-code here.
             # Absence of this injection means every UOW scrape stages courses
@@ -862,7 +862,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             # Bond University: fees and IELTS are JS-rendered (XHR-loaded) so
             # Playwright and Gemini both see empty content for those fields.
             # Bond publishes a stable central English-requirements page that we
-            # can hard-code here — same pattern as UOW above.  Without this,
+            # can hard-code here â same pattern as UOW above.  Without this,
             # every Bond course stages with blank IELTS/PTE/TOEFL values.
             if _scrape_host_eff in ("bond.edu.au", "www.bond.edu.au"):
                 _bond_pages = effective_config.setdefault("uniPages", {})
@@ -872,7 +872,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                         "english-language-requirements"
                     )
 
-            # ── Priority 1: request-body overrides (UI Advanced fields) ─────
+            # ââ Priority 1: request-body overrides (UI Advanced fields) âââââ
             # The router stores these in job.request_payload so the orchestrator
             # can apply them without touching the persistent scrape_config.
             # Precedence: UI override > DB scrape_config > auto-discovery.
@@ -880,7 +880,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             _ui_overrides: dict[str, str | None] = {
                 # feePage maps directly
                 "feePage": rp.get("feePage"),
-                # requirementsPage from UI → both entry-point keys in central_pages
+                # requirementsPage from UI â both entry-point keys in central_pages
                 "entryPage": rp.get("requirementsPage"),
                 "requirementsPage": rp.get("requirementsPage"),
                 "scholarshipPage": rp.get("scholarshipPage"),
@@ -905,7 +905,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             )
             if not has_fee_page and links:
                 # Bug 7: discovery may have encountered a real fee-page URL and
-                # blocked it (correct — it's not a course page) but saved it in
+                # blocked it (correct â it's not a course page) but saved it in
                 # _discover_blocked_fee_urls.  Use that URL as the fee candidate
                 # BEFORE running the slower discover_fee_url_from_course_pages
                 # auto-detection scan, which can return the wrong URL when the
@@ -930,7 +930,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                         )
                     except asyncio.TimeoutError:
                         log.warning(
-                            "discover_fee_url_from_course_pages timed out after 120s for %s — skipping",
+                            "discover_fee_url_from_course_pages timed out after 120s for %s â skipping",
                             base_domain,
                         )
                         discovered = None
@@ -952,17 +952,17 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             log.warning("central_pages prefetch failed: %s", exc)
             central_data = None
 
-        # Phase A.5 — pre-extraction gate.  Drop candidates whose URL or
+        # Phase A.5 â pre-extraction gate.  Drop candidates whose URL or
         # link text matches the central blocklist BEFORE we spend any
         # network/extraction budget on them.  Discovery already filters,
-        # but it can only see anchor text + URL — once we have the
+        # but it can only see anchor text + URL â once we have the
         # finalised candidate list we run one more strict pass with the
         # canonical ``is_blocked_page`` rules so user-reported leaks
         # like "Pathways to uni", "Saved courses", "Study online",
         # "Year 12 entry" never reach extraction or the staging table.
         try:
             from app.services.scraper.guards import is_blocked_page
-        except Exception:  # noqa: BLE001 — never abort the run on import failure
+        except Exception:  # noqa: BLE001 â never abort the run on import failure
             is_blocked_page = None  # type: ignore[assignment]
         if is_blocked_page is not None and links:
             kept: list[dict] = []
@@ -990,7 +990,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 _summary = ", ".join(f"{k}={v}" for k, v in sorted(block_counts.items()))
                 await emit(
                     "status",
-                    f"[EXTRACT] gate dropped {len(links) - len(kept)} non-course candidate(s) — {_summary}",
+                    f"[EXTRACT] gate dropped {len(links) - len(kept)} non-course candidate(s) â {_summary}",
                     phase="extract",
                     kind="extract_gate_summary",
                     dropped=len(links) - len(kept),
@@ -1001,7 +1001,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
 
         await emit("status", f"Extracting course details ({len(links)} pages)...", phase="extract")
 
-        # 1) Extraction phase — parallel network calls, no DB shared state.
+        # 1) Extraction phase â parallel network calls, no DB shared state.
         # We share a counter across coroutines so the live log can show
         # "[EXTRACT] N/total: <name>" as each page is *picked up* (not at the
         # end). The counter is mutated only inside the semaphore, so it is
@@ -1012,7 +1012,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # Per-scrape-run vision OCR cache, keyed by absolute image URL.
         # Many universities (ASA being the canonical example) embed the
         # exact same English-requirements screenshot on every variant of
-        # a course family — MaSTER.png lives on all 4 IT Master pages,
+        # a course family â MaSTER.png lives on all 4 IT Master pages,
         # one shared screenshot covers all 4 Bachelor of Business pages.
         # Without a shared cache we (a) pay Gemini per course and (b)
         # get non-deterministic per-call OCR results that leave sibling
@@ -1029,7 +1029,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 # Stop check INSIDE the semaphore so all queued coroutines
                 # waiting on the sem also short-circuit once the user has
                 # clicked Stop. Returning a sentinel keeps gather() honest
-                # — the staging loop already filters non-dict results.
+                # â the staging loop already filters non-dict results.
                 if stop_flag[0]:
                     return {
                         "name": (link.get("name") or "").strip() or "?",
@@ -1080,12 +1080,61 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
 
         # Honor stop request observed during the gather phase before we
         # spend any time on staging. Anything already extracted is dropped
-        # — no half-staged batch lands in scraped_courses.
+        # â no half-staged batch lands in scraped_courses.
         if stop_flag[0]:
             return await _finalize_stopped()
 
+        # ââ SHADOW MODE ââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+        # When SHADOW_MODE_UNI_IDS includes this uni, run all course links
+        # through the new extraction code path and diff the results.
+        # Only the old-path results (``results``) proceed to staging â shadow
+        # mode is verification only. Cutover (new path becomes authoritative)
+        # is a separate explicit step via SHADOW_CUTOVER_UNI_IDS.
+        #
+        # Both paths share the same vision_image_cache so each unique image
+        # is OCR-decoded once. Any Gemini LLM calls are cached at the
+        # http-client layer so both paths see the same AI response.
+        from app.services.scraper.shadow.mode import is_shadow_enabled as _shadow_on
+        if _shadow_on(uni_id):
+            from app.services.scraper.shadow.diff import diff_staged_runs as _diff_runs
+            from app.services.scraper.shadow.new_path import extract_new_path as _new_path
+            from app.services.scraper.shadow.report import write_shadow_report as _write_report
+
+            async def _bounded_new(link: dict) -> dict:
+                async with sem:
+                    if stop_flag[0]:
+                        return {"url": link.get("url"), "error": "stopped", "payload": {}, "evidence": []}
+                    return await _new_path(
+                        link,
+                        country=uni_country,
+                        uni_pdf_data=uni_pdf_data or None,
+                        emit=None,  # new path doesn't emit progress lines during shadow
+                        vision_image_cache=vision_image_cache,
+                        central_data=central_data,
+                        uni_id=uni_id,
+                    )
+
+            try:
+                log.info("shadow[%s/%d] starting new-path gather for %d links", _uni_cfg.slug, uni_id, len(links))
+                shadow_results = await asyncio.gather(
+                    *[_bounded_new(lk) for lk in links], return_exceptions=True
+                )
+                old_dicts = [r for r in results if isinstance(r, dict)]
+                new_dicts = [r for r in shadow_results if isinstance(r, dict)]
+                shadow_diff = _diff_runs(old_dicts, new_dicts)
+                _write_report(
+                    shadow_diff,
+                    uni_id=uni_id,
+                    slug=_uni_cfg.slug,
+                    old_job_id=runtime_job_id,
+                    new_job_id=f"{runtime_job_id}:shadow",
+                )
+            except Exception as _shadow_exc:
+                log.warning("shadow[%s/%d] failed (non-fatal): %s", _uni_cfg.slug, uni_id, _shadow_exc)
+        # ââ END SHADOW MODE âââââââââââââââââââââââââââââââââââââââââââââââââââ
+
         # T206: sibling-cache back-fill. Runs after every per-course
-        # extract has settled but BEFORE staging — by then we've seen
+        # extract has settled but BEFORE staging â by then we've seen
         # the high-quality english-test slots from siblings that did
         # extract them, and we want every staged row to benefit. Mutates
         # the per-course payload dicts in place.
@@ -1120,18 +1169,18 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             )
             if fills:
                 log.info("sibling-cache backfilled %d slot(s) across siblings", fills)
-        except Exception as exc:  # noqa: BLE001 — never abort the run on cache failure
+        except Exception as exc:  # noqa: BLE001 â never abort the run on cache failure
             log.warning("sibling-cache backfill failed: %s", exc)
             await emit(
                 "status",
-                f"[EXTRACT] [sibling cache ✗] {exc}",
+                f"[EXTRACT] [sibling cache â] {exc}",
                 phase="extract",
                 kind="sibling_cache_error",
             )
 
-        # 2) Staging phase — serial writes through one fresh session per course.
+        # 2) Staging phase â serial writes through one fresh session per course.
         # Heartbeat is now handled by the dedicated ``_heartbeat_pulser``
-        # background task (see top of file) — it spans BOTH this loop
+        # background task (see top of file) â it spans BOTH this loop
         # and the preceding extraction phase, on its own session, so the
         # /active reaper sees a fresh ``heartbeat_at`` regardless of what
         # the main session is doing. We keep the in-memory mutation
@@ -1141,7 +1190,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         _total_gemini_in_tokens: int = 0
         _total_gemini_out_tokens: int = 0
 
-        # ── Cost ceiling monitor ──────────────────────────────────────────────
+        # ââ Cost ceiling monitor ââââââââââââââââââââââââââââââââââââââââââââââ
         from app.services.scraper.cost_ceiling import (
             JobCostMonitor as _JCM,
             get_budget_for_university as _get_budget,
@@ -1153,7 +1202,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             budget_usd=_get_budget(_uni_slug),
         )
 
-        # ── Gemini call log — batch-write all call entries from all courses ───
+        # ââ Gemini call log â batch-write all call entries from all courses âââ
         _all_gemini_calls: list[dict] = []
         for _r in results:
             if isinstance(_r, dict):
@@ -1210,7 +1259,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
 
             # Stop check between rows: lets the user interrupt mid-batch.
             # Anything left in ``results`` at this point came back from the
-            # gather phase BEFORE the stop click — we drop it on the floor
+            # gather phase BEFORE the stop click â we drop it on the floor
             # rather than persist a partial batch the user just cancelled.
             if stop_flag[0]:
                 return await _finalize_stopped()
@@ -1239,9 +1288,9 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 continue
             payload = dict(r.get("payload") or {})
 
-            # ── Provider-name suffix strip ────────────────────────────────
+            # ââ Provider-name suffix strip ââââââââââââââââââââââââââââââââ
             # Some universities embed their own name in H1 elements:
-            #   "Bachelor of Business - Aibi" → "Bachelor of Business"
+            #   "Bachelor of Business - Aibi" â "Bachelor of Business"
             # The course_name extractor handles well-known suffixes (USQ,
             # Charles Sturt University, etc.) but misses custom short names.
             # Use the actual uni_name + domain short name for a targeted strip
@@ -1254,7 +1303,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 if _clean_cn != _raw_cn:
                     payload["course_name"] = _clean_cn
 
-            # ── Bug 5: defaultStudyMode config override ───────────────────
+            # ââ Bug 5: defaultStudyMode config override âââââââââââââââââââ
             # When a university's scrape_config (or UI override) contains
             # "defaultStudyMode", use it as the authoritative mode whenever
             # the extractor returned None (no signal found) or produced a
@@ -1271,7 +1320,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 if not _cur_mode or _cur_mode.lower() == "online":
                     payload["study_mode"] = _default_mode
 
-            # ── parser_error guard (UOW / UniSQ) ─────────────────────────────
+            # ââ parser_error guard (UOW / UniSQ) âââââââââââââââââââââââââââââ
             # When the per-course browser pass rendered the page but critical
             # fields (fee, IELTS) remained empty after the full extractor suite,
             # single_course.py sets payload["parser_error"] = True. We skip
@@ -1283,14 +1332,14 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 summary["skipped"] += 1
                 skip_reasons["parser_error"] = skip_reasons.get("parser_error", 0) + 1
                 log.warning(
-                    "[PARSER ERROR] %s — skipped staging; critical fields missing "
+                    "[PARSER ERROR] %s â skipped staging; critical fields missing "
                     "after browser render: %s",
                     r.get("url"),
                     ", ".join(_pe_fields) if _pe_fields else "unknown",
                 )
                 await emit(
                     "status",
-                    f"[PARSER ERROR] skipped: {r.get('name','?')} — "
+                    f"[PARSER ERROR] skipped: {r.get('name','?')} â "
                     f"missing after render: {', '.join(_pe_fields) if _pe_fields else 'unknown'}",
                     phase="stage",
                     kind="parser_error_skip",
@@ -1300,7 +1349,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 continue
 
             try:
-                # [FIELD TRACE] — log key fields just before staging so we can
+                # [FIELD TRACE] â log key fields just before staging so we can
                 # diagnose drop-off between extraction and the DB row.  This
                 # runs BEFORE stage_course (which internally calls
                 # enforce_source_evidence). Any field that appears non-None
@@ -1316,7 +1365,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     )
                 }
                 log.info(
-                    "[FIELD TRACE] %s → fee=%s ielts=%s dur=%s%s intake=%s "
+                    "[FIELD TRACE] %s â fee=%s ielts=%s dur=%s%s intake=%s "
                     "loc=%s mode=%s",
                     r.get("name", "?"),
                     _trace_fields["annual_tuition_fee"],
@@ -1381,10 +1430,10 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             # local ``job`` instance before the next commit.
             job.heartbeat_at = datetime.now(timezone.utc)
 
-        # ── Data-quality validation ───────────────────────────────────────────
+        # ââ Data-quality validation âââââââââââââââââââââââââââââââââââââââââââ
         # Run after the staging loop so every staged payload is inspected.
         # Issues are streamed to the live log via emit and summarised in the
-        # server log. Never blocks the scrape — catches errors internally.
+        # server log. Never blocks the scrape â catches errors internally.
         try:
             from app.services.scraper.data_quality import run_quality_checks
 
@@ -1394,9 +1443,9 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             log.warning("data_quality check raised: %s", _dq_exc)
 
         # T209: emit a single human-readable TIMING line + a typed DONE
-        # event so the React log viewer can render the "══ DONE ══"
+        # event so the React log viewer can render the "ââ DONE ââ"
         # summary row. ``event="done"`` triggers the dedicated UI branch
-        # at scraping.tsx:1630 — the typed payload (totalFound /
+        # at scraping.tsx:1630 â the typed payload (totalFound /
         # imported / skipped / errors) is what the row prints. Mirrors
         # Node's emitDone (routes/scrape.ts:14442).
         finished_at = datetime.now(timezone.utc)
@@ -1407,7 +1456,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         course_count = summary.get("staged", 0) or summary.get("discovered", 0) or 1
         avg_per_course = elapsed_sec / max(1, course_count)
         mins, secs = divmod(elapsed_sec, 60)
-        # Gemini cost summary — emitted before TIMING so it's visible in the
+        # Gemini cost summary â emitted before TIMING so it's visible in the
         # live log right above the timing row.
         if _total_gemini_cost_usd > 0:
             await emit(
@@ -1435,7 +1484,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         await emit(
             "status",
             # B9 / parity with B13 fix: do NOT prefix the message with
-            # [INFO ] — the React renderer in scraping.tsx already
+            # [INFO ] â the React renderer in scraping.tsx already
             # prepends a phase tag. Doubling it produced
             # "[INFO    ] [INFO ] [TIMING] ..." which read as garbled
             # log noise and hid the timing summary the user was looking
@@ -1453,7 +1502,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         _skip_detail = f" ({', '.join(_skip_parts)})" if _skip_parts else ""
         await emit(
             "done",
-            f"══ DONE ══ Found:{summary.get('discovered', 0)} | "
+            f"ââ DONE ââ Found:{summary.get('discovered', 0)} | "
             f"Staged:{summary.get('staged', 0)} | "
             f"Skipped:{summary.get('skipped', 0)}{_skip_detail} | "
             f"Errors:{summary.get('errors', 0)}",
@@ -1469,7 +1518,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # Prod regression on job_440a0e26c6df reported imported=9 against a
         # DB COUNT(*)=0. Root cause was the over-aggressive _clear_stale_dedup
         # (fixed above), but a divergence between the in-memory counter and
-        # the actual row count is a debugging-hell-class symptom — it makes
+        # the actual row count is a debugging-hell-class symptom â it makes
         # operators chase phantom rows that never landed. Re-read the truth
         # from the DB and use that as the authoritative number; warn loudly
         # in the live log AND server log on any drift so future regressions
@@ -1486,20 +1535,20 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             )).scalar() or 0
         except Exception as exc:  # noqa: BLE001
             log.warning(
-                "post-run row-count check failed for %s: %s — "
+                "post-run row-count check failed for %s: %s â "
                 "leaving counter as-is", runtime_job_id, exc,
             )
             actual_staged = None
         if actual_staged is not None and actual_staged != summary["staged"]:
             log.warning(
                 "imported counter (%d) != actual rows in db (%d) for job %s "
-                "— using actual row count",
+                "â using actual row count",
                 summary["staged"], actual_staged, runtime_job_id,
             )
             await emit(
                 "status",
                 f"[STAGE] counter reconciled: in-memory staged={summary['staged']} "
-                f"vs db rows={actual_staged} — using db count "
+                f"vs db rows={actual_staged} â using db count "
                 f"(prevents counter-vs-rows mismatch debugging hell)",
                 phase="stage",
                 kind="counter_reconciled",
@@ -1518,12 +1567,12 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # a worker that crawls back out of a long extract would
         # silently flip a hard-stopped row back to 'completed' and
         # the user's Stop click would have been pointless.
-        # Re-read straight from the DB — the in-memory ``job`` is
+        # Re-read straight from the DB â the in-memory ``job`` is
         # stale w.r.t. concurrent commits from /active reaper etc.
         await db.refresh(job, ["status"])
         if job.status in {"stopped", "failed", "completed"}:
             log.info(
-                "Scrape %s already terminal (%s) — skipping finalize",
+                "Scrape %s already terminal (%s) â skipping finalize",
                 runtime_job_id, job.status,
             )
             return {"ok": False, "reason": f"already_{job.status}", **summary}
@@ -1548,7 +1597,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         await db.commit()
         log.info("Scrape %s %s: %s", runtime_job_id, job.status, summary)
 
-        # ── Priority 5: metrics + alerts ──────────────────────────────────
+        # ââ Priority 5: metrics + alerts ââââââââââââââââââââââââââââââââââ
         # Run only when the job completed cleanly and the university is known.
         # Both calls are fire-and-forget from the orchestrator's perspective;
         # errors are logged but never bubble up to fail the job.
@@ -1572,7 +1621,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         log.exception("Scrape job %s failed: %s", runtime_job_id, exc)
         # Same terminal-status guard for the exception path. If a
         # /stop or reaper already finalized us, the exception was
-        # likely caused by the cooperative cancel itself — don't
+        # likely caused by the cooperative cancel itself â don't
         # overwrite the user-facing 'stopped' with 'failed'.
         try:
             await db.refresh(job, ["status"])
@@ -1586,7 +1635,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         await db.commit()
         return {"ok": False, "reason": str(exc), **summary}
     finally:
-        # ── Release the per-university Redis distributed lock ────────────────
+        # ââ Release the per-university Redis distributed lock ââââââââââââââââ
         # Only release if we actually hold it (lock value must still match our
         # job_id to guard against an expired TTL being re-acquired by a newer
         # job before our finally block runs).
@@ -1605,13 +1654,13 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             except Exception:  # noqa: BLE001
                 pass
 
-        # Always tear the background tasks down — each holds its own
+        # Always tear the background tasks down â each holds its own
         # AsyncSession and would keep ticking past the worker process
         # otherwise. Setting the flag first lets each `await
         # asyncio.sleep` exit cleanly on the next tick; cancel() is the
         # safety net for the in-flight DB roundtrip case. We cancel
         # both tasks first so they tear down concurrently, then await
-        # each in turn — sequential await would mean waiting up to
+        # each in turn â sequential await would mean waiting up to
         # two full sleep intervals end-to-end.
         stop_flag[0] = True
         stop_poll_task.cancel()

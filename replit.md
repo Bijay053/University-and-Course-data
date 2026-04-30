@@ -19,7 +19,7 @@ The system is built as a monorepo utilizing `pnpm workspaces`.
 ### Technology Stack
 
 - **Frontend**: React with Vite, styled using Tailwind CSS and `shadcn/ui`. Data fetching is managed by TanStack React Query, and routing by `wouter`.
-- **Backend**: FastAPI (Python / Uvicorn) serving on port 8080 — both dev and production. Node.js API server has been deleted.
+- **Backend**: FastAPI (Python / Uvicorn) serving on port 8080 â both dev and production. Node.js API server has been deleted.
 - **Database**: PostgreSQL with Drizzle ORM for type-safe data access.
 - **Type Safety & Validation**: TypeScript 5.9, Zod (`zod/v4`), and `drizzle-zod`.
 - **API Code Generation**: Orval, generating client code from an OpenAPI specification.
@@ -49,7 +49,7 @@ The admin portal now requires login. The auth flow:
 - **Mode/Duration Extraction**: Robust extraction of study modes and course durations with AI fallback and rule-based parsing.
 - **PDF Data Extraction**: Advanced parsing of PDF documents for fees and English requirements, including per-course matching in multi-row tables.
 - **Gemini Cost Optimisation (Priority 6)**: Six-component cost-reduction system:
-  - *Skip gate* (`gemini_gate.py`): skips Gemini or downgrades to a cheap 100-token classification-only prompt when other extractors already populated ≥90% of high-value fields at ≥0.70 confidence. Expected 30-50% cost reduction on static-HTML-rich universities.
+  - *Skip gate* (`gemini_gate.py`): skips Gemini or downgrades to a cheap 100-token classification-only prompt when other extractors already populated â¥90% of high-value fields at â¥0.70 confidence. Expected 30-50% cost reduction on static-HTML-rich universities.
   - *Circuit breaker* (`gemini_client.py`): `GeminiQuotaTracker` singleton trips after 5 quota errors (HTTP 429/503/keywords) within 60 s; stays open 5 min to prevent cascading quota failures.
   - *Cost ceiling* (`cost_ceiling.py`): `JobCostMonitor` per scrape job caps Gemini spend per university; per-university budgets configurable via `LARGE_UNI_BUDGETS` dict.
   - *Call log table* (`gemini_call_log`): every Gemini API call logged with `call_type`, model, tokens, cost, duration, success, scrape_run_id FK. Written by orchestrator after each gather() batch.
@@ -58,20 +58,47 @@ The admin portal now requires login. The auth flow:
   - *Model*: `gemini-2.5-flash-lite` confirmed cost-optimal (Component 5 check script at `backend-py/scripts/check_gemini_model.py`).
 - **Per-host URL rewriting**: UNE appends `?international=true`; UOW appends `?students=international&year=<year>` before fetching each course page so the international-student fee, IELTS, intake, and campus data is visible.
 - **UOW discovery**: BFS page budget raised to 80 (non-fast mode) and all 70 pagination pages pre-seeded so the full ~300 course catalogue is discovered.
-- **Session → intake mapping (Pass 4)**: "Autumn Session" → March, "Spring Session" → July, "Summer Session" → November fallback for Australian universities (UOW-style).
-- **PTE host blocklist**: UOW course pages don't publish PTE scores — a per-host blocklist suppresses false positives from Pattern-3 broad regex.
+- **Session â intake mapping (Pass 4)**: "Autumn Session" â March, "Spring Session" â July, "Summer Session" â November fallback for Australian universities (UOW-style).
+- **PTE host blocklist**: UOW course pages don't publish PTE scores â a per-host blocklist suppresses false positives from Pattern-3 broad regex.
 - **Location "Delivery method" fix**: Added `delivery\s*method` to `_TRAILING_KEYS` so that label is stripped from extracted location values.
-- **Per-university YAML config system (Week 1 — infrastructure only)**:
-  - `backend-py/scraper_config/defaults.yaml` — conservative global defaults (change requires full regression sweep + human approval).
-  - `backend-py/scraper_config/unis/<slug>.yaml` — per-university overrides. 20 stubs created for bug-reported unis (acap, acu, ait, asa, aut, bmihms, bond, cdu, csu, ecu, jcu, kaplan, kbs, latrobe, saibt, torrens, uel, uow, vit, acpe).
-  - `backend-py/app/services/scraper/config/` Python package: `schema.py` (Pydantic `UniConfig` split into `discovery` + `extraction` sections), `loader.py` (deep-merge: defaults → DB `scrape_config` translation → per-uni YAML), `context.py` (`ContextVar[UniConfig]` for scrape-job scope).
+- **Per-university YAML config system (Week 1 â infrastructure only)**:
+  - `backend-py/scraper_config/defaults.yaml` â conservative global defaults (change requires full regression sweep + human approval).
+  - `backend-py/scraper_config/unis/<slug>.yaml` â per-university overrides. 20 stubs created for bug-reported unis (acap, acu, ait, asa, aut, bmihms, bond, cdu, csu, ecu, jcu, kaplan, kbs, latrobe, saibt, torrens, uel, uow, vit, acpe).
+  - `backend-py/app/services/scraper/config/` Python package: `schema.py` (Pydantic `UniConfig` split into `discovery` + `extraction` sections), `loader.py` (deep-merge: defaults â DB `scrape_config` translation â per-uni YAML), `context.py` (`ContextVar[UniConfig]` for scrape-job scope).
   - Config is loaded and set as a contextvar at the start of every `run_scrape()` and `run_repair()` call. No extractor reads it yet (pure infrastructure). Week-2 migrates hardcoded hostname if-blocks.
-  - Contextvar audit complete: only two entry points — `orchestrator.run_scrape()` and `repair.run_repair()`. Both now call `set_uni_config()`. No FastAPI routers or scripts call extractors directly.
+  - Contextvar audit complete: only two entry points â `orchestrator.run_scrape()` and `repair.run_repair()`. Both now call `set_uni_config()`. No FastAPI routers or scripts call extractors directly.
   - `require_uni_config()` guard at the top of `extract_course()`: logs a WARNING + returns bare defaults if contextvar is unset (soft-fail in prod, visible as "extractor called without uni context" log lines).
   - `UniConfig.for_tier3_replay()`: returns config with only `discovery:` section. `extraction:` (including `filters:`) is stripped. Must be used by any Tier-3 playbook-matching code to prevent per-uni filter assumptions from contaminating unknown-uni scrapes.
-  - `backend-py/scripts/capture_baseline.py` — snapshot staged courses with per-field `extraction_method` provenance + last-job stats (discovered, staged, skipped, Gemini cost, elapsed). Dev baseline: `backend-py/baselines/20260430_021811_*`.
+  - `backend-py/scripts/capture_baseline.py` â snapshot staged courses with per-field `extraction_method` provenance + last-job stats (discovered, staged, skipped, Gemini cost, elapsed). Dev baseline: `backend-py/baselines/20260430_021811_*`.
   - **Prod baseline command**: `cd /root/University-and-Course-data && PYTHONPATH=backend-py python3 backend-py/scripts/capture_baseline.py --out-dir backend-py/baselines/`
-  - Slug derived from hostname: `www.acu.edu.au` → `acu`, `www.aut.ac.nz` → `aut`, `bond.edu.au` → `bond`. Files named `{timestamp}_{slug}_{uni_id}.json`.
+  - Slug derived from hostname: `www.acu.edu.au` â `acu`, `www.aut.ac.nz` â `aut`, `bond.edu.au` â `bond`. Files named `{timestamp}_{slug}_{uni_id}.json`.
+
+### Shadow-mode operation
+
+Enable per-uni shadow mode via env vars. **Never set these in prod `.env` permanently â set them on the Celery worker process only for the migration window.**
+
+```bash
+# Enable shadow mode for ACAP (uni_id=41)
+export SHADOW_MODE_UNI_IDS=41
+
+# After 5-run clean streak, flip to cutover
+export SHADOW_CUTOVER_UNI_IDS=41
+unset SHADOW_MODE_UNI_IDS
+```
+
+Reports written to `backend-py/shadow_reports/{timestamp}_{slug}_{uni_id}_run{N}.json`. Ignored by git (only `.gitkeep` is tracked). The JSON includes `is_clean`, `summary`, `clean_streak`, `cutover_ready` fields.
+
+**Cutover criterion**: `cutover_ready: true` = clean_streak â¥ 5. Each run must be a fresh scrape, â¥1 hour apart against the live site. Streak resets on any unexpected diff.
+
+### Week 2 ACAP migration â correct order (reviewer-mandated)
+
+Do NOT fix the NameError first. Order matters because step 4 is a shared-code change:
+
+1. **Shadow-mode scaffolding** â run old + new code paths in parallel for ACAP. Both should produce the same broken result (`Errors:14`). This validates the diff machinery itself.
+2. **Move `domestic_only` to YAML** â migrate `domestic_only.text_must_appear_in: main_content` from shared if-block into `acap_41.yaml`. Shadow mode for 5 runs â byte-identical â cut over. Now the filter is per-uni-configurable.
+3. **Fix the `re` NameError last** â it's a shared-code change that affects every uni. Run the full regression sweep (all 23 baselined unis). Diff against `20260430_024437_*` baseline. Zero regressions â merge.
+
+Rationale: if the NameError fix sweep finds regressions on unexpected unis, that means the `re.*` call was doing something other unis depend on â far better to discover that through the sweep than through bug reports.
 
 ### Data Model
 
@@ -80,14 +107,14 @@ The database schema includes tables for `universities`, `courses`, `intakes`, `f
 ### Deployment Architecture
 
 - **Production Server**: DigitalOcean droplet at `159.65.152.72`, Ubuntu 24.04.
-- **Process Management**: systemd. Services: `uni-api-py.service` (FastAPI/uvicorn, port 8000) and `uni-celery.service` (Celery worker). Nginx proxies `/api` → `127.0.0.1:8000`.
+- **Process Management**: systemd. Services: `uni-api-py.service` (FastAPI/uvicorn, port 8000) and `uni-celery.service` (Celery worker). Nginx proxies `/api` â `127.0.0.1:8000`.
 - **Git repo on server**: `/root/University-and-Course-data`. Deploy = `git pull origin main` + `systemctl restart uni-api-py uni-celery`.
-- **Database**: Local PostgreSQL. Database: `university_portal`, owner: `uniportal`. Access via `sudo -u postgres psql -d university_portal`. Schema changes via direct psql (alembic cannot be used on production — asyncpg fails to connect via TCP to `localhost` due to SSL hostname DNS issue).
-- **CRITICAL — DB URL**: Must use `127.0.0.1` not `localhost` in the asyncpg connection string. asyncpg attempts SSL hostname verification using `getaddrinfo("localhost")` which fails on this server (`[Errno -3] Temporary failure in name resolution`). Using the IP literal bypasses the DNS lookup.  Hardcoded default in `backend-py/app/config.py` is already set to `127.0.0.1`.
-- **alembic**: Do NOT run `alembic upgrade head` on production — it will fail with the same DNS error. Apply all schema changes via `sudo -u postgres psql -d university_portal -c "ALTER TABLE ..."` directly.
-- **alembic_version table**: Contains fake version IDs (`001_initial` … `006_add_scrape_warnings`) inserted manually. The actual migration filenames are `001_add_rejection_reason`, `002_add_extraction_method`, etc. — these do NOT match. Ignore alembic version tracking on production entirely.
+- **Database**: Local PostgreSQL. Database: `university_portal`, owner: `uniportal`. Access via `sudo -u postgres psql -d university_portal`. Schema changes via direct psql (alembic cannot be used on production â asyncpg fails to connect via TCP to `localhost` due to SSL hostname DNS issue).
+- **CRITICAL â DB URL**: Must use `127.0.0.1` not `localhost` in the asyncpg connection string. asyncpg attempts SSL hostname verification using `getaddrinfo("localhost")` which fails on this server (`[Errno -3] Temporary failure in name resolution`). Using the IP literal bypasses the DNS lookup.  Hardcoded default in `backend-py/app/config.py` is already set to `127.0.0.1`.
+- **alembic**: Do NOT run `alembic upgrade head` on production â it will fail with the same DNS error. Apply all schema changes via `sudo -u postgres psql -d university_portal -c "ALTER TABLE ..."` directly.
+- **alembic_version table**: Contains fake version IDs (`001_initial` â¦ `006_add_scrape_warnings`) inserted manually. The actual migration filenames are `001_add_rejection_reason`, `002_add_extraction_method`, etc. â these do NOT match. Ignore alembic version tracking on production entirely.
 - **Environment Management**: DB credentials hardcoded in `app/config.py` default. No `.env` file needed on production.
-- **journalctl**: The service does NOT log uvicorn application output to journalctl — only systemd lifecycle events appear. To see application errors, check `/tmp/dashboard_stats_error.log` (written by the try/except in dashboard.py) or run uvicorn in the foreground temporarily.
+- **journalctl**: The service does NOT log uvicorn application output to journalctl â only systemd lifecycle events appear. To see application errors, check `/tmp/dashboard_stats_error.log` (written by the try/except in dashboard.py) or run uvicorn in the foreground temporarily.
 
 ## External Dependencies
 

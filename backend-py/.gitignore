@@ -13,3 +13,4 @@ build/
 dist/
 .celerybeat-schedule
 celerybeat.pid
+shadow_reports/*.json
