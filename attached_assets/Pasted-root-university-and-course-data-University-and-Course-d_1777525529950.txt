@@ -1,0 +1,121 @@
+root@university-and-course-data:~/University-and-Course-data# cat $(ls -t backend-py/shadow_reports/*.json | head -1) | python3 -m json.tool
+{
+    "schema_version": 1,
+    "timestamp": "2026-04-30T05:03:27.222547+00:00",
+    "uni_id": 41,
+    "slug": "acap",
+    "run_number": 9,
+    "old_job_id": "job_d9f16a9dd818",
+    "new_job_id": "job_d9f16a9dd818:new_path",
+    "is_clean": true,
+    "summary": "CLEAN \u00e2\u0080\u0094 27 courses matched exactly",
+    "clean_streak": 7,
+    "cutover_threshold": 5,
+    "cutover_ready": true,
+    "diff": {
+        "is_clean": true,
+        "summary": "CLEAN \u00e2\u0080\u0094 27 courses matched exactly",
+        "matched": 27,
+        "old_only": [],
+        "new_only": [],
+        "staging_disagreements": [],
+        "field_regressions": []
+    }
+}
+root@university-and-course-data:~/University-and-Course-data# cat $(ls -t backend-py/shadow_reports/*.json | head -1) | python3 -m json.tool
+{
+    "schema_version": 1,
+    "timestamp": "2026-04-30T05:03:27.222547+00:00",
+    "uni_id": 41,
+    "slug": "acap",
+    "run_number": 9,
+    "old_job_id": "job_d9f16a9dd818",
+    "new_job_id": "job_d9f16a9dd818:new_path",
+    "is_clean": true,
+    "summary": "CLEAN \u00e2\u0080\u0094 27 courses matched exactly",
+    "clean_streak": 7,
+    "cutover_threshold": 5,
+    "cutover_ready": true,
+    "diff": {
+        "is_clean": true,
+        "summary": "CLEAN \u00e2\u0080\u0094 27 courses matched exactly",
+        "matched": 27,
+        "old_only": [],
+        "new_only": [],
+        "staging_disagreements": [],
+        "field_regressions": []
+    }
+}
+root@university-and-course-data:~/University-and-Course-data# cat $(ls -t backend-py/shadow_reports/*.json | head -1) | python3 -m json.tool
+{
+    "schema_version": 1,
+    "timestamp": "2026-04-30T05:03:27.222547+00:00",
+    "uni_id": 41,
+    "slug": "acap",
+    "run_number": 9,
+    "old_job_id": "job_d9f16a9dd818",
+    "new_job_id": "job_d9f16a9dd818:new_path",
+    "is_clean": true,
+    "summary": "CLEAN \u00e2\u0080\u0094 27 courses matched exactly",
+    "clean_streak": 7,
+    "cutover_threshold": 5,
+    "cutover_ready": true,
+    "diff": {
+        "is_clean": true,
+        "summary": "CLEAN \u00e2\u0080\u0094 27 courses matched exactly",
+        "matched": 27,
+        "old_only": [],
+        "new_only": [],
+        "staging_disagreements": [],
+        "field_regressions": []
+    }
+}
+root@university-and-course-data:~/University-and-Course-data# cat $(ls -t backend-py/shadow_reports/*.json | head -1) | python3 -m json.tool
+{
+    "schema_version": 1,
+    "timestamp": "2026-04-30T05:03:27.222547+00:00",
+    "uni_id": 41,
+    "slug": "acap",
+    "run_number": 9,
+    "old_job_id": "job_d9f16a9dd818",
+    "new_job_id": "job_d9f16a9dd818:new_path",
+    "is_clean": true,
+    "summary": "CLEAN \u00e2\u0080\u0094 27 courses matched exactly",
+    "clean_streak": 7,
+    "cutover_threshold": 5,
+    "cutover_ready": true,
+    "diff": {
+        "is_clean": true,
+        "summary": "CLEAN \u00e2\u0080\u0094 27 courses matched exactly",
+        "matched": 27,
+        "old_only": [],
+        "new_only": [],
+        "staging_disagreements": [],
+        "field_regressions": []
+    }
+}
+root@university-and-course-data:~/University-and-Course-data# cat $(ls -t backend-py/shadow_reports/*.json | head -1) | python3 -m json.tool
+{
+    "schema_version": 1,
+    "timestamp": "2026-04-30T05:03:27.222547+00:00",
+    "uni_id": 41,
+    "slug": "acap",
+    "run_number": 9,
+    "old_job_id": "job_d9f16a9dd818",
+    "new_job_id": "job_d9f16a9dd818:new_path",
+    "is_clean": true,
+    "summary": "CLEAN \u00e2\u0080\u0094 27 courses matched exactly",
+    "clean_streak": 7,
+    "cutover_threshold": 5,
+    "cutover_ready": true,
+    "diff": {
+        "is_clean": true,
+        "summary": "CLEAN \u00e2\u0080\u0094 27 courses matched exactly",
+        "matched": 27,
+        "old_only": [],
+        "new_only": [],
+        "staging_disagreements": [],
+        "field_regressions": []
+    }
+}
+root@university-and-course-data:~/University-and-Course-data# 
