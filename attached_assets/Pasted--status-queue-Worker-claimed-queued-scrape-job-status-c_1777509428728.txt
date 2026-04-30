@@ -1,0 +1,495 @@
+[status] [queue] Worker claimed queued scrape job
+[status] [cleanup] Cleared 0 stale pending/rejected scraped_courses rows (>10m old) for university 72
+[status] [fetch] Fetching https://bluemountains.edu.au/courses...
+[status] [discover] Discovering candidate course pages...
+[status] [discover] [DISCOVER] Crawling from https://bluemountains.edu.au/courses (max 25 pages, max 200 candidates)
+[status] [discover] [DISCOVER] classified https://bluemountains.edu.au/courses: detail (course content present, only 0 outbound links)
+[status] [discover] [DISCOVER] added self as candidate https://bluemountains.edu.au/courses
+[status] [discover] [DISCOVER] Page 1/25: +1 candidates (total 1) — https://bluemountains.edu.au/courses
+[status] [discover] [DISCOVER] classified https://bluemountains.edu.au/studying-with-us/employability/workforce-edge: detail (course content present, only 0 outbound links)
+[status] [discover] [DISCOVER] added self as candidate https://bluemountains.edu.au/studying-with-us/employability/workforce-edge
+[status] [discover] [DISCOVER] Page 2/25: +1 candidates (total 2) — https://bluemountains.edu.au/studying-with-us/employability/workforce-edge
+[status] [discover] [DISCOVER] classified https://bluemountains.edu.au/studying-with-us/international-students: detail (course content present, only 0 outbound links)
+[status] [discover] [DISCOVER] added self as candidate https://bluemountains.edu.au/studying-with-us/international-students
+[status] [discover] [DISCOVER] Page 3/25: +1 candidates (total 3) — https://bluemountains.edu.au/studying-with-us/international-students
+[status] [discover] [DISCOVER] classified https://bluemountains.edu.au/courses/design: detail (course content present, only 0 outbound links)
+[status] [discover] [DISCOVER] added self as candidate https://bluemountains.edu.au/courses/design
+[status] [discover] [DISCOVER] Page 4/25: +1 candidates (total 4) — https://bluemountains.edu.au/courses/design
+[status] [discover] [DISCOVER] classified https://bluemountains.edu.au/courses/health: detail (course content present, only 0 outbound links)
+[status] [discover] [DISCOVER] added self as candidate https://bluemountains.edu.au/courses/health
+[status] [discover] [DISCOVER] Page 5/25: +1 candidates (total 5) — https://bluemountains.edu.au/courses/health
+[status] [discover] [DISCOVER] classified https://bluemountains.edu.au/courses/business: detail (course content present, only 0 outbound links)
+[status] [discover] [DISCOVER] added self as candidate https://bluemountains.edu.au/courses/business
+[status] [discover] [DISCOVER] Page 6/25: +1 candidates (total 6) — https://bluemountains.edu.au/courses/business
+[status] [discover] [DISCOVER] classified https://bluemountains.edu.au/courses/hospitality: detail (course content present, only 0 outbound links)
+[status] [discover] [DISCOVER] added self as candidate https://bluemountains.edu.au/courses/hospitality
+[status] [discover] [DISCOVER] Page 7/25: +1 candidates (total 7) — https://bluemountains.edu.au/courses/hospitality
+[status] [discover] [DISCOVER] classified https://bluemountains.edu.au/courses/technology: detail (course content present, only 0 outbound links)
+[status] [discover] [DISCOVER] added self as candidate https://bluemountains.edu.au/courses/technology
+[status] [discover] [DISCOVER] Page 8/25: +1 candidates (total 8) — https://bluemountains.edu.au/courses/technology
+[status] [discover] [DISCOVER] classified https://bluemountains.edu.au/courses/education: detail (course content present, only 0 outbound links)
+[status] [discover] [DISCOVER] added self as candidate https://bluemountains.edu.au/courses/education
+[status] [discover] [DISCOVER] Page 9/25: +1 candidates (total 9) — https://bluemountains.edu.au/courses/education
+[status] [discover] [DISCOVER] classified https://bluemountains.edu.au/courses/english: detail (course content present, only 0 outbound links)
+[status] [discover] [DISCOVER] added self as candidate https://bluemountains.edu.au/courses/english
+[status] [discover] [DISCOVER] Page 10/25: +1 candidates (total 10) — https://bluemountains.edu.au/courses/english
+[status] [discover] [DISCOVER] classified https://bluemountains.edu.au/courses/higher-degrees-by-research: detail (course content present, only 0 outbound links)
+[status] [discover] [DISCOVER] added self as candidate https://bluemountains.edu.au/courses/higher-degrees-by-research
+[status] [discover] [DISCOVER] Page 11/25: +1 candidates (total 11) — https://bluemountains.edu.au/courses/higher-degrees-by-research
+[status] [discover] [DISCOVER] classified https://bluemountains.edu.au/courses/course-guides: detail (course content present, only 0 outbound links)
+[status] [discover] [DISCOVER] added self as candidate https://bluemountains.edu.au/courses/course-guides
+[status] [discover] [DISCOVER] Page 12/25: +1 candidates (total 12) — https://bluemountains.edu.au/courses/course-guides
+[status] [discover] [DISCOVER] classified https://bluemountains.edu.au/studying-with-us: detail (course content present, only 0 outbound links)
+[status] [discover] [DISCOVER] added self as candidate https://bluemountains.edu.au/studying-with-us
+[status] [discover] [DISCOVER] Page 13/25: +1 candidates (total 13) — https://bluemountains.edu.au/studying-with-us
+[status] [discover] [DISCOVER] blocked marketing_page: https://bluemountains.edu.au/studying-with-us/why-study-with-us
+[status] [discover] [DISCOVER] classified https://bluemountains.edu.au/studying-with-us/employability: detail (course content present, only 0 outbound links)
+[status] [discover] [DISCOVER] added self as candidate https://bluemountains.edu.au/studying-with-us/employability
+[status] [discover] [DISCOVER] Page 15/25: +1 candidates (total 14) — https://bluemountains.edu.au/studying-with-us/employability
+[status] [discover] [DISCOVER] classified https://bluemountains.edu.au/studying-with-us/study-options: detail (course content present, only 0 outbound links)
+[status] [discover] [DISCOVER] added self as candidate https://bluemountains.edu.au/studying-with-us/study-options
+[status] [discover] [DISCOVER] Page 16/25: +1 candidates (total 15) — https://bluemountains.edu.au/studying-with-us/study-options
+[status] [discover] [DISCOVER] classified https://bluemountains.edu.au/studying-with-us/campus-locations: detail (course content present, only 0 outbound links)
+[status] [discover] [DISCOVER] added self as candidate https://bluemountains.edu.au/studying-with-us/campus-locations
+[status] [discover] [DISCOVER] Page 17/25: +1 candidates (total 16) — https://bluemountains.edu.au/studying-with-us/campus-locations
+[status] [discover] [DISCOVER] blocked campus_page: https://bluemountains.edu.au/studying-with-us/student-life
+[status] [discover] [DISCOVER] classified https://bluemountains.edu.au/studying-with-us/student-support: detail (course content present, only 0 outbound links)
+[status] [discover] [DISCOVER] added self as candidate https://bluemountains.edu.au/studying-with-us/student-support
+[status] [discover] [DISCOVER] Page 19/25: +1 candidates (total 17) — https://bluemountains.edu.au/studying-with-us/student-support
+[status] [discover] [DISCOVER] blocked info_page: https://bluemountains.edu.au/studying-with-us/mature-age-students
+[status] [discover] [DISCOVER] blocked info_page: https://bluemountains.edu.au/studying-with-us/high-school-students
+[status] [discover] [DISCOVER] classified https://bluemountains.edu.au/studying-with-us/choose-a-study-option: detail (course content present, only 0 outbound links)
+[status] [discover] [DISCOVER] added self as candidate https://bluemountains.edu.au/studying-with-us/choose-a-study-option
+[status] [discover] [DISCOVER] Page 22/25: +1 candidates (total 18) — https://bluemountains.edu.au/studying-with-us/choose-a-study-option
+[status] [discover] [DISCOVER] classified https://bluemountains.edu.au/research/faculty-research: detail (course content present, only 0 outbound links)
+[status] [discover] [DISCOVER] added self as candidate https://bluemountains.edu.au/research/faculty-research
+[status] [discover] [DISCOVER] Page 23/25: +1 candidates (total 19) — https://bluemountains.edu.au/research/faculty-research
+[status] [discover] [DISCOVER] classified https://bluemountains.edu.au/courses/hospitality/hotel-management: detail (course content present, only 0 outbound links)
+[status] [discover] [DISCOVER] added self as candidate https://bluemountains.edu.au/courses/hospitality/hotel-management
+[status] [discover] [DISCOVER] Page 24/25: +1 candidates (total 20) — https://bluemountains.edu.au/courses/hospitality/hotel-management
+[status] [discover] [DISCOVER] classified https://bluemountains.edu.au/studying-with-us/study-options/undergraduate-courses: detail (course content present, only 0 outbound links)
+[status] [discover] [DISCOVER] added self as candidate https://bluemountains.edu.au/studying-with-us/study-options/undergraduate-courses
+[status] [discover] [DISCOVER] Page 25/25: +1 candidates (total 21) — https://bluemountains.edu.au/studying-with-us/study-options/undergraduate-courses
+[status] [discover] Discovered 21 candidate course links
+[status] [discover] [CENTRAL] auto-discovered fee page: https://bluemountains.edu.au/how-to-apply/international-student
+[status] [discover] [CENTRAL] fee page parsed → 0 program record(s) from https://bluemountains.edu.au/how-to-apply/international-student
+[status] [extract] [EXTRACT] gate dropped (info_page): Courses
+[status] [extract] [EXTRACT] gate dropped (category_landing_page): Higher Degrees By Research
+[status] [extract] [EXTRACT] gate dropped (category_landing_page): Undergraduate Courses
+[status] [extract] [EXTRACT] gate dropped 3 non-course candidate(s) — category_landing_page=2, info_page=1
+[status] [extract] Extracting course details (18 pages)...
+[status] [extract] [EXTRACT] 1/18: Workforce Edge
+[status] [extract] [EXTRACT] 2/18: International Students
+[status] [extract] [EXTRACT] 3/18: Design
+[status] [extract] [EXTRACT] 4/18: Health
+[progress] [extract] Fetching 1/18: Workforce Edge
+[progress] [extract] Fetching 2/18: International Students
+[progress] [extract] Fetching 3/18: Design
+[progress] [extract] Fetching 4/18: Health
+[status] [extract] [FIELD SUMMARY] Blue Mountains International Hotel Management Scho
+  Fee: ❌ not found
+  IELTS: ❌ not found
+  Duration: ❌ not found
+  Intake: ❌ not found
+  StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[status] [extract] [FIELD SUMMARY] Blue Mountains International Hotel Management Scho
+  Fee: ❌ not found
+  IELTS: ❌ not found
+  Duration: ❌ not found
+  Intake: ❌ not found
+  StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[status] [extract] [FIELD SUMMARY] Blue Mountains International Hotel Management Scho
+  Fee: ❌ not found
+  IELTS: ❌ not found
+  Duration: ❌ not found
+  Intake: ❌ not found
+  StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[status] [extract] [FIELD SUMMARY] Blue Mountains International Hotel Management Scho
+  Fee: ❌ not found
+  IELTS: ❌ not found
+  Duration: ❌ not found
+  Intake: ❌ not found
+  StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[status] [extract] [GP-DEBUG] static=195896B rendered=0B using=static text_len=6883
+[status] [extract] [GP-DEBUG] text[:500]='Internationally recognised hotel management school For more than three decades, Blue Mountains International Hotel Management School (BMIHMS) has established itself as a leading hotel school, serving as a launchpad for countless successful careers. We take pride in our extensive network of industry-leading alumni and our robust partnerships with some of the world’s most renowned hospitality brands. Course campus location Undergraduate - Leura (residential campus) Postgraduate - Sydney and Melbou'
+[status] [extract] [GP-DEBUG] raw_response='```json\n{\n  "international_fee": null,\n  "domestic_fee": null,\n  "fee_term": null,\n  "duration_value": null,\n  "duration_unit": null,\n  "duration_text": null,\n  "ielts_overall": null,\n  "pte_overall": null,\n  "toefl_overall": null,\n  "cambridge_overall": null,\n  "duolingo_overall": null,\n  "sub_category": "International Hotel and Resort Management",\n  "category": "Hospitality, Tourism & Events",\n '
+[status] [extract] [GEMINI] https://bluemountains.edu.au/studying-with-us/international- → 5 field(s) (cost=$0.000274, in=3160 out=123)
+[status] [fallback] [per-course browser ↻] https://bluemountains.edu.au/studying-with-us/international-students
+[status] [extract] [GP-DEBUG] static=195896B rendered=0B using=static text_len=6883
+[status] [extract] [GP-DEBUG] text[:500]='Internationally recognised hotel management school For more than three decades, Blue Mountains International Hotel Management School (BMIHMS) has established itself as a leading hotel school, serving as a launchpad for countless successful careers. We take pride in our extensive network of industry-leading alumni and our robust partnerships with some of the world’s most renowned hospitality brands. Course campus location Undergraduate - Leura (residential campus) Postgraduate - Sydney and Melbou'
+[status] [extract] [GP-DEBUG] raw_response='```json\n{\n  "international_fee": null,\n  "domestic_fee": null,\n  "fee_term": null,\n  "duration_value": null,\n  "duration_unit": null,\n  "duration_text": null,\n  "ielts_overall": null,\n  "pte_overall": null,\n  "toefl_overall": null,\n  "cambridge_overall": null,\n  "duolingo_overall": null,\n  "sub_category": "International Hotel and Resort Management",\n  "category": "Hospitality, Tourism & Events",\n '
+[status] [extract] [GEMINI] https://bluemountains.edu.au/courses/health → 5 field(s) (cost=$0.000273, in=3154 out=123)
+[status] [fallback] [per-course browser ↻] https://bluemountains.edu.au/courses/health
+[status] [fallback] [per-course browser ✓] https://bluemountains.edu.au/studying-with-us/international-students — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[status] [fallback] [VISION] 6 candidate image(s) found — starting OCR pass
+[status] [extract] [GP-DEBUG] static=195896B rendered=0B using=static text_len=6883
+[status] [extract] [GP-DEBUG] text[:500]='Internationally recognised hotel management school For more than three decades, Blue Mountains International Hotel Management School (BMIHMS) has established itself as a leading hotel school, serving as a launchpad for countless successful careers. We take pride in our extensive network of industry-leading alumni and our robust partnerships with some of the world’s most renowned hospitality brands. Course campus location Undergraduate - Leura (residential campus) Postgraduate - Sydney and Melbou'
+[status] [extract] [GP-DEBUG] raw_response='```json\n{\n  "international_fee": null,\n  "domestic_fee": null,\n  "fee_term": null,\n  "duration_value": null,\n  "duration_unit": null,\n  "duration_text": null,\n  "ielts_overall": null,\n  "pte_overall": null,\n  "toefl_overall": null,\n  "cambridge_overall": null,\n  "duolingo_overall": null,\n  "sub_category": "International Hotel and Resort Management",\n  "category": "Hospitality, Tourism & Events",\n '
+[status] [extract] [GEMINI] https://bluemountains.edu.au/courses/design → 5 field(s) (cost=$0.000273, in=3154 out=123)
+[status] [fallback] [per-course browser ↻] https://bluemountains.edu.au/courses/design
+[status] [extract] [GP-DEBUG] static=195896B rendered=0B using=static text_len=6883
+[status] [extract] [GP-DEBUG] text[:500]='Internationally recognised hotel management school For more than three decades, Blue Mountains International Hotel Management School (BMIHMS) has established itself as a leading hotel school, serving as a launchpad for countless successful careers. We take pride in our extensive network of industry-leading alumni and our robust partnerships with some of the world’s most renowned hospitality brands. Course campus location Undergraduate - Leura (residential campus) Postgraduate - Sydney and Melbou'
+[status] [extract] [GP-DEBUG] raw_response='```json\n{\n  "international_fee": null,\n  "domestic_fee": null,\n  "fee_term": null,\n  "duration_value": null,\n  "duration_unit": null,\n  "duration_text": null,\n  "ielts_overall": null,\n  "pte_overall": null,\n  "toefl_overall": null,\n  "cambridge_overall": null,\n  "duolingo_overall": null,\n  "sub_category": "International Hotel and Resort Management",\n  "category": "Hospitality, Tourism & Events",\n '
+[status] [extract] [GEMINI] https://bluemountains.edu.au/studying-with-us/employability/ → 5 field(s) (cost=$0.000274, in=3162 out=123)
+[status] [fallback] [per-course browser ↻] https://bluemountains.edu.au/studying-with-us/employability/workforce-edge
+[status] [fallback] [per-course browser ✓] https://bluemountains.edu.au/courses/health — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[status] [fallback] [VISION] 6 candidate image(s) found — starting OCR pass
+[status] [fallback] [per-course browser ✓] https://bluemountains.edu.au/studying-with-us/employability/workforce-edge — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[status] [fallback] [VISION] 6 candidate image(s) found — starting OCR pass
+[status] [fallback] [per-course browser ✓] https://bluemountains.edu.au/courses/design — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[status] [fallback] [VISION] 6 candidate image(s) found — starting OCR pass
+[status] [fallback] [per-course vision img 2/6] https://bluemountains.edu.au/studying-with-us/international-students — IELTS=6.5 PTE=65.0 TOEFL=80.0 CAE=176.0
+[status] [fallback] [per-course vision img 0/6 (cache hits 2)] https://bluemountains.edu.au/courses/health — IELTS=6.5 PTE=65.0 TOEFL=80.0 CAE=176.0
+[status] [fallback] [per-course vision img 0/6 (cache hits 2)] https://bluemountains.edu.au/studying-with-us/employability/workforce-edge — IELTS=6.5 PTE=65.0 TOEFL=80.0 CAE=176.0
+[status] [fallback] [per-course vision img 0/6 (cache hits 2)] https://bluemountains.edu.au/courses/design — IELTS=6.5 PTE=65.0 TOEFL=80.0 CAE=176.0
+[status] [extract] [FALLBACK] AI enriching https://bluemountains.edu.au/courses/design (missing: international_fee, domestic_fee, duration_text, intake_text)
+[status] [extract] [FALLBACK] AI enriching https://bluemountains.edu.au/studying-with-us/international-students (missing: international_fee, domestic_fee, duration_text, intake_text)
+[status] [extract] [FALLBACK] AI enriching https://bluemountains.edu.au/courses/health (missing: international_fee, domestic_fee, duration_text, intake_text)
+[status] [extract] [FALLBACK] AI enriching https://bluemountains.edu.au/studying-with-us/employability/workforce-edge (missing: international_fee, domestic_fee, duration_text, intake_text)
+[status] [extract] [FIELD TRACE] study_mode='Online' location='Leura, Sydney, Melbourne' method=study_mode:no_location_online_override url=https://bluemountains.edu.au/studying-with-us/international-students
+[status] [classify] [CATEGORY det] Blue Mountains International Hotel Manag → Hospitality, Tourism & Events / Hospitality Management
+[status] [extract] [WARN] Blue Mountains International Hotel Manag — Fee section detected but fee is blank
+[status] [extract] ⚠️ [WARN 60/100] Blue Mountains International Hotel Management Scho — missing: duration, intake | international-students
+[status] [extract] [EXTRACT] 5/18: Business
+[progress] [extract] Fetching 5/18: Business
+[status] [extract] [FIELD SUMMARY] Blue Mountains International Hotel Management Scho
+  Fee: ❌ not found
+  IELTS: ❌ not found
+  Duration: ❌ not found
+  Intake: ❌ not found
+  StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[status] [extract] [FIELD TRACE] study_mode='Online' location='Leura, Sydney, Melbourne' method=study_mode:no_location_online_override url=https://bluemountains.edu.au/courses/design
+[status] [classify] [CATEGORY det] Blue Mountains International Hotel Manag → Hospitality, Tourism & Events / Hospitality Management
+[status] [extract] [WARN] Blue Mountains International Hotel Manag — Fee section detected but fee is blank
+[status] [extract] ⚠️ [WARN 60/100] Blue Mountains International Hotel Management Scho — missing: duration, intake | design
+[status] [extract] [EXTRACT] 6/18: Hospitality
+[progress] [extract] Fetching 6/18: Hospitality
+[status] [extract] [FIELD SUMMARY] Blue Mountains International Hotel Management Scho
+  Fee: ❌ not found
+  IELTS: ❌ not found
+  Duration: ❌ not found
+  Intake: ❌ not found
+  StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[status] [extract] [FIELD TRACE] study_mode='Online' location='Leura, Sydney, Melbourne' method=study_mode:no_location_online_override url=https://bluemountains.edu.au/courses/health
+[status] [classify] [CATEGORY det] Blue Mountains International Hotel Manag → Hospitality, Tourism & Events / Hospitality Management
+[status] [extract] [WARN] Blue Mountains International Hotel Manag — Fee section detected but fee is blank
+[status] [extract] ⚠️ [WARN 60/100] Blue Mountains International Hotel Management Scho — missing: duration, intake | health
+[status] [extract] [EXTRACT] 7/18: Technology
+[progress] [extract] Fetching 7/18: Technology
+[status] [extract] [FIELD SUMMARY] Blue Mountains International Hotel Management Scho
+  Fee: ❌ not found
+  IELTS: ❌ not found
+  Duration: ❌ not found
+  Intake: ❌ not found
+  StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[status] [extract] [FIELD TRACE] study_mode='Online' location='Leura, Sydney, Melbourne' method=study_mode:no_location_online_override url=https://bluemountains.edu.au/studying-with-us/employability/workforce-edge
+[status] [extract] [GP-DEBUG] static=195896B rendered=0B using=static text_len=6883
+[status] [extract] [GP-DEBUG] text[:500]='Internationally recognised hotel management school For more than three decades, Blue Mountains International Hotel Management School (BMIHMS) has established itself as a leading hotel school, serving as a launchpad for countless successful careers. We take pride in our extensive network of industry-leading alumni and our robust partnerships with some of the world’s most renowned hospitality brands. Course campus location Undergraduate - Leura (residential campus) Postgraduate - Sydney and Melbou'
+[status] [classify] [CATEGORY det] Blue Mountains International Hotel Manag → Hospitality, Tourism & Events / Hospitality Management
+[status] [extract] [GP-DEBUG] raw_response='```json\n{\n  "international_fee": null,\n  "domestic_fee": null,\n  "fee_term": null,\n  "duration_value": null,\n  "duration_unit": null,\n  "duration_text": null,\n  "ielts_overall": null,\n  "pte_overall": null,\n  "toefl_overall": null,\n  "cambridge_overall": null,\n  "duolingo_overall": null,\n  "sub_category": "International Hotel and Resort Management",\n  "category": "Hospitality, Tourism & Events",\n '
+[status] [extract] [WARN] Blue Mountains International Hotel Manag — Fee section detected but fee is blank
+[status] [extract] [GEMINI] https://bluemountains.edu.au/courses/business → 5 field(s) (cost=$0.000273, in=3154 out=123)
+[status] [extract] ⚠️ [WARN 60/100] Blue Mountains International Hotel Management Scho — missing: duration, intake | workforce-edge
+[status] [extract] [EXTRACT] 8/18: Education
+[status] [fallback] [per-course browser ↻] https://bluemountains.edu.au/courses/business
+[progress] [extract] Fetching 8/18: Education
+[status] [extract] [FIELD SUMMARY] Blue Mountains International Hotel Management Scho
+  Fee: ❌ not found
+  IELTS: ❌ not found
+  Duration: ❌ not found
+  Intake: ❌ not found
+  StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[status] [fallback] [per-course browser ✓] https://bluemountains.edu.au/courses/business — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[status] [fallback] [VISION] 6 candidate image(s) found — starting OCR pass
+[status] [extract] [GP-DEBUG] static=195896B rendered=0B using=static text_len=?
+[status] [extract] [GP-DEBUG] text[:500]=''
+[status] [extract] [GP-DEBUG] raw_response=''
+[status] [extract] [GEMINI] https://bluemountains.edu.au/courses/hospitality → 0 field(s) (cost=$0.000000, in=3155 out=0) SKIP="503 UNAVAILABLE. {'error': {'code': 503, 'message': 'This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.', 'status': 'UNAVAILABLE'}}"
+[status] [fallback] [per-course browser ↻] https://bluemountains.edu.au/courses/hospitality
+[status] [extract] [GP-DEBUG] static=195896B rendered=0B using=static text_len=6883
+[status] [extract] [GP-DEBUG] text[:500]='Internationally recognised hotel management school For more than three decades, Blue Mountains International Hotel Management School (BMIHMS) has established itself as a leading hotel school, serving as a launchpad for countless successful careers. We take pride in our extensive network of industry-leading alumni and our robust partnerships with some of the world’s most renowned hospitality brands. Course campus location Undergraduate - Leura (residential campus) Postgraduate - Sydney and Melbou'
+[status] [extract] [GP-DEBUG] raw_response='```json\n{\n  "international_fee": null,\n  "domestic_fee": null,\n  "fee_term": null,\n  "duration_value": null,\n  "duration_unit": null,\n  "duration_text": null,\n  "ielts_overall": null,\n  "pte_overall": null,\n  "toefl_overall": null,\n  "cambridge_overall": null,\n  "duolingo_overall": null,\n  "sub_category": "International Hotel and Resort Management",\n  "category": "Hospitality, Tourism & Events",\n '
+[status] [extract] [GEMINI] https://bluemountains.edu.au/courses/technology → 5 field(s) (cost=$0.000274, in=3155 out=123)
+[status] [fallback] [per-course browser ↻] https://bluemountains.edu.au/courses/technology
+[status] [fallback] [per-course browser ✓] https://bluemountains.edu.au/courses/technology — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[status] [fallback] [VISION] 6 candidate image(s) found — starting OCR pass
+[status] [fallback] [per-course vision img 0/6 (cache hits 2)] https://bluemountains.edu.au/courses/technology — IELTS=6.5 PTE=65.0 TOEFL=80.0 CAE=176.0
+[status] [extract] [FALLBACK] AI enriching https://bluemountains.edu.au/courses/technology (missing: international_fee, domestic_fee, duration_text, intake_text)
+[status] [fallback] [per-course browser ✓] https://bluemountains.edu.au/courses/hospitality — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[status] [fallback] [VISION] 6 candidate image(s) found — starting OCR pass
+[status] [fallback] [per-course vision img 0/6 (cache hits 2)] https://bluemountains.edu.au/courses/hospitality — IELTS=6.5 PTE=65.0 TOEFL=80.0 CAE=176.0
+[status] [extract] [FALLBACK] AI enriching https://bluemountains.edu.au/courses/hospitality (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[status] [extract] [GP-DEBUG] static=195896B rendered=0B using=static text_len=?
+[status] [extract] [GP-DEBUG] text[:500]=''
+[status] [extract] [GP-DEBUG] raw_response=''
+[status] [extract] [GEMINI] https://bluemountains.edu.au/courses/education → 0 field(s) (cost=$0.000000, in=3155 out=0) SKIP="503 UNAVAILABLE. {'error': {'code': 503, 'message': 'This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.', 'status': 'UNAVAILABLE'}}"
+[status] [fallback] [per-course browser ↻] https://bluemountains.edu.au/courses/education
+[status] [fallback] [per-course browser ✓] https://bluemountains.edu.au/courses/education — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[status] [fallback] [VISION] 6 candidate image(s) found — starting OCR pass
+[status] [fallback] [per-course vision img 0/6 (cache hits 3)] https://bluemountains.edu.au/courses/education — IELTS=6.5 PTE=65.0 TOEFL=80.0 CAE=176.0
+[status] [extract] [FALLBACK] AI enriching https://bluemountains.edu.au/courses/education (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[status] [extract] [FALLBACK] AI filled 1 field(s) on https://bluemountains.edu.au/courses/education: course_location
+[status] [extract] [FIELD TRACE] study_mode='Online' location='Sydney, Melbourne, Leura' method=study_mode:no_location_online_override url=https://bluemountains.edu.au/courses/education
+[status] [classify] [CATEGORY det] Blue Mountains International Hotel Manag → Hospitality, Tourism & Events / Hospitality Management
+[status] [extract] [WARN] Blue Mountains International Hotel Manag — Fee section detected but fee is blank
+[status] [extract] ⚠️ [WARN 60/100] Blue Mountains International Hotel Management Scho — missing: duration, intake | education
+[status] [extract] [EXTRACT] 9/18: English
+[progress] [extract] Fetching 9/18: English
+[status] [extract] [FIELD TRACE] study_mode='Online' location='Leura, Sydney, Melbourne' method=study_mode:no_location_online_override url=https://bluemountains.edu.au/courses/technology
+[status] [classify] [CATEGORY det] Blue Mountains International Hotel Manag → Hospitality, Tourism & Events / Hospitality Management
+[status] [extract] [WARN] Blue Mountains International Hotel Manag — Fee section detected but fee is blank
+[status] [extract] ⚠️ [WARN 60/100] Blue Mountains International Hotel Management Scho — missing: duration, intake | technology
+[status] [extract] [EXTRACT] 10/18: Course Guides
+[progress] [extract] Fetching 10/18: Course Guides
+[status] [extract] [FALLBACK] AI filled 1 field(s) on https://bluemountains.edu.au/courses/hospitality: course_location
+[status] [extract] [FIELD TRACE] study_mode='Online' location='Sydney, Melbourne, Leura' method=study_mode:no_location_online_override url=https://bluemountains.edu.au/courses/hospitality
+[status] [classify] [CATEGORY det] Blue Mountains International Hotel Manag → Hospitality, Tourism & Events / Hospitality Management
+[status] [extract] [WARN] Blue Mountains International Hotel Manag — Fee section detected but fee is blank
+[status] [extract] ⚠️ [WARN 60/100] Blue Mountains International Hotel Management Scho — missing: duration, intake | hospitality
+[status] [extract] [EXTRACT] 11/18: Studying With Us
+[status] [extract] [FIELD SUMMARY] Blue Mountains International Hotel Management Scho
+  Fee: ❌ not found
+  IELTS: ❌ not found
+  Duration: ❌ not found
+  Intake: ❌ not found
+  StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[progress] [extract] Fetching 11/18: Studying With Us
+[status] [extract] [FIELD SUMMARY] Blue Mountains International Hotel Management Scho
+  Fee: ❌ not found
+  IELTS: ❌ not found
+  Duration: ❌ not found
+  Intake: ❌ not found
+  StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[status] [extract] [FIELD SUMMARY] Blue Mountains International Hotel Management Scho
+  Fee: ❌ not found
+  IELTS: ❌ not found
+  Duration: ❌ not found
+  Intake: ❌ not found
+  StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[status] [extract] [GP-DEBUG] static=195896B rendered=0B using=static text_len=6883
+[status] [extract] [GP-DEBUG] text[:500]='Internationally recognised hotel management school For more than three decades, Blue Mountains International Hotel Management School (BMIHMS) has established itself as a leading hotel school, serving as a launchpad for countless successful careers. We take pride in our extensive network of industry-leading alumni and our robust partnerships with some of the world’s most renowned hospitality brands. Course campus location Undergraduate - Leura (residential campus) Postgraduate - Sydney and Melbou'
+[status] [extract] [GP-DEBUG] raw_response='```json\n{\n  "international_fee": null,\n  "domestic_fee": null,\n  "fee_term": null,\n  "duration_value": null,\n  "duration_unit": null,\n  "duration_text": null,\n  "ielts_overall": null,\n  "pte_overall": null,\n  "toefl_overall": null,\n  "cambridge_overall": null,\n  "duolingo_overall": null,\n  "sub_category": "International Hotel and Resort Management",\n  "category": "Hospitality, Tourism & Events",\n '
+[status] [extract] [GEMINI] https://bluemountains.edu.au/courses/course-guides → 5 field(s) (cost=$0.000274, in=3156 out=123)
+[status] [fallback] [per-course browser ↻] https://bluemountains.edu.au/courses/course-guides
+[status] [fallback] [VISION FAIL] https://maps.googleapis.com/maps/vt?pb=!1m5!1m4!1i18!2i240546!3i157179: Gemini skipped — None (likely quota exhausted)
+[status] [extract] [GP-DEBUG] static=195896B rendered=0B using=static text_len=6883
+[status] [extract] [GP-DEBUG] text[:500]='Internationally recognised hotel management school For more than three decades, Blue Mountains International Hotel Management School (BMIHMS) has established itself as a leading hotel school, serving as a launchpad for countless successful careers. We take pride in our extensive network of industry-leading alumni and our robust partnerships with some of the world’s most renowned hospitality brands. Course campus location Undergraduate - Leura (residential campus) Postgraduate - Sydney and Melbou'
+[status] [extract] [GP-DEBUG] raw_response='```json\n{\n  "international_fee": null,\n  "domestic_fee": null,\n  "fee_term": null,\n  "duration_value": null,\n  "duration_unit": null,\n  "duration_text": null,\n  "ielts_overall": null,\n  "pte_overall": null,\n  "toefl_overall": null,\n  "cambridge_overall": null,\n  "duolingo_overall": null,\n  "sub_category": "International Hotel and Resort Management",\n  "category": "Hospitality, Tourism & Events",\n '
+[status] [extract] [GEMINI] https://bluemountains.edu.au/studying-with-us → 5 field(s) (cost=$0.000273, in=3154 out=123)
+[status] [fallback] [per-course browser ↻] https://bluemountains.edu.au/studying-with-us
+[status] [fallback] [per-course browser ✓] https://bluemountains.edu.au/courses/course-guides — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[status] [fallback] [VISION] 6 candidate image(s) found — starting OCR pass
+[status] [fallback] [per-course vision img 0/6 (cache hits 2)] https://bluemountains.edu.au/courses/course-guides — IELTS=6.5 PTE=65.0 TOEFL=80.0 CAE=176.0
+[status] [extract] [FALLBACK] AI enriching https://bluemountains.edu.au/courses/course-guides (missing: international_fee, domestic_fee, duration_text, intake_text)
+[status] [fallback] [per-course browser ✓] https://bluemountains.edu.au/studying-with-us — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[status] [fallback] [VISION] 6 candidate image(s) found — starting OCR pass
+[status] [fallback] [per-course vision img 0/6 (cache hits 3)] https://bluemountains.edu.au/studying-with-us — IELTS=6.5 PTE=65.0 TOEFL=80.0 CAE=176.0
+[status] [extract] [FALLBACK] AI enriching https://bluemountains.edu.au/studying-with-us (missing: international_fee, domestic_fee, duration_text, intake_text)
+[status] [extract] [FIELD TRACE] study_mode='Online' location='Leura, Sydney, Melbourne' method=study_mode:no_location_online_override url=https://bluemountains.edu.au/studying-with-us
+[status] [classify] [CATEGORY det] Blue Mountains International Hotel Manag → Hospitality, Tourism & Events / Hospitality Management
+[status] [extract] [WARN] Blue Mountains International Hotel Manag — Fee section detected but fee is blank
+[status] [extract] ⚠️ [WARN 60/100] Blue Mountains International Hotel Management Scho — missing: duration, intake | studying-with-us
+[status] [extract] [EXTRACT] 12/18: Employability
+[progress] [extract] Fetching 12/18: Employability
+[status] [extract] [GP-DEBUG] static=195896B rendered=0B using=static text_len=6883
+[status] [extract] [GP-DEBUG] text[:500]='Internationally recognised hotel management school For more than three decades, Blue Mountains International Hotel Management School (BMIHMS) has established itself as a leading hotel school, serving as a launchpad for countless successful careers. We take pride in our extensive network of industry-leading alumni and our robust partnerships with some of the world’s most renowned hospitality brands. Course campus location Undergraduate - Leura (residential campus) Postgraduate - Sydney and Melbou'
+[status] [extract] [GP-DEBUG] raw_response='```json\n{\n  "international_fee": null,\n  "domestic_fee": null,\n  "fee_term": null,\n  "duration_value": null,\n  "duration_unit": null,\n  "duration_text": null,\n  "ielts_overall": null,\n  "pte_overall": null,\n  "toefl_overall": null,\n  "cambridge_overall": null,\n  "duolingo_overall": null,\n  "sub_category": "English Language",\n  "category": "Education",\n  "mode": "Blended",\n  "intake_text": null,\n  '
+[status] [extract] [GEMINI] https://bluemountains.edu.au/courses/english → 5 field(s) (cost=$0.000270, in=3154 out=112)
+[status] [fallback] [per-course browser ↻] https://bluemountains.edu.au/courses/english
+[status] [extract] [FIELD SUMMARY] Blue Mountains International Hotel Management Scho
+  Fee: ❌ not found
+  IELTS: ❌ not found
+  Duration: ❌ not found
+  Intake: ❌ not found
+  StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[status] [extract] [FIELD TRACE] study_mode='Online' location='Leura, Sydney, Melbourne' method=study_mode:no_location_online_override url=https://bluemountains.edu.au/courses/course-guides
+[status] [classify] [CATEGORY det] Blue Mountains International Hotel Manag → Hospitality, Tourism & Events / Hospitality Management
+[status] [extract] [WARN] Blue Mountains International Hotel Manag — Fee section detected but fee is blank
+[status] [extract] ⚠️ [WARN 60/100] Blue Mountains International Hotel Management Scho — missing: duration, intake | course-guides
+[status] [extract] [EXTRACT] 13/18: Study Options
+[progress] [extract] Fetching 13/18: Study Options
+[status] [fallback] [per-course browser ✓] https://bluemountains.edu.au/courses/english — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[status] [fallback] [VISION] 6 candidate image(s) found — starting OCR pass
+[status] [extract] [FIELD SUMMARY] Blue Mountains International Hotel Management Scho
+  Fee: ❌ not found
+  IELTS: ❌ not found
+  Duration: ❌ not found
+  Intake: ❌ not found
+  StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[status] [fallback] [VISION FAIL] https://maps.googleapis.com/maps/vt?pb=!1m5!1m4!1i18!2i240548!3i157181: Gemini skipped — 503 UNAVAILABLE. {'error': {'code': 503, 'message': 'This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.', 'status': 'UNAVAILABLE'}} (likely quota exhausted)
+[status] [fallback] [per-course vision img 5/6 (cache hits 1)] https://bluemountains.edu.au/courses/business — IELTS=6.5 PTE=— TOEFL=80.0 CAE=176.0
+[status] [extract] [FALLBACK] AI enriching https://bluemountains.edu.au/courses/business (missing: international_fee, domestic_fee, duration_text, intake_text)
+[status] [extract] [GP-DEBUG] static=195896B rendered=0B using=static text_len=6883
+[status] [extract] [GP-DEBUG] text[:500]='Internationally recognised hotel management school For more than three decades, Blue Mountains International Hotel Management School (BMIHMS) has established itself as a leading hotel school, serving as a launchpad for countless successful careers. We take pride in our extensive network of industry-leading alumni and our robust partnerships with some of the world’s most renowned hospitality brands. Course campus location Undergraduate - Leura (residential campus) Postgraduate - Sydney and Melbou'
+[status] [extract] [GP-DEBUG] raw_response='```json\n{\n  "international_fee": null,\n  "domestic_fee": null,\n  "fee_term": null,\n  "duration_value": null,\n  "duration_unit": null,\n  "duration_text": null,\n  "ielts_overall": null,\n  "pte_overall": null,\n  "toefl_overall": null,\n  "cambridge_overall": null,\n  "duolingo_overall": null,\n  "sub_category": "International Hotel and Resort Management",\n  "category": "Hospitality, Tourism & Events",\n '
+[status] [extract] [GEMINI] https://bluemountains.edu.au/studying-with-us/study-options → 5 field(s) (cost=$0.000274, in=3158 out=124)
+[status] [fallback] [per-course browser ↻] https://bluemountains.edu.au/studying-with-us/study-options
+[status] [extract] [GP-DEBUG] static=195896B rendered=0B using=static text_len=?
+[status] [extract] [GP-DEBUG] text[:500]=''
+[status] [extract] [GP-DEBUG] raw_response=''
+[status] [extract] [GEMINI] https://bluemountains.edu.au/studying-with-us/employability → 0 field(s) (cost=$0.000000, in=3158 out=0) SKIP="503 UNAVAILABLE. {'error': {'code': 503, 'message': 'This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.', 'status': 'UNAVAILABLE'}}"
+[status] [fallback] [per-course browser ↻] https://bluemountains.edu.au/studying-with-us/employability
+[status] [fallback] [per-course browser ✓] https://bluemountains.edu.au/studying-with-us/employability — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[status] [fallback] [VISION] 6 candidate image(s) found — starting OCR pass
+[status] [fallback] [per-course vision img 0/6 (cache hits 2)] https://bluemountains.edu.au/studying-with-us/employability — IELTS=6.5 PTE=65.0 TOEFL=80.0 CAE=176.0
+[status] [extract] [FALLBACK] AI enriching https://bluemountains.edu.au/studying-with-us/employability (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[status] [fallback] [per-course browser ✓] https://bluemountains.edu.au/studying-with-us/study-options — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[status] [fallback] [VISION] 6 candidate image(s) found — starting OCR pass
+[status] [extract] [FIELD TRACE] study_mode='Online' location='Leura, Sydney, Melbourne' method=study_mode:no_location_online_override url=https://bluemountains.edu.au/courses/business
+[status] [classify] [CATEGORY det] Blue Mountains International Hotel Manag → Hospitality, Tourism & Events / Hospitality Management
+[status] [extract] [WARN] Blue Mountains International Hotel Manag — Fee section detected but fee is blank
+[status] [extract] ⚠️ [WARN 60/100] Blue Mountains International Hotel Management Scho — missing: duration, intake | business
+[status] [extract] [EXTRACT] 14/18: Campus Locations
+[progress] [extract] Fetching 14/18: Campus Locations
+[status] [fallback] [VISION FAIL] https://maps.googleapis.com/maps/vt?pb=!1m5!1m4!1i18!2i240546!3i157179: Gemini skipped — None (likely quota exhausted)
+[status] [extract] [FIELD SUMMARY] Blue Mountains International Hotel Management Scho
+  Fee: ❌ not found
+  IELTS: ❌ not found
+  Duration: ❌ not found
+  Intake: ❌ not found
+  StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[status] [extract] [GP-DEBUG] static=195882B rendered=0B using=static text_len=6883
+[status] [extract] [GP-DEBUG] text[:500]='Internationally recognised hotel management school For more than three decades, Blue Mountains International Hotel Management School (BMIHMS) has established itself as a leading hotel school, serving as a launchpad for countless successful careers. We take pride in our extensive network of industry-leading alumni and our robust partnerships with some of the world’s most renowned hospitality brands. Course campus location Undergraduate - Leura (residential campus) Postgraduate - Sydney and Melbou'
+[status] [extract] [GP-DEBUG] raw_response='```json\n{\n  "international_fee": null,\n  "domestic_fee": null,\n  "fee_term": null,\n  "duration_value": null,\n  "duration_unit": "years",\n  "duration_text": null,\n  "ielts_overall": null,\n  "pte_overall": null,\n  "toefl_overall": null,\n  "cambridge_overall": null,\n  "duolingo_overall": null,\n  "sub_category": "International Hotel and Resort Management",\n  "category": "Hospitality, Tourism & Events"'
+[status] [extract] [GEMINI] https://bluemountains.edu.au/studying-with-us/campus-locatio → 7 field(s) (cost=$0.000274, in=3159 out=124)
+[status] [fallback] [per-course browser ↻] https://bluemountains.edu.au/studying-with-us/campus-locations
+[status] [fallback] [VISION FAIL] https://maps.googleapis.com/maps/vt?pb=!1m5!1m4!1i18!2i240547!3i157179: Gemini skipped — None (likely quota exhausted)
+[status] [fallback] [per-course vision img 2/6 (cache hits 4)] https://bluemountains.edu.au/courses/english — IELTS=6.5 PTE=— TOEFL=80.0 CAE=176.0
+[status] [extract] [FALLBACK] AI enriching https://bluemountains.edu.au/courses/english (missing: international_fee, domestic_fee, duration_text, intake_text)
+[status] [fallback] [per-course browser ✓] https://bluemountains.edu.au/studying-with-us/campus-locations — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[status] [fallback] [VISION] 6 candidate image(s) found — starting OCR pass
+[status] [fallback] [per-course vision img 0/6 (cache hits 2)] https://bluemountains.edu.au/studying-with-us/campus-locations — IELTS=6.5 PTE=65.0 TOEFL=80.0 CAE=176.0
+[status] [extract] [FALLBACK] AI enriching https://bluemountains.edu.au/studying-with-us/campus-locations (missing: international_fee, domestic_fee, duration_text, intake_text)
+[status] [extract] [FALLBACK] AI filled 1 field(s) on https://bluemountains.edu.au/studying-with-us/employability: course_location
+[status] [extract] [FIELD TRACE] study_mode='Online' location='Leura, Sydney, Melbourne' method=study_mode:no_location_online_override url=https://bluemountains.edu.au/studying-with-us/employability
+[status] [classify] [CATEGORY det] Blue Mountains International Hotel Manag → Hospitality, Tourism & Events / Hospitality Management
+[status] [extract] [WARN] Blue Mountains International Hotel Manag — Fee section detected but fee is blank
+[status] [extract] ⚠️ [WARN 60/100] Blue Mountains International Hotel Management Scho — missing: duration, intake | employability
+[status] [extract] [EXTRACT] 15/18: Student Support
+[progress] [extract] Fetching 15/18: Student Support
+[status] [extract] [FIELD SUMMARY] Blue Mountains International Hotel Management Scho
+  Fee: ❌ not found
+  IELTS: ❌ not found
+  Duration: ❌ not found
+  Intake: ❌ not found
+  StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[status] [extract] [FIELD TRACE] study_mode='Online' location='Leura, Sydney, Melbourne' method=study_mode:no_location_online_override url=https://bluemountains.edu.au/courses/english
+[status] [classify] [CATEGORY det] Blue Mountains International Hotel Manag → Hospitality, Tourism & Events / Hospitality Management
+[status] [extract] [WARN] Blue Mountains International Hotel Manag — Fee section detected but fee is blank
+[status] [extract] ⚠️ [WARN 60/100] Blue Mountains International Hotel Management Scho — missing: duration, intake | english
+[status] [extract] [EXTRACT] 16/18: Choose A Study Option
+[progress] [extract] Fetching 16/18: Choose A Study Option
+[status] [extract] [FIELD TRACE] study_mode='Online' location='Leura, Sydney, Melbourne' method=study_mode:no_location_online_override url=https://bluemountains.edu.au/studying-with-us/campus-locations
+[status] [classify] [CATEGORY det] Blue Mountains International Hotel Manag → Hospitality, Tourism & Events / Hospitality Management
+[status] [extract] [WARN] Blue Mountains International Hotel Manag — Fee section detected but fee is blank
+[status] [extract] ⚠️ [WARN 60/100] Blue Mountains International Hotel Management Scho — missing: duration, intake | campus-locations
+[status] [extract] [EXTRACT] 17/18: Faculty Research
+[progress] [extract] Fetching 17/18: Faculty Research
+[status] [extract] [FIELD SUMMARY] Blue Mountains International Hotel Management Scho
+  Fee: ❌ not found
+  IELTS: ❌ not found
+  Duration: ❌ not found
+  Intake: ❌ not found
+  StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[status] [extract] [FIELD SUMMARY] Blue Mountains International Hotel Management Scho
+  Fee: ❌ not found
+  IELTS: ❌ not found
+  Duration: ❌ not found
+  Intake: ❌ not found
+  StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[status] [fallback] [VISION FAIL] https://maps.googleapis.com/maps/vt?pb=!1m5!1m4!1i18!2i240547!3i157179: Gemini skipped — None (likely quota exhausted)
+[status] [fallback] [per-course vision img 2/6 (cache hits 4)] https://bluemountains.edu.au/studying-with-us/study-options — IELTS=6.5 PTE=— TOEFL=80.0 CAE=176.0
+[status] [extract] [FALLBACK] AI enriching https://bluemountains.edu.au/studying-with-us/study-options (missing: international_fee, domestic_fee, duration_text, intake_text)
+[status] [extract] [GP-DEBUG] static=195896B rendered=0B using=static text_len=6883
+[status] [extract] [GP-DEBUG] text[:500]='Internationally recognised hotel management school For more than three decades, Blue Mountains International Hotel Management School (BMIHMS) has established itself as a leading hotel school, serving as a launchpad for countless successful careers. We take pride in our extensive network of industry-leading alumni and our robust partnerships with some of the world’s most renowned hospitality brands. Course campus location Undergraduate - Leura (residential campus) Postgraduate - Sydney and Melbou'
+[status] [extract] [GP-DEBUG] raw_response='```json\n{\n  "international_fee": null,\n  "domestic_fee": null,\n  "fee_term": null,\n  "duration_value": null,\n  "duration_unit": null,\n  "duration_text": null,\n  "ielts_overall": null,\n  "pte_overall": null,\n  "toefl_overall": null,\n  "cambridge_overall": null,\n  "duolingo_overall": null,\n  "sub_category": "International Hotel and Resort Management",\n  "category": "Hospitality, Tourism & Events",\n '
+[status] [extract] [GEMINI] https://bluemountains.edu.au/studying-with-us/choose-a-study → 5 field(s) (cost=$0.000274, in=3160 out=123)
+[status] [fallback] [per-course browser ↻] https://bluemountains.edu.au/studying-with-us/choose-a-study-option
+[status] [extract] [GP-DEBUG] static=195882B rendered=0B using=static text_len=?
+[status] [extract] [GP-DEBUG] text[:500]=''
+[status] [extract] [GP-DEBUG] raw_response=''
+[status] [extract] [GEMINI] https://bluemountains.edu.au/research/faculty-research → 0 field(s) (cost=$0.000000, in=3157 out=0) SKIP="503 UNAVAILABLE. {'error': {'code': 503, 'message': 'This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.', 'status': 'UNAVAILABLE'}}"
+[status] [fallback] [per-course browser ↻] https://bluemountains.edu.au/research/faculty-research
+[status] [extract] [GP-DEBUG] static=195896B rendered=0B using=static text_len=6883
+[status] [extract] [GP-DEBUG] text[:500]='Internationally recognised hotel management school For more than three decades, Blue Mountains International Hotel Management School (BMIHMS) has established itself as a leading hotel school, serving as a launchpad for countless successful careers. We take pride in our extensive network of industry-leading alumni and our robust partnerships with some of the world’s most renowned hospitality brands. Course campus location Undergraduate - Leura (residential campus) Postgraduate - Sydney and Melbou'
+[status] [extract] [GP-DEBUG] raw_response='```json\n{\n  "international_fee": null,\n  "domestic_fee": null,\n  "fee_term": null,\n  "duration_value": null,\n  "duration_unit": null,\n  "duration_text": null,\n  "ielts_overall": null,\n  "pte_overall": null,\n  "toefl_overall": null,\n  "cambridge_overall": null,\n  "duolingo_overall": null,\n  "sub_category": "International Hotel and Resort Management",\n  "category": "Hospitality, Tourism & Events",\n '
+[status] [extract] [GEMINI] https://bluemountains.edu.au/studying-with-us/student-suppor → 5 field(s) (cost=$0.000274, in=3158 out=123)
+[status] [fallback] [per-course browser ↻] https://bluemountains.edu.au/studying-with-us/student-support
+[status] [fallback] [per-course browser ✓] https://bluemountains.edu.au/studying-with-us/choose-a-study-option — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[status] [extract] [FIELD TRACE] study_mode='Online' location='Leura, Sydney, Melbourne' method=study_mode:no_location_online_override url=https://bluemountains.edu.au/studying-with-us/study-options
+[status] [fallback] [VISION] 6 candidate image(s) found — starting OCR pass
+[status] [classify] [CATEGORY det] Blue Mountains International Hotel Manag → Hospitality, Tourism & Events / Hospitality Management
+[status] [extract] [WARN] Blue Mountains International Hotel Manag — Fee section detected but fee is blank
+[status] [fallback] [per-course vision img 0/6 (cache hits 2)] https://bluemountains.edu.au/studying-with-us/choose-a-study-option — IELTS=6.5 PTE=65.0 TOEFL=80.0 CAE=176.0
+[status] [extract] ⚠️ [WARN 60/100] Blue Mountains International Hotel Management Scho — missing: duration, intake | study-options
+[status] [extract] [FALLBACK] AI enriching https://bluemountains.edu.au/studying-with-us/choose-a-study-option (missing: international_fee, domestic_fee, duration_text, intake_text)
+[status] [extract] [EXTRACT] 18/18: Hotel Management
+[progress] [extract] Fetching 18/18: Hotel Management
+[status] [fallback] [per-course browser ✓] https://bluemountains.edu.au/research/faculty-research — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[status] [fallback] [VISION] 6 candidate image(s) found — starting OCR pass
+[status] [fallback] [per-course vision img 0/6 (cache hits 3)] https://bluemountains.edu.au/research/faculty-research — IELTS=6.5 PTE=65.0 TOEFL=80.0 CAE=176.0
+[status] [extract] [FALLBACK] AI enriching https://bluemountains.edu.au/research/faculty-research (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[status] [fallback] [per-course browser ✓] https://bluemountains.edu.au/studying-with-us/student-support — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[status] [fallback] [VISION] 6 candidate image(s) found — starting OCR pass
+[status] [fallback] [per-course vision img 0/6 (cache hits 3)] https://bluemountains.edu.au/studying-with-us/student-support — IELTS=6.5 PTE=65.0 TOEFL=80.0 CAE=176.0
+[status] [extract] [FALLBACK] AI enriching https://bluemountains.edu.au/studying-with-us/student-support (missing: international_fee, domestic_fee, duration_text, intake_text)
+[status] [extract] [FIELD SUMMARY] Blue Mountains International Hotel Management Scho
+  Fee: ❌ not found
+  IELTS: ❌ not found
+  Duration: ❌ not found
+  Intake: ❌ not found
+  StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[status] [extract] [GP-DEBUG] static=195896B rendered=0B using=static text_len=6883
+[status] [extract] [GP-DEBUG] text[:500]='Internationally recognised hotel management school For more than three decades, Blue Mountains International Hotel Management School (BMIHMS) has established itself as a leading hotel school, serving as a launchpad for countless successful careers. We take pride in our extensive network of industry-leading alumni and our robust partnerships with some of the world’s most renowned hospitality brands. Course campus location Undergraduate - Leura (residential campus) Postgraduate - Sydney and Melbou'
+[status] [extract] [GP-DEBUG] raw_response='```json\n{\n  "international_fee": null,\n  "domestic_fee": null,\n  "fee_term": null,\n  "duration_value": null,\n  "duration_unit": null,\n  "duration_text": null,\n  "ielts_overall": null,\n  "pte_overall": null,\n  "toefl_overall": null,\n  "cambridge_overall": null,\n  "duolingo_overall": null,\n  "sub_category": "Hotel Management",\n  "category": "Hospitality, Tourism & Events",\n  "mode": "On Campus",\n  "'
+[status] [extract] [GEMINI] https://bluemountains.edu.au/courses/hospitality/hotel-manag → 5 field(s) (cost=$0.000272, in=3159 out=117)
+[status] [fallback] [per-course browser ↻] https://bluemountains.edu.au/courses/hospitality/hotel-management
+[status] [extract] [FIELD TRACE] study_mode='Online' location='Leura, Sydney, Melbourne' method=study_mode:no_location_online_override url=https://bluemountains.edu.au/studying-with-us/student-support
+[status] [classify] [CATEGORY det] Blue Mountains International Hotel Manag → Hospitality, Tourism & Events / Hospitality Management
+[status] [extract] [WARN] Blue Mountains International Hotel Manag — Fee section detected but fee is blank
+[status] [extract] ⚠️ [WARN 60/100] Blue Mountains International Hotel Management Scho — missing: duration, intake | student-support
+[status] [extract] [FIELD TRACE] study_mode='Online' location='Leura, Sydney, Melbourne' method=study_mode:no_location_online_override url=https://bluemountains.edu.au/studying-with-us/choose-a-study-option
+[status] [classify] [CATEGORY det] Blue Mountains International Hotel Manag → Hospitality, Tourism & Events / Hospitality Management
+[status] [extract] [WARN] Blue Mountains International Hotel Manag — Fee section detected but fee is blank
+[status] [extract] ⚠️ [WARN 60/100] Blue Mountains International Hotel Management Scho — missing: duration, intake | choose-a-study-option
+[status] [fallback] [per-course browser ✓] https://bluemountains.edu.au/courses/hospitality/hotel-management — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[status] [fallback] [VISION] 6 candidate image(s) found — starting OCR pass
+[status] [extract] [FALLBACK] AI filled 1 field(s) on https://bluemountains.edu.au/research/faculty-research: course_location
+[status] [fallback] [per-course vision img 0/6 (cache hits 3)] https://bluemountains.edu.au/courses/hospitality/hotel-management — IELTS=6.5 PTE=65.0 TOEFL=80.0 CAE=176.0
+[status] [extract] [FIELD TRACE] study_mode='Online' location='Leura, Sydney, Melbourne' method=study_mode:no_location_online_override url=https://bluemountains.edu.au/research/faculty-research
+[status] [extract] [FALLBACK] AI enriching https://bluemountains.edu.au/courses/hospitality/hotel-management (missing: international_fee, domestic_fee, duration_text, intake_text)
+[status] [classify] [CATEGORY det] Blue Mountains International Hotel Manag → Hospitality, Tourism & Events / Hospitality Management
+[status] [extract] [WARN] Blue Mountains International Hotel Manag — Fee section detected but fee is blank
+[status] [extract] ⚠️ [WARN 60/100] Blue Mountains International Hotel Management Scho — missing: duration, intake | faculty-research
+[status] [extract] [FIELD TRACE] study_mode='Online' location='Leura, Sydney, Melbourne' method=study_mode:no_location_online_override url=https://bluemountains.edu.au/courses/hospitality/hotel-management
+[status] [classify] [CATEGORY det] Blue Mountains International Hotel Manag → Hospitality, Tourism & Events / Hospitality Management
+[status] [extract] [WARN] Blue Mountains International Hotel Manag — Fee section detected but fee is blank
+[status] [extract] ⚠️ [WARN 60/100] Blue Mountains International Hotel Management Scho — missing: duration, intake | hotel-management
+[status] [extract] [EXTRACT] [sibling cache ↻ build unknown] ielts_listening=6.0 ielts_overall=6.5 ielts_reading=6.0 ielts_speaking=6.0 ielts_writing=6.0
+[status] [stage] [STAGE] skipped Blue Mountains International Hotel Management School: rejected: category_landing_page
+[status] [stage] [STAGE] skipped Blue Mountains International Hotel Management School: rejected: category_landing_page
+[status] [stage] [STAGE] skipped Blue Mountains International Hotel Management School: rejected: category_landing_page
+[status] [stage] [STAGE] skipped Blue Mountains International Hotel Management School: rejected: category_landing_page
+[status] [stage] [STAGE] skipped Blue Mountains International Hotel Management School: rejected: category_landing_page
+[status] [stage] [STAGE] skipped Blue Mountains International Hotel Management School: rejected: category_landing_page
+[status] [stage] [STAGE] skipped Blue Mountains International Hotel Management School: rejected: category_landing_page
+[status] [stage] [STAGE] skipped Blue Mountains International Hotel Management School: rejected: category_landing_page
+[status] [stage] [STAGE] skipped Blue Mountains International Hotel Management School: rejected: category_landing_page
+[status] [stage] [STAGE] skipped Blue Mountains International Hotel Management School: rejected: category_landing_page
+[status] [stage] [STAGE] skipped Blue Mountains International Hotel Management School: rejected: category_landing_page
+[status] [stage] [STAGE] skipped Blue Mountains International Hotel Management School: rejected: category_landing_page
+[status] [stage] [STAGE] skipped Blue Mountains International Hotel Management School: rejected: category_landing_page
+[status] [stage] [STAGE] skipped Blue Mountains International Hotel Management School: rejected: category_landing_page
+[status] [stage] [STAGE] skipped Blue Mountains International Hotel Management School: rejected: category_landing_page
+[status] [stage] [STAGE] skipped Blue Mountains International Hotel Management School: rejected: category_landing_page
+[status] [stage] [STAGE] skipped Blue Mountains International Hotel Management School: rejected: category_landing_page
+[status] [stage] [STAGE] skipped Blue Mountains International Hotel Management School: rejected: category_landing_page
+[status] [complete] [DATA QUALITY] 18 course(s) checked — 0 critical / 55 warning / 18 info
+[status] [complete] [DATA QUALITY][WARN] duplicate_course_name × 1: Course name 'blue mountains international hotel management school' appears 18 times in this batch. URLs: https://bluemountains.edu.au/studying-with-us/employability/workforce-edge, https://bluemountains.edu.au/studying-with-us/international-students, https://bluemountains.edu.au/courses/design (…)
+[status] [complete] [DATA QUALITY][WARN] missing_degree_level × 18: Degree level not extracted. (and 17 more)
+[status] [complete] [DATA QUALITY][WARN] missing_duration × 18: Duration not extracted. (and 17 more)
+[status] [complete] [DATA QUALITY][WARN] missing_international_fee_central_page × 18: International fee absent — marked for central fee page review. (and 17 more)
+[status] [complete] [GEMINI] Total cost: $0.0038 USD across 21 course(s) (~$0.00018/course)
+[status] [complete] [TIMING] Total: 3m 37s | Courses: 21 | Avg: 10.3s/course | Concurrency: HTTP=4 Browser=10
+[done] [complete] ══ DONE ══ Found:21 | Staged:0 | Skipped:18 (rejected:_category_landing_page=18) | Errors:0
+[status] [complete] Staged 0 courses, 18 skipped, 0 fetch errors

@@ -1,0 +1,106 @@
+BMIHMS scrape (university 72, https://bluemountains.edu.au/) found 21 candidates and staged 0. Every single page fetch returned the same 6883 characters of identical HTML — the generic BMIHMS landing copy — regardless of the actual URL. So all 18 extracted "courses" got the same name, same description, same null fields, then all got rejected at staging as `category_landing_page` (correctly).
+
+---
+
+**Bug 1 (root cause): every URL serves the same static HTML; site is JS-rendered**
+
+Look at the GP-DEBUG lines for any of the 18 URLs:
+```
+[GP-DEBUG] static=195896B rendered=0B using=static text_len=6883
+[GP-DEBUG] text[:500]='Internationally recognised hotel management school For more than three decades, Blue Mountains International Hotel Management School (BMIHMS) has established itself as a leading hotel school...'
+```
+This exact 6883-character text and 195896-byte HTML body comes back from `/courses/design`, `/courses/health`, `/courses/business`, `/courses/hospitality`, `/courses/technology`, `/courses/education`, `/courses/english`, `/courses/hospitality/hotel-management`, `/studying-with-us`, `/studying-with-us/international-students`, `/studying-with-us/employability/workforce-edge`, `/research/faculty-research`, etc. Same payload, every time.
+
+This is the classic SPA pattern: the server returns a single HTML shell with the marketing intro, and React/Vue/etc. injects the actual page content client-side based on the URL. The static HTTP fetcher only sees the shell.
+
+Worse, the per-course browser fallback also failed to add anything:
+```
+[per-course browser ✓] https://bluemountains.edu.au/courses/design — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+```
+The browser ran (`✓` not `✗` or timeout) and returned 0 fields filled. Either:
+1. The browser isn't actually executing JS / waiting for the SPA to hydrate before reading the DOM, or
+2. The site requires user interaction (cookie consent, region picker, etc.) before content loads, or
+3. The content is loaded async after some delay that exceeds the browser's wait time
+
+The `static=195896B rendered=0B` line is also strange — the rendered size is 0, suggesting the browser-rendered HTML is being discarded or never captured. If `rendered=0B` and `using=static`, the per-course browser pass might not be writing back into the field-extraction pipeline. Worth checking that branch.
+
+**Fix options:**
+1. Force browser rendering for this site and wait for `networkidle` or for a known content selector (e.g., `.course-detail`, `[data-testid="course"]`) before reading the DOM.
+2. Find the underlying API/JSON endpoint the SPA hits to populate course pages — inspect network requests on a real browser visit to BMIHMS and look for a JSON endpoint with course data.
+3. Try fetching from a sitemap if one exists. The discover step didn't try the sitemap because it found 21 candidates from crawl. But all 21 are from the static HTML shell which lists every URL on the site — meaningless.
+
+Note: this is the same root-cause pattern as the CDU report, but more severe. CDU at least had distinct static HTML per URL with marketing copy specific to each study area. BMIHMS has *literally identical* HTML for every URL. CDU needed browser rendering for the course list; BMIHMS needs browser rendering for everything.
+
+---
+
+**Bug 2: hallucinated PTE/TOEFL/CAE via vision OCR (yet again)**
+
+Log shows the same suspicious values appearing on 16 of 18 pages, all with cache hits indicating they came from one early extraction:
+```
+[per-course vision img 2/6] https://bluemountains.edu.au/studying-with-us/international-students — IELTS=6.5 PTE=65.0 TOEFL=80.0 CAE=176.0
+[per-course vision img 0/6 (cache hits 2)] https://bluemountains.edu.au/courses/health — IELTS=6.5 PTE=65.0 TOEFL=80.0 CAE=176.0
+[per-course vision img 0/6 (cache hits 2)] https://bluemountains.edu.au/studying-with-us/employability/workforce-edge — IELTS=6.5 PTE=65.0 TOEFL=80.0 CAE=176.0
+... (repeated for /courses/design, /courses/technology, /courses/hospitality, /courses/education, /courses/course-guides, /studying-with-us, /studying-with-us/study-options, /studying-with-us/employability, /studying-with-us/campus-locations, /research/faculty-research, /studying-with-us/student-support, /studying-with-us/choose-a-study-option, /courses/hospitality/hotel-management)
+```
+IELTS 6.5 / PTE 65 / TOEFL 80 / CAE 176 — these are textbook "undergraduate baseline" English requirements. They appear on 16 different URLs, including pages like `/studying-with-us/campus-locations`, `/research/faculty-research`, and `/studying-with-us/employability` that should have *no* English requirements at all.
+
+This looks like the same per-course-vision-OCR-hallucination bug from the ACAP `Kripa.jpg` report — vision OCR is reading IELTS-shaped numbers from images that don't contain IELTS data, then those values get cached and reused across all 18 pages. The cache-hit pattern (`cache hits 2`, `cache hits 3`, etc.) also suggests the same image is being reprocessed across pages and giving the same hallucinated values each time.
+
+Same fix as the ACAP report: filter source images so non-requirements images don't get parsed for English bands. Also relevant for the global sibling-cache backfill issue: the sibling cache log line at the end shows:
+```
+[EXTRACT] [sibling cache ↻ build unknown] ielts_listening=6.0 ielts_overall=6.5 ielts_reading=6.0 ielts_speaking=6.0 ielts_writing=6.0
+```
+It's building a sibling cache from these hallucinated values. If staging hadn't been blocked by the category_landing_page filter, every BMIHMS course would have shipped with these fake English scores.
+
+---
+
+**Bug 3: study_mode override is misclassifying as Online**
+
+Every course has:
+```
+[FIELD TRACE] study_mode='Online' location='Leura, Sydney, Melbourne' method=study_mode:no_location_online_override
+```
+BMIHMS is the *opposite* of online — Leura is a residential campus where students live on-site. Sydney and Melbourne are the postgrad campuses. There is no online program. The `no_location_online_override` rule is firing despite `location` being explicitly set to three physical campuses.
+
+The rule name suggests it's defaulting to Online when location is missing. But location *isn't* missing here — it has three campuses. Either the rule is checking the wrong field, or the order of operations puts the override before the location check. Worth checking the rule logic.
+
+This is also similar to the original UniSQ online_only filter bug — defaulting to Online when uncertain causes false rejections. The fix mentioned in the UniSQ report (only use Online when explicitly stated as online-only) would also fix BMIHMS.
+
+---
+
+**Bug 4: category misclassification — every page is "Hospitality Management"**
+
+Every URL gets classified as "Hospitality, Tourism & Events / Hospitality Management":
+```
+[CATEGORY det] Blue Mountains International Hotel Manag → Hospitality, Tourism & Events / Hospitality Management
+```
+Including `/courses/design`, `/courses/health`, `/courses/technology`, `/courses/education`, `/courses/english`, `/research/faculty-research`. Most of these aren't even hospitality. But this is a downstream symptom of Bug 1 — every page got the same hospitality-school landing copy, so every page got categorised as a hospitality school. Will resolve when Bug 1 is fixed.
+
+---
+
+**Bug 5: central international-fee page returned 0 records**
+
+```
+[CENTRAL] auto-discovered fee page: https://bluemountains.edu.au/how-to-apply/international-student
+[CENTRAL] fee page parsed → 0 program record(s)
+```
+Same issue as ASA, AIT, ACU, CDU — the central fee parser doesn't handle the page. Likely fees are in a linked PDF or in JS-rendered tables. Worth following PDF links from this page and rendering via browser.
+
+---
+
+**What worked**
+
+- Discover correctly identified 21 URLs and dropped 3 as `info_page` / `category_landing_page` at the gate. The candidate list is fine; it's just that fetching any of them returns the same nothing.
+- Staging correctly rejected all 18 as `category_landing_page` (because they all had the same name and missing fields). Without that filter, you'd have 18 duplicate junk records.
+- The duplicate_course_name data quality check correctly flagged "Course name 'blue mountains international hotel management school' appears 18 times in this batch" — that catch is exactly the right signal that something is wrong.
+
+---
+
+**Summary**
+
+- **Bug 1** is the blocker. BMIHMS is a single-page application; static HTML returns the same shell for every URL. Fix needs proper browser rendering with appropriate wait conditions, or finding the underlying API.
+- **Bug 2** is the recurring vision-OCR hallucination from the ACAP report.
+- **Bug 3** is a recurring online_only over-classification from the UniSQ report.
+- **Bugs 4 and 5** are downstream of Bug 1 and the central-fee-parser issues already flagged elsewhere.
+
+Until Bug 1 is fixed, no real BMIHMS data can be extracted. Worth checking other AICOL-group sites (Torrens, etc.) to see if they have the same architecture — BMIHMS is part of the Torrens University network and they may share an SPA framework. If so, fixing this once would unblock multiple universities.

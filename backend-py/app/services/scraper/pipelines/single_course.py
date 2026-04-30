@@ -1359,6 +1359,43 @@ async def extract_course(
             else:
                 payload.setdefault(k, v)
         evidence.extend(browser_evidence)
+
+        # ── Reverse no_location_online_override when browser fills location ──
+        # The override fired at line 901 when course_location was blank
+        # (SPA static shell returns the same content for every URL — the
+        # location extractor found nothing).  The browser pass now has
+        # JS-rendered HTML and may have filled course_location with real
+        # physical campuses.  If so, the override was a false positive:
+        # revert study_mode to "On Campus" so the correct mode is stored.
+        _was_no_loc_override = any(
+            e.get("method") == "study_mode:no_location_online_override"
+            for e in evidence
+        )
+        if (
+            _was_no_loc_override
+            and payload.get("study_mode") == "Online"
+            and bool((payload.get("course_location") or "").strip())
+        ):
+            payload["study_mode"] = "On Campus"
+            evidence.append(
+                {
+                    "field_key": "study_mode",
+                    "value": "On Campus",
+                    "confidence": 0.65,
+                    "method": "study_mode:browser_location_restore",
+                    "snippet": (
+                        "no_location_online_override reversed — browser pass "
+                        "found physical location: "
+                        f"{(payload.get('course_location') or '')[:80]}"
+                    ),
+                }
+            )
+            log.info(
+                "[STUDY_MODE RESTORE] course=%r — browser filled location=%r; "
+                "reversed no_location_online_override back to 'On Campus'.",
+                payload.get("course_name") or url,
+                payload.get("course_location"),
+            )
     except Exception as exc:  # noqa: BLE001
         log.warning("per-course browser fallback errored on %s: %s", url, exc)
 
