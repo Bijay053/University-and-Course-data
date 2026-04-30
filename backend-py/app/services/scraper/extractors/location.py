@@ -389,13 +389,45 @@ _LOCATION_LABEL_TAG_RE = re.compile(
 _STRONG_VALUE_CHAR_CAP = 300
 
 
+_FIELD_LABEL_TOKENS: frozenset[str] = frozenset({
+    # Field-label words that can appear as raw DOM text immediately after
+    # a <strong>Location</strong> tag when the adjacent cell is empty or
+    # when the DOM walker accidentally captures the next label instead of
+    # the value.  Rejecting these prevents literal "Location", "Duration",
+    # "Fees" etc. from being stored as a campus location (ACU Bug 2).
+    "location",
+    "locations",
+    "campus",
+    "campuses",
+    "duration",
+    "fees",
+    "fee",
+    "intake",
+    "intakes",
+    "entry",
+    "delivery",
+    "mode",
+    "study",
+    "type",
+    "course",
+    "length",
+})
+
+
 def _classify_location_value(value: str) -> str | None:
     """Run the value text through the existing normalise/sanitise
     pipeline so the structural pre-pass returns the same shape as
     the rest of the cascade. Returns ``None`` when the value is
-    rejected (marketing copy, junk, virtual-only)."""
+    rejected (marketing copy, junk, virtual-only, or a bare field
+    label word like "Location" / "Duration")."""
     normalised = _normalise(value)
     if not normalised:
+        return None
+    # Reject single-word (or single-phrase) values that are just field
+    # label tokens — these arise when the DOM walker captures the next
+    # adjacent label element instead of the actual location value
+    # (e.g. ACU pages: "Offered at 0 locations Location Duration …").
+    if normalised.lower().strip() in _FIELD_LABEL_TOKENS:
         return None
     display = _sanitise_for_display(normalised)
     if not display:
