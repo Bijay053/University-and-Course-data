@@ -1,0 +1,220 @@
+This is an architectural proposal, not a single bug report. After 17+ uni runs the pattern is clear: fixes for one uni keep breaking others, and new unis fail without any automatic attempt to reuse what's already working. Suggesting two structural changes that together solve both.
+
+---
+
+## Part 1: Per-university configuration files
+
+### The problem
+
+Right now the scraper is mostly one big shared codebase. When ACU's handbook URLs need filtering, the regex goes into shared code. When KBS's "X years / Y subjects / Z trimesters" pattern confuses the duration parser, the fix goes into shared code. When ACAP needs a stricter `domestic_only` rule, the fix goes into shared code.
+
+Result: every fix has the potential to break every other uni, because there's no isolation. We've seen this happen multiple times across the bug reports.
+
+### The proposal: each uni has a config file that overrides shared defaults
+
+Structure:
+
+```
+/scraper/
+  defaults.yaml              # Global defaults (regex, filters, selectors)
+  /unis/
+    acap.yaml                # ACAP-specific overrides
+    acu.yaml                 # ACU-specific overrides
+    kbs.yaml                 # KBS-specific overrides
+    bmihms.yaml              # BMIHMS-specific overrides
+    ...
+```
+
+What goes in a per-uni config:
+
+```yaml
+# acap.yaml
+university_id: 41
+name: ACAP
+base_url: https://www.acap.edu.au
+scrape_url: https://www.acap.edu.au/courses
+
+discover:
+  primary: https://www.acap.edu.au/courses
+  fallback_subdomains: []
+  block_url_patterns:
+    - /handbook/handbook-2024/
+    - /handbook/handbook-2025/
+  allow_url_patterns:
+    - /courses/[a-z-]+/$
+
+fees:
+  central_page: https://www.acap.edu.au/admissions/fees
+  follow_router_links: true
+  pdf_brochure_urls: []
+  default_currency: AUD
+  fee_term_default: Full Course
+
+english:
+  central_page: https://www.acap.edu.au/admissions/english-requirements
+  institutional_default_ielts: 6.5
+  institutional_default_pte: 58
+  institutional_default_toefl: 79
+  trust_vision_ocr: false       # ACAP keeps hallucinating IELTS=7, disable vision
+
+filters:
+  domestic_only:
+    enabled: true
+    text_must_appear_in: main_content    # Not sidebar/CTA
+  online_only:
+    enabled: true
+    require_all_locations_online: true   # Don't reject if any campus is on-site
+
+text_cleaning:
+  location:
+    strip_patterns:
+      - '\^\s*\^.*$'                    # ACAP's "^ ^Available in Perth" cruft
+      - 'Australia$'
+  duration:
+    prefer_unit_match: true
+    structural_pattern_split: '/'        # Split "X years / Y subjects / Z trimesters" on /
+
+staging:
+  required_fields: [course_name, level, duration, location, intake, fee_or_default]
+  reject_if_missing: [course_name]
+```
+
+Global `defaults.yaml` has the same keys with sensible defaults. A uni's config only overrides what's different. Most unis would have a 5-line file.
+
+### How this prevents cross-uni regressions
+
+- Fix the ACAP `domestic_only` filter → only affects `acap.yaml`. ACU's `domestic_only` behaviour is unchanged.
+- Add a new caret-strip regex for ACAP locations → only affects ACAP. KBS's locations don't get touched.
+- Disable vision OCR for ACAP because it keeps hallucinating → only affects ACAP. AUT vision OCR (which works fine) stays on.
+- Tighten the duration regex for KBS's "X years / Y subjects" pattern → lives in `kbs.yaml`, doesn't risk other unis.
+
+When something needs fixing in shared code (e.g. the actual regex bug where "8 months" → "8 Year"), there's still risk — but the per-uni configs let you override the bad shared behaviour with a known-good regex per uni until the global fix lands.
+
+### Migration path
+
+1. Extract current shared defaults into `defaults.yaml`
+2. For each uni that's been bug-reported, create a stub config with just its scrape_url and any uni-specific overrides discussed in the reports
+3. New unis start with an empty config (just scrape_url) and inherit all defaults
+4. Each bug fix going forward is either: (a) a global default change with regression-test pass required, or (b) a per-uni override with no regression-test required
+
+---
+
+## Part 2: Tiered fallback for new universities
+
+### The problem
+
+When a new uni is added, the scraper either works or it doesn't. JCU is a recent example — 0 staged because the URL was missing `www`, the site has Cloudflare bot protection, and no fallbacks were tried automatically. Currently the fallback chain is: BFS → sitemap → browser → Wayback CDX → give up.
+
+That chain is just one strategy ("crawl the page") with different transport mechanisms. It doesn't try *different strategies*. Meanwhile we already have working playbooks for many uni types (CourseLoop handbooks, Drupal sites, SPA marketing pages with separate fee pages, etc.) that a new uni might match.
+
+### The proposal: tiered fallback that tests existing per-uni playbooks against new unis
+
+When a new uni is added (or an existing uni's primary path fails), the worker tries strategies in order until one yields ≥5 candidate courses:
+
+**Tier 1: Global default scrape**
+The current behaviour. Use the configured scrape_url with default discover → extract → stage pipeline.
+
+**Tier 2: Subdomain probes**
+If Tier 1 yields <5 candidates, automatically probe common subdomains:
+- `https://www.{domain}` if the configured URL is on the apex
+- `https://handbook.{domain}` (CourseLoop)
+- `https://courses.{domain}`
+- `https://study.{domain}`
+- `https://programs.{domain}`
+- `https://international.{domain}/courses`
+
+Log which ones returned >0 results and pick the highest-yielding one.
+
+**Tier 3: Replay existing uni playbooks**
+This is the new high-leverage idea. Each per-uni config from Part 1 is effectively a playbook. When a new uni's primary discover fails:
+
+```
+For each existing uni config in /unis/*.yaml:
+  Create a temporary config that:
+    - Uses the new uni's scrape_url and base_url
+    - Inherits all other settings from the existing playbook
+  Run discover with this temporary config
+  If ≥5 candidates discovered → save this as a candidate playbook
+```
+
+Then present the operator with: "Tier 3 found that ACAP's playbook successfully discovers 12 courses for new uni X, and BMIHMS's playbook discovers 8. Recommend creating `newuni.yaml` based on `acap.yaml` as a starting point."
+
+This would have caught:
+- BMIHMS (Torrens University network) — should have tried Torrens' playbook automatically
+- JCU — should have tried CourseLoop handbook playbook from another uni that uses CourseLoop
+- Any new uni built on the same CMS as an existing one (Drupal, WordPress, custom Angular)
+
+**Tier 4: Brochure / PDF discovery**
+Many unis have a downloadable course brochure that lists all courses with fees in one PDF. Try:
+- Search the homepage for anchor text containing "brochure", "course guide", "international guide", "download"
+- Follow each link, parse if it's a PDF
+- Extract course list from PDF
+
+KBS, BMIHMS, AIT all have brochure PDFs that contain the data the per-page scraper missed.
+
+**Tier 5: Sitemap deep-dive**
+If nothing else works, fetch the sitemap index, then EVERY sub-sitemap (not just the first one), and filter URLs containing `/course`, `/program`, `/degree`, `/study`, `/qualification`. Cap at 200 candidates.
+
+**Tier 6: Wayback / archive**
+Current fallback, kept as last resort.
+
+**Tier 7: Operator alert with diagnostic dump**
+If all tiers fail, generate a one-page diagnostic with:
+- HTTP status of every URL tried
+- Whether bot protection / Cloudflare challenge was detected
+- Which subdomains responded
+- Closest playbook matches (Tier 3 winners even if <5)
+- Suggested next steps
+
+No more silent "0 candidates" failures.
+
+---
+
+## Part 3: Regression-test gating (the original ask)
+
+With Parts 1 and 2 in place, regression testing becomes structured:
+
+**Before any change to global `defaults.yaml` or shared code:**
+
+1. Identify which unis would be affected (any uni without an override of the changed setting)
+2. Run those unis against a staging DB (not prod)
+3. Diff staged output: for each course, did `fee`, `ielts`, `duration`, `intake`, `location`, `mode` change?
+4. Show the diff to the operator before merge: "This change affects 23 unis. 18 unchanged, 3 improved (more fields populated), 2 regressed (fields lost). Approve?"
+5. Block merge if any regression isn't acknowledged
+
+**Before any change to a per-uni config:**
+
+1. Run that uni only against staging DB
+2. Diff against last known-good run for that uni
+3. Show diff, allow merge
+
+**For new uni additions:**
+
+1. Run Tier 1 → 7 fallback chain
+2. If Tier 3 (existing playbook replay) wins, suggest the matching playbook
+3. Show staged output to operator before promoting to prod
+
+**Periodic regression sweep:**
+
+Every N days (weekly?), run all unis against staging and compare to last known-good. Flag any that have drifted (new fields blank, course count dropped) so the team finds out before users notice.
+
+---
+
+## Why this pays off
+
+**Today:** every bug report I send describes 5–10 issues per uni. Most are repeats of bugs already "fixed" for other unis but never verified to stay fixed. The team's effort goes into firefighting rather than building durable infrastructure.
+
+**With this:** bug fixes are scoped, regressions are caught before merge, new unis automatically benefit from playbooks built for similar unis, and the pattern of "same bug appears in 5 unis" goes away because the fix is either truly global (with regression test) or truly per-uni (with no cross-impact).
+
+The ACAP `name 're' is not defined` bug, the Graduate Diploma → Graduate Certificate miscoding, the duration regex "8 months → 8 Year", the vision OCR Kripa.jpg hallucination — all of these are bugs that have appeared in multiple consecutive bug reports across multiple unis because there's no system to verify a fix sticks.
+
+---
+
+## Suggested rollout order
+
+1. **Week 1:** Extract current shared logic into `defaults.yaml`. Create stub per-uni configs for the 17 unis with bug history. No behaviour change yet, just structure.
+2. **Week 2:** Move existing uni-specific overrides (block_url_patterns, location strip rules, etc.) from shared code into the per-uni configs. Verify each affected uni still produces identical output.
+3. **Week 3:** Build the Tier 1–7 fallback chain. Test against JCU and BMIHMS (the two clearest cases of "existing playbook would have worked").
+4. **Week 4:** Add the regression-test gating to the deploy pipeline. Run the periodic regression sweep nightly.
+
+After this is in place, each future bug report is either a 5-minute config-file edit or a 1-day shared-code change with regression test — not the current state where every fix is a coin flip on whether other unis break.

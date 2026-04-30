@@ -102,4 +102,4 @@ settings = get_settings()
 
 #: A queued job with no ``updated_at`` change for this many minutes is
 #: considered stale and eligible for automatic re-dispatch by the beat task.
-STALE_QUEUED_MINUTES: int = 5
+STALE_QUEUED_MINUTES: int = 2

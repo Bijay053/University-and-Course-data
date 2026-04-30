@@ -41,6 +41,31 @@ def _requeue_lock_key(runtime_job_id: str) -> str:
     return f"scrape:requeue_lock:{runtime_job_id}"
 
 
+def _get_redis():
+    """Return a synchronous Redis client using the Celery broker URL."""
+    import redis as redis_lib
+    return redis_lib.from_url(celery_app.conf.broker_url, decode_responses=True)
+
+
+def set_initial_dispatch_lock(job_id: str) -> None:
+    """Mark a job as 'has a Celery task in the broker' using a Redis NX lock.
+
+    Called by the API router (start_scrape, start_bulk) after a successful
+    ``.delay()`` call so that the post-completion ``_immediate_requeue_hook``
+    does not try to re-dispatch the job while it is still waiting to be picked
+    up by a worker.
+
+    The TTL is slightly longer than _REQUEUE_LOCK_TTL_S to give the worker
+    time to claim the job before the lock expires.
+    """
+    try:
+        r = _get_redis()
+        ttl = _REQUEUE_LOCK_TTL_S + 30
+        r.set(_requeue_lock_key(job_id), "1", nx=True, ex=ttl)
+    except Exception as exc:  # noqa: BLE001
+        log.debug("set_initial_dispatch_lock: Redis unavailable for %s: %s", job_id, exc)
+
+
 async def _async_scrape(runtime_job_id: str) -> None:
     # Dispose any stale connections bound to previous event loops.
     await engine.dispose()
@@ -51,11 +76,78 @@ async def _async_scrape(runtime_job_id: str) -> None:
 async def _async_repair(runtime_job_id: str) -> None:
     # Same engine.dispose() dance as the scrape task — Celery worker is
     # sync, asyncio.run() spins a fresh loop per task and any pooled
-    # asyncpg connection from a previous task is bound to a now-closed
+    # asyncpg connection from a previous task is bound to the old, closed
     # loop ("Future attached to a different loop").
     await engine.dispose()
     async with AsyncSessionLocal() as db:
         await run_repair(db, runtime_job_id)
+
+
+def _immediate_requeue_hook() -> None:
+    """Post-completion hook: immediately re-dispatch any queued jobs that have
+    no Celery task in the broker.
+
+    Called at the end of every ``scrape_university`` and ``repair_university``
+    Celery task so that when a worker slot frees up, orphaned queued jobs start
+    immediately instead of waiting up to ``_STALE_QUEUED_MINUTES`` minutes for
+    the beat task.
+
+    Uses the same Redis NX lock as the periodic ``requeue_stale_queued`` beat
+    task to avoid double-dispatch:
+    • Jobs dispatched via the API (start_scrape / start_bulk) have a lock set
+      by ``set_initial_dispatch_lock`` and are skipped here — they are already
+      in the Celery broker and will be picked up when a slot is free.
+    • Jobs whose initial ``.delay()`` call failed silently have no lock and
+      are re-dispatched immediately by this hook.
+    """
+    try:
+        stale = asyncio.run(_async_find_all_queued())
+    except Exception as exc:  # noqa: BLE001
+        log.warning("immediate_requeue_hook: DB query failed: %s", exc)
+        return
+
+    if not stale:
+        return
+
+    try:
+        r = _get_redis()
+    except Exception as exc:  # noqa: BLE001
+        log.warning("immediate_requeue_hook: Redis connect failed: %s", exc)
+        return
+
+    for jid, jtype, requeue_count in stale:
+        if requeue_count >= _MAX_REQUEUES:
+            log.warning(
+                "immediate_requeue_hook: job %s hit max requeues (%d), skipping",
+                jid,
+                _MAX_REQUEUES,
+            )
+            continue
+
+        lock_key = _requeue_lock_key(jid)
+        acquired = r.set(lock_key, "1", nx=True, ex=_REQUEUE_LOCK_TTL_S)
+        if not acquired:
+            # Job already has a Celery task in the broker (set by initial
+            # dispatch or a previous requeue) — skip to avoid duplicates.
+            log.debug("immediate_requeue_hook: job %s already locked (in broker), skipping", jid)
+            continue
+
+        try:
+            if jtype == "repair":
+                repair_university.delay(jid)
+            else:
+                scrape_university.delay(jid)
+            log.warning(
+                "immediate_requeue_hook: re-dispatched orphaned %s job %s "
+                "(no broker lock found — initial .delay() likely failed silently)",
+                jtype,
+                jid,
+            )
+        except Exception as exc:  # noqa: BLE001
+            r.delete(lock_key)
+            log.warning(
+                "immediate_requeue_hook: dispatch failed for %s: %s", jid, exc
+            )
 
 
 @celery_app.task(name="scrape.university", bind=True, max_retries=0)
@@ -101,6 +193,10 @@ def scrape_university(self, runtime_job_id: str) -> dict:  # noqa: ANN001
         except Exception:
             pass
         return {"ok": False, "id": runtime_job_id, "error": f"BaseException: {exc}"}
+    finally:
+        # Always attempt to pick up any queued jobs whose initial .delay()
+        # call failed silently — this is the key auto-start mechanism.
+        _immediate_requeue_hook()
 
 
 @celery_app.task(name="scrape.repair", bind=True, max_retries=0)
@@ -130,6 +226,27 @@ def repair_university(self, runtime_job_id: str) -> dict:  # noqa: ANN001
         except Exception:
             pass
         return {"ok": False, "id": runtime_job_id, "error": f"BaseException: {exc}"}
+    finally:
+        _immediate_requeue_hook()
+
+
+async def _async_find_all_queued() -> list[tuple[str, str, int]]:
+    """Return (runtime_job_id, job_type, requeue_count) for every job currently
+    in ``queued`` status, with no time cutoff.
+
+    Used by the post-completion ``_immediate_requeue_hook`` so orphaned jobs
+    (whose initial ``.delay()`` call failed silently) are picked up immediately
+    when any worker slot frees up.
+    """
+    from app.models import ScrapeRuntimeJob
+
+    await engine.dispose()
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(
+            select(ScrapeRuntimeJob).where(ScrapeRuntimeJob.status == "queued")
+        )
+        jobs = result.scalars().all()
+    return [(j.runtime_job_id, j.job_type, j.requeue_count) for j in jobs]
 
 
 async def _async_find_stale() -> list[tuple[str, str, int]]:
@@ -256,8 +373,6 @@ def requeue_stale_queued(self) -> dict:  # noqa: ANN001
        is still in the broker backlog or being processed.  The lock expires
        automatically, allowing re-dispatch if the worker never picks it up.
     """
-    import redis as redis_lib
-
     log.info("requeue_stale_queued: checking for stuck queued jobs")
     try:
         stale = asyncio.run(_async_find_stale())
@@ -269,7 +384,7 @@ def requeue_stale_queued(self) -> dict:  # noqa: ANN001
         return {"ok": True, "requeued": []}
 
     try:
-        r = redis_lib.from_url(celery_app.conf.broker_url, decode_responses=True)
+        r = _get_redis()
     except Exception as exc:
         log.exception("requeue_stale_queued Redis connect failed: %s", exc)
         return {"ok": False, "error": f"redis connect: {exc}"}

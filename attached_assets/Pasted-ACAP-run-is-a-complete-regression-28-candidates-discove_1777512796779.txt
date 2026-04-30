@@ -1,0 +1,111 @@
+ACAP run is a complete regression — 28 candidates discovered, 0 courses staged. The cause is a Python NameError in the staging path that affects every single course.
+
+---
+
+**Bug 1 (URGENT — code bug, not data): `name 're' is not defined` at staging stage**
+
+Every single course that survived the domestic_only filter died at the staging step with the exact same Python error:
+
+```
+[STAGE] skipped Bachelor Of Social Work: extract: name 're' is not defined
+[STAGE] skipped Graduate Certificate In Business Administration: extract: name 're' is not defined
+[STAGE] skipped Graduate Certificate Of Applied Coaching: extract: name 're' is not defined
+[STAGE] skipped Graduate Certificate Of Human Services: extract: name 're' is not defined
+[STAGE] skipped Graduate Certificate Of Professional Accounting: extract: name 're' is not defined
+[STAGE] skipped Graduate Diploma Of Business Administration: extract: name 're' is not defined
+[STAGE] skipped Graduate Diploma Of Professional Accounting: extract: name 're' is not defined
+[STAGE] skipped Master Of Business Administration: extract: name 're' is not defined
+[STAGE] skipped Master Of Professional Psychology: extract: name 're' is not defined
+[STAGE] skipped Master Of Psychology Clinical: extract: name 're' is not defined
+[STAGE] skipped Master Of Psychology Practice Clinical: extract: name 're' is not defined
+[STAGE] skipped Master Of Social Work Qualifying: extract: name 're' is not defined
+[STAGE] skipped Graduate Diploma Of Legal Practice: extract: name 're' is not defined
+[STAGE] skipped Graduate Diploma Of Legal Practice Nsw: extract: name 're' is not defined
+```
+
+14 courses, all the same error. The `Errors:14` count at the end of the log confirms this.
+
+This is a Python `NameError` — the `re` module (Python's regex library) is being referenced somewhere in the staging code without being imported. Almost certainly someone added a `re.match()`, `re.search()`, or `re.sub()` call to a function in the staging path during a recent edit and forgot to add `import re` at the top of that file.
+
+**Find the bug:** grep the codebase for `re\.(match|search|sub|findall|compile)` calls that occur in any module reached during the `extract:` → `stage:` transition. Look specifically at any code paths that handle `Bachelor of Social Work` style course names — the error fires there but is unrelated to the course itself, just whatever code runs first after the FIELD TRACE step.
+
+Since the error message starts with `extract: ...`, the failing code is in a function tagged with the `extract` label, called during the staging phase (i.e. final field assembly before INSERT). It's not in the per-page Gemini extraction — those all completed fine.
+
+**Fix:** add `import re` at the top of whatever file contains the regex call. This is a 1-line fix.
+
+**Test:** the same ACAP URL should produce non-zero staged records on re-run after the import is added. The actual extraction worked perfectly this run — every one of the 13 non-domestic-only courses had clean `[FIELD SUMMARY]` results with fees, IELTS, durations, intakes, locations, modes. So once staging unblocks, we should see good data.
+
+---
+
+**Bug 2: domestic_only filter rejected 12 courses — was this intentional?**
+
+12 of 28 ACAP courses were marked `domestic_only` and skipped:
+- Associate Degree of Criminal Justice
+- Bachelor of Counselling
+- Bachelor of Criminology and Justice
+- Bachelor of Psychological Science
+- Bachelor of Psychological Science (Honours)
+- Bachelor of Psychological Science and Counselling
+- Bachelor of Psychological Science and Criminology
+- Diploma of Counselling Skills
+- Graduate Certificate of Counselling
+- Graduate Certificate of Psychological Science
+- Graduate Diploma of Psychological Science
+- Master of Counselling and Psychotherapy
+- Undergraduate Certificate of Psychological Science (rejected as category_landing_page but probably also domestic-only)
+
+The scraper is reading these correctly — the message is `course page states domestic-students-only`, which means the page itself says domestic-only. So the filter is working as designed.
+
+BUT — ACAP has a previous run history where some of these *were* available to international students. Worth verifying whether ACAP changed their international offerings recently or whether the page text has a phrase that's now triggering the domestic-only filter incorrectly.
+
+For example: if the page says "Domestic students must apply through XYZ" or "This page describes the domestic version, see also: international students", that could trip the filter even though the course is open to international students. Look at the Bachelor of Psychological Science page directly and check whether the domestic-only language is in a CTA/sidebar/related-info section vs the main course content.
+
+---
+
+**Bug 3 (recurring): vision OCR pulling 7.0 IELTS from suspect images**
+
+Same Kripa.jpg-style hallucination as the previous ACAP report:
+
+```
+[per-course vision img 1/1] graduate-certificate-of-human-services — IELTS=7.0 PTE=— TOEFL=— CAE=—
+[per-course vision img 2/2] graduate-certificate-of-professional-accounting — IELTS=7.0 PTE=65.0 TOEFL=— CAE=—
+[per-course vision img 0/2 (cache hits 2)] graduate-diploma-of-professional-accounting — IELTS=7.0 PTE=65.0 TOEFL=— CAE=—
+[per-course vision img 4/4] graduate-certificate-of-applied-coaching — IELTS=7.0 PTE=65.0 TOEFL=90.0 CAE=185.0
+[per-course vision img 3/3] master-of-social-work-qualifying — IELTS=7.0 PTE=56.0 TOEFL=— CAE=—
+```
+
+Most of those courses had a regex hit of IELTS=6.5 from the actual page text but vision is overwriting with 7.0 from somewhere. Notably this happens on the same `cdn-ileicgm.nitrocdn.com` domain (NitroPack CDN) that was hosting the Kripa.jpg image in the previous report. The image-source whitelist for vision OCR (require filename/alt-text/heading to contain `ielts`, `pte`, `english`, `requirements`) hasn't been implemented yet.
+
+Graduate Certificate of Applied Coaching is the worst: regex didn't find IELTS in the page text, so vision filled in IELTS=7.0 / PTE=65 / TOEFL=90 / CAE=185 — those are extremely common institutional minimums for an Australian uni and look like they were OCR'd off a generic English requirements badge image, not the course-specific value.
+
+---
+
+**Bug 4: location text contains literal annotation cruft**
+
+Multiple courses have `location_text` containing the annotation `^ ^Available in Perth from Trimester 3, 2026`:
+- Graduate Certificate of Human Services: `Adelaide, Melbourne, Sydney, Perth^ ^Available in Perth from Trimester 3, 2026`
+- Graduate Certificate of Professional Accounting: `Perth^ ^Available in Perth from Trimester 3, 2026`
+- Graduate Diploma of Professional Accounting: `Perth^ ^Available in Perth from Trimester 3, 2026`
+- Master of Social Work (Qualifying): `Adelaide, Melbourne, Sydney, Perth^ ^Available in Perth from Trimester 3, 2026`
+
+The `^` character is being used on the page as a footnote marker (probably a superscript styled with CSS). The text extractor is grabbing the literal `^` characters and the footnote text as part of the location field. This would render badly in the staged table.
+
+**Fix:** strip caret-style footnote annotations from location text. Pattern: `\^.*$` or `\^\s*\^.*` to clean trailing caret-prefixed content.
+
+---
+
+**Bug 5: duration extracted as 16.0 years for Graduate Diploma of Business Administration**
+
+The FIELD SUMMARY line shows `Duration: ✅ '16.0' [duration.structural conf=0.85]` for Graduate Diploma of Business Administration. Page text presumably says "16 months" — same number-without-unit regex bug from KBS, ACU, and AIT reports. The `[NULLIFIED]` sanity check would have caught it but apparently not in this case (or it would have been logged).
+
+Similar concern: Graduate Certificate values showing duration=8.0 across multiple records (Graduate Certificate in Business Administration, Graduate Certificate of Applied Coaching, Graduate Certificate of Human Services, Graduate Certificate of Professional Accounting) — these are all "8 months" courses, not 8 years. Same regex grabs the number, drops the unit, defaults to years.
+
+Good news here: since staging failed for everything anyway, none of these wrong values made it to the DB this time. But once Bug 1 is fixed and staging works, these duration values will all be wrong unless the regex also gets fixed.
+
+---
+
+**Bottom line**
+
+Bug 1 is the only blocker. Add `import re` to the file with the unbound `re.` call. After that, re-run — the data extraction itself worked clean. Bug 2 is worth a quick check (verify ACAP really did make those courses domestic-only) but isn't a code bug. Bugs 3-5 are existing recurring issues from the previous reports and don't block this run.
+
+High urgency — if this code shipped to other unis as part of the same deployment, every recent run is potentially broken in the same way. Worth checking the next scrape of any uni to see if the same NameError fires.

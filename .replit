@@ -49,7 +49,7 @@ outputType = "console"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd backend-py && PYTHONPATH=. celery -A app.tasks.celery_app worker --concurrency=4 --loglevel=info -Q scrape"
+args = "cd backend-py && PYTHONPATH=. celery -A app.tasks.celery_app worker --concurrency=4 --loglevel=info -Q scrape --beat"
 
 [[workflows.workflow]]
 name = "Redis"
