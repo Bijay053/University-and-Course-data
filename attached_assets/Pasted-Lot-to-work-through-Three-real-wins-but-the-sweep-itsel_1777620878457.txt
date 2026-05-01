@@ -1,0 +1,156 @@
+Lot to work through. Three real wins, but the sweep itself failed and that's the headline.
+
+---
+
+**The wins:**
+
+**1. Fee extraction is genuinely working.** From the spot-check:
+
+```
+Bachelor of Information Technology                | 74880
+MBA - Master of Business Administration           | 58920
+Master of Information Technology (Extension)      | 57140
+... (all 15 KBS courses populated with real fees)
+```
+
+15/15 with international_fee. Yesterday it was 0/29. That's the user-facing improvement.
+
+**2. KBS English URL was 404'd.** You diagnosed this directly with curl: `/admissions/english-requirements` returns 404. Real data lives at `/admissions/entry-requirements/english-entry-requirements`. The DB config was pointing at a dead URL the entire time. Good catch.
+
+**3. Column-keyed English parser shipped.** The KBS English page uses a column-per-degree-level table format. Your new `_parse_column_keyed_english_table` correctly extracts IELTS 6.0 for Bachelor+PG, 5.5 for Diploma, etc. Smoke-tested with the actual KBS HTML.
+
+---
+
+**The headline: the regression sweep FAILED.**
+
+```
+SUMMARY
+  Clean unis:            20
+  Expected diffs:        1  (acknowledged)
+  Unexpected diffs:      2
+  FAIL — 2 unexpected regression(s).
+```
+
+Two unis showed unexpected changes that weren't in `--expected-slugs`:
+
+**asahe (uni_id=2)**: 17 courses → 26 courses. 9 ADDED, 8 method-only changes.
+
+**vit (uni_id=6)**: 30 courses → 66 courses. 34 ADDED, 2 changes.
+
+Neither of these unis was supposed to change. The fee-fix and English-fix were both targeted at central-page extraction, which DOES affect every uni's pipeline. So this is exactly the blast radius the regression sweep is designed to catch.
+
+Two possibilities:
+
+**Option A — The shared-code changes legitimately improved extraction for asahe and vit too.** The fee sub-page follower might have found previously-missed pages on those unis. The English column-keyed parser might have unlocked new courses. If so, this is bonus wins to celebrate, not regressions.
+
+**Option B — The shared-code changes broke something on asahe and vit.** The 34 NEW courses on vit could be category landing pages or junk that should have been filtered out. A staging policy change might have lowered the bar.
+
+**We don't know which without investigating. The sweep is correctly telling us "unexpected change — verify before merging."**
+
+The fact that prod has already been deployed past this sweep gate is a problem. The sweep failed AFTER the code shipped, which means the discipline gate wasn't actually a gate this round — it was a post-deploy monitor. This is the same pattern as the bundled-deploy disaster: ship first, validate after.
+
+---
+
+**Concrete diagnostic queries needed before doing anything else:**
+
+```
+# 1. ASAHE — what got added or changed?
+sudo -u postgres psql university_portal -c "
+SELECT course_name, degree_level, international_fee, ielts_overall, status, created_at
+FROM scraped_courses
+WHERE university_id = 2
+ORDER BY created_at DESC LIMIT 30;"
+
+# Look for: did the 9 newly-added courses look like real degree programs,
+# or category landing pages / boilerplate?
+
+# 2. VIT — what got added? 34 new courses is a LOT
+sudo -u postgres psql university_portal -c "
+SELECT course_name, degree_level, international_fee, ielts_overall, status, created_at
+FROM scraped_courses
+WHERE university_id = 6
+ORDER BY created_at DESC LIMIT 50;"
+
+# Look for: 'Bachelor of Business (Bbus Accounting)' — the parenthesised redundancy
+# suggests these might be CRICOS-coded variants of existing courses. If yes, 
+# these are duplicates or noise, not legitimate new courses.
+
+# 3. What scrape jobs ran for uni 2 and 6 between the baselines?
+sudo -u postgres psql university_portal -c "
+SELECT runtime_job_id, university_id, started_at, completed_at, imported, skipped
+FROM scrape_runtime_jobs
+WHERE university_id IN (2, 6)
+  AND started_at > '2026-05-01 06:00:00+00'
+ORDER BY started_at DESC;"
+
+# Were these recently-rescraped, or did the baseline-after capture stale data 
+# from an unrelated earlier run?
+```
+
+Query 3 is the key disambiguation. If asahe and vit were NOT scraped in this deploy cycle, then the diff in the sweep is from earlier scrapes that just happened to land between baselines — not a result of this commit at all. If they WERE scraped, then we need to look hard at what those new courses are.
+
+---
+
+**On the IELTS spot-check still showing blanks:**
+
+Your Step 8 verification shows:
+
+```
+Bachelor of Information Technology       | 74880 | (blank ielts_overall)
+```
+
+Fee populated, IELTS still blank on every course. So the column-keyed parser shipped to GitHub but didn't fix the actual user-facing IELTS data. Three possibilities:
+
+1. The English fix needs another scrape cycle to take effect (the Step 6 scrape ran AFTER the URL fix but the sweep was run BEFORE the URL fix — ordering matters)
+2. The cache wasn't actually cleared (`DELETE 0` from Step 3 suggests the cache row didn't exist)
+3. The parser shipped but isn't being called from the right code path
+
+Quick check:
+
+```
+sudo -u postgres psql university_portal -c "
+SELECT payload->>'message' AS msg, created_at
+FROM scrape_runtime_logs
+WHERE runtime_job_id = '$JOB'
+  AND (payload->>'message' ILIKE '%column-keyed%'
+    OR payload->>'message' ILIKE '%english%'
+    OR payload->>'message' ILIKE '%entry-requirements%')
+ORDER BY sequence;"
+```
+
+(Use the actual job_444e6ff2898a as $JOB, not the literal angle-bracket text.)
+
+---
+
+**What to do, in order:**
+
+1. **Investigate the asahe and vit unexpected diffs** — are they bonus improvements or regressions? Run queries 1-3 above.
+2. **Check whether the column-keyed parser actually fired** for the recent KBS scrape using the message-pattern query above.
+3. **If asahe/vit changes are bonus improvements**: re-run the sweep with `--expected-slugs kbs,asahe,vit` to acknowledge them, then we're clean.
+4. **If asahe/vit changes are regressions**: revert the shared-code fix, redesign with KBS-only scope (per-uni override instead of shared code), reship.
+5. **If column-keyed parser didn't fire**: investigate why. Cache miss issue, code path not reached, or URL update didn't propagate.
+
+---
+
+**On the workflow drift:**
+
+The English fix and fee fix were shipped together as one deploy. We agreed each shared-code change should ship as its own commit with its own sweep. Bundling two shared-code changes — especially when one of them adds a new code path (`_parse_column_keyed_english_table`) — is a smaller version of the bundled-deploy disaster.
+
+With both changes deployed and the sweep failing, we now can't tell which change caused which unexpected diff. Was it the fee sub-page follower that found new pages on vit? Or the column-keyed English parser unlocking previously-blocked extractions? Both? Different things on each uni?
+
+The answer matters for the fix design. If we have to revert and redo, we don't know which of the two commits to revert.
+
+**Recommendation for going forward:** the next migration ships ONE shared-code change at a time. No bundling, even when changes look related. The discipline isn't about how many commits feel related — it's about being able to attribute every diff in a sweep to a specific change.
+
+---
+
+**Where things genuinely stand:**
+
+- Fees populated on 15+ KBS courses — real win
+- KBS English URL fixed in DB — real win
+- Column-keyed parser shipped — working in unit test, unverified in prod
+- IELTS still blank on KBS in spot-check — unresolved
+- 2 unis with unexpected diffs — unresolved, blocking declaration of done
+- Architecture discipline: drifted again on this round
+
+Run queries 1-3 first. Don't ship anything else until we know what the asahe/vit changes are. If they're bonus wins, this round becomes a clean PASS. If they're regressions, we have rollback work to do.
