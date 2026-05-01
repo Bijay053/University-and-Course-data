@@ -1,0 +1,127 @@
+Root cause analysis is correct. The regex misreads `8 months / 4 subjects / 2 trimesters` as `8 years` because the trailing `/ 2 trimesters` token captures the unit-detection priority. Sanity cap nullifies, confidence drops to 55, course skipped. Solid diagnosis.
+
+But before declaring the cycle done, three things in the spot-check output need addressing.
+
+---
+
+**1. ACAP has ZERO rows in the `courses` table.**
+
+From the spot-check query:
+
+```
+university_id | course_count 
+---------------+--------------
+             4 |          173
+             3 |           74
+             1 |           67
+             6 |           30
+             2 |            8
+```
+
+uni_id 41 (ACAP) is not in the list. The `courses` table only has 5 universities populated, and ACAP isn't one of them. Yet the dashboard screenshot from earlier showed 11 ACAP courses visible in the review UI — and the `scraped_courses` query returned all 11 ACAP courses with clean post-Option-C location values (`Perth, Australia`, no `^` cruft).
+
+So ACAP courses are in `scraped_courses` (the staging table) but never got promoted to `courses` (the approved table). The KBS courses you queried are also all in `scraped_courses` with `status = 'pending'` — so they're staged but not yet approved.
+
+This raises a question: **what populates the `courses` table?** Manual admin approval workflow? Auto-promotion after some delay? Something else?
+
+If admin approval is the gate, then:
+- ACAP's 11 staged courses are still pending review — visible in admin UI but not in the public-facing search
+- The Option C location strip and Phase 5 vision OCR fix only show user value AFTER admin approves them
+- The end-to-end win we've been celebrating (`staged: 11`) hasn't yet translated to user-facing data
+
+If there's auto-promotion logic, then either it's broken or it has a delay we haven't accounted for.
+
+Worth a quick query to confirm:
+
+```
+sudo -u postgres psql university_portal -c "
+SELECT u.name, COUNT(sc.id) AS staged, COUNT(c.id) AS approved
+FROM universities u
+LEFT JOIN scraped_courses sc ON sc.university_id = u.id AND sc.status = 'pending'
+LEFT JOIN courses c ON c.university_id = u.id
+GROUP BY u.name
+ORDER BY staged DESC;"
+```
+
+This tells us the full pipeline state. If many unis have high `staged` but low `approved`, the bottleneck is the approval step, not the scraper.
+
+**Why this matters for the cycle:** if approval is manual, then "Option C is shipped" doesn't mean "users see clean ACAP locations" — it means "admin can review courses with clean locations and approve them." Different milestone. Worth being precise about.
+
+---
+
+**2. The IELTS values for ACAP look right — confirms Phase 5 worked.**
+
+From the scraped_courses query for uni 41:
+
+```
+Master of Business Administration (MBA)         | Perth, Australia                              |  6.5
+Graduate Diploma of Legal Practice (Plt)        | Sydney, Australia                             |  6.5
+Master of Social Work (Qualifying)              | Adelaide, Melbourne, Sydney, Perth, Australia |  7
+Master of Psychology (Clinical)                 | Sydney, Australia                             |  7
+Master of Professional Psychology               | Sydney, Australia                             |  7
+Graduate Diploma of Professional Accounting     | Perth, Australia                              |  6.5
+Graduate Diploma of Business Administration     | Perth, Australia                              |  6.5
+Graduate Certificate of Professional Accounting | Perth, Australia                              |  6.5
+Graduate Certificate of Human Services          | Adelaide, Melbourne, Sydney, Perth, Australia |  6.5
+Graduate Certificate in Business Administration | Perth, Australia                              |  6.5
+Bachelor of Social Work                         | Melbourne, Sydney, Australia                  |  6
+```
+
+This is the actual user-facing validation we've been waiting for:
+- **Locations are clean.** No `Perth^ ^Available in Perth from Trimester 3, 2026` cruft anywhere. Option C works in production data.
+- **IELTS values look reasonable.** 6.0–7.0 range, no impossible 9.0 or 4.0 from vision OCR hallucination. Phase 5 (`trust_vision_ocr: false`) works in production data.
+- **Bachelor of Social Work shows IELTS 6.0** — still wrong. Should be 7.0 per the popup-modal screenshot from earlier. Confirmation that the international-tab/modal interaction issue (Option E in the queue) is still a real bug. Not a regression — we knew about it. Just noting it persists.
+
+---
+
+**3. The KBS slash-vs-comma location format question is partially answered but not fully.**
+
+From the KBS scraped_courses query, locations like `Adelaide, Brisbane, Gold Coast, Melbourne, Perth, Sydney, Australia` are showing comma-separated for ALL the staged KBS courses. The KBS fix (`b38134f`) was supposed to normalise slash-separated MBA locations (`Adelaide / Brisbane / Gold Coast / Melbourne / Perth / Sydney /`) into comma-separated. The data shows comma-separated, so the fix worked.
+
+But the original slash format only appeared on MBA courses (per the earlier screenshot where MBA – Health Services Management showed `Adelaide / Brisbane / ...`). Now those MBA courses also show comma-separated. So either:
+- The fix correctly normalised them (good)
+- OR the underlying KBS website changed format between scrapes (different cause, same observed effect)
+
+No way to tell from this output alone, but the practical outcome is right: dashboard now shows consistent location format across all KBS courses. Call it done.
+
+---
+
+**4. The 3 KBS grad cert ticket needs to track the right scope.**
+
+Your ticket draft is good but misses one nuance: the bug isn't just the regex — it's also the staging policy of "no duration = drop the course." Two bugs, one symptom.
+
+**Bug A (the real fix):** Duration regex misclassifies `8 months / N subjects / M trimesters` as `8 years`. Need to handle slash-separated suffixes correctly so the unit comes from the *first* segment (`months`) not the *last* (`trimesters`).
+
+**Bug B (the safety net):** Staging policy currently treats "duration is NULL after sanity check" as "drop the course." Could instead be "stage with NULL duration, flag for review." The latter prevents data loss when the regex fails.
+
+Fix Bug A and the symptom goes away. But Bug B is worth fixing independently because it'll catch *future* duration regex bugs too. Recommend:
+
+- Bug A: B-scope, requires duration regex unit-detection rework. Ship as Option B continuation.
+- Bug B: Separate small ticket. Per-uni or shared? Probably shared — every uni benefits from "don't silently drop courses with missing optional fields." Lower priority but lower risk.
+
+---
+
+**Updated state of the redeploy:**
+
+| Concern | Status |
+|---------|--------|
+| 7 functional commits cherry-picked + swept | ✅ Done |
+| ACAP location cruft removed from staged data | ✅ Confirmed in DB query |
+| ACAP vision OCR hallucinations gone | ✅ IELTS values now sensible (6.0-7.0 range) |
+| KBS location format normalised | ✅ Comma-separated across all 22 staged KBS courses |
+| 3 KBS grad certs missing | ⚠️ Known, ticket needed (Bugs A + B) |
+| ACAP courses in `courses` table | ❌ None — still in `scraped_courses` pending approval |
+| GitHub history reconciled | ⏸️ Tag created, force-push deferred |
+
+---
+
+**Concrete next actions:**
+
+1. Run the staged-vs-approved comparison query above. Confirm whether approval is manual (and how many unis are blocked there) or automated.
+2. Open the follow-up ticket(s) for KBS grad certs. Recommend splitting into Bug A (regex fix) and Bug B (don't-drop policy).
+3. **Don't force-push to GitHub yet.** Decision can wait until either (a) ACAP shows up in `courses` table after admin approval and we confirm the full pipeline works end-to-end, or (b) we explicitly accept that the redeploy validation ends at staging.
+4. Spot-check one more thing: visit the actual review UI in a browser. Confirm the 11 ACAP courses are visible there with clean locations and sensible IELTS. The DB queries we ran prove the data is correct — but the UI is what users (admin or otherwise) actually see.
+
+**The cycle isn't fully done until step 4 is confirmed by eyeball.** Sweep proves data structure is bounded. DB query proves data values are right. UI proves the values render correctly through the read path (which is a separate code path from the write path we've been validating).
+
+Run step 1 first — the staged-vs-approved query is one minute and tells us whether the rest of this is end-to-end or just halfway there.
