@@ -1,0 +1,125 @@
+CREATE INDEX idx_csv_duration_years ON public.course_search_view USING btree (duration_years);
+CREATE INDEX idx_csv_featured ON public.course_search_view USING btree (featured DESC, featured_priority DESC) WHERE (featured = true);
+CREATE UNIQUE INDEX idx_csv_id ON public.course_search_view USING btree (id);
+CREATE INDEX idx_csv_intakes ON public.course_search_view USING gin (intakes);
+CREATE INDEX idx_csv_intl_fee ON public.course_search_view USING btree (international_fee);
+CREATE INDEX idx_csv_loc_trgm ON public.course_search_view USING gin (lower(COALESCE(course_location, ''::text)) public.gin_trgm_ops);
+CREATE INDEX idx_csv_name_trgm ON public.course_search_view USING gin (course_name public.gin_trgm_ops);
+CREATE INDEX idx_csv_name_tsv ON public.course_search_view USING gin (name_tsv);
+CREATE INDEX idx_csv_search_tsv ON public.course_search_view USING gin (search_tsv);
+CREATE INDEX idx_csv_uni_name_lower_trgm ON public.course_search_view USING gin (lower(university_name) public.gin_trgm_ops);
+CREATE INDEX idx_csv_uni_name_trgm ON public.course_search_view USING gin (university_name public.gin_trgm_ops);
+CREATE INDEX idx_csv_university_id ON public.course_search_view USING btree (university_id);
+\unrestrict QS4iS9XqVj7yrhcfTyYVtm3YqZTdTvpnWzwJ4k4aJqr3mTuNAd75yGtXf16hTFb
+CREATE MATERIALIZED VIEW
+ALTER MATERIALIZED VIEW
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+GRANT
+=== View recreated on staging ===
+ERROR:  materialized view "course_search_view" has not been populated
+HINT:  Use the REFRESH MATERIALIZED VIEW command.
+root@university-and-course-data:~/University-and-Course-data# cd ~/University-and-Course-data
+
+# ── Populate the view on staging ──
+sudo -u postgres psql university_portal_staging -c \
+  "REFRESH MATERIALIZED VIEW course_search_view;"
+echo "View populated"
+
+# ── Check row count matches prod ──
+sudo -u postgres psql university_portal_staging -c \
+  "SELECT COUNT(*) FROM course_search_view;"
+sudo -u postgres psql university_portal -c \
+  "SELECT COUNT(*) FROM course_search_view;"
+
+# ── List available baselines ──
+ls -1 backend-py/baselines/
+REFRESH MATERIALIZED VIEW
+View populated
+ count 
+-------
+   352
+(1 row)
+
+ERROR:  materialized view "course_search_view" has not been populated
+HINT:  Use the REFRESH MATERIALIZED VIEW command.
+20260430_024437_acu_51.json
+20260430_024437_aibi_47.json
+20260430_024437_ait_37.json
+20260430_024437_apicollege_30.json
+20260430_024437_asahe_2.json
+20260430_024437_asahe_35.json
+20260430_024437_atmc_93.json
+20260430_024437_aut_20.json
+20260430_024437_aut_87.json
+20260430_024437_bond_22.json
+20260430_024437_cqu_18.json
+20260430_024437_flinders_12.json
+20260430_024437_kbs_29.json
+20260430_024437_kbs_8.json
+20260430_024437_scu_17.json
+20260430_024437_study_4.json
+20260430_024437_torrens_3.json
+20260430_024437_une_14.json
+20260430_024437_unisq_1.json
+20260430_024437_uow_13.json
+20260430_024437_utas_5.json
+20260430_024437_vit_38.json
+20260430_024437_vit_6.json
+20260430_024556_acap_41.json
+after
+before
+phase5-after
+phase6-after
+re-fix-after
+re-fix-before
+root@university-and-course-data:~/University-and-Course-data# # ── Step 5: Capture post-migration baseline from staging ──
+cd ~/University-and-Course-data/backend-py
+set -a && source .env && set +a
+
+DATABASE_URL="postgresql+asyncpg://uniportal:Bij%40y12345@127.0.0.1:5432/university_portal_staging" \
+  PYTHONPATH=. venv/bin/python3 scripts/capture_baseline.py \
+  --out-dir baselines/fix2-staging-after/
+INFO capture_baseline: Snapshotting 23 universities...
+INFO capture_baseline: Saved: 20260501_015009_acap_41.json  (courses=11  disc=27  staged=11  cost=$0.0028  81.0)
+INFO capture_baseline: Saved: 20260501_015009_aibi_47.json  (courses=8  disc=11  staged=8  cost=$0.0000  99.1)
+INFO capture_baseline: Saved: 20260501_015009_ait_37.json  (courses=6  disc=8  staged=6  cost=$0.0017  118.1)
+INFO capture_baseline: Saved: 20260501_015009_apicollege_30.json  (courses=25  disc=27  staged=25  cost=$0.0000  169.7)
+INFO capture_baseline: Saved: 20260501_015009_atmc_93.json  (courses=4  disc=6  staged=4  cost=$0.0000  89.6)
+INFO capture_baseline: Saved: 20260501_015009_aut_87.json  (courses=13  disc=36  staged=13  cost=$0.0035  604.3)
+INFO capture_baseline: Saved: 20260501_015009_acu_51.json  (courses=99  disc=165  staged=99  cost=$0.0234  3410.1)
+INFO capture_baseline: Saved: 20260501_015009_bond_22.json  (courses=126  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_015009_study_4.json  (courses=694  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_015009_flinders_12.json  (courses=105  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_015009_kbs_8.json  (courses=30  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_015009_kbs_29.json  (courses=21  disc=37  staged=21  cost=$0.0056  393.1)
+INFO capture_baseline: Saved: 20260501_015009_scu_17.json  (courses=6  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_015009_une_14.json  (courses=12  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_015009_uow_13.json  (courses=3  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_015009_unisq_1.json  (courses=167  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_015009_utas_5.json  (courses=13  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_015009_vit_38.json  (courses=19  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_015009_asahe_2.json  (courses=17  disc=9  staged=9  cost=$0.0025  61.8)
+INFO capture_baseline: Saved: 20260501_015009_aut_20.json  (courses=92  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_015009_cqu_18.json  (courses=4  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_015009_torrens_3.json  (courses=174  disc=168  staged=99  cost=$0.0326  956.7)
+INFO capture_baseline: Saved: 20260501_015009_vit_6.json  (courses=30  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Done. 23 universities, 1679 courses total. Baselines written to baselines/fix2-staging-after/
+root@university-and-course-data:~/University-and-Course-data/backend-py# 

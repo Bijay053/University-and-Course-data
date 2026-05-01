@@ -1,0 +1,169 @@
+The git log output reveals a worse state than the three scenarios I outlined. Reading what's actually on prod:
+
+```
+9b95125 (HEAD -> main, origin/main) fix(migration-012): drop/recreate course_search_view around ALTER COLUMN
+bbea119 fix(alembic): escape % in DATABASE_URL for ConfigParser
+0279075 chore(acap): mark Phase 6 TODO as DONE in comment
+b38134f fix(kbs): disable vision OCR + normalise slash-separated location format
+be3df67 feat(option-c): wire strip_patterns into location extractor (ACAP footnote fix)
+629e5de fix(models): courses.duration Float->Numeric(6,2) + Alembic migration 012
+```
+
+Three problems with the current state, in order of severity.
+
+---
+
+**Problem 1: Prod code is at HEAD with everything; prod DB is still pre-Fix-2.**
+
+The model declares `duration: Numeric(6, 2)` (commit `629e5de`). The prod DB column is still `Float`. The migration ran on `university_portal_staging` (the validation DB), NOT on `university_portal` (prod).
+
+SQLAlchemy will work most of the time — it'll coerce Float values into the Numeric type at read time. But this is exactly the kind of mismatch that produces subtle "values look right in one query, wrong in another" bugs. Any ORM internal that compares declared type vs actual column type will misbehave.
+
+This is worse than not deploying Fix 2 at all. Either roll back the model commit (restoring code-DB consistency) or run the migration on prod (after sweep validation). Leaving the half-applied state is the worst option.
+
+---
+
+**Problem 2: KBS vision OCR fix shipped without sweep.**
+
+Commit `b38134f` (`fix(kbs): disable vision OCR + normalise slash-separated location format`) is the per-uni override I'd queued as the *next* migration after Option C cleared. It was supposed to follow the Phase 5 template — single per-uni override, single-uni shadow validation, ship.
+
+Instead it shipped bundled with Option C and Fix 2. Two per-uni migrations in one deploy means the eventual sweep can't isolate which one caused which diff. If anything looks off, we can't tell whether it's C, the KBS change, the model declaration mismatch, or all three.
+
+The KBS fix probably works (it mirrors Phase 5 exactly), but "probably works" is not the standard the architecture exists to enforce.
+
+Also: `b38134f` mentions "normalise slash-separated location format" — that's a SECOND change bundled into the same KBS commit (the slash-vs-comma format issue I noted in the KBS bug report). Two distinct changes in one commit, neither validated independently. The "normalise location format" change is shared-code (it affects every uni's location processing if it's in shared code, or KBS-only if it's a per-uni override — worth checking which).
+
+---
+
+**Problem 3: Staging DB validation revealed real data quality issues that weren't acknowledged.**
+
+The staging DB snapshot you posted shows duration values like:
+
+```
+ duration | count 
+----------+-------
+     0.00 |    59
+     1.70 |     4
+   104.00 |     2
+    52.00 |     2
+    88.00 |     2
+    64.00 |     1
+    66.00 |     1
+```
+
+Two concerning patterns:
+
+- **`0.00` appears 59 times.** Are these real zero-duration courses (unlikely — no university course is zero years) or were they tiny floats (like `1e-10` from bad upstream extraction) that ROUND() silently collapsed to 0.00? Worth running `SELECT id, name FROM courses WHERE duration = 0.0 LIMIT 10` on the pre-migration prod DB to see what these are.
+
+- **104, 88, 66, 64, 52 year durations.** These are wildly out-of-range. The shared-code `[NULLIFIED]` sanity check is supposed to clear values >10 years before they get staged, but these are sitting in the DB anyway. Either the sanity check has been failing on some code path, or these were staged before the sanity check shipped, or they came in through a path that bypasses validation.
+
+This isn't Fix 2's fault — the migration just round-tripped existing values. But it surfaces a data-quality problem that the dashboard is rendering to users right now (someone seeing "104 Year" on a course is going to lose trust in the data).
+
+This also tells us Fixes 1+3 (B-scope) need to do more than just fix the regex — they also need a cleanup query to re-extract or null out the existing bad values that landed in prod before the regex fix.
+
+---
+
+**Recommended path forward: full rollback + sequenced redeploy.**
+
+The alternative — trying to validate the bundle forward and ship if it looks fine — is exactly the heuristic the architecture was built to replace. Better to spend an hour rolling back than an unknown number of hours debugging if something's subtly off.
+
+**Step 1: Roll back prod to the pre-batch stable state.**
+
+```
+cd ~/University-and-Course-data
+git fetch origin main
+git log --oneline -10  # confirm f95d75fc590c is the pre-batch SHA
+git reset --hard f95d75fc590c
+sudo systemctl restart uni-api-py.service uni-celery.service
+# Confirm services healthy
+sudo systemctl status uni-api-py.service --no-pager | tail -5
+sudo journalctl -u uni-celery -n 5 --no-pager | grep "celery@\|ERROR"
+```
+
+At this point: prod code = post-Phase-5 stable state. Prod DB = Float column (untouched throughout). Code matches DB schema. Clean baseline.
+
+**Step 2: Cherry-pick Option C only. Sweep. Ship.**
+
+```
+git cherry-pick be3df67
+sudo systemctl restart uni-api-py.service uni-celery.service
+```
+
+Then capture before/after baselines around an ACAP scrape, run sweep with `--expected-slugs acap`, expect 22 clean + 1 acknowledged-dirty (ACAP location values change for the 4 affected courses). Spot-check the 4 ACAP courses in dashboard. Ship if clean.
+
+**Step 3: Cherry-pick KBS fix only. Sweep. Ship.**
+
+First: confirm `b38134f` contains TWO distinct changes (vision OCR disable AND location format normalisation). If they're separate enough to split into two commits, do that and cherry-pick each separately. If they're entangled, treat the whole commit as one migration but note that two per-uni overrides shipped together.
+
+```
+git cherry-pick b38134f
+sudo systemctl restart uni-api-py.service uni-celery.service
+```
+
+Then ACAP and KBS sweep with `--expected-slugs kbs`. Expected: 21 clean (including ACAP, which Step 2 already shipped) + KBS dirty (vision OCR no longer hallucinating, locations normalised). Spot-check KBS courses in dashboard for IELTS no longer showing 9.0 or 4.0, locations using consistent format. Ship if clean.
+
+**Step 4: Fix 2 with proper staging-DB validation including the sweep step.**
+
+The staging-DB validation flow you described has steps 1-4 (backup, restore, migrate staging, eyeball values). It's missing steps 5-6:
+
+```
+# Step 5: Capture baseline from STAGING DB (post-migration state)
+cd backend-py
+set -a && source .env && set +a
+DATABASE_URL=postgresql://uniportal@localhost/university_portal_staging \
+  PYTHONPATH=. venv/bin/python3 scripts/capture_baseline.py \
+  --out-dir baselines/fix2-staging-after/
+
+# Step 6: Run sweep against the post-Phase-5 baseline (current prod = before)
+PYTHONPATH=. venv/bin/python3 scripts/regression_sweep.py \
+  --before baselines/<post-phase-5-baseline>/ \
+  --after  baselines/fix2-staging-after/ \
+  --verbose
+
+# Expected: zero diffs across all 23 unis.
+# Numeric(6,2) of 1.7 should equal float 1.7000000476837158 within tolerance.
+# If non-zero diffs appear: investigate which uni's downstream logic depends
+# on the float-precision artefacts. Do NOT promote to prod until diffs explained.
+```
+
+Only when Step 6 returns zero diffs do you take a fresh prod backup, apply the migration to prod, and ship the model commit (`629e5de`).
+
+**Step 5: Fixes 1+3 (Option B, multi-uni sweep).**
+
+This is the proper Option B PR. Combine `ede9354` (sanity cap + same-N) and `fba79b1` (anti-context) into one migration since both are duration-regex-related shared code. Enumerate affected courses by querying staged data first:
+
+```sql
+SELECT university_id, slug, duration_value, duration_unit 
+FROM staged_courses 
+WHERE duration_value >= 5 
+  AND duration_unit = 'years' 
+  AND degree_level IN ('Graduate Certificate', 'Graduate Diploma', 'Master');
+```
+
+This returns the full list of bug-affected courses across all 22 baselined unis. Use that list as `--expected-slugs` for the multi-uni sweep. Diff should show ONLY duration changes on the enumerated courses, no other field changes anywhere, no other unis dirty.
+
+This is the first multi-uni expected-dirty sweep test — worth running it deliberately rather than as part of a bundled deploy.
+
+**Step 6: Cleanup query for the wild-out-of-range durations.**
+
+After Fixes 1+3 ship, identify courses where the bad-extraction values (104, 88, 66, 64, 52) exist in prod and re-extract them. Either via a SQL UPDATE that nulls them out (forces re-extraction next scrape) or a targeted re-scrape of the affected unis.
+
+---
+
+**On the bigger picture:**
+
+The last few exchanges have featured "three fixes shipped, paste-and-run script, half-applied bundle". That's a pattern. The architecture work over the past two weeks built three things to prevent exactly this: per-uni configs, the regression sweep, the expected-diff workflow. They only protect us if we use them.
+
+Option C through Phase 5 each followed the discipline: one change, one PR, one sweep, one merge gate. The result was confidence that no other uni broke. The recent commits skipped that and produced the half-applied state we're now untangling.
+
+Going forward: **one migration per PR, one sweep per migration, one merge gate per sweep.** No bundling of "a few small fixes together because they're related." If two changes are related, they sweep together but with an enumerated expected-dirty list that covers both. If they're unrelated, they ship separately.
+
+The rollback-then-sequenced-redeploy I outlined above is the correction for the current state. After that's done, the queue continues at low cost per migration because each one is small and isolated.
+
+---
+
+**Concrete next action:**
+
+Run Step 1 (rollback to `f95d75fc590c`). Paste the output of `git status` and `git log --oneline -3` after the reset, plus `sudo systemctl status uni-api-py.service` confirming services are healthy. That's the gate before Step 2 starts.
+
+Do not run any DB commands in this step. The prod DB stays untouched until Step 4's staging validation completes.
