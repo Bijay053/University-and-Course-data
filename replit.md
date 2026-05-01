@@ -73,6 +73,12 @@ The admin portal now requires login. The auth flow:
   - **Prod baseline command**: `cd /root/University-and-Course-data && PYTHONPATH=backend-py python3 backend-py/scripts/capture_baseline.py --out-dir backend-py/baselines/`
   - Slug derived from hostname: `www.acu.edu.au` → `acu`, `www.aut.ac.nz` → `aut`, `bond.edu.au` → `bond`. Files named `{timestamp}_{slug}_{uni_id}.json`.
 
+### Feature set (session 2026-05-01)
+
+- **Tier-7 operator alert** (`discovery_failure_alerts` table): When all discovery tiers (BFS, sitemap, alt-paths, subdomain probes, browser, Wayback) complete with fewer than 3 course-link candidates, the orchestrator persists a `DiscoveryFailureAlert` row (with JSONB diagnostic) and fires a Slack/email push via `alert_delivery.deliver_discovery_failure_alert()`. Threshold = 3 (catches zero AND near-zero silently-failed runs). Migration: `013_discovery_failure_alerts.py` (apply manually on prod — see migration file header for SQL).
+- **Nightly sweep Celery beat task** (`scrape.nightly_sweep`, 02:00 UTC): Runs `capture_baseline.py` to snapshot all universities into `baselines/nightly/<YYYYMMDD>/`, then runs `regression_sweep.py` to compare against the previous night's snapshot. If unexpected field-value diffs are found (exit code 1), calls `alert_delivery.deliver_drift_alert()` with a summary. First-run produces `sweep=skipped_no_baseline` (no comparison, no alert). Added to `celery_app.beat_schedule` at 02:00 UTC (before 03:00 snapshot, before 04:00 baseline-refresh).
+- **Tier-2 per-uni subdomain probes** (`discover_course_links`): New `discovery_config` kwarg accepted by `discover_course_links`. When BFS + sitemap + alt-listing-path probes all yield < 5 candidates and `DiscoveryConfig.fallback_subdomains` is non-empty for the university, probes each configured subdomain (e.g. `handbook.{domain}` → `handbook.myuni.edu.au`). The `{domain}` placeholder is expanded using the apex domain (www-stripped). The orchestrator passes `_uni_cfg.discovery` to wire per-uni YAML config. 13 tests covering all three features in `tests/test_new_features_v2.py`.
+
 ### Shadow-mode operation
 
 Enable per-uni shadow mode via env vars. **Never set these in prod `.env` permanently — set them on the Celery worker process only for the migration window.**

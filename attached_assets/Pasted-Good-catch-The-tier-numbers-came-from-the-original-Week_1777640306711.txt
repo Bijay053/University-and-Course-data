@@ -1,0 +1,167 @@
+Good catch. The tier numbers came from the original Week 3 "tiered fallback chain" plan and I assumed shared context. Let me define each precisely.
+
+**Side notes acknowledged:**
+- FastAPI scripts/ watch: noted, fine to leave as-is. The reload behaviour is annoying but harmless. If it gets in the way, the `.watchfilesignore` approach is correct.
+- Worker ghost-job reset behaviour confirmed: "no ghost running jobs found — all slots clean" is exactly what we want on startup.
+
+Good Block 2 close-out.
+
+---
+
+**Definitions for the three remaining items:**
+
+## Tier 2 — Subdomain probes (course discovery enhancement)
+
+**Context:** This is part of the "tiered fallback chain" for course discovery. When a uni's main domain (e.g. `kbs.edu.au`) doesn't yield enough courses from the standard course-list URL, we probe known subdomain conventions before giving up.
+
+**The "tier" refers to the order of fallback strategies in the discovery pipeline, not a severity level.**
+
+The existing tiers (already implemented or implicit):
+- **Tier 1**: Configured `coursesPage` URL from the uni's `scrape_config.uniPages.coursesPage`
+- **Tier 2** (this work): Try common subdomain conventions if Tier 1 yields <5 candidates
+- **Tier 3**: Replay per-uni playbooks (deferred to next week)
+- **Tier 4**: PDF/brochure discovery (deferred)
+- **Tier 5**: Sitemap deep-dive (deferred — partial sitemap fallback already exists in the discoverer)
+- **Tier 7**: Operator alert (the failure-mode notification, see below)
+
+**What Tier 2 needs to do:**
+
+In `backend-py/app/services/scraper/discover.py`, after the existing crawl + sitemap fallback, if total candidates is still <5, try probing these subdomain patterns:
+
+```
+For uni domain bond.edu.au, try in this order:
+  - https://www.bond.edu.au/programs        (already covered by Tier 1 usually)
+  - https://study.bond.edu.au/             (study. subdomain)
+  - https://courses.bond.edu.au/           (courses. subdomain)
+  - https://handbook.bond.edu.au/          (handbook. subdomain)
+  - https://international.bond.edu.au/     (international. subdomain)
+```
+
+For each subdomain that returns 200, run the existing course-link extraction against it. Add results to the candidate pool. Stop probing once total candidates ≥ 5.
+
+**Implementation notes:**
+- Skip subdomains that return 404, 5xx, or timeout (>3s)
+- Log every probe attempt: `[DISCOVER] subdomain probe: {url} → {status_code}, {n_candidates} added`
+- Per-uni override: allow `scrape_config.discovery.subdomain_probes` to specify a custom list (override defaults)
+- Per-uni disable: `scrape_config.discovery.skip_subdomain_probes: true` to skip entirely (e.g. for unis where we know it's pointless)
+
+**Why Tier 2 is the day's main shared-code work:**
+- Affects every uni's discovery pipeline (shared code)
+- Could legitimately add or remove courses on multiple unis at once — expect dirty sweep
+- User-facing impact: more candidate pages → more courses discovered → better promotion gap closure
+- Bounded scope: 4-5 hardcoded subdomain patterns + 2 config knobs
+
+---
+
+## Tier 7 — Operator alert with diagnostic dump
+
+**Context:** When all discovery tiers (1-6) fail and a uni ends up with <3 candidates after a full scrape attempt, we need to surface this loudly instead of silently logging and moving on. "Operator alert" means the human running scrapes should see it.
+
+**The "tier" here refers to the same fallback chain — it's the final "give up" tier that fires the alert.**
+
+**What Tier 7 needs to do:**
+
+In `backend-py/app/services/scraper/discover.py` (or wherever the discovery summary is logged), after the full discovery pipeline completes:
+
+```python
+if len(candidates) < 3:
+    diagnostic = {
+        "university_id": uni_id,
+        "university_name": uni_name,
+        "slug": uni_slug,
+        "candidates_found": len(candidates),
+        "tiers_attempted": ["main_url", "sitemap", "subdomain_probes"],
+        "main_url_response": main_url_status,
+        "sitemap_urls_checked": sitemap_urls,
+        "subdomain_probes_tried": subdomain_results,
+        "timestamp": now,
+    }
+    log.error(f"[DISCOVERY FAIL] {uni_slug} — only {len(candidates)} candidates after all tiers",
+              extra={"diagnostic": diagnostic})
+    
+    # Also write to a dedicated table for the admin UI to surface
+    db.add(DiscoveryFailureAlert(
+        university_id=uni_id,
+        diagnostic=diagnostic,
+        created_at=now,
+        resolved_at=None,
+    ))
+```
+
+The alert table (`discovery_failure_alerts`) is new — simple schema:
+- `id`, `university_id`, `diagnostic` (jsonb), `created_at`, `resolved_at` (nullable), `resolved_by` (nullable)
+
+**Why:** Right now when discovery silently returns 0 candidates (like Torrens — "discovering 168 courses but staging 0" from the bug queue), there's no signal anywhere except buried in logs. This makes that signal loud.
+
+**Scope:** This is logging + one new table + one new service call. No changes to existing extraction logic. Lowest-risk item on today's list.
+
+---
+
+## Nightly sweep cron + drift alerts
+
+**Context:** The regression sweep currently runs manually. The next-level discipline is running it automatically every night across all unis, then alerting if anything drifts unexpectedly.
+
+**Two pieces:**
+
+**Piece 1 — Nightly sweep cron**
+
+A new beat task or systemd timer that, every night at e.g. 02:00 AEST:
+
+```
+1. Capture a fresh baseline:
+   PYTHONPATH=. venv/bin/python3 scripts/capture_baseline.py \
+     --out-dir /var/baselines/nightly/$(date +%Y%m%d)/
+
+2. Compare against the previous night's baseline:
+   PYTHONPATH=. venv/bin/python3 scripts/regression_sweep.py \
+     --before /var/baselines/nightly/$(date -d 'yesterday' +%Y%m%d)/ \
+     --after  /var/baselines/nightly/$(date +%Y%m%d)/ \
+     --expected-slugs '' \
+     --output-json /var/log/sweep/nightly_$(date +%Y%m%d).json
+
+3. If any unexpected diffs are found (sweep exits non-zero), trigger drift alert (Piece 2)
+```
+
+Implement as either:
+- A celery beat task (preferred, since the worker is already running)
+- A systemd timer (simpler, no celery dependency)
+
+My preference: celery beat, since the existing `requeue_stale` beat task already runs and we have the infrastructure.
+
+**Piece 2 — Drift alerts**
+
+When the nightly sweep finds unexpected diffs, surface them somewhere visible. Two options:
+
+- **Email** to a configured admin address (simplest)
+- **Slack webhook** to a configured channel (preferred if the team uses Slack)
+- **In-app admin notification** in the UI (most complex, defer)
+
+For today, email is fine. The alert payload should include:
+- Date of sweep
+- Summary line (X unis dirty, Y added, Z removed)
+- For each dirty uni: name, count of changes, sample of 3 changed course names
+- Link to the full JSON output for investigation
+
+**Configuration:**
+```
+# In .env or config
+DRIFT_ALERT_EMAIL=admin@example.com
+DRIFT_ALERT_SLACK_WEBHOOK=https://hooks.slack.com/...   # optional
+NIGHTLY_SWEEP_HOUR=02   # AEST
+```
+
+**Why:** Without nightly drift detection, regressions only surface when someone happens to run a sweep manually — which has been after problems already affected admin approval. Nightly catches regressions within 24 hours of them landing.
+
+---
+
+**Suggested order of work today:**
+
+1. **Tier 7 operator alert FIRST** — lowest risk, smallest blast radius, gets a useful new signal in place
+2. **Nightly sweep cron + drift alerts** — also low risk (monitoring infra), and once shipped will catch any issues from Tier 2
+3. **Tier 2 subdomain probes LAST** — highest risk (shared code), and we want the sweep + drift detection in place before deploying it so any unexpected effects get caught
+
+This ordering means Tier 2 ships into a system that's already monitoring it, rather than us having to remember to run a manual sweep after.
+
+---
+
+**Confirm definitions match what you understand, then I can review implementations as you build them. Or if any of these definitions don't match the codebase reality (e.g. discovery is in a different file than I assumed), flag it back and I'll adjust the spec.**

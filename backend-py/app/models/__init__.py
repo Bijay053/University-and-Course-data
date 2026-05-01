@@ -4,6 +4,7 @@ column-for-column to the existing Postgres schema; we never own DDL — the
 existing Drizzle migrations remain the source of truth.
 """
 from app.models.academic_level_option import AcademicLevelOption
+from app.models.discovery_failure_alert import DiscoveryFailureAlert
 from app.models.central_page_cache import CentralPageCache
 from app.models.academic_requirement import AcademicRequirement
 from app.models.acronym import CourseAcronymOption
@@ -32,6 +33,7 @@ from app.models.university_field_baseline import UniversityFieldBaseline
 
 __all__ = [
     "AcademicLevelOption",
+    "DiscoveryFailureAlert",
     "GeminiCallLog",
     "AcademicRequirement",
     "CentralPageCache",

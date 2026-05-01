@@ -707,6 +707,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 max_courses=max_courses,
                 emit=emit,
                 _blocked_fee_urls_sink=_discover_blocked_fee_urls,
+                discovery_config=_uni_cfg.discovery,
             )
 
         # ── Fallback 1: Generic Playwright browser discovery ─────────────────
@@ -773,6 +774,47 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         job.total_found = len(links)
         job.heartbeat_at = datetime.now(timezone.utc)
         await db.commit()
+
+        # ── Tier 7: operator alert when all discovery tiers yield < 3 candidates ──
+        # A threshold of 3 (not 1 or 0) catches "almost empty" runs that
+        # currently complete silently but produce no usable data.  We persist
+        # the alert to discovery_failure_alerts and push via Slack/email so
+        # operators see it without tailing logs.
+        _TIER7_THRESHOLD = 3
+        if len(links) < _TIER7_THRESHOLD:
+            try:
+                from app.models.discovery_failure_alert import DiscoveryFailureAlert
+                from app.services.scraper.alert_delivery import deliver_discovery_failure_alert
+                _diag = {
+                    "job_id": str(job.id),
+                    "scrape_url": scrape_url,
+                    "candidates_found": len(links),
+                    "fast_mode": bool(job.fast_mode),
+                    "discovered_at": datetime.now(timezone.utc).isoformat(),
+                    "uni_slug": _uni_cfg.slug,
+                }
+                _failure_alert = DiscoveryFailureAlert(
+                    university_id=uni_id,
+                    candidates_found=len(links),
+                    diagnostic=_diag,
+                )
+                db.add(_failure_alert)
+                await db.commit()
+                log.warning(
+                    "[TIER7] Discovery failure alert persisted for %s "
+                    "(candidates=%d, job=%s)",
+                    uni_name, len(links), job.id,
+                )
+                # Fire-and-forget Slack/email (sync helpers, no await needed)
+                deliver_discovery_failure_alert(
+                    uni_name=uni_name,
+                    uni_id=uni_id,
+                    scrape_url=scrape_url,
+                    candidates_found=len(links),
+                    diagnostic=_diag,
+                )
+            except Exception as _t7_exc:  # noqa: BLE001
+                log.error("[TIER7] Failed to persist/deliver discovery alert: %s", _t7_exc)
 
         # Zero-discovery = hard failure. The site is either blocking our
         # crawler (403/Cloudflare), misconfigured, or the URL changed.

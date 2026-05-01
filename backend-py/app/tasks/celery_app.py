@@ -97,6 +97,17 @@ celery_app.conf.update(
             "args": (),
             "options": {"queue": "scrape"},
         },
+        # Nightly regression sweep: capture a fresh baseline snapshot for all
+        # universities, compare against the previous night's snapshot, and
+        # push a drift alert (Slack/email) if unexpected field changes are
+        # detected.  Runs at 02:00 UTC (after AEST business hours, before the
+        # 03:00 snapshot and 04:00 baseline-refresh tasks).
+        "nightly-sweep-and-drift-alert": {
+            "task": "scrape.nightly_sweep",
+            "schedule": crontab(hour=2, minute=0),
+            "args": (),
+            "options": {"queue": "scrape"},
+        },
     },
 )
 
