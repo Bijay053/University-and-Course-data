@@ -1,0 +1,94 @@
+Bond live: 126 courses, approved=126 failed=0. The enrichment quality looks reasonable — 117/126 enriched (93%), with 72 fees and 113 IELTS values populated by the bond_enrich script before bulk_approve.
+
+Running total: 524 live courses across 9 universities. Up from 267 at the start of the engagement. That's a near-doubling of the live catalog.
+
+---
+
+**Before moving to Flinders, two things to answer about Bond first:**
+
+**Question 1 — The bulk_approve.py disappearance is a real concern.**
+
+From the log:
+
+```
+venv/bin/python3: can't open file '/root/University-and-Course-data/backend-py/scripts/bulk_approve.py': [Errno 2] No such file or directory
+```
+
+This script was working two hours ago when we used it on KBS, VIT, CSU, AUT. Then it vanished from the working tree. You restored it with `git checkout HEAD -- backend-py/scripts/bulk_approve.py`, which means the file IS in the git tree but was missing from the working directory.
+
+This is not a normal git state. Most likely explanations:
+- Someone ran `git clean` or `git stash` or similar destructive operation
+- A `git pull` with conflicts left the file in an unresolved state
+- The Replit-side workflow that pulled fixes earlier accidentally removed local files
+
+Worth investigating before Flinders so we don't hit it again with a different file:
+
+```
+cd ~/University-and-Course-data
+git reflog | head -20
+git status
+```
+
+`git reflog` shows the recent HEAD movements — stash, reset, checkout etc. would all show up there. If we can identify which command caused it, we can avoid it next time.
+
+The broader fix you already ran (`git checkout HEAD -- backend-py/scripts/`) restored everything, but a check of the rest of the tree is worth doing too:
+
+```
+git status                          # any other missing files?
+git diff HEAD --stat                # any working-tree changes?
+find backend-py -name '*.py' -newer .git/HEAD | head -10
+```
+
+If nothing else is missing, we move on. If other files are gone too, we restore them all the same way before Flinders.
+
+**Question 2 — The Bond enrichment data has a 6.5 monoculture worth one spot-check.**
+
+Looking at the bond_enrich log, a striking pattern: nearly every course has `ielts=6.5`. Out of 117 enriched rows:
+- ~10 show ielts=7.0 (Doctor of Physiotherapy, Master of OT, Master of Architecture, etc.) — these track with healthcare/professional programs
+- ~6 show ielts=6.0 — some diplomas
+- The rest (~100) show ielts=6.5
+
+Is this real, or is it the same Gemini-hallucinates-6.5 pattern we caught on KBS? Bond.edu.au actually does set most undergrad programs at IELTS 6.5, so 6.5 monoculture isn't necessarily wrong — but worth one ground-truth check:
+
+```
+# Pick three courses at random from different levels and check
+sudo -u postgres psql university_portal -c "
+SELECT id, course_name, ielts_overall,
+       extraction_method->>'ielts_overall' AS source,
+       course_website
+FROM scraped_courses
+WHERE university_id = 22 AND ielts_overall IS NOT NULL
+ORDER BY random()
+LIMIT 5;"
+```
+
+Then open the `course_website` URL for each and verify the IELTS value against the actual Bond page. If `source = 'ai_fallback'` on more than 1-2 of them, we have a Gemini-substitution problem like KBS had. If `source = 'central_page:...'` or similar, it's real.
+
+The specific concern is that the 9 "WARNING ... no data-program-detail-url found" and "HTML fetch failed" rows mostly ended up with `ielts=None` (correct — no data, no value), but the 117 successful ones being so heavily 6.5 is statistically suspicious. One spot check resolves it.
+
+---
+
+**On Flinders next:**
+
+Yes, ready to move on after Q1 + Q2 are cleared. Flinders is uni_id=12 with ~105 staged. The playbook is now well-proven:
+
+1. Confirm pipeline + scripts are still on prod (run the `git status` from Q1)
+2. Quick `pg_dump` snapshot before the migration
+3. Diagnose Flinders state: `SELECT status, auto_publish_status, COUNT(*) FROM scraped_courses WHERE university_id = 12 GROUP BY ...`
+4. If staged rows are stale, rescrape; if fresh, dry-run + bulk_approve
+5. Check for name quality issues (the `' Of '` and abbreviated-name patterns we caught on CSU)
+6. Final verification including a 3-course ground-truth IELTS spot check
+
+Should take ~20-30 minutes. Same playbook as Bond.
+
+---
+
+**Engagement summary check-in:**
+
+Before this engagement: 267 live courses across 9 unis.
+After today: 524 live courses across 9 unis.
+After Flinders: should reach ~620+.
+
+This is real, end-user-visible work — doubled+ the searchable catalog in three weeks. The discipline pattern (diagnose, dry-run, commit, verify) has held all day on Bond.
+
+Run the two diagnostic checks (git reflog + Bond IELTS spot-check), then go for Flinders.
