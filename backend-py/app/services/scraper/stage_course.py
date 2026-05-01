@@ -22,7 +22,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -233,6 +233,43 @@ async def stage_course(
             return StageResult(False, "rejected: duplicate_url_in_job")
     except Exception as _dep:  # noqa: BLE001 — never abort on dedup check failure
         log.warning("stage_course: within-job dedup check failed for %r: %s", source_url, _dep)
+
+    # Cross-job dedup: delete stale pending/review_ready rows from prior scrape
+    # jobs for the same (university_id, course_website).  Without this guard
+    # every re-scrape doubles the row count in scraped_courses — new rows from
+    # the fresh job land alongside old rows from the previous job, and admins
+    # see every course twice in the review queue.
+    #
+    # Safety: only delete rows whose status is NOT 'approved' or 'published' —
+    # those are operator-confirmed and must never be touched here.  The existing
+    # preservation block below (lines ~285+) already copies field values from
+    # approved rows into the new staging row so no data is lost.
+    if source_url:
+        try:
+            _stale_q = await db.execute(
+                select(ScrapedCourse.id)
+                .where(
+                    ScrapedCourse.university_id == university_id,
+                    ScrapedCourse.course_website == source_url,
+                    ScrapedCourse.scrape_job_id != scrape_job_id,
+                    ScrapedCourse.status.not_in(["approved", "published"]),
+                )
+            )
+            _stale_ids = [row[0] for row in _stale_q.fetchall()]
+            if _stale_ids:
+                await db.execute(
+                    delete(ScrapedCourse).where(ScrapedCourse.id.in_(_stale_ids))
+                )
+                log.info(
+                    "stage_course: cross-job dedup — deleted %d stale row(s) for URL %r (uni %s)",
+                    len(_stale_ids),
+                    source_url,
+                    university_id,
+                )
+        except Exception as _cdep:  # noqa: BLE001 — never abort on dedup check failure
+            log.warning(
+                "stage_course: cross-job dedup check failed for %r: %s", source_url, _cdep
+            )
 
     # Phase A: drop critical fields (fee, english tests, location, study_mode,
     # duration) that lack source proof.  Better to publish "unknown" than
