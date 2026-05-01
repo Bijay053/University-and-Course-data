@@ -273,7 +273,7 @@ def main() -> None:
     with engine.connect() as conn:
         q = """
             SELECT id,
-                   course_url AS source_url,
+                   course_website AS source_url,
                    course_name
             FROM scraped_courses
             WHERE university_id = :uid
