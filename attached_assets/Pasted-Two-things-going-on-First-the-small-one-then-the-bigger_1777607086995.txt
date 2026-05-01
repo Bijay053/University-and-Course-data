@@ -1,0 +1,139 @@
+Two things going on. First the small one, then the bigger one.
+
+---
+
+**The chore commit `0279075` is empty because the change was already in the cherry-picked Option C commit (`44b049f`).** That's why git said `The previous cherry-pick is now empty, possibly due to conflict resolution.` The TODO/DONE comment update lived in `acap.yaml` and the same file got modified during Option C's cherry-pick, which already included the comment update. Resolution:
+
+```
+cd ~/University-and-Course-data
+git cherry-pick --skip
+git log --oneline | head -9
+```
+
+This is correct — skip the empty commit, redeploy is complete with 7 functional commits applied.
+
+---
+
+**Now the bigger thing. The redeploy summary you posted skips past several issues that need acknowledgement before declaring this done.**
+
+Reading the actual sweep outputs carefully:
+
+**1. The KBS sweep after the duration fix shows 3 courses REMOVED, not 0 changes.**
+
+```
+[EXPECTED] kbs (uni_id=29)  before=25  after=22  → DIRTY
+    added=0  removed=3  changed=0
+    [REMOVED] 'Graduate Certificate in Accounting'
+    [REMOVED] 'Graduate Certificate in Business Administration'
+    [REMOVED] 'Graduate Certificate in Business Analytics'
+```
+
+You described this as "3 grad certs blocked by the sanity cap, expected for this phase." That's the correct diagnosis but it's NOT a clean sweep result — these are real KBS courses that users would expect to see, and they're now invisible. The sweep gate said PASS because `--expected-slugs kbs` made any KBS diff acknowledgeable, but the *content* of the acknowledgement matters.
+
+What's actually happened: Fixes 1+3 (the duration regex code) couldn't find a valid duration for these 3 courses, so the sanity cap nullified the value, and then the staging logic rejected the course entirely because it had no duration. Three courses that *were* visible in production yesterday are now invisible.
+
+From a user perspective:
+- Yesterday: 25 KBS courses visible, 3 of them with wrong/blank duration
+- Now: 22 KBS courses visible, 3 missing entirely
+
+This is a regression in catalog completeness even if it's an improvement in data quality. The sanity cap is doing what it's designed to do (block bad data from reaching users), but the design choice that "no duration = drop the course" rather than "no duration = show with NULL" is what's making courses disappear.
+
+Worth flagging as a known follow-up. Two options for resolving:
+- Stage courses with NULL duration anyway (let users see them with a blank duration cell)
+- Investigate why the duration regex still can't parse "8 months / 4 subjects / 2 trimesters" correctly after Fixes 1+3, since these are exactly the patterns Fix 1 was supposed to handle
+
+The second option is the real B-scope. Fixes 1+3 fixed *some* of the duration regex problems but clearly not all of them. The 3 KBS grad certs being dropped is the data showing where the regex still fails.
+
+**2. The KBS sweep AFTER the KBS fix (before the duration fix) showed 5 courses ADDED.**
+
+Going back further:
+
+```
+[EXPECTED] kbs (uni_id=29)  before=21  after=25  → DIRTY
+    added=5  removed=1
+    [REMOVED] 'Master of Information Technology'
+    [ADDED] 'Graduate Certificate in Business Administration'
+    [ADDED] 'Graduate Certificate in Business Analytics'
+    [ADDED] 'MBA – Data-driven Leadership'
+    [ADDED] 'MBA – Digital Management'
+    [ADDED] 'MBA – Tourism and Hospitality Leadership'
+```
+
+The KBS fix (vision OCR disable + slash location format) caused 5 courses to APPEAR and 1 to DISAPPEAR. This is the opposite of what we'd expect from a per-uni override that just changes vision OCR behaviour and location string formatting.
+
+My guess: the slash-location-normalisation change (in the same commit) affected which courses passed some downstream filter. Or vision OCR disable changed which English requirements got populated, which changed eligibility scoring, which changed staging filter pass/fail.
+
+But it's a guess. The KBS commit bundled TWO changes (vision OCR disable + location format) into one cherry-pick. We can't isolate which change caused the 5 added / 1 removed. Original recommendation was to split that commit into two separate cherry-picks for exactly this reason.
+
+Why is `Master of Information Technology` removed but `Master of Information Technology (Extension)` still present? Worth a query against staged_courses for uni 29 to see what status the dropped course has — might be an extraction failure rather than a filter rejection.
+
+**3. The duration migration was already applied to prod DB before the code commits.**
+
+From the diagnostics:
+
+```
+SELECT version_num FROM alembic_version;
+     version_num      
+----------------------
+ 012_duration_numeric
+```
+
+And `\d courses` shows `duration | numeric(6,2)`. This means the prod DB schema was already migrated during the bundled deploy attempt earlier (the commit history in `e7bfd9a` notes "on prod this was applied manually via psql"). So the model commit (`58d5f0c`) cherry-pick was a no-op for the schema — just a code change to match an already-migrated DB.
+
+This is actually fine, but it skips the proper Fix 2 validation flow we designed (isolated staging DB sweep before applying to prod). The migration was applied pre-rollback, the prod DB still has it post-rollback (rollback only reverted code, not DB), and now the model commit was cherry-picked to make the model match the DB.
+
+**This means we never actually ran the Fix 2 isolated validation sweep** that we'd designed. We just cherry-picked the code commits and trusted that the previously-applied migration was safe. The validation gate was skipped.
+
+Is the migration safe? Probably yes — looking at the data, all 1580+ duration values round-tripped from Float to Numeric(6,2) cleanly with the 59 zeros and the wild 104/88/66/64 values still sitting there unchanged. Nothing visibly broke. But "probably yes" is exactly the heuristic the architecture work was designed to replace.
+
+For future Fix-2-shaped changes (any global schema migration), the isolated sweep flow needs to run. This time we got away with it because the migration is straightforward column-type rounding. Next time might not be.
+
+**4. Two instances of the celery zombie-job problem during the run.**
+
+Two separate KBS scrape attempts (`job_6f1ff0470cfd` and `job_844f3b3d3ede`) sat in `queued` state with 0 in Redis until you manually marked them failed and retriggered. This is a separate prod infrastructure bug — the API enqueues a job to the DB but the celery dispatch to Redis is failing silently in some race condition (probably immediately after a `systemctl restart` while celery is still warming up).
+
+Worth a separate bug ticket: "API returns `queued` for scrape jobs but celery never picks them up if dispatched within ~10s of worker restart."
+
+Workaround for now: always `sleep 15` between `systemctl restart` and `curl -X POST scrape/start`. Better fix: make the API verify the task actually landed in Redis before returning 200.
+
+---
+
+**Where the redeploy actually stands:**
+
+| Concern | Status |
+|---------|--------|
+| 7 functional commits cherry-picked | ✅ Applied to prod code |
+| Each cherry-pick had its own sweep | ✅ 4 sweeps (Option C, KBS, duration fixes ×2) |
+| All sweeps showed PASS | ⚠️ PASS with acknowledged diffs — acknowledgements accepted some real impact (3 KBS courses dropped) |
+| Fix 2 schema migration validated | ❌ Skipped — migration was already on prod from earlier bundled deploy |
+| GitHub history reconciled | ❌ Local diverged 8 ahead of origin (origin has the original 8 commits in the bundled order, local has the cleanly-sequenced 8 commits) |
+
+**On the GitHub force-push question:**
+
+Don't force-push yet. Two reasons:
+
+1. The local 8 commits and the origin 8 commits are functionally equivalent but have different SHAs (because they were re-applied in a different order). Force-pushing replaces origin history with local history. If anyone else has pulled or branched from origin's current state, force-push breaks them.
+
+2. The redeploy isn't actually "clean" yet. The 3 KBS grad certs being dropped is a real impact that should be either accepted as known (and documented) or fixed (continue debugging the duration regex) before declaring the cycle done.
+
+Suggested:
+- Before force-pushing: tag the current `origin/main` as `archive/bundled-deploy-attempt` so the original commit history is preserved for reference
+- Document the known KBS grad cert drop in a follow-up ticket ("Fixes 1+3 don't yet handle '8 months / N subjects / N trimesters' patterns; 3 KBS grad certs currently invisible")
+- THEN force-push the cleanly-sequenced local history
+
+Or: live with the diverged state. Prod runs from local git, GitHub is just a sync point. As long as future commits are pushed cleanly going forward, the bundled commits on origin become historical. Less clean but lower risk.
+
+---
+
+**Concrete next steps:**
+
+1. `git cherry-pick --skip` (clear the empty cherry-pick state)
+2. Confirm `git log --oneline | head -9` shows the clean 8-commit chain
+3. Decide on GitHub reconciliation: tag-then-force-push OR live-with-divergence
+4. Open follow-up ticket for the 3 KBS grad certs (B-scope continuation)
+5. Add `sleep 15` to deploy script after celery restart (zombie-job workaround)
+6. Spot-check the dashboard: visit ACAP and KBS in the review UI, confirm location strips work and IELTS hallucinations are gone
+
+Step 6 is the actual user-facing validation. The sweep proves data structure changes are bounded; eyeballing the dashboard proves users see what we expect.
+
+Don't push to GitHub or call the cycle done until step 6 is complete.
