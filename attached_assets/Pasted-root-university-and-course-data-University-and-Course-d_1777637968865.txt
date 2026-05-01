@@ -1,0 +1,179 @@
+root@university-and-course-data:~/University-and-Course-data/backend-py# # Find where bulk_approve might be
+find ~/University-and-Course-data -name 'bulk_approve.py' 2>/dev/null
+
+# Check actual Bond row statuses
+sudo -u postgres psql university_portal -c "
+SELECT status, auto_publish_status, COUNT(*), 
+       ROUND(AVG(completeness)) avg_pct
+FROM scraped_courses WHERE university_id = 22
+GROUP BY status, auto_publish_status
+ORDER BY status, auto_publish_status;"
+ status  | auto_publish_status | count | avg_pct 
+---------+---------------------+-------+---------
+ pending | ready               |   126 |      51
+(1 row)
+
+root@university-and-course-data:~/University-and-Course-data/backend-py# ls ~/University-and-Course-data/backend-py/scripts/
+audit_null_ielts.py  bond_enrich.py  capture_baseline.py  check_gemini_model.py  regression_sweep.py  verify_db_match.py
+root@university-and-course-data:~/University-and-Course-data/backend-py# cd ~/University-and-Course-data/backend-py
+PYTHONPATH=. venv/bin/python3 scripts/bulk_approve.py --university-id 22 --dry-run
+venv/bin/python3: can't open file '/root/University-and-Course-data/backend-py/scripts/bulk_approve.py': [Errno 2] No such file or directory
+root@university-and-course-data:~/University-and-Course-data/backend-py# cd ~/University-and-Course-data
+git checkout HEAD -- backend-py/scripts/bulk_approve.py
+ls backend-py/scripts/bulk_approve.py
+backend-py/scripts/bulk_approve.py
+root@university-and-course-data:~/University-and-Course-data# cd ~/University-and-Course-data/backend-py
+
+PYTHONPATH=. venv/bin/python3 scripts/bulk_approve.py --university-id 22 --dry-run
+
+PYTHONPATH=. venv/bin/python3 scripts/bulk_approve.py --university-id 22
+
+sudo -u postgres psql university_portal -c "
+SELECT COUNT(*) AS bond_live FROM courses WHERE university_id = 22;"
+2026-05-01 12:19:17,273 INFO bulk_approve: University: Bond University (id=22) | filter: status='pending' auto_publish_status='ready' | matched: 126 rows
+2026-05-01 12:19:17,273 INFO bulk_approve: DRY-RUN — no rows will be committed.
+2026-05-01 12:19:17,273 INFO bulk_approve: Sample names (up to 10):
+2026-05-01 12:19:17,273 INFO bulk_approve:   [10378] Master of Enterprise Artificial Intelligence (Professional)
+2026-05-01 12:19:17,273 INFO bulk_approve:   [10379] Master of Enterprise Artificial Intelligence
+2026-05-01 12:19:17,273 INFO bulk_approve:   [10380] Bachelor of Enterprise Artificial Intelligence
+2026-05-01 12:19:17,273 INFO bulk_approve:   [10381] Graduate Diploma in Project Management
+2026-05-01 12:19:17,273 INFO bulk_approve:   [10382] Master of Legal Administration
+2026-05-01 12:19:17,273 INFO bulk_approve:   [10383] Master of Construction Practice/ Master of Project Management
+2026-05-01 12:19:17,273 INFO bulk_approve:   [10384] Graduate Certificate in Business
+2026-05-01 12:19:17,273 INFO bulk_approve:   [10385] Graduate Diploma in Business
+2026-05-01 12:19:17,273 INFO bulk_approve:   [10386] Master of Architecture
+2026-05-01 12:19:17,273 INFO bulk_approve:   [10387] Master of Valuation and Property Development (Professional)
+2026-05-01 12:19:18,264 INFO bulk_approve: University: Bond University (id=22) | filter: status='pending' auto_publish_status='ready' | matched: 126 rows
+2026-05-01 12:19:18,309 INFO bulk_approve:   approved sc_id=10378 → course_id=547  'Master of Enterprise Artificial Intelligence (Professional)'
+2026-05-01 12:19:18,320 INFO bulk_approve:   approved sc_id=10379 → course_id=548  'Master of Enterprise Artificial Intelligence'
+2026-05-01 12:19:18,333 INFO bulk_approve:   approved sc_id=10380 → course_id=549  'Bachelor of Enterprise Artificial Intelligence'
+2026-05-01 12:19:18,351 INFO bulk_approve:   approved sc_id=10381 → course_id=550  'Graduate Diploma in Project Management'
+2026-05-01 12:19:18,366 INFO bulk_approve:   approved sc_id=10382 → course_id=551  'Master of Legal Administration'
+2026-05-01 12:19:18,381 INFO bulk_approve:   approved sc_id=10383 → course_id=552  'Master of Construction Practice/ Master of Project Management'
+2026-05-01 12:19:18,391 INFO bulk_approve:   approved sc_id=10384 → course_id=553  'Graduate Certificate in Business'
+2026-05-01 12:19:18,404 INFO bulk_approve:   approved sc_id=10385 → course_id=554  'Graduate Diploma in Business'
+2026-05-01 12:19:18,415 INFO bulk_approve:   approved sc_id=10386 → course_id=555  'Master of Architecture'
+2026-05-01 12:19:18,424 INFO bulk_approve:   approved sc_id=10387 → course_id=556  'Master of Valuation and Property Development (Professional)'
+2026-05-01 12:19:18,435 INFO bulk_approve:   approved sc_id=10388 → course_id=557  'Diploma Preparation Program'
+2026-05-01 12:19:18,445 INFO bulk_approve:   approved sc_id=10389 → course_id=558  'Master of Architecture (Professional)'
+2026-05-01 12:19:18,456 INFO bulk_approve:   approved sc_id=10390 → course_id=559  'Bachelor of Project Management'
+2026-05-01 12:19:18,468 INFO bulk_approve:   approved sc_id=10391 → course_id=560  'Master of Laws in Enterprise Governance'
+2026-05-01 12:19:18,478 INFO bulk_approve:   approved sc_id=10392 → course_id=561  'Master of International Hotel and Tourism Management (Professional)'
+2026-05-01 12:19:18,489 INFO bulk_approve:   approved sc_id=10393 → course_id=562  'Graduate Certificate of Valuation and Property Development'
+2026-05-01 12:19:18,500 INFO bulk_approve:   approved sc_id=10394 → course_id=563  'Master of International Hotel and Tourism Management'
+2026-05-01 12:19:18,511 INFO bulk_approve:   approved sc_id=10395 → course_id=564  'Graduate Diploma in Architecture'
+2026-05-01 12:19:18,522 INFO bulk_approve:   approved sc_id=10396 → course_id=565  'Master of Laws'
+2026-05-01 12:19:18,533 INFO bulk_approve:   approved sc_id=10397 → course_id=566  'Bachelor of Design in Architecture'
+2026-05-01 12:19:18,543 INFO bulk_approve:   approved sc_id=10398 → course_id=567  'Graduate Diploma in Psychology (Bridging)'
+2026-05-01 12:19:18,554 INFO bulk_approve:   approved sc_id=10399 → course_id=568  'Diploma of Built Environment'
+2026-05-01 12:19:18,564 INFO bulk_approve:   approved sc_id=10400 → course_id=569  'Diploma of Health Sciences'
+2026-05-01 12:19:18,575 INFO bulk_approve:   approved sc_id=10401 → course_id=570  'Diploma of Creative Design'
+2026-05-01 12:19:18,586 INFO bulk_approve:   approved sc_id=10402 → course_id=571  'Graduate Certificate in Data Analytics'
+2026-05-01 12:19:18,597 INFO bulk_approve:   approved sc_id=10403 → course_id=572  'Bachelor of Psychological Science'
+2026-05-01 12:19:18,608 INFO bulk_approve:   approved sc_id=10404 → course_id=573  'Bachelor of Actuarial Science (Honours)'
+2026-05-01 12:19:18,619 INFO bulk_approve:   approved sc_id=10405 → course_id=574  'Bachelor of Sport Management'
+2026-05-01 12:19:18,631 INFO bulk_approve:   approved sc_id=10406 → course_id=575  'Bachelor of Film and Television'
+2026-05-01 12:19:18,643 INFO bulk_approve:   approved sc_id=10407 → course_id=576  'Bachelor of Film and Television (3 Year Program)'
+2026-05-01 12:19:18,655 INFO bulk_approve:   approved sc_id=10408 → course_id=577  'Master of Communication'
+2026-05-01 12:19:18,665 INFO bulk_approve:   approved sc_id=10409 → course_id=578  'Bachelor of Communication'
+2026-05-01 12:19:18,677 INFO bulk_approve:   approved sc_id=10410 → course_id=579  'Bachelor of Communication (Business)'
+2026-05-01 12:19:18,688 INFO bulk_approve:   approved sc_id=10411 → course_id=580  'Bachelor of International Relations (3 Year Program)'
+2026-05-01 12:19:18,700 INFO bulk_approve:   approved sc_id=10412 → course_id=581  'Master of Professional Psychology'
+2026-05-01 12:19:18,711 INFO bulk_approve:   approved sc_id=10413 → course_id=582  'Bachelor of Biomedical Science/ Bachelor of Laws'
+2026-05-01 12:19:18,724 INFO bulk_approve:   approved sc_id=10414 → course_id=583  'Bachelor of Construction Management and Quantity Surveying'
+2026-05-01 12:19:18,739 INFO bulk_approve:   approved sc_id=10415 → course_id=584  'Bachelor of Creative Arts'
+2026-05-01 12:19:18,752 INFO bulk_approve:   approved sc_id=10416 → course_id=585  'Bachelor of Journalism'
+2026-05-01 12:19:18,763 INFO bulk_approve:   approved sc_id=10417 → course_id=586  'Bachelor of Journalism/ Bachelor of Laws'
+2026-05-01 12:19:18,775 INFO bulk_approve:   approved sc_id=10418 → course_id=587  'Bachelor of Property'
+2026-05-01 12:19:18,788 INFO bulk_approve:   approved sc_id=10419 → course_id=588  'Bachelor of Psychological Science (Honours)'
+2026-05-01 12:19:18,802 INFO bulk_approve:   approved sc_id=10420 → course_id=589  'Bachelor of Psychological Science/ Bachelor of Laws'
+2026-05-01 12:19:18,814 INFO bulk_approve:   approved sc_id=10421 → course_id=590  'Graduate Certificate in Building Surveying'
+2026-05-01 12:19:18,825 INFO bulk_approve:   approved sc_id=10422 → course_id=591  'Graduate Certificate in Construction Practice'
+2026-05-01 12:19:18,836 INFO bulk_approve:   approved sc_id=10423 → course_id=592  'Graduate Diploma in Building Surveying'
+2026-05-01 12:19:18,847 INFO bulk_approve:   approved sc_id=10424 → course_id=593  'Bachelor of Actuarial Science'
+2026-05-01 12:19:18,857 INFO bulk_approve:   approved sc_id=10425 → course_id=594  'Bachelor of Actuarial Science (3 Year Program)'
+2026-05-01 12:19:18,871 INFO bulk_approve:   approved sc_id=10426 → course_id=595  'Master of Finance/ Master of Business Administration'
+2026-05-01 12:19:18,883 INFO bulk_approve:   approved sc_id=10427 → course_id=596  'Graduate Diploma in Business Administration'
+2026-05-01 12:19:18,894 INFO bulk_approve:   approved sc_id=10428 → course_id=597  'Master of Finance'
+2026-05-01 12:19:18,906 INFO bulk_approve:   approved sc_id=10429 → course_id=598  'Graduate Certificate in Business Administration'
+2026-05-01 12:19:18,918 INFO bulk_approve:   approved sc_id=10430 → course_id=599  'Master of Sport Management'
+2026-05-01 12:19:18,931 INFO bulk_approve:   approved sc_id=10431 → course_id=600  'Master of Sport Management (Professional)'
+2026-05-01 12:19:18,943 INFO bulk_approve:   approved sc_id=10432 → course_id=601  'Graduate Certificate in Sport Management'
+2026-05-01 12:19:18,955 INFO bulk_approve:   approved sc_id=10433 → course_id=602  'Graduate Diploma in Sport Management'
+2026-05-01 12:19:18,965 INFO bulk_approve:   approved sc_id=10434 → course_id=603  'Master of Business Data Analytics'
+2026-05-01 12:19:18,976 INFO bulk_approve:   approved sc_id=10435 → course_id=604  'Master of Business Data Analytics (Professional)'
+2026-05-01 12:19:18,992 INFO bulk_approve:   approved sc_id=10436 → course_id=605  'Bachelor of Laws'
+2026-05-01 12:19:19,004 INFO bulk_approve:   approved sc_id=10437 → course_id=606  'Master of Finance (Professional)'
+2026-05-01 12:19:19,016 INFO bulk_approve:   approved sc_id=10438 → course_id=607  'Bachelor of Communication/ Bachelor of Laws'
+2026-05-01 12:19:19,030 INFO bulk_approve:   approved sc_id=10439 → course_id=608  'Bachelor of Communication (Business)/ Bachelor of Laws'
+2026-05-01 12:19:19,042 INFO bulk_approve:   approved sc_id=10440 → course_id=609  'Bachelor of Actuarial Science/ Bachelor of Laws'
+2026-05-01 12:19:19,054 INFO bulk_approve:   approved sc_id=10441 → course_id=610  'Diploma of Arts'
+2026-05-01 12:19:19,066 INFO bulk_approve:   approved sc_id=10442 → course_id=611  'Diploma of Legal Studies'
+2026-05-01 12:19:19,080 INFO bulk_approve:   approved sc_id=10443 → course_id=612  'Bachelor of Criminal Justice and Criminology'
+2026-05-01 12:19:19,092 INFO bulk_approve:   approved sc_id=10444 → course_id=613  'Graduate Certificate in Criminology'
+2026-05-01 12:19:19,105 INFO bulk_approve:   approved sc_id=10445 → course_id=614  'Master of Criminology'
+2026-05-01 12:19:19,118 INFO bulk_approve:   approved sc_id=10446 → course_id=615  'Master of Criminology (Professional)'
+2026-05-01 12:19:19,134 INFO bulk_approve:   approved sc_id=10447 → course_id=616  'Master of Criminology/ Master of Project Management'
+2026-05-01 12:19:19,143 INFO bulk_approve:   approved sc_id=10448 → course_id=617  'Bachelor of Social Science'
+2026-05-01 12:19:19,156 INFO bulk_approve:   approved sc_id=10449 → course_id=618  'Bachelor of Global Studies (Sustainability)'
+2026-05-01 12:19:19,170 INFO bulk_approve:   approved sc_id=10450 → course_id=619  'Bachelor of Arts'
+2026-05-01 12:19:19,184 INFO bulk_approve:   approved sc_id=10451 → course_id=620  'Bachelor of International Relations/ Bachelor of Business'
+2026-05-01 12:19:19,194 INFO bulk_approve:   approved sc_id=10452 → course_id=621  'Master of International Relations/ Master of Project Management'
+2026-05-01 12:19:19,206 INFO bulk_approve:   approved sc_id=10453 → course_id=622  'Bachelor of Arts/ Bachelor of Laws'
+2026-05-01 12:19:19,218 INFO bulk_approve:   approved sc_id=10454 → course_id=623  'Bachelor of International Relations/ Bachelor of Laws'
+2026-05-01 12:19:19,231 INFO bulk_approve:   approved sc_id=10455 → course_id=624  'Bachelor of Policy, Philosophy and Economics'
+2026-05-01 12:19:19,240 INFO bulk_approve:   approved sc_id=10456 → course_id=625  'Master of International Relations (Professional)'
+2026-05-01 12:19:19,252 INFO bulk_approve:   approved sc_id=10457 → course_id=626  'Master of Arts (Tesol)'
+2026-05-01 12:19:19,267 INFO bulk_approve:   approved sc_id=10458 → course_id=627  'Master of Arts (Coursework)'
+2026-05-01 12:19:19,276 INFO bulk_approve:   approved sc_id=10459 → course_id=628  'Master of International Relations'
+2026-05-01 12:19:19,286 INFO bulk_approve:   approved sc_id=10460 → course_id=629  'Master of Accounting (Professional)'
+2026-05-01 12:19:19,299 INFO bulk_approve:   approved sc_id=10461 → course_id=630  'Bachelor of Commerce/ Bachelor of Laws'
+2026-05-01 12:19:19,311 INFO bulk_approve:   approved sc_id=10462 → course_id=631  'Bachelor of Commerce'
+2026-05-01 12:19:19,323 INFO bulk_approve:   approved sc_id=10463 → course_id=632  'Bachelor of Business/ Bachelor of Commerce'
+2026-05-01 12:19:19,335 INFO bulk_approve:   approved sc_id=10464 → course_id=633  'Bachelor of Biomedical Science'
+2026-05-01 12:19:19,346 INFO bulk_approve:   approved sc_id=10465 → course_id=634  'Bachelor of Exercise and Sports Science'
+2026-05-01 12:19:19,357 INFO bulk_approve:   approved sc_id=10466 → course_id=635  'Bachelor of Exercise and Sports Performance'
+2026-05-01 12:19:19,368 INFO bulk_approve:   approved sc_id=10467 → course_id=636  'Doctor of Physiotherapy'
+2026-05-01 12:19:19,381 INFO bulk_approve:   approved sc_id=10468 → course_id=637  'Master of Occupational Therapy'
+2026-05-01 12:19:19,396 INFO bulk_approve:   approved sc_id=10469 → course_id=638  'Graduate Diploma in Occupation and Health'
+2026-05-01 12:19:19,407 INFO bulk_approve:   approved sc_id=10470 → course_id=639  'Master of Healthcare Innovations'
+2026-05-01 12:19:19,420 INFO bulk_approve:   approved sc_id=10471 → course_id=640  'Bachelor of Business Law'
+2026-05-01 12:19:19,431 INFO bulk_approve:   approved sc_id=10472 → course_id=641  'Master of Occupational Therapy Prerequisites'
+2026-05-01 12:19:19,443 INFO bulk_approve:   approved sc_id=10473 → course_id=642  'Bachelor of Jurisprudence'
+2026-05-01 12:19:19,454 INFO bulk_approve:   approved sc_id=10474 → course_id=643  'Master of Business Administration'
+2026-05-01 12:19:19,466 INFO bulk_approve:   approved sc_id=10475 → course_id=644  'Master of Management'
+2026-05-01 12:19:19,477 INFO bulk_approve:   approved sc_id=10476 → course_id=645  'Master of Actuarial Science'
+2026-05-01 12:19:19,487 INFO bulk_approve:   approved sc_id=10477 → course_id=646  'Bachelor of Health Sciences (Honours, Intensive)'
+2026-05-01 12:19:19,497 INFO bulk_approve:   approved sc_id=10478 → course_id=647  'Master of Business (Professional)'
+2026-05-01 12:19:19,509 INFO bulk_approve:   approved sc_id=10479 → course_id=648  'Master of Business'
+2026-05-01 12:19:19,521 INFO bulk_approve:   approved sc_id=10480 → course_id=649  'Bachelor of Business Data Analytics'
+2026-05-01 12:19:19,533 INFO bulk_approve:   approved sc_id=10481 → course_id=650  'Diploma of Business'
+2026-05-01 12:19:19,545 INFO bulk_approve:   approved sc_id=10482 → course_id=651  'Master of Laws (by Research)'
+2026-05-01 12:19:19,558 INFO bulk_approve:   approved sc_id=10483 → course_id=652  'Master of Psychology (Clinical)'
+2026-05-01 12:19:19,570 INFO bulk_approve:   approved sc_id=10484 → course_id=653  'Bachelor of Business/ Bachelor of Laws'
+2026-05-01 12:19:19,584 INFO bulk_approve:   approved sc_id=10485 → course_id=654  'Bachelor of Digital Transformation'
+2026-05-01 12:19:19,598 INFO bulk_approve:   approved sc_id=10486 → course_id=655  'Bachelor of Entrepreneurial Transformation'
+2026-05-01 12:19:19,610 INFO bulk_approve:   approved sc_id=10487 → course_id=656  'Graduate Diploma in Building Information Modelling and Integrated Project Delivery'
+2026-05-01 12:19:19,621 INFO bulk_approve:   approved sc_id=10488 → course_id=657  'Graduate Certificate in Building Information Modelling and Integrated Project Delivery'
+2026-05-01 12:19:19,632 INFO bulk_approve:   approved sc_id=10489 → course_id=658  'Master of Building Information Modelling and Integrated Project Delivery'
+2026-05-01 12:19:19,645 INFO bulk_approve:   approved sc_id=10490 → course_id=659  'Bachelor of Business Data Analytics (3 Year Program)'
+2026-05-01 12:19:19,657 INFO bulk_approve:   approved sc_id=10491 → course_id=660  'Master of Nutrition and Dietetic Practice'
+2026-05-01 12:19:19,670 INFO bulk_approve:   approved sc_id=10492 → course_id=661  'Master of Project Management'
+2026-05-01 12:19:19,682 INFO bulk_approve:   approved sc_id=10493 → course_id=662  'Graduate Certificate in Family Dispute Resolution'
+2026-05-01 12:19:19,695 INFO bulk_approve:   approved sc_id=10494 → course_id=663  'Master of Valuation and Property Development'
+2026-05-01 12:19:19,706 INFO bulk_approve:   approved sc_id=10495 → course_id=664  'Graduate Certificate in Project Management'
+2026-05-01 12:19:19,718 INFO bulk_approve:   approved sc_id=10496 → course_id=665  'Graduate Diploma of Valuation and Property Development'
+2026-05-01 12:19:19,729 INFO bulk_approve:   approved sc_id=10497 → course_id=666  'Bachelor of Biomedical Science / Master of Nutrition and Dietetic Practice'
+2026-05-01 12:19:19,739 INFO bulk_approve:   approved sc_id=10498 → course_id=667  'Bachelor of Exercise and Sports Science / Doctor of Physiotherapy'
+2026-05-01 12:19:19,749 INFO bulk_approve:   approved sc_id=10499 → course_id=668  'Bachelor of Health Science and Master of Nutrition and Dietetic Practice'
+2026-05-01 12:19:19,760 INFO bulk_approve:   approved sc_id=10500 → course_id=669  'Bachelor of Entrepreneurial Transformation / Bachelor of Global Studies (Sustainability)'
+2026-05-01 12:19:19,771 INFO bulk_approve:   approved sc_id=10501 → course_id=670  'Bachelor of Digital Transformation/ Bachelor of Laws'
+2026-05-01 12:19:19,783 INFO bulk_approve:   approved sc_id=10502 → course_id=671  'Bachelor of Entrepreneurial Transformation/ Bachelor of Laws'
+2026-05-01 12:19:19,792 INFO bulk_approve:   approved sc_id=10503 → course_id=672  'Master of Philosophy'
+2026-05-01 12:19:19,793 INFO bulk_approve: Done. approved=126  failed=0  (total matched=126)
+ bond_live 
+-----------
+       126
+(1 row)
+
+root@university-and-course-data:~/University-and-Course-data/backend-py# 
