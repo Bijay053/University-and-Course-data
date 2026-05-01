@@ -90,6 +90,127 @@ def _send_slack(webhook_url: str, run_id: str, message: str) -> None:
         log.warning("[ALERT DELIVERY] Slack failed for run %s: %s", run_id, exc)
 
 
+def deliver_discovery_failure_alert(
+    uni_name: str,
+    uni_id: int,
+    scrape_url: str,
+    candidates_found: int,
+    diagnostic: dict,
+) -> None:
+    """Fire-and-forget Slack/email when discovery yields < 3 candidates.
+
+    Wraps the raw transport helpers so the orchestrator can call this with
+    a single line.  No-ops gracefully when neither transport is configured.
+    """
+    subject = f"[Tier-7] Discovery failure — {uni_name} ({candidates_found} candidate(s))"
+    lines = [
+        f"University:  {uni_name}  (id={uni_id})",
+        f"Scrape URL:  {scrape_url}",
+        f"Candidates:  {candidates_found}  (threshold < 3)",
+        "",
+        "All discovery tiers (BFS, sitemap, alt-paths, subdomain probes,",
+        "browser fallback, Wayback Machine) returned fewer than 3 course links.",
+        "This is almost always caused by:",
+        "  • The site blocking the crawler (403 / Cloudflare / geo-block)",
+        "  • scrape_url changed or is no longer valid",
+        "  • A Playwright / network outage on the scraper host",
+        "",
+        "Diagnostic snapshot:",
+    ]
+    for key, val in diagnostic.items():
+        lines.append(f"  {key}: {val}")
+    lines.append("")
+    lines.append(
+        "Action: check the scrape job log in the admin UI, then resolve "
+        "the discovery_failure_alerts row once the root cause is fixed."
+    )
+    body = "\n".join(lines)
+
+    if SLACK_WEBHOOK_URL:
+        _send_slack_raw(SLACK_WEBHOOK_URL, subject, body)
+
+    if ALERT_EMAIL_TO and SMTP_HOST:
+        _send_email(to=ALERT_EMAIL_TO, subject=subject, body=body)
+
+
+def deliver_drift_alert(
+    *,
+    before_date: str,
+    after_date: str,
+    diffs: list[dict],
+    warnings: list[dict],
+    summary: str,
+) -> None:
+    """Send the nightly regression-sweep drift report via Slack/email.
+
+    Called by the ``scrape.nightly_sweep`` Celery beat task when the
+    before/after baseline comparison finds unexpected changes.
+
+    ``diffs`` and ``warnings`` are lists of dict produced by the sweep
+    (each has ``slug``, ``field``, ``before``, ``after`` keys).
+    """
+    if not diffs and not warnings:
+        log.info("[DRIFT ALERT] no diffs — skipping delivery")
+        return
+
+    subject = (
+        f"[Nightly Drift] {len(diffs)} error(s), {len(warnings)} warning(s) "
+        f"— {before_date} → {after_date}"
+    )
+    lines = [
+        f"Nightly regression sweep:  {before_date} → {after_date}",
+        summary,
+        "",
+    ]
+    if diffs:
+        lines.append(f"ERRORS ({len(diffs)}):")
+        for d in diffs[:30]:  # cap at 30 to keep message readable
+            lines.append(
+                f"  [{d.get('slug','')}] {d.get('field','')}: "
+                f"{d.get('before','')} → {d.get('after','')}"
+            )
+        if len(diffs) > 30:
+            lines.append(f"  … and {len(diffs) - 30} more")
+        lines.append("")
+    if warnings:
+        lines.append(f"WARNINGS ({len(warnings)}):")
+        for w in warnings[:20]:
+            lines.append(
+                f"  [{w.get('slug','')}] {w.get('field','')}: "
+                f"{w.get('before','')} → {w.get('after','')}"
+            )
+        if len(warnings) > 20:
+            lines.append(f"  … and {len(warnings) - 20} more")
+        lines.append("")
+    lines.append(
+        "Review: compare baselines/nightly/<before_date>/ vs baselines/nightly/<after_date>/"
+    )
+    body = "\n".join(lines)
+
+    if SLACK_WEBHOOK_URL:
+        _send_slack_raw(SLACK_WEBHOOK_URL, subject, body)
+
+    if ALERT_EMAIL_TO and SMTP_HOST:
+        _send_email(to=ALERT_EMAIL_TO, subject=subject, body=body)
+
+
+def _send_slack_raw(webhook_url: str, subject: str, body: str) -> None:
+    """Post an arbitrary text message to Slack."""
+    payload = json.dumps({"text": f"*{subject}*\n```{body}```"}).encode()
+    req = urllib.request.Request(
+        webhook_url,
+        data=payload,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            status = resp.status
+        log.info("[ALERT DELIVERY] Slack OK (HTTP %s)", status)
+    except urllib.error.URLError as exc:
+        log.warning("[ALERT DELIVERY] Slack failed: %s", exc)
+
+
 def _send_email(to: str, subject: str, body: str) -> None:
     if not SMTP_HOST:
         log.debug("[ALERT DELIVERY] SMTP_HOST not set — skipping email")
