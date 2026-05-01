@@ -1,0 +1,51 @@
+Good — that's the right course correction. The acknowledgement is genuine and the rewritten sequence respects the discipline.
+A few things to confirm before you run the prod commands:
+On the proposed staging-DB validation for Fix 2:
+The path is correct in shape but missing the most important step — running the regression sweep against the staging DB. Steps 1-4 confirm the migration completes without error and that values look "sensible" by eye. They do NOT confirm zero behavioural drift across the 23 baselined unis.
+What's missing between step 4 and prod promotion:
+# Step 5: Capture baseline from staging (post-migration state)
+cd backend-py
+set -a && source .env && set +a
+DATABASE_URL=postgresql://uniportal@localhost/university_portal_staging \
+  PYTHONPATH=. venv/bin/python3 scripts/capture_baseline.py \
+  --out-dir baselines/fix2-staging-after/
+
+# Step 6: Run sweep against the post-Phase-5 baseline (current prod = before)
+PYTHONPATH=. venv/bin/python3 scripts/regression_sweep.py \
+  --before baselines/<post-phase-5-baseline>/ \
+  --after  baselines/fix2-staging-after/ \
+  --verbose
+
+# Expected: zero diffs across all 23 unis
+# (since Numeric(6,2) of 1.7 should equal float 1.7000000476837158 within tolerance)
+Step 4's "values look sensible by eye" is the heuristic the architecture exists to replace. If Fix 2 is genuinely a no-op behaviourally, the sweep will prove it with zero diffs. If it's NOT a no-op (some uni's downstream rendering or eligibility scoring depends on the float-precision artefacts in some unexpected way), the sweep finds it before prod sees it.
+Don't promote Fix 2 to prod without seeing the sweep result, even if steps 1-4 look clean.
+On the cherry-pick command being held pending the git log output:
+That's the right move. The exact reset target depends on what's actually on prod right now. The pre-batch stable SHA f95d75fc590c is the candidate, but if prod has additional local commits that aren't in GitHub, the reset would lose them. The git log --oneline -6 from prod will surface that.
+When the output comes back, two scenarios:
+Scenario A — prod HEAD matches f95d75fc590c or an earlier GitHub commit, no local-only commits:
+git fetch origin main
+git reset --hard f95d75fc590c
+git cherry-pick be3df6700db3
+git status  # confirm clean
+git log --oneline -3  # confirm: be3df6700db3 cherry-pick on top of f95d75fc590c
+sudo systemctl restart uni-api-py.service uni-celery.service
+Scenario B — prod HEAD has any local commits not in GitHub:
+Stop. Investigate what those commits are. They might be hotfixes that were applied directly to prod and never pushed back. Resetting blind would lose them. The right move is to identify them, push them to GitHub as a separate branch first, then reset and cherry-pick.
+Scenario C — prod HEAD is already at one of the four problematic commits (ede935448ea1, fba79b1cb3d2, 629e5de001ce):
+Even more important to reset. Means someone partially applied the bundled deploy. Reset to f95d75fc590c, cherry-pick C, then verify no DB changes were applied (the alembic_version table should still show the pre-Fix-2 version, NOT 012_duration_numeric).
+The git log --oneline -6 output will tell you which scenario you're in. Paste it before running anything.
+One more thing on the staging validation flow for Fix 2:
+The proposed sequence creates university_portal_staging on the same Postgres instance as prod. That's fine for a quick validation, but worth knowing: any process running queries against the prod DB at the same time as the pg_restore will see the prod DB only (the staging DB is a separate logical database). So the migration test won't affect prod traffic. Good. But also — when you're done, drop the staging DB (sudo -u postgres dropdb university_portal_staging) so it doesn't sit around accumulating state and confusing future work.
+Order of operations:
+
+Get the git log --oneline -6 output from prod → confirm scenario A/B/C
+Reset + cherry-pick C only
+Restart services
+Run ACAP sweep with --expected-slugs acap
+If clean: ship C, spot-check 4 ACAP courses in dashboard, declare C done
+Then start the Fix 2 staging validation (steps 1-6 above, including the sweep)
+Then start the Fixes 1+3 multi-uni sweep (B-scope)
+
+Don't skip the sweep step in Fix 2's validation. That's the gate.
+Paste the git log --oneline -6 output when you have it.
