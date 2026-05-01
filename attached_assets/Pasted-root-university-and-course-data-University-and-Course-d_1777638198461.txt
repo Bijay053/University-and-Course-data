@@ -1,0 +1,66 @@
+root@university-and-course-data:~/University-and-Course-data/backend-py# cd ~/University-and-Course-data
+git checkout HEAD -- backend-py/scripts/
+ls backend-py/scripts/
+audit_null_ielts.py  bond_enrich.py  bulk_approve.py  capture_baseline.py  check_gemini_model.py  regression_sweep.py  verify_db_match.py
+root@university-and-course-data:~/University-and-Course-data# cd ~/University-and-Course-data
+
+# Q1 — why did bulk_approve.py vanish?
+git reflog | head -20
+git status
+git diff HEAD --stat
+
+# Q2 — Bond IELTS spot-check (source will be NULL — that's expected and correct)
+sudo -u postgres psql university_portal -c "
+SELECT sc.id, sc.course_name, sc.ielts_overall,
+       sc.extraction_method->>'ielts_overall' AS source,
+       sc.course_website
+FROM scraped_courses sc
+WHERE sc.university_id = 22 AND sc.ielts_overall IS NOT NULL
+ORDER BY random()
+LIMIT 5;"
+
+# Flinders staging status
+sudo -u postgres psql university_portal -c "
+SELECT status, auto_publish_status, COUNT(*),
+       ROUND(AVG(completeness)) avg_pct
+FROM scraped_courses
+WHERE university_id = 12
+GROUP BY status, auto_publish_status
+ORDER BY status, auto_publish_status;"
+5601683 HEAD@{0}: pull origin main: Fast-forward
+44ff000 HEAD@{1}: pull origin main: Fast-forward
+f249dc3 HEAD@{2}: pull origin main: Fast-forward
+65b983c HEAD@{3}: pull origin main: Fast-forward
+7b643a6 HEAD@{4}: pull origin main: Fast-forward
+93497af HEAD@{5}: pull origin main: Fast-forward
+83e53e5 HEAD@{6}: pull origin main: Fast-forward
+1a1c95a HEAD@{7}: pull origin main: Fast-forward
+941d64f HEAD@{8}: pull origin main: Fast-forward
+983cc60 HEAD@{9}: pull origin main: Fast-forward
+ce11302 HEAD@{10}: pull origin main: Fast-forward
+aee94d7 HEAD@{11}: pull origin main: Fast-forward
+9a8e6b3 HEAD@{12}: pull origin main: Fast-forward
+0a29829 HEAD@{13}: commit: fix(duration): handle slash-structured program cells (Bug A)
+488a17e HEAD@{14}: reset: moving to 488a17e1a52ffb3a269784f8334c072ed838e3c8
+488a17e HEAD@{15}: cherry-pick: chore(acap): mark Phase 6 TODO as DONE in comment
+e7bfd9a HEAD@{16}: cherry-pick: fix(migration-012): drop/recreate course_search_view around ALTER COLUMN
+9c3090a HEAD@{17}: cherry-pick: fix(alembic): escape % in DATABASE_URL for ConfigParser
+58d5f0c HEAD@{18}: cherry-pick: fix(models): courses.duration Float->Numeric(6,2) + Alembic migration 012
+411f8ab HEAD@{19}: cherry-pick: fix(duration): block Year-12/schooling boilerplate from tournament
+On branch main
+Your branch is up to date with 'origin/main'.
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+        backend-py/2026-04-28 00:00:00+00
+        backend-py/baselines/
+        baselines/
+        drizzle-kit
+
+nothing added to commit but untracked files present (use "git add" to track)
+ status  | auto_publish_status | count | avg_pct 
+---------+---------------------+-------+---------
+ pending | review              |   105 |      75
+(1 row)
+
+root@university-and-course-data:~/University-and-Course-data# 
