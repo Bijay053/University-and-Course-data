@@ -1,0 +1,95 @@
+root@university-and-course-data:~/University-and-Course-data# JOB=$(curl -s -X POST http://localhost:80/api/scrape/start \
+  -H "Content-Type: application/json" -d '{"university_id": 29}' \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['jobId'])")
+echo "Job: $JOB"
+Job: job_8d3660df58cb
+root@university-and-course-data:~/University-and-Course-data# while true; do
+  STATUS=$(curl -s "http://localhost:80/api/scrape/status/$JOB" \
+    | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['status'])")
+  echo "$(date '+%H:%M:%S') status=$STATUS"
+  [ "$STATUS" = "completed" ] || [ "$STATUS" = "failed" ] && break
+  sleep 20
+done
+06:16:29 status=queued
+06:16:49 status=stopped
+06:17:09 status=stopped
+06:17:30 status=stopped
+^C
+root@university-and-course-data:~/University-and-Course-data# JOB=$(curl -s -X POST http://localhost:80/api/scrape/start \
+  -H "Content-Type: application/json" -d '{"university_id": 29}' \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['jobId'])")
+echo "Job: $JOB"
+Job: job_2d29494bfd5e
+root@university-and-course-data:~/University-and-Course-data# while true; do
+  STATUS=$(curl -s "http://localhost:80/api/scrape/status/$JOB" \
+    | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['status'])")
+  echo "$(date '+%H:%M:%S') status=$STATUS"
+  [ "$STATUS" = "completed" ] || [ "$STATUS" = "failed" ] && break
+  sleep 20
+done
+06:17:43 status=running
+06:18:03 status=running
+06:18:23 status=running
+06:18:43 status=running
+06:19:03 status=running
+06:19:23 status=running
+06:19:43 status=running
+06:20:03 status=running
+06:20:23 status=running
+06:20:43 status=running
+06:21:03 status=running
+06:21:23 status=running
+06:21:44 status=running
+06:22:04 status=running
+06:22:24 status=completed
+root@university-and-course-data:~/University-and-Course-data# backend-py/venv/bin/python3 backend-py/scripts/capture_baseline.py \
+  --slug kbs --out-dir baselines/after-bug-a2/
+
+backend-py/venv/bin/python3 backend-py/scripts/regression_sweep.py \
+  --before baselines/before-bug-a2/ \
+  --after  baselines/after-bug-a2/ \
+  --expected-slugs kbs
+INFO capture_baseline: Snapshotting 2 universities...
+INFO capture_baseline: Saved: 20260501_062300_kbs_8.json  (courses=30  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_062300_kbs_29.json  (courses=29  disc=37  staged=29  cost=$0.0111  304.6)
+INFO capture_baseline: Done. 2 universities, 59 courses total. Baselines written to baselines/after-bug-a2/
+
+Regression sweep: 2 before / 2 after snapshots
+Expected slugs:   ['kbs']
+------------------------------------------------------------------------
+
+  [EXPECTED] kbs (uni_id=29)  before=21  after=29  → DIRTY
+    added=8  removed=0  changed=16
+    [ADDED] 'Graduate Certificate in Accounting'
+    [ADDED] 'Graduate Certificate in Business Administration'
+    [ADDED] 'Graduate Certificate in Business Analytics'
+    [ADDED] 'Graduate Certificate in Information Technology'
+    [ADDED] 'Graduate Diploma of Business Administration'
+    [ADDED] 'Master of Business Analytics'
+    [ADDED] 'Master of Information Technology'
+    [ADDED] 'Master of Professional Accounting'
+    [CHANGED] 'Bachelor of Business (Accounting)'
+          (method-only) extraction_method.duration_term: 'gemini_primary' → None
+    [CHANGED] 'Bachelor of Business (Hospitality and Tourism Management)'
+          (method-only) extraction_method.duration_term: 'gemini_primary' → None
+    ... (14 more courses omitted)
+
+========================================================================
+SUMMARY
+  Clean unis:            1
+  Expected diffs:        1  (acknowledged)
+  Unexpected diffs:      0
+  Missing before:        0
+  Missing after:         0
+
+PASS (with acknowledged diffs) — 1 expected diff(s) for ['kbs']. Reviewer sign-off required before merge.
+root@university-and-course-data:~/University-and-Course-data# sudo -u postgres psql university_portal -c "
+SELECT course_name, duration, duration_term, status
+FROM staged_courses
+WHERE university_id = 29
+  AND course_name ILIKE '%graduate certificate%'
+ORDER BY course_name;"
+ERROR:  relation "staged_courses" does not exist
+LINE 3: FROM staged_courses
+             ^
+root@university-and-course-data:~/University-and-Course-data# 
