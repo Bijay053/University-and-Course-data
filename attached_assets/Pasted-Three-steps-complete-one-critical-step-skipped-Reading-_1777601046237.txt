@@ -1,0 +1,80 @@
+Three steps complete, one critical step skipped. Reading the output:
+
+**✓ Cherry-pick succeeded:** Option C is at `44b049f` on top of `f95d75f`. 4 files changed, 99 insertions, 2 deletions. Clean apply.
+
+**✓ Services restarted:** `uni-api-py.service` started at 02:03:22, `celery@university-and-course-data ready` at 02:03:25. Both healthy.
+
+**✗ ACAP scrape NOT triggered before capturing the "after" baseline.**
+
+Look at the timestamps and the ACAP cost in `option-c-after/`:
+
+```
+baselines/post-rollback-baseline/  acap_41.json  staged=11  cost=$0.0028  81.0
+baselines/option-c-after/          acap_41.json  staged=11  cost=$0.0028  81.0
+```
+
+Identical cost ($0.0028), identical processing time (81.0s), identical staged count (11). That's not a fresh scrape — the baseline script is reading the SAME existing data from the DB. The capture_baseline.py script reads what's already in the staging table, it doesn't trigger a re-scrape.
+
+**This means a sweep against `option-c-after/` right now would compare two snapshots of identical pre-Option-C data.** The Option C code change is in `location.py` (the location text post-processor), which only fires when an ACAP course is actually scraped fresh. The existing 11 staged ACAP courses in the DB still have their old location values with the `^` cruft.
+
+If you run the sweep now, you'll get 23 CLEAN unis. Looks great, proves nothing.
+
+**To actually validate Option C, the scrape has to happen between cherry-pick and after-baseline:**
+
+```
+# 1. Trigger ACAP scrape from admin UI
+#    OR via celery directly:
+cd ~/University-and-Course-data/backend-py
+set -a && source .env && set +a
+PYTHONPATH=. venv/bin/python3 -c "
+from app.tasks.scrape import run_scrape
+result = run_scrape.delay(university_id=41)
+print(f'Triggered scrape: {result.id}')
+"
+
+# 2. Wait for completion (watch the logs)
+sudo journalctl -u uni-celery -f | grep -E 'ACAP|acap|\[STAGE\]|\[VISION SKIP\]|Staged'
+# Wait until you see: 'Staged 11 courses' or similar completion line
+# Then Ctrl+C
+
+# 3. NOW capture the after-baseline (with fresh post-cherry-pick data)
+PYTHONPATH=. venv/bin/python3 scripts/capture_baseline.py \
+  --out-dir baselines/option-c-after/
+
+# 4. Run the sweep
+PYTHONPATH=. venv/bin/python3 scripts/regression_sweep.py \
+  --before baselines/post-rollback-baseline/ \
+  --after  baselines/option-c-after/ \
+  --expected-slugs acap \
+  --verbose
+```
+
+The ACAP scrape needs to run with the new code active so the location strip patterns are applied to fresh extraction output. Without that, the staging table still has the old `Perth^ ^Available in Perth from Trimester 3, 2026` values from previous runs.
+
+**Verify the scrape actually used the new code:**
+
+In the celery logs during the scrape, you should see something like:
+
+```
+[LOCATION STRIP] applied 1 pattern(s) for acap; 'Perth^ ^Available in Perth...' → 'Perth'
+```
+
+or whatever log line the new strip-pattern code emits. If no such line appears in the ACAP scrape log, the code path isn't firing for some reason — which would be a separate bug to debug before declaring Option C done.
+
+**If the scrape happens and the strip code fires correctly, the sweep should show:**
+- 22 unis CLEAN (none of them re-scraped, so their data is unchanged)
+- ACAP acknowledged-dirty: 4 courses with `course_location` field changes from `Perth^ ^Available...` to `Perth`. Specifically:
+  - Master of Social Work (Qualifying)
+  - Graduate Diploma of Professional Accounting
+  - Graduate Certificate of Professional Accounting
+  - Graduate Certificate of Human Services
+- Zero unexpected diffs
+
+**Side note on the 22 "clean" expectation:** since only ACAP is being re-scraped, the other 22 unis' baselines will be byte-identical to post-rollback (because nothing touched them). That's the expected behaviour and confirms Option C didn't accidentally regress anything outside ACAP.
+
+**Run the scrape now, then re-capture and re-sweep. Paste:**
+- Output of the scrape trigger command
+- A few relevant lines from the celery log showing the ACAP scrape ran (especially any `[LOCATION STRIP]` or location-related lines)
+- The sweep result
+
+That's the actual gate before Option C is declared done.
