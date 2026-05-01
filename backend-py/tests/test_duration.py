@@ -231,3 +231,140 @@ def test_cross_check_does_not_fire_for_different_n():
         f"Cross-check must NOT fire: Year N=2 differs from Month N=8. "
         f"Labeled 'Duration: 2 years' must win unchanged; got {n!r}."
     )
+
+
+# ── Bug A: KBS slash-structured program cells ─────────────────────────────
+
+
+def test_bug_a_slash_structure_months_wins_over_candidature_deadline():
+    """Bug A (KBS grad certs): 'N months / M subjects / K trimesters' format.
+
+    The first slash-token is the real program duration.  The sentence contains
+    no duration-context word so Pattern-2 was blocked; a candidature-deadline
+    sentence ('complete within 8 years') then won the weight tournament and was
+    nullified by the grad-cert sanity cap (4 yr max), dropping the course.
+
+    Fix: _SLASH_PROGRAM_STRUCTURE_RE fires at Pattern-0 priority (×100) so
+    (8, Month) always beats any fallback year match.
+    """
+    html = (
+        "<p>8 months / 4 subjects / 2 trimesters</p>"
+        "<p>Students must complete their qualification within 8 years of "
+        "commencement of studies.</p>"
+    )
+    out = _run(duration.extract(html, "https://www.kbs.edu.au/courses/grad-cert-accounting/"))
+    assert out, "extractor must find a duration for the KBS grad cert"
+    n = out[0].normalized
+    assert n["duration"] == 8.0 and n["duration_term"] == "Month", (
+        f"Slash-structure pre-check must yield (8, Month); got {n!r}. "
+        f"Before Bug A fix the candidature deadline '8 years' won the "
+        f"tournament and was nullified by the grad-cert sanity cap."
+    )
+
+
+def test_bug_a_slash_structure_trimesters_variant():
+    """Slash-structure where the first token is trimesters, not months."""
+    html = "<p>2 trimesters / 8 subjects / 1 year</p>"
+    out = _run(duration.extract(html, "https://e/x"))
+    assert out, "extractor must find a duration"
+    n = out[0].normalized
+    assert n["duration"] == 2.0 and n["duration_term"] == "Trimester", (
+        f"First slash-token (2 trimesters) must win; got {n!r}."
+    )
+
+
+def test_bug_a_slash_structure_does_not_fire_mid_sentence():
+    """Slash-structure regex only fires when the number+unit begins the sentence.
+
+    A slash embedded mid-sentence ('Fee: $12,000 / year') must NOT trigger it.
+    The labeled 'Duration: 3 years' should still win via the structural pre-pass.
+    """
+    html = (
+        "<div><strong>Duration</strong></div>"
+        "<div>3 years full-time</div>"
+        "<p>International fee is $12,000 / year or $6,000 / semester.</p>"
+    )
+    out = _run(duration.extract(html, "https://e/x"))
+    assert out, "extractor must find a duration"
+    n = out[0].normalized
+    assert n["duration"] == 3.0 and n["duration_term"] == "Year", (
+        f"Mid-sentence slash must not trigger slash-structure logic; got {n!r}."
+    )
+
+
+def test_bug_a_slash_structure_multiple_kbs_variants():
+    """All three KBS grad-cert durations that were previously dropped.
+
+    KBS pages expose duration in a labeled <dt>/<dd> cell.  The structural
+    pre-pass reads the value cell directly and calls _classify_duration_value
+    which picks the first digit+unit match from finditer — always "8 months"
+    — regardless of trailing slash tokens.  Previously these courses were
+    dropped because the sentence-level path (which fires when no structural
+    label exists) produced NULL duration after the sanity-cap nullification.
+    This test confirms the structural pre-pass path works correctly for the
+    canonical KBS HTML format.
+    """
+    for months, course in [
+        (8, "Graduate Certificate in Accounting"),
+        (8, "Graduate Certificate in Business Administration"),
+        (8, "Graduate Certificate in Business Analytics"),
+    ]:
+        html = (
+            f"<h1>{course}</h1>"
+            f"<dl><dt>Duration</dt><dd>{months} months / 4 subjects / 2 trimesters</dd></dl>"
+            "<p>Candidates must complete their studies within 8 years of enrolment.</p>"
+        )
+        out = _run(duration.extract(html, f"https://www.kbs.edu.au/courses/{course.lower().replace(' ', '-')}/"))
+        assert out, f"extractor must find a duration for {course}"
+        n = out[0].normalized
+        assert n["duration"] == float(months) and n["duration_term"] == "Month", (
+            f"{course}: expected ({months}, Month); got {n!r}"
+        )
+        assert out[0].method == "duration.structural", (
+            f"{course}: structural pre-pass must fire on <dt>Duration</dt>; "
+            f"got method={out[0].method!r}"
+        )
+
+
+def test_bug_a2_slash_sentence_no_label_returns_regex_method():
+    """Bug A.2 regression: when no DOM Duration label exists, the slash
+    sentence-level regex fires and returns method='regex'.
+
+    'regex' must be in _STRUCTURAL_COURSE_PAGE_EXACT in single_course.py so
+    the atomic duration-term guard (Bug A.2 fix) protects duration_term from
+    being overwritten by Gemini primary when it runs afterwards.
+
+    This test verifies the extractor correctly extracts 8 Month via the
+    tournament path and that it returns method='regex', which is what
+    single_course.py uses to decide whether to lock the duration_term.
+    """
+    # compact() collapses <p> newlines to spaces, so sentence-boundary
+    # detection needs a period to split the slash sentence from the rest.
+    # Real pages have the slash text in a cell that starts a period-terminated
+    # "sentence" after compaction (e.g. a table cell whose value ends with ".").
+    # We simulate that here: the slash sentence MUST end with "." so the
+    # sentence splitter (r"(?<=[.!?])\s+|\n") isolates it as its own segment
+    # that starts with "8 months" — the position _SLASH_PROGRAM_STRUCTURE_RE
+    # requires (re.match anchors at the start of the string).
+    html = (
+        # No <dt>Duration</dt> label — structural pre-pass will NOT fire.
+        "<p>8 months / 4 subjects / 2 trimesters. "
+        "Candidates must complete their studies within 8 years of enrolment.</p>"
+    )
+    out = _run(duration.extract(html, "https://www.kbs.edu.au/courses/grad-cert-accounting/"))
+    assert out, "extractor must find a duration from the slash sentence"
+    n = out[0].normalized
+    assert n["duration"] == 8.0, (
+        f"Expected duration=8.0 from '8 months / 4 subjects', got {n!r}"
+    )
+    assert n["duration_term"] == "Month", (
+        f"Expected duration_term=Month, got {n!r}. "
+        f"The slash regex must lock BOTH value AND unit so the downstream "
+        f"atomic guard in single_course.py can protect duration_term from "
+        f"Gemini overwrite."
+    )
+    assert out[0].method == "regex", (
+        f"Expected method='regex' for tournament path; got {out[0].method!r}. "
+        f"'regex' must be in _STRUCTURAL_COURSE_PAGE_EXACT so the Bug A.2 "
+        f"atomic guard fires in single_course.py."
+    )
