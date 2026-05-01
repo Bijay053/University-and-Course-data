@@ -1,0 +1,54 @@
+sudo -u postgres psql university_portal -c "
+SELECT c.name, c.course_location,
+       er.overall AS ielts_overall,
+       c.duration, c.duration_term
+FROM courses c
+LEFT JOIN english_requirements er
+  ON er.course_id = c.id AND er.test_type = 'IELTS'
+WHERE c.university_id = 29
+ORDER BY c.name;"
+
+# ── KBS scraped_courses: why were the 3 grad certs dropped? ──
+sudo -u postgres psql university_portal -c "
+SELECT sc.name, sc.duration_value, sc.duration_unit,
+       sc.stage_status, sc.stage_reason
+FROM scraped_courses sc
+JOIN scrape_runtime_jobs srj ON sc.job_id = srj.runtime_job_id
+WHERE srj.university_id = 29
+  AND sc.name ILIKE '%Graduate Certificate%'
+ORDER BY sc.created_at DESC LIMIT 15;" 2>/dev/null || \
+sudo -u postgres psql university_portal -c "\d scraped_courses" | head -25
+ name | course_location | ielts_overall 
+------+-----------------+---------------
+(0 rows)
+
+ name | course_location | ielts_overall | duration | duration_term 
+------+-----------------+---------------+----------+---------------
+(0 rows)
+
+                                             Table "public.scraped_courses"
+         Column         |           Type           | Collation | Nullable |                   Default                   
+------------------------+--------------------------+-----------+----------+---------------------------------------------
+ id                     | integer                  |           | not null | nextval('scraped_courses_id_seq'::regclass)
+ scrape_job_id          | text                     |           | not null | 
+ university_id          | integer                  |           | not null | 
+ course_name            | text                     |           | not null | 
+ category               | text                     |           |          | 
+ sub_category           | text                     |           |          | 
+ course_website         | text                     |           |          | 
+ duration               | real                     |           |          | 
+ duration_term          | text                     |           |          | 
+ study_mode             | text                     |           |          | 
+ degree_level           | text                     |           |          | 
+ study_load             | text                     |           |          | 
+ language               | text                     |           |          | 
+ description            | text                     |           |          | 
+ other_requirement      | text                     |           |          | 
+ international_fee      | real                     |           |          | 
+ fee_term               | text                     |           |          | 
+ fee_year               | integer                  |           |          | 
+ currency               | text                     |           |          | 
+ ielts_overall          | real                     |           |          | 
+ ielts_listening        | real                     |           |          | 
+ ielts_speaking         | real                     |           |          | 
+root@university-and-course-data:~/University-and-Course-data# 
