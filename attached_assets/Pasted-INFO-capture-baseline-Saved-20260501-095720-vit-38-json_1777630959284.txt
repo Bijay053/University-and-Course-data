@@ -1,0 +1,1045 @@
+INFO capture_baseline: Saved: 20260501_095720_vit_38.json  (courses=19  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_095720_vit_6.json  (courses=66  disc=38  staged=36  cost=$0.0017  238.9)
+INFO capture_baseline: Done. 2 universities, 85 courses total. Baselines written to baselines/bug-f-clean/
+root@university-and-course-data:~/University-and-Course-data/backend-py# # 1. Find Charles Sturt university ID and its scraped_course state
+sudo -u postgres psql university_portal -c "
+SELECT u.id, u.name, u.slug,
+       COUNT(sc.id) FILTER (WHERE sc.status = 'pending' AND sc.auto_publish_status = 'ready') AS ready_to_auto,
+       COUNT(sc.id) FILTER (WHERE sc.status = 'pending' AND sc.auto_publish_status = 'review') AS needs_review,
+       COUNT(sc.id) FILTER (WHERE sc.status = 'approved') AS already_approved,
+       COUNT(c.id) AS live_courses
+FROM universities u
+LEFT JOIN scraped_courses sc ON sc.university_id = u.id
+LEFT JOIN courses c ON c.university_id = u.id
+GROUP BY u.id, u.name, u.slug
+HAVING COUNT(sc.id) > 0 OR COUNT(c.id) > 0
+ORDER BY u.name;"
+
+# 2. Specifically check the aut_20 / CSU-like uni with 92 courses
+sudo -u postgres psql university_portal -c "
+SELECT u.id, u.name, u.slug,
+       sc.status, sc.auto_publish_status, COUNT(*) AS cnt
+FROM scraped_courses sc
+JOIN universities u ON u.id = sc.university_id
+GROUP BY u.id, u.name, u.slug, sc.status, sc.auto_publish_status
+ORDER BY u.name, sc.status, sc.auto_publish_status;"
+ERROR:  column u.slug does not exist
+LINE 2: SELECT u.id, u.name, u.slug,
+                             ^
+ERROR:  column u.slug does not exist
+LINE 2: SELECT u.id, u.name, u.slug,
+                             ^
+root@university-and-course-data:~/University-and-Course-data/backend-py# # ── Block 1: Full university × scraped_course × live-course count (no slug) ──
+sudo -u postgres psql university_portal -c "
+SELECT u.id,
+       u.name,
+       COUNT(sc.id) FILTER (WHERE sc.status = 'pending' AND sc.auto_publish_status = 'ready') AS ready_to_auto,
+       COUNT(sc.id) FILTER (WHERE sc.status = 'pending' AND sc.auto_publish_status = 'review') AS needs_review,
+       COUNT(sc.id) FILTER (WHERE sc.status = 'approved') AS sc_approved,
+       COUNT(c.id)  AS live_courses
+FROM universities u
+LEFT JOIN scraped_courses sc ON sc.university_id = u.id
+LEFT JOIN courses         c  ON c.university_id  = u.id
+GROUP BY u.id, u.name
+HAVING COUNT(sc.id) > 0 OR COUNT(c.id) > 0
+ORDER BY u.name;"
+
+# ── Block 2: scraped_course status breakdown per university ──
+sudo -u postgres psql university_portal -c "
+SELECT u.id, u.name, sc.status, sc.auto_publish_status, COUNT(*) AS cnt
+FROM scraped_courses sc
+JOIN universities u ON u.id = sc.university_id
+GROUP BY u.id, u.name, sc.status, sc.auto_publish_status
+ORDER BY u.name, sc.status, sc.auto_publish_status;"
+
+# ── Block 3: Look at the uni with 92 live courses but 0 staged ──
+sudo -u postgres psql university_portal -c "
+SELECT u.id, u.name, u.website, u.scrape_url,
+       (SELECT COUNT(*) FROM courses c WHERE c.university_id = u.id) AS live_courses,
+       (SELECT COUNT(*) FROM scraped_courses sc WHERE sc.university_id = u.id) AS total_scraped
+FROM universities u
+ORDER BY live_courses DESC
+LIMIT 15;"
+ id |                  name                   | ready_to_auto | needs_review | sc_approved | live_courses 
+----+-----------------------------------------+---------------+--------------+-------------+--------------
+ 41 | ACAP University College                 |             0 |           11 |           0 |            0
+ 47 | AIBI                                    |             0 |            8 |           0 |            0
+ 37 | AIT Academy of Interactive Technology   |             0 |            6 |           0 |            0
+ 30 | APIC College                            |             0 |           25 |           0 |            0
+ 93 | ATMC New Zealand                        |             0 |            4 |           0 |            0
+ 87 | Auckland University of Technology (AUT) |             0 |           13 |           0 |            0
+ 51 | Australian Catholic University (ACU)    |             0 |           99 |           0 |            0
+ 22 | Bond University                         |             0 |          126 |           0 |            0
+  4 | Charles Sturt university                |          5190 |         1903 |       46883 |       120062
+ 12 | Flinders University                     |             0 |          105 |           0 |            0
+  8 | KBS                                     |             0 |            0 |          30 |            0
+ 29 | Kaplan Business School                  |             0 |           29 |           0 |            0
+ 17 | SCU                                     |             2 |            4 |           0 |            0
+ 14 | UNE                                     |             0 |           12 |           0 |            0
+ 13 | UOW                                     |             0 |            3 |           0 |            0
+  1 | University of Southern Queenland        |             0 |            0 |        4489 |        11189
+  5 | University of Tasmania                  |             1 |           12 |           0 |            0
+ 38 | VIT Victorian Institute of Technology   |             0 |           19 |           0 |            0
+  2 | asa                                     |             0 |          144 |          64 |          208
+ 20 | aut                                     |            73 |           19 |           0 |            0
+ 18 | cqu                                     |             0 |            4 |           0 |            0
+  3 | torrens                                 |             0 |            0 |        5476 |         5550
+  6 | vit                                     |             0 |         1080 |         900 |         1980
+(23 rows)
+
+ id |                  name                   |  status  | auto_publish_status | cnt 
+----+-----------------------------------------+----------+---------------------+-----
+ 41 | ACAP University College                 | pending  | review              |  11
+ 47 | AIBI                                    | pending  | review              |   8
+ 37 | AIT Academy of Interactive Technology   | pending  | review              |   6
+ 30 | APIC College                            | pending  | review              |  25
+ 93 | ATMC New Zealand                        | pending  | review              |   4
+ 87 | Auckland University of Technology (AUT) | pending  | review              |  13
+ 51 | Australian Catholic University (ACU)    | pending  | review              |  99
+ 22 | Bond University                         | pending  | review              | 126
+  4 | Charles Sturt university                | approved | approved            | 187
+  4 | Charles Sturt university                | approved | pending_review      |  84
+  4 | Charles Sturt university                | pending  | ready               |  30
+  4 | Charles Sturt university                | pending  | review              |  11
+  4 | Charles Sturt university                | rejected | approved            |  11
+  4 | Charles Sturt university                | rejected | pending_review      | 169
+  4 | Charles Sturt university                | rejected | ready               |   9
+  4 | Charles Sturt university                | rejected | rejected            |   9
+  4 | Charles Sturt university                | rejected | review              | 184
+ 12 | Flinders University                     | pending  | review              | 105
+  8 | KBS                                     | approved | ready               |  29
+  8 | KBS                                     | approved | review              |   1
+ 29 | Kaplan Business School                  | pending  | review              |  29
+ 17 | SCU                                     | pending  | ready               |   2
+ 17 | SCU                                     | pending  | review              |   4
+ 14 | UNE                                     | pending  | review              |  12
+ 13 | UOW                                     | pending  | review              |   3
+  1 | University of Southern Queenland        | approved | approved            |  56
+  1 | University of Southern Queenland        | approved | pending_review      |  11
+  1 | University of Southern Queenland        | rejected | pending_review      | 100
+  5 | University of Tasmania                  | pending  | ready               |   1
+  5 | University of Tasmania                  | pending  | review              |  12
+ 38 | VIT Victorian Institute of Technology   | pending  | review              |  19
+  2 | asa                                     | approved | pending_review      |   8
+  2 | asa                                     | pending  | review              |  18
+ 20 | aut                                     | pending  | ready               |  73
+ 20 | aut                                     | pending  | review              |  19
+ 18 | cqu                                     | pending  | review              |   4
+  3 | torrens                                 | approved | approved            |  74
+  3 | torrens                                 | rejected | rejected            |   1
+  6 | vit                                     | approved | approved            |  19
+  6 | vit                                     | approved | pending_review      |  11
+  6 | vit                                     | pending  | review              |  36
+(41 rows)
+
+ id |               name               |              website              |                    scrape_url                     | live_courses | total_scraped 
+----+----------------------------------+-----------------------------------+---------------------------------------------------+--------------+---------------
+  4 | Charles Sturt university         |                                   | https://study.csu.edu.au/                         |          173 |           694
+  3 | torrens                          |                                   | https://www.torrens.edu.au/                       |           74 |            75
+  1 | University of Southern Queenland |                                   | https://www.unisq.edu.au/                         |           67 |           167
+  6 | vit                              |                                   | https://vit.edu.au/                               |           30 |            66
+  2 | asa                              | https://www.asahe.edu.au/         | https://www.asahe.edu.au/                         |            8 |            26
+ 16 | Western sydney university        | https://www.westernsydney.edu.au/ | https://www.westernsydney.edu.au/                 |            0 |             0
+ 10 | ECU                              | https://www.ecu.edu.au/           | https://www.ecu.edu.au/                           |            0 |             0
+  8 | KBS                              | https://www.kbs.edu.au/           | https://www.kbs.edu.au/                           |            0 |            30
+ 18 | cqu                              | https://www.cqu.edu.au/           | https://www.cqu.edu.au/                           |            0 |             4
+  9 | Federation                       | https://www.federation.edu.au/    | https://www.federation.edu.au/                    |            0 |             0
+ 20 | aut                              | https://www.aut.ac.nz/            | https://www.aut.ac.nz/                            |            0 |            92
+ 19 | CDU                              | https://www.cdu.edu.au/           | https://www.cdu.edu.au/                           |            0 |             0
+ 21 | Macquarie University             | https://www.mq.edu.au/            | https://www.mq.edu.au/study/find-a-course/courses |            0 |             0
+ 22 | Bond University                  | https://bond.edu.au/              | https://bond.edu.au/program-list                  |            0 |           126
+ 17 | SCU                              | https://www.scu.edu.au/           | https://www.scu.edu.au/                           |            0 |             6
+(15 rows)
+
+root@university-and-course-data:~/University-and-Course-data/backend-py# cd ~/University-and-Course-data
+git pull origin main
+sudo systemctl restart uni-api-py.service
+sleep 10
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+Already up to date.
+root@university-and-course-data:~/University-and-Course-data# # Authenticate and save the token
+TOKEN=$(curl -s -X POST http://localhost:80/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@university-portal.local","password":"Bijay@12345"}' \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
+
+# Dry-run: preview what would be approved
+curl -s -X POST \
+  "http://localhost:80/api/scraped-courses/bulk-approve?university_id=20&dry_run=true" \
+  -H "Authorization: Bearer $TOKEN" | python3 -m json.tool
+
+# If "would_approve":73 and sample names look like real AUT courses → commit:
+curl -s -X POST \
+  "http://localhost:80/api/scraped-courses/bulk-approve?university_id=20" \
+  -H "Authorization: Bearer $TOKEN" | python3 -m json.tool
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+KeyError: 'access_token'
+{
+    "detail": "Not Found"
+}
+{
+    "detail": "Not Found"
+}
+root@university-and-course-data:~/University-and-Course-data# # Dry-run
+curl -s -X POST \
+  "http://localhost:80/api/scraped-courses/bulk-approve?university_id=8&status=approved&auto_publish_status=ready&dry_run=true" \
+  -H "Authorization: Bearer $TOKEN" | python3 -m json.tool
+
+# Commit
+curl -s -X POST \
+  "http://localhost:80/api/scraped-courses/bulk-approve?university_id=8&status=approved&auto_publish_status=ready" \
+  -H "Authorization: Bearer $TOKEN" | python3 -m json.tool
+{
+    "detail": "Not Found"
+}
+{
+    "detail": "Not Found"
+}
+root@university-and-course-data:~/University-and-Course-data# # Dry-run
+curl -s -X POST \
+  "http://localhost:80/api/scraped-courses/bulk-approve?university_id=4&status=approved&auto_publish_status=pending_review&dry_run=true" \
+  -H "Authorization: Bearer $TOKEN" | python3 -m json.tool
+
+# Commit
+curl -s -X POST \
+  "http://localhost:80/api/scraped-courses/bulk-approve?university_id=4&status=approved&auto_publish_status=pending_review" \
+  -H "Authorization: Bearer $TOKEN" | python3 -m json.tool
+{
+    "detail": "Not Found"
+}
+{
+    "detail": "Not Found"
+}
+root@university-and-course-data:~/University-and-Course-data# # Expected: AUT live_courses=73, KBS live_courses≥28, CSU live_courses grew by ~84
+sudo -u postgres psql university_portal -c "
+SELECT u.id, u.name,
+       (SELECT COUNT(*) FROM courses c WHERE c.university_id = u.id) AS live_courses,
+       (SELECT COUNT(*) FROM scraped_courses sc
+        WHERE sc.university_id = u.id AND sc.status = 'pending' AND sc.auto_publish_status = 'ready') AS still_ready
+FROM universities u
+WHERE u.id IN (4, 8, 20)
+ORDER BY u.id;"
+ id |           name           | live_courses | still_ready 
+----+--------------------------+--------------+-------------
+  4 | Charles Sturt university |          173 |          30
+  8 | KBS                      |            0 |           0
+ 20 | aut                      |            0 |          73
+(3 rows)
+
+root@university-and-course-data:~/University-and-Course-data# cat > ~/University-and-Course-data/backend-py/scripts/bulk_approve.py << 'PYEOF'
+"""Bulk-promote scraped_courses into the live courses table."""
+from __future__ import annotations
+import argparse, asyncio, logging, sys
+from sqlalchemy import select
+from app.database import AsyncSessionLocal
+from app.models import ScrapedCourse, University
+from app.services.scraper.approve_course import approve_scraped_course
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s: %(message)s", stream=sys.stdout)
+log = logging.getLogger("bulk_approve")
+
+async def run(university_id, sc_status, ap_status, dry_run, limit, actor):
+    async with AsyncSessionLocal() as db:
+        uni = await db.get(University, university_id)
+        if not uni: log.error("University id=%s not found.", university_id); sys.exit(1)
+        stmt = (select(ScrapedCourse)
+            .where(ScrapedCourse.university_id == university_id,
+                   ScrapedCourse.status == sc_status,
+                   ScrapedCourse.auto_publish_status == ap_status)
+            .order_by(ScrapedCourse.id).limit(limit))
+        rows = (await db.execute(stmt)).scalars().all()
+        log.info("University: %s (id=%s) | status=%r ap=%r | matched: %d rows", uni.name, university_id, sc_status, ap_status, len(rows))
+        if dry_run:
+            log.info("DRY-RUN — not committing. Sample names:")
+            for r in rows[:10]: log.info("  [%s] %s", r.id, r.course_name)
+            return
+        approved, failed = [], []
+        for sc in rows:
+            try:
+                result = await approve_scraped_course(db, sc, actor=actor)
+                approved.append(result["course_id"])
+                log.info("  approved sc_id=%s → course_id=%s  %r", sc.id, result["course_id"], sc.course_name)
+            except Exception as exc:
+                failed.append((sc.id, str(exc))); log.warning("  FAILED sc_id=%s: %s", sc.id, exc)
+        log.info("Done. approved=%d  failed=%d", len(approved), len(failed))
+        if failed: log.warning("Failed IDs: %s", [x for x,_ in failed])
+
+def main():
+    p = argparse.ArgumentParser()
+    p.add_argument("--university-id", type=int, required=True)
+    p.add_argument("--status", default="pending")
+    p.add_argument("--ap-status", default="ready")
+    p.add_argument("--dry-run", action="store_true")
+    p.add_argument("--limit", type=int, default=500)
+echo "file written OK"__": main()id, a.status, a.ap_status, a.dry_run, a.limit, a.actor))
+file written OK
+root@university-and-course-data:~/University-and-Course-data# cd ~/University-and-Course-data/backend-py
+set -a && source .env && set +a
+
+# ── AUT: 73 pending/ready ──
+PYTHONPATH=. venv/bin/python3 scripts/bulk_approve.py --university-id 20 --dry-run
+PYTHONPATH=. venv/bin/python3 scripts/bulk_approve.py --university-id 20
+
+# ── KBS legacy: 30 approved/ready ──
+PYTHONPATH=. venv/bin/python3 scripts/bulk_approve.py --university-id 8 --status approved --ap-status ready --dry-run
+PYTHONPATH=. venv/bin/python3 scripts/bulk_approve.py --university-id 8 --status approved --ap-status ready
+
+# ── CSU legacy: 84 approved/pending_review ──
+PYTHONPATH=. venv/bin/python3 scripts/bulk_approve.py --university-id 4 --status approved --ap-status pending_review --dry-run
+PYTHONPATH=. venv/bin/python3 scripts/bulk_approve.py --university-id 4 --status approved --ap-status pending_review
+
+# ── Verify ──
+sudo -u postgres psql university_portal -c "
+SELECT u.id, u.name,
+       (SELECT COUNT(*) FROM courses c WHERE c.university_id = u.id) AS live_courses,
+       (SELECT COUNT(*) FROM scraped_courses sc
+        WHERE sc.university_id = u.id AND sc.status = 'pending' AND sc.auto_publish_status = 'ready') AS still_ready
+FROM universities u
+WHERE u.id IN (4, 8, 20) ORDER BY u.id;"
+2026-05-01 10:16:46,126 INFO: University: aut (id=20) | status='pending' ap='ready' | matched: 73 rows
+2026-05-01 10:16:46,126 INFO: DRY-RUN — not committing. Sample names:
+2026-05-01 10:16:46,126 INFO:   [8633] Master of Philosophy
+2026-05-01 10:16:46,126 INFO:   [8634] Doctor of Philosophy (Phd)
+2026-05-01 10:16:46,126 INFO:   [8635] Bachelor of Design Te Tohu Paetahi Mō Te Hoahoa
+2026-05-01 10:16:46,126 INFO:   [8636] Bachelor of Arts and Bachelor of Business Conjoint Programmes
+2026-05-01 10:16:46,126 INFO:   [8637] Bachelor of Business and Bachelor of Computer and Information Sciences Conjoint Programmes
+2026-05-01 10:16:46,127 INFO:   [8638] Bachelor of Business and Bachelor of Health Science in Psychology Conjoint Programmes
+2026-05-01 10:16:46,127 INFO:   [8639] Bachelor of Business and Bachelor of International Hospitality Management Conjoint Programmes
+2026-05-01 10:16:46,127 INFO:   [8640] Bachelor of Arts and Bachelor of Computer and Information Sciences Conjoint Programmes
+2026-05-01 10:16:46,127 INFO:   [8641] Bachelor of Arts (Honours)
+2026-05-01 10:16:46,127 INFO:   [8642] Certificate in Arts
+2026-05-01 10:16:47,013 INFO: University: aut (id=20) | status='pending' ap='ready' | matched: 73 rows
+2026-05-01 10:16:47,057 INFO:   approved sc_id=8633 → course_id=413  'Master of Philosophy'
+2026-05-01 10:16:47,071 INFO:   approved sc_id=8634 → course_id=414  'Doctor of Philosophy (Phd)'
+2026-05-01 10:16:47,085 INFO:   approved sc_id=8635 → course_id=415  'Bachelor of Design Te Tohu Paetahi Mō Te Hoahoa'
+2026-05-01 10:16:47,097 INFO:   approved sc_id=8636 → course_id=416  'Bachelor of Arts and Bachelor of Business Conjoint Programmes'
+2026-05-01 10:16:47,109 INFO:   approved sc_id=8637 → course_id=417  'Bachelor of Business and Bachelor of Computer and Information Sciences Conjoint Programmes'
+2026-05-01 10:16:47,121 INFO:   approved sc_id=8638 → course_id=418  'Bachelor of Business and Bachelor of Health Science in Psychology Conjoint Programmes'
+2026-05-01 10:16:47,132 INFO:   approved sc_id=8639 → course_id=419  'Bachelor of Business and Bachelor of International Hospitality Management Conjoint Programmes'
+2026-05-01 10:16:47,143 INFO:   approved sc_id=8640 → course_id=420  'Bachelor of Arts and Bachelor of Computer and Information Sciences Conjoint Programmes'
+2026-05-01 10:16:47,154 INFO:   approved sc_id=8641 → course_id=421  'Bachelor of Arts (Honours)'
+2026-05-01 10:16:47,167 INFO:   approved sc_id=8642 → course_id=422  'Certificate in Arts'
+2026-05-01 10:16:47,179 INFO:   approved sc_id=8643 → course_id=423  'Diploma in Arts'
+2026-05-01 10:16:47,191 INFO:   approved sc_id=8644 → course_id=424  'Bachelor of Arts'
+2026-05-01 10:16:47,201 INFO:   approved sc_id=8645 → course_id=425  'Graduate Certificate in Arts'
+2026-05-01 10:16:47,212 INFO:   approved sc_id=8646 → course_id=426  'Graduate Diploma in Arts'
+2026-05-01 10:16:47,223 INFO:   approved sc_id=8647 → course_id=427  'Certificate in Science and Technology'
+2026-05-01 10:16:47,233 INFO:   approved sc_id=8648 → course_id=428  'Bachelor of Science'
+2026-05-01 10:16:47,244 INFO:   approved sc_id=8649 → course_id=429  'Graduate Certificate in Science'
+2026-05-01 10:16:47,254 INFO:   approved sc_id=8650 → course_id=430  'Graduate Diploma in Science'
+2026-05-01 10:16:47,265 INFO:   approved sc_id=8651 → course_id=431  'Master of Science'
+2026-05-01 10:16:47,275 INFO:   approved sc_id=8652 → course_id=432  'Bachelor of Engineering (Honours)'
+2026-05-01 10:16:47,285 INFO:   approved sc_id=8653 → course_id=433  'Master of Arts'
+2026-05-01 10:16:47,294 INFO:   approved sc_id=8654 → course_id=434  'Bachelor of Science (Honours)'
+2026-05-01 10:16:47,305 INFO:   approved sc_id=8655 → course_id=435  'Diploma in Science'
+2026-05-01 10:16:47,315 INFO:   approved sc_id=8657 → course_id=436  'Bachelor of International Hospitality Management'
+2026-05-01 10:16:47,326 INFO:   approved sc_id=8658 → course_id=437  'Graduate Certificate in International Hospitality Management'
+2026-05-01 10:16:47,337 INFO:   approved sc_id=8659 → course_id=438  'Graduate Diploma in International Hospitality Management'
+2026-05-01 10:16:47,348 INFO:   approved sc_id=8661 → course_id=439  'Master of International Hospitality Management'
+2026-05-01 10:16:47,359 INFO:   approved sc_id=8662 → course_id=440  'Master of International Tourism Management'
+2026-05-01 10:16:47,369 INFO:   approved sc_id=8663 → course_id=441  'Diploma in Culinary Arts'
+2026-05-01 10:16:47,379 INFO:   approved sc_id=8665 → course_id=442  'Bachelor of Education ([Specialty] Teaching)'
+2026-05-01 10:16:47,389 INFO:   approved sc_id=8666 → course_id=443  'Master of Teaching and Learning'
+2026-05-01 10:16:47,400 INFO:   approved sc_id=8667 → course_id=444  'Bachelor of Health Science'
+2026-05-01 10:16:47,409 INFO:   approved sc_id=8668 → course_id=445  'Bachelor of Health Science (Honours)'
+2026-05-01 10:16:47,420 INFO:   approved sc_id=8669 → course_id=446  'Bachelor of Health Science (Nursing)'
+2026-05-01 10:16:47,430 INFO:   approved sc_id=8670 → course_id=447  'Bachelor of Health Science (Occupational Therapy)'
+2026-05-01 10:16:47,441 INFO:   approved sc_id=8671 → course_id=448  'Bachelor of Health Science (Physiotherapy)'
+2026-05-01 10:16:47,451 INFO:   approved sc_id=8672 → course_id=449  'Bachelor of Health Science (Podiatry)'
+2026-05-01 10:16:47,464 INFO:   approved sc_id=8673 → course_id=450  'Doctor of Health Science'
+2026-05-01 10:16:47,475 INFO:   approved sc_id=8674 → course_id=451  'Graduate Certificate in Health Science'
+2026-05-01 10:16:47,488 INFO:   approved sc_id=8675 → course_id=452  'Graduate Diploma in Health Science'
+2026-05-01 10:16:47,499 INFO:   approved sc_id=8683 → course_id=453  'Bachelor of Architecture and Future Environments'
+2026-05-01 10:16:47,513 INFO:   approved sc_id=8684 → course_id=454  'Bachelor of Construction'
+2026-05-01 10:16:47,525 INFO:   approved sc_id=8685 → course_id=455  'Graduate Diploma in Architecture'
+2026-05-01 10:16:47,537 INFO:   approved sc_id=8686 → course_id=456  'Master of Architectural Design Management'
+2026-05-01 10:16:47,549 INFO:   approved sc_id=8687 → course_id=457  'Master of Architecture (Professional)'
+2026-05-01 10:16:47,561 INFO:   approved sc_id=8688 → course_id=413  'Master of Philosophy'
+2026-05-01 10:16:47,572 INFO:   approved sc_id=8689 → course_id=458  'Bachelor of Visual Arts Te Tohu Paetahi Mō Toi Ataata'
+2026-05-01 10:16:47,583 INFO:   approved sc_id=8690 → course_id=459  'Master of Design'
+2026-05-01 10:16:47,595 INFO:   approved sc_id=8691 → course_id=460  'Master of Visual Arts'
+2026-05-01 10:16:47,615 INFO:   approved sc_id=8692 → course_id=461  'Diploma in Design Tītohu Mō Te Hoahoa'
+2026-05-01 10:16:47,625 INFO:   approved sc_id=8693 → course_id=462  'Bachelor of Business'
+2026-05-01 10:16:47,635 INFO:   approved sc_id=8694 → course_id=463  'Bachelor of Business (Honours)'
+2026-05-01 10:16:47,646 INFO:   approved sc_id=8695 → course_id=464  'Certificate in Business Studies'
+2026-05-01 10:16:47,656 INFO:   approved sc_id=8696 → course_id=465  'Diploma in Business'
+2026-05-01 10:16:47,667 INFO:   approved sc_id=8697 → course_id=466  'Graduate Certificate in Business'
+2026-05-01 10:16:47,677 INFO:   approved sc_id=8698 → course_id=467  'Graduate Diploma in Business'
+2026-05-01 10:16:47,688 INFO:   approved sc_id=8699 → course_id=468  'Master of Applied Finance'
+2026-05-01 10:16:47,698 INFO:   approved sc_id=8700 → course_id=469  'Master of Business'
+2026-05-01 10:16:47,708 INFO:   approved sc_id=8701 → course_id=470  'Master of Global Business'
+2026-05-01 10:16:47,719 INFO:   approved sc_id=8702 → course_id=471  'Master of Marketing'
+2026-05-01 10:16:47,730 INFO:   approved sc_id=8703 → course_id=472  'Master of Professional Accounting'
+2026-05-01 10:16:47,741 INFO:   approved sc_id=8704 → course_id=473  'Bachelor of Communication Studies'
+2026-05-01 10:16:47,752 INFO:   approved sc_id=8705 → course_id=474  'Master of Communication Studies'
+2026-05-01 10:16:47,764 INFO:   approved sc_id=8707 → course_id=475  'Graduate Diploma in Secondary Teaching'
+2026-05-01 10:16:47,775 INFO:   approved sc_id=8708 → course_id=443  'Master of Teaching and Learning'
+2026-05-01 10:16:47,785 INFO:   approved sc_id=8710 → course_id=432  'Bachelor of Engineering (Honours)'
+2026-05-01 10:16:47,796 INFO:   approved sc_id=8711 → course_id=476  'Bachelor of Engineering Technology'
+2026-05-01 10:16:47,807 INFO:   approved sc_id=8716 → course_id=477  'Master of Engineering'
+2026-05-01 10:16:47,818 INFO:   approved sc_id=8717 → course_id=478  'Master of Cyber Security and Digital Forensics'
+2026-05-01 10:16:47,829 INFO:   approved sc_id=8718 → course_id=479  'Master of IT Project Management'
+2026-05-01 10:16:47,841 INFO:   approved sc_id=8721 → course_id=480  'Certificate in Legal Studies'
+2026-05-01 10:16:47,852 INFO:   approved sc_id=8723 → course_id=481  'Bachelor of Medical Laboratory Science'
+2026-05-01 10:16:47,864 INFO:   approved sc_id=8724 → course_id=482  'Certificate in Applied Science'
+2026-05-01 10:16:47,864 INFO: Done. approved=73  failed=0
+2026-05-01 10:16:48,801 INFO: University: KBS (id=8) | status='approved' ap='ready' | matched: 29 rows
+2026-05-01 10:16:48,801 INFO: DRY-RUN — not committing. Sample names:
+2026-05-01 10:16:48,802 INFO:   [8423] MBA - Master of Business Administration
+2026-05-01 10:16:48,802 INFO:   [8424] Diploma of Business
+2026-05-01 10:16:48,802 INFO:   [8425] Bachelor of Business
+2026-05-01 10:16:48,802 INFO:   [8426] Bachelor of Business (Accounting)
+2026-05-01 10:16:48,802 INFO:   [8427] Bachelor of Business (Hospitality and Tourism Management)
+2026-05-01 10:16:48,802 INFO:   [8428] Bachelor of Business (Management)
+2026-05-01 10:16:48,802 INFO:   [8429] Bachelor of Business (Marketing)
+2026-05-01 10:16:48,802 INFO:   [8430] Graduate Certificate in Accounting
+2026-05-01 10:16:48,802 INFO:   [8431] Master of Professional Accounting
+2026-05-01 10:16:48,802 INFO:   [8432] Master of Accounting
+2026-05-01 10:16:49,727 INFO: University: KBS (id=8) | status='approved' ap='ready' | matched: 29 rows
+2026-05-01 10:16:49,767 INFO:   approved sc_id=8423 → course_id=483  'MBA - Master of Business Administration'
+2026-05-01 10:16:49,781 INFO:   approved sc_id=8424 → course_id=484  'Diploma of Business'
+2026-05-01 10:16:49,793 INFO:   approved sc_id=8425 → course_id=485  'Bachelor of Business'
+2026-05-01 10:16:49,805 INFO:   approved sc_id=8426 → course_id=486  'Bachelor of Business (Accounting)'
+2026-05-01 10:16:49,817 INFO:   approved sc_id=8427 → course_id=487  'Bachelor of Business (Hospitality and Tourism Management)'
+2026-05-01 10:16:49,828 INFO:   approved sc_id=8428 → course_id=488  'Bachelor of Business (Management)'
+2026-05-01 10:16:49,839 INFO:   approved sc_id=8429 → course_id=489  'Bachelor of Business (Marketing)'
+2026-05-01 10:16:49,850 INFO:   approved sc_id=8430 → course_id=490  'Graduate Certificate in Accounting'
+2026-05-01 10:16:49,860 INFO:   approved sc_id=8431 → course_id=491  'Master of Professional Accounting'
+2026-05-01 10:16:49,871 INFO:   approved sc_id=8432 → course_id=492  'Master of Accounting'
+2026-05-01 10:16:49,882 INFO:   approved sc_id=8433 → course_id=493  'Graduate Certificate in Business Administration'
+2026-05-01 10:16:49,893 INFO:   approved sc_id=8434 → course_id=494  'Graduate Diploma of Business Administration'
+2026-05-01 10:16:49,904 INFO:   approved sc_id=8435 → course_id=495  'Graduate Certificate in Business Analytics'
+2026-05-01 10:16:49,915 INFO:   approved sc_id=8437 → course_id=496  'Master of Business Analytics'
+2026-05-01 10:16:49,925 INFO:   approved sc_id=8438 → course_id=497  'Master of Business Analytics (Extension)'
+2026-05-01 10:16:49,938 INFO:   approved sc_id=8439 → course_id=498  'MBA – Digital Management'
+2026-05-01 10:16:49,948 INFO:   approved sc_id=8440 → course_id=499  'MBA – Health Services Management'
+2026-05-01 10:16:49,959 INFO:   approved sc_id=8441 → course_id=500  'MBA – International Leadership'
+2026-05-01 10:16:49,969 INFO:   approved sc_id=8442 → course_id=501  'MBA – Project Management'
+2026-05-01 10:16:49,980 INFO:   approved sc_id=8443 → course_id=502  'MBA – Tourism and Hospitality Leadership'
+2026-05-01 10:16:49,990 INFO:   approved sc_id=8444 → course_id=503  'MBA – (Women in Leadership)'
+2026-05-01 10:16:50,001 INFO:   approved sc_id=8445 → course_id=504  'MBA – Data-driven Leadership'
+2026-05-01 10:16:50,012 INFO:   approved sc_id=8446 → course_id=505  'Bachelor of Information Technology'
+2026-05-01 10:16:50,023 INFO:   approved sc_id=8447 → course_id=506  'Diploma of Information Technology'
+2026-05-01 10:16:50,035 INFO:   approved sc_id=8448 → course_id=507  'Master of Information Technology'
+2026-05-01 10:16:50,047 INFO:   approved sc_id=8449 → course_id=508  'Graduate Certificate in Information Technology'
+2026-05-01 10:16:50,058 INFO:   approved sc_id=8450 → course_id=509  'Graduate Diploma of Information Technology'
+2026-05-01 10:16:50,069 INFO:   approved sc_id=8451 → course_id=510  'Master of Information Technology (Extension)'
+2026-05-01 10:16:50,080 INFO:   approved sc_id=8452 → course_id=511  'Master of Business Analytics (Information Technology)'
+2026-05-01 10:16:50,081 INFO: Done. approved=29  failed=0
+2026-05-01 10:16:51,010 INFO: University: Charles Sturt university (id=4) | status='approved' ap='pending_review' | matched: 84 rows
+2026-05-01 10:16:51,011 INFO: DRY-RUN — not committing. Sample names:
+2026-05-01 10:16:51,011 INFO:   [5329] Undergraduate Certificate of Business
+2026-05-01 10:16:51,011 INFO:   [5330] Undergraduate Certificate of Information Technology
+2026-05-01 10:16:51,011 INFO:   [5331] Undergraduate Certificate of Science
+2026-05-01 10:16:51,011 INFO:   [5332] Graduate Certificate Of Adult Vocational Education
+2026-05-01 10:16:51,011 INFO:   [5333] Graduate Diploma Of Midwifery
+2026-05-01 10:16:51,011 INFO:   [5336] Undergraduate Certificate of Agricultural Studies
+2026-05-01 10:16:51,011 INFO:   [5337] Undergraduate Certificate of Exercise Studies
+2026-05-01 10:16:51,011 INFO:   [5338] Undergraduate Certificate of Creative Writing
+2026-05-01 10:16:51,011 INFO:   [5339] Graduate Diploma Of Ageing Pastoral Studies
+2026-05-01 10:16:51,011 INFO:   [5341] Undergraduate Certificate of Psychological Studies
+2026-05-01 10:16:51,903 INFO: University: Charles Sturt university (id=4) | status='approved' ap='pending_review' | matched: 84 rows
+2026-05-01 10:16:51,932 INFO:   approved sc_id=5329 → course_id=301  'Undergraduate Certificate of Business'
+2026-05-01 10:16:51,941 INFO:   approved sc_id=5330 → course_id=235  'Undergraduate Certificate of Information Technology'
+2026-05-01 10:16:51,949 INFO:   approved sc_id=5331 → course_id=238  'Undergraduate Certificate of Science'
+2026-05-01 10:16:51,962 INFO:   approved sc_id=5332 → course_id=157  'Graduate Certificate Of Adult Vocational Education'
+2026-05-01 10:16:51,968 INFO:   approved sc_id=5333 → course_id=163  'Graduate Diploma Of Midwifery'
+2026-05-01 10:16:51,977 INFO:   approved sc_id=5336 → course_id=226  'Undergraduate Certificate of Agricultural Studies'
+2026-05-01 10:16:51,986 INFO:   approved sc_id=5337 → course_id=227  'Undergraduate Certificate of Exercise Studies'
+2026-05-01 10:16:51,996 INFO:   approved sc_id=5338 → course_id=228  'Undergraduate Certificate of Creative Writing'
+2026-05-01 10:16:52,004 INFO:   approved sc_id=5339 → course_id=215  'Graduate Diploma Of Ageing Pastoral Studies'
+2026-05-01 10:16:52,013 INFO:   approved sc_id=5341 → course_id=234  'Undergraduate Certificate of Psychological Studies'
+2026-05-01 10:16:52,023 INFO:   approved sc_id=5342 → course_id=237  'Undergraduate Certificate of University Preparation'
+2026-05-01 10:16:52,030 INFO:   approved sc_id=5344 → course_id=230  'Undergraduate Certificate of Health Studies'
+2026-05-01 10:16:52,039 INFO:   approved sc_id=5345 → course_id=231  'Undergraduate Certificate of Geospatial Science'
+2026-05-01 10:16:52,047 INFO:   approved sc_id=5347 → course_id=250  'Doctor of Veterinary Studies'
+2026-05-01 10:16:52,058 INFO:   approved sc_id=5348 → course_id=251  'Doctor of Philosophy (Science)'
+2026-05-01 10:16:52,065 INFO:   approved sc_id=5349 → course_id=253  'Graduate Diploma Of Theological Studies'
+2026-05-01 10:16:52,071 INFO:   approved sc_id=5350 → course_id=269  'Graduate Certificate Of Applied Data Science'
+2026-05-01 10:16:52,078 INFO:   approved sc_id=5351 → course_id=272  'Graduate Certificate Of Paramedicine'
+2026-05-01 10:16:52,084 INFO:   approved sc_id=5352 → course_id=273  'Graduate Certificate Of Computing Career Transition'
+2026-05-01 10:16:52,090 INFO:   approved sc_id=5353 → course_id=285  'Graduate Diploma Of Intelligence Analysis'
+2026-05-01 10:16:52,097 INFO:   approved sc_id=5354 → course_id=297  'Graduate Diploma Of Psychology'
+2026-05-01 10:16:52,106 INFO:   approved sc_id=5355 → course_id=303  'Undergraduate Certificate of Early Childhood Education'
+2026-05-01 10:16:52,114 INFO:   approved sc_id=5356 → course_id=304  'Undergraduate Certificate of Environmental Studies'
+2026-05-01 10:16:52,121 INFO:   approved sc_id=5357 → course_id=306  'Undergraduate Certificate of Theology'
+2026-05-01 10:16:52,130 INFO:   approved sc_id=5358 → course_id=313  'Graduate Diploma Of Of Project Management And Leadership'
+2026-05-01 10:16:52,137 INFO:   approved sc_id=5359 → course_id=325  'Undergraduate Certificate of Human Services'
+2026-05-01 10:16:52,146 INFO:   approved sc_id=5360 → course_id=298  'Master Of Pastoral Counselling'
+2026-05-01 10:16:52,153 INFO:   approved sc_id=5361 → course_id=323  'Graduate Diploma Of Pastoral Counselling'
+2026-05-01 10:16:52,162 INFO:   approved sc_id=5362 → course_id=299  'Master Of Of Project Management And Leadership'
+2026-05-01 10:16:52,169 INFO:   approved sc_id=5363 → course_id=262  'Diploma Of Environmental Studies'
+2026-05-01 10:16:52,179 INFO:   approved sc_id=5364 → course_id=203  'Bachelor Of Information Studies'
+2026-05-01 10:16:52,193 INFO:   approved sc_id=5365 → course_id=202  'Bachelor Of Health Medical Science'
+2026-05-01 10:16:52,204 INFO:   approved sc_id=5366 → course_id=204  'Bachelor Of Human Services'
+2026-05-01 10:16:52,219 INFO:   approved sc_id=5368 → course_id=239  'Master Of Info Studies'
+2026-05-01 10:16:52,232 INFO:   approved sc_id=5369 → course_id=241  'Master Of It 12'
+2026-05-01 10:16:52,242 INFO:   approved sc_id=5370 → course_id=252  'Master Of Adult Vocational Education'
+2026-05-01 10:16:52,256 INFO:   approved sc_id=5371 → course_id=254  'Master Of Arts Theological Studies'
+2026-05-01 10:16:52,267 INFO:   approved sc_id=5372 → course_id=255  'Master Of Of Business Data Analytics'
+2026-05-01 10:16:52,276 INFO:   approved sc_id=5374 → course_id=265  'Bachelor Of Health Science Mental Health'
+2026-05-01 10:16:52,285 INFO:   approved sc_id=5376 → course_id=309  'Master Of Ministry'
+2026-05-01 10:16:52,292 INFO:   approved sc_id=5377 → course_id=310  'Master Of Int Education'
+2026-05-01 10:16:52,301 INFO:   approved sc_id=5378 → course_id=319  'Bachelor Of Pharmacy Honours'
+2026-05-01 10:16:52,309 INFO:   approved sc_id=5379 → course_id=320  'Diploma Of Exercise Studies'
+2026-05-01 10:16:52,317 INFO:   approved sc_id=5380 → course_id=275  'Graduate Certificate Of Digital Communication'
+2026-05-01 10:16:52,326 INFO:   approved sc_id=5381 → course_id=276  'Graduate Certificate Of In Fish Conservation And Management'
+2026-05-01 10:16:52,335 INFO:   approved sc_id=5382 → course_id=279  'Graduate Certificate Of Human Services'
+2026-05-01 10:16:52,344 INFO:   approved sc_id=5384 → course_id=293  'Graduate Certificate Of Wiradyuri Language'
+2026-05-01 10:16:52,352 INFO:   approved sc_id=5387 → course_id=213  'Graduate Certificate Of Nuclear Safeguards Security'
+2026-05-01 10:16:52,359 INFO:   approved sc_id=5388 → course_id=214  'Graduate Certificate Of Professional Supervision Pastoral'
+2026-05-01 10:16:52,366 INFO:   approved sc_id=5389 → course_id=218  'Graduate Diploma Of Mammography'
+2026-05-01 10:16:52,372 INFO:   approved sc_id=5390 → course_id=219  'Graduate Diploma Of Dental Implantology'
+2026-05-01 10:16:52,380 INFO:   approved sc_id=5391 → course_id=159  'Master Of Nursing Pre Registration'
+2026-05-01 10:16:52,390 INFO:   approved sc_id=5392 → course_id=170  'Bachelor Of Arts'
+2026-05-01 10:16:52,398 INFO:   approved sc_id=5393 → course_id=155  'Bachelor Of Education Technology Applied Studies'
+2026-05-01 10:16:52,406 INFO:   approved sc_id=5394 → course_id=158  'Master Of Ageing Pastoral Studies'
+2026-05-01 10:16:52,416 INFO:   approved sc_id=5395 → course_id=164  'Master Of Clinical Exercise Physiology'
+2026-05-01 10:16:52,426 INFO:   approved sc_id=5396 → course_id=165  'Master Of Teaching Primary'
+2026-05-01 10:16:52,436 INFO:   approved sc_id=5397 → course_id=166  'Master Of Speech Pathology'
+2026-05-01 10:16:52,446 INFO:   approved sc_id=5398 → course_id=167  'Master Of Teaching Secondary'
+2026-05-01 10:16:52,454 INFO:   approved sc_id=5399 → course_id=168  'Bachelor Of Education Secondary Hsie'
+2026-05-01 10:16:52,461 INFO:   approved sc_id=5400 → course_id=169  'Bachelor Of Business Studies'
+2026-05-01 10:16:52,469 INFO:   approved sc_id=5401 → course_id=172  'Bachelor Of Education Secondary Pdhpe'
+2026-05-01 10:16:52,477 INFO:   approved sc_id=5402 → course_id=173  'Bachelor Of Education Secondary Science'
+2026-05-01 10:16:52,485 INFO:   approved sc_id=5403 → course_id=174  'Bachelor Of Education Secondary English'
+2026-05-01 10:16:52,494 INFO:   approved sc_id=5404 → course_id=176  'Bachelor Of Education Secondary Mathematics'
+2026-05-01 10:16:52,502 INFO:   approved sc_id=5405 → course_id=177  'Bachelor Of Education Secondary Creative Arts'
+2026-05-01 10:16:52,511 INFO:   approved sc_id=5406 → course_id=178  'Bachelor Of Education Primary'
+2026-05-01 10:16:52,520 INFO:   approved sc_id=5407 → course_id=179  'Bachelor Of Education Secondary Industry Entry Program'
+2026-05-01 10:16:52,528 INFO:   approved sc_id=5408 → course_id=180  'Bachelor Of Education K 12'
+2026-05-01 10:16:52,537 INFO:   approved sc_id=5409 → course_id=182  'Bachelor Of Social Work'
+2026-05-01 10:16:52,546 INFO:   approved sc_id=5410 → course_id=185  'Bachelor Of Education Early Childhood Primary'
+2026-05-01 10:16:52,554 INFO:   approved sc_id=5411 → course_id=187  'Bachelor Of Adult Vocational Education'
+2026-05-01 10:16:52,562 INFO:   approved sc_id=5412 → course_id=196  'Bachelor Of Podiatric Medicine'
+2026-05-01 10:16:52,569 INFO:   approved sc_id=5413 → course_id=197  'Bachelor Of Clinical Science Medicine Doctor Medicine'
+2026-05-01 10:16:52,575 INFO:   approved sc_id=5414 → course_id=200  'Bachelor Of Exercise Sport Science'
+2026-05-01 10:16:52,584 INFO:   approved sc_id=5416 → course_id=208  'Diploma Of Agricultural Studies'
+2026-05-01 10:16:52,591 INFO:   approved sc_id=5417 → course_id=209  'Diploma Of Psychological Studies'
+2026-05-01 10:16:52,598 INFO:   approved sc_id=5418 → course_id=223  'Master Of Professional Psychology'
+2026-05-01 10:16:52,607 INFO:   approved sc_id=5419 → course_id=236  'Master Of Speech'
+2026-05-01 10:16:52,614 INFO:   approved sc_id=5420 → course_id=240  'Diploma Of Exercise'
+2026-05-01 10:16:52,622 INFO:   approved sc_id=5421 → course_id=242  'Master Of Pro Psych'
+2026-05-01 10:16:52,630 INFO:   approved sc_id=5422 → course_id=245  'Master Of Exercise Physiology'
+2026-05-01 10:16:52,638 INFO:   approved sc_id=5423 → course_id=247  'Master Of Ageing Pastoral'
+2026-05-01 10:16:52,646 INFO:   approved sc_id=5425 → course_id=327  'Master Of Nursing'
+2026-05-01 10:16:52,646 INFO: Done. approved=84  failed=0
+ id |           name           | live_courses | still_ready 
+----+--------------------------+--------------+-------------
+  4 | Charles Sturt university |          173 |          30
+  8 | KBS                      |           29 |           0
+ 20 | aut                      |           70 |           0
+(3 rows)
+
+root@university-and-course-data:~/University-and-Course-data/backend-py# cd ~/University-and-Course-data/backend-py
+root@university-and-course-data:~/University-and-Course-data/backend-py# cd ~/University-and-Course-data/backend-py
+set -a && source .env && set +a
+# ── CSU: 30 pending/ready (new scrape rows — these will be net-new courses) ──
+# ── CSU: 30 pending/ready (new scrape rows — these will be net-new courses) ──un
+PYTHONPATH=. venv/bin/python3 scripts/bulk_approve.py --university-id 4 --dry-run
+PYTHONPATH=. venv/bin/python3 scripts/bulk_approve.py --university-id 4
+# ── VIT legacy: 11 approved/pending_review ──
+# ── VIT legacy: 11 approved/pending_review ──rove.py \
+PYTHONPATH=. venv/bin/python3 scripts/bulk_approve.py \ng_review --dry-run
+  --university-id 6 --status approved --ap-status pending_review --dry-run
+PYTHONPATH=. venv/bin/python3 scripts/bulk_approve.py \ng_review
+  --university-id 6 --status approved --ap-status pending_review
+# ── USQ legacy: 11 approved/pending_review ──
+# ── USQ legacy: 11 approved/pending_review ──rove.py \
+PYTHONPATH=. venv/bin/python3 scripts/bulk_approve.py \ng_review --dry-run
+  --university-id 1 --status approved --ap-status pending_review --dry-run
+PYTHONPATH=. venv/bin/python3 scripts/bulk_approve.py \ng_review
+  --university-id 1 --status approved --ap-status pending_review
+# ── ASA legacy: 8 approved/pending_review ──
+# ── ASA legacy: 8 approved/pending_review ──prove.py \
+PYTHONPATH=. venv/bin/python3 scripts/bulk_approve.py \ng_review --dry-run
+  --university-id 2 --status approved --ap-status pending_review --dry-run
+PYTHONPATH=. venv/bin/python3 scripts/bulk_approve.py \ng_review
+  --university-id 2 --status approved --ap-status pending_review
+# ── SCU: 2 pending/ready ──
+# ── SCU: 2 pending/ready ──3 scripts/bulk_approve.py --university-id 17 --dry-run
+PYTHONPATH=. venv/bin/python3 scripts/bulk_approve.py --university-id 17 --dry-run
+PYTHONPATH=. venv/bin/python3 scripts/bulk_approve.py --university-id 17
+# ── UTas: 1 pending/ready ──
+# ── UTas: 1 pending/ready ── scripts/bulk_approve.py --university-id 5 --dry-run
+PYTHONPATH=. venv/bin/python3 scripts/bulk_approve.py --university-id 5 --dry-run
+PYTHONPATH=. venv/bin/python3 scripts/bulk_approve.py --university-id 5
+# ── Final verify: all gap universities ──
+# ── Final verify: all gap universities ── "
+sudo -u postgres psql university_portal -c "
+SELECT u.id, u.name,(*) FROM courses c WHERE c.university_id = u.id) AS live_courses,
+       (SELECT COUNT(*) FROM courses c WHERE c.university_id = u.id) AS live_courses,
+       (SELECT COUNT(*) FROM scraped_courses scatus = 'pending'
+        WHERE sc.university_id = u.id AND sc.status = 'pending'pending,
+          AND sc.auto_publish_status = 'ready') AS still_ready_pending,
+       (SELECT COUNT(*) FROM scraped_courses scatus = 'approved'
+        WHERE sc.university_id = u.id AND sc.status = 'approved'l_legacy_pending
+          AND sc.auto_publish_status = 'pending_review') AS still_legacy_pending
+FROM universities u, 4, 5, 6, 8, 17, 20)
+WHERE u.id IN (1, 2, 4, 5, 6, 8, 17, 20)
+ORDER BY u.id;"
+2026-05-01 10:18:58,814 INFO: University: Charles Sturt university (id=4) | status='pending' ap='ready' | matched: 30 rows
+2026-05-01 10:18:58,814 INFO: DRY-RUN — not committing. Sample names:
+2026-05-01 10:18:58,814 INFO:   [8731] Bachelor of Accounting
+2026-05-01 10:18:58,814 INFO:   [8732] Bachelor of Agricultural Business Management
+2026-05-01 10:18:58,814 INFO:   [8733] Bachelor of Agricultural Science
+2026-05-01 10:18:58,814 INFO:   [8734] Bachelor of Agriculture
+2026-05-01 10:18:58,815 INFO:   [8735] Bachelor of Animal Science
+2026-05-01 10:18:58,815 INFO:   [8736] Bachelor of Business
+2026-05-01 10:18:58,815 INFO:   [8737] Bachelor of Business Studies
+2026-05-01 10:18:58,815 INFO:   [8738] Bachelor of Communication
+2026-05-01 10:18:58,815 INFO:   [8739] Bachelor of Dental Science
+2026-05-01 10:18:58,815 INFO:   [8740] Bachelor of Education (Early Childhood and Primary)
+2026-05-01 10:18:59,688 INFO: University: Charles Sturt university (id=4) | status='pending' ap='ready' | matched: 30 rows
+2026-05-01 10:18:59,726 INFO:   approved sc_id=8731 → course_id=512  'Bachelor of Accounting'
+2026-05-01 10:18:59,738 INFO:   approved sc_id=8732 → course_id=186  'Bachelor of Agricultural Business Management'
+2026-05-01 10:18:59,749 INFO:   approved sc_id=8733 → course_id=188  'Bachelor of Agricultural Science'
+2026-05-01 10:18:59,759 INFO:   approved sc_id=8734 → course_id=194  'Bachelor of Agriculture'
+2026-05-01 10:18:59,771 INFO:   approved sc_id=8735 → course_id=190  'Bachelor of Animal Science'
+2026-05-01 10:18:59,783 INFO:   approved sc_id=8736 → course_id=201  'Bachelor of Business'
+2026-05-01 10:18:59,794 INFO:   approved sc_id=8737 → course_id=169  'Bachelor of Business Studies'
+2026-05-01 10:18:59,804 INFO:   approved sc_id=8738 → course_id=189  'Bachelor of Communication'
+2026-05-01 10:18:59,815 INFO:   approved sc_id=8739 → course_id=171  'Bachelor of Dental Science'
+2026-05-01 10:18:59,827 INFO:   approved sc_id=8740 → course_id=513  'Bachelor of Education (Early Childhood and Primary)'
+2026-05-01 10:18:59,838 INFO:   approved sc_id=8742 → course_id=514  'Bachelor of Engineering (Honours)'
+2026-05-01 10:18:59,849 INFO:   approved sc_id=8743 → course_id=515  'Bachelor of Environmental Science and Management'
+2026-05-01 10:18:59,860 INFO:   approved sc_id=8744 → course_id=516  'Bachelor of Equine Science'
+2026-05-01 10:18:59,871 INFO:   approved sc_id=8745 → course_id=517  'Bachelor of Information Technology'
+2026-05-01 10:18:59,882 INFO:   approved sc_id=8746 → course_id=518  'Bachelor of Medical Radiation Science (with Specialisations)'
+2026-05-01 10:18:59,893 INFO:   approved sc_id=8747 → course_id=195  'Bachelor of Nursing'
+2026-05-01 10:18:59,904 INFO:   approved sc_id=8748 → course_id=191  'Bachelor of Occupational Therapy'
+2026-05-01 10:18:59,913 INFO:   approved sc_id=8751 → course_id=193  'Bachelor of Physiotherapy'
+2026-05-01 10:18:59,924 INFO:   approved sc_id=8752 → course_id=519  'Bachelor of Social Science (Psychology)'
+2026-05-01 10:18:59,935 INFO:   approved sc_id=8755 → course_id=520  'Bachelor of Veterinary Biology/ Bachelor of Veterinary Science'
+2026-05-01 10:18:59,946 INFO:   approved sc_id=8756 → course_id=521  'Doctor of Philosophy (Arts and Education)'
+2026-05-01 10:18:59,956 INFO:   approved sc_id=8757 → course_id=522  'Doctor of Philosophy (Business, Justice and Behavioural Sciences)'
+2026-05-01 10:18:59,966 INFO:   approved sc_id=8758 → course_id=523  'Doctor of Philosophy (Science and Agriculture)'
+2026-05-01 10:18:59,977 INFO:   approved sc_id=8762 → course_id=524  'Graduate Diploma of Business Data Analytics'
+2026-05-01 10:18:59,987 INFO:   approved sc_id=8763 → course_id=525  'Graduate Diploma of Project Management and Leadership'
+2026-05-01 10:18:59,998 INFO:   approved sc_id=8765 → course_id=526  'Master of Agricultural Science (with Specialisations)'
+2026-05-01 10:19:00,014 INFO:   approved sc_id=8766 → course_id=527  'Master of Agriculture (with Specialisations)'
+2026-05-01 10:19:00,030 INFO:   approved sc_id=8767 → course_id=528  'Master of Applied Business (with Specialisations)'
+2026-05-01 10:19:00,042 INFO:   approved sc_id=8768 → course_id=529  'Master of Arts (Theological Studies)'
+2026-05-01 10:19:00,054 INFO:   approved sc_id=8769 → course_id=530  'Master of Business Data Analytics'
+2026-05-01 10:19:00,054 INFO: Done. approved=30  failed=0
+2026-05-01 10:19:00,951 INFO: University: vit (id=6) | status='approved' ap='pending_review' | matched: 11 rows
+2026-05-01 10:19:00,951 INFO: DRY-RUN — not committing. Sample names:
+2026-05-01 10:19:00,951 INFO:   [4258] Bbus Accounting
+2026-05-01 10:19:00,951 INFO:   [4259] Bbus Business Technology
+2026-05-01 10:19:00,951 INFO:   [4260] Bbus Human Resource Management
+2026-05-01 10:19:00,951 INFO:   [4261] Bbus Marketing
+2026-05-01 10:19:00,951 INFO:   [4262] Bbus International Business Management
+2026-05-01 10:19:00,951 INFO:   [4263] Bbus Tourism And Hospitality Management
+2026-05-01 10:19:00,951 INFO:   [4264] Mba Finance
+2026-05-01 10:19:00,951 INFO:   [4266] Mba Information Systems
+2026-05-01 10:19:00,951 INFO:   [4267] Mba Project Management
+2026-05-01 10:19:00,951 INFO:   [4268] Mba Leadership And Management
+2026-05-01 10:19:01,828 INFO: University: vit (id=6) | status='approved' ap='pending_review' | matched: 11 rows
+2026-05-01 10:19:01,864 INFO:   approved sc_id=4258 → course_id=48  'Bbus Accounting'
+2026-05-01 10:19:01,878 INFO:   approved sc_id=4259 → course_id=47  'Bbus Business Technology'
+2026-05-01 10:19:01,891 INFO:   approved sc_id=4260 → course_id=46  'Bbus Human Resource Management'
+2026-05-01 10:19:01,902 INFO:   approved sc_id=4261 → course_id=45  'Bbus Marketing'
+2026-05-01 10:19:01,914 INFO:   approved sc_id=4262 → course_id=44  'Bbus International Business Management'
+2026-05-01 10:19:01,924 INFO:   approved sc_id=4263 → course_id=43  'Bbus Tourism And Hospitality Management'
+2026-05-01 10:19:01,934 INFO:   approved sc_id=4264 → course_id=42  'Mba Finance'
+2026-05-01 10:19:01,944 INFO:   approved sc_id=4266 → course_id=40  'Mba Information Systems'
+2026-05-01 10:19:01,953 INFO:   approved sc_id=4267 → course_id=39  'Mba Project Management'
+2026-05-01 10:19:01,963 INFO:   approved sc_id=4268 → course_id=38  'Mba Leadership And Management'
+2026-05-01 10:19:01,972 INFO:   approved sc_id=4270 → course_id=36  'Mba Tourism And Hospitality Management'
+2026-05-01 10:19:01,972 INFO: Done. approved=11  failed=0
+2026-05-01 10:19:02,919 INFO: University: University of Southern Queenland (id=1) | status='approved' ap='pending_review' | matched: 11 rows
+2026-05-01 10:19:02,919 INFO: DRY-RUN — not committing. Sample names:
+2026-05-01 10:19:02,919 INFO:   [4485] Bachelor Of Education Secondary
+2026-05-01 10:19:02,919 INFO:   [4503] Bachelor Of Clinical Exercise Physiology Honours
+2026-05-01 10:19:02,919 INFO:   [4509] Bachelor Of Business And Bachelor Of Science Psychology
+2026-05-01 10:19:02,919 INFO:   [4512] Bachelor Of Occupational Therapy Honours
+2026-05-01 10:19:02,919 INFO:   [4514] Bachelor Of Paramedicine
+2026-05-01 10:19:02,919 INFO:   [4515] Bachelor Of Physiotherapy Honours
+2026-05-01 10:19:02,919 INFO:   [4516] Bachelor Of Science Psychology
+2026-05-01 10:19:02,919 INFO:   [4517] Bachelor Of Science
+2026-05-01 10:19:02,919 INFO:   [4518] Bachelor Of Psychology Honours
+2026-05-01 10:19:02,919 INFO:   [4535] Bachelor Of Surveying Honours
+2026-05-01 10:19:03,774 INFO: University: University of Southern Queenland (id=1) | status='approved' ap='pending_review' | matched: 11 rows
+2026-05-01 10:19:03,806 INFO:   approved sc_id=4485 → course_id=51  'Bachelor Of Education Secondary'
+2026-05-01 10:19:03,817 INFO:   approved sc_id=4503 → course_id=69  'Bachelor Of Clinical Exercise Physiology Honours'
+2026-05-01 10:19:03,828 INFO:   approved sc_id=4509 → course_id=75  'Bachelor Of Business And Bachelor Of Science Psychology'
+2026-05-01 10:19:03,838 INFO:   approved sc_id=4512 → course_id=78  'Bachelor Of Occupational Therapy Honours'
+2026-05-01 10:19:03,847 INFO:   approved sc_id=4514 → course_id=80  'Bachelor Of Paramedicine'
+2026-05-01 10:19:03,859 INFO:   approved sc_id=4515 → course_id=81  'Bachelor Of Physiotherapy Honours'
+2026-05-01 10:19:03,871 INFO:   approved sc_id=4516 → course_id=82  'Bachelor Of Science Psychology'
+2026-05-01 10:19:03,883 INFO:   approved sc_id=4517 → course_id=83  'Bachelor Of Science'
+2026-05-01 10:19:03,892 INFO:   approved sc_id=4518 → course_id=84  'Bachelor Of Psychology Honours'
+2026-05-01 10:19:03,901 INFO:   approved sc_id=4535 → course_id=101  'Bachelor Of Surveying Honours'
+2026-05-01 10:19:03,910 INFO:   approved sc_id=4550 → course_id=116  'Master Of Counselling'
+2026-05-01 10:19:03,910 INFO: Done. approved=11  failed=0
+2026-05-01 10:19:04,762 INFO: University: asa (id=2) | status='approved' ap='pending_review' | matched: 8 rows
+2026-05-01 10:19:04,762 INFO: DRY-RUN — not committing. Sample names:
+2026-05-01 10:19:04,762 INFO:   [4218] Bachelor of Business International Business
+2026-05-01 10:19:04,762 INFO:   [4219] Bachelor of Business Hospitality Management
+2026-05-01 10:19:04,762 INFO:   [4220] Bachelor of Business Technology Management
+2026-05-01 10:19:04,762 INFO:   [4221] Bachelor of Business
+2026-05-01 10:19:04,762 INFO:   [4222] Bachelor of Professional Accounting
+2026-05-01 10:19:04,762 INFO:   [4223] Master of Project Management
+2026-05-01 10:19:04,762 INFO:   [4224] Master of Information Technology (Cyber Security)
+2026-05-01 10:19:04,762 INFO:   [4225] Master of Information Technology (Artificial Intelligence)
+2026-05-01 10:19:05,617 INFO: University: asa (id=2) | status='approved' ap='pending_review' | matched: 8 rows
+2026-05-01 10:19:05,650 INFO:   approved sc_id=4218 → course_id=10  'Bachelor of Business International Business'
+2026-05-01 10:19:05,661 INFO:   approved sc_id=4219 → course_id=11  'Bachelor of Business Hospitality Management'
+2026-05-01 10:19:05,670 INFO:   approved sc_id=4220 → course_id=12  'Bachelor of Business Technology Management'
+2026-05-01 10:19:05,680 INFO:   approved sc_id=4221 → course_id=13  'Bachelor of Business'
+2026-05-01 10:19:05,690 INFO:   approved sc_id=4222 → course_id=14  'Bachelor of Professional Accounting'
+2026-05-01 10:19:05,700 INFO:   approved sc_id=4223 → course_id=16  'Master of Project Management'
+2026-05-01 10:19:05,710 INFO:   approved sc_id=4224 → course_id=17  'Master of Information Technology (Cyber Security)'
+2026-05-01 10:19:05,719 INFO:   approved sc_id=4225 → course_id=18  'Master of Information Technology (Artificial Intelligence)'
+2026-05-01 10:19:05,720 INFO: Done. approved=8  failed=0
+2026-05-01 10:19:06,646 INFO: University: SCU (id=17) | status='pending' ap='ready' | matched: 2 rows
+2026-05-01 10:19:06,647 INFO: DRY-RUN — not committing. Sample names:
+2026-05-01 10:19:06,647 INFO:   [8790] Master of Business Administration - (MBA) Online
+2026-05-01 10:19:06,647 INFO:   [8791] Master of Business Administration - (MBA) Online
+2026-05-01 10:19:07,588 INFO: University: SCU (id=17) | status='pending' ap='ready' | matched: 2 rows
+2026-05-01 10:19:07,629 INFO:   approved sc_id=8790 → course_id=531  'Master of Business Administration - (MBA) Online'
+2026-05-01 10:19:07,642 INFO:   approved sc_id=8791 → course_id=531  'Master of Business Administration - (MBA) Online'
+2026-05-01 10:19:07,642 INFO: Done. approved=2  failed=0
+2026-05-01 10:19:08,523 INFO: University: University of Tasmania (id=5) | status='pending' ap='ready' | matched: 1 rows
+2026-05-01 10:19:08,523 INFO: DRY-RUN — not committing. Sample names:
+2026-05-01 10:19:08,524 INFO:   [8547] Master of Social Work (Qualifying) (R7o)
+2026-05-01 10:19:09,418 INFO: University: University of Tasmania (id=5) | status='pending' ap='ready' | matched: 1 rows
+2026-05-01 10:19:09,461 INFO:   approved sc_id=8547 → course_id=532  'Master of Social Work (Qualifying) (R7o)'
+2026-05-01 10:19:09,461 INFO: Done. approved=1  failed=0
+ id |               name               | live_courses | still_ready_pending | still_legacy_pending 
+----+----------------------------------+--------------+---------------------+----------------------
+  1 | University of Southern Queenland |           67 |                   0 |                    0
+  2 | asa                              |            8 |                   0 |                    0
+  4 | Charles Sturt university         |          192 |                   0 |                    0
+  5 | University of Tasmania           |            1 |                   0 |                    0
+  6 | vit                              |           30 |                   0 |                    0
+  8 | KBS                              |           29 |                   0 |                    0
+ 17 | SCU                              |            1 |                   0 |                    0
+ 20 | aut                              |           70 |                   0 |                    0
+(8 rows)
+
+root@university-and-course-data:~/University-and-Course-data/backend-py# sudo -u postgres psql university_portal -c "
+SELECT id, name FROM courses
+WHERE university_id = 4
+  AND (name ~* ' Of Of | Pro Psych| Int | Of It 12| Of In | Of Info | Of Speech$| Of Ageing Pastoral$| Diploma Of Exercise$')
+ORDER BY name;"
+ id  |                            name                             
+-----+-------------------------------------------------------------
+ 258 | Bachelor Of Of Education Secondary
+ 276 | Graduate Certificate Of In Fish Conservation And Management
+ 216 | Graduate Diploma Of Of Business Data Analytics
+ 313 | Graduate Diploma Of Of Project Management And Leadership
+ 247 | Master Of Ageing Pastoral
+ 239 | Master Of Info Studies
+ 310 | Master Of Int Education
+ 241 | Master Of It 12
+ 255 | Master Of Of Business Data Analytics
+ 299 | Master Of Of Project Management And Leadership
+ 242 | Master Of Pro Psych
+ 236 | Master Of Speech
+(12 rows)
+
+root@university-and-course-data:~/University-and-Course-data/backend-py# cd ~/University-and-Course-data/backend-py
+set -a && source .env && set +a
+
+# ── CSU: 30 pending/ready (newly scraped — net-new courses) ──
+PYTHONPATH=. venv/bin/python3 scripts/bulk_approve.py --university-id 4 --dry-run
+PYTHONPATH=. venv/bin/python3 scripts/bulk_approve.py --university-id 4
+
+# ── VIT legacy: 11 approved/pending_review ──
+PYTHONPATH=. venv/bin/python3 scripts/bulk_approve.py \
+  --university-id 6 --status approved --ap-status pending_review
+  
+# ── USQ legacy: 11 approved/pending_review ──
+PYTHONPATH=. venv/bin/python3 scripts/bulk_approve.py \
+  --university-id 1 --status approved --ap-status pending_review
+
+# ── ASA legacy: 8 approved/pending_review ──
+PYTHONPATH=. venv/bin/python3 scripts/bulk_approve.py \
+  --university-id 2 --status approved --ap-status pending_review
+
+# ── SCU: 2 pending/ready + UTas: 1 pending/ready ──
+PYTHONPATH=. venv/bin/python3 scripts/bulk_approve.py --university-id 17
+PYTHONPATH=. venv/bin/python3 scripts/bulk_approve.py --university-id 5
+2026-05-01 10:22:04,370 INFO: University: Charles Sturt university (id=4) | status='pending' ap='ready' | matched: 0 rows
+2026-05-01 10:22:04,370 INFO: DRY-RUN — not committing. Sample names:
+2026-05-01 10:22:05,237 INFO: University: Charles Sturt university (id=4) | status='pending' ap='ready' | matched: 0 rows
+2026-05-01 10:22:05,237 INFO: Done. approved=0  failed=0
+2026-05-01 10:22:06,106 INFO: University: vit (id=6) | status='approved' ap='pending_review' | matched: 0 rows
+2026-05-01 10:22:06,107 INFO: Done. approved=0  failed=0
+2026-05-01 10:22:06,973 INFO: University: University of Southern Queenland (id=1) | status='approved' ap='pending_review' | matched: 0 rows
+2026-05-01 10:22:06,973 INFO: Done. approved=0  failed=0
+2026-05-01 10:22:07,846 INFO: University: asa (id=2) | status='approved' ap='pending_review' | matched: 0 rows
+2026-05-01 10:22:07,846 INFO: Done. approved=0  failed=0
+2026-05-01 10:22:08,728 INFO: University: SCU (id=17) | status='pending' ap='ready' | matched: 0 rows
+2026-05-01 10:22:08,728 INFO: Done. approved=0  failed=0
+2026-05-01 10:22:09,612 INFO: University: University of Tasmania (id=5) | status='pending' ap='ready' | matched: 0 rows
+2026-05-01 10:22:09,612 INFO: Done. approved=0  failed=0
+root@university-and-course-data:~/University-and-Course-data/backend-py# sudo -u postgres psql university_portal << 'ENDSQL'
+BEGIN;
+
+-- Step 1: Kill double "Of Of" (e.g. "Master of Of Business Data Analytics")
+UPDATE courses
+SET name = regexp_replace(name, ' Of Of ', ' of ', 'g')
+WHERE university_id = 4 AND name LIKE '% Of Of %'
+RETURNING id, name;
+
+-- Step 2: Fix all remaining capitalized mid-title "Of"
+-- "Graduate Certificate Of X" → "Graduate Certificate of X"
+UPDATE courses
+SET name = replace(name, ' Of ', ' of ')
+WHERE university_id = 4 AND name LIKE '% Of %'
+RETURNING id, name;
+
+-- Step 3: Fix "of In" artifact from step 2 on "Certificate Of In Fish..."
+UPDATE courses
+SET name = regexp_replace(name, ' of In ', ' in ', 'g')
+WHERE university_id = 4 AND name ILIKE '% of In %'
+RETURNING id, name;
+
+-- Step 4: Repair known truncated names
+UPDATE courses SET name = 'Master of Information Studies'
+  WHERE university_id = 4 AND lower(name) = 'master of info studies';
+UPDATE courses SET name = 'Master of Professional Psychology'
+  WHERE university_id = 4 AND lower(name) = 'master of pro psych';
+UPDATE courses SET name = 'Master of International Education'
+  WHERE university_id = 4 AND lower(name) = 'master of int education';
+UPDATE courses SET name = 'Master of Speech Pathology'
+  WHERE university_id = 4 AND lower(name) = 'master of speech';
+UPDATE courses SET name = 'Diploma of Exercise Science'
+  WHERE university_id = 4 AND lower(name) = 'diploma of exercise';
+UPDATE courses SET name = 'Master of Ageing and Pastoral Studies'
+  WHERE university_id = 4 AND lower(name) = 'master of ageing pastoral';
+
+COMMIT;
+ENDSQL
+BEGIN
+ id  |                         name                          
+-----+-------------------------------------------------------
+ 299 | Master of Project Management And Leadership
+ 216 | Graduate Diploma of Business Data Analytics
+ 258 | Bachelor of Education Secondary
+ 255 | Master of Business Data Analytics
+ 313 | Graduate Diploma of Project Management And Leadership
+(5 rows)
+
+UPDATE 5
+ id  |                            name                             
+-----+-------------------------------------------------------------
+ 186 | Bachelor of Agricultural Business Management
+ 169 | Bachelor of Business Studies
+ 157 | Graduate Certificate of Adult Vocational Education
+ 163 | Graduate Diploma of Midwifery
+ 275 | Graduate Certificate of Digital Communication
+ 279 | Graduate Certificate of Human Services
+ 293 | Graduate Certificate of Wiradyuri Language
+ 167 | Master of Teaching Secondary
+ 172 | Bachelor of Education Secondary Pdhpe
+ 178 | Bachelor of Education Primary
+ 210 | Graduate Certificate of Case Management Coordinated Care
+ 211 | Graduate Certificate of Digital Archiving
+ 217 | Graduate Diploma of Clinical Practice Paramedicine
+ 215 | Graduate Diploma of Ageing Pastoral Studies
+ 170 | Bachelor of Arts
+ 270 | Graduate Certificate of Business Administration Computing
+ 271 | Graduate Certificate of Classical Arabic
+ 282 | Graduate Certificate of Information Technology
+ 283 | Graduate Certificate of Islamic Studies
+ 253 | Graduate Diploma of Theological Studies
+ 269 | Graduate Certificate of Applied Data Science
+ 272 | Graduate Certificate of Paramedicine
+ 273 | Graduate Certificate of Computing Career Transition
+ 285 | Graduate Diploma of Intelligence Analysis
+ 297 | Graduate Diploma of Psychology
+ 295 | Graduate Diploma of Customs Administration
+ 296 | Graduate Diploma of Investigations
+ 298 | Master of Pastoral Counselling
+ 323 | Graduate Diploma of Pastoral Counselling
+ 322 | Graduate Certificate of Sustainable Agriculture
+ 261 | Bachelor of Viticulture
+ 160 | Master of Applied Business
+ 161 | Master of Agriculture
+ 162 | Master of Philosophy
+ 175 | Bachelor of Engineering Honours
+ 181 | Bachelor of Medical Radiation Science
+ 183 | Bachelor of Theology
+ 184 | Bachelor of Social Science Psychology
+ 262 | Diploma of Environmental Studies
+ 188 | Bachelor of Agricultural Science
+ 190 | Bachelor of Animal Science
+ 189 | Bachelor of Communication
+ 171 | Bachelor of Dental Science
+ 192 | Bachelor of Oral Health Therapy Hygiene
+ 198 | Bachelor of Environmental Science Management
+ 199 | Bachelor of Veterinary Biology Bachelor Veterinary Science
+ 194 | Bachelor of Agriculture
+ 201 | Bachelor of Business
+ 207 | Bachelor of Theology Honours
+ 195 | Bachelor of Nursing
+ 220 | Master of Information Studies
+ 191 | Bachelor of Occupational Therapy
+ 221 | Master of Professional Accounting Professional Practice
+ 202 | Bachelor of Health Medical Science
+ 241 | Master of It 12
+ 193 | Bachelor of Physiotherapy
+ 222 | Master of Philosophy Arts Education
+ 224 | Master of Professional Information Technology
+ 225 | Master of Social Work Professional Qualifying
+ 243 | Master of Social Work Professional
+ 246 | Master of App Digital Marketing
+ 249 | Master of Ag Science
+ 256 | Master of Ethics Legal Studies
+ 257 | Master of Intelligence Analysis
+ 259 | Bachelor of Laws
+ 260 | Bachelor of Veterinary Technology
+ 263 | Bachelor of Applied Research Honours
+ 252 | Master of Adult Vocational Education
+ 254 | Master of Arts Theological Studies
+ 266 | Bachelor of Islamic Studies Honours
+ 267 | Bachelor of Psychology
+ 268 | Bachelor of Science
+ 300 | Master of Theology
+ 307 | Master of Gis
+ 308 | Master of Intel Analysis
+ 311 | Master of Anti Money Laundering
+ 312 | Master of Cloud Computing Virtualisation
+ 314 | Master of Health Management Leadership
+ 316 | Bachelor of Social Science Psychology Honours
+ 317 | Bachelor of Arts Social Science Honours
+ 318 | Bachelor of Food Science Nutrition
+ 324 | Master of Veterinary Studies
+ 326 | Master of Advanced Social Work
+ 274 | Graduate Certificate of Cyber Security
+ 309 | Master of Ministry
+ 310 | Master of Int Education
+ 277 | Graduate Certificate of Digital Health
+ 278 | Graduate Certificate of Environmental Management
+ 280 | Graduate Certificate of Industrial Relations
+ 281 | Graduate Certificate of Information Studies
+ 284 | Graduate Certificate of Leadership Human Services
+ 286 | Graduate Certificate of Learning Teaching Higher Education
+ 287 | Graduate Certificate of Nursing Clinical Education
+ 288 | Graduate Certificate of Organisational Coaching Leadership
+ 289 | Graduate Certificate of Nursing Leadership Management
+ 290 | Graduate Certificate of Nursing Aged Care
+ 291 | Graduate Certificate of Research
+ 292 | Graduate Certificate of Terrorism Security Studies
+ 294 | Graduate Certificate of Theological Studies
+ 321 | Graduate Diploma of Adult Vocational Education
+ 212 | Graduate Certificate of Ministry
+ 320 | Diploma of Exercise Studies
+ 205 | Bachelor of Nuclear Science Safety
+ 214 | Graduate Certificate of Professional Supervision Pastoral
+ 218 | Graduate Diploma of Mammography
+ 219 | Graduate Diploma of Dental Implantology
+ 159 | Master of Nursing Pre Registration
+ 155 | Bachelor of Education Technology Applied Studies
+ 158 | Master of Ageing Pastoral Studies
+ 164 | Master of Clinical Exercise Physiology
+ 165 | Master of Teaching Primary
+ 166 | Master of Speech Pathology
+ 173 | Bachelor of Education Secondary Science
+ 174 | Bachelor of Education Secondary English
+ 244 | Master of Vocational Ed
+ 248 | Master of Clinical Psych
+ 177 | Bachelor of Education Secondary Creative Arts
+ 179 | Bachelor of Education Secondary Industry Entry Program
+ 180 | Bachelor of Education K 12
+ 182 | Bachelor of Social Work
+ 187 | Bachelor of Adult Vocational Education
+ 196 | Bachelor of Podiatric Medicine
+ 197 | Bachelor of Clinical Science Medicine Doctor Medicine
+ 200 | Bachelor of Exercise Sport Science
+ 208 | Diploma of Agricultural Studies
+ 240 | Diploma of Exercise
+ 242 | Master of Pro Psych
+ 209 | Diploma of Psychological Studies
+ 223 | Master of Professional Psychology
+ 236 | Master of Speech
+ 245 | Master of Exercise Physiology
+ 247 | Master of Ageing Pastoral
+ 327 | Master of Nursing
+ 203 | Bachelor of Information Studies
+ 204 | Bachelor of Human Services
+ 239 | Master of Info Studies
+ 265 | Bachelor of Health Science Mental Health
+ 319 | Bachelor of Pharmacy Honours
+ 276 | Graduate Certificate of In Fish Conservation And Management
+ 213 | Graduate Certificate of Nuclear Safeguards Security
+ 168 | Bachelor of Education Secondary Hsie
+ 176 | Bachelor of Education Secondary Mathematics
+ 185 | Bachelor of Education Early Childhood Primary
+(143 rows)
+
+UPDATE 143
+ id  |                           name                           
+-----+----------------------------------------------------------
+ 276 | Graduate Certificate in Fish Conservation And Management
+(1 row)
+
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+COMMIT
+root@university-and-course-data:~/University-and-Course-data/backend-py# # Final state check
+sudo -u postgres psql university_portal -c "
+SELECT u.id, u.name,
+       (SELECT COUNT(*) FROM courses c WHERE c.university_id = u.id) AS live_courses,
+       (SELECT COUNT(*) FROM scraped_courses sc
+        WHERE sc.university_id = u.id AND sc.status = 'pending'
+          AND sc.auto_publish_status = 'ready') AS pending_ready,
+       (SELECT COUNT(*) FROM scraped_courses sc
+        WHERE sc.university_id = u.id AND sc.status = 'approved'
+          AND sc.auto_publish_status = 'pending_review') AS legacy_gap
+FROM universities u
+WHERE u.id IN (1, 2, 4, 5, 6, 8, 17, 20)
+ORDER BY u.id;"
+
+# Check for remaining "Of" capitalisation issues in CSU
+sudo -u postgres psql university_portal -c "
+SELECT id, name FROM courses
+WHERE university_id = 4 AND name ~ ' Of | Of Of '
+ORDER BY name LIMIT 20;"
+
+# Check for remaining truncated CSU names
+sudo -u postgres psql university_portal -c "
+SELECT id, name FROM courses
+WHERE university_id = 4
+  AND (name ~* '\bOf It \d+\b' OR name ~ '\bOf Of\b'
+       OR name ~* '\bPro Psych\b|\bInt Edu|\bOf Speech$|\bOf Exercise$|\bOf Info |\bAgeing Pastoral$')
+ORDER BY name;"
+ id |               name               | live_courses | pending_ready | legacy_gap 
+----+----------------------------------+--------------+---------------+------------
+  1 | University of Southern Queenland |           67 |             0 |          0
+  2 | asa                              |            8 |             0 |          0
+  4 | Charles Sturt university         |          192 |             0 |          0
+  5 | University of Tasmania           |            1 |             0 |          0
+  6 | vit                              |           30 |             0 |          0
+  8 | KBS                              |           29 |             0 |          0
+ 17 | SCU                              |            1 |             0 |          0
+ 20 | aut                              |           70 |             0 |          0
+(8 rows)
+
+ id | name 
+----+------
+(0 rows)
+
+ id | name 
+----+------
+(0 rows)
+
+root@university-and-course-data:~/University-and-Course-data/backend-py# sudo -u postgres psql university_portal -c "
+SELECT id, name, course_website FROM courses
+WHERE id = 241;"
+ id  |      name       |            course_website             
+-----+-----------------+---------------------------------------
+ 241 | Master of It 12 | https://study.csu.edu.au/master-it-12
+(1 row)
+
+root@university-and-course-data:~/University-and-Course-data/backend-py# 
