@@ -1,0 +1,224 @@
+  Processes:             194
+  Users logged in:       1
+  IPv4 address for eth0: 159.65.152.72
+  IPv4 address for eth0: 10.47.0.13
+  IPv6 address for eth0: 2400:6180:100:d0:0:1:3615:5001
+
+Expanded Security Maintenance for Applications is not enabled.
+
+5 updates can be applied immediately.
+To see these additional updates run: apt list --upgradable
+
+1 additional security update can be applied with ESM Apps.
+Learn more about enabling ESM Apps service at https://ubuntu.com/esm
+
+
+Last login: Thu Apr 30 14:30:57 2026 from 162.243.190.66
+root@university-and-course-data:~# cd ~/University-and-Course-data
+
+# Abort any in-progress rebase
+git rebase --abort 2>/dev/null || true
+
+# Fetch
+git fetch origin main
+
+# Check what's on prod right now
+git log --oneline -6
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+9b95125 (HEAD -> main, origin/main) fix(migration-012): drop/recreate course_search_view around ALTER COLUMN
+bbea119 fix(alembic): escape % in DATABASE_URL for ConfigParser
+0279075 chore(acap): mark Phase 6 TODO as DONE in comment
+b38134f fix(kbs): disable vision OCR + normalise slash-separated location format
+be3df67 feat(option-c): wire strip_patterns into location extractor (ACAP footnote fix)
+629e5de fix(models): courses.duration Float->Numeric(6,2) + Alembic migration 012
+root@university-and-course-data:~/University-and-Course-data# # Step 1: Take a prod backup FIRST
+sudo -u postgres pg_dump university_portal -F c -f /tmp/university_portal_backup_$(date +%Y%m%d_%H%M).dump
+echo "Backup done: $(ls -lh /tmp/university_portal_backup_*.dump | tail -1)"
+
+# Step 2: Restore to a staging DB
+sudo -u postgres createdb university_portal_staging 2>/dev/null || true
+sudo -u postgres pg_restore -d university_portal_staging /tmp/university_portal_backup_*.dump 2>/dev/null; echo "restore done"
+
+# Step 3: Apply the migration on staging only
+sudo -u postgres psql university_portal_staging << 'SQL'
+DROP MATERIALIZED VIEW IF EXISTS course_search_view;
+ALTER TABLE courses ALTER COLUMN duration TYPE NUMERIC(6, 2) USING ROUND(duration::numeric, 2);
+SQL
+echo "Staging migration applied"
+
+# Step 4: Verify no value drift on staging
+sudo -u postgres psql university_portal_staging -c "
+SELECT duration, COUNT(*) FROM courses 
+WHERE duration IS NOT NULL 
+GROUP BY duration ORDER BY COUNT(*) DESC LIMIT 20;"
+Backup done: -rw-rw-r-- 1 postgres postgres 9.0M May  1 01:42 /tmp/university_portal_backup_20260501_0142.dump
+restore done
+DROP MATERIALIZED VIEW
+ALTER TABLE
+Staging migration applied
+ duration | count 
+----------+-------
+     3.00 |    72
+     0.00 |    59
+     2.00 |    54
+     1.00 |    47
+     4.00 |    34
+     0.50 |    29
+     1.50 |    17
+     6.00 |     5
+     1.70 |     4
+     5.00 |     3
+    18.00 |     3
+     2.25 |     2
+     7.00 |     2
+     0.70 |     2
+   104.00 |     2
+    52.00 |     2
+    88.00 |     2
+    64.00 |     1
+     4.75 |     1
+    66.00 |     1
+(20 rows)
+
+root@university-and-course-data:~/University-and-Course-data# cd ~/University-and-Course-data && git log --oneline -6
+9b95125 (HEAD -> main, origin/main) fix(migration-012): drop/recreate course_search_view around ALTER COLUMN
+bbea119 fix(alembic): escape % in DATABASE_URL for ConfigParser
+0279075 chore(acap): mark Phase 6 TODO as DONE in comment
+b38134f fix(kbs): disable vision OCR + normalise slash-separated location format
+be3df67 feat(option-c): wire strip_patterns into location extractor (ACAP footnote fix)
+629e5de fix(models): courses.duration Float->Numeric(6,2) + Alembic migration 012
+root@university-and-course-data:~/University-and-Course-data# cd ~/University-and-Course-data
+
+# ── Recreate course_search_view on staging (it was dropped in step 3) ──
+sudo -u postgres bash << 'OUTER'
+pg_dump university_portal --schema-only -t course_search_view 2>/dev/null \
+  | grep -Ev "^--|^SET |^SELECT pg_catalog" \
+  | sed '/^[[:space:]]*$/d' \
+  > /tmp/view_ddl.sql
+echo "=== View DDL ==="
+cat /tmp/view_ddl.sql
+psql university_portal_staging -f /tmp/view_ddl.sql
+psql university_portal_staging -c "GRANT SELECT ON course_search_view TO uniportal;"
+echo "=== View recreated on staging ==="
+psql university_portal_staging -c "SELECT COUNT(*) FROM course_search_view;"
+OUTER
+=== View DDL ===
+\restrict QS4iS9XqVj7yrhcfTyYVtm3YqZTdTvpnWzwJ4k4aJqr3mTuNAd75yGtXf16hTFb
+CREATE MATERIALIZED VIEW public.course_search_view AS
+ SELECT c.id,
+    c.name AS course_name,
+    c.category,
+    c.sub_category,
+    c.degree_level,
+    c.duration,
+    c.duration_term,
+    c.study_mode,
+    c.course_website,
+    c.course_location,
+    c.university_id,
+    (setweight(to_tsvector('simple'::regconfig, COALESCE(c.name, ''::text)), 'A'::"char") || setweight(to_tsvector('simple'::regconfig, COALESCE(u.name, ''::text)), 'B'::"char")) AS name_tsv,
+    ((((((setweight(to_tsvector('english'::regconfig, COALESCE(c.name, ''::text)), 'A'::"char") || setweight(to_tsvector('english'::regconfig, COALESCE(u.name, ''::text)), 'B'::"char")) || setweight(to_tsvector('english'::regconfig, COALESCE(c.category, ''::text)), 'C'::"char")) || setweight(to_tsvector('english'::regconfig, COALESCE(c.course_location, ''::text)), 'C'::"char")) || setweight(to_tsvector('english'::regconfig, COALESCE(u.city, ''::text)), 'C'::"char")) || setweight(to_tsvector('english'::regconfig, COALESCE(u.country, ''::text)), 'C'::"char")) || setweight(to_tsvector('english'::regconfig, COALESCE(c.sub_category, ''::text)), 'D'::"char")) AS search_tsv,
+    u.name AS university_name,
+    u.logo_url,
+    u.city AS university_city,
+    u.country AS university_country,
+    u.website AS university_website,
+    COALESCE(u.featured, false) AS featured,
+    COALESCE(u.featured_priority, 0) AS featured_priority,
+    ( SELECT fees.international_fee
+           FROM public.fees
+          WHERE (fees.course_id = c.id)
+          ORDER BY fees.id DESC
+         LIMIT 1) AS international_fee,
+    ( SELECT fees.currency
+           FROM public.fees
+          WHERE (fees.course_id = c.id)
+          ORDER BY fees.id DESC
+         LIMIT 1) AS currency,
+    ( SELECT fees.fee_term
+           FROM public.fees
+          WHERE (fees.course_id = c.id)
+          ORDER BY fees.id DESC
+         LIMIT 1) AS fee_term,
+    NULL::real AS application_fee,
+    ( SELECT array_agg(DISTINCT intakes.intake_month ORDER BY intakes.intake_month) AS array_agg
+           FROM public.intakes
+          WHERE ((intakes.course_id = c.id) AND (intakes.intake_month IS NOT NULL))) AS intakes,
+    ( SELECT english_requirements.overall
+           FROM public.english_requirements
+          WHERE ((english_requirements.course_id = c.id) AND (english_requirements.test_type = 'IELTS'::text))
+         LIMIT 1) AS ielts_overall,
+    ( SELECT english_requirements.overall
+           FROM public.english_requirements
+          WHERE ((english_requirements.course_id = c.id) AND (english_requirements.test_type = 'PTE'::text))
+         LIMIT 1) AS pte_overall,
+    ( SELECT english_requirements.overall
+           FROM public.english_requirements
+          WHERE ((english_requirements.course_id = c.id) AND (english_requirements.test_type = 'TOEFL'::text))
+         LIMIT 1) AS toefl_overall,
+    ( SELECT english_requirements.overall
+           FROM public.english_requirements
+          WHERE ((english_requirements.course_id = c.id) AND (english_requirements.test_type = ANY (ARRAY['CAE'::text, 'Cambridge'::text])))
+         LIMIT 1) AS cae_overall,
+    ( SELECT english_requirements.overall
+           FROM public.english_requirements
+          WHERE ((english_requirements.course_id = c.id) AND (english_requirements.test_type = ANY (ARRAY['Duolingo'::text, 'DET'::text])))
+         LIMIT 1) AS duolingo_overall,
+        CASE
+            WHEN (c.duration IS NULL) THEN NULL::double precision
+            WHEN (c.duration_term ~~* 'month%'::text) THEN ((c.duration)::double precision / (12.0)::double precision)
+            WHEN (c.duration_term ~~* 'week%'::text) THEN ((c.duration)::double precision / (52.0)::double precision)
+            ELSE (c.duration)::double precision
+        END AS duration_years
+   FROM (public.courses c
+     JOIN public.universities u ON ((u.id = c.university_id)))
+  WHERE ((COALESCE(c.status, 'active'::text) = 'active'::text) AND (COALESCE(c.approval_status, 'approved'::text) = 'approved'::text))
+  WITH NO DATA;
+ALTER MATERIALIZED VIEW public.course_search_view OWNER TO uniportal;
+CREATE INDEX idx_csv_category ON public.course_search_view USING btree (category);
+CREATE INDEX idx_csv_city ON public.course_search_view USING btree (university_city);
+CREATE INDEX idx_csv_city_trgm ON public.course_search_view USING gin (lower(university_city) public.gin_trgm_ops);
+CREATE INDEX idx_csv_country ON public.course_search_view USING btree (university_country);
+CREATE INDEX idx_csv_country_trgm ON public.course_search_view USING gin (lower(university_country) public.gin_trgm_ops);
+CREATE INDEX idx_csv_course_name_lower_trgm ON public.course_search_view USING gin (lower(course_name) public.gin_trgm_ops);
+CREATE INDEX idx_csv_degree_level ON public.course_search_view USING btree (degree_level);
+CREATE INDEX idx_csv_duration_years ON public.course_search_view USING btree (duration_years);
+CREATE INDEX idx_csv_featured ON public.course_search_view USING btree (featured DESC, featured_priority DESC) WHERE (featured = true);
+CREATE UNIQUE INDEX idx_csv_id ON public.course_search_view USING btree (id);
+CREATE INDEX idx_csv_intakes ON public.course_search_view USING gin (intakes);
+CREATE INDEX idx_csv_intl_fee ON public.course_search_view USING btree (international_fee);
+CREATE INDEX idx_csv_loc_trgm ON public.course_search_view USING gin (lower(COALESCE(course_location, ''::text)) public.gin_trgm_ops);
+CREATE INDEX idx_csv_name_trgm ON public.course_search_view USING gin (course_name public.gin_trgm_ops);
+CREATE INDEX idx_csv_name_tsv ON public.course_search_view USING gin (name_tsv);
+CREATE INDEX idx_csv_search_tsv ON public.course_search_view USING gin (search_tsv);
+CREATE INDEX idx_csv_uni_name_lower_trgm ON public.course_search_view USING gin (lower(university_name) public.gin_trgm_ops);
+CREATE INDEX idx_csv_uni_name_trgm ON public.course_search_view USING gin (university_name public.gin_trgm_ops);
+CREATE INDEX idx_csv_university_id ON public.course_search_view USING btree (university_id);
+\unrestrict QS4iS9XqVj7yrhcfTyYVtm3YqZTdTvpnWzwJ4k4aJqr3mTuNAd75yGtXf16hTFb
+CREATE MATERIALIZED VIEW
+ALTER MATERIALIZED VIEW
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+GRANT
+=== View recreated on staging ===
+ERROR:  materialized view "course_search_view" has not been populated
+HINT:  Use the REFRESH MATERIALIZED VIEW command.
+root@university-and-course-data:~/University-and-Course-data# 
