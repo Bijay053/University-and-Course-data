@@ -1,0 +1,122 @@
+Variant 1 it is. Sequencing the morning now.
+
+Five items to ship today:
+1. Housekeeping (git anomaly + Bond spot-check + pg_dump + ACU diagnostic)
+2. Zombie beat-task path test
+3. Tier 7 operator alert
+4. Nightly sweep cron + drift alerts
+5. Tier 2 subdomain probes
+
+---
+
+**BLOCK 1 — Morning housekeeping (target: 45 min)**
+
+Run these in order on prod (`ssh root@159.65.152.72`):
+
+**Step 1.1 — Git working-tree investigation (5 min)**
+
+```
+cd ~/University-and-Course-data
+
+# Check if bulk_approve.py was ever commit-deleted
+git log --oneline --diff-filter=D --all -- backend-py/scripts/bulk_approve.py
+
+# If above returns nothing, check working-tree events
+git reflog | head -20
+
+# Check for any other tree drift
+git status
+git diff HEAD --stat
+```
+
+Report back what `reflog` shows. If it's just normal commits/checkouts, the bulk_approve.py disappearance was a one-off and we move on. If it shows `stash`, `reset --hard`, or unfamiliar `checkout` commands, we need to understand the cause before proceeding.
+
+**Step 1.2 — git clean preview (2 min)**
+
+```
+git clean -nfd
+```
+
+Review the dry-run output. If the listed files are all scratch (`__pycache__`, `.pyc`, temp logs), proceed:
+
+```
+git clean -fd
+```
+
+If any listed file looks like work-in-progress, **don't run without `-n`** — paste the list here first.
+
+**Step 1.3 — pg_dump backup (3 min)**
+
+```
+mkdir -p /root/backups
+pg_dump university_portal | gzip > /root/backups/uni_portal_$(date +%Y%m%d_%H%M%S).sql.gz
+
+# Verify it landed and isn't suspiciously small
+ls -lh /root/backups/ | tail -3
+```
+
+Expect the .gz file to be a few MB at minimum. If it's <100KB, the dump failed silently — stop and check.
+
+**Step 1.4 — Bond IELTS ground-truth spot-check (5 min)**
+
+```
+sudo -u postgres psql university_portal -c "
+WITH bond_sample AS (
+  SELECT id, course_name, ielts_overall,
+         extraction_method->>'ielts_overall' AS source,
+         course_website
+  FROM scraped_courses
+  WHERE university_id = 22 AND ielts_overall IS NOT NULL
+  ORDER BY random() LIMIT 5
+)
+SELECT * FROM bond_sample;"
+```
+
+For each of the 5 rows: open `course_website` in a browser, find the IELTS requirement on the page, compare to `ielts_overall` in the row. Report results in this format:
+
+```
+Course                              | DB IELTS | Page IELTS | Source              | Match?
+Bachelor of Communication           | 6.5      | 6.5        | central_page:...    | yes
+Master of Architecture              | 6.5      | 6.5        | ai_fallback         | yes BUT source is bad
+...
+```
+
+Pass criteria: all 5 match the page, AND no source shows `ai_fallback` more than once. If `ai_fallback` shows up multiple times — even when values match — we have the same Gemini-substitution issue KBS had, just hiding behind correct-by-coincidence values.
+
+**Step 1.5 — ACU diagnostic (2 min)**
+
+```
+sudo -u postgres psql university_portal -c "
+SELECT status, auto_publish_status, COUNT(*),
+       MIN(created_at) AS oldest, MAX(created_at) AS newest,
+       ROUND(AVG(completeness)) AS avg_completeness
+FROM scraped_courses
+WHERE university_id = 51
+GROUP BY status, auto_publish_status
+ORDER BY status, auto_publish_status;"
+```
+
+This tells us:
+- How many ACU rows are staged and in what state
+- Whether they're recently scraped (use as-is) or stale (rescrape first)
+- Average completeness (will the rows pass the auto-publish gate?)
+
+Don't promote ACU yet — just understand state. ACU promotion is for tomorrow if it's clean, or after rescrape if stale.
+
+---
+
+**Block 1 success criteria:**
+
+- Git anomaly understood (or confirmed one-off)
+- Working tree clean
+- pg_dump backup exists
+- Bond IELTS verified against ground truth (5/5 match, sources OK)
+- ACU state classified (clean / needs rescrape / needs enrichment)
+
+---
+
+**Once Block 1 is reported back, I'll send Block 2 (zombie test + monitoring infra).**
+
+If anything in Block 1 surfaces a real problem (Bond hallucination, mass git drift, pg_dump failure), we pause Block 2 and address Block 1 findings first. The pattern is: ship Block 1 cleanly, then Block 2, then Block 3 — don't run them in parallel.
+
+Go.
