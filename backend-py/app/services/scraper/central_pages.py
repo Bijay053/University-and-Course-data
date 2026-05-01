@@ -577,11 +577,22 @@ def _parse_column_keyed_english_table(
 
     # Column header tokens → (by_level level keys to populate, priority)
     # Higher priority = higher qualification level.
-    # "Bachelor and all Postgraduate programs" maps to BOTH keys so every
-    # degree level gets the correct value.
+    #
+    # Key design: use THREE distinct by_level keys so that Diploma-level
+    # requirements (often lower than Bachelor+PG) are never overwritten by
+    # the Bachelor+PG column.
+    #
+    #   "postgraduate" — Master's, Graduate Cert/Diploma, Doctorate
+    #   "undergraduate" — Bachelor's
+    #   "diploma"       — Diploma, Advanced Diploma, Associate Diploma
+    #
+    # single_course.py maps each degree_level string to one of these keys
+    # via _level_bucket.  The "bachelor+PG" column maps to BOTH
+    # "postgraduate" and "undergraduate" (same value for both in most
+    # institutions); the "Diploma" column maps to "diploma" only.
     _COL_LEVEL_MAP: list[tuple[list[str], list[str], int]] = [
         (["bachelor", "postgraduate"], ["postgraduate", "undergraduate"], 4),
-        (["diploma", "advanced diploma", "associate diploma"], ["undergraduate"], 3),
+        (["diploma", "advanced diploma", "associate diploma"], ["diploma"], 3),
         # EAP/ELICOS columns are pathway-level — excluded from by_level (level_keys=[])
         # so they don't override degree-level requirements in single_course.py.
         (["eap 2", "eap2", "academic purposes 2", "purposes 2"], [], 2),

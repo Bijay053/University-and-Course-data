@@ -2423,9 +2423,21 @@ async def extract_course(
             #   applying them to PG courses is wrong, hence the pg_skip flag.
             _course_dl = (payload.get("degree_level") or "").strip()
             _english_by_level: dict = central_data.get("english_by_level") or {}
+            # Diploma/Advanced Diploma programs sit between pathway programs
+            # and bachelor-level courses in the KBS column-keyed table.  They
+            # have a separate "diploma" by_level key populated by the
+            # _parse_column_keyed_english_table Diploma column (e.g. IELTS 5.5
+            # at KBS).  Without this bucket, the Diploma column value would be
+            # overwritten by the higher-priority Bachelor+PG column (6.0)
+            # because both previously shared the "undergraduate" key.
+            _DIPLOMA_LEVELS: frozenset[str] = frozenset(
+                {"Diploma", "Advanced Diploma", "Associate Diploma"}
+            )
             _level_bucket = (
                 "postgraduate"
                 if _course_dl in _CENTRAL_ENGLISH_PG_LEVELS
+                else "diploma"
+                if _course_dl in _DIPLOMA_LEVELS
                 else "undergraduate"
             )
             _level_english: dict = _english_by_level.get(_level_bucket) or {}
@@ -2439,14 +2451,41 @@ async def extract_course(
             # a value; null is reviewable; a silently wrong 6.5 is not.
             _is_pathway_course = bool(payload.get("is_pathway"))
 
+            # Methods whose values the verified central English page may
+            # supersede.  AI guesses (hallucinated) and Gemini primary
+            # (university-generic, not course-specific) lose to an
+            # explicitly configured central-page URL.  Course-specific
+            # sources (browser, vision, per-course Gemini) keep their
+            # values.  Defined here so both Path 1 and Path 2 share it.
+            _CENTRAL_ENGLISH_OVERRIDABLE: frozenset[str] = frozenset(
+                {"", "ai_fallback", "gemini_primary"}
+            )
+
             # Path 1: level-specific values available — use them unconditionally.
             if _level_english and not _is_pathway_course:
                 _eng_filled: list[str] = []
                 for _k, _v in _level_english.items():
                     if _v in (None, "", 0):
                         continue
-                    if payload.get(_k) not in (None, "", 0):
-                        continue
+                    _curr = payload.get(_k)
+                    if _curr not in (None, "", 0):
+                        # Allow override when existing value came from a
+                        # low-authority source (AI guess, Gemini primary).
+                        _existing_method = next(
+                            (
+                                ev.get("method", "")
+                                for ev in reversed(evidence)
+                                if ev.get("field_key") == _k
+                            ),
+                            "",
+                        )
+                        if _existing_method not in _CENTRAL_ENGLISH_OVERRIDABLE:
+                            continue
+                        # Drop stale low-authority evidence for this slot so
+                        # extraction_method reflects the central page source.
+                        evidence[:] = [
+                            ev for ev in evidence if ev.get("field_key") != _k
+                        ]
                     payload[_k] = _v
                     evidence.append({
                         "field_key": _k,
@@ -2486,8 +2525,21 @@ async def extract_course(
                     for _k, _v in _central_english.items():
                         if _v in (None, "", 0):
                             continue
-                        if payload.get(_k) not in (None, "", 0):
-                            continue
+                        _curr = payload.get(_k)
+                        if _curr not in (None, "", 0):
+                            _existing_method = next(
+                                (
+                                    ev.get("method", "")
+                                    for ev in reversed(evidence)
+                                    if ev.get("field_key") == _k
+                                ),
+                                "",
+                            )
+                            if _existing_method not in _CENTRAL_ENGLISH_OVERRIDABLE:
+                                continue
+                            evidence[:] = [
+                                ev for ev in evidence if ev.get("field_key") != _k
+                            ]
                         payload[_k] = _v
                         evidence.append({
                             "field_key": _k,

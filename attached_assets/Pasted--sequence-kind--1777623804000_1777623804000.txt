@@ -1,0 +1,56 @@
+ sequence |             kind              |                                                                                                                                                                        
+                                                                                             msg                                                                                                                   
+                                                                                                                                                   
+----------+-------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------------------------------------------------
+       45 | central_fee_parsed            | [CENTRAL] fee page parsed → 0 program record(s) from https://www.kbs.edu.au/admissions/fees
+       46 | central_fee_subpage_parsed    | [CENTRAL] sub-page fee parsed → 22 record(s) from https://www.kbs.edu.au/admissions/fees/international-fees
+       47 | central_english_col_keyed     | [CENTRAL] column-keyed english table → postgraduate: cambridge_overall=169.0, duolingo_overall=110.0, ielts_overall=6.0, pte_overall=50.0, toefl_overall=72.0; undergra
+duate: cambridge_overall=169.0, duolingo_overall=110.0, ielts_overall=6.0, pte_overall=50.0, toefl_overall=72.0
+       48 | central_english_parsed        | [CENTRAL] english page parsed → cambridge_overall=169.0, duolingo_overall=110.0, ielts_listening=5.5, ielts_overall=6.0, ielts_reading=5.5, ielts_speaking=6.0, ielts_w
+riting=6.0, pte_overall=50.0, toefl_overall=72.0 from https://www.kbs.edu.au/admissions/entry-requirements/english-entry-requirements
+       92 | central_fee_applied           | [FEE match] course='MBA - Master of Business Administration' matched_row='Master of Business Administration' fee=58920.0 confidence=high
+       94 | central_english_level_applied | [CENTRAL ✓] MBA - Master of Business Administration — english (postgraduate) from central page: ielts=6.0 pte=50.0 toefl=72.0 cambridge=169.0 duolingo=110.0
+       95 | central_english_level_applied | [CENTRAL ✓] Non-award Single Subject Enrolment — english (undergraduate) from central page: ielts=6.0 pte=50.0 toefl=72.0 cambridge=169.0 duolingo=110.0
+      107 | central_english_level_applied | [CENTRAL ✓] The Ultimate Guide to Doing An MBA in Au — english (postgraduate) from central page: ielts=6.0 pte=50.0 toefl=72.0 cambridge=169.0 duolingo=110.0
+      132 | central_fee_applied           | [FEE match] course='Bachelor of Business' matched_row='Bachelor of Business' fee=69120.0 confidence=exact
+      133 | central_english_level_applied | [CENTRAL ✓] Bachelor of Business — english (undergraduate) from central page: ielts=6.0 pte=50.0 toefl=72.0 cambridge=169.0 duolingo=110.0
+      146 | central_english_level_applied | [CENTRAL ✓] Course Delivery Options — english (undergraduate) from central page: ielts=6.0 pte=50.0 toefl=72.0 cambridge=169.0 duolingo=110.0
+      160 | central_fee_bucket_skip       | [FEE skip] course='Bachelor of Business (Management)' — only bucket match available (row='Diploma of\xa0Business', fee=23040.0); fee left blank to avoid wrong data
+      161 | central_english_level_applied | [CENTRAL ✓] Bachelor of Business (Management) — english (undergraduate) from central page: ielts=6.0 pte=50.0 toefl=72.0 cambridge=169.0 duolingo=110.0
+      178 | central_fee_applied           | [FEE match] course='Diploma of Business' matched_row='Diploma of\xa0Business' fee=23040.0 confidence=exact
+      179 | central_english_level_applied | [CENTRAL ✓] Diploma of Business — english (undergraduate) from central page: ielts=6.0 pte=50.0 toefl=72.0 cambridge=169.0 duolingo=110.0
+      193 | central_fee_bucket_skip       | [FEE skip] course='Bachelor of Business (Marketing)' — only bucket match available (row='Diploma of\xa0Business', fee=23040.0); fee left blank to avoid wrong data
+      194 | central_english_level_applied | [CENTRAL ✓] Bachelor of Business (Marketing) — english (undergraduate) from central page: ielts=6.0 pte=50.0 toefl=72.0 cambridge=169.0 duolingo=110.0
+      203 | central_fee_bucket_skip       | [FEE skip] course='Bachelor of Business (Accounting)' — only bucket match available (row='Diploma of\xa0Business', fee=23040.0); fee left blank to avoid wrong data
+      204 | central_english_level_applied | [CENTRAL ✓] Bachelor of Business (Accounting) — english (undergraduate) from central page: pte=50.0 toefl=72.0 cambridge=169.0 duolingo=110.0
+      225 | central_fee_applied           | [FEE match] course='Graduate Certificate in Accounting' matched_row='Graduate Certificate of Accounting' fee=13600.0 confidence=high
+      226 | central_english_level_applied | [CENTRAL ✓] Graduate Certificate in Accounting — english (postgraduate) from central page: ielts=6.0 pte=50.0 toefl=72.0 cambridge=169.0 duolingo=110.0
+      236 | central_fee_bucket_skip       | [FEE skip] course='Bachelor of Business (Hospitality and Tourism Management)' — only bucket match available (row='Diploma of\xa0Business', fee=23040.0); fee left blank
+ to avoid wrong data
+      237 | central_english_level_applied | [CENTRAL ✓] Bachelor of Business (Hospitality and To — english (undergraduate) from central page: ielts=6.0 pte=50.0 toefl=72.0 cambridge=169.0 duolingo=110.0
+      258 | central_fee_applied           | [FEE match] course='Master of Professional Accounting' matched_row='Master of Professional Accounting' fee=40800.0 confidence=exact
+      259 | central_english_level_applied | [CENTRAL ✓] Master of Professional Accounting — english (postgraduate) from central page: ielts=6.0 pte=50.0 toefl=72.0 cambridge=169.0 duolingo=110.0
+      274 | central_fee_applied           | [FEE match] course='Graduate Certificate in Business Administration' matched_row='Graduate Certificate in Business Administration' fee=19640.0 confidence=exact
+      275 | central_english_level_applied | [CENTRAL ✓] Graduate Certificate in Business Adminis — english (postgraduate) from central page: ielts=6.0 pte=50.0 toefl=72.0 cambridge=169.0 duolingo=110.0
+      289 | central_fee_applied           | [FEE match] course='Graduate Certificate in Business Analytics' matched_row='Graduate Certificate in Business Analytics' fee=13600.0 confidence=exact
+      290 | central_english_level_applied | [CENTRAL ✓] Graduate Certificate in Business Analyti — english (postgraduate) from central page: ielts=6.0 pte=50.0 toefl=72.0 cambridge=169.0 duolingo=110.0
+      305 | central_fee_applied           | [FEE match] course='Master of Business Analytics' matched_row='Master of Business Analytics' fee=40800.0 confidence=exact
+      306 | central_english_level_applied | [CENTRAL ✓] Master of Business Analytics — english (postgraduate) from central page: ielts=6.0 pte=50.0 toefl=72.0 cambridge=169.0 duolingo=110.0
+      321 | central_fee_applied           | [FEE match] course='Master of Accounting' matched_row='Master of Accounting' fee=54400.0 confidence=exact
+      322 | central_english_level_applied | [CENTRAL ✓] Master of Accounting — english (postgraduate) from central page: ielts=6.0 pte=50.0 toefl=72.0 cambridge=169.0 duolingo=110.0
+      337 | central_fee_applied           | [FEE match] course='Graduate Diploma of Business Administration' matched_row='Graduate Diploma of Business Administration' fee=39280.0 confidence=exact
+      339 | central_english_level_applied | [CENTRAL ✓] Graduate Diploma of Business Administrat — english (postgraduate) from central page: ielts=6.0 pte=50.0 toefl=72.0 cambridge=169.0 duolingo=110.0
+      345 | central_fee_applied           | [FEE match] course='Master of Business Analytics (Extension)' matched_row='Master of Business Analytics (Extension)' fee=54020.0 confidence=exact
+      346 | central_english_level_applied | [CENTRAL ✓] Master of Business Analytics (Extension) — english (postgraduate) from central page: ielts=6.0 pte=50.0 toefl=72.0 cambridge=169.0 duolingo=110.0
+      361 | central_fee_bucket_skip       | [FEE skip] course='MBA – Digital Management' — only bucket match available (row='Graduate Certificate in Business Administration', fee=19640.0); fee left blank to avoi
+d wrong data
+      362 | central_english_level_applied | [CENTRAL ✓] MBA – Digital Management — english (postgraduate) from central page: ielts=6.0 pte=50.0 toefl=72.0 cambridge=169.0 duolingo=110.0
+      375 | central_fee_applied           | [FEE match] course='Graduate Diploma of Business Analytics' matched_row='Graduate Diploma of Business Analytics' fee=27200.0 confidence=exact
+      376 | central_english_level_applied | [CENTRAL ✓] Graduate Diploma of Business Analytics — english (postgraduate) from central page: ielts=6.0 pte=50.0 toefl=72.0 cambridge=169.0 duolingo=110.0
+      386 | central_fee_bucket_skip       | [FEE skip] course='MBA – Health Services Management' — only bucket match available (row='Graduate Certificate in Business Administration', fee=19640.0); fee left blank
+ to avoid wrong data
+      388 | central_english_level_applied | [CENTRAL ✓] MBA – Health Services Management — english (postgraduate) from central page: ielts=6.0 pte=50.0 toefl=72.0 cambridge=169.0 duolingo=110.0
+      416 | central_fee_bucket_skip       | [FEE skip] course='MBA – Project Management' — only bucket match available (row='Graduate Certificate in Business Administration', fee=19640.0); fee left blank to avoid wrong data
+:

@@ -1,0 +1,155 @@
+DATE 1
+      page_type       |                                       url                                       
+----------------------+---------------------------------------------------------------------------------
+ fee_schedule         | https://www.kbs.edu.au/admissions/fees
+ english_requirements | https://www.kbs.edu.au/admissions/entry-requirements/english-entry-requirements
+(2 rows)
+
+DELETE 2
+KBS job: job_133f9ba55941
+08:10:47 running
+08:11:07 running
+08:11:27 running
+08:11:47 running
+08:12:07 running
+08:12:28 running
+08:12:48 running
+08:13:08 running
+08:13:28 running
+08:13:48 running
+08:14:08 running
+08:14:28 running
+08:14:48 running
+08:15:08 completed
+ page_type | english_vals | by_level | fetched_at 
+-----------+--------------+----------+------------
+(0 rows)
+
+                        course_name                        |     degree_level     | international_fee | ielts_overall | pte_overall |        ielts_source        
+-----------------------------------------------------------+----------------------+-------------------+---------------+-------------+----------------------------
+ Bachelor of Business (Accounting)                         | Bachelor's           |                   |           6.5 |          50 | ai_fallback
+ Bachelor of Business (Hospitality and Tourism Management) | Bachelor's           |                   |             6 |          50 | central_page:english_level
+ Bachelor of Business (Management)                         | Bachelor's           |                   |             6 |          50 | central_page:english_level
+ Bachelor of Business (Marketing)                          | Bachelor's           |                   |             6 |          50 | central_page:english_level
+ Bachelor of Information Technology                        | Bachelor's           |             74880 |             6 |          50 | central_page:english_level
+ Diploma of Business                                       | Diploma              |             23040 |             6 |          50 | central_page:english_level
+ Diploma of Information Technology                         | Diploma              |             24960 |             6 |          50 | central_page:english_level
+ Graduate Certificate in Accounting                        | Graduate Certificate |             13600 |             6 |          50 | central_page:english_level
+ Graduate Certificate in Business Administration           | Graduate Certificate |             19640 |             6 |          50 | central_page:english_level
+ Graduate Certificate in Business Analytics                | Graduate Certificate |             13600 |             6 |          50 | central_page:english_level
+ Graduate Certificate in Information Technology            | Graduate Certificate |             14560 |             6 |          50 | central_page:english_level
+ Graduate Diploma of Business Administration               | Graduate Diploma     |             39280 |             6 |          50 | central_page:english_level
+ Graduate Diploma of Business Analytics                    | Graduate Diploma     |             27200 |             6 |          50 | central_page:english_level
+ Graduate Diploma of Information Technology                | Graduate Diploma     |             29120 |             6 |          50 | central_page:english_level
+ MBA - Master of Business Administration                   | Master's             |             58920 |             6 |          50 | central_page:english_level
+ MBA – (Women in Leadership)                               | Master's             |                   |             6 |          50 | central_page:english_level
+ MBA – Data-driven Leadership                              | Master's             |                   |             6 |          50 | central_page:english_level
+ MBA – Digital Management                                  | Master's             |                   |             6 |          50 | central_page:english_level
+ MBA – Health Services Management                          | Master's             |                   |             6 |          50 | central_page:english_level
+ MBA – International Leadership                            | Master's             |                   |             6 |          50 | central_page:english_level
+ MBA – Project Management                                  | Master's             |                   |             6 |          50 | central_page:english_level
+ MBA – Tourism and Hospitality Leadership                  | Master's             |                   |             6 |          50 | central_page:english_level
+ Master of Accounting                                      | Master's             |             54400 |             6 |          50 | central_page:english_level
+ Master of Business Analytics                              | Master's             |             40800 |             6 |          50 | central_page:english_level
+ Master of Business Analytics (Extension)                  | Master's             |             54020 |             6 |          50 | central_page:english_level
+ Master of Business Analytics (Information Technology)     | Master's             |             55460 |             6 |          50 | central_page:english_level
+ Master of Information Technology                          | Master's             |             43680 |             6 |          50 | central_page:english_level
+ Master of Information Technology (Extension)              | Master's             |             57140 |             6 |          50 | central_page:english_level
+ Master of Professional Accounting                         | Master's             |             40800 |             6 |          50 | central_page:english_level
+(29 rows)
+
+root@university-and-course-data:~/University-and-Course-data/backend-py# # On prod — run ALL of these in one paste:
+
+# ── A. Full central-pages event sequence for job_133f9ba55941 ─────────────
+sudo -u postgres psql university_portal -c "
+SELECT sequence,
+       payload->>'kind'    AS kind,
+       payload->>'message' AS msg
+FROM scrape_runtime_logs
+WHERE runtime_job_id = 'job_133f9ba55941'
+  AND (payload->>'message' ILIKE '%central%'
+    OR payload->>'message' ILIKE '%column-keyed%'
+    OR payload->>'message' ILIKE '%english%'
+    OR payload->>'message' ILIKE '%cache%'
+    OR payload->>'kind' ILIKE '%central%'
+    OR payload->>'kind' ILIKE '%cache%')
+ORDER BY sequence;"
+# Looking for:
+#   [CENTRAL] column-keyed english table → ...  ← parser fired (we know)
+#   [CENTRAL] english page parsed → ...          ← what flat vals were stored?
+#   [CACHE] cached english_requirements ...      ← cache write succeeded?
+#   [CENTRAL] english page fetch failed ...      ← if present, fetch failed
+#   [CACHE] english_requirements hit → ...       ← cache hit (means re-fetch skipped)
+
+# ── B. Did Path 1 ([CENTRAL ✓]) ever fire per-course? ────────────────────
+sudo -u postgres psql university_portal -c "
+SELECT COUNT(*) AS central_applied_count,
+       payload->>'kind' AS kind
+FROM scrape_runtime_logs
+WHERE runtime_job_id = 'job_133f9ba55941'
+  AND (payload->>'kind' IN ('central_english_level_applied','central_english_applied')
+    OR payload->>'message' ILIKE '%[CENTRAL %]%english%')
+GROUP BY payload->>'kind';"
+# Zero rows = central page values never reached individual courses
+
+# ── C. How many courses were actually staged vs how many exist now? ────────
+sudo -u postgres psql university_portal -c "
+SELECT status, COUNT(*) FROM scraped_courses
+WHERE university_id = 29
+GROUP BY status;"
+
+# ── D. Check the Celery worker for any prefetch exception ─────────────────
+# (run in a separate terminal — this reads the journald logs for the service)
+sudo journalctl -u uni-celery.service --since '08:10:00' --until '08:20:00' \
+  | grep -i 'prefetch\|central_pages\|kbs\|uni.*29\|exception\|traceback' | head -40
+ central_applied_count |             kind              
+-----------------------+-------------------------------
+                    36 | central_english_level_applied
+(1 row)
+
+ status  | count 
+---------+-------
+ pending |    29
+(1 row)
+
+May 01 08:10:11 university-and-course-data celery[1281575]: [2026-05-01 08:10:11,687: INFO/ForkPoolWorker-3] Discovering course links from https://www.kbs.edu.au/courses (fast_mode=False)
+May 01 08:10:12 university-and-course-data celery[1281575]: [2026-05-01 08:10:12,080: INFO/ForkPoolWorker-3] HTTP Request: GET https://www.kbs.edu.au/courses "HTTP/1.1 200 OK"
+May 01 08:10:12 university-and-course-data celery[1281575]: [2026-05-01 08:10:12,132: INFO/ForkPoolWorker-3] [DISCOVER] added self as candidate https://www.kbs.edu.au/courses
+May 01 08:10:12 university-and-course-data celery[1281575]: [2026-05-01 08:10:12,156: INFO/ForkPoolWorker-3] [DISCOVER] added child course https://www.kbs.edu.au/ultimate-guide-doing-mba-australia
+May 01 08:10:12 university-and-course-data celery[1281575]: [2026-05-01 08:10:12,415: INFO/ForkPoolWorker-3] HTTP Request: GET https://www.kbs.edu.au/admissions/course-delivery-options "HTTP/1.1 200 OK"
+May 01 08:10:12 university-and-course-data celery[1281575]: [2026-05-01 08:10:12,453: INFO/ForkPoolWorker-3] [DISCOVER] added self as candidate https://www.kbs.edu.au/admissions/course-delivery-options
+May 01 08:10:12 university-and-course-data celery[1281575]: [2026-05-01 08:10:12,762: INFO/ForkPoolWorker-3] HTTP Request: GET https://www.kbs.edu.au/study-australia-complete-guide-international-students "HTTP/1.1 200 OK"
+May 01 08:10:13 university-and-course-data celery[1281575]: [2026-05-01 08:10:13,187: INFO/ForkPoolWorker-3] HTTP Request: GET https://www.kbs.edu.au/courses/non-award-single-subject-enrolment "HTTP/1.1 200 OK"
+May 01 08:10:13 university-and-course-data celery[1281575]: [2026-05-01 08:10:13,242: INFO/ForkPoolWorker-3] [DISCOVER] added self as candidate https://www.kbs.edu.au/courses/non-award-single-subject-enrolment
+May 01 08:10:13 university-and-course-data celery[1281575]: [2026-05-01 08:10:13,583: INFO/ForkPoolWorker-3] HTTP Request: GET https://www.kbs.edu.au/documents/studying-australia-ebook "HTTP/1.1 200 OK"
+May 01 08:10:21 university-and-course-data celery[1281575]: [2026-05-01 08:10:21,893: INFO/ForkPoolWorker-3] HTTP Request: GET https://www.kbs.edu.au/robots.txt "HTTP/1.1 200 OK"
+May 01 08:10:22 university-and-course-data celery[1281575]: [2026-05-01 08:10:22,224: INFO/ForkPoolWorker-3] HTTP Request: GET https://www.kbs.edu.au/sitemap.xml "HTTP/1.1 200 OK"
+May 01 08:10:22 university-and-course-data celery[1281575]: [2026-05-01 08:10:22,585: INFO/ForkPoolWorker-3] HTTP Request: GET https://www.kbs.edu.au/sitemap.xml "HTTP/1.1 200 OK"
+May 01 08:10:22 university-and-course-data celery[1281575]: [2026-05-01 08:10:22,982: INFO/ForkPoolWorker-3] HTTP Request: GET https://www.kbs.edu.au/admissions/fees "HTTP/1.1 200 OK"
+May 01 08:10:23 university-and-course-data celery[1281575]: [2026-05-01 08:10:23,005: INFO/ForkPoolWorker-3] central_pages: HTTP fetch returned no fee signals for https://www.kbs.edu.au/admissions/fees — trying browser
+May 01 08:10:28 university-and-course-data celery[1281576]: [2026-05-01 08:10:28,929: INFO/ForkPoolWorker-4] HTTP Request: GET https://vit.edu.au/course-list?type=mba "HTTP/1.1 200 OK"
+May 01 08:10:30 university-and-course-data celery[1281575]: [2026-05-01 08:10:30,083: INFO/ForkPoolWorker-3] central_pages: browser fetch OK for https://www.kbs.edu.au/admissions/fees (93144 bytes)
+May 01 08:10:30 university-and-course-data celery[1281575]: [2026-05-01 08:10:30,144: INFO/ForkPoolWorker-3] central_pages: 0 fee records from https://www.kbs.edu.au/admissions/fees
+May 01 08:10:30 university-and-course-data celery[1281575]: [2026-05-01 08:10:30,228: INFO/ForkPoolWorker-3] central_pages: hub sub-page follower — trying 2 candidate(s): ['https://www.kbs.edu.au/admissions/fees/international-fees', 'https://www.kbs.edu.au/admissions/fees/domestic-fees']
+May 01 08:10:30 university-and-course-data celery[1281575]: [2026-05-01 08:10:30,497: INFO/ForkPoolWorker-3] HTTP Request: GET https://www.kbs.edu.au/admissions/fees/international-fees "HTTP/1.1 200 OK"
+May 01 08:10:30 university-and-course-data celery[1281575]: [2026-05-01 08:10:30,525: INFO/ForkPoolWorker-3] central_pages: HTTP fetch has fee signals for https://www.kbs.edu.au/admissions/fees/international-fees (86582 chars)
+May 01 08:10:30 university-and-course-data celery[1281575]: [2026-05-01 08:10:30,571: INFO/ForkPoolWorker-3] central_pages: sub-page fee parse (https://www.kbs.edu.au/admissions/fees/international-fees) → 22 record(s)
+May 01 08:10:30 university-and-course-data celery[1281575]: [2026-05-01 08:10:30,582: INFO/ForkPoolWorker-3] [CACHE] cached 29/fee_schedule for 30 days (expires 2026-05-31)
+May 01 08:10:30 university-and-course-data celery[1281575]: [2026-05-01 08:10:30,835: INFO/ForkPoolWorker-3] HTTP Request: GET https://www.kbs.edu.au/admissions/entry-requirements/english-entry-requirements "HTTP/1.1 200 OK"
+May 01 08:10:31 university-and-course-data celery[1281575]: [2026-05-01 08:10:31,035: INFO/ForkPoolWorker-3] central_pages: column-keyed english table override for https://www.kbs.edu.au/admissions/entry-requirements/english-entry-requirements: {'ielts_overall': 6.0, 'pte_overall': 50.0, 'toefl_overall': 72.0, 'cambridge_overall': 169.0, 'duolingo_overall': 110.0}
+May 01 08:10:31 university-and-course-data celery[1281575]: [2026-05-01 08:10:31,046: INFO/ForkPoolWorker-3] central_pages: english slots from https://www.kbs.edu.au/admissions/entry-requirements/english-entry-requirements: {'duolingo_overall': 110.0, 'ielts_overall': 6.0, 'ielts_speaking': 6.0, 'ielts_writing': 6.0, 'ielts_listening': 5.5, 'ielts_reading': 5.5, 'pte_overall': 50.0, 'toefl_overall': 72.0, 'cambridge_overall': 169.0}
+May 01 08:10:31 university-and-course-data celery[1281575]: [2026-05-01 08:10:31,054: INFO/ForkPoolWorker-3] [CACHE] cached 29/english_requirements for 30 days (expires 2026-05-31)
+May 01 08:10:31 university-and-course-data celery[1281575]: [2026-05-01 08:10:31,552: INFO/ForkPoolWorker-3] HTTP Request: GET https://www.kbs.edu.au/admissions/course-delivery-options "HTTP/1.1 200 OK"
+May 01 08:10:31 university-and-course-data celery[1281575]: [2026-05-01 08:10:31,560: INFO/ForkPoolWorker-3] HTTP Request: GET https://www.kbs.edu.au/ultimate-guide-doing-mba-australia "HTTP/1.1 200 OK"
+May 01 08:10:31 university-and-course-data celery[1281575]: [2026-05-01 08:10:31,571: INFO/ForkPoolWorker-3] HTTP Request: GET https://www.kbs.edu.au/courses/non-award-single-subject-enrolment "HTTP/1.1 200 OK"
+May 01 08:10:31 university-and-course-data celery[1281576]: [2026-05-01 08:10:31,669: INFO/ForkPoolWorker-4] central_pages: HTTP fetch returned no fee signals for https://vit.edu.au/international/fees — trying browser
+May 01 08:10:32 university-and-course-data celery[1281575]: [2026-05-01 08:10:32,113: INFO/ForkPoolWorker-3] HTTP Request: GET https://www.kbs.edu.au/courses/mba-master-of-business-administration "HTTP/1.1 200 OK"
+May 01 08:10:38 university-and-course-data celery[1281575]: [2026-05-01 08:10:38,150: INFO/ForkPoolWorker-3] gemini_primary: https://www.kbs.edu.au/courses/non-award-single-subject-enrolment → 1 fields filled, cost=$0.000197
+May 01 08:10:39 university-and-course-data celery[1281575]: [2026-05-01 08:10:39,017: INFO/ForkPoolWorker-3] gemini_primary: https://www.kbs.edu.au/courses/mba-master-of-business-administration → 8 fields filled, cost=$0.000340
+May 01 08:10:39 university-and-course-data celery[1281575]: [2026-05-01 08:10:39,996: INFO/ForkPoolWorker-3] gemini_primary: https://www.kbs.edu.au/ultimate-guide-doing-mba-australia → 6 fields filled, cost=$0.000535
+May 01 08:10:40 university-and-course-data celery[1281575]: [2026-05-01 08:10:40,141: INFO/ForkPoolWorker-3] gemini_primary: https://www.kbs.edu.au/admissions/course-delivery-options → 1 fields filled, cost=$0.000165
+May 01 08:10:54 university-and-course-data celery[1281574]: [2026-05-01 08:10:54,282: INFO/ForkPoolWorker-2] central_pages: HTTP fetch returned no fee signals for https://vit.edu.au/international/fees — trying browser
+May 01 08:10:54 university-and-course-data celery[1281575]: [2026-05-01 08:10:54,561: INFO/ForkPoolWorker-3] [VISION SKIP] trust_vision_ocr=false for this uni — skipping vision OCR pass on https://www.kbs.edu.au/courses/non-award-single-subject-enrolment
+May 01 08:10:55 university-and-course-data celery[1281575]: [2026-05-01 08:10:55,305: INFO/ForkPoolWorker-3] [VISION SKIP] trust_vision_ocr=false for this uni — skipping vision OCR pass on https://www.kbs.edu.au/courses/mba-master-of-business-administration
+May 01 08:10:56 university-and-course-data celery[1281575]: [2026-05-01 08:10:56,362: INFO/ForkPoolWorker-3] [VISION SKIP] trust_vision_ocr=false for this uni — skipping vision OCR pass on https://www.kbs.edu.au/ultimate-guide-doing-mba-australia
+root@university-and-course-data:~/University-and-Course-data/backend-py# 

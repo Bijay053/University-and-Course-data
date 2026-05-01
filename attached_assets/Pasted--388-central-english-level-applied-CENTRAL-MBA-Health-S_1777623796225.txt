@@ -1,0 +1,56 @@
+      388 | central_english_level_applied | [CENTRAL ✓] MBA – Health Services Management — english (postgraduate) from central page: ielts=6.0 pte=50.0 toefl=72.0 cambridge=169.0 duolingo=110.0
+      416 | central_fee_bucket_skip       | [FEE skip] course='MBA – Project Management' — only bucket match available (row='Graduate Certificate in Business Administration', fee=19640.0); fee left blank to avoid wrong data
+      417 | central_english_level_applied | [CENTRAL ✓] MBA – Project Management — english (postgraduate) from central page: ielts=6.0 pte=50.0 toefl=72.0 cambridge=169.0 duolingo=110.0
+      428 | central_fee_bucket_skip       | [FEE skip] course='MBA – Tourism and Hospitality Leadership' — only bucket match available (row='Graduate Certificate in Business Administration', fee=19640.0); fee le
+ft blank to avoid wrong data
+      429 | central_english_level_applied | [CENTRAL ✓] MBA – Tourism and Hospitality Leadership — english (postgraduate) from central page: ielts=6.0 pte=50.0 toefl=72.0 cambridge=169.0 duolingo=110.0
+      447 | central_fee_bucket_skip       | [FEE skip] course='MBA – International Leadership' — only bucket match available (row='Graduate Certificate in Business Administration', fee=19640.0); fee left blank t
+o avoid wrong data
+      449 | central_english_level_applied | [CENTRAL ✓] MBA – International Leadership — english (postgraduate) from central page: ielts=6.0 pte=50.0 toefl=72.0 cambridge=169.0 duolingo=110.0
+      461 | central_fee_bucket_skip       | [FEE skip] course='MBA – (Women in Leadership)' — only bucket match available (row='Graduate Certificate in Business Administration', fee=19640.0); fee left blank to a
+void wrong data
+      462 | central_english_level_applied | [CENTRAL ✓] MBA – (Women in Leadership) — english (postgraduate) from central page: ielts=6.0 pte=50.0 toefl=72.0 cambridge=169.0 duolingo=110.0
+      486 | central_fee_bucket_skip       | [FEE skip] course='MBA – Data-driven Leadership' — only bucket match available (row='Graduate Certificate in Business Administration', fee=19640.0); fee left blank to 
+avoid wrong data
+      488 | central_english_level_applied | [CENTRAL ✓] MBA – Data-driven Leadership — english (postgraduate) from central page: ielts=6.0 pte=50.0 toefl=72.0 cambridge=169.0 duolingo=110.0
+      491 | central_fee_applied           | [FEE match] course='Bachelor of Information Technology' matched_row='Bachelor of Information Technology' fee=74880.0 confidence=exact
+      493 | central_english_level_applied | [CENTRAL ✓] Bachelor of Information Technology — english (undergraduate) from central page: ielts=6.0 pte=50.0 toefl=72.0 cambridge=169.0 duolingo=110.0
+      517 | central_fee_applied           | [FEE match] course='Diploma of Information Technology' matched_row='Diploma of\xa0Information Technology' fee=24960.0 confidence=exact
+      518 | central_english_level_applied | [CENTRAL ✓] Diploma of Information Technology — english (undergraduate) from central page: ielts=6.0 pte=50.0 toefl=72.0 cambridge=169.0 duolingo=110.0
+      533 | central_fee_applied           | [FEE match] course='Graduate Certificate in Information Technology' matched_row='Graduate Certificate in Information Technology' fee=14560.0 confidence=exact
+      534 | central_english_level_applied | [CENTRAL ✓] Graduate Certificate in Information Tech — english (postgraduate) from central page: ielts=6.0 pte=50.0 toefl=72.0 cambridge=169.0 duolingo=110.0
+      549 | central_fee_applied           | [FEE match] course='Master of Information Technology (Extension)' matched_row='Master of Information Technology (Extension)' fee=57140.0 confidence=exact
+      550 | central_english_level_applied | [CENTRAL ✓] Master of Information Technology (Extens — english (postgraduate) from central page: ielts=6.0 pte=50.0 toefl=72.0 cambridge=169.0 duolingo=110.0
+      553 | extract_start                 | [EXTRACT] 34/36: English For Academic Purposes
+      554 |                               | Fetching 34/36: English For Academic Purposes
+      557 | gp_debug_text                 | [GP-DEBUG] text[:500]='English for Academic Purposes COURSE CRICOS code 105225K / AQF level N/A My saved courses (0) Typical Duration / 10 weeks per level Structure / 
+20 hours of class per week ARTICULATION INTO / Business / Analytics / Accounting / IT START DATE / EAP 1, EAP1&2 - February, June, September EAP2 - April, August, December TAP BELOW FOR MORE INFORMATION Overview
+ Kaplan Business School offers Academic English programs for those students who need to improve their English proficiency before commencing their'
+      558 | gp_debug_raw                  | [GP-DEBUG] raw_response='```json\n{\n  "international_fee": null,\n  "domestic_fee": null,\n  "fee_term": null,\n  "duration_value": 10,\n  "duration_unit": "weeks",\n
+  "duration_text": "10 weeks per level",\n  "ielts_overall": null,\n  "pte_overall": null,\n  "toefl_overall": null,\n  "cambridge_overall": null,\n  "duolingo_overall": null,\n  "sub_category": "English for Aca
+demic Purposes",\n  "category": "Education",\n  "mode": "On Ca'
+      559 | gemini_primary_done           | [GEMINI] https://www.kbs.edu.au/courses/english-for-academic-purposes → 11 field(s) (cost=$0.000255, in=2835 out=140)
+      560 | per_course_browser_start      | [per-course browser ↻] https://www.kbs.edu.au/courses/english-for-academic-purposes
+      565 | central_fee_applied           | [FEE match] course='Master of Business Analytics (Information Technology)' matched_row='Master of Business Analytics (Information Technology)' fee=55460.0 confidence=e
+xact
+      566 | central_english_level_applied | [CENTRAL ✓] Master of Business Analytics (Informatio — english (postgraduate) from central page: ielts=6.0 pte=50.0 toefl=72.0 cambridge=169.0 duolingo=110.0
+      572 | per_course_browser_done       | [per-course browser ✓] https://www.kbs.edu.au/courses/english-for-academic-purposes — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+      573 | ai_fallback_start             | [FALLBACK] AI enriching https://www.kbs.edu.au/courses/english-for-academic-purposes (missing: international_fee, domestic_fee, ielts_overall)
+      579 | ai_fallback_done              | [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/english-for-academic-purposes: duration_value, duration_unit
+      580 | field_trace_study_mode        | [FIELD TRACE] study_mode='On Campus' location='EAP1 - Melbourne, Perth, Sydney EAP2 - Adelaide, Brisbane, Gold Coast, Melbourne, Sydney' method=study_mode:location_der
+ived url=https://www.kbs.edu.au/courses/english-for-academic-purposes
+      581 | central_fee_applied           | [FEE match] course='Business Administration' matched_row='Master of Business Administration' fee=58920.0 confidence=medium
+      582 | central_english_level_applied | [CENTRAL ✓] Business Administration — english (undergraduate) from central page: ielts=6.0 pte=50.0 toefl=72.0 cambridge=169.0 duolingo=110.0
+      584 | confidence_score              | ✅ [PASS 80/100] Business Administration — missing: duration | english-for-academic-purposes
+      594 | central_fee_applied           | [FEE match] course='Master of Information Technology' matched_row='Master of Information Technology' fee=43680.0 confidence=exact
+      596 | central_english_level_applied | [CENTRAL ✓] Master of Information Technology — english (postgraduate) from central page: ielts=6.0 pte=50.0 toefl=72.0 cambridge=169.0 duolingo=110.0
+      603 | central_english_level_applied | [CENTRAL ✓] Study Abroad Program — english (undergraduate) from central page: pte=50.0 toefl=72.0 cambridge=169.0 duolingo=110.0
+      608 | central_english_level_applied | [CENTRAL ✓] IT Specialisations and System Requiremen — english (undergraduate) from central page: ielts=6.0 pte=50.0 toefl=72.0 cambridge=169.0 duolingo=110.0
+      614 | central_fee_applied           | [FEE match] course='Graduate Diploma of Information Technology' matched_row='Graduate Diploma of Information Technology' fee=29120.0 confidence=exact
+      615 | central_english_level_applied | [CENTRAL ✓] Graduate Diploma of Information Technolo — english (postgraduate) from central page: ielts=6.0 pte=50.0 toefl=72.0 cambridge=169.0 duolingo=110.0
+      618 | sibling_cache_build           | [EXTRACT] [sibling cache ↻ build unknown] ielts_overall=6.0
+      619 | sibling_cache_build           | [EXTRACT] [sibling cache ↻ build undergraduate] ielts_overall=6.5
+      659 | data_quality_issue            | [DATA QUALITY][WARN] missing_international_fee_central_page Ã\u0097 14: International fee absent â\u0080\u0094 marked for central fee page review. (and 13 more)
+(85 rows)
+
+(END)
