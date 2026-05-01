@@ -1,0 +1,54 @@
+root@university-and-course-data:~/University-and-Course-data# while true; do
+  S=$(curl -s "http://localhost:80/api/scrape/status/$JOB" \
+    | python3 -c "import sys,json; print(json.load(sys.stdin)['status'])")
+  echo "$(date '+%H:%M:%S') $S"; [ "$S" = "completed" ] || [ "$S" = "failed" ] && break
+  sleep 20
+done
+07:00:55 running
+07:01:15 running
+07:01:35 running
+07:01:55 running
+07:02:15 running
+07:02:35 running
+07:02:55 running
+07:03:15 running
+07:03:35 running
+07:03:55 running
+07:04:15 running
+07:04:35 running
+07:04:55 running
+07:05:15 running
+07:05:35 running
+07:05:55 completed
+root@university-and-course-data:~/University-and-Course-data# # Should show non-null fees
+sudo -u postgres psql university_portal -c "
+SELECT course_name, international_fee, ielts_overall
+FROM scraped_courses
+WHERE university_id = 29
+ORDER BY international_fee DESC NULLS LAST
+LIMIT 10;"
+
+# Should see sub-page follower fired
+sudo -u postgres psql university_portal -c "
+SELECT msg FROM scrape_runtime_logs
+WHERE runtime_job_id = '$JOB'
+  AND msg ILIKE '%sub-page%'
+ORDER BY sequence;"
+                      course_name                      | international_fee | ielts_overall 
+-------------------------------------------------------+-------------------+---------------
+ Bachelor of Information Technology                    |             74880 |              
+ MBA - Master of Business Administration               |             58920 |              
+ Master of Information Technology (Extension)          |             57140 |              
+ Master of Business Analytics (Information Technology) |             55460 |              
+ Master of Accounting                                  |             54400 |              
+ Master of Business Analytics (Extension)              |             54020 |              
+ Master of Information Technology                      |             43680 |              
+ Master of Professional Accounting                     |             40800 |              
+ Master of Business Analytics                          |             40800 |              
+ Graduate Diploma of Business Administration           |             39280 |              
+(10 rows)
+
+ERROR:  column "msg" does not exist
+LINE 2: SELECT msg FROM scrape_runtime_logs
+               ^
+root@university-and-course-data:~/University-and-Course-data# 
