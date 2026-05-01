@@ -1,0 +1,95 @@
+
+# ── Check scraped_courses for ACAP (uni_id=41) and KBS (uni_id=29) ──
+sudo -u postgres psql university_portal -c "
+SELECT sc.course_name, sc.course_location, sc.ielts_overall,
+       sc.duration, sc.duration_term, sc.import_status
+FROM scraped_courses sc
+WHERE sc.university_id IN (29, 41)
+  AND sc.scrape_job_id IN (
+    SELECT runtime_job_id FROM scrape_runtime_jobs
+    WHERE university_id IN (29, 41)
+    ORDER BY created_at DESC LIMIT 4
+  )
+ORDER BY sc.university_id, sc.course_name
+LIMIT 30;" 2>/dev/null || \
+sudo -u postgres psql university_portal -c "\d scraped_courses" | grep -E "import|status|stage|job"
+ERROR:  column u.slug does not exist
+LINE 2: SELECT u.slug, u.id AS uni_id, COUNT(c.id) AS course_count
+               ^
+ scrape_job_id          | text                     |           | not null | 
+ status                 | text                     |           | not null | 'pending'::text
+ eligibility_status     | text                     |           | not null | 'unknown'::text
+ auto_publish_status    | text                     |           | not null | 'pending_review'::text
+root@university-and-course-data:~/University-and-Course-data# sudo -u postgres psql university_portal -c "\d universities" | head -15
+
+# ── Courses count by university ──
+sudo -u postgres psql university_portal -c "
+SELECT university_id, COUNT(*) AS course_count
+FROM courses
+GROUP BY university_id
+ORDER BY course_count DESC LIMIT 15;"
+
+# ── scraped_courses for recent ACAP + KBS jobs ──
+sudo -u postgres psql university_portal -c "
+SELECT sc.course_name, sc.course_location, sc.ielts_overall,
+       sc.duration, sc.duration_term, sc.status
+FROM scraped_courses sc
+WHERE sc.university_id IN (29, 41)
+  AND sc.scrape_job_id IN (
+    SELECT runtime_job_id FROM scrape_runtime_jobs
+    WHERE university_id IN (29, 41)
+    ORDER BY created_at DESC LIMIT 4
+  )
+ORDER BY sc.university_id, sc.course_name
+LIMIT 30;"
+                                                 Table "public.universities"
+             Column             |           Type           | Collation | Nullable |                 Default                  
+--------------------------------+--------------------------+-----------+----------+------------------------------------------
+ id                             | integer                  |           | not null | nextval('universities_id_seq'::regclass)
+ name                           | text                     |           | not null | 
+ country                        | text                     |           | not null | 
+ city                           | text                     |           | not null | 
+ website                        | text                     |           |          | 
+ description                    | text                     |           |          | 
+ logo_url                       | text                     |           |          | 
+ scrape_url                     | text                     |           |          | 
+ scrape_config                  | jsonb                    |           |          | 
+ created_at                     | timestamp with time zone |           | not null | now()
+ updated_at                     | timestamp with time zone |           | not null | now()
+ fee_page_url                   | text                     |           |          | 
+ university_id | course_count 
+---------------+--------------
+             4 |          173
+             3 |           74
+             1 |           67
+             6 |           30
+             2 |            8
+(5 rows)
+
+                        course_name                        |                           course_location                           | ielts_overall | duration | duration_term | status  
+-----------------------------------------------------------+---------------------------------------------------------------------+---------------+----------+---------------+---------
+ Bachelor of Business (Accounting)                         | Adelaide, Brisbane, Melbourne, Sydney, Perth, Australia             |               |        3 | Year          | pending
+ Bachelor of Business (Hospitality and Tourism Management) | Adelaide, Brisbane, Melbourne, Sydney, Perth, Australia             |               |        3 | Year          | pending
+ Bachelor of Business (Management)                         | Adelaide, Melbourne, Sydney, Australia                              |               |        3 | Year          | pending
+ Bachelor of Business (Marketing)                          | Adelaide, Melbourne, Sydney, Australia                              |               |        3 | Year          | pending
+ Bachelor of Information Technology                        | Adelaide, Brisbane, Melbourne, Perth, Sydney, Australia             |               |        3 | Year          | pending
+ Diploma of Business                                       | Adelaide, Brisbane, Melbourne, Sydney, Perth, Australia             |               |        1 | Year          | pending
+ Diploma of Information Technology                         | Adelaide, Brisbane, Melbourne, Perth, Sydney, Australia             |               |        1 | Year          | pending
+ Graduate Certificate in Information Technology            | Adelaide, Brisbane, Gold Coast, Melbourne, Perth, Sydney, Australia |               |        8 | Month         | pending
+ Graduate Diploma of Business Analytics                    | Adelaide, Brisbane, Gold Coast, Melbourne, Perth, Sydney, Australia |               |        1 | Year          | pending
+ Graduate Diploma of Information Technology                | Adelaide, Brisbane, Gold Coast, Melbourne, Perth, Sydney, Australia |               |        1 | Year          | pending
+ MBA - Master of Business Administration                   | Adelaide, Brisbane, Gold Coast, Melbourne, Perth, Sydney, Australia |               |        2 | Year          | pending
+ MBA – (Women in Leadership)                               | Adelaide, Brisbane, Gold Coast, Melbourne, Perth, Sydney, Australia |               |        2 | Year          | pending
+ MBA – Data-driven Leadership                              | Adelaide, Brisbane, Gold Coast, Melbourne, Perth, Sydney, Australia |               |        2 | Year          | pending
+ MBA – Digital Management                                  | Adelaide, Brisbane, Gold Coast, Melbourne, Perth, Sydney, Australia |               |        2 | Year          | pending
+ MBA – Health Services Management                          | Adelaide, Brisbane, Gold Coast, Melbourne, Perth, Sydney, Australia |               |        2 | Year          | pending
+ MBA – International Leadership                            | Adelaide, Brisbane, Gold Coast, Melbourne, Perth, Sydney, Australia |               |        2 | Year          | pending
+ MBA – Project Management                                  | Adelaide, Brisbane, Gold Coast, Melbourne, Perth, Sydney, Australia |               |        2 | Year          | pending
+ MBA – Tourism and Hospitality Leadership                  | Adelaide, Brisbane, Gold Coast, Melbourne, Perth, Sydney, Australia |               |        2 | Year          | pending
+ Master of Accounting                                      | Adelaide, Brisbane, Gold Coast, Melbourne, Sydney, Perth, Australia |               |        2 | Year          | pending
+ Master of Business Analytics (Extension)                  | Adelaide, Brisbane, Gold Coast, Melbourne, Perth, Sydney, Australia |               |        2 | Year          | pending
+ Master of Business Analytics (Information Technology)     | Adelaide, Brisbane, Gold Coast, Melbourne, Perth, Sydney, Australia |               |        2 | Year          | pending
+ Master of Information Technology (Extension)              | Adelaide, Brisbane, Gold Coast, Melbourne, Perth, Sydney, Australia |               |        2 | Year          | pending
+(22 rows)
+
+root@university-and-course-data:~/University-and-Course-data# 
