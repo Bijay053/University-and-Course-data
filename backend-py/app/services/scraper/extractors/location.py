@@ -25,9 +25,11 @@ LOCATION_LABEL = re.compile(
     r"start\s+dates?\s+(?:and\s+)?campus(?:es)?|"
     r"availability\s+(?:&|and)\s+campus(?:es)?|"
     r"where\s+(?:can\s+)?(?:i|you)\s+study|delivery\s+location|"
-    r"available\s+at)\s*:?\s*$",
+    r"available\s+at)\s*[*†^‡]?\s*:?\s*$",
     re.I,
 )
+# Strips trailing footnote markers (*, †, ^, ‡) before matching LOCATION_LABEL.
+_FOOTNOTE_TRAILER_RE = re.compile(r"[*†^‡\u2020\u2021]+$")
 _MARKETING_HINTS = re.compile(
     r"\b(?:focuses on|knowledge and skills|this (?:course|program|degree|qualification)|our (?:courses?|programs?))\b",
     re.I,
@@ -637,6 +639,51 @@ def _from_delivery_mode_inperson(soup: BeautifulSoup) -> str | None:
     return None
 
 
+def _from_panel_divs(soup: BeautifulSoup) -> str | None:
+    """Handle div-label / div-value panel idiom (e.g. Torrens ``course-card-panel``).
+
+    Finds any ``<div>`` or ``<span>`` whose short text matches LOCATION_LABEL
+    (after stripping trailing footnote markers like ``*``), then reads the
+    next sibling div/span as the value.  Covers patterns like::
+
+        <div class="course-card-panel__label">Campus locations*</div>
+        <div class="course-card-panel__value">Sydney, Melbourne, Brisbane</div>
+
+    Short-text guard (≤ 60 chars) prevents content divs from triggering.
+    The element must also have no block-level children (it must be a leaf label).
+    """
+    try:
+        from bs4.element import Tag  # noqa: F401 — just checking import health
+    except ImportError:  # pragma: no cover
+        return None
+
+    for el in soup.find_all(("div", "span")):
+        raw_text = el.get_text(" ", strip=True)
+        if not raw_text or len(raw_text) > 60:
+            continue
+        # Strip footnote markers before checking the label regex.
+        cleaned = _FOOTNOTE_TRAILER_RE.sub("", raw_text).strip()
+        if not LOCATION_LABEL.match(cleaned):
+            continue
+        # Require leaf-like label: no block-level children.
+        if el.find(("div", "table", "ul", "ol", "p")):
+            continue
+        # Try the label's next sibling first, then the parent's next sibling
+        # (ASA-style adjacent parent containers).
+        nxt = el.find_next_sibling(("div", "span"))
+        if nxt is None:
+            parent = el.parent
+            if parent:
+                nxt = parent.find_next_sibling(("div", "span"))
+        if nxt is None:
+            continue
+        val = compact(nxt.get_text(" ", strip=True))
+        result = _classify_location_value(val)
+        if result:
+            return result
+    return None
+
+
 def _from_text_block(text: str) -> str | None:
     text = compact(text)
     if not text:
@@ -680,6 +727,8 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:  # noqa: ARG00
         # idiom that the heading walker misses.
         ("strong", _from_strong_dom_walk(soup), 0.9),
         ("dl", _from_dl(soup), 0.9),
+        # Div-label / div-value panel idiom (Torrens course-card-panel, etc.)
+        ("div_panel", _from_panel_divs(soup), 0.88),
         ("table", _from_tables(soup), 0.85),
         ("heading", _from_headings(soup), 0.7),
         # "In person (CampusName)" delivery-mode pattern (Flinders, etc.)
