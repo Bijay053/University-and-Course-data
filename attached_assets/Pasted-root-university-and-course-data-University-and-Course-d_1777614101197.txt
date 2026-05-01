@@ -1,0 +1,39 @@
+root@university-and-course-data:~/University-and-Course-data/backend-py# # Q4: Does the KBS grad cert page actually contain the slash pattern?
+curl -s 'https://www.kbs.edu.au/courses/graduate-certificate-in-accounting' \
+  | grep -iE '[0-9]+ ?(month|year|week|semester|trimester)' | head -20
+root@university-and-course-data:~/University-and-Course-data/backend-py# cd ~/University-and-Course-data
+git pull origin main
+sudo systemctl restart uni-api-py.service uni-celery.service
+sleep 15
+remote: Enumerating objects: 23, done.
+remote: Counting objects: 100% (23/23), done.
+remote: Compressing objects: 100% (12/12), done.
+remote: Total 12 (delta 10), reused 0 (delta 0), pack-reused 0 (from 0)
+Unpacking objects: 100% (12/12), 5.14 KiB | 584.00 KiB/s, done.
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+   0a29829..9a8e6b3  main       -> origin/main
+Updating 0a29829..9a8e6b3
+Fast-forward
+ backend-py/app/services/scraper/pipelines/single_course.py |  22 ++++++++++++++++++++++
+ backend-py/scripts/regression_sweep.py                     |  50 ++++++++++++++++++++++++++++++++++++++------------
+ backend-py/tests/test_duration.py                          | 137 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 197 insertions(+), 12 deletions(-)
+root@university-and-course-data:~/University-and-Course-data# venv/bin/python3 backend-py/scripts/capture_baseline.py \
+  --university-ids 29 --out-dir baselines/before-bug-a2/
+
+curl -s -X POST http://localhost:80/api/scrape/start \
+  -H "Content-Type: application/json" -d '{"university_id": 29}'
+
+# wait ~5 min
+sleep 300
+
+venv/bin/python3 backend-py/scripts/capture_baseline.py \
+  --university-ids 29 --out-dir baselines/after-bug-a2/
+
+venv/bin/python3 backend-py/scripts/regression_sweep.py \
+  --before baselines/before-bug-a2/ \
+  --after  baselines/after-bug-a2/ \
+  --expected-dirty kbs
+-bash: venv/bin/python3: No such file or directory
+{"jobId":"job_b31d4bcb2e00","runtimeJobId":"job_b31d4bcb2e00","status":"queued","ok":true}
