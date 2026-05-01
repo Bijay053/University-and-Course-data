@@ -1,0 +1,67 @@
+root@university-and-course-data:~/University-and-Course-data# cd ~/University-and-Course-data
+
+cat > backend-py/scripts/test_zombie_beat.py << 'PYEOF'
+#!/usr/bin/env python3
+"""Zombie beat-task double-dispatch test.
+
+Verifies that when two requeue_stale_queued beat ticks fire simultaneously
+for the same stale job, exactly ONE Celery .delay() is called — not two.
+
+Run (from backend-py/):
+    PYTHONPATH=. venv/bin/python3 scripts/test_zombie_beat.py
+"""
+from __future__ import annotations
+
+import os
+import sys
+import threading
+import uuid
+import logging
+from datetime import datetime, timedelta, timezone
+from unittest.mock import patch
+
+logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s: %(message)s")
+log = logging.getLogger("zombie_test")
+
+
+def _sync_db_url() -> str:
+    raw = os.environ.get("DATABASE_URL", "")
+    for prefix in ("postgresql+asyncpg://", "postgres://", "postgresql://"):
+        if raw.startswith(prefix):
+            raw = "postgresql://" + raw[len(prefix):]
+            break
+    raw = raw.split("?")[0]
+    if not raw:
+        return "postgresql://uniportal:Bij%40y12345@127.0.0.1:5432/university_portal"
+    return raw
+
+
+def _get_conn():
+    import psycopg2
+    return psycopg2.connect(_sync_db_url())
+
+
+def _insert_fake_job(job_id: str) -> None:
+    conn = _get_conn()
+echo "Exit code: $?"n/python3 scripts/test_zombie_beat.py 1.")spatch BUG!")delay):\e_job_id = %s", (job_id,)) "
+
+[TEST] job_id=zombie-test-fdd75d48
+[TEST] Firing two concurrent beat ticks …
+WARNING app.tasks.scrape_tasks: requeue_stale_queued: could not increment requeue_count for zombie-test-fdd75d48: (sqlalchemy.dialects.postgresql.asyncpg.ProgrammingError) <class 'asyncpg.exceptions.IndeterminateDatatypeError'>: could not determine data type of parameter $1
+[SQL: UPDATE scrape_runtime_jobs SET requeue_count = requeue_count + 1,     requeue_events = COALESCE(requeue_events, '[]'::jsonb) ||         jsonb_build_array(jsonb_build_object(             'number', requeue_count + 1,             'stale_minutes', $1,             'timestamp', to_char(                NOW() AT TIME ZONE 'UTC',                 'YYYY-MM-DD"T"HH24:MI:SS"Z"'            )         )) WHERE runtime_job_id = $2]
+[parameters: (5, 'zombie-test-fdd75d48')]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+WARNING app.tasks.scrape_tasks: requeue_stale_queued: re-dispatched stale scrape job zombie-test-fdd75d48 (queued for >5 min with no worker activity, requeue #1)
+
+[RESULT] dispatch calls  = 1  (want 1)
+[RESULT] DB requeue_count = 0  (want 1)
+[PASS] Exactly 1 dispatch.
+[FAIL] requeue_count=0, expected 1.
+
+^CException ignored in: <module 'threading' from '/usr/lib/python3.12/threading.py'>
+Traceback (most recent call last):
+  File "/usr/lib/python3.12/threading.py", line 1622, in _shutdown
+    lock.acquire()
+KeyboardInterrupt: 
+Exit code: 1
+root@university-and-course-data:~/University-and-Course-data/backend-py# 
