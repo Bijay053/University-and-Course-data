@@ -1,0 +1,82 @@
+Strong shipping cycle. Three of today's five items now live and verified on prod.
+
+**Confirmed running:**
+
+| Schedule | Task | Status |
+|---|---|---|
+| Every 60s | requeue-stale-queued-jobs | Live (existing) |
+| 02:00 UTC | nightly-sweep-and-drift-alert | Live, first run tonight |
+| 03:00 UTC | snapshot-editable-tables-daily | Live |
+| Sun 04:00 UTC | refresh-baselines-weekly | Live |
+
+The `scrape.nightly_sweep` task registration + beat scheduler active + Redis broker connected gives a clean three-line health check — worth keeping that exact pattern in mind for future deploy validation.
+
+---
+
+**On the "skipped_no_baseline" behaviour for tonight:**
+
+This is the right design. Tonight's run captures `baselines/nightly/20260501/`, exits cleanly with `sweep=skipped_no_baseline`, no email fires. Tomorrow night runs the actual comparison. No false alarms on day one, no need for a manual seed run.
+
+One small note: it's worth checking tomorrow morning that the baseline directory actually got written. If something goes wrong with capture (permissions, disk space, schema mismatch), we want to catch it before assuming it's working. Quick verification command for tomorrow:
+
+```
+ls -lh /var/baselines/nightly/20260501/
+```
+
+Expect to see per-uni JSON files, total ~few MB. If empty or missing, the sweep silently failed and we need to look at the logs (`grep nightly_sweep /var/log/celery/beat.log` or wherever beat logs land).
+
+---
+
+**Today's progress (Variant 1):**
+
+- Block 1 — Housekeeping: ✅ done earlier (git anomaly investigated, pg_dump landed, ACU diagnostic captured)
+- Block 2 — Zombie beat-task test: ✅ done (15ms cycle, requeued: [], FastAPI hot-reloaded clean)
+- Block 3 — Tier 7 operator alert: ✅ done (assuming it shipped alongside the nightly cron, since you flagged "snapshot-editable-tables-daily" landing too)
+- Block 4 — Nightly sweep cron + drift alerts: ✅ done
+- Block 5 — Tier 2 subdomain probes: ⏳ not yet started
+
+Three of five clean. One left for today.
+
+**Quick check on Block 3 (Tier 7 operator alert):** I noted in the plan it would ship before the nightly cron, but your update only mentions the cron pieces. Did Tier 7 also ship, or is that still pending? The two are genuinely separate — Tier 7 is the discovery-failure logging + `discovery_failure_alerts` table, while the nightly cron is the regression sweep scheduler. If Tier 7 hasn't shipped, it's still on today's list (lowest risk — logging only).
+
+---
+
+**Next: Tier 2 subdomain probes.**
+
+This is today's one shared-code change — affects every uni's discovery pipeline. Spec recap from the earlier message:
+
+- Location: `backend-py/app/services/scraper/discover.py`
+- Trigger: when Tier 1 + sitemap fallback yield <5 candidates
+- Probe order: `study.`, `courses.`, `handbook.`, `international.` subdomains
+- Stop probing once total ≥ 5
+- Skip 404/5xx/timeout (>3s)
+- Log every probe: `[DISCOVER] subdomain probe: {url} → {status_code}, {n_candidates} added`
+- Per-uni overrides: `scrape_config.discovery.subdomain_probes` (custom list) and `scrape_config.discovery.skip_subdomain_probes: true`
+
+**Pre-shipping discipline (carrying forward from this week's pattern):**
+
+1. **Capture a fresh baseline FIRST**, before any code change — Tier 2 will legitimately add candidates on some unis, and we want a clean before/after comparison. Suggest `/var/baselines/pre-tier2/`.
+2. **Code + unit tests** for the subdomain probing function (unit tests can mock the HTTP responses). Test cases: subdomain returns 200 with course links, 404, 5xx, timeout, and the stop-at-5 short-circuit.
+3. **Deploy.**
+4. **Run a regression sweep** comparing `pre-tier2` to a fresh post-deploy baseline.
+5. **Expect dirty results on some unis.** Universities likely to gain candidates: any with low Tier 1 yield. Worth pre-listing which unis to expect changes from — candidate list:
+ - Torrens (uni 168 discovered/0 staged — the bug-E case)
+ - Any uni currently with <5 staged courses (UTas, SCU)
+ - Possibly ACU (uni_id=51) since we haven't promoted yet
+6. **Ground-truth check on 1-2 unis that gained candidates.** Pick a uni where Tier 2 added courses, verify those courses actually exist on that subdomain by visiting the URL.
+7. **Then declare shipped.**
+
+This is the fullest end-to-end discipline cycle of the week. Worth doing it carefully — if Tier 2 lands clean, it's a real capability addition (not just a fix), and the pattern itself becomes the template for future Tiers 3/4/5 next week.
+
+---
+
+**Order of operations from here:**
+
+1. Confirm Tier 7 status (already shipped? still pending?)
+2. If Tier 7 still pending: ship it first (15-30 min, low risk)
+3. Capture pre-Tier-2 baseline
+4. Build + ship Tier 2 with the seven-step cycle above
+5. End-of-day verification: full sweep across all unis, confirm no unexpected dirty
+6. Update project notes for tomorrow (ACU promotion + nightly drift check)
+
+Ready to confirm Tier 7 status and proceed?
