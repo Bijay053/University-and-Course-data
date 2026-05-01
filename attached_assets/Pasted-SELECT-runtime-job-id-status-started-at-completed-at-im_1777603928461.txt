@@ -1,0 +1,65 @@
+SELECT runtime_job_id, status, started_at, completed_at, imported, skipped, errors
+FROM scrape_runtime_jobs WHERE university_id = 29
+ORDER BY created_at DESC LIMIT 1;"
+  runtime_job_id  | status |          started_at           |         completed_at          | imported | skipped | errors 
+------------------+--------+-------------------------------+-------------------------------+----------+---------+--------
+ job_52e972a7788a | failed | 2026-05-01 02:29:45.359786+00 | 2026-05-01 02:32:40.361694+00 |        0 |       0 |      0
+(1 row)
+
+root@university-and-course-data:~/University-and-Course-data# # ── 1. Finalize the cherry-pick state ──
+cd ~/University-and-Course-data
+git cherry-pick --skip    # skip if already committed as add1bdd
+git log --oneline -3
+git status | head -5
+
+# ── 2. Check if kbs.yaml actually got the vision OCR change ──
+cat backend-py/scraper_config/unis/kbs.yaml | grep -E 'trust_vision|vision_ocr|slash'
+# Expected: trust_vision_ocr: false
+
+# ── 3. Also check the commit is non-empty ──
+git show add1bdd --stat
+add1bdd (HEAD -> main) fix(kbs): disable vision OCR + normalise slash-separated location format
+44b049f feat(option-c): wire strip_patterns into location extractor (ACAP footnote fix)
+f95d75f Phase 6: add 3 regression tests for completion-deadline anti-context fix
+On branch main
+Your branch and 'origin/main' have diverged,
+and have 2 and 8 different commits each, respectively.
+  (use "git pull" if you want to integrate the remote branch with yours)
+
+#     require slash splitting before numeric extraction.
+    trust_vision_ocr: false
+      split_on_slash: true
+commit add1bdd29c878ae4f0b64a8cdc40710c42fb0ae1 (HEAD -> main)
+Author: Bijay053 <au@studyinfocentre.com>
+Date:   Thu Apr 30 23:40:23 2026 +1000
+
+    fix(kbs): disable vision OCR + normalise slash-separated location format
+    
+    Two per-uni / low-blast-radius fixes for KBS:
+    
+    1. trust_vision_ocr: false in kbs.yaml
+       KBS vision OCR hallucinates IELTS scores from cdn.kbs.edu.au images
+       (IELTS=9, IELTS=4 visible in staged data — both physically impossible).
+       Mirrors Phase 5 for ACAP. Per-uni YAML override, no shared-code change.
+    
+    2. Slash-separated location normalisation in location._normalise()
+       KBS publishes campus lists as 'Adelaide / Brisbane / Gold Coast / ...'
+       with trailing slash. _from_text_block already handled this via
+       window.replace(' / ', ', ') but _from_dl, _from_tables, _from_strong
+       did not. Move the normalisation into _normalise() so all cascade paths
+       see consistent comma-separated output. Guard: only fires when ' / '
+       (spaces on both sides) is present — 'City1/City2' is unchanged.
+    
+    21/21 location tests pass.
+    
+    NOT fixed in this commit (require regression sweeps):
+      - Fees missing (Option D: follow link-outs)
+      - Duration misclassified (Option B: duration regex)
+      - IELTS sibling cache cross-level leakage (shared code)
+      - IELTS from English requirements page (Option D)
+
+ backend-py/app/services/scraper/extractors/location.py |  7 +++++++
+ backend-py/scraper_config/unis/kbs.yaml                |  7 +++++++
+ backend-py/tests/test_location.py                      | 29 +++++++++++++++++++++++++++++
+ 3 files changed, 43 insertions(+)
+root@university-and-course-data:~/University-and-Course-data# 
