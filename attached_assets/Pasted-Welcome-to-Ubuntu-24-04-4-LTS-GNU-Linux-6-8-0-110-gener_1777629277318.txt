@@ -1,0 +1,94 @@
+Welcome to Ubuntu 24.04.4 LTS (GNU/Linux 6.8.0-110-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/pro
+
+ System information as of Fri May  1 09:40:09 UTC 2026
+
+  System load:           0.01
+  Usage of /:            3.7% of 231.44GB
+  Memory usage:          21%
+  Swap usage:            0%
+  Processes:             191
+  Users logged in:       1
+  IPv4 address for eth0: 159.65.152.72
+  IPv4 address for eth0: 10.47.0.13
+  IPv6 address for eth0: 2400:6180:100:d0:0:1:3615:5001
+
+Expanded Security Maintenance for Applications is not enabled.
+
+17 updates can be applied immediately.
+To see these additional updates run: apt list --upgradable
+
+1 additional security update can be applied with ESM Apps.
+Learn more about enabling ESM Apps service at https://ubuntu.com/esm
+
+
+Last login: Fri May  1 06:37:02 2026 from 162.243.188.66
+root@university-and-course-data:~# cd ~/University-and-Course-data
+git pull origin main          # pulls commit 83e53e57
+sudo systemctl restart uni-api-py.service uni-celery.service
+sleep 15
+
+# Clear VIT scraped_courses pending rows (if any) and wipe cache
+sudo -u postgres psql university_portal -c "
+DELETE FROM scraped_courses WHERE university_id = 6 AND status = 'pending';
+DELETE FROM central_page_cache WHERE university_id = 6 RETURNING page_type;"
+
+# Trigger fresh VIT scrape
+VIT_JOB=$(curl -s -X POST http://localhost:80/api/scrape/start \
+  -H "Content-Type: application/json" -d '{"university_id": 6}' \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['jobId'])")
+echo "VIT job: $VIT_JOB"
+
+while true; do
+  STATUS=$(curl -s "http://localhost:80/api/scrape/status/$VIT_JOB" \
+    | python3 -c "import sys,json; print(json.load(sys.stdin)['status'])")
+  echo "$(date '+%H:%M:%S') $STATUS"
+  [[ "$STATUS" == "completed" || "$STATUS" == "failed" ]] && break
+  sleep 20
+done
+
+# Check results
+sudo -u postgres psql university_portal -c "
+SELECT course_name, degree_level, source_url
+FROM scraped_courses
+WHERE university_id = 6 AND status = 'pending'
+ORDER BY degree_level, course_name;"
+remote: Enumerating objects: 13, done.
+remote: Counting objects: 100% (13/13), done.
+remote: Compressing objects: 100% (7/7), done.
+remote: Total 7 (delta 6), reused 0 (delta 0), pack-reused 0 (from 0)
+Unpacking objects: 100% (7/7), 2.24 KiB | 763.00 KiB/s, done.
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+   1a1c95a..83e53e5  main       -> origin/main
+Updating 1a1c95a..83e53e5
+Fast-forward
+ backend-py/app/services/scraper/stage_course.py | 47 ++++++++++++++++++++++++++++++++++++++++-------
+ 1 file changed, 40 insertions(+), 7 deletions(-)
+DELETE 0
+ page_type 
+-----------
+(0 rows)
+
+DELETE 0
+VIT job: job_afc10ebad90f
+09:40:43 running
+09:41:03 running
+09:41:23 running
+09:41:43 running
+09:42:03 running
+09:42:23 running
+09:42:43 running
+09:43:03 running
+09:43:23 running
+09:43:43 running
+09:44:03 running
+09:44:23 running
+09:44:43 completed
+ERROR:  column "source_url" does not exist
+LINE 2: SELECT course_name, degree_level, source_url
+                                          ^
+root@university-and-course-data:~/University-and-Course-data# 
