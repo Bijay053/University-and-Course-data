@@ -1,0 +1,147 @@
+Two things you've already confirmed in your last output that need restating before we move:
+
+```
+# Spot-check after cleanup
+ course_name | degree_level | international_fee | ielts_overall | pte_overall 
+-------------+--------------+-------------------+---------------+-------------
+(0 rows)
+```
+
+**KBS scraped_courses table is empty. Zero rows.**
+
+```
+# Sweep diff (still in the PASS output)
+[CHANGED] 'Bachelor of Business (Accounting)'
+      ielts: None → 6.5
+      (method-only) extraction_method.ielts_overall: None → 'ai_fallback'
+```
+
+**The IELTS values that were there were 6.5 from `ai_fallback` (Gemini hallucination), not from the column-keyed parser. The real KBS value is 6.0.**
+
+The sweep PASSed because it compared a stale `bug-f-after/` snapshot from 07:45 (which had the 58-row pre-cleanup state) against the older `bug-a-after/` baseline. The actual current production state — zero KBS rows — isn't reflected in either snapshot. **The PASS does not mean things are clean; it means the snapshots agree with each other while neither matches reality.**
+
+---
+
+**What needs to happen, in order. Don't skip steps and don't declare done until Step 5 verifies against the KBS website.**
+
+**Step 1 — Rescrape KBS with the dedup fix in place.**
+
+```
+cd ~/University-and-Course-data
+
+# Confirm the URL config is still set correctly (was lost once before)
+sudo -u postgres psql university_portal -c "
+SELECT scrape_config->'uniPages'->'entryPage' AS english_url
+FROM universities WHERE id = 29;"
+# Must show: "https://www.kbs.edu.au/admissions/entry-requirements/english-entry-requirements"
+
+# If empty, re-run the COALESCE UPDATE before continuing
+
+# Confirm services are running
+sudo systemctl is-active uni-api-py.service uni-celery.service
+
+# Wipe the central cache so the corrected URL is fetched fresh
+sudo -u postgres psql university_portal -c "
+DELETE FROM central_page_cache WHERE university_id = 29;"
+
+# Trigger rescrape
+JOB=$(curl -s -X POST http://localhost:80/api/scrape/start \
+  -H "Content-Type: application/json" -d '{"university_id": 29}' \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['jobId'])")
+echo "Job: $JOB"
+
+while true; do
+  S=$(curl -s "http://localhost:80/api/scrape/status/$JOB" \
+    | python3 -c "import sys,json; print(json.load(sys.stdin)['status'])")
+  echo "$(date '+%H:%M:%S') $S"
+  [[ "$S" == "completed" || "$S" == "failed" ]] && break
+  sleep 20
+done
+```
+
+**Step 2 — Confirm the column-keyed parser actually fired this time.**
+
+```
+sudo -u postgres psql university_portal -c "
+SELECT payload->>'message' AS msg
+FROM scrape_runtime_logs
+WHERE runtime_job_id = '$JOB'
+  AND (payload->>'message' ILIKE '%column-keyed%'
+    OR payload->>'message' ILIKE '%entry-requirements%'
+    OR payload->>'message' ILIKE '%english%')
+ORDER BY sequence
+LIMIT 30;"
+```
+
+**Expected:** A line like `[CENTRAL] column-keyed english table → ...` with parsed values.
+
+**If this returns 0 rows for `%column-keyed%`**, the parser STILL isn't firing. The column-keyed branch shipped as code but isn't being reached — either it's gated on a condition that's false, or `prefetch_central_pages` doesn't reach the new code, or the central_pages module isn't even being invoked for the entry-requirements URL.
+
+**Step 3 — Check the cache contents.**
+
+```
+sudo -u postgres psql university_portal -c "
+SELECT page_type,
+       parsed_data->'english'          AS english_vals,
+       parsed_data->'english_by_level' AS english_by_level,
+       fetched_at
+FROM central_page_cache
+WHERE university_id = 29
+ORDER BY fetched_at DESC;"
+```
+
+**Expected:** A row for `english_requirements` with `english_by_level` containing keys like `bachelor`, `postgraduate`, `diploma` and values like `{"ielts_overall": 6.0, ...}`.
+
+**If english_by_level is null but english_vals is populated**, the column-keyed parser ran but didn't split by degree level — every course will get the same value (currently 6.0 from flat-parse instead of 6.5 from Gemini, but Diploma should be 5.5).
+
+**Step 4 — Spot-check IELTS values with method attribution.**
+
+```
+sudo -u postgres psql university_portal -c "
+SELECT course_name, degree_level, ielts_overall,
+       extraction_method->>'ielts_overall' AS ielts_source
+FROM scraped_courses
+WHERE university_id = 29
+ORDER BY ielts_overall DESC NULLS LAST, course_name;"
+```
+
+**Step 5 — The verification gate. Match against KBS website ground truth.**
+
+The KBS website publishes:
+- Bachelor + all Postgraduate programs: **IELTS Overall 6.0**
+- Diploma programs: **IELTS Overall 5.5**
+- EAP pathway: separate scores
+
+For the spot-check from Step 4 to be considered a PASS, ALL of these must be true:
+
+| Course type | Required IELTS | Required source |
+|---|---|---|
+| Any Bachelor of Business / Bachelor of IT | 6.0 (NOT 6.5) | NOT `ai_fallback` |
+| Diploma of Business / Diploma of IT | 5.5 (NOT 6.5, NOT 6.0) | NOT `ai_fallback` |
+| Master of Business / Master of IT / MBA | 6.0 (NOT 6.5) | NOT `ai_fallback` |
+| Graduate Certificate / Graduate Diploma | 6.0 (NOT 6.5) | NOT `ai_fallback` |
+
+**If any value is 6.5 OR any source is `ai_fallback`**: the column-keyed parser still isn't being preferred over Gemini. The parser shipped to GitHub but the orchestrator is still calling Gemini and accepting its hallucinated 6.5 over the parser's correct 6.0.
+
+**If all values are 6.0/5.5 AND sources are `central_page` or similar**: real win, declare done.
+
+---
+
+**On the bigger pattern, since this is the third time this round it's coming up:**
+
+Look back at the last six "shipped" claims in this engagement:
+
+1. Column-keyed English parser — shipped to GitHub, never verified firing in prod, sweep ran without checking the parser had executed
+2. IELTS values populated — celebrated as a win, never verified against the actual KBS published value, were wrong (6.5 vs real 6.0)
+3. Cross-job dedup fix — shipped to GitHub, hasn't yet been exercised end-to-end on a clean rescrape
+4. KBS cleanup — declared done with `DELETE 29`, actually deleted everything to zero
+5. The sweep PASS — declared a successful gate, comparing stale snapshots to each other
+6. The fee fix — declared shipped, but no per-uni regression sweep before deploy (the only one that actually held up under verification, by luck)
+
+The pattern: code reaches GitHub, declared shipped. SQL command runs without error, declared cleanup done. Sweep header says PASS, declared verified. **None of these is a verification step that matches output against external ground truth.**
+
+The user just spent two minutes on the KBS website and caught what hours of automated checks missed. That's a sign the verification methodology is broken, not that the user got lucky.
+
+**New rule going forward, no exceptions:** every claim of "shipped" or "working" on a data-quality fix must include a side-by-side comparison of (a) what production now contains vs (b) what the source-of-truth website publishes. Until both match, the fix is "in-flight," not "shipped." Sweep PASS doesn't count. Code-on-GitHub doesn't count. Spot-check showing values doesn't count. Only ground-truth match counts.
+
+Run Steps 1-5. Don't reply with "shipped" until Step 5 verification confirms 6.0 (Bachelor+PG) and 5.5 (Diploma) and source is not `ai_fallback`.

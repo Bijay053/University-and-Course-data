@@ -1,0 +1,195 @@
+Two serious issues from the last round. Stop and address both before any further work.
+
+---
+
+**Issue 1: The IELTS values are WRONG.**
+
+The user just verified directly against the KBS website at `https://www.kbs.edu.au/admissions/entry-requirements/english-entry-requirements`:
+
+> Bachelor and all Postgraduate programs
+> Academic IELTS, including One Skill Retake
+> Overall **6.0**, with not less than 6.0 for Speaking and Writing and 5.5 for Listening and Reading
+
+**KBS publishes IELTS Overall 6.0 for Bachelor + all Postgraduate. Not 6.5.**
+
+But the spot-check was showing 6.5 across the board:
+
+```
+Bachelor of Business (Accounting)         | 6.5
+Bachelor of Business (Hospitality...)     | 6.5
+Bachelor of Information Technology        | 6.5
+Diploma of Business                       | 6.5
+```
+
+Three problems hiding in this:
+
+**1a. The 6.5 value is wrong.** Real value is 6.0. We're shipping incorrect data to admin approval.
+
+**1b. The change-log line revealed the source.** From the sweep diff:
+
+```
+[CHANGED] 'Bachelor of Business (Accounting)'
+      ielts: None → 6.5
+      (method-only) extraction_method.ielts_overall: None → 'ai_fallback'
+```
+
+**Method = `ai_fallback`.** The IELTS value didn't come from the column-keyed parser we built. It came from Gemini AI fallback, which hallucinated 6.5 (a common default value for Australian English requirements). The column-keyed English parser we shipped never actually fired.
+
+**1c. Diploma showing 6.5 is impossible.** The KBS page lists Diploma at 5.5 overall. If Diploma is showing 6.5 alongside Bachelor's, then the parser definitely isn't column-keyed reading by degree level — every course is getting the same hallucinated value.
+
+The earlier diagnostic queries already confirmed this: `[CENTRAL] column-keyed english table` log line returned 0 rows, `central_page_cache` had 0 rows for `english_requirements`. The column-keyed parser shipped to GitHub but never fired in production. We've been celebrating IELTS=6.5 for an hour while it's been wrong the whole time.
+
+---
+
+**Issue 2: The cleanup deleted ALL KBS courses, not just duplicates.**
+
+From the cleanup output:
+
+```
+NEWEST_JOB="<NEWEST_JOB_ID>"
+```
+
+This is the same bug as before — the literal placeholder `<NEWEST_JOB_ID>` never got replaced with an actual job ID. So the DELETE statement ran:
+
+```
+DELETE FROM scraped_courses
+WHERE university_id = 29
+  AND scrape_job_id != ''
+  AND status NOT IN ('approved', 'published');
+```
+
+With `scrape_job_id != ''` matching every row (no row has empty job ID), all 58 rows got deleted:
+
+```
+DELETE 29
+ total_kbs_rows 
+----------------
+              0
+```
+
+Then the spot-check confirmed:
+
+```
+ course_name | degree_level | international_fee | ielts_overall | pte_overall 
+-------------+--------------+-------------------+---------------+-------------
+(0 rows)
+```
+
+**Zero KBS courses in `scraped_courses` right now.** Not 29 clean, zero. The capture_baseline call later reported `Snapshotting 22 universities` (not 23) because KBS_29 had no rows to snapshot.
+
+The sweep then hilariously reported PASS with `kbs (uni_id=29) before=22 after=58` because it was reading the OLD baseline file from 07:45 that still had the 58 duplicate rows recorded — it never reflected the cleanup having reduced the count to zero.
+
+**So three things are simultaneously broken:**
+
+- KBS courses table is empty (deleted by buggy DELETE)
+- The IELTS values were wrong anyway (Gemini hallucination, not real parser output)
+- The sweep is reading stale baselines and reporting PASS based on data that doesn't match production
+
+---
+
+**What needs to happen, in order:**
+
+**Step 1 — Recover the 58 deleted rows from logical backups.**
+
+```
+# Check if PG has WAL-based recovery available
+sudo -u postgres psql university_portal -c "SELECT pg_is_in_recovery();"
+
+# Check most recent backup
+ls -la /var/backups/postgresql/ 2>/dev/null || echo "no standard backup dir"
+sudo -u postgres pg_dumpall --version
+```
+
+If no backups exist, the data is lost and KBS needs a fresh scrape. That's not catastrophic — we can rescrape — but it confirms a backup gap to address.
+
+**Step 2 — Rescrape KBS clean.**
+
+```
+# Confirm services are running
+sudo systemctl is-active uni-api-py.service uni-celery.service
+
+# Trigger fresh KBS scrape
+JOB=$(curl -s -X POST http://localhost:80/api/scrape/start \
+  -H "Content-Type: application/json" -d '{"university_id": 29}' \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['jobId'])")
+echo "Job: $JOB"
+
+# Poll until complete
+while true; do
+  S=$(curl -s "http://localhost:80/api/scrape/status/$JOB" \
+    | python3 -c "import sys,json; print(json.load(sys.stdin)['status'])")
+  echo "$(date '+%H:%M:%S') $S"
+  [[ "$S" == "completed" || "$S" == "failed" ]] && break
+  sleep 20
+done
+```
+
+**Step 3 — Diagnose why the column-keyed parser isn't firing.**
+
+```
+# Use the actual JOB id from Step 2
+sudo -u postgres psql university_portal -c "
+SELECT payload->>'message' AS msg
+FROM scrape_runtime_logs
+WHERE runtime_job_id = '$JOB'
+  AND (payload->>'message' ILIKE '%entry-requirements%'
+    OR payload->>'message' ILIKE '%english%'
+    OR payload->>'message' ILIKE '%column%')
+ORDER BY sequence;"
+
+# What's the URL config now?
+sudo -u postgres psql university_portal -c "
+SELECT scrape_config->'uniPages'->'entryPage' AS english_url
+FROM universities WHERE id = 29;"
+```
+
+The URL config `entryPage` was confirmed empty earlier (the `jsonb_set` UPDATE silently failed because `scrape_config` was NULL). It then got fixed with the `COALESCE` version. Confirm it's still set correctly.
+
+If URL is set but parser still doesn't fire, the central-page extractor isn't reading from `entryPage` — it's reading from somewhere else. Check the code path:
+
+```
+cd ~/University-and-Course-data
+grep -rn "entryPage\|english_url\|english_requirements" backend-py/app/services/scraper/ | head -20
+```
+
+**Step 4 — Confirm IELTS comes from real parser, not Gemini.**
+
+After the rescrape, the spot-check should show:
+
+```
+Bachelor of Business (Accounting)         | 6.0  (NOT 6.5)
+Diploma of Business                       | 5.5  (NOT 6.5)
+Master of Information Technology          | 6.0
+```
+
+And the extraction_method should be a real source, not `ai_fallback`:
+
+```
+sudo -u postgres psql university_portal -c "
+SELECT course_name,
+       ielts_overall,
+       extraction_method->>'ielts_overall' AS ielts_source
+FROM scraped_courses
+WHERE university_id = 29
+ORDER BY ielts_overall DESC NULLS LAST
+LIMIT 10;"
+```
+
+If `ielts_source` shows `central_page` or `column-keyed_english` or similar — real parser working. If still `ai_fallback` — column-keyed parser still not firing despite URL being correct.
+
+---
+
+**Bigger picture worth saying directly:**
+
+Four things in this sequence got declared "shipped" or "done" when they weren't:
+
+1. The column-keyed English parser — shipped to GitHub but never verified in prod
+2. The IELTS=6.5 values — celebrated as a win when they're hallucinated wrong values
+3. The dedup fix — shipped before the cleanup, didn't prevent the cleanup from going wrong
+4. The cleanup itself — declared successful ("DELETE 29") when it actually deleted everything to zero
+
+Each individual mistake is recoverable. The pattern of declaring success before verifying isn't. The user's question "are we getting the right data?" caught that all four of these had been moving in the wrong direction for an hour because nothing was being verified against ground truth.
+
+From now on: every claim of "shipped" or "working" needs a verification step that matches the deployed result against the actual external source (the KBS website in this case). Not "the sweep PASSed." Not "the spot-check shows values." Match against ground truth.
+
+Recover KBS, rescrape, then verify IELTS shows 6.0 (Bachelor+PG) and 5.5 (Diploma) — NOT 6.5.
