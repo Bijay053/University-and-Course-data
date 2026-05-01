@@ -1,0 +1,63 @@
+Reading the actual output you pasted — there's a lot here that needs untangling. The rollback already ran. The sweep already ran. Both surfaced things worth flagging.
+The rollback completed. HEAD is now at f95d75f Phase 6: add 3 regression tests for completion-deadline anti-context fix. Services restarted cleanly (celery@university-and-course-data ready and uni-api-py.service started). Prod code is back at the post-Phase-5 stable state. Good.
+One untracked-files concern in git status:
+Untracked files:
+        =
+        backend-py/baselines/
+        drizzle-kit
+That = at the top of the untracked list is suspicious — usually means a stray file got created from a redirected command (> = or similar shell error). Worth ls -la = and removing if it's empty cruft. The backend-py/baselines/ and drizzle-kit are expected (baselines aren't gitignored, drizzle-kit is a build artefact).
+The sweep result is the bigger finding — it's NOT clean even with no migration applied.
+Two unexpected dirty unis showed up:
+1. asahe (uni_id=2) — 8 courses with method-only changes.
+Pattern: extraction_method.X: 'per_course_vision' → 'per_course_vision_cached' and reverse. Plus some 'gemini_primary' → None and None → 'uni_pdf:requirements:null' flipping.
+This is exactly the cache-hit non-determinism we discussed earlier in shadow mode design. The vision OCR cache hits during the staging baseline capture aren't deterministic across separate scrapes — sometimes the cached value wins, sometimes the fresh fetch wins. The :null provenance addition is also new (it wasn't there in the April 30 baseline). So the diff is showing:
+
+Cache hit ordering shuffled (no real value change)
+New :null provenance suffix appearing (correct behaviour from the Phase-1 :null improvement, but not present in old baselines)
+A few cases where the underlying extractor returned None where it returned a value before (or vice versa)
+
+This is a baseline-staleness problem, not a regression. The April 30 baselines were captured before :null provenance shipped. Comparing against them will always produce these :null diffs even when behaviour is identical.
+2. kbs (uni_id=29) — 8 removed + 21 changed.
+Removed: Graduate Certificate in Business Administration, Graduate Certificate in Business Analytics, Graduate Diploma of Business Administration, MBA – Data-driven Leadership, MBA – Digital Management, MBA – Tourism and Hospitality Leadership, Master of Business Analytics, Master of Professional Accounting.
+Changed: 21 courses with ielts: 6.5 → None plus method-only changes.
+This is genuinely concerning. Eight courses removed between April 30 and now — meaning 8 KBS courses that were staged in the April 30 baseline are no longer being staged. And 21 courses lost their IELTS values (which previously came from per_course_vision).
+But wait — the staging baseline was captured AFTER the rollback was already done in mind, but the staging DB was a copy of prod taken BEFORE the rollback. So the staging DB has the bundled-deploy code applied to its captured data. The ielts: 6.5 → None changes for KBS are likely the KBS vision OCR fix (b38134f) doing exactly what it should — disabling vision OCR for KBS, which removes the vision-sourced IELTS values.
+The 8 removed courses are harder to explain. Possibilities:
+
+KBS scraper run between April 30 and the staging snapshot dropped 8 courses (real change in KBS website? extraction failure on 8 specific courses?)
+The online_only filter rejected more KBS courses this time
+Some other filter caught them
+
+This is exactly why the discipline matters. The staging DB was supposed to be a clean test of "does Fix 2 (Numeric column type) cause behavioural drift." Instead it's a test of "does the entire bundle (Fix 2 + Option C + KBS fix + KBS location format change + every scrape that ran in between) cause drift." We can't isolate Fix 2's contribution from this sweep.
+The 0.00 duration finding is real and worth flagging separately.
+20 Charles Sturt University courses showing duration=0.0. Bachelor of Laws, Bachelor of Psychology, Bachelor of Science, Diploma of Environmental Studies, Graduate Certificate of Cyber Security — these are real courses with real durations (3-4 years for Bachelors, 0.5-1 year for Grad Certs). Storing 0.0 as their duration is wrong.
+This is a separate bug from Fix 2. Likely root cause: the duration extractor returned 0 (probably failed to parse) and the extraction code stored 0 instead of NULL. Worth a separate investigation:
+sql-- Confirm the scope across all unis
+SELECT u.name, COUNT(*) 
+FROM courses c JOIN universities u ON u.id = c.university_id 
+WHERE c.duration = 0.0 
+GROUP BY u.name 
+ORDER BY COUNT(*) DESC;
+If it's only Charles Sturt, it's a uni-specific extraction issue. If it's many unis, it's a shared-code bug where "couldn't parse" became "0.0" instead of "NULL".
+Where this leaves the rollback plan.
+The rollback ran cleanly. Prod code is at f95d75f. Services are healthy. That's the good news.
+But the sweep we just ran isn't usable as Fix 2 validation because the staging DB had the entire bundle applied, not just Fix 2. The staging snapshot represents "what prod would look like with ALL the changes" not "what prod would look like with ONLY Fix 2."
+To do Fix 2 validation properly, the sequence needs to be:
+
+Now: rollback complete (done). Capture fresh baseline from current prod state (post-rollback, no fixes applied). Call this baselines/post-rollback-baseline/.
+Restore the prod backup to a fresh staging DB.
+Apply ONLY Fix 2's migration (the ALTER COLUMN) to staging. Don't apply any code from 629e5de or beyond — staging DB needs to be schema-only different from prod.
+Capture baseline from staging (which is now Float-rounded-to-Numeric-2dp values, otherwise identical to prod).
+Run sweep --before post-rollback-baseline --after fix2-staging-isolated. Expected: zero diffs.
+If clean: apply Fix 2 to prod with the same script.
+
+The current fix2-staging-after baseline is contaminated by all the other code changes that were applied to staging-DB during the bundled deploy. It can't validate Fix 2 in isolation.
+Concrete next steps (don't run anything yet, want to confirm):
+
+Clean up the stray = file: ls -la = → if empty cruft, rm =
+Capture fresh post-rollback baseline. This is the new "before" for everything going forward.
+Investigate the 0.00 durations — separate bug, separate fix later.
+Address the 8 removed KBS courses — confirm they exist in current prod DB (post-rollback) before declaring this a real regression vs a baseline-staleness artefact. Query SELECT name FROM courses WHERE university_id = 29 ORDER BY name; and compare to the April 30 baseline.
+Then start Step 2 (cherry-pick Option C, run sweep against the fresh post-rollback baseline).
+
+The sweep against the contaminated staging snapshot doesn't tell us anything reliable about Fix 2's safety. We need a clean fix2-staging-isolated baseline before that step's gate is meaningful.
