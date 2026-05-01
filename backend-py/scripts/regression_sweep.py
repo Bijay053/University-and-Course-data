@@ -285,6 +285,15 @@ def main() -> int:  # returns exit code
         ),
     )
     parser.add_argument(
+        "--allow-missing", action="store_true",
+        help=(
+            "Treat MISSING-BEFORE / MISSING-AFTER entries as warnings instead of "
+            "failures.  By default the sweep exits non-zero when any snapshot is "
+            "present in one directory but absent in the other — this guards against "
+            "running capture_baseline.py while a scrape job is still in flight."
+        ),
+    )
+    parser.add_argument(
         "--verbose", "-v", action="store_true",
         help="Print clean unis in addition to dirty ones.",
     )
@@ -346,21 +355,32 @@ def main() -> int:  # returns exit code
             _print_uni_diff(uni_diff, expected=False)
 
     # Report missing
+    missing_severity = "WARN" if args.allow_missing else "ERROR"
     for key in missing_before:
-        print(f"\n  [MISSING-BEFORE] {key} — snapshot exists only in 'after'; "
-              "cannot compare (new uni added this PR?)")
+        print(
+            f"\n  [{missing_severity}: MISSING-BEFORE] {key} — snapshot exists only "
+            "in 'after'; cannot compare. Was capture_baseline.py run while a scrape "
+            "was in flight? Use --allow-missing to downgrade to a warning."
+        )
     for key in missing_after:
-        print(f"\n  [MISSING-AFTER]  {key} — snapshot exists only in 'before'; "
-              "likely removed or renamed.")
+        print(
+            f"\n  [{missing_severity}: MISSING-AFTER]  {key} — snapshot exists only "
+            "in 'before'; capture may have been interrupted by an in-flight scrape. "
+            "Use --allow-missing to downgrade to a warning."
+        )
 
     # Summary
     print("\n" + "=" * 72)
-    print(f"SUMMARY")
+    print("SUMMARY")
     print(f"  Clean unis:            {len(clean_unis)}")
     print(f"  Expected diffs:        {len(expected_dirty)}  (acknowledged)")
     print(f"  Unexpected diffs:      {len(unexpected_dirty)}")
-    print(f"  Missing before:        {len(missing_before)}")
-    print(f"  Missing after:         {len(missing_after)}")
+    print(f"  Missing before:        {len(missing_before)}"
+          + ("  [warnings only]" if args.allow_missing and missing_before else ""))
+    print(f"  Missing after:         {len(missing_after)}"
+          + ("  [warnings only]" if args.allow_missing and missing_after else ""))
+
+    has_missing_failure = bool(missing_before or missing_after) and not args.allow_missing
 
     if args.self_test:
         if unexpected_dirty or expected_dirty or missing_before or missing_after:
@@ -370,11 +390,17 @@ def main() -> int:  # returns exit code
         print("\nSELF-TEST PASSED: zero diffs against itself — sweep is deterministic")
         return 0
 
-    if unexpected_dirty:
-        print(
-            f"\nFAIL — {len(unexpected_dirty)} unexpected regression(s). "
-            "Do not merge until all unexpected diffs are acknowledged."
-        )
+    if unexpected_dirty or has_missing_failure:
+        reasons: list[str] = []
+        if unexpected_dirty:
+            reasons.append(f"{len(unexpected_dirty)} unexpected regression(s)")
+        if has_missing_failure:
+            reasons.append(
+                f"{len(missing_before) + len(missing_after)} missing snapshot(s) "
+                "(run capture_baseline.py only after all scrape jobs complete, "
+                "or re-run the after-baseline capture and sweep)"
+            )
+        print(f"\nFAIL — {'; '.join(reasons)}.")
         return 1
 
     if expected_dirty:

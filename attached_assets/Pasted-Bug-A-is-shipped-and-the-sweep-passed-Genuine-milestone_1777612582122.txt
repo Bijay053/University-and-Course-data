@@ -1,0 +1,142 @@
+Bug A is shipped and the sweep passed. Genuine milestone — first multi-uni-shaped fix delivered through the proper architecture (force-push reconciled, baseline captured, sweep clean, expected diffs all method-only). Worth recognising.
+
+But your interpretation of the sweep result has two issues that matter for Bug B and beyond. Reading the actual diff carefully:
+
+---
+
+**1. The sweep doesn't show what you think it shows.**
+
+You wrote: "The sweep compares the `courses` table (live published courses). The 3 Graduate Certificate courses are now correctly staged and awaiting admin approval. They will appear as ADDED in the sweep only after an admin clicks Approve."
+
+That's not what the sweep does. `capture_baseline.py` snapshots `scraped_courses` (the staging table), not `courses` (the live table). Look at the baseline output:
+
+```
+INFO capture_baseline: Saved: 20260501_050402_kbs_29.json  (courses=22  disc=37  staged=22  cost=$0.0104  333.7)
+```
+
+`staged=22`. Same number as before Bug A. The sweep is comparing staging-table snapshots.
+
+Which means: **the 3 KBS grad certs are NOT in staging.** Bug A's fix didn't bring them back. They're still being dropped somewhere.
+
+Let me re-read the diff carefully:
+
+```
+[EXPECTED] kbs (uni_id=29)  before=22  after=22  → DIRTY
+    added=0  removed=0  changed=3
+```
+
+`before=22, after=22`. Same count. Zero added. Zero removed. The 3 grad certs are still missing from KBS staging.
+
+**This is the opposite of the expected outcome.** The plan was: 3 ADDED (grad certs return because regex now correctly extracts 8 Month). The actual result: 3 CHANGED (method metadata on unrelated courses) and 0 added.
+
+So Bug A's fix DID change extractor behaviour (the method-only diffs prove the regex is now winning where AI used to fall back), but it DID NOT fix the grad cert drops. The slash-pattern fix isn't the right fix, OR the grad cert pages don't actually contain the slash pattern Bug A targets, OR there's a second guard rejecting the courses for a different reason.
+
+**Verification needed before Bug B:**
+
+```
+# What's actually on the KBS Graduate Certificate in Accounting page right now?
+curl -s https://www.kbs.edu.au/courses/graduate-certificate-in-accounting | \
+  grep -iE '8 month|trimester|subject|duration' | head -20
+
+# What did the latest scrape job extract for that URL?
+sudo -u postgres psql university_portal -c "
+SELECT course_name, duration, duration_term, status
+FROM scraped_courses
+WHERE university_id = 29
+  AND course_website ILIKE '%graduate-certificate-in-accounting%'
+ORDER BY id DESC LIMIT 1;"
+
+# If the row exists with duration set: it's the staging policy that's still dropping it
+# If the row doesn't exist at all: extraction is producing a value but something rejects before insert
+# If the row exists with NULL duration: the regex still isn't matching, Bug A didn't fire
+```
+
+The answer to that determines whether Bug A is actually done or whether we shipped a non-fix and need to revisit.
+
+---
+
+**2. The intermediate "MISSING-AFTER" sweep was a real warning, not a transient.**
+
+Look at the sequence:
+
+- First post-restart sweep: `kbs_29 MISSING-AFTER`
+- Replit re-ran the after-baseline capture
+- Second post-restart sweep: `kbs_29 MISSING-AFTER` again
+- Third capture (after job completed): `kbs_29` present
+
+The baseline script ran while the KBS scrape job was still in `running` status. Result: KBS got skipped from the snapshot. That's a real race condition in the workflow — if anyone runs `capture_baseline.py` while a scrape is in flight, the snapshot is incomplete.
+
+The sweep gave a misleading PASS for one of those intermediate runs ("PASS — no unexpected regressions") because zero diffs were detected on the 22 unis that DID get snapshotted, and the MISSING-AFTER for kbs_29 wasn't escalated to a failure.
+
+**This is a sweep bug.** `MISSING-AFTER` on a uni that was supposed to be in the sweep should fail loudly, not pass quietly. Otherwise we can't trust the script to catch incomplete runs. Worth a small ticket: `regression_sweep.py` should treat `MISSING-AFTER` and `MISSING-BEFORE` as failures by default unless explicitly allowed via flag.
+
+Also the `Snapshotting 22 universities` line vs the earlier `Snapshotting 23 universities` should have been an alarm bell. The script should error out if it can't snapshot all expected unis.
+
+---
+
+**3. Method-only changes ARE meaningful — don't dismiss them.**
+
+You described the 3 method-only changes as "benign — regex now classifies what Gemini used to." Mostly true, but read the direction:
+
+```
+Bachelor of Business (Hospitality and Tourism Management):
+  category: 'gemini_primary' → 'category:det'
+  duration_term: 'gemini_primary' → None
+  duration_text: 'gemini_primary' → None
+  intake_text: 'gemini_primary' → None
+  location_text: 'gemini_primary' → None
+```
+
+For `category`, the change is gemini_primary → category:det. That's regex/heuristic replacing AI — good.
+
+But for `duration_term`, `duration_text`, `intake_text`, `location_text`, the change is gemini_primary → **None**. That means: previously these fields were filled by Gemini, now they're not filled at all.
+
+So Bug A's deployment caused:
+- `category` to switch source (cheaper, fine)
+- `duration_term`, `duration_text`, `intake_text`, `location_text` to become EMPTY on these courses
+
+Look at the actual data in staging:
+
+```
+# What changed in the data, not just the methods?
+sudo -u postgres psql university_portal -c "
+SELECT course_name, duration, duration_term, course_location, intake_dates
+FROM scraped_courses
+WHERE university_id = 29
+  AND course_name IN (
+    'Bachelor of Business (Hospitality and Tourism Management)',
+    'Bachelor of Business (Management)',
+    'Master of Business Analytics (Extension)'
+  )
+ORDER BY id DESC LIMIT 6;"
+```
+
+Compare to the values you queried earlier (those courses had `Adelaide, Brisbane, Melbourne, Sydney, Perth, Australia` locations and `3 Year`/`2 Year` durations). If the values are still there, the method change is benign. If the values are now NULL/empty, Bug A introduced a regression on 3 unrelated courses.
+
+The sweep diff format only shows method changes when values match. But "method went from filled to None" usually means "value also went from filled to None" — the diff is hiding it because both `before` and `after` have NULL value, so technically no value change.
+
+This needs verification before declaring Bug A done.
+
+---
+
+**4. The clean-22-unis result IS solid.**
+
+Nothing else broke. ACAP, Bond, Charles Sturt, Torrens, all the others — no regressions. That's the architecture working as designed: a shared-code change with bounded blast radius. Whatever's going on with KBS specifically, it didn't leak.
+
+If the verification queries above show:
+- KBS grad certs still missing because of staging policy (not extraction): Bug A worked, Bug B is the actual fix
+- KBS grad certs still missing because regex didn't fire: Bug A's targeting was wrong, needs revision
+- 3 changed courses lost values (not just methods): Bug A introduced a regression, needs partial rollback
+
+Three very different conclusions. Run the queries before deciding whether Bug A is done.
+
+---
+
+**Concrete next actions:**
+
+1. Run the three verification queries above (scraped_courses for grad certs, KBS page curl, scraped_courses for the 3 changed courses)
+2. Based on results, classify Bug A as: shipped-and-done, shipped-needs-Bug-B-too, shipped-with-regression, or not-actually-shipped
+3. Approve the 3 grad certs in admin UI ONLY if they appear in staging — if they're not there, approval isn't possible
+4. The `MISSING-AFTER` sweep behaviour needs a ticket as a separate fix to the sweep script
+
+Don't move to Bug B yet. The sweep PASS hides too much to call this done without verification.

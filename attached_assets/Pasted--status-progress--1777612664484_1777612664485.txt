@@ -1,0 +1,57 @@
+ status   |             |                                                  | 
+ progress |             |                                                  | 
+ status   |             |                                                  | 
+ status   |             |                                                  | 
+ status   |             |                                                  | 
+ status   |             |                                                  | 
+ status   |             |                                                  | 
+ status   |             |                                                  | 
+ status   |             |                                                  | 
+ status   |             |                                                  | 
+ status   |             |                                                  | 
+ status   |             |                                                  | 
+ status   |             |                                                  | 
+ status   |             |                                                  | 
+ status   |             |                                                  | 
+ status   |             |                                                  | 
+ status   |             |                                                  | 
+ status   |             |                                                  | 
+ progress |             |                                                  | 
+ status   |             |                                                  | 
+ status   |             |                                                  | 
+ status   |             |                                                  | 
+ status   |             |                                                  | 
+ status   |             |                                                  | 
+ status   |             |                                                  | 
+ status   |             |                                                  | 
+ status   |             |                                                  | 
+ status   |             |                                                  | 
+ status   |             |                                                  | 
+ status   |             |                                                  | 
+ status   |             |                                                  | 
+ status   |             |                                                  | 
+ status   |             |                                                  | 
+ status   |             |                                                  | 
+ status   |             |                                                  | 
+ progress |             |                                                  | 
+ status   |             |                                                  | 
+ status   |             |                                                  | 
+ status   |             |                                                  | 
+ status   |             |                                                  | 
+ status   |             |                                                  | 
+ status   |             |                                                  | 
+ status   |             |                                                  | 
+ status   |             |                                                  | 
+ status   |             |                                                  | 
+ status   |             |                                                  | 
+ status   |             |                                                  | 
+ status   |             |                                                  | 
+ status   |             |                                                  | 
+ status   |             |                                                  | 
+ status   |             | rejected: confidence_55_missing_english_duration | 
+ status   |             | rejected: confidence_55_missing_english_duration | 
+ status   |             | rejected: confidence_55_missing_english_duration | 
+ status   |             |                                                  | 
+(71 rows)
+
+(END)
