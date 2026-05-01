@@ -541,6 +541,143 @@ async def _parse_english_page_html_async(html: str, page_url: str) -> dict[str, 
         return {}
 
 
+def _parse_column_keyed_english_table(
+    html: str,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Parse English requirements tables where *columns* are qualification levels.
+
+    Handles institutions (e.g. KBS) that publish a single table with one column
+    per program level:
+
+        | Test  | EAP 1 | EAP 2 | Diploma | Bachelor and all Postgraduate |
+        | IELTS | 5.0   | 5.5   | 5.5     | 6.0                          |
+        | PTE   | 41    | 46    | 46      | 50                           |
+        | TOEFL | 37    | 58    | 58      | 72                           |
+
+    The standard flat parser grabs the first value it sees (5.0 for IELTS,
+    wrong for bachelor/postgrad courses).  This function:
+    - Identifies which column corresponds to bachelor/postgraduate entry
+    - Returns those values as ``flat_vals`` (overriding the flat extractor)
+    - Returns a ``by_level`` dict suitable for ``result["english_by_level"]``
+      using the "postgraduate" / "undergraduate" keys that ``single_course.py``
+      expects
+
+    Args:
+        html: Raw HTML of the English requirements page.
+
+    Returns:
+        ``(flat_vals, by_level)`` — both empty dicts when no column-keyed table
+        is detected.
+    """
+    try:
+        from bs4 import BeautifulSoup
+        import re as _re
+    except ImportError:
+        return {}, {}
+
+    # Column header tokens → (by_level level keys to populate, priority)
+    # Higher priority = higher qualification level.
+    # "Bachelor and all Postgraduate programs" maps to BOTH keys so every
+    # degree level gets the correct value.
+    _COL_LEVEL_MAP: list[tuple[list[str], list[str], int]] = [
+        (["bachelor", "postgraduate"], ["postgraduate", "undergraduate"], 4),
+        (["diploma", "advanced diploma", "associate diploma"], ["undergraduate"], 3),
+        # EAP/ELICOS columns are pathway-level — excluded from by_level (level_keys=[])
+        # so they don't override degree-level requirements in single_course.py.
+        (["eap 2", "eap2", "academic purposes 2", "purposes 2"], [], 2),
+        (["eap 1", "eap1", "academic purposes 1", "purposes 1"], [], 1),
+    ]
+
+    # (row-header token, slot_key, score regex)
+    _TEST_ROWS: list[tuple[str, str, "_re.Pattern[str]"]] = [
+        ("ielts", "ielts_overall",
+         _re.compile(r"overall\s+(\d\.?\d*)", _re.I)),
+        ("pte", "pte_overall",
+         _re.compile(r"(?:academic\s+)?score\s+of\s+(\d{2,3})", _re.I)),
+        ("toefl", "toefl_overall",
+         _re.compile(r"(?:(?:total|band)\s+)?score\s+of\s+(\d{2,3})", _re.I)),
+        ("cambridge", "cambridge_overall",
+         _re.compile(r"(?:band\s+)?score\s+of\s+(\d{3})", _re.I)),
+        ("duolingo", "duolingo_overall",
+         _re.compile(r"(?:overall\s+)?score\s+of\s+(\d{2,3})", _re.I)),
+    ]
+
+    try:
+        soup = BeautifulSoup(html, "html.parser")
+    except Exception:
+        return {}, {}
+
+    flat_vals: dict[str, Any] = {}
+    by_level: dict[str, Any] = {}
+
+    for table in soup.find_all("table"):
+        rows = table.find_all("tr")
+        if len(rows) < 2:
+            continue
+
+        # Examine the header row for level column headers
+        header_cells = rows[0].find_all(["th", "td"])
+        if len(header_cells) < 3:
+            continue
+
+        # col_idx (1-based, col 0 = row-label) → (level_keys, priority)
+        col_meta: dict[int, tuple[list[str], int]] = {}
+        for col_idx, cell in enumerate(header_cells[1:], 1):
+            cell_text = cell.get_text(" ", strip=True).lower()
+            for tokens, level_keys, priority in _COL_LEVEL_MAP:
+                if any(t in cell_text for t in tokens):
+                    col_meta[col_idx] = (level_keys, priority)
+                    break
+
+        # Only process tables where we identified at least one level column
+        if not col_meta:
+            continue
+
+        # Highest-priority column → its values become flat_vals
+        highest_col_idx = max(col_meta, key=lambda ci: col_meta[ci][1])
+
+        # Parse each data row
+        for row in rows[1:]:
+            cells = row.find_all(["td", "th"])
+            if len(cells) < 2:
+                continue
+            row_header = cells[0].get_text(" ", strip=True).lower()
+
+            slot_info: tuple[str, "_re.Pattern[str]"] | None = None
+            for test_token, slot_key, score_re in _TEST_ROWS:
+                if test_token in row_header:
+                    slot_info = (slot_key, score_re)
+                    break
+            if not slot_info:
+                continue
+            slot_key, score_re = slot_info
+
+            for col_idx, (level_keys, _priority) in col_meta.items():
+                if col_idx >= len(cells):
+                    continue
+                cell_text = cells[col_idx].get_text(" ", strip=True)
+                m = score_re.search(cell_text)
+                if not m:
+                    continue
+                try:
+                    val = float(m.group(1))
+                except ValueError:
+                    continue
+
+                # Populate by_level for each level this column represents
+                for lk in level_keys:
+                    by_level.setdefault(lk, {})[slot_key] = val
+
+                # flat_vals: value from the highest-priority column
+                if col_idx == highest_col_idx:
+                    flat_vals[slot_key] = val
+
+        if flat_vals or by_level:
+            break  # First matching table is sufficient
+
+    return flat_vals, by_level
+
+
 # ---------------------------------------------------------------------------
 # Browser-backed fetch (for JS-rendered central pages)
 # ---------------------------------------------------------------------------
@@ -1218,6 +1355,49 @@ async def prefetch_central_pages(
                                     values=by_level,
                                     url=english_url,
                                 )
+
+                    # ── Column-keyed English table (e.g. KBS) ──────────────
+                    # Some institutions publish a table with one COLUMN per
+                    # qualification level (EAP1 | EAP2 | Diploma | Bachelor+PG).
+                    # The flat extractor grabs the first value it encounters
+                    # (5.0 for IELTS — the EAP1 column) which is too low for
+                    # bachelor/postgrad courses.  This parser finds the
+                    # highest-qualification column and returns both:
+                    # - flat_vals: the bachelor+PG scores (override flat extractor)
+                    # - by_level: "postgraduate"/"undergraduate" → correct score
+                    _ck_flat, _ck_by_level = _parse_column_keyed_english_table(eng_html)
+                    if _ck_flat:
+                        # Override extractor's wrong-column values
+                        english_vals.update(_ck_flat)
+                        result["english"] = english_vals
+                        log.info(
+                            "central_pages: column-keyed english table override "
+                            "for %s: %s",
+                            english_url,
+                            _ck_flat,
+                        )
+                    if _ck_by_level:
+                        # Merge into by_level; don't overwrite browser-rendered
+                        # values already present.
+                        for _lk, _lv in _ck_by_level.items():
+                            by_level.setdefault(_lk, {}).update(
+                                {k: v for k, v in _lv.items() if v not in (None, 0)}
+                            )
+                        result["english_by_level"] = by_level
+                        if emit:
+                            _ck_summary = "; ".join(
+                                f"{lvl}: "
+                                + ", ".join(f"{k}={v}" for k, v in sorted(vals.items()))
+                                for lvl, vals in sorted(_ck_by_level.items())
+                            )
+                            await emit(
+                                "status",
+                                f"[CENTRAL] column-keyed english table → {_ck_summary}",
+                                phase="discover",
+                                kind="central_english_col_keyed",
+                                values=_ck_by_level,
+                                url=english_url,
+                            )
 
                     if emit:
                         slots_found = ", ".join(
