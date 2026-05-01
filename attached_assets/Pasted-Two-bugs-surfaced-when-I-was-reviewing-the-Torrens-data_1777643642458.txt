@@ -1,0 +1,49 @@
+Two bugs surfaced when I was reviewing the Torrens data in the admin screen. One is serious enough that I think it should jump the queue ahead of tomorrow's planned work; the other is a cosmetic regression with an easy fix.
+
+**Bug 1 — Vision OCR cache is serving images from unrelated courses (SERIOUS)**
+
+When I opened the Bachelor of Nursing review panel, the IELTS evidence trail showed:
+
+- ielts_overall = 7.0, source: `per_course_vision_cached`
+- evidence image URL: `https://www.torrens.edu.au/-/media/project/laureate/shared/course-hero/health/master-of-public-health/health-courses-medical-professionals-chatting-lg.jpg`
+- course URL being scraped: `bachelor-of-nursing`
+
+The vision OCR cache returned an image from the Master of Public Health hero as evidence for Bachelor of Nursing. The image is shared across multiple Health faculty pages, and the cache appears to be keyed on image URL alone — so the first IELTS value extracted from that image gets reused for every course where the image appears.
+
+In the Nursing case the value happens to be correct (Nursing genuinely is IELTS 7.0, regex on the page text agrees). But the *evidence is wrong* — meaning in any case where two courses share a hero image but have different IELTS requirements, we'd silently propagate one course's IELTS to the other.
+
+This is the sibling cache cross-level contamination bug already on the open queue, but the new evidence shows it's worse than just within-level. It's cross-course, cross-degree-level, anywhere shared marketing/hero images appear.
+
+The Nursing review panel also shows a conflict it created:
+- ielts_writing = 6.5 (vision_cached, from MPH image) vs 5.5 (sibling_cache from Clinical Nutrition undergraduate bucket)
+- Neither value belongs on the Nursing page; the actual page text states 7.0 directly.
+
+**Suggested fix:** vision OCR cache must key on (image URL + source course URL), not image URL alone. If the same image appears on multiple courses, either re-extract per course or reject the cache hit when the image's source course doesn't match the current course.
+
+**Audit query that would help:** count of live courses where IELTS source = `per_course_vision_cached` AND the image URL path doesn't contain the same course slug as the course being scraped. That tells us how many existing rows are at risk.
+
+**Bug 2 — Float32 precision artifacts in duration values (cosmetic regression)**
+
+Multiple Torrens courses are showing durations like `1.7000000476837158 Year` and `0.699999988079071 Year` in the review screen. Examples: Master of Cybersecurity, Master of Business Analytics, Master of Information Technology, Diploma of Ux and Web Design, Diploma of Photography, Graduate Certificate of Business Analytics, Graduate Certificate of Analytics.
+
+These are float32 → float64 conversion artifacts. Intended values are `1.7` and `0.7`.
+
+This looks like a regression of the Float → Numeric(6,2) fix from Week 2. The Gemini extraction logs from the Torrens scrape show the AI correctly returning `"duration_value": 1.7` — so the corruption is happening somewhere between the JSON response and what the frontend reads.
+
+Possibilities: (a) write path on the Torrens code branch still casts to float32 before Numeric, (b) frontend reads a denormalised field that wasn't migrated, (c) JSON.parse → Number() cast somewhere without rounding.
+
+**Quick fix:** round to 2 decimal places at write time, regardless of source. Plus a one-shot UPDATE to clean existing rows: `UPDATE courses SET duration_years = ROUND(duration_years::numeric, 2) WHERE duration_years::text ~ '0{4}|9{4}'`.
+
+**Root cause** still needs finding so this doesn't recur — happy to defer that part.
+
+**Suggested order for tomorrow morning:**
+1. The three nightly-sweep checks first (5 min)
+2. Bond IELTS spot-check with corrected JOIN (5 min)
+3. **Bug 2 quick fix + cleanup UPDATE** (~30 min — easy, gets the cosmetic problem off the screen)
+4. **Bug 1 audit query** (~15 min — tells us scope before we commit to a fix)
+5. Bug 1 fix design + implementation (~2 hours, depending on what the audit shows)
+6. Then resume Tier 2 activation work as planned
+
+The argument for jumping the queue: Bug 1 means we can't trust IELTS values on any course in the catalog where the hero image is shared across courses. Until it's audited we don't know whether 5 courses are affected or 200. That uncertainty makes the rest of the verification work less meaningful.
+
+Let me know what you think of the priority order — happy to adjust if there's something else higher up I'm not seeing.

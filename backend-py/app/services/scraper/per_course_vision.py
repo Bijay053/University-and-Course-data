@@ -568,9 +568,16 @@ async def _download(url: str) -> bytes | None:
         return None
 
 
-VisionImageCache = dict[str, "asyncio.Future[dict[str, Any]]"]
+VisionImageCache = dict[tuple[str, str], "asyncio.Future[dict[str, Any]]"]
 """Type alias for the per-scrape-run cache used by
 :func:`maybe_vision_refetch`.
+
+The cache key is a ``(img_url, course_url)`` tuple so that the same hero
+image appearing on two different courses (e.g. a shared Health faculty
+banner) never causes one course's IELTS values to be silently reused for
+another.  Within a single course the leader/waiter coalescing pattern still
+applies — the same ``(img_url, course_url)`` key deduplications concurrent
+extraction of the same image on the same page.
 
 Stores ``asyncio.Future`` values (not raw parsed dicts) so that
 concurrent coroutines processing the same image URL coalesce into a
@@ -734,15 +741,16 @@ async def maybe_vision_refetch(
         normalized: dict[str, Any] | None = None
         cached_method = "per_course_vision"
         leader_future: asyncio.Future[dict[str, Any]] | None = None
+        _cache_key = (img_url, url)
         if image_cache is not None:
-            existing: asyncio.Future[dict[str, Any]] | None = image_cache.get(img_url)
+            existing: asyncio.Future[dict[str, Any]] | None = image_cache.get(_cache_key)
             if existing is None:
                 # Be the leader for this URL. Install our Future
                 # synchronously (no await between get and set) so any
                 # subsequent coroutine in the same event-loop iteration
                 # sees it and becomes a waiter.
                 leader_future = asyncio.get_running_loop().create_future()
-                image_cache[img_url] = leader_future
+                image_cache[_cache_key] = leader_future
             else:
                 # Waiter path: someone is already (or has already) OCR'd
                 # this image. Await the Future (resolves instantly if
@@ -797,8 +805,8 @@ async def maybe_vision_refetch(
                     # can retry independently instead of inheriting the failure.
                     # (Download failures stay cached because a 404 won't fix
                     # itself; API quota failures may clear between courses.)
-                    if image_cache is not None and img_url in image_cache:
-                        del image_cache[img_url]
+                    if image_cache is not None and _cache_key in image_cache:
+                        del image_cache[_cache_key]
                     if leader_future is not None and not leader_future.done():
                         leader_future.set_result({})
                     continue
@@ -818,8 +826,8 @@ async def maybe_vision_refetch(
                             url=url,
                             image_url=img_url,
                         )
-                    if image_cache is not None and img_url in image_cache:
-                        del image_cache[img_url]
+                    if image_cache is not None and _cache_key in image_cache:
+                        del image_cache[_cache_key]
                     if leader_future is not None and not leader_future.done():
                         leader_future.set_result({})
                     continue

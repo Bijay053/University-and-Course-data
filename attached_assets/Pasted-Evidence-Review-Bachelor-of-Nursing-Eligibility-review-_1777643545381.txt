@@ -1,0 +1,166 @@
+Evidence Review
+Bachelor of Nursing
+Eligibility: review - Missing: courseLocation, academicLevel, academicScore, otherRequirement | Warnings: missing academic requirement, completeness 69% < 75%
+Conflicts
+ielts_writing: 6.5 vs 5.5 - per_course_vision_cached vs sibling_cache:undergraduate disagreed
+toefl_overall: 100.0 vs 94.0 - per_course_vision_cached vs regex disagreed
+category
+selected
+selected
+/ category:det
+confidence 70%
+Medicine & Health
+Bachelor of Nursing
+https://www.torrens.edu.au/courses/health/bachelor-of-nursing
+course_name
+selected
+selected
+/ course_name.h1
+confidence 90%
+Bachelor of Nursing
+Bachelor of Nursing
+https://www.torrens.edu.au/courses/health/bachelor-of-nursing
+cricos_code
+selected
+selected
+/ regex:cricos
+confidence 95%
+097405K
+CRICOS code extracted from course page: 097405K
+https://www.torrens.edu.au/courses/health/bachelor-of-nursing
+degree_level
+selected
+selected
+/ degree_level:name
+confidence 90%
+Bachelor's
+Bachelor of Nursing
+https://www.torrens.edu.au/courses/health/bachelor-of-nursing
+description
+selected
+selected
+/ description.meta
+confidence 95%
+Looking to become a Registered Nurse (RN)? Study with Torrens University on campus in Sydney, Melbourne, Adelaide or Brisbane. Start your journey today!
+https://www.torrens.edu.au/courses/health/bachelor-of-nursing
+https://www.torrens.edu.au/courses/health/bachelor-of-nursing
+duration
+selected
+selected
+/ regex
+confidence 75%
+3.0
+Download course guide Start online application Study mode On campus Campus locations* Sydney, Melbourne, Brisbane, Adelaide Student Domestic International Course duration 3 years full-time Start date 14 Sep 2026 Fee & scholarships Learn mor
+https://www.torrens.edu.au/courses/health/bachelor-of-nursing
+ielts_listening
+selected
+selected
+/ per_course_vision_cached
+confidence 85%
+7.0
+Medical professionals chatting
+https://www.torrens.edu.au/-/media/project/laureate/shared/course-hero/health/master-of-public-health/health-courses-medical-professionals-chatting-lg.jpg?w=450&rev=4760cbb6ddfc4698b2fb96aa1993c10d&hash=DEF9B5804BD4C58A6D54CE72793A289C
+ielts_overall
+selected
+selected
+/ per_course_vision_cached
+confidence 85%
+7.0
+Medical professionals chatting
+https://www.torrens.edu.au/-/media/project/laureate/shared/course-hero/health/master-of-public-health/health-courses-medical-professionals-chatting-lg.jpg?w=450&rev=4760cbb6ddfc4698b2fb96aa1993c10d&hash=DEF9B5804BD4C58A6D54CE72793A289C
+needs_review
+/ regex
+confidence 85%
+7.0
+Bachelor of Nursing in Adelaide, Brisbane, Sydney & Melbourne | Torrens University Apply now Contact us News & articles Our impact Employer solutions About Apply now International students Find a cour
+https://www.torrens.edu.au/courses/health/bachelor-of-nursing
+ielts_reading
+selected
+selected
+/ per_course_vision_cached
+confidence 85%
+7.0
+Medical professionals chatting
+https://www.torrens.edu.au/-/media/project/laureate/shared/course-hero/health/master-of-public-health/health-courses-medical-professionals-chatting-lg.jpg?w=450&rev=4760cbb6ddfc4698b2fb96aa1993c10d&hash=DEF9B5804BD4C58A6D54CE72793A289C
+ielts_speaking
+selected
+selected
+/ per_course_vision_cached
+confidence 85%
+7.0
+Medical professionals chatting
+https://www.torrens.edu.au/-/media/project/laureate/shared/course-hero/health/master-of-public-health/health-courses-medical-professionals-chatting-lg.jpg?w=450&rev=4760cbb6ddfc4698b2fb96aa1993c10d&hash=DEF9B5804BD4C58A6D54CE72793A289C
+ielts_writing
+needs_review
+/ per_course_vision_cached
+confidence 85%
+6.5
+Medical professionals chatting
+https://www.torrens.edu.au/-/media/project/laureate/shared/course-hero/health/master-of-public-health/health-courses-medical-professionals-chatting-lg.jpg?w=450&rev=4760cbb6ddfc4698b2fb96aa1993c10d&hash=DEF9B5804BD4C58A6D54CE72793A289C
+needs_review
+/ sibling_cache:undergraduate
+confidence 55%
+5.5
+sibling-cache backfill from undergraduate bucket (source: https://www.torrens.edu.au/courses/health/bachelor-of-health-science-clinical-nutrition): ielts_writing=5.5
+https://www.torrens.edu.au/courses/health/bachelor-of-health-science-clinical-nutrition
+intake_months
+selected
+selected
+/ regex
+confidence 70%
+["September"]
+-life experience. *Main Intake 3 is reserved for those who have a completed (current) Diploma of Nursing and Registration with the Australian Health Practitioner Regulation Agency (AHPRA). View all key dates for more information. More Learn
+https://www.torrens.edu.au/courses/health/bachelor-of-nursing
+international_eligible
+needs_review
+/ eligibility.negative
+confidence 90%
+False
+Domestic students only
+https://www.torrens.edu.au/courses/health/bachelor-of-nursing
+international_fee
+selected
+selected
+/ regex
+confidence 100%
+96000
+e courses. How much does a Bachelor of Nursing cost in Australia? The Bachelor of Nursing will cost domestic students around $71,592 and international students $96,000. If studied with a full-time course load, this is a 3 year degree. Schol
+https://www.torrens.edu.au/courses/health/bachelor-of-nursing
+pte_overall
+selected
+selected
+/ regex
+confidence 85%
+66.0
+Bachelor of Nursing in Adelaide, Brisbane, Sydney & Melbourne | Torrens University Apply now Contact us News & articles Our impact Employer solutions About Apply now International students Find a cour
+https://www.torrens.edu.au/courses/health/bachelor-of-nursing
+study_mode
+selected
+selected
+/ study_mode:rule
+confidence 70%
+Blended
+n Skills Assessment Delivery Mode: On Campus, Online Structure and Funct
+https://www.torrens.edu.au/courses/health/bachelor-of-nursing
+sub_category
+selected
+selected
+/ category:det
+confidence 70%
+Nursing
+Bachelor of Nursing
+https://www.torrens.edu.au/courses/health/bachelor-of-nursing
+toefl_overall
+selected
+selected
+/ regex
+confidence 85%
+94.0
+Bachelor of Nursing in Adelaide, Brisbane, Sydney & Melbourne | Torrens University Apply now Contact us News & articles Our impact Employer solutions About Apply now International students Find a cour
+https://www.torrens.edu.au/courses/health/bachelor-of-nursing
+needs_review
+/ per_course_vision_cached
+confidence 85%
+100.0
+Medical professionals chatting
+https://www.torrens.edu.au/-/media/project/laureate/shared/course-hero/health/master-of-public-health/health-courses-medical-professionals-chatting-lg.jpg?w=450&rev=4760cbb6ddfc4698b2fb96aa1993c10d&hash=DEF9B5804BD4C58A6D54CE72793A289C
