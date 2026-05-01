@@ -1,0 +1,35 @@
+l-business-management
+ Bachelor of Business (Tourism and Hospitality Management)                          | Bachelor's           | https://vit.edu.au/bachelor-of-business/bbus-tourism-and-hospitality-management
+ Bachelor of Information Technology and Systems                                     | Bachelor's           | https://vit.edu.au/bits
+ Bachelor of Information Technology and Systems (Application Development)           | Bachelor's           | https://vit.edu.au/bits/bits-application-development
+ Bachelor of Information Technology and Systems (Artificial Intelligence Analytics) | Bachelor's           | https://vit.edu.au/bits/bits-artificial-intelligence-analytics
+ Bachelor of Information Technology and Systems (Cyber Security)                    | Bachelor's           | https://vit.edu.au/bits/bits-cyber-security
+ Bachelor of Information Technology and Systems (Networking)                        | Bachelor's           | https://vit.edu.au/bits/bits-networking
+ Certificate III in Carpentry                                                       | Certificate          | https://vit.edu.au/vocational/cpc30220-certificate-iii-in-carpentry
+ Certificate III in Commercial Cookery                                              | Certificate          | https://vit.edu.au/vocational/sit30821-certificate-iii-in-commercial-cookery
+ Certificate III in Patisserie                                                      | Certificate          | https://vit.edu.au/vocational/sit31021-certificate-iii-in-patisserie
+ Certificate IV in Information Technology                                           | Certificate          | https://vit.edu.au/vocational/ict40120-certificate-iv-in-information-technology
+ Certificate IV in Kitchen Management                                               | Certificate          | https://vit.edu.au/vocational/sit40521-certificate-iv-in-kitchen-management
+ Certificate IV in Patisserie                                                       | Certificate          | https://vit.edu.au/vocational/sit40721-certificate-iv-in-patisserie
+ Diploma of Business                                                                | Diploma              | https://vit.edu.au/diploma-of-business
+ Diploma of Hospitality Management                                                  | Diploma              | https://vit.edu.au/vocational/sit50422-diploma-of-hospitality-management
+ Diploma of Information Technology                                                  | Diploma              | https://vit.edu.au/vocational/ict50220-diploma-of-information-technology
+ Graduate Certificate of Business Administration                                    | Graduate Certificate | https://vit.edu.au/mba/gcba
+ Graduate Certificate of Information Technology and Systems                         | Graduate Certificate | https://vit.edu.au/mits/gcits
+ Graduate Diploma of Business Administration                                        | Graduate Diploma     | https://vit.edu.au/mba/gdba
+ Graduate Diploma of Information Technology and Systems                             | Graduate Diploma     | https://vit.edu.au/mits/gdits
+ Master of Business Administration                                                  | Master's             | https://vit.edu.au/mba
+ Master of Business Administration (Finance)                                        | Master's             | https://vit.edu.au/mba/mba-finance
+ Master of Business Administration (Information Systems)                            | Master's             | https://vit.edu.au/mba/mba-information-systems
+ Master of Business Administration (Leadership and Management)                      | Master's             | https://vit.edu.au/mba/mba-leadership-and-management
+ Master of Business Administration (Project Management)                             | Master's             | https://vit.edu.au/mba/mba-project-management
+ Master of Business Administration (Tourism and Hospitality Management)             | Master's             | https://vit.edu.au/mba/mba-tourism-and-hospitality-manage
+ment
+ Master of Information Technology and Systems                                       | Master's             | https://vit.edu.au/mits
+ Master of Information Technology and Systems (Business Analytics)                  | Master's             | https://vit.edu.au/mits/mits-business-analytics
+ Master of Information Technology and Systems (Cybersecurity)                       | Master's             | https://vit.edu.au/mits/mits-cybersecurity
+ Master of Information Technology and Systems (Information Systems)                 | Master's             | https://vit.edu.au/mits/mits-information-systems
+ Master of Information Technology and Systems (Software Engineering)                | Master's             | https://vit.edu.au/mits/mits-software-engineering
+(36 rows)
+
+(END)
