@@ -1,0 +1,251 @@
+Welcome to Ubuntu 24.04.4 LTS (GNU/Linux 6.8.0-110-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/pro
+
+ System information as of Fri May  1 12:08:36 UTC 2026
+
+  System load:           0.08
+  Usage of /:            3.7% of 231.44GB
+  Memory usage:          25%
+  Swap usage:            0%
+  Processes:             206
+  Users logged in:       1
+  IPv4 address for eth0: 159.65.152.72
+  IPv4 address for eth0: 10.47.0.13
+  IPv6 address for eth0: 2400:6180:100:d0:0:1:3615:5001
+
+Expanded Security Maintenance for Applications is not enabled.
+
+17 updates can be applied immediately.
+To see these additional updates run: apt list --upgradable
+
+1 additional security update can be applied with ESM Apps.
+Learn more about enabling ESM Apps service at https://ubuntu.com/esm
+
+
+Last login: Fri May  1 09:40:11 2026 from 162.243.188.66
+root@university-and-course-data:~# cd ~/University-and-Course-data && git pull origin main
+# Should show: 56016839 bond_enrich: fix column name course_url→course_website
+
+cd backend-py
+set -a && source .env && set +a
+PYTHONPATH=. venv/bin/python3 scripts/bond_enrich.py --workers 8
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+Already up to date.
+2026-05-01 12:09:13,343 INFO Found 126 Bond rows to enrich (workers=8, dry_run=False)
+2026-05-01 12:09:14,078 INFO [10380] done: fee=None ielts=6.5 duration=2.0 intakes=['January', 'September']
+2026-05-01 12:09:14,167 INFO [10382] done: fee=None ielts=6.5 duration=1.0 intakes=None
+2026-05-01 12:09:14,191 INFO [10381] done: fee=80070.0 ielts=6.5 duration=0.67 intakes=['May', 'September', 'January']
+2026-05-01 12:09:14,244 INFO [10378] done: fee=None ielts=6.5 duration=None intakes=['January', 'September']
+2026-05-01 12:09:14,269 INFO [10379] done: fee=None ielts=6.5 duration=1.0 intakes=['January', 'September']
+2026-05-01 12:09:14,286 INFO [10383] done: fee=52959.0 ielts=6.5 duration=2.0 intakes=['May', 'September', 'January']
+2026-05-01 12:09:14,302 INFO [10384] done: fee=None ielts=6.5 duration=0.33 intakes=['May', 'September', 'January']
+2026-05-01 12:09:14,366 INFO [10385] done: fee=81600.0 ielts=6.5 duration=0.67 intakes=['May', 'September', 'January']
+2026-05-01 12:09:14,968 INFO [10386] done: fee=80583.0 ielts=6.5 duration=1.0 intakes=['September', 'January']
+2026-05-01 12:09:15,007 INFO [10387] done: fee=None ielts=6.5 duration=None intakes=['May', 'September', 'January']
+2026-05-01 12:09:15,106 INFO [10390] done: fee=75120.0 ielts=6.5 duration=2.0 intakes=['May', 'September', 'January']
+2026-05-01 12:09:15,125 INFO [10392] done: fee=None ielts=6.5 duration=None intakes=['May', 'September']
+2026-05-01 12:09:15,139 INFO [10391] done: fee=None ielts=6.5 duration=1.0 intakes=['September']
+2026-05-01 12:09:15,144 INFO [10389] done: fee=None ielts=6.5 duration=2.0 intakes=['September', 'January']
+2026-05-01 12:09:15,211 INFO [10388] done: fee=None ielts=6.0 duration=0.33 intakes=['May', 'September', 'January']
+2026-05-01 12:09:15,235 INFO [10393] done: fee=None ielts=6.5 duration=0.33 intakes=['May', 'September', 'January']
+2026-05-01 12:09:15,746 INFO [10394] done: fee=60309.0 ielts=6.5 duration=1.0 intakes=['May', 'September']
+2026-05-01 12:09:15,892 INFO [10395] done: fee=77760.0 ielts=6.5 duration=0.67 intakes=['May', 'January']
+2026-05-01 12:09:15,946 INFO [10397] done: fee=75120.0 ielts=6.5 duration=2.0 intakes=['May', 'September', 'January']
+2026-05-01 12:09:15,960 INFO [10396] done: fee=81600.0 ielts=6.5 duration=0.67 intakes=['May', 'September', 'January']
+2026-05-01 12:09:16,018 INFO [10399] done: fee=57960.0 ielts=6.0 duration=0.67 intakes=['May', 'September', 'January']
+2026-05-01 12:09:16,045 INFO [10398] done: fee=None ielts=6.5 duration=1.0 intakes=['May', 'January']
+2026-05-01 12:09:16,135 INFO [10400] done: fee=57960.0 ielts=6.0 duration=0.67 intakes=['September', 'January']
+2026-05-01 12:09:16,135 INFO [10401] done: fee=43470.0 ielts=6.0 duration=1.0 intakes=['May', 'September', 'January']
+2026-05-01 12:09:16,396 WARNING [10409] https://bond.edu.au/program/bachelor-of-communication — no data-program-detail-url found
+2026-05-01 12:09:16,659 INFO [10402] done: fee=None ielts=6.5 duration=0.33 intakes=['May', 'September']
+2026-05-01 12:09:16,695 INFO [10403] done: fee=75120.0 ielts=7.0 duration=2.0 intakes=['May', 'September', 'January']
+2026-05-01 12:09:16,889 INFO [10404] done: fee=81345.0 ielts=6.5 duration=0.67 intakes=['September', 'January']
+2026-05-01 12:09:16,898 INFO [10405] done: fee=75120.0 ielts=6.5 duration=2.0 intakes=['May', 'September', 'January']
+2026-05-01 12:09:16,947 INFO [10407] done: fee=75120.0 ielts=6.5 duration=3.0 intakes=['September', 'January']
+2026-05-01 12:09:16,962 INFO [10406] done: fee=75120.0 ielts=6.5 duration=2.0 intakes=['May', 'September', 'January']
+2026-05-01 12:09:17,017 INFO [10408] done: fee=62361.0 ielts=6.5 duration=1.0 intakes=['May', 'September', 'January']
+2026-05-01 12:09:17,270 INFO [10410] done: fee=75120.0 ielts=6.5 duration=2.0 intakes=['May', 'September', 'January']
+2026-05-01 12:09:17,561 INFO [10411] done: fee=None ielts=6.5 duration=3.0 intakes=None
+2026-05-01 12:09:17,575 INFO [10412] done: fee=84480.0 ielts=7.0 duration=0.67 intakes=['May']
+2026-05-01 12:09:17,717 INFO [10413] done: fee=75120.0 ielts=7.0 duration=4.0 intakes=['May', 'January']
+2026-05-01 12:09:17,822 INFO [10415] done: fee=75120.0 ielts=6.5 duration=2.0 intakes=['May', 'September', 'January']
+2026-05-01 12:09:17,838 INFO [10416] done: fee=75120.0 ielts=6.5 duration=2.0 intakes=['May', 'September', 'January']
+2026-05-01 12:09:17,862 INFO [10414] done: fee=75120.0 ielts=6.5 duration=2.0 intakes=['May', 'September', 'January']
+2026-05-01 12:09:17,912 INFO [10417] done: fee=75120.0 ielts=7.0 duration=4.0 intakes=['May', 'September', 'January']
+2026-05-01 12:09:18,133 INFO [10418] done: fee=75120.0 ielts=6.5 duration=2.0 intakes=['May', 'September', 'January']
+2026-05-01 12:09:18,508 INFO [10419] done: fee=69615.0 ielts=6.5 duration=0.67 intakes=['May', 'September', 'January']
+2026-05-01 12:09:18,524 INFO [10421] done: fee=None ielts=6.5 duration=0.67 intakes=['May', 'September', 'January']
+2026-05-01 12:09:18,584 INFO [10420] done: fee=75120.0 ielts=7.0 duration=3.0 intakes=['May', 'September', 'January']
+2026-05-01 12:09:18,625 INFO [10422] done: fee=None ielts=6.5 duration=0.33 intakes=['May', 'September', 'January']
+2026-05-01 12:09:18,641 INFO [10425] done: fee=None ielts=6.5 duration=3.0 intakes=['September', 'January']
+2026-05-01 12:09:18,711 INFO [10423] done: fee=None ielts=6.5 duration=1.0 intakes=['May', 'September', 'January']
+2026-05-01 12:09:18,829 INFO [10424] done: fee=75120.0 ielts=6.5 duration=2.0 intakes=['May', 'September', 'January']
+2026-05-01 12:09:19,032 INFO [10426] done: fee=60264.0 ielts=6.5 duration=2.0 intakes=['May', 'September', 'January']
+2026-05-01 12:09:19,357 INFO [10428] done: fee=59670.0 ielts=6.5 duration=1.0 intakes=['May', 'September', 'January']
+2026-05-01 12:09:19,379 INFO [10427] done: fee=81600.0 ielts=6.5 duration=0.67 intakes=['May', 'September', 'January']
+2026-05-01 12:09:19,441 INFO [10429] done: fee=None ielts=6.5 duration=0.42 intakes=['May', 'September', 'January']
+2026-05-01 12:09:19,533 INFO [10431] done: fee=None ielts=6.5 duration=None intakes=['May', 'September', 'January']
+2026-05-01 12:09:19,581 INFO [10430] done: fee=60564.0 ielts=6.5 duration=1.0 intakes=['May', 'September', 'January']
+2026-05-01 12:09:19,661 INFO [10432] done: fee=None ielts=6.5 duration=0.33 intakes=['May', 'September', 'January']
+2026-05-01 12:09:19,764 INFO [10433] done: fee=81345.0 ielts=6.5 duration=0.67 intakes=['May', 'September', 'January']
+2026-05-01 12:09:19,943 INFO [10434] done: fee=None ielts=6.5 duration=1.0 intakes=None
+2026-05-01 12:09:20,277 INFO [10437] done: fee=None ielts=6.5 duration=None intakes=['May', 'September', 'January']
+2026-05-01 12:09:20,312 INFO [10435] done: fee=None ielts=6.5 duration=None intakes=None
+2026-05-01 12:09:20,330 INFO [10436] done: fee=75120.0 ielts=7.0 duration=2.0 intakes=['May', 'September', 'January']
+2026-05-01 12:09:20,366 INFO [10438] done: fee=75120.0 ielts=7.0 duration=3.0 intakes=['May', 'September', 'January']
+2026-05-01 12:09:20,484 INFO [10439] done: fee=75120.0 ielts=7.0 duration=3.0 intakes=['May', 'September', 'January']
+2026-05-01 12:09:20,552 INFO [10440] done: fee=75120.0 ielts=7.0 duration=3.0 intakes=['May', 'September', 'January']
+2026-05-01 12:09:20,607 INFO [10441] done: fee=57960.0 ielts=6.0 duration=0.67 intakes=['May', 'September', 'January']
+2026-05-01 12:09:20,877 INFO [10442] done: fee=57960.0 ielts=6.0 duration=0.67 intakes=['May', 'September', 'January']
+2026-05-01 12:09:21,151 INFO [10444] done: fee=None ielts=6.5 duration=0.33 intakes=['May', 'September', 'January']
+2026-05-01 12:09:21,231 INFO [10443] done: fee=75120.0 ielts=6.5 duration=2.0 intakes=['May', 'September', 'January']
+2026-05-01 12:09:21,307 INFO [10446] done: fee=None ielts=6.5 duration=None intakes=['May', 'September', 'January']
+2026-05-01 12:09:21,324 INFO [10445] done: fee=61851.0 ielts=6.5 duration=1.0 intakes=['May', 'September', 'January']
+2026-05-01 12:09:21,425 INFO [10447] done: fee=49074.0 ielts=6.5 duration=2.0 intakes=['May', 'September', 'January']
+2026-05-01 12:09:21,489 INFO [10448] done: fee=None ielts=6.5 duration=2.0 intakes=None
+2026-05-01 12:09:21,539 INFO [10449] done: fee=75120.0 ielts=6.5 duration=2.0 intakes=['May', 'September', 'January']
+2026-05-01 12:09:21,863 INFO [10450] done: fee=75120.0 ielts=6.5 duration=2.0 intakes=['May', 'September', 'January']
+2026-05-01 12:09:22,042 INFO [10451] done: fee=75120.0 ielts=6.5 duration=2.0 intakes=['May', 'September', 'January']
+2026-05-01 12:09:22,134 INFO [10452] done: fee=None ielts=6.5 duration=2.0 intakes=None
+2026-05-01 12:09:22,216 INFO [10453] done: fee=75120.0 ielts=7.0 duration=3.0 intakes=['May', 'September', 'January']
+2026-05-01 12:09:22,288 INFO [10454] done: fee=75120.0 ielts=7.0 duration=3.0 intakes=['May', 'September', 'January']
+2026-05-01 12:09:22,321 INFO [10455] done: fee=75120.0 ielts=6.5 duration=2.0 intakes=['May', 'September', 'January']
+2026-05-01 12:09:22,372 INFO [10456] done: fee=None ielts=6.5 duration=None intakes=None
+2026-05-01 12:09:22,459 INFO [10457] done: fee=None ielts=6.5 duration=1.0 intakes=None
+2026-05-01 12:09:22,832 INFO [10458] done: fee=60369.0 ielts=6.5 duration=1.0 intakes=['May', 'September', 'January']
+2026-05-01 12:09:22,947 INFO [10459] done: fee=None ielts=6.5 duration=1.0 intakes=None
+2026-05-01 12:09:22,982 INFO [10460] done: fee=None ielts=6.5 duration=None intakes=['May', 'September', 'January']
+2026-05-01 12:09:23,182 INFO [10461] done: fee=75120.0 ielts=7.0 duration=3.0 intakes=['May', 'September', 'January']
+2026-05-01 12:09:23,238 INFO [10463] done: fee=75120.0 ielts=6.5 duration=2.0 intakes=['May', 'September', 'January']
+2026-05-01 12:09:23,255 INFO [10462] done: fee=75120.0 ielts=6.5 duration=2.0 intakes=['May', 'September', 'January']
+2026-05-01 12:09:23,301 INFO [10464] done: fee=75120.0 ielts=6.5 duration=2.0 intakes=['May', 'January']
+2026-05-01 12:09:23,341 INFO [10465] done: fee=75120.0 ielts=7.0 duration=2.0 intakes=['January']
+2026-05-01 12:09:23,546 WARNING [10472] https://bond.edu.au/program/master-occupational-therapy/master-occupational-therapy-prerequisites — no data-program-detail-url found
+2026-05-01 12:09:23,794 INFO [10466] done: fee=None ielts=6.5 duration=2.0 intakes=None
+2026-05-01 12:09:23,878 INFO [10467] done: fee=87960.0 ielts=7.0 duration=2.0 intakes=['May']
+2026-05-01 12:09:23,968 INFO [10468] done: fee=81600.0 ielts=7.0 duration=2.0 intakes=['May', 'September']
+2026-05-01 12:09:24,062 INFO [10469] done: fee=81600.0 ielts=7.0 duration=0.67 intakes=['May', 'September']
+2026-05-01 12:09:24,140 INFO [10470] done: fee=58929.0 ielts=6.5 duration=1.0 intakes=['May', 'September', 'January']
+2026-05-01 12:09:24,156 INFO [10471] done: fee=75120.0 ielts=7.0 duration=2.0 intakes=['May', 'September', 'January']
+2026-05-01 12:09:24,287 INFO [10473] done: fee=75120.0 ielts=7.0 duration=2.0 intakes=['May', 'September', 'January']
+2026-05-01 12:09:24,533 INFO [10474] done: fee=61074.0 ielts=6.5 duration=1.0 intakes=['September', 'January']
+2026-05-01 12:09:24,644 INFO [10475] done: fee=60309.0 ielts=6.5 duration=1.0 intakes=['May', 'September', 'January']
+2026-05-01 12:09:24,736 INFO [10476] done: fee=60435.0 ielts=6.5 duration=1.0 intakes=['May', 'September', 'January']
+2026-05-01 12:09:24,781 INFO [10477] done: fee=None ielts=7.0 duration=0.67 intakes=['May']
+2026-05-01 12:09:24,902 INFO [10478] done: fee=None ielts=6.5 duration=None intakes=['May', 'September', 'January']
+2026-05-01 12:09:25,023 INFO [10480] done: fee=None ielts=6.5 duration=2.0 intakes=None
+2026-05-01 12:09:25,071 INFO [10479] done: fee=60309.0 ielts=6.5 duration=1.0 intakes=['May', 'September', 'January']
+2026-05-01 12:09:25,113 INFO [10481] done: fee=57960.0 ielts=6.0 duration=0.67 intakes=['May', 'September', 'January']
+2026-05-01 12:09:25,470 INFO [10482] done: fee=None ielts=7.0 duration=2.0 intakes=['May', 'September', 'January']
+2026-05-01 12:09:25,542 INFO [10483] done: fee=54399.0 ielts=7.0 duration=2.0 intakes=['May']
+2026-05-01 12:09:25,599 INFO [10485] done: fee=75120.0 ielts=6.5 duration=2.0 intakes=['May', 'September', 'January']
+2026-05-01 12:09:25,683 INFO [10484] done: fee=75120.0 ielts=7.0 duration=3.0 intakes=['May', 'September', 'January']
+2026-05-01 12:09:25,782 INFO [10486] done: fee=75120.0 ielts=6.5 duration=2.0 intakes=['May', 'September', 'January']
+2026-05-01 12:09:25,918 INFO [10487] done: fee=None ielts=6.5 duration=2.0 intakes=['January']
+2026-05-01 12:09:25,973 INFO [10488] done: fee=None ielts=6.5 duration=1.0 intakes=['January']
+2026-05-01 12:09:26,026 INFO [10489] done: fee=None ielts=6.5 duration=1.0 intakes=None
+2026-05-01 12:09:28,408 WARNING [10496] https://bond.edu.au/program/graduate-diploma-of-valuation-and-property-development — HTML fetch failed
+2026-05-01 12:09:28,624 INFO [10490] done: fee=None ielts=None duration=3.0 intakes=None
+2026-05-01 12:09:28,647 WARNING [10497] https://bond.edu.au/program/bachelor-of-biomedical-science-master-of-nutrition-and-dietetic-practice — HTML fetch failed
+2026-05-01 12:09:29,535 INFO [10493] done: fee=None ielts=6.5 duration=0.67 intakes=None
+2026-05-01 12:09:30,872 INFO [10492] done: fee=None ielts=None duration=1.0 intakes=['May', 'September', 'January']
+2026-05-01 12:09:30,888 INFO [10491] done: fee=None ielts=None duration=2.0 intakes=['May']
+2026-05-01 12:09:32,071 INFO [10494] done: fee=None ielts=None duration=1.0 intakes=['May', 'September', 'January']
+2026-05-01 12:09:33,192 INFO [10495] done: fee=None ielts=None duration=None intakes=None
+2026-05-01 12:09:33,901 INFO [10498] done: fee=None ielts=None duration=None intakes=None
+2026-05-01 12:09:34,307 INFO [10502] done: fee=75120.0 ielts=7.0 duration=3.0 intakes=['May', 'September', 'January']
+2026-05-01 12:09:35,640 INFO [10499] done: fee=None ielts=None duration=None intakes=None
+2026-05-01 12:09:36,689 INFO [10500] done: fee=75120.0 ielts=6.5 duration=None intakes=None
+2026-05-01 12:09:36,718 INFO [10503] done: fee=None ielts=None duration=None intakes=None
+2026-05-01 12:09:36,997 INFO [10501] done: fee=None ielts=None duration=None intakes=None
+2026-05-01 12:09:36,999 INFO Done in 23.7s — updated 117/126 rows  (fee=72  ielts=113)
+2026-05-01 12:09:36,999 INFO Next step: run scripts/bulk_approve.py --university-id 22
+root@university-and-course-data:~/University-and-Course-data/backend-py# # Check completeness distribution
+sudo -u postgres psql university_portal -c "
+SELECT auto_publish_status,
+       COUNT(*) AS n,
+       COUNT(*) FILTER (WHERE international_fee IS NOT NULL) AS has_fee,
+       COUNT(*) FILTER (WHERE ielts_overall IS NOT NULL) AS has_ielts,
+       ROUND(AVG(completeness)) AS avg_pct
+FROM scraped_courses
+WHERE university_id = 22 AND status = 'pending'
+GROUP BY auto_publish_status;"
+
+# Force-promote all review rows (same approach as VIT)
+sudo -u postgres psql university_portal -c "
+UPDATE scraped_courses SET auto_publish_status = 'ready'
+WHERE university_id = 22
+  AND status = 'pending'
+  AND auto_publish_status IN ('review', 'pending_review')
+RETURNING id;"
+
+# Dry-run first
+PYTHONPATH=. venv/bin/python3 scripts/bulk_approve.py --university-id 22 --dry-run
+
+# Promote
+PYTHONPATH=. venv/bin/python3 scripts/bulk_approve.py --university-id 22
+
+# Final count
+sudo -u postgres psql university_portal -c "
+SELECT COUNT(*) AS bond_live FROM courses WHERE university_id = 22;"
+ auto_publish_status |  n  | has_fee | has_ielts | avg_pct 
+---------------------+-----+---------+-----------+---------
+ ready               | 126 |      77 |       123 |      51
+(1 row)
+
+ id 
+----
+(0 rows)
+
+UPDATE 0
+venv/bin/python3: can't open file '/root/University-and-Course-data/backend-py/scripts/bulk_approve.py': [Errno 2] No such file or directory
+venv/bin/python3: can't open file '/root/University-and-Course-data/backend-py/scripts/bulk_approve.py': [Errno 2] No such file or directory
+ bond_live 
+-----------
+         0
+(1 row)
+
+root@university-and-course-data:~/University-and-Course-data/backend-py# # Check completeness before promoting
+sudo -u postgres psql university_portal -c "
+SELECT auto_publish_status,
+       COUNT(*) n,
+       COUNT(*) FILTER (WHERE international_fee IS NOT NULL) has_fee,
+       COUNT(*) FILTER (WHERE ielts_overall IS NOT NULL) has_ielts,
+       ROUND(AVG(completeness)) avg_pct
+FROM scraped_courses
+WHERE university_id = 22 AND status = 'pending'
+GROUP BY auto_publish_status
+ORDER BY auto_publish_status;"
+
+# Force-promote all review rows
+sudo -u postgres psql university_portal -c "
+UPDATE scraped_courses SET auto_publish_status = 'ready'
+WHERE university_id = 22
+  AND status = 'pending'
+  AND auto_publish_status IN ('review', 'pending_review');"
+
+# Promote
+PYTHONPATH=. venv/bin/python3 scripts/bulk_approve.py --university-id 22 --dry-run
+PYTHONPATH=. venv/bin/python3 scripts/bulk_approve.py --university-id 22
+
+# Confirm
+sudo -u postgres psql university_portal -c "
+SELECT COUNT(*) AS bond_live FROM courses WHERE university_id = 22;"
+ auto_publish_status |  n  | has_fee | has_ielts | avg_pct 
+---------------------+-----+---------+-----------+---------
+ ready               | 126 |      77 |       123 |      51
+(1 row)
+
+UPDATE 0
+venv/bin/python3: can't open file '/root/University-and-Course-data/backend-py/scripts/bulk_approve.py': [Errno 2] No such file or directory
+venv/bin/python3: can't open file '/root/University-and-Course-data/backend-py/scripts/bulk_approve.py': [Errno 2] No such file or directory
+ bond_live 
+-----------
+         0
+(1 row)
+
+root@university-and-course-data:~/University-and-Course-data/backend-py# 
