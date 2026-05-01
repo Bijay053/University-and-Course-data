@@ -116,6 +116,62 @@ The database schema includes tables for `universities`, `courses`, `intakes`, `f
 - **Environment Management**: DB credentials hardcoded in `app/config.py` default. No `.env` file needed on production.
 - **journalctl**: The service does NOT log uvicorn application output to journalctl — only systemd lifecycle events appear. To see application errors, check `/tmp/dashboard_stats_error.log` (written by the try/except in dashboard.py) or run uvicorn in the foreground temporarily.
 
+## Live Course Data State (verified 2026-05-01)
+
+### Verified live counts
+
+| University | id | Live courses | Notes |
+|---|---|---|---|
+| USQ | 1 | 67 | stable |
+| ASA | 2 | 8 | stable |
+| CSU | 4 | 184 | 8 dups deleted; 11 review rows pending (see below) |
+| UTas | 5 | 1 | |
+| VIT | 6 | 38 | fresh scrape promoted; 6 old prefix-code dups deleted |
+| KBS | 8 | 29 | |
+| SCU | 17 | 1 | |
+| AUT | 20 | 70 | |
+
+All 8 universities: `pending_ready = 0`, `legacy_gap = 0`, zero duplicate pairs.
+
+### Outstanding CSU review rows (11)
+
+11 `pending/review` CSU scraped_courses rows blocked by Phase A completeness floor (< 85%).
+- 4 also missing `international_fee`
+- All missing `category`, `academic_level`, `academic_score`, `other_requirement`
+- Leave for next CSU targeted re-scrape — do NOT force-promote (genuinely incomplete)
+- Courses include: Associate Degree in Policing Practice, Bachelor of Education (Primary),
+  Bachelor of Education (Secondary) - Pdhpe, Graduate Certificate/Diploma of Theological Studies,
+  Bachelor of Theology, Bachelor of Oral Health, Bachelor of Paramedicine,
+  Graduate Diploma of Ageing and Pastoral Studies, Graduate Certificate in Fish Conservation
+
+### Auto-publish gate
+
+Hard floor: **85% completeness** (`_PHASE_A_MIN_COMPLETENESS` in `backend-py/app/services/auto_publish.py`).
+13 review fields: course_name, degree_level, category, study_mode, course_location, duration,
+intake_months, international_fee, description, academic_level, academic_score, english_test, other_requirement.
+VIT fresh-scrape rows score 77% (missing: category, academic_level, academic_score, other_requirement) —
+below floor. Force-promote via `UPDATE scraped_courses SET auto_publish_status='ready' WHERE ...`
+then run `bulk_approve.py`.
+
+### bulk_approve.py (prod-side script)
+
+Location on prod: `~/University-and-Course-data/backend-py/scripts/bulk_approve.py`
+Usage: `PYTHONPATH=. venv/bin/python3 scripts/bulk_approve.py --university-id <N> [--status pending] [--ap-status ready] [--dry-run]`
+Idempotent: deduplicates on `lower(course_name)` per university. Updates existing row if name matches.
+
+### Pipeline code gap (IMPORTANT)
+
+Pipeline fixes made in Replit (stage_course.py VIT specialization fix, single_course.py
+CENTRAL_ENGLISH_OVERRIDABLE guard, central_pages.py diploma fix) are NOT on GitHub/prod.
+Prod runs the old pipeline code. Any future scrape on prod will use unfixed extractors.
+Resolution: push Replit commits to GitHub via Replit's GitHub integration, then `git pull` on prod.
+The Replit remote is named `github` (not `origin`). Prod remote is `origin`.
+
+### Next promotion targets
+
+- **Bond (uni_id=22)**: ~126 scraped_courses staged, 0 live — highest single-uni impact
+- **Flinders (uni_id=12)**: ~105 scraped_courses staged, 0 live
+
 ## External Dependencies
 
 - **AI/ML**: Gemini API (`GEMINI_API_KEY`) for AI-powered web scraping and data extraction. Uses `gemini-2.5-flash`, `gemini-2.0-flash-001`, and `gemini-2.0-flash-lite-001` with auto-fallback.
