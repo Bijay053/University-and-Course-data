@@ -489,6 +489,142 @@ async def _mark_failed(runtime_job_id: str, err: str) -> None:
             await db.commit()
 
 
+@celery_app.task(name="scrape.nightly_sweep", bind=True, max_retries=0)
+def nightly_sweep_and_alert(self) -> dict:  # type: ignore[override]
+    """Celery beat task — nightly regression sweep at 02:00 UTC.
+
+    Workflow
+    --------
+    1. Capture a fresh baseline snapshot for all universities into
+       ``baselines/nightly/<YYYYMMDD>/`` using ``capture_baseline.py``.
+    2. Find the most recent *previous* snapshot directory.
+    3. Run ``regression_sweep.py`` to compare before vs after.
+    4. Call ``deliver_drift_alert()`` if unexpected diffs are found
+       (sweep exit code 1).
+
+    The task is intentionally fire-and-forget: a sweep failure only
+    logs an error, it never marks itself as retriable (max_retries=0).
+    """
+    import os
+    import pathlib
+    import re
+    import subprocess
+
+    _backend_py = pathlib.Path(__file__).resolve().parent.parent.parent
+    _python = _backend_py / "venv" / "bin" / "python3"
+    _env = {**os.environ, "PYTHONPATH": "."}
+
+    today = datetime.now(timezone.utc).strftime("%Y%m%d")
+    today_dir = _backend_py / "baselines" / "nightly" / today
+    today_dir.mkdir(parents=True, exist_ok=True)
+
+    # ── Step 1: capture today's snapshot ──────────────────────────────────
+    log.info("[NIGHTLY SWEEP] capturing baseline snapshot → %s", today_dir)
+    capture_result = subprocess.run(
+        [str(_python), "scripts/capture_baseline.py", "--out-dir", str(today_dir)],
+        cwd=str(_backend_py),
+        env=_env,
+        capture_output=True,
+        text=True,
+        timeout=600,
+    )
+    if capture_result.returncode != 0:
+        log.error(
+            "[NIGHTLY SWEEP] capture_baseline.py failed (rc=%d):\n%s",
+            capture_result.returncode,
+            capture_result.stderr[:2000],
+        )
+        return {"ok": False, "reason": "capture_baseline failed", "rc": capture_result.returncode}
+
+    log.info("[NIGHTLY SWEEP] baseline captured OK:\n%s", capture_result.stdout[:1000])
+
+    # ── Step 2: find the most recent previous snapshot directory ──────────
+    nightly_root = _backend_py / "baselines" / "nightly"
+    prev_dirs = sorted(
+        [d for d in nightly_root.iterdir() if d.is_dir() and d.name != today],
+        reverse=True,
+    )
+    if not prev_dirs:
+        log.info("[NIGHTLY SWEEP] no previous snapshot to compare against — skipping sweep")
+        return {"ok": True, "today": today, "sweep": "skipped_no_baseline"}
+
+    before_dir = prev_dirs[0]
+    before_date = before_dir.name
+    log.info("[NIGHTLY SWEEP] comparing %s → %s", before_date, today)
+
+    # ── Step 3: run regression sweep ──────────────────────────────────────
+    sweep_result = subprocess.run(
+        [
+            str(_python),
+            "scripts/regression_sweep.py",
+            "--before", str(before_dir),
+            "--after", str(today_dir),
+        ],
+        cwd=str(_backend_py),
+        env=_env,
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    sweep_stdout = sweep_result.stdout
+    sweep_rc = sweep_result.returncode
+
+    log.info(
+        "[NIGHTLY SWEEP] sweep finished rc=%d:\n%s",
+        sweep_rc, sweep_stdout[:2000],
+    )
+    if sweep_result.stderr:
+        log.warning("[NIGHTLY SWEEP] sweep stderr:\n%s", sweep_result.stderr[:500])
+
+    if sweep_rc == 0:
+        log.info("[NIGHTLY SWEEP] clean — no unexpected diffs")
+        return {"ok": True, "before": before_date, "after": today, "sweep": "clean"}
+
+    # ── Step 4: parse diffs and warnings from stdout and deliver alert ────
+    diffs: list[dict] = []
+    warnings: list[dict] = []
+    _current_slug = ""
+    # Capture lines like:  "      fen: 32000 → 33000"  or  "    (method-only) ielts: ..."
+    _diff_re = re.compile(r"^\s+((?:\(method-only\)\s+)?)([\w_]+):\s+(.+?)\s+→\s+(.+)$")
+    _unexpected_re = re.compile(r"\[UNEXPECTED\]\s+(\w+)")
+
+    for line in sweep_stdout.splitlines():
+        m_slug = _unexpected_re.search(line)
+        if m_slug:
+            _current_slug = m_slug.group(1)
+        m_diff = _diff_re.match(line)
+        if m_diff and _current_slug:
+            method_only = bool(m_diff.group(1).strip())
+            entry = {
+                "slug": _current_slug,
+                "field": m_diff.group(2),
+                "before": m_diff.group(3),
+                "after": m_diff.group(4),
+            }
+            if method_only:
+                warnings.append(entry)
+            else:
+                diffs.append(entry)
+
+    from app.services.scraper.alert_delivery import deliver_drift_alert
+    deliver_drift_alert(
+        before_date=before_date,
+        after_date=today,
+        diffs=diffs,
+        warnings=warnings,
+        summary=sweep_stdout[:3000],
+    )
+
+    return {
+        "ok": True,
+        "before": before_date,
+        "after": today,
+        "sweep": "diffs_found",
+        "errors": len(diffs),
+        "warnings": len(warnings),
+    }
+
+
 @celery_app.task(name="scrape.refresh_baselines", bind=True, max_retries=0)
 def refresh_baselines_weekly(self) -> dict:  # type: ignore[override]
     """Celery beat task — recompute fill-rate baselines from the trailing 30 days.
