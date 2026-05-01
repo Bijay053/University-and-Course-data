@@ -1,0 +1,157 @@
+    ... (15 more courses omitted)
+  [CLEAN]    kbs (uni_id=8)
+  [CLEAN]    scu (uni_id=17)
+  [CLEAN]    study (uni_id=4)
+  [CLEAN]    torrens (uni_id=3)
+  [CLEAN]    une (uni_id=14)
+  [CLEAN]    unisq (uni_id=1)
+  [CLEAN]    uow (uni_id=13)
+  [CLEAN]    utas (uni_id=5)
+  [CLEAN]    vit (uni_id=38)
+
+  [EXPECTED] vit (uni_id=6)  before=30  after=66  → DIRTY
+    added=34  removed=0  changed=2
+    [ADDED] 'Advanced Diploma of Hospitality Management (Sit60322 Advanced Diploma Of Hospitality Management)'
+    [ADDED] 'Advanced Diploma of Information Technology (Ict60220 Advanced Diploma Of Information Technology)'
+    [ADDED] 'Bachelor of Business (Bbus Accounting)'
+    [ADDED] 'Bachelor of Business (Bbus Business Technology)'
+    [ADDED] 'Bachelor of Business (Bbus Human Resource Management)'
+    [ADDED] 'Bachelor of Business (Bbus International Business Management)'
+    [ADDED] 'Bachelor of Business (Bbus Tourism And Hospitality Management)'
+    [ADDED] 'Bachelor of Information Technology and Systems'
+    [ADDED] 'Bachelor of Information Technology and Systems (Application Development)'
+    [ADDED] 'Bachelor of Information Technology and Systems (Artificial Intelligence Analytics)'
+    ... (26 more courses omitted)
+
+========================================================================
+SUMMARY
+  Clean unis:            20
+  Expected diffs:        3  (acknowledged)
+  Unexpected diffs:      0
+  Missing before:        0
+  Missing after:         0
+
+PASS (with acknowledged diffs) — 3 expected diff(s) for ['asahe', 'kbs', 'vit']. Reviewer sign-off required before merge.
+root@university-and-course-data:~/University-and-Course-data/backend-py# cd ~/University-and-Course-data/backend-py
+set -a && source .env && set +a
+
+# ── 1. Show the full KBS scrape_config so we can see exactly what's there ──
+sudo -u postgres psql university_portal -c "
+SELECT id, scrape_config FROM universities WHERE id = 29;"
+
+# ── 2. Write the English URL — handles both NULL scrape_config and
+#       missing uniPages key with COALESCE + jsonb_set create_missing=true ──
+sudo -u postgres psql university_portal -c "
+UPDATE universities
+SET scrape_config = jsonb_set(
+  COALESCE(scrape_config, '{}'::jsonb),
+  '{uniPages,entryPage}',
+  '\"https://www.kbs.edu.au/admissions/entry-requirements/english-entry-requirements\"',
+  true
+)
+WHERE id = 29
+RETURNING id, scrape_config->'uniPages'->'entryPage' AS entryPage_now;"
+# Must print: UPDATE 1 with the URL in entryPage_now column
+
+# ── 3. Wipe ALL KBS cache rows (all page types) ───────────────────────────
+sudo -u postgres psql university_portal -c "
+DELETE FROM central_page_cache WHERE university_id = 29
+RETURNING page_type, url;"
+
+# ── 4. Trigger fresh KBS scrape — capture job ID inline ──────────────────
+KBS_JOB=$(curl -s -X POST http://localhost:80/api/scrape/start \
+  -H "Content-Type: application/json" \
+  -d '{"university_id": 29}' \
+  | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['jobId'])")
+echo "KBS job: $KBS_JOB"
+
+# ── 5. Poll until done ────────────────────────────────────────────────────
+while true; do
+  STATUS=$(curl -s "http://localhost:80/api/scrape/status/$KBS_JOB" \
+    | python3 -c "import sys,json; print(json.load(sys.stdin)['status'])")
+  echo "$(date '+%H:%M:%S') $STATUS"
+  [[ "$STATUS" == "completed" || "$STATUS" == "failed" ]] && break
+  sleep 20
+done
+
+# ── 6. Did the column-keyed parser fire? ─────────────────────────────────
+sudo -u postgres psql university_portal -c "
+SELECT payload->>'message' AS msg, created_at
+FROM scrape_runtime_logs
+WHERE runtime_job_id = '$KBS_JOB'
+  AND (payload->>'message' ILIKE '%column-keyed%'
+    OR payload->>'message' ILIKE '%entry-requirements%'
+    OR payload->>'message' ILIKE '%english%')
+ORDER BY sequence;"
+# Must contain: '[CENTRAL] column-keyed english table → postgraduate: ielts_overall=6.0...'
+# If 0 rows: entryPage still wrong, look at step 1 output
+
+# ── 7. IELTS ground-truth check — must match KBS website exactly ─────────
+# KBS website states: Bachelor+PG = IELTS 6.0, Diploma = 5.5
+# Any other value means AI fallback or wrong column
+# Must show: english_vals with ielts_overall=6.0 (NOT 6.5, NOT empty)─────── firing
+ id | scrape_config 
+----+---------------
+ 29 | {}
+(1 row)
+
+ id | entrypage_now 
+----+---------------
+ 29 | 
+(1 row)
+
+UPDATE 1
+  page_type   |                  url                   
+--------------+----------------------------------------
+ fee_schedule | https://www.kbs.edu.au/admissions/fees
+(1 row)
+
+DELETE 1
+KBS job: job_73c565146438
+08:00:17 running
+08:00:37 running
+08:00:57 running
+08:01:17 running
+08:01:38 running
+08:01:58 running
+08:02:18 running
+08:02:38 running
+08:02:58 running
+08:03:18 running
+08:03:38 completed
+                        course_name                        |     degree_level     | international_fee | ielts_overall | pte_overall | ielts_source 
+-----------------------------------------------------------+----------------------+-------------------+---------------+-------------+--------------
+ Bachelor of Business (Accounting)                         | Bachelor's           |                   |               |             | 
+ Bachelor of Business (Hospitality and Tourism Management) | Bachelor's           |                   |               |             | 
+ Bachelor of Business (Management)                         | Bachelor's           |                   |               |             | 
+ Bachelor of Business (Marketing)                          | Bachelor's           |                   |               |             | 
+ Bachelor of Information Technology                        | Bachelor's           |             74880 |               |             | 
+ Diploma of Business                                       | Diploma              |             23040 |               |             | 
+ Diploma of Information Technology                         | Diploma              |             24960 |               |             | 
+ Graduate Certificate in Accounting                        | Graduate Certificate |             13600 |               |             | 
+ Graduate Certificate in Business Administration           | Graduate Certificate |             19640 |               |             | 
+ Graduate Certificate in Business Analytics                | Graduate Certificate |             13600 |               |             | 
+ Graduate Certificate in Information Technology            | Graduate Certificate |             14560 |               |             | 
+ Graduate Diploma of Business Administration               | Graduate Diploma     |             39280 |               |             | 
+ Graduate Diploma of Business Analytics                    | Graduate Diploma     |             27200 |               |             | 
+ Graduate Diploma of Information Technology                | Graduate Diploma     |             29120 |               |             | 
+ MBA - Master of Business Administration                   | Master's             |             58920 |               |             | 
+ MBA – (Women in Leadership)                               | Master's             |                   |               |             | 
+ MBA – Data-driven Leadership                              | Master's             |                   |               |             | 
+ MBA – Digital Management                                  | Master's             |                   |               |             | 
+ MBA – Health Services Management                          | Master's             |                   |               |             | 
+ MBA – International Leadership                            | Master's             |                   |               |             | 
+ MBA – Project Management                                  | Master's             |                   |               |             | 
+ MBA – Tourism and Hospitality Leadership                  | Master's             |                   |               |             | 
+ Master of Accounting                                      | Master's             |             54400 |               |             | 
+ Master of Business Analytics                              | Master's             |             40800 |               |             | 
+ Master of Business Analytics (Extension)                  | Master's             |             54020 |               |             | 
+ Master of Business Analytics (Information Technology)     | Master's             |             55460 |               |             | 
+ Master of Information Technology                          | Master's             |             43680 |               |             | 
+ Master of Information Technology (Extension)              | Master's             |             57140 |               |             | 
+ Master of Professional Accounting                         | Master's             |             40800 |               |             | 
+(29 rows)
+
+ page_type | english_vals | by_level | fetched_at 
+-----------+--------------+----------+------------
+(0 rows)

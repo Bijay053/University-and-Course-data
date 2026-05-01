@@ -1,0 +1,55 @@
+                                                                                                                                                                                                                   
+                                                                                                        | 2026-05-01 08:02:51.269983+00
+ [GP-DEBUG] text[:500]='English for Academic Purposes COURSE CRICOS code 105225K / AQF level N/A My saved courses (0) Typical Duration / 10 weeks per level Structure / 20 hours of class per week ARTICULATION INT
+O / Business / Analytics / Accounting / IT START DATE / EAP 1, EAP1&2 - February, June, September EAP2 - April, August, December TAP BELOW FOR MORE INFORMATION Overview Kaplan Business School offers Academic Eng
+lish programs for those students who need to improve their English proficiency before commencing their' | 2026-05-01 08:02:54.379859+00
+ [GP-DEBUG] raw_response='```json\n{\n  "international_fee": null,\n  "domestic_fee": null,\n  "fee_term": null,\n  "duration_value": 0.25,\n  "duration_unit": "years",\n  "duration_text": "10 weeks per level",\
+n  "ielts_overall": null,\n  "pte_overall": null,\n  "toefl_overall": null,\n  "cambridge_overall": null,\n  "duolingo_overall": null,\n  "sub_category": "English for Academic Purposes",\n  "category": "Educatio
+n",\n  "mode": "On '                                                                                    | 2026-05-01 08:02:54.383757+00
+ [GEMINI] https://www.kbs.edu.au/courses/english-for-academic-purposes → 11 field(s) (cost=$0.000255, in=2835 out=140)                                                                                             
+                                                                                                                                                                                                                   
+                                                                                                        | 2026-05-01 08:02:54.388169+00
+ [per-course browser ↻] https://www.kbs.edu.au/courses/english-for-academic-purposes                                                                                                                               
+                                                                                                                                                                                                                   
+                                                                                                        | 2026-05-01 08:02:54.392166+00
+ [WARN] Master of Information Technology (Extens — English section detected in HTML but all scores blank                                                                                                           
+                                                                                                                                                                                                                   
+                                                                                                        | 2026-05-01 08:02:55.954762+00
+ ⚠️ [WARN 75/100] Master of Information Technology (Extension) — missing: english | master-of-information-technology-extensi                                                                                        
+                                                                                                                                                                                                                   
+                                                                                                        | 2026-05-01 08:02:55.958416+00
+ [per-course browser ✓] https://www.kbs.edu.au/courses/english-for-academic-purposes — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]                                                                                 
+                                                                                                                                                                                                                   
+                                                                                                        | 2026-05-01 08:03:04.216575+00
+ [FALLBACK] AI enriching https://www.kbs.edu.au/courses/english-for-academic-purposes (missing: international_fee, domestic_fee, ielts_overall)                                                                    
+                                                                                                                                                                                                                   
+                                                                                                        | 2026-05-01 08:03:04.233324+00
+ [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/english-for-academic-purposes: duration_value, duration_unit                                                                                    
+                                                                                                                                                                                                                   
+                                                                                                        | 2026-05-01 08:03:05.278399+00
+ [FIELD TRACE] study_mode='On Campus' location='EAP1 - Melbourne, Perth, Sydney EAP2 - Adelaide, Brisbane, Gold Coast, Melbourne, Sydney' method=study_mode:location_derived url=https://www.kbs.edu.au/courses/eng
+lish-for-academic-purposes                                                                                                                                                                                         
+                                                                                                        | 2026-05-01 08:03:05.284178+00
+ [WARN] Business Administration — English section detected in HTML but all scores blank                                                                                                                            
+                                                                                                                                                                                                                   
+                                                                                                        | 2026-05-01 08:03:05.416175+00
+                                                                                                                                                                                                                   
+                                                                                                        | 2026-05-01 08:03:05.422548+00
+ [WARN] Diploma of Information Technology — English section detected in HTML but all scores blank                                                                                                                  
+                                                                                                                                                                                                                   
+                                                                                                        | 2026-05-01 08:03:08.569635+00
+ ⚠️ [WARN 75/100] Diploma of Information Technology — missing: english | diploma-of-information-technology                                                                                                          
+                                                                                                                                                                                                                   
+                                                                                                        | 2026-05-01 08:03:08.57333+00
+                                                                                                                                                                                                                   
+                                                                                                        | 2026-05-01 08:03:23.407665+00
+ [WARN] Master of Business Analytics (Informatio — English section detected in HTML but all scores blank                                                                                                           
+                                                                                                                                                                                                                   
+                                                                                                        | 2026-05-01 08:03:36.253337+00
+ ⚠️ [WARN 75/100] Master of Business Analytics (Information Technolo — missing: english | master-of-business-analytics-information                                                                                  
+                                                                                                                                                                                                                   
+                                                                                                        | 2026-05-01 08:03:36.256845+00
+ [DATA QUALITY][WARN] missing_english_requirement Ã\u0097 31: No English language test score found (IELTS / PTE / TOEFL / CAE). (and 30 more)                                                                      
+                                                                                                                                                                                                                   
+                                                                                                        | 2026-05-01 08:03:37.49788+00
+(78 rows)
