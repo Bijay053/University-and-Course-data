@@ -1,0 +1,151 @@
+All five deploy issues confirmed by your runs (`python` not found, divergent branches blocking pull, `/api/admin/scrape` returning 404). Bug A code work itself is clean — root cause traced, fix targeted at Pattern-0 with the slash-structure pre-check, 15/15 tests pass, broader suite unchanged.
+
+The distinct-names query confirms the 92-course gap on Charles Sturt is real (265 approved staged, 173 in courses). Queue as a separate bug — not blocking Bug A but should be tracked. Question for that ticket later: when you click Approve in the review UI on one of the 92 missing courses, does it appear in `courses` immediately?
+
+---
+
+**Force-push approved. Go ahead with Option 1.**
+
+Reasoning: the `archive/bundled-deploy-attempt` tag preserves the bundled history for forensics. Clean main going forward is worth more than maintaining the divergence record. Use `--force-with-lease` so it'll fail if someone else has pushed since you last fetched.
+
+---
+
+**Exact deploy sequence:**
+
+```
+# ============================================================
+# STEP 1 — ON LOCAL (where you developed Bug A)
+# ============================================================
+
+# Confirm Bug A is committed and HEAD
+git log --oneline -3
+
+# Force-push the cleanly-sequenced history to origin
+git push origin main --force-with-lease
+
+# ============================================================
+# STEP 2 — ON PROD
+# ============================================================
+
+cd ~/University-and-Course-data
+
+# Fetch the new origin/main (now matches local + has Bug A on top)
+git fetch origin main
+
+# Reset prod's working tree to match origin (since prod was already
+# at local HEAD pre-Bug-A, this just adds the new Bug A commit)
+git reset --hard origin/main
+
+# Verify Bug A is HEAD on prod
+git log --oneline -3
+
+# ============================================================
+# STEP 3 — CAPTURE PRE-BUG-A BASELINE (on prod)
+# ============================================================
+
+cd ~/University-and-Course-data/backend-py
+set -a && source .env && set +a
+
+PYTHONPATH=. venv/bin/python3 scripts/capture_baseline.py \
+  --out-dir baselines/bug-a-before/
+
+# This captures all 23 unis. Takes ~30s. Outputs to baselines/bug-a-before/
+
+# ============================================================
+# STEP 4 — RESTART SERVICES (with sleep 15 zombie-job guard)
+# ============================================================
+
+sudo systemctl restart uni-celery.service uni-api-py.service
+sleep 15
+sudo systemctl is-active uni-celery.service uni-api-py.service
+
+# ============================================================
+# STEP 5 — TRIGGER KBS SCRAPE (correct endpoint!)
+# ============================================================
+
+# The endpoint is /api/scrape/start with university_id, not /api/admin/scrape
+curl -s -X POST http://localhost:80/api/scrape/start \
+  -H "Content-Type: application/json" \
+  -d '{"university_id": 29}' | python3 -m json.tool
+
+# Verify Redis got the task within 5s (zombie-job sanity check)
+sleep 5
+redis-cli -p 6379 llen scrape
+
+sudo -u postgres psql university_portal -c "
+SELECT runtime_job_id, status FROM scrape_runtime_jobs
+WHERE university_id = 29 ORDER BY created_at DESC LIMIT 1;"
+
+# Should show status = 'running'. If 'queued' with llen=0, it's a zombie
+# — mark failed, restart Celery, sleep 15 again, retry.
+
+# ============================================================
+# STEP 6 — WAIT FOR COMPLETION (poll every 60s)
+# ============================================================
+
+sudo -u postgres psql university_portal -c "
+SELECT runtime_job_id, status, started_at, completed_at,
+       imported, skipped, errors
+FROM scrape_runtime_jobs WHERE university_id = 29
+ORDER BY created_at DESC LIMIT 1;"
+
+# Repeat until status='completed'. Expect ~5–11 minutes.
+
+# ============================================================
+# STEP 7 — CAPTURE POST-BUG-A BASELINE
+# ============================================================
+
+cd ~/University-and-Course-data/backend-py
+set -a && source .env && set +a
+
+PYTHONPATH=. venv/bin/python3 scripts/capture_baseline.py \
+  --out-dir baselines/bug-a-after/
+
+# ============================================================
+# STEP 8 — REGRESSION SWEEP
+# ============================================================
+
+PYTHONPATH=. venv/bin/python3 scripts/regression_sweep.py \
+  --before baselines/bug-a-before/ \
+  --after  baselines/bug-a-after/ \
+  --expected-slugs kbs \
+  --verbose
+```
+
+---
+
+**Expected sweep result:**
+
+- 22 unis CLEAN
+- KBS expected-dirty:
+  - **3 ADDED**: Graduate Certificate in Accounting, Graduate Certificate in Business Administration, Graduate Certificate in Business Analytics (now staging because the regex correctly returns 8 Month and the value passes the sanity cap)
+  - **Possibly some CHANGED entries** on existing KBS courses where `extraction_method.duration_*` flips from `ai_fallback` to a regex source (method-only, benign — means the regex now succeeds where it previously fell back to AI)
+  - **Nothing else**
+
+If the sweep matches that exactly: ship. The cycle is complete. Bug A is the first multi-uni-shaped fix delivered through the proper architecture.
+
+If the sweep shows additional changes — other unis dirty, KBS course duration *values* changing (not just methods), KBS courses removed — stop and investigate before merging anywhere else.
+
+---
+
+**Two things to watch for:**
+
+1. **Method-only changes on existing KBS courses are GOOD.** If the sweep shows `extraction_method.duration_unit: 'ai_fallback' → 'duration.structural'` (or similar), that means Bug A's fix is now extracting durations correctly from the structural HTML cells where it previously fell through to Gemini. That's an improvement — the regex is doing its job and we're saving Gemini API cost.
+
+2. **If KBS course duration *values* change** (not just methods) on existing courses, that's a different signal. Either Bug A's regex change is altering values for courses it shouldn't be (regression), or the previously-AI-fallback values were wrong and the regex is now correct (improvement). Spot-check one or two by hand against the KBS website.
+
+---
+
+**One more thing while we're at it:**
+
+The deploy script that produced the bad commands (using `python` instead of `python3`, wrong arg names, wrong endpoint) needs updating. After Bug A ships, fix the deploy script template so the next migration doesn't repeat these mistakes:
+
+- Replace `python` with `venv/bin/python3` everywhere
+- Replace `--slug X --unis Y` with `--out-dir baselines/X/`
+- Replace `--baseline X --unis Y --expected-dirty <courses>` with `--before X --after Y --expected-slugs <unis>`
+- Replace `/api/admin/scrape` with `/api/scrape/start` and `university_slug` with `university_id` (use the universities table to look up id by slug if needed)
+- Add `sleep 15` after every `systemctl restart`
+
+Not blocking Bug A. But worth doing before Bug B so we don't repeat this Q&A cycle.
+
+Go run the deploy. Paste the sweep result when complete.

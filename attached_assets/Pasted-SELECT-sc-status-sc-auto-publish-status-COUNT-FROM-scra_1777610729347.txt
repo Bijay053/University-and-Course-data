@@ -1,0 +1,187 @@
+SELECT sc.status, sc.auto_publish_status, COUNT(*)
+FROM scraped_courses sc
+WHERE sc.university_id = 4
+GROUP BY sc.status, sc.auto_publish_status
+ORDER BY count DESC;"
+ trigger_name | event_manipulation | event_object_table | action_statement 
+--------------+--------------------+--------------------+------------------
+(0 rows)
+
+  status  | auto_publish_status | count 
+----------+---------------------+-------
+ approved | approved            |   187
+ rejected | review              |   184
+ rejected | pending_review      |   169
+ approved | pending_review      |    84
+ pending  | ready               |    30
+ pending  | review              |    11
+ rejected | approved            |    11
+ rejected | ready               |     9
+ rejected | rejected            |     9
+(9 rows)
+
+root@university-and-course-data:~/University-and-Course-data# grep -r "auto_publish\|publish_status\|courses.*INSERT\|promote" \
+  ~/University-and-Course-data/backend-py/app/tasks/ \
+  ~/University-and-Course-data/backend-py/app/services/ \
+  --include="*.py" -l
+/root/University-and-Course-data/backend-py/app/services/auto_publish.py
+/root/University-and-Course-data/backend-py/app/services/scraper/completeness.py
+/root/University-and-Course-data/backend-py/app/services/scraper/per_course_vision.py
+/root/University-and-Course-data/backend-py/app/services/scraper/stage_course.py
+/root/University-and-Course-data/backend-py/app/services/scraper/approve_course.py
+/root/University-and-Course-data/backend-py/app/services/scraper/orchestrator.py
+/root/University-and-Course-data/backend-py/app/services/scraper/pipelines/single_course.py
+/root/University-and-Course-data/backend-py/app/services/scraper/extractors/degree_level.py
+/root/University-and-Course-data/backend-py/app/services/scraper/home_page_redirect.py
+/root/University-and-Course-data/backend-py/app/services/scraper/sibling_cache.py
+root@university-and-course-data:~/University-and-Course-data# grep -r "auto_publish_status.*approved\|status.*approved.*courses" \
+  ~/University-and-Course-data/backend-py/app/ \
+  --include="*.py" -n | head -20
+/root/University-and-Course-data/backend-py/app/services/scraper/approve_course.py:154:    sc.auto_publish_status = "approved" if decision.auto_publish else "manual_approved"
+root@university-and-course-data:~/University-and-Course-data# sudo -u postgres psql university_portal -c "
+SELECT 
+  (SELECT COUNT(DISTINCT course_name) FROM scraped_courses WHERE university_id = 4 AND status = 'approved') AS approved_distinct_names,
+  (SELECT COUNT(DISTINCT name) FROM courses WHERE university_id = 4) AS courses_distinct_names;"
+ approved_distinct_names | courses_distinct_names 
+-------------------------+------------------------
+                     265 |                    173
+(1 row)
+
+root@university-and-course-data:~/University-and-Course-data# # ── 1. Capture pre-Bug-A baseline on prod ──
+cd ~/University-and-Course-data
+python backend-py/scripts/capture_baseline.py \
+  --slug post-bug-a-baseline \
+  --unis kbs
+
+# ── 2. Pull the fix ──
+git pull origin main   # or cherry-pick if on a branch
+
+# ── 3. Restart Celery (after 15s guard) ──
+systemctl restart uni-celery.service && sleep 15
+
+# ── 4. Trigger KBS re-scrape ──
+curl -X POST http://localhost:80/api/admin/scrape \
+  -H "Content-Type: application/json" \
+  -d '{"university_slug": "kbs"}'
+
+# ── 5. Regression sweep (after scrape completes) ──
+python backend-py/scripts/regression_sweep.py \
+  --baseline post-bug-a-baseline \
+  --unis kbs \
+  --expected-dirty "Graduate Certificate in Accounting,Graduate Certificate in Business Administration,Graduate Certificate in Business Analytics"
+Command 'python' not found, did you mean:
+  command 'python3' from deb python3
+  command 'python' from deb python-is-python3
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+hint: You have divergent branches and need to specify how to reconcile them.
+hint: You can do so by running one of the following commands sometime before
+hint: your next pull:
+hint: 
+hint:   git config pull.rebase false  # merge
+hint:   git config pull.rebase true   # rebase
+hint:   git config pull.ff only       # fast-forward only
+hint: 
+hint: You can replace "git config" with "git config --global" to set a default
+hint: preference for all repositories. You can also pass --rebase, --no-rebase,
+hint: or --ff-only on the command line to override the configured default per
+hint: invocation.
+fatal: Need to specify how to reconcile divergent branches.
+{"detail":"Not Found"}Command 'python' not found, did you mean:
+  command 'python3' from deb python3
+  command 'python' from deb python-is-python3
+root@university-and-course-data:~/University-and-Course-data# cd ~/University-and-Course-data
+
+# Write the patch (paste exactly as-is)
+cat > /tmp/bug-a-duration-slash.patch << 'ENDPATCH'
+diff --git a/backend-py/app/services/scraper/extractors/duration.py b/backend-py/app/services/scraper/extractors/duration.py
+index ce50514..0553c63 100644
+--- a/backend-py/app/services/scraper/extractors/duration.py
++++ b/backend-py/app/services/scraper/extractors/duration.py
+@@ -184,6 +184,23 @@ _COMPOUND_DURATION_RE = re.compile(
+     re.IGNORECASE,
+ )
+ 
++# Bug A (KBS grad certs): slash-structured program-info cells.
++# Pages like KBS publish duration as "8 months / 4 subjects / 2 trimesters"
++# where the first slash-separated token is the real duration and subsequent
++# tokens are delivery structure (subject count, delivery period).
++# These sentences contain NO duration-context word ("course", "full-time",
++# etc.) so the loose Pattern-2 guard (_DURATION_CONTEXT) refuses to fire,
++# leaving (8, Month) absent from `parsed`.  A candidature-deadline sentence
++# elsewhere ("complete within 8 years") then wins the tournament and is later
++# nullified by the grad-cert sanity cap, dropping the course entirely.
++# Fix: detect the slash pattern at the start of a sentence and add the first
++# token directly to `parsed` at Pattern-0 priority (×100) so it beats any
++# fallback match for the same number in a different unit.
++_SLASH_PROGRAM_STRUCTURE_RE = re.compile(
++    r"^\s*(\d+(?:\.\d+)?)\s*(years?|months?|weeks?|semesters?|trimesters?)\s*/",
++    re.IGNORECASE,
++)
++
+ _UNIT_RANK = {"Year": 4, "Semester": 3, "Trimester": 3, "Month": 2, "Week": 1}
+ _WEEKS = {"Year": 52, "Semester": 20, "Trimester": 14, "Month": 4, "Week": 1}
+ # Per-unit extraction caps.  Values above these are almost certainly
+@@ -447,6 +464,27 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
+         duration_context = bool(_DURATION_CONTEXT.search(s))
+         anti_duration_context = bool(_DURATION_ANTI_CONTEXT.search(s))
+ 
++        # Bug A (KBS grad certs): slash-structured program-info cell.
++        # "8 months / 4 subjects / 2 trimesters" — first token is real duration.
++        # No duration-context word exists so Pattern-2 is blocked; add the first
++        # token directly at Pattern-0 priority (×100) before anything else fires.
++        slash_m = _SLASH_PROGRAM_STRUCTURE_RE.match(s)
++        if slash_m and not _ACCELERATED.search(s) and not credit_context:
++            try:
++                _sl_amount = float(slash_m.group(1))
++                _sl_unit = _normalise_unit(slash_m.group(2))
++                if _sl_unit and 0 < _sl_amount <= _DURATION_CAP[_sl_unit]:
++                    _sl_weeks = _sl_amount * _WEEKS[_sl_unit]
++                    parsed.append((
++                        (_sl_weeks * 100 + _UNIT_RANK[_sl_unit]) * 100.0,
++                        _sl_amount,
++                        _sl_unit,
++                        s.strip()[:240],
++                    ))
++                    continue  # first token is definitive; skip other patterns
++            except (ValueError, IndexError):
++                pass
++
+grep -n "_SLASH_PROGRAM_STRUCTURE_RE" backend-py/app/services/scraper/extractors/duration.py
+199:_SLASH_PROGRAM_STRUCTURE_RE = re.compile(
+471:        slash_m = _SLASH_PROGRAM_STRUCTURE_RE.match(s)
+root@university-and-course-data:~/University-and-Course-data# cd ~/University-and-Course-data/backend-py
+set -a && source .env && set +a
+PYTHONPATH=. venv/bin/python3 -m pytest tests/test_duration.py -v 2>&1 | tail -20
+/root/University-and-Course-data/backend-py/venv/bin/python3: No module named pytest
+root@university-and-course-data:~/University-and-Course-data/backend-py# cd ~/University-and-Course-data
+
+# Write patch file
+cat > /tmp/bug-a.patch << 'ENDPATCH'
+--- a/backend-py/app/services/scraper/extractors/duration.py
++++ b/backend-py/app/services/scraper/extractors/duration.py
+@@ -184,6 +184,23 @@ _COMPOUND_DURATION_RE = re.compile(
+     re.IGNORECASE,
+ )
+ 
++# Bug A (KBS grad certs): slash-structured program-info cells.
++# Pages like KBS publish duration as "8 months / 4 subjects / 2 trimesters"
++# where the first slash-separated token is the real duration and subsequent
++# tokens are delivery structure (subject count, delivery period).
++# These sentences contain NO duration-context word ("course", "full-time",
++# etc.) so the loose Pattern-2 guard (_DURATION_CONTEXT) refuses to fire,
++# leaving (8, Month) absent from `parsed`.  A candidature-deadline sentence
++# elsewhere ("complete within 8 years") then wins the tournament and is later
++# nullified by the grad-cert sanity cap, dropping the course entirely.
++# Fix: detect the slash pattern at the start of a sentence and add the first
++# token directly to `parsed` at Pattern-0 priority (x100) so it beats any
++# fallback match for the same number in a different unit.
++_SLASH_PROGRAM_STRUCTURE_RE = re.compile(
++    r"^\s*(\d+(?:\.\d+)?)\s*(years?|months?|weeks?|semesters?|trimesters?)\s*/",
++    re.IGNORECASE,
++)
++
+ _UNIT_RANK = {"Year": 4, "Semester": 3, "Trimester": 3, "Month": 2, "Week": 1}
+ _WEEKS = {"Year": 52, "Semester": 20, "Trimester": 14, "Month": 4, "Week": 1}
+ENDPATCH
+root@university-and-course-data:~/University-and-Course-data# 
