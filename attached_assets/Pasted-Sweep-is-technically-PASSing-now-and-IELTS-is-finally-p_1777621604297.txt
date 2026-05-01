@@ -1,0 +1,127 @@
+Sweep is technically PASSing now and IELTS is finally populated on KBS. Two real wins. But there's a serious duplicate-course bug that the sweep is hiding inside the expected-dirty acknowledgement.
+
+---
+
+**The wins:**
+
+**1. IELTS now populated on KBS courses.** From the spot-check:
+
+```
+Bachelor of Business (Accounting)            | 6.5
+Bachelor of Business (Hospitality...)        | 6.5
+Bachelor of Business (Management)            | 6.5
+Bachelor of Information Technology  | 74880 | 6.5
+Diploma of Business                | 23040 | 6.5
+Diploma of Information Technology  | 24960 | 6.5
+```
+
+After cycles of investigation, IELTS values are populating. Combined with the fees from earlier, KBS now has all three of the most-important user-facing fields (duration, fees, IELTS) populated.
+
+**2. Your four bug diagnoses were all correct.** The `--expected-slugs` separator (space vs comma), the asahe method-only noise, the `scrape_config` NULL issue, and the `payload` vs `parsed_data` column name. All four nailed cleanly.
+
+---
+
+**But look at the KBS row in the new sweep header:**
+
+```
+[EXPECTED] kbs (uni_id=29)  before=22  after=58  → DIRTY
+```
+
+**58 courses on KBS, up from 22.** Earlier today it was 29. Now it's 58.
+
+The baseline output confirms it:
+
+```
+INFO capture_baseline: Saved: 20260501_074524_kbs_29.json  (courses=58  disc=37  staged=29)
+```
+
+`courses=58, staged=29`. There are 58 rows in the snapshot but only 29 distinct staged courses. **Each course is appearing twice.**
+
+Look at the spot-check output — it's right there:
+
+```
+ Bachelor of Business (Accounting)         | Bachelor's | (no fee) | 6.5  | <- new IELTS row
+ Bachelor of Business (Accounting)         | Bachelor's | (no fee) |      | <- old NULL IELTS row
+ Bachelor of Business (Hospitality...)     | Bachelor's | (no fee) | 6.5
+ Bachelor of Business (Hospitality...)     | Bachelor's | (no fee) |
+ Bachelor of Business (Management)         | Bachelor's | (no fee) | 6.5
+ Bachelor of Business (Management)         | Bachelor's | (no fee) |
+```
+
+Duplicate rows for every course. The new scrape inserted fresh rows instead of updating the existing ones. Two classes of duplicates probably:
+- Old rows from previous scrapes (with NULL IELTS) still present
+- New rows from the latest scrape (with 6.5 IELTS) added alongside
+
+**This is a real regression.** When admin goes to approve KBS courses, they'll see two of every course. If they approve both, the live `courses` table gets duplicates. If they approve one, they have to figure out which is canonical.
+
+This was probably caused by the `DELETE FROM central_page_cache WHERE university_id = 29` step combined with the URL change — the new scrape couldn't match against existing scraped_courses rows on the old URL/cache key, so it inserted fresh ones.
+
+---
+
+**The sweep PASS is also somewhat misleading.**
+
+The sweep now reports PASS because asahe, kbs, vit are all in `--expected-slugs`. But:
+
+- asahe diffs really are method-only noise (cache hit/miss variance). True benign — acknowledge and move on.
+- vit added 34 NEW courses. We never investigated whether those are bonus wins or junk like CRICOS-coded duplicates. We just added vit to expected-slugs and let it pass. **The vit issue was acknowledged-away, not investigated.**
+- kbs has duplicate rows (the 58-vs-29 issue above), and this is being treated as just another expected diff.
+
+The `--expected-slugs` flag is meant to acknowledge KNOWN expected diffs. It's not a way to silence unexpected ones. We're using it to silence things we haven't understood. That defeats the gate's purpose.
+
+For reference: vit's added courses look like CRICOS-suffixed variants of existing courses (`Bachelor of Business (Bbus Accounting)`, `Advanced Diploma of Hospitality Management (Sit60322...)`). These look like duplicates with different name formatting, not new degree programs. Worth checking before declaring vit clean.
+
+---
+
+**Diagnostic queries needed:**
+
+```
+# 1. Confirm KBS duplication scope
+sudo -u postgres psql university_portal -c "
+SELECT course_name, COUNT(*) AS row_count
+FROM scraped_courses
+WHERE university_id = 29
+GROUP BY course_name
+HAVING COUNT(*) > 1
+ORDER BY row_count DESC, course_name;"
+
+# Expected: every KBS course shows count=2
+
+# 2. Confirm vit duplication suspicion
+sudo -u postgres psql university_portal -c "
+SELECT course_name FROM scraped_courses
+WHERE university_id = 6 AND course_name ILIKE '%accounting%'
+ORDER BY course_name;"
+
+# If shows both 'Bachelor of Business (Accounting)' and 'Bachelor of Business (Bbus Accounting)' 
+# — same course, two name formats — that's the duplication pattern.
+
+# 3. Find what changed in the dedup logic recently
+cd ~/University-and-Course-data
+git log --oneline --since='2 days ago' -- backend-py/app/services/scraper/stage_course.py \
+  backend-py/app/services/scraper/approve_course.py \
+  backend-py/app/services/scraper/orchestrator.py
+```
+
+---
+
+**Recommended sequence:**
+
+1. **Confirm the KBS duplication** (Q1 above). If it's 29 courses each appearing twice, that's the scope.
+
+2. **Decide cleanup strategy.** Options:
+   - Delete the older NULL-IELTS rows (keep newer 6.5 rows). One SQL statement, fast.
+   - Delete all KBS scraped_courses, rescrape clean. More disruptive but guaranteed clean state.
+
+3. **Investigate the dedup logic** (Q3 above). What's supposed to prevent rescrape from inserting duplicates? Maybe `course_website` URL match? If so, did the URL change between scrapes?
+
+4. **Investigate vit's 34 added courses** (Q2 above). If they're CRICOS-suffixed duplicates, that's another duplicate-creating bug to fix, not a bonus win.
+
+5. **STOP using `--expected-slugs` to silence things we haven't understood.** Only acknowledge slugs after investigating what changed and confirming the change is intended.
+
+---
+
+**Honest framing:**
+
+The round produced two genuine wins (IELTS populated, four bug diagnoses correct). It also introduced one significant regression (KBS course duplication) and let one suspicious vit change pass without investigation. The sweep technically PASSed but only because we widened the acknowledgement, not because the data is actually clean.
+
+Run Q1 first. If KBS shows 29 duplicate pairs, that's the most urgent thing to fix today. Don't promote KBS to admin approval until duplicates are resolved — admin would just be approving messy data.
