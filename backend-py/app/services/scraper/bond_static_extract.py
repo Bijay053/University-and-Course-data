@@ -1,11 +1,31 @@
 """Bond University program-page extractor.
 
 Bond University (bond.edu.au) publishes all real courses under the path
-``/program/<slug>`` and renders all dynamic fields (fees, English scores,
-intake calendar) via client-side JavaScript. The standard Playwright browser
-pass returns ``filled=[]`` for every Bond program page because the fee and
-English tables are not present in the initial HTML payload — they require
-a second XHR/fetch round-trip that the extractor's settle window misses.
+``/program/<slug>``.  Dynamic fields (fees, English scores, intake calendar)
+are rendered client-side, but Bond exposes undocumented JSON APIs that can be
+discovered from ``data-*`` attributes embedded in the static HTML.
+
+Discovered API endpoints
+------------------------
+All endpoints are publicly accessible (no auth/cookies required):
+
+* **Program details** — duration, offerings (intakes), study areas, degree type::
+
+      GET /api/program-details/{numeric_id}
+      → { "programs": [{ "id", "duration", "type", "studyAreas", "offerings" }] }
+
+* **Fees** — per-semester and total fee for domestic and international students::
+
+      GET /api/program-fees/{numeric_id}/{program_code}
+      → { "fees": [{ "year", "international": { "semester", "total" } }] }
+
+* **International requirements** — per-country academic entry requirements
+  (per-entry IELTS data not available; parse static HTML of /entry_requirements
+  subpage instead).
+
+Both numeric_id and program_code are embedded in the static HTML of every
+``/program/`` page as ``data-program-detail-url`` and ``data-program-code``
+data attributes on the main program container element.
 
 This module provides:
 
@@ -13,50 +33,28 @@ This module provides:
     Returns True for bond.edu.au/program/* URLs.
 
 ``apply_bond_extraction(url, html)``
-    Pre-seeds the per-course payload with Bond-authoritative values:
+    Pre-seeds the per-course payload with Bond-authoritative values by:
 
-    * ``has_central_fee_page = True``
-        Bypasses the ``no_international_fee`` staging gate so every real
-        Bond program page is staged for human review rather than silently
-        discarded. Operators see the fee-blank row in the Review UI and
-        can supply the correct fee manually.
+    1. Parsing ``data-program-detail-url`` and ``data-program-code`` from the
+       static HTML.
+    2. Calling ``/api/program-details/{id}`` for duration, intake months (from
+       offerings), study area (category), and degree type.
+    3. Calling ``/api/program-fees/{id}/{code}`` for the international semester
+       fee.  Annual fee = semester × 3 (Bond operates three semesters per year:
+       January, May, September).
+    4. Fetching ``/program/{slug}/entry_requirements`` and parsing the IELTS
+       overall band score from the plain-text content.
 
-    * ``course_location = "Gold Coast, Queensland"``
-        Bond has a single residential campus at Robina (Gold Coast, QLD).
-        All ``/program/`` pages are physically delivered there.
-        Written directly (not via setdefault) so the standard location
-        extractor's footer-derived garbage ("University Club (Building 6),
-        Bond University", or random sentence fragments) cannot win.
-
-    * ``study_mode = "On Campus"``
-        Bond's standard delivery mode is on-campus.  The extractor also
-        looks for explicit "online" delivery keywords in the static HTML;
-        if found it switches to "Blended" (Bond may offer selected programs
-        online as well as on campus).  Written directly so the fallback
-        derive_mode_from_location path in single_course.py is suppressed.
-
-    * ``intake_months``
-        Bond operates a tri-semester model: January, May, September.
-        The extractor first tries to read real intake months from the page;
-        if nothing is found, these three are used as the known-good fallback.
-
-    * ``scrape_warnings``
-        Appends ``"bond_fee_js_rendered"`` when no international fee could
-        be found in the static HTML. This surfaced as an amber badge in the
-        Review UI so operators know why the fee field is empty.
-
-    All other fields (course_name, degree_level, English scores, duration,
-    domestic_fee, international_fee) are left to the standard extractor chain
-    and the AI fallback. The Bond extractor NEVER overwrites a non-empty slot.
+    Falls back gracefully when any API call fails — the existing
+    ``has_central_fee_page = True`` strategy keeps the course staged for human
+    review whenever fee extraction fails.
 
 Design note
 -----------
 Called as a *pre-seed* inside ``single_course.extract_course`` before the
-``_EXTRACTORS`` loop.  Uses direct assignment (``payload[k] = v``) — not
-``setdefault`` — for location, study_mode, and has_central_fee_page so
-these values cannot be overwritten by the generic extractors' first-write-wins
-``setdefault`` calls.  All other keys use ``setdefault`` to let the
-extractors win when they do find real values.
+``_EXTRACTORS`` loop.  Uses direct assignment for location, study_mode, and
+has_central_fee_page.  All other keys use ``setdefault`` so the generic
+extractors can still win when they find real values first.
 """
 from __future__ import annotations
 
@@ -85,42 +83,89 @@ def is_bond_program_url(url: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
+# HTTP helpers
+# ---------------------------------------------------------------------------
+
+_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+    ),
+    "Accept": "application/json, text/html, */*",
+}
+_API_TIMEOUT = 10  # seconds per request
+
+
+def _get_json(url: str) -> dict | list | None:
+    """GET *url* and return parsed JSON, or None on any error."""
+    try:
+        import requests  # lazy import — keeps module usable in test contexts
+        r = requests.get(url, headers=_HEADERS, timeout=_API_TIMEOUT)
+        r.raise_for_status()
+        return r.json()
+    except Exception as exc:
+        log.debug("[BOND] JSON fetch failed for %s: %s", url, exc)
+        return None
+
+
+def _get_html(url: str) -> str | None:
+    """GET *url* and return response text, or None on any error."""
+    try:
+        import requests
+        r = requests.get(url, headers={**_HEADERS, "Accept": "text/html,*/*"},
+                         timeout=_API_TIMEOUT)
+        r.raise_for_status()
+        return r.text
+    except Exception as exc:
+        log.debug("[BOND] HTML fetch failed for %s: %s", url, exc)
+        return None
+
+
+# ---------------------------------------------------------------------------
+# Static HTML: data-* attribute parsing
+# ---------------------------------------------------------------------------
+
+_DETAIL_URL_RE = re.compile(
+    r'data-program-detail-url=["\']\/api\/program-details\/(\d+)["\']'
+)
+_PROG_CODE_RE = re.compile(r'data-program-code=["\']([A-Z0-9\-]+)["\']')
+
+
+def _extract_program_ids(html: str) -> tuple[str | None, str | None]:
+    """Return (numeric_id, program_code) parsed from Bond course-page HTML.
+
+    Both are embedded as data-* attributes on the main program container::
+
+        data-program-detail-url="/api/program-details/432"
+        data-program-code="HS-20003"
+    """
+    m_id = _DETAIL_URL_RE.search(html)
+    m_code = _PROG_CODE_RE.search(html)
+    numeric_id = m_id.group(1) if m_id else None
+    prog_code = m_code.group(1) if m_code else None
+    return numeric_id, prog_code
+
+
+# ---------------------------------------------------------------------------
 # Location / mode
 # ---------------------------------------------------------------------------
 
 _BOND_LOCATION: str = "Gold Coast, Queensland"
 
-# Explicit online-delivery keywords that override the default On Campus mode.
-# Bond has historically offered selected programs via online delivery as well.
 _ONLINE_MODE_RE = re.compile(
     r"\b(online(?:\s+delivery)?|fully\s+online|distance\s+learning|"
     r"external\s+study|study\s+online)\b",
     re.IGNORECASE,
 )
-
-# Location keywords that indicate a physical campus presence — used to
-# distinguish "Online and On Campus" (Blended) from fully online delivery.
 _CAMPUS_MENTION_RE = re.compile(
     r"\b(gold\s+coast|robina|on.campus|on\s+campus|residential)\b",
     re.IGNORECASE,
 )
 
 
-def _derive_study_mode(html_text: str) -> str | None:
-    """Return the most appropriate study_mode for a Bond program page.
-
-    Only returns a value when there is explicit delivery evidence in the HTML.
-    Returns None when no delivery keywords are detected — this allows the
-    standard study_mode extractor chain to attempt classification rather
-    than hard-coding a default.
-
-    Priority:
-    1. "online" keyword found AND campus mention found → "Blended"
-    2. "online" keyword found but NO campus mention → "Online"
-    3. No delivery keywords → None  (do not default to "On Campus")
-    """
-    has_online = bool(_ONLINE_MODE_RE.search(html_text))
-    has_campus = bool(_CAMPUS_MENTION_RE.search(html_text))
+def _derive_study_mode(plain_text: str) -> str | None:
+    has_online = bool(_ONLINE_MODE_RE.search(plain_text))
+    has_campus = bool(_CAMPUS_MENTION_RE.search(plain_text))
     if has_online and has_campus:
         return "Blended"
     if has_online:
@@ -129,84 +174,179 @@ def _derive_study_mode(html_text: str) -> str | None:
 
 
 # ---------------------------------------------------------------------------
-# Intake months
+# /api/program-details/{id}  — duration, intakes, category, degree type
 # ---------------------------------------------------------------------------
 
-# Bond's standard tri-semester calendar.  The extractor looks for explicit
-# month names first; this is the fallback used when none are found.
-_BOND_DEFAULT_INTAKES: list[str] = ["January", "May", "September"]
+_YEAR_RE = re.compile(r"(\d+(?:\.\d+)?)\s+years?", re.IGNORECASE)
+_MONTH_RE = re.compile(r"(\d+)\s+months?", re.IGNORECASE)
 
-_MONTH_NAMES = (
-    "january", "february", "march", "april", "may", "june",
-    "july", "august", "september", "october", "november", "december",
-)
-# Title-cased month list for the fallback evidence snippet.
-_MONTH_TITLE = {m: m.title() for m in _MONTH_NAMES}
-
-_INTAKE_CONTEXT_RE = re.compile(
-    r"(?:intakes?|semesters?|sessions?|start\s+dates?|commenc(?:e|ing)|"
-    r"enroll(?:ment)?|enrol(?:ment)?)\s*:?\s*([^\n<]{5,120})",
-    re.IGNORECASE,
-)
+_OFFERING_MONTH_MAP: dict[str, str] = {
+    "jan": "January", "feb": "February", "mar": "March",
+    "apr": "April",   "may": "May",       "jun": "June",
+    "jul": "July",    "aug": "August",    "sep": "September",
+    "oct": "October", "nov": "November",  "dec": "December",
+}
 
 
-def _extract_intake_months(html: str) -> list[str] | None:
-    """Try to pull intake months from an intake/session context block.
+def _parse_duration_years(duration_str: str) -> float | None:
+    """Convert 'N years (M semesters)' or 'N months' to a year float."""
+    m = _YEAR_RE.search(duration_str)
+    if m:
+        return float(m.group(1))
+    m = _MONTH_RE.search(duration_str)
+    if m:
+        return round(int(m.group(1)) / 12, 2)
+    return None
 
-    Returns a deduplicated ordered list of title-cased month names, or None
-    when no intake-context block is found so the caller can apply the Bond
-    default fallback.
-    """
-    text = re.sub(r"<[^>]+>", " ", html)
-    text = re.sub(r"\s+", " ", text)
+
+def _parse_offerings_intakes(offerings: list[dict]) -> list[str]:
+    """Extract unique month names from offering semester strings like 'May 2026'."""
     months: list[str] = []
     seen: set[str] = set()
-    for m in _INTAKE_CONTEXT_RE.finditer(text):
-        snippet = m.group(1).lower()
-        for month in _MONTH_NAMES:
-            if month in snippet and month not in seen:
-                months.append(_MONTH_TITLE[month])
-                seen.add(month)
-    return months if months else None
+    for offering in offerings:
+        sem = offering.get("semester", "")
+        key = sem[:3].lower()
+        name = _OFFERING_MONTH_MAP.get(key)
+        if name and name not in seen:
+            months.append(name)
+            seen.add(name)
+    return months
+
+
+def _enrich_from_details_api(numeric_id: str) -> dict[str, Any]:
+    """Call /api/program-details/{id} and return extracted fields."""
+    data = _get_json(f"https://bond.edu.au/api/program-details/{numeric_id}")
+    if not data or not isinstance(data, dict):
+        return {}
+    programs = data.get("programs", [])
+    if not programs:
+        return {}
+    prog = programs[0]
+
+    result: dict[str, Any] = {}
+
+    # Duration
+    dur_str = prog.get("duration", "")
+    if dur_str:
+        dur_years = _parse_duration_years(dur_str)
+        if dur_years is not None:
+            result["duration"] = dur_years
+
+    # Intake months from offerings
+    offerings = prog.get("offerings", [])
+    if offerings:
+        months = _parse_offerings_intakes(offerings)
+        if months:
+            result["intake_months"] = months
+
+    # Category from first study area
+    study_areas = prog.get("studyAreas", [])
+    if study_areas and study_areas[0].get("label"):
+        result["category"] = study_areas[0]["label"]
+
+    log.info(
+        "[BOND] program-details API → duration=%s intake_months=%s category=%s",
+        result.get("duration"), result.get("intake_months"), result.get("category"),
+    )
+    return result
 
 
 # ---------------------------------------------------------------------------
-# Fee extraction (best-effort from static HTML)
+# /api/program-fees/{id}/{code}  — international fee
 # ---------------------------------------------------------------------------
 
-# Bond fee labels seen in static HTML:
-#   "International students: A$28,320 per year"
-#   "Total program fee: $85,440"
-#   "Annual tuition fee: $28,320"
-_INTL_FEE_RE = re.compile(
-    r"(?:international(?:\s+students?)?|intl)\s*:?\s*[A-Z]?\$\s*([\d,]+)",
+# Bond runs 3 semesters per year (January, May, September).
+# Annual fee = per-semester fee × 3.
+_BOND_SEMESTERS_PER_YEAR = 3
+# Prefer 2026 fees; fall back to first available year.
+_PREFERRED_FEE_YEAR = "2026"
+
+
+def _enrich_from_fees_api(numeric_id: str, program_code: str) -> dict[str, Any]:
+    """Call /api/program-fees/{id}/{code} and return international_fee (annual)."""
+    url = f"https://bond.edu.au/api/program-fees/{numeric_id}/{program_code}"
+    data = _get_json(url)
+    if not data or not isinstance(data, dict):
+        return {}
+    fees_list = data.get("fees", [])
+    if not fees_list:
+        return {}
+
+    # Prefer the target year; fall back to first entry.
+    fee_entry = next(
+        (f for f in fees_list if str(f.get("year", "")) == _PREFERRED_FEE_YEAR),
+        fees_list[0],
+    )
+    intl = fee_entry.get("international", {})
+    semester_fee = intl.get("semester")
+    if not semester_fee or not isinstance(semester_fee, (int, float)):
+        return {}
+
+    annual_fee = float(semester_fee) * _BOND_SEMESTERS_PER_YEAR
+    log.info(
+        "[BOND] fees API → semester=%s × %d = annual %.0f (year=%s)",
+        semester_fee, _BOND_SEMESTERS_PER_YEAR, annual_fee,
+        fee_entry.get("year"),
+    )
+    return {
+        "international_fee": annual_fee,
+        "fee_term": "year",
+    }
+
+
+# ---------------------------------------------------------------------------
+# /program/{slug}/entry_requirements — IELTS from static HTML
+# ---------------------------------------------------------------------------
+
+# Matches: "Overall score 6.5" or "overall: 6.5"
+_IELTS_OVERALL_RE = re.compile(
+    r"[Oo]verall\s+(?:band\s+)?(?:score\s+)?(\d+(?:\.\d+)?)", re.IGNORECASE
+)
+# Matches: "no sub score less than 6.0" / "minimum 6.0 in each" / "not less than 6.0"
+_IELTS_SUB_RE = re.compile(
+    r"(?:sub\s*score|band|each\s+(?:sub)?skill|each\s+component|minimum(?:\s+band)?)"
+    r"\s+(?:(?:less\s+than\s+|not\s+less\s+than\s+|of\s+)?(?:at\s+least\s+)?)"
+    r"(\d+(?:\.\d+)?)",
     re.IGNORECASE,
 )
-_ANNUAL_FEE_RE = re.compile(
-    r"(?:annual\s+tuition|tuition\s+fee|per\s+year|annual\s+fee)\s*:?\s*[A-Z]?\$\s*([\d,]+)",
-    re.IGNORECASE,
-)
 
 
-def _extract_international_fee(html: str) -> float | None:
-    """Try to pull a numeric international fee from Bond's static HTML.
+def _enrich_from_entry_requirements(course_url: str) -> dict[str, Any]:
+    """Fetch /entry_requirements subpage and parse IELTS bands from plain text."""
+    # Construct subpage URL: strip trailing slash, append /entry_requirements
+    base = course_url.rstrip("/")
+    er_url = f"{base}/entry_requirements"
 
-    Returns a float (AUD) or None when not found.
-    """
+    html = _get_html(er_url)
+    if not html:
+        return {}
+
+    # Strip tags and normalise whitespace for regex matching
     text = re.sub(r"<[^>]+>", " ", html)
     text = re.sub(r"\s+", " ", text)
 
-    for pattern in (_INTL_FEE_RE, _ANNUAL_FEE_RE):
-        m = pattern.search(text)
-        if m:
-            raw = m.group(1).replace(",", "")
-            try:
-                val = float(raw)
-                if 1_000 <= val <= 200_000:
-                    return val
-            except ValueError:
-                pass
-    return None
+    result: dict[str, Any] = {}
+
+    m_overall = _IELTS_OVERALL_RE.search(text)
+    if m_overall:
+        try:
+            result["ielts_overall"] = float(m_overall.group(1))
+        except ValueError:
+            pass
+
+    m_sub = _IELTS_SUB_RE.search(text)
+    if m_sub:
+        try:
+            sub = float(m_sub.group(1))
+            for band in ("ielts_writing", "ielts_reading",
+                         "ielts_listening", "ielts_speaking"):
+                result[band] = sub
+        except ValueError:
+            pass
+
+    if result:
+        log.info("[BOND] entry_requirements → %s", result)
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -216,58 +356,71 @@ def _extract_international_fee(html: str) -> float | None:
 def apply_bond_extraction(url: str, html: str) -> dict[str, Any]:
     """Return a pre-seed dict for Bond University ``/program/`` pages.
 
-    Called before the standard extractor loop in single_course.extract_course.
-    Values that must block extractor mis-fires are returned unconditionally
-    (location, study_mode, has_central_fee_page).  All other values are only
-    returned when the extractor found something concrete so the caller can
-    decide whether to use setdefault or direct assignment.
+    Enrichment order:
+    1. Parse ``data-*`` attributes from static HTML to get numeric_id and code.
+    2. Call ``/api/program-details`` for duration, intakes, category.
+    3. Call ``/api/program-fees`` for annual international fee.
+    4. Fetch ``/entry_requirements`` subpage for IELTS bands.
 
-    Return keys
-    -----------
-    has_central_fee_page : True  (always)
-    course_location      : "Gold Coast, Queensland"  (always for /program/)
-    study_mode           : "On Campus" | "Blended" | "Online"
-    intake_months        : list[str]  (extracted or Bond tri-semester default)
-    international_fee    : float | absent  (only when found in static HTML)
-    scrape_warnings      : list[str]  (appended "bond_fee_js_rendered" when fee absent)
+    Falls back gracefully: any failed API call is skipped and the
+    ``bond_fee_js_rendered`` warning is added when no fee is found so the
+    Review UI surfaces the incomplete row for human follow-up.
+
+    Hard-set keys (direct assignment, cannot be overwritten by generic
+    extractors): ``has_central_fee_page``, ``course_location``.
+
+    Soft-set keys (``setdefault`` semantics, extractors may win):
+    ``study_mode``, ``duration``, ``intake_months``, ``category``,
+    ``international_fee``, ``fee_term``, ``ielts_*``.
     """
     result: dict[str, Any] = {}
 
-    # ── Always-set keys (direct write, block extractor mis-fires) ──────────
+    # ── Always-set (hard block on extractor mis-fires) ─────────────────────
     result["has_central_fee_page"] = True
     result["course_location"] = _BOND_LOCATION
 
-    # Study mode — parse from static HTML only. If no delivery keywords are
-    # detected we return nothing; the standard extractor chain will handle it.
-    # NEVER default to "On Campus" without evidence from the page.
+    # Study mode from static HTML keywords
     plain_text = re.sub(r"<[^>]+>", " ", html or "")
     plain_text = re.sub(r"\s+", " ", plain_text)
     _mode = _derive_study_mode(plain_text)
     if _mode is not None:
         result["study_mode"] = _mode
 
-    # ── Intake months ─────────────────────────────────────────────────────
-    # Only include when explicitly found on the page. Never use the
-    # tri-semester fallback — Bond publishes real intake dates on each course
-    # page and a hard-coded fallback produces inaccurate data for courses
-    # that don't actually start in all three semesters.
-    found_months = _extract_intake_months(html or "")
-    if found_months:
-        result["intake_months"] = found_months
+    # ── API enrichment ──────────────────────────────────────────────────────
+    numeric_id, program_code = _extract_program_ids(html or "")
 
-    # ── Best-effort fee extraction from static HTML ──────────────────────
-    intl_fee = _extract_international_fee(html or "")
-    if intl_fee is not None:
-        result["international_fee"] = intl_fee
-        result["fee_term"] = "year"
-        log.info("[BOND] %s — fee extracted from static HTML: %.0f", url, intl_fee)
+    if numeric_id:
+        details = _enrich_from_details_api(numeric_id)
+        # Use setdefault for everything from the API so generic extractors
+        # can still win if they found values first.
+        for k, v in details.items():
+            result.setdefault(k, v)
+
+        if program_code:
+            fees = _enrich_from_fees_api(numeric_id, program_code)
+            for k, v in fees.items():
+                result.setdefault(k, v)
+        else:
+            log.warning("[BOND] %s — program_code not found in HTML, skipping fees API", url)
     else:
-        # Fee is JS-rendered — not available in static HTML. Flag for review.
+        log.warning("[BOND] %s — numeric_id not found in HTML, API enrichment skipped", url)
+
+    # ── IELTS from entry_requirements subpage ───────────────────────────────
+    ielts = _enrich_from_entry_requirements(url)
+    for k, v in ielts.items():
+        result.setdefault(k, v)
+
+    # ── Fee warning when still missing ─────────────────────────────────────
+    if "international_fee" not in result:
         result["scrape_warnings"] = ["bond_fee_js_rendered"]
         log.info(
-            "[BOND] %s — fee not in static HTML (JS-rendered); "
-            "staging with has_central_fee_page=True for human review",
-            url,
+            "[BOND] %s — fee not resolved from API; "
+            "staging with has_central_fee_page=True for human review", url,
+        )
+    else:
+        log.info(
+            "[BOND] %s — fully enriched: fee=%.0f ielts=%s",
+            url, result["international_fee"], result.get("ielts_overall"),
         )
 
     return result
