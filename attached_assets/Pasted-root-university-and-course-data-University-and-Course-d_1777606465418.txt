@@ -1,0 +1,54 @@
+root@university-and-course-data:~/University-and-Course-data# sudo -u postgres psql university_portal -c "
+SELECT runtime_job_id, status, started_at, completed_at, imported, skipped, errors
+FROM scrape_runtime_jobs WHERE university_id = 29
+ORDER BY created_at DESC LIMIT 1;"
+  runtime_job_id  | status |          started_at           | completed_at | imported | skipped | errors 
+------------------+--------+-------------------------------+--------------+----------+---------+--------
+ job_844f3b3d3ede | queued | 2026-05-01 03:33:07.646148+00 |              |        0 |       0 |      0
+(1 row)
+
+root@university-and-course-data:~/University-and-Course-data# sleep 10 && redis-cli -p 6379 llen scrape
+
+sudo -u postgres psql university_portal -c "
+SELECT runtime_job_id, status, started_at, completed_at, imported, skipped, errors
+FROM scrape_runtime_jobs WHERE university_id = 29
+ORDER BY created_at DESC LIMIT 1;"
+(integer) 0
+  runtime_job_id  | status |          started_at           | completed_at | imported | skipped | errors 
+------------------+--------+-------------------------------+--------------+----------+---------+--------
+ job_844f3b3d3ede | queued | 2026-05-01 03:33:07.646148+00 |              |        0 |       0 |      0
+(1 row)
+
+root@university-and-course-data:~/University-and-Course-data# # ── Mark zombie failed ──
+sudo -u postgres psql university_portal -c "
+UPDATE scrape_runtime_jobs
+SET status='failed', completed_at=NOW()
+WHERE runtime_job_id='job_844f3b3d3ede' AND status='queued';"
+
+# ── Wait 5s for Celery to fully settle after restart, then trigger ──
+sleep 5
+curl -s -X POST http://localhost:80/api/scrape/start \
+  -H "Content-Type: application/json" \
+  -d '{"university_id": 29}' | python3 -m json.tool
+
+# ── Immediately verify Redis got the task ──
+sleep 3
+redis-cli -p 6379 llen scrape
+
+sudo -u postgres psql university_portal -c "
+SELECT runtime_job_id, status FROM scrape_runtime_jobs
+WHERE university_id = 29 ORDER BY created_at DESC LIMIT 1;"
+UPDATE 1
+{
+    "jobId": "job_4190bd464ea6",
+    "runtimeJobId": "job_4190bd464ea6",
+    "status": "queued",
+    "ok": true
+}
+(integer) 0
+  runtime_job_id  | status  
+------------------+---------
+ job_4190bd464ea6 | running
+(1 row)
+
+root@university-and-course-data:~/University-and-Course-data# 
