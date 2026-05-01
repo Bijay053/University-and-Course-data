@@ -1,10 +1,12 @@
 """Celery tasks. Each task opens its own async session because Celery workers
 run sync; we use ``asyncio.run`` to bridge.
 
-IMPORTANT: Each asyncio.run() creates a fresh event loop. Any asyncpg
-connection held in the SQLAlchemy pool from a previous task is bound to
-a now-closed loop. We dispose the engine at task start so the pool is
-empty and new connections bind to the current loop.
+IMPORTANT: Each ``asyncio.run()`` creates a fresh event loop.  Any asyncpg
+connection held in the SQLAlchemy pool from a *previous* task is bound to a
+now-closed loop.  We call ``_sync_dispose()`` **before** every
+``asyncio.run()`` (not inside the coroutine) so the pool is invalidated
+synchronously — no asyncio involvement, no "Future attached to a different
+loop" error.  See ``_sync_dispose`` for the full explanation.
 """
 from __future__ import annotations
 
@@ -22,6 +24,30 @@ from app.services.scraper.repair import run_repair
 from app.tasks.celery_app import celery_app
 
 log = logging.getLogger(__name__)
+
+
+def _sync_dispose() -> None:
+    """Synchronously invalidate the SQLAlchemy connection pool before
+    starting a fresh ``asyncio.run()`` event loop inside a Celery task.
+
+    Each ``asyncio.run()`` creates a new event loop.  Any asyncpg connection
+    that the pool holds from a *previous* ``asyncio.run()`` is bound to the
+    old (now-closed) loop.  If we try to dispose those connections *inside*
+    the new coroutine via ``await engine.dispose()``, asyncpg tries to call
+    ``loop.call_soon()`` on the old loop and raises:
+
+        RuntimeError: Task ... got Future attached to a different loop
+        RuntimeError: Event loop is closed
+
+    The fix: call ``engine.sync_engine.dispose(close=False)`` *synchronously*
+    before entering ``asyncio.run()``.  ``close=False`` marks all pooled
+    connections invalid (so new ones are created in the new loop) without
+    trying to close/await the old asyncpg connections — no asyncio required.
+    """
+    try:
+        engine.sync_engine.dispose(close=False)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("_sync_dispose: could not invalidate engine pool: %s", exc)
 
 # Alias for internal use within this module.
 _STALE_QUEUED_MINUTES = STALE_QUEUED_MINUTES
@@ -41,26 +67,113 @@ def _requeue_lock_key(runtime_job_id: str) -> str:
     return f"scrape:requeue_lock:{runtime_job_id}"
 
 
+def _get_redis():
+    """Return a synchronous Redis client using the Celery broker URL."""
+    import redis as redis_lib
+    return redis_lib.from_url(celery_app.conf.broker_url, decode_responses=True)
+
+
+def set_initial_dispatch_lock(job_id: str) -> None:
+    """Mark a job as 'has a Celery task in the broker' using a Redis NX lock.
+
+    Called by the API router (start_scrape, start_bulk) after a successful
+    ``.delay()`` call so that the post-completion ``_immediate_requeue_hook``
+    does not try to re-dispatch the job while it is still waiting to be picked
+    up by a worker.
+
+    The TTL is slightly longer than _REQUEUE_LOCK_TTL_S to give the worker
+    time to claim the job before the lock expires.
+    """
+    try:
+        r = _get_redis()
+        ttl = _REQUEUE_LOCK_TTL_S + 30
+        r.set(_requeue_lock_key(job_id), "1", nx=True, ex=ttl)
+    except Exception as exc:  # noqa: BLE001
+        log.debug("set_initial_dispatch_lock: Redis unavailable for %s: %s", job_id, exc)
+
+
 async def _async_scrape(runtime_job_id: str) -> None:
-    # Dispose any stale connections bound to previous event loops.
-    await engine.dispose()
     async with AsyncSessionLocal() as db:
         await run_scrape(db, runtime_job_id)
 
 
 async def _async_repair(runtime_job_id: str) -> None:
-    # Same engine.dispose() dance as the scrape task — Celery worker is
-    # sync, asyncio.run() spins a fresh loop per task and any pooled
-    # asyncpg connection from a previous task is bound to a now-closed
-    # loop ("Future attached to a different loop").
-    await engine.dispose()
     async with AsyncSessionLocal() as db:
         await run_repair(db, runtime_job_id)
+
+
+def _immediate_requeue_hook() -> None:
+    """Post-completion hook: immediately re-dispatch any queued jobs that have
+    no Celery task in the broker.
+
+    Called at the end of every ``scrape_university`` and ``repair_university``
+    Celery task so that when a worker slot frees up, orphaned queued jobs start
+    immediately instead of waiting up to ``_STALE_QUEUED_MINUTES`` minutes for
+    the beat task.
+
+    Uses the same Redis NX lock as the periodic ``requeue_stale_queued`` beat
+    task to avoid double-dispatch:
+    • Jobs dispatched via the API (start_scrape / start_bulk) have a lock set
+      by ``set_initial_dispatch_lock`` and are skipped here — they are already
+      in the Celery broker and will be picked up when a slot is free.
+    • Jobs whose initial ``.delay()`` call failed silently have no lock and
+      are re-dispatched immediately by this hook.
+    """
+    _sync_dispose()
+    try:
+        stale = asyncio.run(_async_find_all_queued())
+    except Exception as exc:  # noqa: BLE001
+        log.warning("immediate_requeue_hook: DB query failed: %s", exc)
+        return
+
+    if not stale:
+        return
+
+    try:
+        r = _get_redis()
+    except Exception as exc:  # noqa: BLE001
+        log.warning("immediate_requeue_hook: Redis connect failed: %s", exc)
+        return
+
+    for jid, jtype, requeue_count in stale:
+        if requeue_count >= _MAX_REQUEUES:
+            log.warning(
+                "immediate_requeue_hook: job %s hit max requeues (%d), skipping",
+                jid,
+                _MAX_REQUEUES,
+            )
+            continue
+
+        lock_key = _requeue_lock_key(jid)
+        acquired = r.set(lock_key, "1", nx=True, ex=_REQUEUE_LOCK_TTL_S)
+        if not acquired:
+            # Job already has a Celery task in the broker (set by initial
+            # dispatch or a previous requeue) — skip to avoid duplicates.
+            log.debug("immediate_requeue_hook: job %s already locked (in broker), skipping", jid)
+            continue
+
+        try:
+            if jtype == "repair":
+                repair_university.delay(jid)
+            else:
+                scrape_university.delay(jid)
+            log.warning(
+                "immediate_requeue_hook: re-dispatched orphaned %s job %s "
+                "(no broker lock found — initial .delay() likely failed silently)",
+                jtype,
+                jid,
+            )
+        except Exception as exc:  # noqa: BLE001
+            r.delete(lock_key)
+            log.warning(
+                "immediate_requeue_hook: dispatch failed for %s: %s", jid, exc
+            )
 
 
 @celery_app.task(name="scrape.university", bind=True, max_retries=0)
 def scrape_university(self, runtime_job_id: str) -> dict:  # noqa: ANN001
     log.info("Celery task scrape_university start id=%s", runtime_job_id)
+    _sync_dispose()
     try:
         asyncio.run(_async_scrape(runtime_job_id))
         return {"ok": True, "id": runtime_job_id}
@@ -72,6 +185,7 @@ def scrape_university(self, runtime_job_id: str) -> dict:  # noqa: ANN001
             runtime_job_id,
         )
         try:
+            _sync_dispose()
             asyncio.run(_mark_failed(runtime_job_id, "Scrape exceeded 2-hour time limit"))
         except Exception:
             pass
@@ -81,6 +195,7 @@ def scrape_university(self, runtime_job_id: str) -> dict:  # noqa: ANN001
         # Mark job failed in DB so UI sees real status. No retry — the loop
         # issue won't fix itself on retry.
         try:
+            _sync_dispose()
             asyncio.run(_mark_failed(runtime_job_id, str(exc)))
         except Exception:
             pass
@@ -97,10 +212,15 @@ def scrape_university(self, runtime_job_id: str) -> dict:  # noqa: ANN001
             runtime_job_id, exc,
         )
         try:
+            _sync_dispose()
             asyncio.run(_mark_failed(runtime_job_id, f"BaseException: {exc}"))
         except Exception:
             pass
         return {"ok": False, "id": runtime_job_id, "error": f"BaseException: {exc}"}
+    finally:
+        # Always attempt to pick up any queued jobs whose initial .delay()
+        # call failed silently — this is the key auto-start mechanism.
+        _immediate_requeue_hook()
 
 
 @celery_app.task(name="scrape.repair", bind=True, max_retries=0)
@@ -111,12 +231,14 @@ def repair_university(self, runtime_job_id: str) -> dict:  # noqa: ANN001
     pool dispose, failure-mark fallback and Celery retry semantics
     are identical for both job types."""
     log.info("Celery task repair_university start id=%s", runtime_job_id)
+    _sync_dispose()
     try:
         asyncio.run(_async_repair(runtime_job_id))
         return {"ok": True, "id": runtime_job_id}
     except Exception as exc:
         log.exception("Repair task failed id=%s: %s", runtime_job_id, exc)
         try:
+            _sync_dispose()
             asyncio.run(_mark_failed(runtime_job_id, str(exc)))
         except Exception:
             pass
@@ -126,10 +248,31 @@ def repair_university(self, runtime_job_id: str) -> dict:  # noqa: ANN001
             raise
         log.error("repair_university BaseException id=%s: %s", runtime_job_id, exc)
         try:
+            _sync_dispose()
             asyncio.run(_mark_failed(runtime_job_id, f"BaseException: {exc}"))
         except Exception:
             pass
         return {"ok": False, "id": runtime_job_id, "error": f"BaseException: {exc}"}
+    finally:
+        _immediate_requeue_hook()
+
+
+async def _async_find_all_queued() -> list[tuple[str, str, int]]:
+    """Return (runtime_job_id, job_type, requeue_count) for every job currently
+    in ``queued`` status, with no time cutoff.
+
+    Used by the post-completion ``_immediate_requeue_hook`` so orphaned jobs
+    (whose initial ``.delay()`` call failed silently) are picked up immediately
+    when any worker slot frees up.
+    """
+    from app.models import ScrapeRuntimeJob
+
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(
+            select(ScrapeRuntimeJob).where(ScrapeRuntimeJob.status == "queued")
+        )
+        jobs = result.scalars().all()
+    return [(j.runtime_job_id, j.job_type, j.requeue_count) for j in jobs]
 
 
 async def _async_find_stale() -> list[tuple[str, str, int]]:
@@ -146,7 +289,6 @@ async def _async_find_stale() -> list[tuple[str, str, int]]:
     """
     from app.models import ScrapeRuntimeJob
 
-    await engine.dispose()
     cutoff = datetime.now(tz=timezone.utc) - timedelta(minutes=_STALE_QUEUED_MINUTES)
 
     async with AsyncSessionLocal() as db:
@@ -178,13 +320,11 @@ async def _async_increment_requeue(runtime_job_id: str) -> None:
     A single ``UPDATE`` statement handles both fields so there is no
     read-modify-write race even if two beat ticks overlap on the same job.
 
-    Disposes the engine first — each asyncio.run() in the Celery task body
-    creates a fresh event loop and any pooled asyncpg connection from a prior
-    run would be bound to the old, closed loop.
+    The caller must call ``_sync_dispose()`` before ``asyncio.run()`` so the
+    pool is fresh when this coroutine creates new asyncpg connections.
     """
     from sqlalchemy import text
 
-    await engine.dispose()
     async with AsyncSessionLocal() as db:
         await db.execute(
             text(
@@ -210,11 +350,11 @@ async def _async_mark_failed_max_requeue(runtime_job_id: str) -> None:
     """Mark a job ``failed`` because it has exceeded the maximum number of
     automatic requeue attempts, indicating a pathological loop.
 
-    Disposes the engine first for the same reason as ``_async_increment_requeue``.
+    The caller must call ``_sync_dispose()`` before ``asyncio.run()`` so the
+    pool is fresh when this coroutine creates new asyncpg connections.
     """
     from app.models import ScrapeRuntimeJob
 
-    await engine.dispose()
     async with AsyncSessionLocal() as db:
         job = await db.get(ScrapeRuntimeJob, runtime_job_id)
         if job:
@@ -256,9 +396,8 @@ def requeue_stale_queued(self) -> dict:  # noqa: ANN001
        is still in the broker backlog or being processed.  The lock expires
        automatically, allowing re-dispatch if the worker never picks it up.
     """
-    import redis as redis_lib
-
     log.info("requeue_stale_queued: checking for stuck queued jobs")
+    _sync_dispose()
     try:
         stale = asyncio.run(_async_find_stale())
     except Exception as exc:
@@ -269,7 +408,7 @@ def requeue_stale_queued(self) -> dict:  # noqa: ANN001
         return {"ok": True, "requeued": []}
 
     try:
-        r = redis_lib.from_url(celery_app.conf.broker_url, decode_responses=True)
+        r = _get_redis()
     except Exception as exc:
         log.exception("requeue_stale_queued Redis connect failed: %s", exc)
         return {"ok": False, "error": f"redis connect: {exc}"}
@@ -287,6 +426,7 @@ def requeue_stale_queued(self) -> dict:  # noqa: ANN001
                 _MAX_REQUEUES,
             )
             try:
+                _sync_dispose()
                 asyncio.run(_async_mark_failed_max_requeue(jid))
             except Exception as exc:
                 log.exception(
@@ -317,6 +457,7 @@ def requeue_stale_queued(self) -> dict:  # noqa: ANN001
 
         # Increment the persistent counter so operators can track bouncing jobs.
         try:
+            _sync_dispose()
             asyncio.run(_async_increment_requeue(jid))
         except Exception as exc:
             log.warning(
@@ -339,7 +480,6 @@ def requeue_stale_queued(self) -> dict:  # noqa: ANN001
 
 
 async def _mark_failed(runtime_job_id: str, err: str) -> None:
-    await engine.dispose()
     from app.models import ScrapeRuntimeJob
     async with AsyncSessionLocal() as db:
         job = await db.get(ScrapeRuntimeJob, runtime_job_id)
@@ -357,12 +497,12 @@ def refresh_baselines_weekly(self) -> dict:  # type: ignore[override]
     Idempotent: uses INSERT ... ON CONFLICT DO UPDATE so re-running is safe.
     """
     async def _run() -> dict:
-        await engine.dispose()
         async with AsyncSessionLocal() as db:
             from app.scripts.seed_baselines import seed_baselines
             count = await seed_baselines(db)
             return {"ok": True, "baselines_upserted": count}
 
+    _sync_dispose()
     try:
         return asyncio.run(_run())
     except Exception as exc:
