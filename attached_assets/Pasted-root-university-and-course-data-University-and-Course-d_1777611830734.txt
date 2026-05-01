@@ -1,0 +1,109 @@
+root@university-and-course-data:~/University-and-Course-data# sudo -u postgres psql university_portal -c "
+SELECT runtime_job_id, status, imported, skipped, errors
+FROM scrape_runtime_jobs WHERE university_id = 29
+ORDER BY created_at DESC LIMIT 1;"
+  runtime_job_id  | status  | imported | skipped | errors 
+------------------+---------+----------+---------+--------
+ job_a35b3c37e8fc | running |        0 |       0 |      0
+(1 row)
+
+root@university-and-course-data:~/University-and-Course-data# sudo -u postgres psql university_portal -c "
+SELECT runtime_job_id, status, imported, skipped, errors
+FROM scrape_runtime_jobs WHERE university_id = 29
+ORDER BY created_at DESC LIMIT 1;"
+  runtime_job_id  |  status   | imported | skipped | errors 
+------------------+-----------+----------+---------+--------
+ job_a35b3c37e8fc | completed |       22 |      14 |      0
+(1 row)
+
+root@university-and-course-data:~/University-and-Course-data# cd ~/University-and-Course-data/backend-py
+set -a && source .env && set +a
+
+PYTHONPATH=. venv/bin/python3 scripts/capture_baseline.py \
+  --out-dir baselines/bug-a-after/
+
+PYTHONPATH=. venv/bin/python3 scripts/regression_sweep.py \
+  --before baselines/bug-a-before/ \
+  --after  baselines/bug-a-after/ \
+  --expected-slugs kbs \
+  --verbose
+INFO capture_baseline: Snapshotting 23 universities...
+INFO capture_baseline: Saved: 20260501_050402_acap_41.json  (courses=11  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_050402_aibi_47.json  (courses=8  disc=11  staged=8  cost=$0.0000  99.1)
+INFO capture_baseline: Saved: 20260501_050402_ait_37.json  (courses=6  disc=8  staged=6  cost=$0.0017  118.1)
+INFO capture_baseline: Saved: 20260501_050402_apicollege_30.json  (courses=25  disc=27  staged=25  cost=$0.0000  169.7)
+INFO capture_baseline: Saved: 20260501_050402_atmc_93.json  (courses=4  disc=6  staged=4  cost=$0.0000  89.6)
+INFO capture_baseline: Saved: 20260501_050402_aut_87.json  (courses=13  disc=36  staged=13  cost=$0.0035  604.3)
+INFO capture_baseline: Saved: 20260501_050402_acu_51.json  (courses=99  disc=165  staged=99  cost=$0.0234  3410.1)
+INFO capture_baseline: Saved: 20260501_050402_bond_22.json  (courses=126  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_050402_study_4.json  (courses=694  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_050402_flinders_12.json  (courses=105  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_050402_kbs_8.json  (courses=30  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_050402_kbs_29.json  (courses=22  disc=37  staged=22  cost=$0.0104  333.7)
+INFO capture_baseline: Saved: 20260501_050402_scu_17.json  (courses=6  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_050402_une_14.json  (courses=12  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_050402_uow_13.json  (courses=3  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_050402_unisq_1.json  (courses=167  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_050402_utas_5.json  (courses=13  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_050402_vit_38.json  (courses=19  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_050402_asahe_2.json  (courses=17  disc=9  staged=9  cost=$0.0019  107.2)
+INFO capture_baseline: Saved: 20260501_050402_aut_20.json  (courses=92  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_050402_cqu_18.json  (courses=4  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_050402_torrens_3.json  (courses=75  disc=168  staged=0  cost=$0.0000  463.9)
+INFO capture_baseline: Saved: 20260501_050402_vit_6.json  (courses=30  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Done. 23 universities, 1581 courses total. Baselines written to baselines/bug-a-after/
+
+Regression sweep: 23 before / 23 after snapshots
+Expected slugs:   ['kbs']
+------------------------------------------------------------------------
+  [CLEAN]    acap (uni_id=41)
+  [CLEAN]    acu (uni_id=51)
+  [CLEAN]    aibi (uni_id=47)
+  [CLEAN]    ait (uni_id=37)
+  [CLEAN]    apicollege (uni_id=30)
+  [CLEAN]    asahe (uni_id=2)
+  [CLEAN]    atmc (uni_id=93)
+  [CLEAN]    aut (uni_id=20)
+  [CLEAN]    aut (uni_id=87)
+  [CLEAN]    bond (uni_id=22)
+  [CLEAN]    cqu (uni_id=18)
+  [CLEAN]    flinders (uni_id=12)
+
+  [EXPECTED] kbs (uni_id=29)  before=22  after=22  → DIRTY
+    added=0  removed=0  changed=3
+    [CHANGED] 'Bachelor of Business (Hospitality and Tourism Management)'
+          (method-only) extraction_method.category: 'gemini_primary' → 'category:det'
+          (method-only) extraction_method.duration_term: 'gemini_primary' → None
+          (method-only) extraction_method.duration_text: 'gemini_primary' → None
+          (method-only) extraction_method.intake_text: 'gemini_primary' → None
+          (method-only) extraction_method.location_text: 'gemini_primary' → None
+    [CHANGED] 'Bachelor of Business (Management)'
+          (method-only) extraction_method.category: 'gemini_primary' → 'category:rule'
+          (method-only) extraction_method.duration_term: 'gemini_primary' → None
+          (method-only) extraction_method.duration_text: 'gemini_primary' → None
+          (method-only) extraction_method.intake_text: 'gemini_primary' → None
+          (method-only) extraction_method.location_text: 'gemini_primary' → None
+    [CHANGED] 'Master of Business Analytics (Extension)'
+          (method-only) extraction_method.duration_unit: 'ai_fallback' → None
+          (method-only) extraction_method.duration_value: 'ai_fallback' → None
+  [CLEAN]    kbs (uni_id=8)
+  [CLEAN]    scu (uni_id=17)
+  [CLEAN]    study (uni_id=4)
+  [CLEAN]    torrens (uni_id=3)
+  [CLEAN]    une (uni_id=14)
+  [CLEAN]    unisq (uni_id=1)
+  [CLEAN]    uow (uni_id=13)
+  [CLEAN]    utas (uni_id=5)
+  [CLEAN]    vit (uni_id=38)
+  [CLEAN]    vit (uni_id=6)
+
+========================================================================
+SUMMARY
+  Clean unis:            22
+  Expected diffs:        1  (acknowledged)
+  Unexpected diffs:      0
+  Missing before:        0
+  Missing after:         0
+
+PASS (with acknowledged diffs) — 1 expected diff(s) for ['kbs']. Reviewer sign-off required before merge.
+root@university-and-course-data:~/University-and-Course-data/backend-py# 
