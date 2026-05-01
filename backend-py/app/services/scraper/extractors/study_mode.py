@@ -119,11 +119,15 @@ _MODE_TOKEN = (
 # without a delimiter colon.  Checked BEFORE the percent-online heuristic
 # so an explicit "Study modes Online" label wins over the noisy
 # "100% online + on-campus" combination that incorrectly returns "Blended".
+_MODE_JOINER = r"(?:\s+(?:and|or|&|/|,)\s+|\s*[/,]\s*)"
+# Colon-free label: captures the full comma/slash-joined mode list so that
+# "Study mode Online, On campus, Blended" returns "Online, On campus, Blended"
+# (→ Blended via _classify_label_value) rather than just "Online".
 _STUDY_MODES_NOCOLON_RE = re.compile(
-    r"\bstudy\s+modes?\s+(" + _MODE_TOKEN + r")\b",
+    r"\bstudy\s+modes?\s+"
+    r"((?:" + _MODE_TOKEN + r")(?:" + _MODE_JOINER + r"(?:" + _MODE_TOKEN + r"))*)\b",
     re.IGNORECASE,
 )
-_MODE_JOINER = r"(?:\s+(?:and|or|&|/|,)\s+|\s*[/,]\s*)"
 # Delimiter is REQUIRED (`:`, `-`, `–`). Without it the regex fires on
 # unlabelled prose like "learn about mode of study online" and treats
 # that as authoritative — code review caught this exact false positive.
@@ -454,25 +458,36 @@ def classify_study_mode(
     plain = _RECENTLY_VIEWED_SM_RE.sub("", plain)
 
     label_match = _LABEL_RE.search(plain)
+    nocolon_m = _STUDY_MODES_NOCOLON_RE.search(plain)
+
+    # Step 2: use whichever label-style match appears EARLIEST in the text.
+    #
+    # Why position-first: course summary panels are always at the page top;
+    # per-unit/subject descriptions with their own "Delivery Mode: On Campus,
+    # Online" entries appear later.  If the colon-delimited label (_LABEL_RE)
+    # comes from a subject description AFTER the course-level panel
+    # (_STUDY_MODES_NOCOLON_RE matches "Study mode Online"), preferring the
+    # earlier nocolon match returns the correct course-level mode.
+    #
+    # The nocolon match still runs BEFORE the percent-online heuristic per the
+    # original Step 2b requirement — that invariant is preserved here because
+    # the percent-online check is further below regardless of which label wins.
+    _use_nocolon = nocolon_m and (
+        not label_match or nocolon_m.start() < label_match.start()
+    )
+    if _use_nocolon and nocolon_m:
+        canonical = _classify_label_value(nocolon_m.group(1))
+        if canonical:
+            start = max(0, nocolon_m.start() - 10)
+            end = min(len(plain), nocolon_m.end() + 10)
+            return canonical, plain[start:end].strip(), 0.7
+
     if label_match:
         value = label_match.group(1).strip()
         canonical = _classify_label_value(value)
         if canonical:
             start = max(0, label_match.start() - 20)
             end = min(len(plain), label_match.end() + 20)
-            return canonical, plain[start:end].strip(), 0.7
-
-    # Step 2b: colon-free "Study modes Online" label (e.g. ACAP).
-    # Must run BEFORE the percent-online heuristic so an explicit mode label
-    # wins over the "100% online + on-campus" combination that incorrectly
-    # returns "Blended" for courses that are 100% online but whose page also
-    # mentions physical campuses in unrelated copy.
-    nocolon_m = _STUDY_MODES_NOCOLON_RE.search(plain)
-    if nocolon_m:
-        canonical = _classify_label_value(nocolon_m.group(1))
-        if canonical:
-            start = max(0, nocolon_m.start() - 10)
-            end = min(len(plain), nocolon_m.end() + 10)
             return canonical, plain[start:end].strip(), 0.7
 
     pct = _PERCENT_ONLINE_RE.search(plain)
