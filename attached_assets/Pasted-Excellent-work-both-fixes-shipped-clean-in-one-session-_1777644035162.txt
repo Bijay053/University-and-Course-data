@@ -1,0 +1,37 @@
+Excellent work — both fixes shipped clean in one session, and finding that migration 012 missed `scraped_courses.duration` is exactly the kind of root-cause catch that prevents this recurring on the next table that gets a duration column added.
+
+Running the prod commands now:
+
+1. `git pull` on prod ✓ (will run)
+2. Migration 014 + cleanup UPDATE ✓ (will run)
+3. `systemctl restart uni-celery.service` ✓ (will run)
+4. FastAPI hot-reload check ✓ (will verify)
+
+Two refinements to the audit plan before tomorrow:
+
+**Audit query needs to actually detect cross-contamination, not just count vision_cached usage.** The query you wrote tells us how many rows used `per_course_vision_cached` for IELTS, but not how many of those have evidence pointing to an image from a different course. The cross-contamination count is what tells us whether we need a remediation plan or just monitoring going forward.
+
+Something like (column names probably wrong, you'll know the actual schema):
+
+```sql
+SELECT 
+  COUNT(*) FILTER (WHERE extraction_method->>'ielts_overall' = 'per_course_vision_cached') AS vision_cached_total,
+  COUNT(*) FILTER (
+    WHERE extraction_method->>'ielts_overall' = 'per_course_vision_cached'
+    AND evidence->>'ielts_overall' NOT LIKE '%' || regexp_replace(source_url, '.*/([^/]+)$', '\1') || '%'
+  ) AS vision_cached_cross_contaminated
+FROM scraped_courses
+WHERE status IN ('pending','approved','promoted');
+```
+
+**Run the same audit against the `courses` table.** The 792 live rows are what students see. If any of those were promoted with cross-contaminated vision IELTS, those need cleaning too — not just the staging table. The Bachelor of Nursing case shows it's possible for the contamination to be silent (Nursing happened to have the right value anyway), so we can't trust that audit-pass on staging means the live table is clean.
+
+**Decision needed on the Torrens batch staged today:** the 101 Torrens rows just scraped were staged with the buggy vision cache. Two paths:
+
+(a) Re-scrape Torrens after the fix lands on prod, before promoting any rows. Cleaner — guarantees no contamination in what gets promoted.
+
+(b) Accept the staged data, run the audit query against the Torrens rows specifically, and clean any cross-contaminated values in place. Faster, but trusts the audit query to catch everything.
+
+My preference is (a) since Torrens is fresh anyway and the re-scrape is ~16 minutes — small cost for a clean baseline. But happy with (b) if you'd rather not lose the staged rows.
+
+Let me know on the Torrens decision and I'll run the prod commands shortly.
