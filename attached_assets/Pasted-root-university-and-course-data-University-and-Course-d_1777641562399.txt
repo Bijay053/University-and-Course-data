@@ -1,0 +1,54 @@
+root@university-and-course-data:~/University-and-Course-data/backend-py# cd /root/University-and-Course-data && git pull
+
+# Apply the new DB migration manually (uniportal role lacks alembic GRANT)
+sudo -u postgres psql university_portal << 'SQL'
+CREATE TABLE IF NOT EXISTS discovery_failure_alerts (
+    id               SERIAL PRIMARY KEY,
+    university_id    INTEGER NOT NULL REFERENCES universities(id) ON DELETE CASCADE,
+    candidates_found INTEGER NOT NULL,
+    diagnostic       JSONB   NOT NULL DEFAULT '{}',
+    created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+    resolved_at      TIMESTAMPTZ,
+    resolved_by      TEXT
+);
+CREATE INDEX IF NOT EXISTS ix_discovery_failure_alerts_university_id
+    ON discovery_failure_alerts (university_id);
+SQL
+
+# Restart the Celery worker so it picks up:
+#   - scrape.nightly_sweep beat task (02:00 UTC)
+#   - Tier-7 alert hook in the orchestrator
+#   - Tier-2 subdomain probe wiring
+supervisorctl restart celery
+
+# Verify the new task registered
+supervisorctl tail -f celery | grep -E "nightly_sweep|TIER7|tasks\]" | head -5
+remote: Enumerating objects: 59, done.
+remote: Counting objects: 100% (26/26), done.
+remote: Total 59 (delta 26), reused 26 (delta 26), pack-reused 33 (from 1)
+Unpacking objects: 100% (59/59), 57.46 KiB | 1.79 MiB/s, done.
+From https://github.com/Bijay053/University-and-Course-data
+   af3fd1d..6618540  main       -> origin/main
+Updating af3fd1d..6618540
+Fast-forward
+ backend-py/alembic/versions/013_discovery_failure_alerts.py |  66 ++++++++++++++++++
+ backend-py/app/models/__init__.py                           |   2 +
+ backend-py/app/models/discovery_failure_alert.py            |  38 ++++++++++
+ backend-py/app/services/scraper/alert_delivery.py           | 121 ++++++++++++++++++++++++++++++++
+ backend-py/app/services/scraper/discovery.py                |  94 +++++++++++++++++++++++++
+ backend-py/app/services/scraper/orchestrator.py             | 264 ++++++++++++++++++++++++++++++++++++++++------------------------------
+ backend-py/app/tasks/celery_app.py                          |  51 ++++++++------
+ backend-py/app/tasks/scrape_tasks.py                        | 136 ++++++++++++++++++++++++++++++++++++
+ backend-py/tests/test_new_features_v2.py                    | 370 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ replit.md                                                   | 135 +++++++++++++++++++++++++++++-------
+ 10 files changed, 1122 insertions(+), 155 deletions(-)
+ create mode 100644 backend-py/alembic/versions/013_discovery_failure_alerts.py
+ create mode 100644 backend-py/app/models/discovery_failure_alert.py
+ create mode 100644 backend-py/tests/test_new_features_v2.py
+CREATE TABLE
+CREATE INDEX
+Command 'supervisorctl' not found, but can be installed with:
+apt install supervisor
+Command 'supervisorctl' not found, but can be installed with:
+apt install supervisor
+root@university-and-course-data:~/University-and-Course-data# 
