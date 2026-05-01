@@ -1,0 +1,114 @@
+Just looked at the KBS staged courses in the admin dashboard. Bug A worked — the duration column is correct on all 29 courses (8 Month, 2 Year, 20 Month, 1 Year, 3 Year, etc.). That's the win.
+
+**But there's a bigger gap that's now visible: every single one of the 29 KBS courses has empty IELTS, PTE, TOEFL, CAE, DET, AND International Fee columns. All 29. Zero exceptions.**
+
+The scrape log confirms it's not random extraction failure — it's systematic. Look at the warnings on every course:
+
+```
+[WARN] MBA - Master of Business Administration — English section detected in HTML but all scores blank
+[WARN] MBA - Master of Business Administration — Fee section detected but fee is blank
+```
+
+This warning fires on EVERY KBS course in the run. The scraper recognises the English section and Fee section exist on the page, but extracts no values. Every course ends up at 75/100 confidence (`missing: english`), and the dashboard shows 62% display score for all of them.
+
+---
+
+**Why this matters more than the duration work:**
+
+For international students looking at KBS, the two most important fields after "is this course relevant" are:
+1. **English requirements** — "can I get in with my IELTS score?"
+2. **Tuition fee** — "can I afford this?"
+
+Duration is third. We just shipped a fix that makes duration accurate, which is great. But the dashboard is showing users (well, will show users when admin approves these) 29 KBS courses with no English requirements and no fees. From a user-facing data completeness perspective, that's worse than the 3 missing grad certs.
+
+This isn't a Bug A regression — it's been like this the whole time. We were focused on the visible duration bugs and didn't notice the silent fee/English bugs because they were uniformly missing rather than incorrectly populated. Empty data is less alarming in a sweep than wrong data, but it's worse for users.
+
+---
+
+**Likely root cause (worth confirming):**
+
+KBS publishes fees and English requirements on separate sub-pages, not inline on each course page:
+- https://www.kbs.edu.au/admissions/fees
+- https://www.kbs.edu.au/admissions/english-requirements (or similar)
+
+The scrape log shows the scraper attempted `https://www.kbs.edu.au/admissions/fees` as a central fee page but got `0 fee records` from it:
+
+```
+[CENTRAL] auto-discovered fee page: https://www.kbs.edu.au/admissions/fees
+[CENTRAL] fee page parsed — 0 program record(s) from https://www.kbs.edu.au/admissions/fees
+```
+
+So the central-fee-page extraction code IS running, but isn't successfully parsing KBS's fee schedule format. Same likely true for English requirements.
+
+The Sept entry in the open bug queue was: "KBS fee/IELTS link-out following: broader rule, follow link if value not inline." That's this. Worth promoting to next priority.
+
+---
+
+**Diagnostic queries to run before designing the fix:**
+
+```
+# Q1: What did the central fee page actually return for KBS?
+sudo -u postgres psql university_portal -c "
+SELECT payload
+FROM scrape_runtime_logs
+WHERE runtime_job_id = (
+  SELECT runtime_job_id FROM scrape_runtime_jobs
+  WHERE university_id = 29 ORDER BY created_at DESC LIMIT 1
+)
+AND payload::text ILIKE '%admissions/fees%'
+ORDER BY sequence LIMIT 5;"
+
+# Q2: Is there an admissions/english-requirements page?
+curl -s 'https://www.kbs.edu.au/admissions/english-requirements' -I
+curl -s 'https://www.kbs.edu.au/admissions/english-language-requirements' -I
+
+# Q3: What HTML structure does the fee page use?
+curl -s 'https://www.kbs.edu.au/admissions/fees' \
+  | grep -A2 -B2 -iE 'fee|tuition|\\$[0-9]|aud' | head -40
+
+# Q4: What HTML structure does the English requirements page use?
+curl -s 'https://www.kbs.edu.au/admissions/english-language-requirements' \
+  | grep -A2 -B2 -iE 'ielts|pte|toefl' | head -40
+```
+
+Q1 tells us why the existing central-fee-page logic returned zero records. Q2 confirms the English requirements page exists. Q3 and Q4 show the actual HTML format we need to parse.
+
+---
+
+**Why this fix is harder than Bug A:**
+
+Bug A was a regex fix in one extractor. This is a pipeline architecture question:
+
+1. The central-fee-page extractor exists but doesn't parse KBS format — needs format-specific work
+2. There's no equivalent central-English-page extractor that I'm aware of — might need to build one
+3. Both need to *back-fill* values onto every course in the staging job, not just emit standalone records
+
+Might need to be a per-uni override (KBS-specific fee/English page parsers) rather than a shared-code fix, depending on how generic the formats are. Worth checking if other unis (Bond, Charles Sturt, ACU) publish fees/English the same way — if yes, shared code; if no, per-uni configs.
+
+---
+
+**Recommended sequencing:**
+
+1. **Run the four diagnostic queries above** — confirms the actual root cause and gives us the HTML formats to target
+2. **Decide scope** — is this KBS-specific or a broader pattern across multiple unis?
+3. **Open as Bug F** in the queue (KBS fee/English back-fill) with the diagnostic results attached
+4. **Implement** — likely 2-3 commits: fee-page parser update + English-page parser + back-fill orchestration
+5. **Sweep** — standard `--expected-slugs kbs` flow, expect all 29 courses to gain fee + IELTS values
+
+---
+
+**About the other queued items:**
+
+This bumps Bug B (NULL duration drop policy) and the Charles Sturt 92-course gap further down the queue. That's the right call — 0/29 courses missing fee+English is more user-facing than 3 grad certs missing entirely or 92 courses sitting in approval limbo.
+
+The Charles Sturt promotion gap should still get investigated soon (those 92 courses are real and should be live), but data completeness on visible courses outranks course count on partially-visible ones.
+
+---
+
+**Honest framing of progress:**
+
+We spent two and a half weeks building infrastructure that made the duration work possible. That infrastructure is now real and proven. But the dashboard reveals that the *visible end-user data quality* is still poor on KBS — not because we broke anything, but because we were focused on the bugs we could see. Now that we can see the dashboard end-to-end, we can see that English and fee are the actual user-facing pain.
+
+Fix this first, then come back to the queue.
+
+Run the diagnostic queries when you can.
