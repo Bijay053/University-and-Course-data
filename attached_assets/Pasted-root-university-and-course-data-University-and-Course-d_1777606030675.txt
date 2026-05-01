@@ -1,0 +1,226 @@
+root@university-and-course-data:~/University-and-Course-data/backend-py# watch -n 60 "sudo -u postgres psql university_portal -c \"
+SELECT runtime_job_id, status, started_at, completed_at, imported, skipped, errors
+FROM scrape_runtime_jobs WHERE university_id = 29
+ORDER BY created_at DESC LIMIT 1;\""
+root@university-and-course-data:~/University-and-Course-data/backend-py# watch -n 60 "sudo -u postgres psql university_portal -c \"
+SELECT runtime_job_id, status, started_at, completed_at, imported, skipped, errors
+FROM scrape_runtime_jobs WHERE university_id = 29
+ORDER BY created_at DESC LIMIT 1;\""
+root@university-and-course-data:~/University-and-Course-data/backend-py# sudo -u postgres psql university_portal -c "
+SELECT runtime_job_id, status, started_at, completed_at, imported, skipped, errors
+FROM scrape_runtime_jobs WHERE university_id = 29
+ORDER BY created_at DESC LIMIT 1;"
+  runtime_job_id  | status |          started_at           | completed_at | imported | skipped | errors 
+------------------+--------+-------------------------------+--------------+----------+---------+--------
+ job_6f1ff0470cfd | queued | 2026-05-01 03:03:37.795975+00 |              |        0 |       0 |      0
+(1 row)
+
+root@university-and-course-data:~/University-and-Course-data/backend-py# ^[[200~sudo -u postgres psql university_portal -c "
+> SELECT runtime_job_id, status, started_at, completed_at, imported, skipped, errors
+> FROM scrape_runtime_jobs WHERE university_id = 29
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> q
+> ^C
+root@university-and-course-data:~/University-and-Course-data/backend-py# sudo -u postgres psql university_portal -c "
+SELECT runtime_job_id, status, started_at, completed_at, imported, skipped, errors
+FROM scrape_runtime_jobs WHERE university_id = 29
+ORDER BY created_at DESC LIMIT 1;"
+  runtime_job_id  | status |          started_at           | completed_at | imported | skipped | errors 
+------------------+--------+-------------------------------+--------------+----------+---------+--------
+ job_6f1ff0470cfd | queued | 2026-05-01 03:03:37.795975+00 |              |        0 |       0 |      0
+(1 row)
+
+root@university-and-course-data:~/University-and-Course-data/backend-py# # ── 1. Current job status ──
+sudo -u postgres psql university_portal -c "
+SELECT runtime_job_id, status, started_at, completed_at, imported, skipped, errors
+FROM scrape_runtime_jobs WHERE university_id = 29
+ORDER BY created_at DESC LIMIT 1;"
+
+# ── 2. Is prod Celery actually working on it? ──
+sudo journalctl -u uni-celery --since "2026-05-01 03:03:00" --no-pager \
+  | grep -v "blob data" | grep -E "kbs|KBS|job_6f1ff|scrape_university|ForkPoolWorker" \
+  | tail -20
+  runtime_job_id  | status |          started_at           | completed_at | imported | skipped | errors 
+------------------+--------+-------------------------------+--------------+----------+---------+--------
+ job_6f1ff0470cfd | queued | 2026-05-01 03:03:37.795975+00 |              |        0 |       0 |      0
+(1 row)
+
+root@university-and-course-data:~/University-and-Course-data/backend-py# # ── Check if the Celery queue actually has the job ──
+redis-cli -p 6379 llen scrape
+redis-cli -p 6379 lrange scrape 0 5 | python3 -m json.tool 2>/dev/null | grep -E "job_6f|kwargs"
+(integer) 0
+root@university-and-course-data:~/University-and-Course-data/backend-py# # ── Step 1: Mark the zombie job as failed so it doesn't block a new dispatch ──
+sudo -u postgres psql university_portal -c "
+UPDATE scrape_runtime_jobs
+SET status='failed', completed_at=NOW()
+WHERE runtime_job_id='job_6f1ff0470cfd' AND status='queued';"
+UPDATE 1
+root@university-and-course-data:~/University-and-Course-data/backend-py# # ── Step 2: Re-trigger KBS scrape ──
+curl -s -X POST http://localhost:80/api/scrape/start \
+  -H "Content-Type: application/json" \
+  -d '{"university_id": 29}' | python3 -m json.tool
+{
+    "jobId": "job_291af5ab41bd",
+    "runtimeJobId": "job_291af5ab41bd",
+    "status": "queued",
+    "ok": true
+}
+root@university-and-course-data:~/University-and-Course-data/backend-py# # ── Step 3: Immediately verify the task actually landed in Redis ──
+sleep 2
+redis-cli -p 6379 llen scrape
+sudo -u postgres psql university_portal -c "
+SELECT runtime_job_id, status FROM scrape_runtime_jobs
+WHERE university_id = 29 ORDER BY created_at DESC LIMIT 1;"
+(integer) 0
+  runtime_job_id  | status  
+------------------+---------
+ job_291af5ab41bd | running
+(1 row)
+
+root@university-and-course-data:~/University-and-Course-data/backend-py# sudo journalctl -u uni-celery --since "now" --no-pager -f | grep -v "blob data" | head -5
+May 01 03:10:08 university-and-course-data celery[1263749]: [2026-05-01 03:10:08,866: WARNING/ForkPoolWorker-4] central_pages: browser fetch timed out (60s) for https://www.kbs.edu.au/admissions/fees — using HTTP html
+May 01 03:10:08 university-and-course-data celery[1263749]: [2026-05-01 03:10:08,940: INFO/ForkPoolWorker-4] central_pages: 0 fee records from https://www.kbs.edu.au/admissions/fees
+May 01 03:10:08 university-and-course-data celery[1263749]: [2026-05-01 03:10:08,973: INFO/ForkPoolWorker-4] central_page_cache: skipping empty result for 29/fee_schedule — no useful data extracted, will re-fetch on next scrape
+May 01 03:10:09 university-and-course-data celery[1263749]: [2026-05-01 03:10:09,354: INFO/ForkPoolWorker-4] HTTP Request: GET https://www.kbs.edu.au/courses/non-award-single-subject-enrolment "HTTP/1.1 200 OK"
+May 01 03:10:09 university-and-course-data celery[1263749]: [2026-05-01 03:10:09,375: INFO/ForkPoolWorker-4] HTTP Request: GET https://www.kbs.edu.au/admissions/course-delivery-options "HTTP/1.1 200 OK"
+root@university-and-course-data:~/University-and-Course-data/backend-py# sudo -u postgres psql university_portal -c "
+SELECT runtime_job_id, status, started_at, completed_at, imported, skipped, errors
+FROM scrape_runtime_jobs WHERE university_id = 29
+ORDER BY created_at DESC LIMIT 1;"
+  runtime_job_id  | status  |          started_at           | completed_at | imported | skipped | errors 
+------------------+---------+-------------------------------+--------------+----------+---------+--------
+ job_291af5ab41bd | running | 2026-05-01 03:08:54.596274+00 |              |        0 |       0 |      0
+(1 row)
+
+root@university-and-course-data:~/University-and-Course-data/backend-py# sudo -u postgres psql university_portal -c "
+SELECT runtime_job_id, status, started_at, completed_at, imported, skipped, errors
+FROM scrape_runtime_jobs WHERE university_id = 29
+ORDER BY created_at DESC LIMIT 1;"
+  runtime_job_id  | status  |          started_at           | completed_at | imported | skipped | errors 
+------------------+---------+-------------------------------+--------------+----------+---------+--------
+ job_291af5ab41bd | running | 2026-05-01 03:08:54.596274+00 |              |        0 |       0 |      0
+(1 row)
+
+root@university-and-course-data:~/University-and-Course-data/backend-py# sudo -u postgres psql university_portal -c "
+SELECT runtime_job_id, status, started_at, completed_at, imported, skipped, errors
+FROM scrape_runtime_jobs WHERE university_id = 29
+ORDER BY created_at DESC LIMIT 1;"
+  runtime_job_id  |  status   |          started_at           |         completed_at         | imported | skipped | errors 
+------------------+-----------+-------------------------------+------------------------------+----------+---------+--------
+ job_291af5ab41bd | completed | 2026-05-01 03:08:54.596274+00 | 2026-05-01 03:20:23.42168+00 |       25 |      11 |      0
+(1 row)
+
+root@university-and-course-data:~/University-and-Course-data/backend-py# cd ~/University-and-Course-data/backend-py
+set -a && source .env && set +a
+
+PYTHONPATH=. venv/bin/python3 scripts/capture_baseline.py \
+  --out-dir baselines/kbs-after/
+
+PYTHONPATH=. venv/bin/python3 scripts/regression_sweep.py \
+  --before baselines/option-c-after/ \
+  --after  baselines/kbs-after/ \
+  --expected-slugs kbs \
+  --verbose
+INFO capture_baseline: Snapshotting 23 universities...
+INFO capture_baseline: Saved: 20260501_032726_acap_41.json  (courses=11  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_032726_aibi_47.json  (courses=8  disc=11  staged=8  cost=$0.0000  99.1)
+INFO capture_baseline: Saved: 20260501_032726_ait_37.json  (courses=6  disc=8  staged=6  cost=$0.0017  118.1)
+INFO capture_baseline: Saved: 20260501_032726_apicollege_30.json  (courses=25  disc=27  staged=25  cost=$0.0000  169.7)
+INFO capture_baseline: Saved: 20260501_032726_atmc_93.json  (courses=4  disc=6  staged=4  cost=$0.0000  89.6)
+INFO capture_baseline: Saved: 20260501_032726_aut_87.json  (courses=13  disc=36  staged=13  cost=$0.0035  604.3)
+INFO capture_baseline: Saved: 20260501_032726_acu_51.json  (courses=99  disc=165  staged=99  cost=$0.0234  3410.1)
+INFO capture_baseline: Saved: 20260501_032726_bond_22.json  (courses=126  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_032726_study_4.json  (courses=694  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_032726_flinders_12.json  (courses=105  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_032726_kbs_8.json  (courses=30  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_032726_kbs_29.json  (courses=25  disc=37  staged=25  cost=$0.0111  688.8)
+INFO capture_baseline: Saved: 20260501_032726_scu_17.json  (courses=6  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_032726_une_14.json  (courses=12  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_032726_uow_13.json  (courses=3  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_032726_unisq_1.json  (courses=167  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_032726_utas_5.json  (courses=13  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_032726_vit_38.json  (courses=19  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_032726_asahe_2.json  (courses=17  disc=9  staged=9  cost=$0.0019  107.2)
+INFO capture_baseline: Saved: 20260501_032726_aut_20.json  (courses=92  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_032726_cqu_18.json  (courses=4  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_032726_torrens_3.json  (courses=75  disc=168  staged=0  cost=$0.0000  463.9)
+INFO capture_baseline: Saved: 20260501_032726_vit_6.json  (courses=30  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Done. 23 universities, 1584 courses total. Baselines written to baselines/kbs-after/
+
+Regression sweep: 23 before / 23 after snapshots
+Expected slugs:   ['kbs']
+------------------------------------------------------------------------
+  [CLEAN]    acap (uni_id=41)
+  [CLEAN]    acu (uni_id=51)
+  [CLEAN]    aibi (uni_id=47)
+  [CLEAN]    ait (uni_id=37)
+  [CLEAN]    apicollege (uni_id=30)
+  [CLEAN]    asahe (uni_id=2)
+  [CLEAN]    atmc (uni_id=93)
+  [CLEAN]    aut (uni_id=20)
+  [CLEAN]    aut (uni_id=87)
+  [CLEAN]    bond (uni_id=22)
+  [CLEAN]    cqu (uni_id=18)
+  [CLEAN]    flinders (uni_id=12)
+
+  [EXPECTED] kbs (uni_id=29)  before=21  after=25  → DIRTY
+    added=5  removed=1  changed=12
+    [REMOVED] 'Master of Information Technology'
+    [ADDED] 'Graduate Certificate in Business Administration'
+    [ADDED] 'Graduate Certificate in Business Analytics'
+    [ADDED] 'MBA – Data-driven Leadership'
+    [ADDED] 'MBA – Digital Management'
+    [ADDED] 'MBA – Tourism and Hospitality Leadership'
+    [CHANGED] 'Bachelor of Information Technology'
+          (method-only) extraction_method.category: 'category:det' → 'gemini_primary'
+          (method-only) extraction_method.duration_term: None → 'gemini_primary'
+          (method-only) extraction_method.duration_text: None → 'gemini_primary'
+          (method-only) extraction_method.duration_unit: None → 'ai_fallback'
+          (method-only) extraction_method.duration_value: None → 'ai_fallback'
+    [CHANGED] 'Diploma of Information Technology'
+          (method-only) extraction_method.category: 'category:det' → 'gemini_primary'
+          (method-only) extraction_method.duration_term: None → 'gemini_primary'
+          (method-only) extraction_method.duration_text: None → 'gemini_primary'
+          (method-only) extraction_method.duration_unit: None → 'ai_fallback'
+          (method-only) extraction_method.duration_value: None → 'ai_fallback'
+    [CHANGED] 'Graduate Certificate in Accounting'
+          duration: '8 Month' → '8 Year'
+          (method-only) extraction_method.duration_unit: None → 'ai_fallback'
+          (method-only) extraction_method.duration_value: None → 'ai_fallback'
+    [CHANGED] 'Graduate Certificate in Information Technology'
+          (method-only) extraction_method.category: 'category:det' → 'gemini_primary'
+          (method-only) extraction_method.duration_term: None → 'gemini_primary'
+          (method-only) extraction_method.duration_text: None → 'gemini_primary'
+          (method-only) extraction_method.duration_unit: None → 'ai_fallback'
+          (method-only) extraction_method.duration_value: None → 'ai_fallback'
+    ... (8 more courses omitted)
+  [CLEAN]    kbs (uni_id=8)
+  [CLEAN]    scu (uni_id=17)
+  [CLEAN]    study (uni_id=4)
+  [CLEAN]    torrens (uni_id=3)
+  [CLEAN]    une (uni_id=14)
+  [CLEAN]    unisq (uni_id=1)
+  [CLEAN]    uow (uni_id=13)
+  [CLEAN]    utas (uni_id=5)
+  [CLEAN]    vit (uni_id=38)
+  [CLEAN]    vit (uni_id=6)
+
+========================================================================
+SUMMARY
+  Clean unis:            22
+  Expected diffs:        1  (acknowledged)
+  Unexpected diffs:      0
+  Missing before:        0
+  Missing after:         0
+
+PASS (with acknowledged diffs) — 1 expected diff(s) for ['kbs']. Reviewer sign-off required before merge.
+root@university-and-course-data:~/University-and-Course-data/backend-py# 
