@@ -1,0 +1,390 @@
+  (use "git add <file>..." to include in what will be committed)
+        backend-py/baselines/
+        drizzle-kit
+
+nothing added to commit but untracked files present (use "git add" to track)
+The previous cherry-pick is now empty, possibly due to conflict resolution.
+If you wish to commit it anyway, use:
+
+    git commit --allow-empty
+
+Otherwise, please use 'git cherry-pick --skip'
+add1bdd (HEAD -> main) fix(kbs): disable vision OCR + normalise slash-separated location format
+44b049f feat(option-c): wire strip_patterns into location extractor (ACAP footnote fix)
+f95d75f Phase 6: add 3 regression tests for completion-deadline anti-context fix
+On branch main
+Your branch and 'origin/main' have diverged,
+and have 2 and 8 different commits each, respectively.
+  (use "git pull" if you want to integrate the remote branch with yours)
+
+You are currently cherry-picking commit b38134f.
+  (all conflicts fixed: run "git cherry-pick --continue")
+  (use "git cherry-pick --skip" to skip this patch)
+  (use "git cherry-pick --abort" to cancel the cherry-pick operation)
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+        backend-py/baselines/
+        drizzle-kit
+
+nothing added to commit but untracked files present (use "git add" to track)
+
+active
+active
+root@university-and-course-data:~/University-and-Course-data# sudo -u postgres psql university_portal -c "
+SELECT runtime_job_id, status, started_at, completed_at, imported, skipped, errors
+FROM scrape_runtime_jobs WHERE university_id = 29
+ORDER BY created_at DESC LIMIT 1;"
+  runtime_job_id  | status |          started_at           |         completed_at          | imported | skipped | errors 
+------------------+--------+-------------------------------+-------------------------------+----------+---------+--------
+ job_52e972a7788a | failed | 2026-05-01 02:29:45.359786+00 | 2026-05-01 02:32:40.361694+00 |        0 |       0 |      0
+(1 row)
+
+root@university-and-course-data:~/University-and-Course-data# # ── 1. Finalize the cherry-pick state ──
+cd ~/University-and-Course-data
+git cherry-pick --skip    # skip if already committed as add1bdd
+git log --oneline -3
+git status | head -5
+
+# ── 2. Check if kbs.yaml actually got the vision OCR change ──
+cat backend-py/scraper_config/unis/kbs.yaml | grep -E 'trust_vision|vision_ocr|slash'
+# Expected: trust_vision_ocr: false
+
+# ── 3. Also check the commit is non-empty ──
+git show add1bdd --stat
+add1bdd (HEAD -> main) fix(kbs): disable vision OCR + normalise slash-separated location format
+44b049f feat(option-c): wire strip_patterns into location extractor (ACAP footnote fix)
+f95d75f Phase 6: add 3 regression tests for completion-deadline anti-context fix
+On branch main
+Your branch and 'origin/main' have diverged,
+and have 2 and 8 different commits each, respectively.
+  (use "git pull" if you want to integrate the remote branch with yours)
+
+#     require slash splitting before numeric extraction.
+    trust_vision_ocr: false
+      split_on_slash: true
+commit add1bdd29c878ae4f0b64a8cdc40710c42fb0ae1 (HEAD -> main)
+Author: Bijay053 <au@studyinfocentre.com>
+Date:   Thu Apr 30 23:40:23 2026 +1000
+
+    fix(kbs): disable vision OCR + normalise slash-separated location format
+    
+    Two per-uni / low-blast-radius fixes for KBS:
+    
+    1. trust_vision_ocr: false in kbs.yaml
+       KBS vision OCR hallucinates IELTS scores from cdn.kbs.edu.au images
+       (IELTS=9, IELTS=4 visible in staged data — both physically impossible).
+       Mirrors Phase 5 for ACAP. Per-uni YAML override, no shared-code change.
+    
+    2. Slash-separated location normalisation in location._normalise()
+       KBS publishes campus lists as 'Adelaide / Brisbane / Gold Coast / ...'
+       with trailing slash. _from_text_block already handled this via
+       window.replace(' / ', ', ') but _from_dl, _from_tables, _from_strong
+       did not. Move the normalisation into _normalise() so all cascade paths
+       see consistent comma-separated output. Guard: only fires when ' / '
+       (spaces on both sides) is present — 'City1/City2' is unchanged.
+    
+    21/21 location tests pass.
+    
+    NOT fixed in this commit (require regression sweeps):
+      - Fees missing (Option D: follow link-outs)
+      - Duration misclassified (Option B: duration regex)
+      - IELTS sibling cache cross-level leakage (shared code)
+      - IELTS from English requirements page (Option D)
+
+ backend-py/app/services/scraper/extractors/location.py |  7 +++++++
+ backend-py/scraper_config/unis/kbs.yaml                |  7 +++++++
+ backend-py/tests/test_location.py                      | 29 +++++++++++++++++++++++++++++
+ 3 files changed, 43 insertions(+)
+root@university-and-course-data:~/University-and-Course-data# # ── Check prod Celery logs around the KBS failure (02:28–02:33) ──
+sudo journalctl -u uni-celery \
+  --since "2026-05-01 02:28:00" \
+  --until "2026-05-01 02:33:00" \
+  --no-pager | grep -v "blob data"
+May 01 02:29:20 university-and-course-data systemd[1]: Stopping uni-celery.service - University Portal Celery Worker (scraper)...
+May 01 02:29:20 university-and-course-data celery[1262408]: worker: Warm shutdown (MainProcess)
+May 01 02:29:23 university-and-course-data systemd[1]: uni-celery.service: Deactivated successfully.
+May 01 02:29:23 university-and-course-data systemd[1]: Stopped uni-celery.service - University Portal Celery Worker (scraper).
+May 01 02:29:23 university-and-course-data systemd[1]: uni-celery.service: Consumed 58.128s CPU time.
+May 01 02:29:23 university-and-course-data systemd[1]: Started uni-celery.service - University Portal Celery Worker (scraper).
+May 01 02:29:24 university-and-course-data celery[1263170]: /root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/celery/platforms.py:841: SecurityWarning: You're running the worker with superuser privileges: this is
+May 01 02:29:24 university-and-course-data celery[1263170]: absolutely not recommended!
+May 01 02:29:24 university-and-course-data celery[1263170]: Please specify a different user using the --uid option.
+May 01 02:29:24 university-and-course-data celery[1263170]: User information: uid=0 euid=0 gid=0 egid=0
+May 01 02:29:24 university-and-course-data celery[1263170]:   warnings.warn(SecurityWarning(ROOT_DISCOURAGED.format(
+May 01 02:29:24 university-and-course-data celery[1263170]:  
+May 01 02:29:24 university-and-course-data celery[1263170]:  -------------- celery@university-and-course-data v5.6.3 (recovery)
+May 01 02:29:24 university-and-course-data celery[1263170]: --- ***** -----
+May 01 02:29:24 university-and-course-data celery[1263170]: -- ******* ---- Linux-6.8.0-110-generic-x86_64-with-glibc2.39 2026-05-01 02:29:24
+May 01 02:29:24 university-and-course-data celery[1263170]: - *** --- * ---
+May 01 02:29:24 university-and-course-data celery[1263170]: - ** ---------- [config]
+May 01 02:29:24 university-and-course-data celery[1263170]: - ** ---------- .> app:         uniportal:0x769517422180
+May 01 02:29:24 university-and-course-data celery[1263170]: - ** ---------- .> transport:   redis://localhost:6379/0
+May 01 02:29:24 university-and-course-data celery[1263170]: - ** ---------- .> results:     redis://localhost:6379/0
+May 01 02:29:24 university-and-course-data celery[1263170]: - *** --- * --- .> concurrency: 4 (prefork)
+May 01 02:29:24 university-and-course-data celery[1263170]: -- ******* ---- .> task events: OFF (enable -E to monitor tasks in this worker)
+May 01 02:29:24 university-and-course-data celery[1263170]: --- ***** -----
+May 01 02:29:24 university-and-course-data celery[1263170]:  -------------- [queues]
+May 01 02:29:24 university-and-course-data celery[1263170]:                 .> scrape           exchange=scrape(direct) key=scrape
+May 01 02:29:24 university-and-course-data celery[1263170]:                 
+May 01 02:29:24 university-and-course-data celery[1263170]: [tasks]
+May 01 02:29:24 university-and-course-data celery[1263170]:   . scrape.refresh_baselines
+May 01 02:29:24 university-and-course-data celery[1263170]:   . scrape.repair
+May 01 02:29:24 university-and-course-data celery[1263170]:   . scrape.requeue_stale
+May 01 02:29:24 university-and-course-data celery[1263170]:   . scrape.university
+May 01 02:29:24 university-and-course-data celery[1263170]:   . tasks.snapshot.editable
+May 01 02:29:24 university-and-course-data celery[1263170]: [2026-05-01 02:29:24,688: INFO/MainProcess] Connected to redis://localhost:6379/0
+May 01 02:29:24 university-and-course-data celery[1263170]: [2026-05-01 02:29:24,692: INFO/MainProcess] mingle: searching for neighbors
+May 01 02:29:25 university-and-course-data celery[1263170]: [2026-05-01 02:29:25,701: INFO/MainProcess] mingle: all alone
+May 01 02:29:25 university-and-course-data celery[1263170]: [2026-05-01 02:29:25,710: INFO/MainProcess] [SHADOW] shadow mode ENABLED for uni_ids: 41
+May 01 02:29:25 university-and-course-data celery[1263170]: [2026-05-01 02:29:25,771: INFO/MainProcess] celery@university-and-course-data ready.
+May 01 02:29:45 university-and-course-data celery[1263170]: [2026-05-01 02:29:45,871: INFO/MainProcess] Task scrape.university[aa9561e3-4f92-4cf2-9141-223543a8ee14] received
+May 01 02:29:45 university-and-course-data celery[1263177]: [2026-05-01 02:29:45,872: INFO/ForkPoolWorker-4] Celery task scrape_university start id=job_52e972a7788a
+May 01 02:29:46 university-and-course-data celery[1263177]: [2026-05-01 02:29:46,356: INFO/ForkPoolWorker-4] Discovering course links from https://www.kbs.edu.au/courses (fast_mode=False)
+May 01 02:29:46 university-and-course-data celery[1263177]: [2026-05-01 02:29:46,760: INFO/ForkPoolWorker-4] HTTP Request: GET https://www.kbs.edu.au/courses "HTTP/1.1 200 OK"
+May 01 02:29:46 university-and-course-data celery[1263177]: [2026-05-01 02:29:46,942: INFO/ForkPoolWorker-4] [DISCOVER] added self as candidate https://www.kbs.edu.au/courses
+May 01 02:29:46 university-and-course-data celery[1263177]: [2026-05-01 02:29:46,962: INFO/ForkPoolWorker-4] [DISCOVER] added child course https://www.kbs.edu.au/ultimate-guide-doing-mba-australia
+May 01 02:29:47 university-and-course-data celery[1263177]: [2026-05-01 02:29:47,227: INFO/ForkPoolWorker-4] HTTP Request: GET https://www.kbs.edu.au/admissions/course-delivery-options "HTTP/1.1 200 OK"
+May 01 02:29:47 university-and-course-data celery[1263177]: [2026-05-01 02:29:47,264: INFO/ForkPoolWorker-4] [DISCOVER] added self as candidate https://www.kbs.edu.au/admissions/course-delivery-options
+May 01 02:29:47 university-and-course-data celery[1263177]: [2026-05-01 02:29:47,570: INFO/ForkPoolWorker-4] HTTP Request: GET https://www.kbs.edu.au/study-australia-complete-guide-international-students "HTTP/1.1 200 OK"
+May 01 02:29:47 university-and-course-data celery[1263177]: [2026-05-01 02:29:47,914: INFO/ForkPoolWorker-4] HTTP Request: GET https://www.kbs.edu.au/courses/non-award-single-subject-enrolment "HTTP/1.1 200 OK"
+May 01 02:29:47 university-and-course-data celery[1263177]: [2026-05-01 02:29:47,949: INFO/ForkPoolWorker-4] [DISCOVER] added self as candidate https://www.kbs.edu.au/courses/non-award-single-subject-enrolment
+May 01 02:29:48 university-and-course-data celery[1263177]: [2026-05-01 02:29:48,489: INFO/ForkPoolWorker-4] HTTP Request: GET https://www.kbs.edu.au/documents/studying-australia-ebook "HTTP/1.1 200 OK"
+May 01 02:29:54 university-and-course-data celery[1263177]: [2026-05-01 02:29:54,984: INFO/ForkPoolWorker-4] HTTP Request: GET https://www.kbs.edu.au/robots.txt "HTTP/1.1 200 OK"
+May 01 02:29:55 university-and-course-data celery[1263177]: [2026-05-01 02:29:55,283: INFO/ForkPoolWorker-4] HTTP Request: GET https://www.kbs.edu.au/sitemap.xml "HTTP/1.1 200 OK"
+May 01 02:29:55 university-and-course-data celery[1263177]: [2026-05-01 02:29:55,626: INFO/ForkPoolWorker-4] HTTP Request: GET https://www.kbs.edu.au/sitemap.xml "HTTP/1.1 200 OK"
+May 01 02:29:55 university-and-course-data celery[1263177]: [2026-05-01 02:29:55,811: INFO/ForkPoolWorker-4] Discovered 37 candidate course links for Kaplan Business School
+May 01 02:29:56 university-and-course-data celery[1263177]: [2026-05-01 02:29:56,137: INFO/ForkPoolWorker-4] HTTP Request: GET https://www.kbs.edu.au/courses "HTTP/1.1 200 OK"
+May 01 02:29:56 university-and-course-data celery[1263177]: [2026-05-01 02:29:56,515: INFO/ForkPoolWorker-4] HTTP Request: GET https://www.kbs.edu.au/ultimate-guide-doing-mba-australia "HTTP/1.1 200 OK"
+May 01 02:29:56 university-and-course-data celery[1263177]: [2026-05-01 02:29:56,878: INFO/ForkPoolWorker-4] HTTP Request: GET https://www.kbs.edu.au/admissions/course-delivery-options "HTTP/1.1 200 OK"
+May 01 02:29:57 university-and-course-data celery[1263177]: [2026-05-01 02:29:57,213: INFO/ForkPoolWorker-4] HTTP Request: GET https://www.kbs.edu.au/courses/non-award-single-subject-enrolment "HTTP/1.1 200 OK"
+May 01 02:29:57 university-and-course-data celery[1263177]: [2026-05-01 02:29:57,704: INFO/ForkPoolWorker-4] HTTP Request: GET https://www.kbs.edu.au/courses/mba-master-of-business-administration "HTTP/1.1 200 OK"
+May 01 02:29:57 university-and-course-data celery[1263177]: [2026-05-01 02:29:57,868: INFO/ForkPoolWorker-4] central_pages: auto-discovered fee URL 'https://www.kbs.edu.au/admissions/fees' (votes=5 from 5 pages, specificity=6)
+May 01 02:29:58 university-and-course-data celery[1263177]: [2026-05-01 02:29:58,128: INFO/ForkPoolWorker-4] HTTP Request: GET https://www.kbs.edu.au/admissions/fees "HTTP/1.1 200 OK"
+May 01 02:29:58 university-and-course-data celery[1263177]: [2026-05-01 02:29:58,149: INFO/ForkPoolWorker-4] central_pages: HTTP fetch returned no fee signals for https://www.kbs.edu.au/admissions/fees — trying browser
+May 01 02:30:04 university-and-course-data celery[1263177]: [2026-05-01 02:30:04,419: INFO/ForkPoolWorker-4] central_pages: browser fetch OK for https://www.kbs.edu.au/admissions/fees (79863 bytes)
+May 01 02:30:04 university-and-course-data celery[1263177]: [2026-05-01 02:30:04,511: INFO/ForkPoolWorker-4] central_pages: 0 fee records from https://www.kbs.edu.au/admissions/fees
+May 01 02:30:04 university-and-course-data celery[1263177]: [2026-05-01 02:30:04,682: INFO/ForkPoolWorker-4] central_page_cache: skipping empty result for 29/fee_schedule — no useful data extracted, will re-fetch on next scrape
+May 01 02:30:05 university-and-course-data celery[1263177]: [2026-05-01 02:30:05,096: INFO/ForkPoolWorker-4] HTTP Request: GET https://www.kbs.edu.au/admissions/course-delivery-options "HTTP/1.1 200 OK"
+May 01 02:30:05 university-and-course-data celery[1263177]: [2026-05-01 02:30:05,098: INFO/ForkPoolWorker-4] HTTP Request: GET https://www.kbs.edu.au/courses/non-award-single-subject-enrolment "HTTP/1.1 200 OK"
+May 01 02:30:05 university-and-course-data celery[1263177]: [2026-05-01 02:30:05,501: INFO/ForkPoolWorker-4] HTTP Request: GET https://www.kbs.edu.au/ultimate-guide-doing-mba-australia "HTTP/1.1 200 OK"
+May 01 02:30:05 university-and-course-data celery[1263177]: [2026-05-01 02:30:05,504: INFO/ForkPoolWorker-4] HTTP Request: GET https://www.kbs.edu.au/courses/mba-master-of-business-administration "HTTP/1.1 200 OK"
+May 01 02:30:07 university-and-course-data celery[1263177]: [2026-05-01 02:30:07,970: INFO/ForkPoolWorker-4] [STUDY_MODE OVERRIDE] course='Non-award Single Subject Enrolment' — rule-only 'On Campus' with no location evidence; downgraded to Online for guard evaluation.
+May 01 02:30:09 university-and-course-data celery[1263177]: [2026-05-01 02:30:09,237: INFO/ForkPoolWorker-4] AFC is enabled with max remote calls: 10.
+May 01 02:30:09 university-and-course-data celery[1263177]: [2026-05-01 02:30:09,575: INFO/ForkPoolWorker-4] AFC is enabled with max remote calls: 10.
+May 01 02:30:09 university-and-course-data celery[1263177]: [2026-05-01 02:30:09,882: INFO/ForkPoolWorker-4] AFC is enabled with max remote calls: 10.
+May 01 02:30:10 university-and-course-data celery[1263177]: [2026-05-01 02:30:10,115: INFO/ForkPoolWorker-4] AFC is enabled with max remote calls: 10.
+May 01 02:30:11 university-and-course-data celery[1263177]: [2026-05-01 02:30:11,555: INFO/ForkPoolWorker-4] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+May 01 02:30:11 university-and-course-data celery[1263177]: [2026-05-01 02:30:11,560: INFO/ForkPoolWorker-4] gemini_primary: https://www.kbs.edu.au/admissions/course-delivery-options → 1 fields filled, cost=$0.000165
+May 01 02:30:11 university-and-course-data celery[1263177]: [2026-05-01 02:30:11,674: INFO/ForkPoolWorker-4] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+May 01 02:30:11 university-and-course-data celery[1263177]: [2026-05-01 02:30:11,677: INFO/ForkPoolWorker-4] gemini_primary: https://www.kbs.edu.au/courses/mba-master-of-business-administration → 8 fields filled, cost=$0.000340
+May 01 02:30:13 university-and-course-data celery[1263177]: [2026-05-01 02:30:13,764: INFO/ForkPoolWorker-4] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+May 01 02:30:13 university-and-course-data celery[1263177]: [2026-05-01 02:30:13,777: INFO/ForkPoolWorker-4] gemini_primary: https://www.kbs.edu.au/courses/non-award-single-subject-enrolment → 3 fields filled, cost=$0.000199
+May 01 02:30:14 university-and-course-data celery[1263177]: [2026-05-01 02:30:14,499: INFO/ForkPoolWorker-4] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+May 01 02:30:14 university-and-course-data celery[1263177]: [2026-05-01 02:30:14,516: INFO/ForkPoolWorker-4] gemini_primary: https://www.kbs.edu.au/ultimate-guide-doing-mba-australia → 6 fields filled, cost=$0.000535
+May 01 02:30:25 university-and-course-data celery[1263177]: [2026-05-01 02:30:25,997: INFO/ForkPoolWorker-4] [VISION SKIP] trust_vision_ocr=false for this uni — skipping vision OCR pass on https://www.kbs.edu.au/courses/mba-master-of-business-administration
+May 01 02:30:26 university-and-course-data celery[1263177]: [2026-05-01 02:30:26,085: INFO/ForkPoolWorker-4] AFC is enabled with max remote calls: 10.
+May 01 02:30:27 university-and-course-data celery[1263177]: [2026-05-01 02:30:27,408: INFO/ForkPoolWorker-4] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent "HTTP/1.1 503 Service Unavailable"
+May 01 02:30:27 university-and-course-data celery[1263177]: [2026-05-01 02:30:27,409: WARNING/ForkPoolWorker-4] Gemini generate failed [primary_full]: 503 UNAVAILABLE. {'error': {'code': 503, 'message': 'This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.', 'status': 'UNAVAILABLE'}}
+May 01 02:30:27 university-and-course-data celery[1263177]: [2026-05-01 02:30:27,410: INFO/ForkPoolWorker-4] AI fallback skipped for https://www.kbs.edu.au/courses/mba-master-of-business-administration: 503 UNAVAILABLE. {'error': {'code': 503, 'message': 'This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.', 'status': 'UNAVAILABLE'}}
+May 01 02:30:27 university-and-course-data celery[1263177]: [2026-05-01 02:30:27,586: INFO/ForkPoolWorker-4] [CRICOS] extracted 078565G from https://www.kbs.edu.au/courses/mba-master-of-business-administration
+May 01 02:30:27 university-and-course-data celery[1263177]: [2026-05-01 02:30:27,921: INFO/ForkPoolWorker-4] HTTP Request: GET https://www.kbs.edu.au/courses/diploma-of-business "HTTP/1.1 200 OK"
+May 01 02:30:29 university-and-course-data celery[1263177]: [2026-05-01 02:30:29,560: INFO/ForkPoolWorker-4] AFC is enabled with max remote calls: 10.
+May 01 02:30:29 university-and-course-data celery[1263177]: [2026-05-01 02:30:29,683: INFO/ForkPoolWorker-4] [VISION SKIP] trust_vision_ocr=false for this uni — skipping vision OCR pass on https://www.kbs.edu.au/courses/non-award-single-subject-enrolment
+May 01 02:30:29 university-and-course-data celery[1263177]: [2026-05-01 02:30:29,756: INFO/ForkPoolWorker-4] AFC is enabled with max remote calls: 10.
+May 01 02:30:29 university-and-course-data celery[1263177]: [2026-05-01 02:30:29,877: INFO/ForkPoolWorker-4] [VISION SKIP] trust_vision_ocr=false for this uni — skipping vision OCR pass on https://www.kbs.edu.au/ultimate-guide-doing-mba-australia
+May 01 02:30:29 university-and-course-data celery[1263177]: [2026-05-01 02:30:29,957: INFO/ForkPoolWorker-4] AFC is enabled with max remote calls: 10.
+May 01 02:30:30 university-and-course-data celery[1263177]: [2026-05-01 02:30:30,792: INFO/ForkPoolWorker-4] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+May 01 02:30:30 university-and-course-data celery[1263177]: [2026-05-01 02:30:30,793: INFO/ForkPoolWorker-4] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+May 01 02:30:30 university-and-course-data celery[1263177]: [2026-05-01 02:30:30,795: INFO/ForkPoolWorker-4] gemini_primary: https://www.kbs.edu.au/courses/diploma-of-business → 8 fields filled, cost=$0.000319
+May 01 02:30:31 university-and-course-data celery[1263177]: [2026-05-01 02:30:31,391: INFO/ForkPoolWorker-4] HTTP Request: GET https://www.kbs.edu.au/courses/bachelor-of-business "HTTP/1.1 200 OK"
+May 01 02:30:31 university-and-course-data celery[1263177]: [2026-05-01 02:30:31,405: INFO/ForkPoolWorker-4] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+May 01 02:30:31 university-and-course-data celery[1263177]: [2026-05-01 02:30:31,408: INFO/ForkPoolWorker-4] AI fallback filled ['duration_value', 'duration_unit'] for https://www.kbs.edu.au/ultimate-guide-doing-mba-australia (cost=$0.000486)
+May 01 02:30:33 university-and-course-data celery[1263177]: [2026-05-01 02:30:33,442: INFO/ForkPoolWorker-4] AFC is enabled with max remote calls: 10.
+May 01 02:30:33 university-and-course-data celery[1263177]: [2026-05-01 02:30:33,853: INFO/ForkPoolWorker-4] HTTP Request: GET https://www.kbs.edu.au/courses/bachelor-of-business-accounting "HTTP/1.1 200 OK"
+May 01 02:30:35 university-and-course-data celery[1263177]: [2026-05-01 02:30:35,392: INFO/ForkPoolWorker-4] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+May 01 02:30:35 university-and-course-data celery[1263177]: [2026-05-01 02:30:35,396: INFO/ForkPoolWorker-4] gemini_primary: https://www.kbs.edu.au/courses/bachelor-of-business → 8 fields filled, cost=$0.000365
+May 01 02:30:35 university-and-course-data celery[1263177]: [2026-05-01 02:30:35,735: INFO/ForkPoolWorker-4] AFC is enabled with max remote calls: 10.
+May 01 02:30:37 university-and-course-data celery[1263177]: [2026-05-01 02:30:37,987: INFO/ForkPoolWorker-4] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+May 01 02:30:38 university-and-course-data celery[1263177]: [2026-05-01 02:30:37,999: INFO/ForkPoolWorker-4] gemini_primary: https://www.kbs.edu.au/courses/bachelor-of-business-accounting → 8 fields filled, cost=$0.000365
+May 01 02:30:42 university-and-course-data celery[1263177]: [2026-05-01 02:30:42,149: INFO/ForkPoolWorker-4] [VISION SKIP] trust_vision_ocr=false for this uni — skipping vision OCR pass on https://www.kbs.edu.au/courses/diploma-of-business
+May 01 02:30:42 university-and-course-data celery[1263177]: [2026-05-01 02:30:42,495: INFO/ForkPoolWorker-4] AFC is enabled with max remote calls: 10.
+May 01 02:30:43 university-and-course-data celery[1263177]: [2026-05-01 02:30:43,516: INFO/ForkPoolWorker-4] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+May 01 02:30:43 university-and-course-data celery[1263177]: [2026-05-01 02:30:43,523: INFO/ForkPoolWorker-4] AI fallback filled ['duration_value', 'duration_unit'] for https://www.kbs.edu.au/courses/diploma-of-business (cost=$0.000266)
+May 01 02:30:44 university-and-course-data celery[1263177]: [2026-05-01 02:30:44,061: INFO/ForkPoolWorker-4] [CRICOS] extracted 086332B from https://www.kbs.edu.au/courses/diploma-of-business
+May 01 02:30:44 university-and-course-data celery[1263177]: [2026-05-01 02:30:44,389: INFO/ForkPoolWorker-4] HTTP Request: GET https://www.kbs.edu.au/courses/bachelor-of-business-hospitality-and-tourism-management "HTTP/1.1 200 OK"
+May 01 02:30:46 university-and-course-data celery[1263177]: [2026-05-01 02:30:46,391: INFO/ForkPoolWorker-4] AFC is enabled with max remote calls: 10.
+May 01 02:30:47 university-and-course-data celery[1263177]: [2026-05-01 02:30:47,621: INFO/ForkPoolWorker-4] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+May 01 02:30:47 university-and-course-data celery[1263177]: [2026-05-01 02:30:47,626: INFO/ForkPoolWorker-4] gemini_primary: https://www.kbs.edu.au/courses/bachelor-of-business-hospitality-and-tourism-management → 8 fields filled, cost=$0.000372
+May 01 02:30:49 university-and-course-data celery[1263177]: [2026-05-01 02:30:49,337: INFO/ForkPoolWorker-4] [VISION SKIP] trust_vision_ocr=false for this uni — skipping vision OCR pass on https://www.kbs.edu.au/courses/bachelor-of-business
+May 01 02:30:49 university-and-course-data celery[1263177]: [2026-05-01 02:30:49,347: INFO/ForkPoolWorker-4] [VISION SKIP] trust_vision_ocr=false for this uni — skipping vision OCR pass on https://www.kbs.edu.au/courses/bachelor-of-business-accounting
+May 01 02:30:49 university-and-course-data celery[1263177]: [2026-05-01 02:30:49,450: INFO/ForkPoolWorker-4] AFC is enabled with max remote calls: 10.
+May 01 02:30:49 university-and-course-data celery[1263177]: [2026-05-01 02:30:49,540: INFO/ForkPoolWorker-4] AFC is enabled with max remote calls: 10.
+May 01 02:30:50 university-and-course-data celery[1263177]: [2026-05-01 02:30:50,702: INFO/ForkPoolWorker-4] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+May 01 02:30:50 university-and-course-data celery[1263177]: [2026-05-01 02:30:50,705: INFO/ForkPoolWorker-4] AI fallback filled ['duration_value', 'duration_unit'] for https://www.kbs.edu.au/courses/bachelor-of-business (cost=$0.000312)
+May 01 02:30:50 university-and-course-data celery[1263177]: [2026-05-01 02:30:50,708: INFO/ForkPoolWorker-4] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+May 01 02:30:50 university-and-course-data celery[1263177]: [2026-05-01 02:30:50,712: INFO/ForkPoolWorker-4] AI fallback filled ['duration_value', 'duration_unit'] for https://www.kbs.edu.au/courses/bachelor-of-business-accounting (cost=$0.000311)
+May 01 02:30:50 university-and-course-data celery[1263177]: [2026-05-01 02:30:50,937: INFO/ForkPoolWorker-4] [CRICOS] extracted 067756B from https://www.kbs.edu.au/courses/bachelor-of-business
+May 01 02:30:51 university-and-course-data celery[1263177]: [2026-05-01 02:30:51,308: INFO/ForkPoolWorker-4] [CRICOS] extracted 085958J from https://www.kbs.edu.au/courses/bachelor-of-business-accounting
+May 01 02:30:51 university-and-course-data celery[1263177]: [2026-05-01 02:30:51,629: INFO/ForkPoolWorker-4] HTTP Request: GET https://www.kbs.edu.au/courses/bachelor-of-business-management "HTTP/1.1 200 OK"
+May 01 02:30:53 university-and-course-data celery[1263177]: [2026-05-01 02:30:53,087: INFO/ForkPoolWorker-4] HTTP Request: GET https://www.kbs.edu.au/courses/bachelor-of-business-marketing "HTTP/1.1 200 OK"
+May 01 02:30:54 university-and-course-data celery[1263177]: [2026-05-01 02:30:54,992: INFO/ForkPoolWorker-4] AFC is enabled with max remote calls: 10.
+May 01 02:30:55 university-and-course-data celery[1263177]: [2026-05-01 02:30:55,326: INFO/ForkPoolWorker-4] AFC is enabled with max remote calls: 10.
+May 01 02:30:56 university-and-course-data celery[1263177]: [2026-05-01 02:30:56,688: INFO/ForkPoolWorker-4] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+May 01 02:30:56 university-and-course-data celery[1263177]: [2026-05-01 02:30:56,691: INFO/ForkPoolWorker-4] gemini_primary: https://www.kbs.edu.au/courses/bachelor-of-business-marketing → 8 fields filled, cost=$0.000353
+May 01 02:30:56 university-and-course-data celery[1263177]: [2026-05-01 02:30:56,817: INFO/ForkPoolWorker-4] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+May 01 02:30:56 university-and-course-data celery[1263177]: [2026-05-01 02:30:56,820: INFO/ForkPoolWorker-4] gemini_primary: https://www.kbs.edu.au/courses/bachelor-of-business-management → 8 fields filled, cost=$0.000366
+May 01 02:30:58 university-and-course-data celery[1263177]: [2026-05-01 02:30:58,927: INFO/ForkPoolWorker-4] [VISION SKIP] trust_vision_ocr=false for this uni — skipping vision OCR pass on https://www.kbs.edu.au/courses/bachelor-of-business-hospitality-and-tourism-management
+May 01 02:30:59 university-and-course-data celery[1263177]: [2026-05-01 02:30:59,290: INFO/ForkPoolWorker-4] AFC is enabled with max remote calls: 10.
+May 01 02:31:01 university-and-course-data celery[1263177]: [2026-05-01 02:31:01,089: INFO/ForkPoolWorker-4] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+May 01 02:31:01 university-and-course-data celery[1263177]: [2026-05-01 02:31:01,094: INFO/ForkPoolWorker-4] AI fallback filled ['duration_value', 'duration_unit'] for https://www.kbs.edu.au/courses/bachelor-of-business-hospitality-and-tourism-management (cost=$0.000317)
+May 01 02:31:01 university-and-course-data celery[1263177]: [2026-05-01 02:31:01,593: INFO/ForkPoolWorker-4] [CRICOS] extracted 085961C from https://www.kbs.edu.au/courses/bachelor-of-business-hospitality-and-tourism-management
+May 01 02:31:01 university-and-course-data celery[1263177]: [2026-05-01 02:31:01,667: WARNING/ForkPoolWorker-4] browser fetch https://www.kbs.edu.au/admissions/course-delivery-options: goto timed out (Page.goto: Timeout 50000ms exceeded.
+May 01 02:31:01 university-and-course-data celery[1263177]: Call log:
+May 01 02:31:01 university-and-course-data celery[1263177]:   - navigating to "https://www.kbs.edu.au/admissions/course-delivery-options", waiting until "networkidle"
+May 01 02:31:01 university-and-course-data celery[1263177]: ) — trying partial HTML
+May 01 02:31:01 university-and-course-data celery[1263177]: [2026-05-01 02:31:01,859: INFO/ForkPoolWorker-4] [VISION SKIP] trust_vision_ocr=false for this uni — skipping vision OCR pass on https://www.kbs.edu.au/admissions/course-delivery-options
+May 01 02:31:01 university-and-course-data celery[1263177]: [2026-05-01 02:31:01,953: INFO/ForkPoolWorker-4] AFC is enabled with max remote calls: 10.
+May 01 02:31:01 university-and-course-data celery[1263177]: [2026-05-01 02:31:01,955: INFO/ForkPoolWorker-4] HTTP Request: GET https://www.kbs.edu.au/courses/graduate-certificate-in-accounting "HTTP/1.1 200 OK"
+May 01 02:31:03 university-and-course-data celery[1263177]: [2026-05-01 02:31:03,774: INFO/ForkPoolWorker-4] AFC is enabled with max remote calls: 10.
+May 01 02:31:04 university-and-course-data celery[1263177]: [2026-05-01 02:31:04,957: INFO/ForkPoolWorker-4] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+May 01 02:31:05 university-and-course-data celery[1263177]: [2026-05-01 02:31:05,316: INFO/ForkPoolWorker-4] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+May 01 02:31:05 university-and-course-data celery[1263177]: [2026-05-01 02:31:05,320: INFO/ForkPoolWorker-4] gemini_primary: https://www.kbs.edu.au/courses/graduate-certificate-in-accounting → 8 fields filled, cost=$0.000259
+May 01 02:31:05 university-and-course-data celery[1263177]: [2026-05-01 02:31:05,558: INFO/ForkPoolWorker-4] HTTP Request: GET https://www.kbs.edu.au/courses/master-of-professional-accounting "HTTP/1.1 200 OK"
+May 01 02:31:07 university-and-course-data celery[1263177]: [2026-05-01 02:31:07,052: INFO/ForkPoolWorker-4] AFC is enabled with max remote calls: 10.
+May 01 02:31:07 university-and-course-data celery[1263177]: [2026-05-01 02:31:07,567: INFO/ForkPoolWorker-4] [VISION SKIP] trust_vision_ocr=false for this uni — skipping vision OCR pass on https://www.kbs.edu.au/courses/bachelor-of-business-marketing
+May 01 02:31:07 university-and-course-data celery[1263177]: [2026-05-01 02:31:07,655: INFO/ForkPoolWorker-4] AFC is enabled with max remote calls: 10.
+May 01 02:31:07 university-and-course-data celery[1263177]: [2026-05-01 02:31:07,918: INFO/ForkPoolWorker-4] [VISION SKIP] trust_vision_ocr=false for this uni — skipping vision OCR pass on https://www.kbs.edu.au/courses/bachelor-of-business-management
+May 01 02:31:08 university-and-course-data celery[1263177]: [2026-05-01 02:31:08,049: INFO/ForkPoolWorker-4] AFC is enabled with max remote calls: 10.
+May 01 02:31:08 university-and-course-data celery[1263177]: [2026-05-01 02:31:08,656: INFO/ForkPoolWorker-4] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+May 01 02:31:08 university-and-course-data celery[1263177]: [2026-05-01 02:31:08,659: INFO/ForkPoolWorker-4] gemini_primary: https://www.kbs.edu.au/courses/master-of-professional-accounting → 8 fields filled, cost=$0.000281
+May 01 02:31:08 university-and-course-data celery[1263177]: [2026-05-01 02:31:08,784: INFO/ForkPoolWorker-4] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+May 01 02:31:08 university-and-course-data celery[1263177]: [2026-05-01 02:31:08,788: INFO/ForkPoolWorker-4] AI fallback filled ['duration_value', 'duration_unit'] for https://www.kbs.edu.au/courses/bachelor-of-business-marketing (cost=$0.000302)
+May 01 02:31:09 university-and-course-data celery[1263177]: [2026-05-01 02:31:09,085: INFO/ForkPoolWorker-4] [CRICOS] extracted 087660M from https://www.kbs.edu.au/courses/bachelor-of-business-marketing
+May 01 02:31:09 university-and-course-data celery[1263177]: [2026-05-01 02:31:09,088: INFO/ForkPoolWorker-4] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+May 01 02:31:09 university-and-course-data celery[1263177]: [2026-05-01 02:31:09,091: INFO/ForkPoolWorker-4] AI fallback filled ['duration_value', 'duration_unit'] for https://www.kbs.edu.au/courses/bachelor-of-business-management (cost=$0.000313)
+May 01 02:31:09 university-and-course-data celery[1263177]: [2026-05-01 02:31:09,644: INFO/ForkPoolWorker-4] [CRICOS] extracted 085959G from https://www.kbs.edu.au/courses/bachelor-of-business-management
+May 01 02:31:10 university-and-course-data celery[1263177]: [2026-05-01 02:31:10,029: INFO/ForkPoolWorker-4] HTTP Request: GET https://www.kbs.edu.au/courses/graduate-certificate-in-business-administration "HTTP/1.1 200 OK"
+May 01 02:31:10 university-and-course-data celery[1263177]: [2026-05-01 02:31:10,030: INFO/ForkPoolWorker-4] HTTP Request: GET https://www.kbs.edu.au/courses/master-of-accounting "HTTP/1.1 200 OK"
+May 01 02:31:13 university-and-course-data celery[1263177]: [2026-05-01 02:31:13,673: INFO/ForkPoolWorker-4] AFC is enabled with max remote calls: 10.
+May 01 02:31:13 university-and-course-data celery[1263177]: [2026-05-01 02:31:13,939: INFO/ForkPoolWorker-4] AFC is enabled with max remote calls: 10.
+May 01 02:31:15 university-and-course-data celery[1263177]: [2026-05-01 02:31:15,245: INFO/ForkPoolWorker-4] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+May 01 02:31:15 university-and-course-data celery[1263177]: [2026-05-01 02:31:15,249: INFO/ForkPoolWorker-4] gemini_primary: https://www.kbs.edu.au/courses/master-of-accounting → 8 fields filled, cost=$0.000311
+May 01 02:31:16 university-and-course-data celery[1263177]: [2026-05-01 02:31:16,003: INFO/ForkPoolWorker-4] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+May 01 02:31:16 university-and-course-data celery[1263177]: [2026-05-01 02:31:16,015: INFO/ForkPoolWorker-4] gemini_primary: https://www.kbs.edu.au/courses/graduate-certificate-in-business-administration → 8 fields filled, cost=$0.000271
+May 01 02:31:17 university-and-course-data celery[1263177]: [2026-05-01 02:31:17,367: INFO/ForkPoolWorker-4] [VISION SKIP] trust_vision_ocr=false for this uni — skipping vision OCR pass on https://www.kbs.edu.au/courses/graduate-certificate-in-accounting
+May 01 02:31:17 university-and-course-data celery[1263177]: [2026-05-01 02:31:17,566: INFO/ForkPoolWorker-4] AFC is enabled with max remote calls: 10.
+May 01 02:31:18 university-and-course-data celery[1263177]: [2026-05-01 02:31:18,791: INFO/ForkPoolWorker-4] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+May 01 02:31:18 university-and-course-data celery[1263177]: [2026-05-01 02:31:18,805: INFO/ForkPoolWorker-4] AI fallback filled ['duration_value', 'duration_unit'] for https://www.kbs.edu.au/courses/graduate-certificate-in-accounting (cost=$0.000208)
+May 01 02:31:19 university-and-course-data celery[1263177]: [2026-05-01 02:31:19,301: INFO/ForkPoolWorker-4] [CRICOS] extracted 063299K from https://www.kbs.edu.au/courses/graduate-certificate-in-accounting
+May 01 02:31:19 university-and-course-data celery[1263177]: [2026-05-01 02:31:19,602: INFO/ForkPoolWorker-4] [VISION SKIP] trust_vision_ocr=false for this uni — skipping vision OCR pass on https://www.kbs.edu.au/courses/master-of-professional-accounting
+May 01 02:31:19 university-and-course-data celery[1263177]: [2026-05-01 02:31:19,717: INFO/ForkPoolWorker-4] AFC is enabled with max remote calls: 10.
+May 01 02:31:20 university-and-course-data celery[1263177]: [2026-05-01 02:31:20,035: INFO/ForkPoolWorker-4] HTTP Request: GET https://www.kbs.edu.au/courses/graduate-diploma-of-business-administration "HTTP/1.1 200 OK"
+May 01 02:31:22 university-and-course-data celery[1263177]: [2026-05-01 02:31:22,218: INFO/ForkPoolWorker-4] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+May 01 02:31:22 university-and-course-data celery[1263177]: [2026-05-01 02:31:22,222: INFO/ForkPoolWorker-4] AI fallback filled ['duration_value', 'duration_unit'] for https://www.kbs.edu.au/courses/master-of-professional-accounting (cost=$0.000228)
+May 01 02:31:22 university-and-course-data celery[1263177]: [2026-05-01 02:31:22,520: INFO/ForkPoolWorker-4] AFC is enabled with max remote calls: 10.
+May 01 02:31:22 university-and-course-data celery[1263177]: [2026-05-01 02:31:22,834: INFO/ForkPoolWorker-4] [CRICOS] extracted 063297A from https://www.kbs.edu.au/courses/master-of-professional-accounting
+May 01 02:31:23 university-and-course-data celery[1263177]: [2026-05-01 02:31:23,146: INFO/ForkPoolWorker-4] HTTP Request: GET https://www.kbs.edu.au/courses/graduate-certificate-in-business-analytics "HTTP/1.1 200 OK"
+May 01 02:31:24 university-and-course-data celery[1263177]: [2026-05-01 02:31:24,342: INFO/ForkPoolWorker-4] AFC is enabled with max remote calls: 10.
+May 01 02:31:24 university-and-course-data celery[1263177]: [2026-05-01 02:31:24,417: INFO/ForkPoolWorker-4] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+May 01 02:31:24 university-and-course-data celery[1263177]: [2026-05-01 02:31:24,420: INFO/ForkPoolWorker-4] gemini_primary: https://www.kbs.edu.au/courses/graduate-diploma-of-business-administration → 8 fields filled, cost=$0.000326
+May 01 02:31:26 university-and-course-data celery[1263177]: [2026-05-01 02:31:26,102: INFO/ForkPoolWorker-4] [VISION SKIP] trust_vision_ocr=false for this uni — skipping vision OCR pass on https://www.kbs.edu.au/courses/master-of-accounting
+May 01 02:31:26 university-and-course-data celery[1263177]: [2026-05-01 02:31:26,190: INFO/ForkPoolWorker-4] AFC is enabled with max remote calls: 10.
+May 01 02:31:26 university-and-course-data celery[1263177]: [2026-05-01 02:31:26,903: INFO/ForkPoolWorker-4] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+May 01 02:31:26 university-and-course-data celery[1263177]: [2026-05-01 02:31:26,906: INFO/ForkPoolWorker-4] gemini_primary: https://www.kbs.edu.au/courses/graduate-certificate-in-business-analytics → 8 fields filled, cost=$0.000282
+May 01 02:31:27 university-and-course-data celery[1263177]: [2026-05-01 02:31:27,528: INFO/ForkPoolWorker-4] [VISION SKIP] trust_vision_ocr=false for this uni — skipping vision OCR pass on https://www.kbs.edu.au/courses/graduate-certificate-in-business-administration
+May 01 02:31:27 university-and-course-data celery[1263177]: [2026-05-01 02:31:27,631: INFO/ForkPoolWorker-4] AFC is enabled with max remote calls: 10.
+May 01 02:31:28 university-and-course-data celery[1263177]: [2026-05-01 02:31:28,304: INFO/ForkPoolWorker-4] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+May 01 02:31:28 university-and-course-data celery[1263177]: [2026-05-01 02:31:28,308: INFO/ForkPoolWorker-4] AI fallback filled ['duration_value', 'duration_unit'] for https://www.kbs.edu.au/courses/master-of-accounting (cost=$0.000257)
+May 01 02:31:28 university-and-course-data celery[1263177]: [2026-05-01 02:31:28,757: INFO/ForkPoolWorker-4] [CRICOS] extracted 078568D from https://www.kbs.edu.au/courses/master-of-accounting
+May 01 02:31:29 university-and-course-data celery[1263177]: [2026-05-01 02:31:29,071: INFO/ForkPoolWorker-4] HTTP Request: GET https://www.kbs.edu.au/courses/graduate-diploma-of-business-analytics "HTTP/1.1 200 OK"
+May 01 02:31:30 university-and-course-data celery[1263177]: [2026-05-01 02:31:30,762: INFO/ForkPoolWorker-4] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+May 01 02:31:30 university-and-course-data celery[1263177]: [2026-05-01 02:31:30,770: INFO/ForkPoolWorker-4] AI fallback filled ['duration_value', 'duration_unit'] for https://www.kbs.edu.au/courses/graduate-certificate-in-business-administration (cost=$0.000219)
+May 01 02:31:31 university-and-course-data celery[1263177]: [2026-05-01 02:31:31,068: INFO/ForkPoolWorker-4] AFC is enabled with max remote calls: 10.
+May 01 02:31:31 university-and-course-data celery[1263177]: [2026-05-01 02:31:31,192: INFO/ForkPoolWorker-4] [CRICOS] extracted 078567E from https://www.kbs.edu.au/courses/graduate-certificate-in-business-administration
+May 01 02:31:31 university-and-course-data celery[1263177]: [2026-05-01 02:31:31,515: INFO/ForkPoolWorker-4] HTTP Request: GET https://www.kbs.edu.au/courses/master-of-business-analytics "HTTP/1.1 200 OK"
+May 01 02:31:32 university-and-course-data celery[1263177]: [2026-05-01 02:31:32,694: INFO/ForkPoolWorker-4] AFC is enabled with max remote calls: 10.
+May 01 02:31:32 university-and-course-data celery[1263177]: [2026-05-01 02:31:32,697: INFO/ForkPoolWorker-4] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+May 01 02:31:32 university-and-course-data celery[1263177]: [2026-05-01 02:31:32,700: INFO/ForkPoolWorker-4] gemini_primary: https://www.kbs.edu.au/courses/graduate-diploma-of-business-analytics → 8 fields filled, cost=$0.000289
+May 01 02:31:34 university-and-course-data celery[1263177]: [2026-05-01 02:31:34,826: INFO/ForkPoolWorker-4] [VISION SKIP] trust_vision_ocr=false for this uni — skipping vision OCR pass on https://www.kbs.edu.au/courses/graduate-diploma-of-business-administration
+May 01 02:31:34 university-and-course-data celery[1263177]: [2026-05-01 02:31:34,926: INFO/ForkPoolWorker-4] AFC is enabled with max remote calls: 10.
+May 01 02:31:35 university-and-course-data celery[1263177]: [2026-05-01 02:31:35,741: INFO/ForkPoolWorker-4] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+May 01 02:31:35 university-and-course-data celery[1263177]: [2026-05-01 02:31:35,743: INFO/ForkPoolWorker-4] AI fallback filled ['duration_value', 'duration_unit'] for https://www.kbs.edu.au/courses/graduate-diploma-of-business-administration (cost=$0.000273)
+May 01 02:31:35 university-and-course-data celery[1263177]: [2026-05-01 02:31:35,900: INFO/ForkPoolWorker-4] [CRICOS] extracted 078566F from https://www.kbs.edu.au/courses/graduate-diploma-of-business-administration
+May 01 02:31:36 university-and-course-data celery[1263177]: [2026-05-01 02:31:36,183: INFO/ForkPoolWorker-4] HTTP Request: GET https://www.kbs.edu.au/courses/master-of-business-analytics-extension "HTTP/1.1 200 OK"
+May 01 02:31:36 university-and-course-data celery[1263177]: [2026-05-01 02:31:36,237: INFO/ForkPoolWorker-4] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+May 01 02:31:36 university-and-course-data celery[1263177]: [2026-05-01 02:31:36,240: INFO/ForkPoolWorker-4] gemini_primary: https://www.kbs.edu.au/courses/master-of-business-analytics → 8 fields filled, cost=$0.000295
+May 01 02:31:38 university-and-course-data celery[1263177]: [2026-05-01 02:31:38,358: INFO/ForkPoolWorker-4] AFC is enabled with max remote calls: 10.
+May 01 02:31:39 university-and-course-data systemd[1]: Stopping uni-celery.service - University Portal Celery Worker (scraper)...
+May 01 02:31:39 university-and-course-data celery[1263170]: worker: Warm shutdown (MainProcess)
+May 01 02:31:39 university-and-course-data celery[1263170]: [2026-05-01 02:31:39,269: ERROR/MainProcess] Process 'ForkPoolWorker-2' pid:1263175 exited with 'signal 15 (SIGTERM)'
+May 01 02:31:39 university-and-course-data celery[1263170]: [2026-05-01 02:31:39,283: ERROR/MainProcess] Process 'ForkPoolWorker-1' pid:1263174 exited with 'signal 15 (SIGTERM)'
+May 01 02:31:39 university-and-course-data celery[1263170]: [2026-05-01 02:31:39,827: ERROR/MainProcess] Process 'ForkPoolWorker-3' pid:1263176 exited with 'signal 15 (SIGTERM)'
+May 01 02:32:36 university-and-course-data celery[1263170]: [2026-05-01 02:32:36,882: ERROR/MainProcess] Process 'ForkPoolWorker-4' pid:1263177 exited with 'signal 15 (SIGTERM)'
+May 01 02:32:36 university-and-course-data celery[1263170]: [2026-05-01 02:32:36,895: ERROR/MainProcess] Task handler raised error: WorkerLostError('Worker exited prematurely: signal 15 (SIGTERM) Job: 0.')
+May 01 02:32:36 university-and-course-data celery[1263170]: Traceback (most recent call last):
+May 01 02:32:36 university-and-course-data celery[1263170]:   File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/billiard/pool.py", line 1265, in mark_as_worker_lost
+May 01 02:32:36 university-and-course-data celery[1263170]:     raise WorkerLostError(
+May 01 02:32:36 university-and-course-data celery[1263170]: billiard.einfo.ExceptionWithTraceback:
+May 01 02:32:36 university-and-course-data celery[1263170]: """
+May 01 02:32:36 university-and-course-data celery[1263170]: Traceback (most recent call last):
+May 01 02:32:36 university-and-course-data celery[1263170]:   File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/celery/worker/worker.py", line 203, in start
+May 01 02:32:36 university-and-course-data celery[1263170]:     self.blueprint.start(self)
+May 01 02:32:36 university-and-course-data celery[1263170]:   File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/celery/bootsteps.py", line 116, in start
+May 01 02:32:36 university-and-course-data celery[1263170]:     step.start(parent)
+May 01 02:32:36 university-and-course-data celery[1263170]:   File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/celery/bootsteps.py", line 365, in start
+May 01 02:32:36 university-and-course-data celery[1263170]:     return self.obj.start()
+May 01 02:32:36 university-and-course-data celery[1263170]:            ^^^^^^^^^^^^^^^^
+May 01 02:32:36 university-and-course-data celery[1263170]:   File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/celery/worker/consumer/consumer.py", line 346, in start
+May 01 02:32:36 university-and-course-data celery[1263170]:     blueprint.start(self)
+May 01 02:32:36 university-and-course-data celery[1263170]:   File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/celery/bootsteps.py", line 116, in start
+May 01 02:32:36 university-and-course-data celery[1263170]:     step.start(parent)
+May 01 02:32:36 university-and-course-data celery[1263170]:   File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/celery/worker/consumer/consumer.py", line 788, in start
+May 01 02:32:36 university-and-course-data celery[1263170]:     c.loop(*c.loop_args())
+May 01 02:32:36 university-and-course-data celery[1263170]:   File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/celery/worker/loops.py", line 86, in asynloop
+May 01 02:32:36 university-and-course-data celery[1263170]:     state.maybe_shutdown()
+May 01 02:32:36 university-and-course-data celery[1263170]:   File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/celery/worker/state.py", line 93, in maybe_shutdown
+May 01 02:32:36 university-and-course-data celery[1263170]:     raise WorkerShutdown(should_stop)
+May 01 02:32:36 university-and-course-data celery[1263170]: celery.exceptions.WorkerShutdown: 0
+May 01 02:32:36 university-and-course-data celery[1263170]: During handling of the above exception, another exception occurred:
+May 01 02:32:36 university-and-course-data celery[1263170]: Traceback (most recent call last):
+May 01 02:32:36 university-and-course-data celery[1263170]:   File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/billiard/pool.py", line 1265, in mark_as_worker_lost
+May 01 02:32:36 university-and-course-data celery[1263170]:     raise WorkerLostError(
+May 01 02:32:36 university-and-course-data celery[1263170]: billiard.exceptions.WorkerLostError: Worker exited prematurely: signal 15 (SIGTERM) Job: 0.
+May 01 02:32:36 university-and-course-data celery[1263170]: """
+May 01 02:32:37 university-and-course-data systemd[1]: uni-celery.service: Deactivated successfully.
+May 01 02:32:37 university-and-course-data systemd[1]: Stopped uni-celery.service - University Portal Celery Worker (scraper).
+May 01 02:32:37 university-and-course-data systemd[1]: uni-celery.service: Consumed 4min 25.833s CPU time.
+May 01 02:32:37 university-and-course-data systemd[1]: Started uni-celery.service - University Portal Celery Worker (scraper).
+May 01 02:32:38 university-and-course-data celery[1263739]: /root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/celery/platforms.py:841: SecurityWarning: You're running the worker with superuser privileges: this is
+May 01 02:32:38 university-and-course-data celery[1263739]: absolutely not recommended!
+May 01 02:32:38 university-and-course-data celery[1263739]: Please specify a different user using the --uid option.
+May 01 02:32:38 university-and-course-data celery[1263739]: User information: uid=0 euid=0 gid=0 egid=0
+May 01 02:32:38 university-and-course-data celery[1263739]:   warnings.warn(SecurityWarning(ROOT_DISCOURAGED.format(
+May 01 02:32:38 university-and-course-data celery[1263739]:  
+May 01 02:32:38 university-and-course-data celery[1263739]:  -------------- celery@university-and-course-data v5.6.3 (recovery)
+May 01 02:32:38 university-and-course-data celery[1263739]: --- ***** -----
+May 01 02:32:38 university-and-course-data celery[1263739]: -- ******* ---- Linux-6.8.0-110-generic-x86_64-with-glibc2.39 2026-05-01 02:32:38
+May 01 02:32:38 university-and-course-data celery[1263739]: - *** --- * ---
+May 01 02:32:38 university-and-course-data celery[1263739]: - ** ---------- [config]
+May 01 02:32:38 university-and-course-data celery[1263739]: - ** ---------- .> app:         uniportal:0x75739db32a20
+May 01 02:32:38 university-and-course-data celery[1263739]: - ** ---------- .> transport:   redis://localhost:6379/0
+May 01 02:32:38 university-and-course-data celery[1263739]: - ** ---------- .> results:     redis://localhost:6379/0
+May 01 02:32:38 university-and-course-data celery[1263739]: - *** --- * --- .> concurrency: 4 (prefork)
+May 01 02:32:38 university-and-course-data celery[1263739]: -- ******* ---- .> task events: OFF (enable -E to monitor tasks in this worker)
+May 01 02:32:38 university-and-course-data celery[1263739]: --- ***** -----
+May 01 02:32:38 university-and-course-data celery[1263739]:  -------------- [queues]
+May 01 02:32:38 university-and-course-data celery[1263739]:                 .> scrape           exchange=scrape(direct) key=scrape
+May 01 02:32:38 university-and-course-data celery[1263739]:                 
+May 01 02:32:38 university-and-course-data celery[1263739]: [tasks]
+May 01 02:32:38 university-and-course-data celery[1263739]:   . scrape.refresh_baselines
+May 01 02:32:38 university-and-course-data celery[1263739]:   . scrape.repair
+May 01 02:32:38 university-and-course-data celery[1263739]:   . scrape.requeue_stale
+May 01 02:32:38 university-and-course-data celery[1263739]:   . scrape.university
+May 01 02:32:38 university-and-course-data celery[1263739]:   . tasks.snapshot.editable
+May 01 02:32:39 university-and-course-data celery[1263739]: [2026-05-01 02:32:39,281: INFO/MainProcess] Connected to redis://localhost:6379/0
+May 01 02:32:39 university-and-course-data celery[1263739]: [2026-05-01 02:32:39,284: INFO/MainProcess] mingle: searching for neighbors
+May 01 02:32:40 university-and-course-data celery[1263739]: [2026-05-01 02:32:40,295: INFO/MainProcess] mingle: all alone
+May 01 02:32:40 university-and-course-data celery[1263739]: [2026-05-01 02:32:40,305: INFO/MainProcess] [SHADOW] shadow mode ENABLED for uni_ids: 41
+May 01 02:32:40 university-and-course-data celery[1263739]: [2026-05-01 02:32:40,367: INFO/MainProcess] celery@university-and-course-data ready.
+root@university-and-course-data:~/University-and-Course-data# 
