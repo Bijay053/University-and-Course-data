@@ -1,0 +1,248 @@
+ls backend-py/scripts/
+audit_null_ielts.py  bond_enrich.py  bulk_approve.py  capture_baseline.py  check_gemini_model.py  regression_sweep.py  verify_db_match.py
+root@university-and-course-data:~/University-and-Course-data# cd ~/University-and-Course-data
+
+# Q1 — why did bulk_approve.py vanish?
+git reflog | head -20
+git status
+git diff HEAD --stat
+
+# Q2 — Bond IELTS spot-check (source will be NULL — that's expected and correct)
+sudo -u postgres psql university_portal -c "
+SELECT sc.id, sc.course_name, sc.ielts_overall,
+       sc.extraction_method->>'ielts_overall' AS source,
+       sc.course_website
+FROM scraped_courses sc
+WHERE sc.university_id = 22 AND sc.ielts_overall IS NOT NULL
+ORDER BY random()
+LIMIT 5;"
+
+# Flinders staging status
+sudo -u postgres psql university_portal -c "
+SELECT status, auto_publish_status, COUNT(*),
+       ROUND(AVG(completeness)) avg_pct
+FROM scraped_courses
+WHERE university_id = 12
+GROUP BY status, auto_publish_status
+ORDER BY status, auto_publish_status;"
+5601683 HEAD@{0}: pull origin main: Fast-forward
+44ff000 HEAD@{1}: pull origin main: Fast-forward
+f249dc3 HEAD@{2}: pull origin main: Fast-forward
+65b983c HEAD@{3}: pull origin main: Fast-forward
+7b643a6 HEAD@{4}: pull origin main: Fast-forward
+93497af HEAD@{5}: pull origin main: Fast-forward
+83e53e5 HEAD@{6}: pull origin main: Fast-forward
+1a1c95a HEAD@{7}: pull origin main: Fast-forward
+941d64f HEAD@{8}: pull origin main: Fast-forward
+983cc60 HEAD@{9}: pull origin main: Fast-forward
+ce11302 HEAD@{10}: pull origin main: Fast-forward
+aee94d7 HEAD@{11}: pull origin main: Fast-forward
+9a8e6b3 HEAD@{12}: pull origin main: Fast-forward
+0a29829 HEAD@{13}: commit: fix(duration): handle slash-structured program cells (Bug A)
+488a17e HEAD@{14}: reset: moving to 488a17e1a52ffb3a269784f8334c072ed838e3c8
+488a17e HEAD@{15}: cherry-pick: chore(acap): mark Phase 6 TODO as DONE in comment
+e7bfd9a HEAD@{16}: cherry-pick: fix(migration-012): drop/recreate course_search_view around ALTER COLUMN
+9c3090a HEAD@{17}: cherry-pick: fix(alembic): escape % in DATABASE_URL for ConfigParser
+58d5f0c HEAD@{18}: cherry-pick: fix(models): courses.duration Float->Numeric(6,2) + Alembic migration 012
+411f8ab HEAD@{19}: cherry-pick: fix(duration): block Year-12/schooling boilerplate from tournament
+On branch main
+Your branch is up to date with 'origin/main'.
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+        backend-py/2026-04-28 00:00:00+00
+        backend-py/baselines/
+        baselines/
+        drizzle-kit
+
+nothing added to commit but untracked files present (use "git add" to track)
+ status  | auto_publish_status | count | avg_pct 
+---------+---------------------+-------+---------
+ pending | review              |   105 |      75
+(1 row)
+
+root@university-and-course-data:~/University-and-Course-data# sudo -u postgres psql university_portal -c "
+SELECT 
+  COUNT(*) FILTER (WHERE international_fee IS NOT NULL) AS has_fee,
+  COUNT(*) FILTER (WHERE ielts_overall IS NOT NULL)     AS has_ielts,
+  COUNT(*) FILTER (WHERE duration IS NOT NULL)          AS has_duration,
+  COUNT(*) FILTER (WHERE degree_level IS NOT NULL)      AS has_degree_level,
+  COUNT(*) FILTER (WHERE description IS NOT NULL)       AS has_description,
+  COUNT(*) FILTER (WHERE intake_months IS NOT NULL)     AS has_intakes,
+  COUNT(*) FILTER (WHERE course_location IS NOT NULL)   AS has_location,
+  COUNT(*) FILTER (WHERE course_website IS NOT NULL)    AS has_website,
+  COUNT(*)                                              AS total
+FROM scraped_courses
+WHERE university_id = 12 AND status = 'pending';"
+
+# Also check a sample of names for quality
+sudo -u postgres psql university_portal -c "
+SELECT id, course_name, degree_level, completeness, international_fee, ielts_overall
+FROM scraped_courses
+WHERE university_id = 12 AND status = 'pending'
+ORDER BY completeness DESC
+LIMIT 10;"
+ has_fee | has_ielts | has_duration | has_degree_level | has_description | has_intakes | has_location | has_website | total 
+---------+-----------+--------------+------------------+-----------------+-------------+--------------+-------------+-------
+     105 |       105 |          105 |              105 |             105 |          91 |          103 |         105 |   105
+(1 row)
+
+  id   |                          course_name                          | degree_level | completeness | international_fee | ielts_overall 
+-------+---------------------------------------------------------------+--------------+--------------+-------------------+---------------
+ 10267 | Bachelor of Business Majoring in Event Management and Tourism | Bachelor's   |           77 |             39000 |             6
+ 10277 | Bachelor of Criminology                                       | Bachelor's   |           77 |             36300 |             6
+ 10275 | Bachelor of Commerce                                          | Bachelor's   |           77 |             39000 |             6
+ 10264 | Bachelor of Accounting                                        | Bachelor's   |           77 |             39000 |             6
+ 10266 | Bachelor of Business                                          | Bachelor's   |           77 |             39000 |             6
+ 10268 | Bachelor of Business Majoring in Human Resource Management    | Bachelor's   |           77 |             39000 |             6
+ 10271 | Bachelor of Business Majoring in Management                   | Bachelor's   |           77 |             39000 |             6
+ 10274 | Bachelor of Business Majoring in Sports Management            | Bachelor's   |           77 |             39000 |             6
+ 10269 | Bachelor of Business Majoring in International Business       | Bachelor's   |           77 |             39000 |             6
+ 10270 | Bachelor of Business Majoring in Leading Change               | Bachelor's   |           77 |             39000 |             6
+(10 rows)
+
+root@university-and-course-data:~/University-and-Course-data# cd ~/University-and-Course-data/backend-py
+
+# Force-promote the 105 review rows
+sudo -u postgres psql university_portal -c "
+UPDATE scraped_courses SET auto_publish_status = 'ready'
+WHERE university_id = 12
+  AND status = 'pending'
+  AND auto_publish_status = 'review';"
+
+# Dry-run
+PYTHONPATH=. venv/bin/python3 scripts/bulk_approve.py --university-id 12 --dry-run
+
+# Promote
+PYTHONPATH=. venv/bin/python3 scripts/bulk_approve.py --university-id 12
+
+# Verify
+sudo -u postgres psql university_portal -c "
+SELECT COUNT(*) AS flinders_live FROM courses WHERE university_id = 12;"
+UPDATE 105
+2026-05-01 12:25:00,497 INFO bulk_approve: University: Flinders University (id=12) | filter: status='pending' auto_publish_status='ready' | matched: 105 rows
+2026-05-01 12:25:00,498 INFO bulk_approve: DRY-RUN — no rows will be committed.
+2026-05-01 12:25:00,498 INFO bulk_approve: Sample names (up to 10):
+2026-05-01 12:25:00,498 INFO bulk_approve:   [10264] Bachelor of Accounting
+2026-05-01 12:25:00,498 INFO bulk_approve:   [10265] Bachelor of Archaeology
+2026-05-01 12:25:00,498 INFO bulk_approve:   [10266] Bachelor of Business
+2026-05-01 12:25:00,498 INFO bulk_approve:   [10267] Bachelor of Business Majoring in Event Management and Tourism
+2026-05-01 12:25:00,498 INFO bulk_approve:   [10268] Bachelor of Business Majoring in Human Resource Management
+2026-05-01 12:25:00,498 INFO bulk_approve:   [10269] Bachelor of Business Majoring in International Business
+2026-05-01 12:25:00,498 INFO bulk_approve:   [10270] Bachelor of Business Majoring in Leading Change
+2026-05-01 12:25:00,498 INFO bulk_approve:   [10271] Bachelor of Business Majoring in Management
+2026-05-01 12:25:00,498 INFO bulk_approve:   [10272] Bachelor of Business Majoring in Marketing
+2026-05-01 12:25:00,498 INFO bulk_approve:   [10273] Bachelor of Business Majoring in Small Business Leadership
+2026-05-01 12:25:01,420 INFO bulk_approve: University: Flinders University (id=12) | filter: status='pending' auto_publish_status='ready' | matched: 105 rows
+2026-05-01 12:25:01,484 INFO bulk_approve:   approved sc_id=10264 → course_id=673  'Bachelor of Accounting'
+2026-05-01 12:25:01,505 INFO bulk_approve:   approved sc_id=10265 → course_id=674  'Bachelor of Archaeology'
+2026-05-01 12:25:01,526 INFO bulk_approve:   approved sc_id=10266 → course_id=675  'Bachelor of Business'
+2026-05-01 12:25:01,543 INFO bulk_approve:   approved sc_id=10267 → course_id=676  'Bachelor of Business Majoring in Event Management and Tourism'
+2026-05-01 12:25:01,559 INFO bulk_approve:   approved sc_id=10268 → course_id=677  'Bachelor of Business Majoring in Human Resource Management'
+2026-05-01 12:25:01,576 INFO bulk_approve:   approved sc_id=10269 → course_id=678  'Bachelor of Business Majoring in International Business'
+2026-05-01 12:25:01,593 INFO bulk_approve:   approved sc_id=10270 → course_id=679  'Bachelor of Business Majoring in Leading Change'
+2026-05-01 12:25:01,610 INFO bulk_approve:   approved sc_id=10271 → course_id=680  'Bachelor of Business Majoring in Management'
+2026-05-01 12:25:01,628 INFO bulk_approve:   approved sc_id=10272 → course_id=681  'Bachelor of Business Majoring in Marketing'
+2026-05-01 12:25:01,647 INFO bulk_approve:   approved sc_id=10273 → course_id=682  'Bachelor of Business Majoring in Small Business Leadership'
+2026-05-01 12:25:01,663 INFO bulk_approve:   approved sc_id=10274 → course_id=683  'Bachelor of Business Majoring in Sports Management'
+2026-05-01 12:25:01,679 INFO bulk_approve:   approved sc_id=10275 → course_id=684  'Bachelor of Commerce'
+2026-05-01 12:25:01,697 INFO bulk_approve:   approved sc_id=10276 → course_id=685  'Bachelor of Computing and Mathematical Sciences (Honours)'
+2026-05-01 12:25:01,715 INFO bulk_approve:   approved sc_id=10277 → course_id=686  'Bachelor of Criminology'
+2026-05-01 12:25:01,732 INFO bulk_approve:   approved sc_id=10278 → course_id=687  'Bachelor of Disability and Community Inclusion'
+2026-05-01 12:25:01,752 INFO bulk_approve:   approved sc_id=10279 → course_id=688  'Bachelor of Engineering (Biomedical) (Honours) / Master of Engineering (Biomedical)'
+2026-05-01 12:25:01,774 INFO bulk_approve:   approved sc_id=10280 → course_id=689  'Bachelor of Engineering (Civil) (Honours)/ Master of Engineering Management'
+2026-05-01 12:25:01,794 INFO bulk_approve:   approved sc_id=10281 → course_id=690  'Bachelor of Engineering (Electrical and Electronic) (Honours), Master of Engineering (Mechanical)'
+2026-05-01 12:25:01,815 INFO bulk_approve:   approved sc_id=10282 → course_id=691  'Bachelor of Engineering (Electrical and Electronic) (Honours)/master of Engineering Management'
+2026-05-01 12:25:01,834 INFO bulk_approve:   approved sc_id=10283 → course_id=692  'Bachelor of Engineering (Environmental) (Honours)'
+2026-05-01 12:25:01,851 INFO bulk_approve:   approved sc_id=10284 → course_id=693  'Bachelor of Engineering (Environmental) (Honours), Master of Engineering (Civil)'
+2026-05-01 12:25:01,872 INFO bulk_approve:   approved sc_id=10285 → course_id=694  'Bachelor of Engineering (Maritime) (Honours)'
+2026-05-01 12:25:01,892 INFO bulk_approve:   approved sc_id=10286 → course_id=695  'Bachelor of Engineering (Mechanical) (Honours) / Master of Engineering (Biomedical)'
+2026-05-01 12:25:01,912 INFO bulk_approve:   approved sc_id=10287 → course_id=696  'Bachelor of Engineering (Mechanical) (Honours)/ Master of Engineering Management'
+2026-05-01 12:25:01,934 INFO bulk_approve:   approved sc_id=10288 → course_id=697  'Bachelor of Engineering (Robotics) (Honours) / Master of Engineering (Electrical and Electronic)'
+2026-05-01 12:25:01,956 INFO bulk_approve:   approved sc_id=10289 → course_id=698  'Bachelor of Engineering Technology (Advanced Manufacturing and Digital Design)'
+2026-05-01 12:25:01,976 INFO bulk_approve:   approved sc_id=10290 → course_id=699  'Bachelor of Health Sciences (Vision Science) / Master of Optometry'
+2026-05-01 12:25:02,001 INFO bulk_approve:   approved sc_id=10291 → course_id=700  'Bachelor of Health Sciences / Master of Occupational Therapy'
+2026-05-01 12:25:02,024 INFO bulk_approve:   approved sc_id=10292 → course_id=701  'Bachelor of Health Sciences / Master of Physiotherapy'
+2026-05-01 12:25:02,045 INFO bulk_approve:   approved sc_id=10293 → course_id=702  'Bachelor of Human Nutrition'
+2026-05-01 12:25:02,067 INFO bulk_approve:   approved sc_id=10294 → course_id=703  'Bachelor of Information Technology'
+2026-05-01 12:25:02,084 INFO bulk_approve:   approved sc_id=10295 → course_id=704  'Bachelor of International Relations and Political Science'
+2026-05-01 12:25:02,101 INFO bulk_approve:   approved sc_id=10296 → course_id=705  'Bachelor of Laws (Honours) - Legal Practice Entry'
+2026-05-01 12:25:02,117 INFO bulk_approve:   approved sc_id=10297 → course_id=706  'Bachelor of Laws - Legal Practice Entry'
+2026-05-01 12:25:02,132 INFO bulk_approve:   approved sc_id=10298 → course_id=707  'Bachelor of Medical Science'
+2026-05-01 12:25:02,146 INFO bulk_approve:   approved sc_id=10299 → course_id=708  'Bachelor of Medical Science (Honours)'
+2026-05-01 12:25:02,161 INFO bulk_approve:   approved sc_id=10300 → course_id=709  'Bachelor of Psychological Science'
+2026-05-01 12:25:02,177 INFO bulk_approve:   approved sc_id=10301 → course_id=710  'Bachelor of Science'
+2026-05-01 12:25:02,195 INFO bulk_approve:   approved sc_id=10302 → course_id=710  'Bachelor of Science'
+2026-05-01 12:25:02,211 INFO bulk_approve:   approved sc_id=10303 → course_id=711  'Bachelor of Sport and Active Recreation'
+2026-05-01 12:25:02,226 INFO bulk_approve:   approved sc_id=10304 → course_id=708  'Bachelor of Medical Science (Honours)'
+2026-05-01 12:25:02,244 INFO bulk_approve:   approved sc_id=10305 → course_id=712  'Bachelor of Science (Honours)'
+2026-05-01 12:25:02,263 INFO bulk_approve:   approved sc_id=10306 → course_id=713  'Bachelor of Sport, Health and Physical Activity (Honours) 1 Year'
+2026-05-01 12:25:02,281 INFO bulk_approve:   approved sc_id=10307 → course_id=714  'Bachelor of Psychological Studies (Graduate Entry)'
+2026-05-01 12:25:02,300 INFO bulk_approve:   approved sc_id=10308 → course_id=715  'Master of Applied Business Analytics'
+2026-05-01 12:25:02,320 INFO bulk_approve:   approved sc_id=10309 → course_id=716  'Master of Business Administration (Business Analytics)'
+2026-05-01 12:25:02,339 INFO bulk_approve:   approved sc_id=10310 → course_id=717  'Master of Business Administration (Finance)'
+2026-05-01 12:25:02,357 INFO bulk_approve:   approved sc_id=10311 → course_id=718  'Master of Business Administration (Healthcare Management)'
+2026-05-01 12:25:02,370 INFO bulk_approve:   approved sc_id=10312 → course_id=719  'Master of Business Administration (Human Resource Management)'
+2026-05-01 12:25:02,383 INFO bulk_approve:   approved sc_id=10313 → course_id=720  'Master of Business Administration (International Business)'
+2026-05-01 12:25:02,396 INFO bulk_approve:   approved sc_id=10314 → course_id=721  'Master of Business Administration (Marketing)'
+2026-05-01 12:25:02,409 INFO bulk_approve:   approved sc_id=10315 → course_id=722  'Master of Business Administration Industry Focused'
+2026-05-01 12:25:02,421 INFO bulk_approve:   approved sc_id=10316 → course_id=723  'Master of Disability Practice and Leadership'
+2026-05-01 12:25:02,434 INFO bulk_approve:   approved sc_id=10317 → course_id=724  'Master of Disability Practice and Leadership (Developmental Education)'
+2026-05-01 12:25:02,448 INFO bulk_approve:   approved sc_id=10318 → course_id=725  'Doctor of Medicine'
+2026-05-01 12:25:02,461 INFO bulk_approve:   approved sc_id=10319 → course_id=726  'Master of Forensic Science'
+2026-05-01 12:25:02,473 INFO bulk_approve:   approved sc_id=10320 → course_id=727  'Graduate Certificate in Public Health'
+2026-05-01 12:25:02,486 INFO bulk_approve:   approved sc_id=10321 → course_id=728  'Master of Education'
+2026-05-01 12:25:02,502 INFO bulk_approve:   approved sc_id=10322 → course_id=729  'Master of Inclusive and Specialised Education'
+2026-05-01 12:25:02,517 INFO bulk_approve:   approved sc_id=10323 → course_id=730  'Master of Professional Psychology'
+2026-05-01 12:25:02,533 INFO bulk_approve:   approved sc_id=10324 → course_id=731  'Master of Project Management'
+2026-05-01 12:25:02,548 INFO bulk_approve:   approved sc_id=10325 → course_id=732  'Master of Public Health'
+2026-05-01 12:25:02,564 INFO bulk_approve:   approved sc_id=10326 → course_id=733  'Master of Social Work (Graduate Entry)'
+2026-05-01 12:25:02,579 INFO bulk_approve:   approved sc_id=10327 → course_id=734  'Master of Teaching (Birth - 5)'
+2026-05-01 12:25:02,594 INFO bulk_approve:   approved sc_id=10328 → course_id=735  'Master of Teaching (Secondary)'
+2026-05-01 12:25:02,609 INFO bulk_approve:   approved sc_id=10329 → course_id=736  'Master of Occupational Therapy'
+2026-05-01 12:25:02,622 INFO bulk_approve:   approved sc_id=10330 → course_id=737  'Master of Science (Biology)'
+2026-05-01 12:25:02,637 INFO bulk_approve:   approved sc_id=10331 → course_id=738  'Master of Science (Environmental Science)'
+2026-05-01 12:25:02,651 INFO bulk_approve:   approved sc_id=10332 → course_id=739  'Doctor of Philosophy (Clinical Psychology)'
+2026-05-01 12:25:02,668 INFO bulk_approve:   approved sc_id=10333 → course_id=740  'Doctor of Philosophy (Phd) / Master of Business Administration (MBA)'
+2026-05-01 12:25:02,680 INFO bulk_approve:   approved sc_id=10334 → course_id=741  'Doctor of Philosophy (Phd) in Biological Sciences'
+2026-05-01 12:25:02,694 INFO bulk_approve:   approved sc_id=10335 → course_id=742  'Doctor of Philosophy (Phd) in Business'
+2026-05-01 12:25:02,705 INFO bulk_approve:   approved sc_id=10336 → course_id=743  'Doctor of Philosophy (Phd) in Chemical Or Physical Sciences'
+2026-05-01 12:25:02,719 INFO bulk_approve:   approved sc_id=10337 → course_id=744  'Doctor of Philosophy (Phd) in Clinical'
+2026-05-01 12:25:02,732 INFO bulk_approve:   approved sc_id=10338 → course_id=745  'Doctor of Philosophy (Phd) in Computing, Information Technology Or Mathematical Sciences'
+2026-05-01 12:25:02,745 INFO bulk_approve:   approved sc_id=10339 → course_id=746  'Doctor of Philosophy (Phd) in Creative and Performing Arts'
+2026-05-01 12:25:02,760 INFO bulk_approve:   approved sc_id=10340 → course_id=747  'Doctor of Philosophy (Phd) in Criminology'
+2026-05-01 12:25:02,772 INFO bulk_approve:   approved sc_id=10341 → course_id=748  'Doctor of Philosophy (Phd) in Disability and Community Inclusion'
+2026-05-01 12:25:02,785 INFO bulk_approve:   approved sc_id=10342 → course_id=749  'Doctor of Philosophy (Phd) in Education'
+2026-05-01 12:25:02,798 INFO bulk_approve:   approved sc_id=10343 → course_id=750  'Doctor of Philosophy (Phd) in Engineering'
+2026-05-01 12:25:02,810 INFO bulk_approve:   approved sc_id=10344 → course_id=751  'Doctor of Philosophy (Phd) in Environmental Sciences'
+2026-05-01 12:25:02,821 INFO bulk_approve:   approved sc_id=10345 → course_id=752  'Doctor of Philosophy (Phd) in Government and International Relations'
+2026-05-01 12:25:02,832 INFO bulk_approve:   approved sc_id=10346 → course_id=753  'Doctor of Philosophy (Phd) in Health Emergencies and Health Security'
+2026-05-01 12:25:02,846 INFO bulk_approve:   approved sc_id=10347 → course_id=754  'Doctor of Philosophy (Phd) in Health Sciences and Allied Health'
+2026-05-01 12:25:02,858 INFO bulk_approve:   approved sc_id=10348 → course_id=755  'Doctor of Philosophy (Phd) in Healthy Ageing and Aged Care'
+2026-05-01 12:25:02,872 INFO bulk_approve:   approved sc_id=10349 → course_id=756  'Doctor of Philosophy (Phd) in History, Archaeology, Geography and Indigenous Studies'
+2026-05-01 12:25:02,884 INFO bulk_approve:   approved sc_id=10350 → course_id=757  'Doctor of Philosophy (Phd) in Language, Literature and Culture'
+2026-05-01 12:25:02,898 INFO bulk_approve:   approved sc_id=10351 → course_id=758  'Doctor of Philosophy (Phd) in Law'
+2026-05-01 12:25:02,909 INFO bulk_approve:   approved sc_id=10352 → course_id=759  'Doctor of Philosophy (Phd) in Medical Biosciences'
+2026-05-01 12:25:02,921 INFO bulk_approve:   approved sc_id=10353 → course_id=760  'Doctor of Philosophy (Phd) in Nursing Or Midwifery'
+2026-05-01 12:25:02,931 INFO bulk_approve:   approved sc_id=10354 → course_id=761  'Doctor of Philosophy (Phd) in Palliative Care and End of Life'
+2026-05-01 12:25:02,942 INFO bulk_approve:   approved sc_id=10355 → course_id=762  'Doctor of Philosophy (Phd) in Psychology'
+2026-05-01 12:25:02,952 INFO bulk_approve:   approved sc_id=10356 → course_id=763  'Doctor of Philosophy (Phd) in Public Health and Rural and Remote Health'
+2026-05-01 12:25:02,968 INFO bulk_approve:   approved sc_id=10357 → course_id=764  'Doctor of Philosophy (Phd) in Social Sciences'
+2026-05-01 12:25:02,984 INFO bulk_approve:   approved sc_id=10358 → course_id=765  'Doctor of Philosophy (Phd) in Social Work'
+2026-05-01 12:25:02,995 INFO bulk_approve:   approved sc_id=10359 → course_id=766  'Master of Arts by Research in Creative and Performing Arts'
+2026-05-01 12:25:03,005 INFO bulk_approve:   approved sc_id=10360 → course_id=767  'Master of Arts by Research in History and Archaeology'
+2026-05-01 12:25:03,017 INFO bulk_approve:   approved sc_id=10361 → course_id=768  'Master of Arts by Research in Language, Literature and Culture'
+2026-05-01 12:25:03,027 INFO bulk_approve:   approved sc_id=10362 → course_id=769  'Master of Arts by Research in Social Sciences'
+2026-05-01 12:25:03,039 INFO bulk_approve:   approved sc_id=10363 → course_id=770  'Master of Health and Clinical Research'
+2026-05-01 12:25:03,051 INFO bulk_approve:   approved sc_id=10364 → course_id=771  'Master of Laws'
+2026-05-01 12:25:03,064 INFO bulk_approve:   approved sc_id=10365 → course_id=683  'Bachelor of Business Majoring in Sports Management'
+2026-05-01 12:25:03,076 INFO bulk_approve:   approved sc_id=10366 → course_id=710  'Bachelor of Science'
+2026-05-01 12:25:03,086 INFO bulk_approve:   approved sc_id=10367 → course_id=710  'Bachelor of Science'
+2026-05-01 12:25:03,097 INFO bulk_approve:   approved sc_id=10368 → course_id=692  'Bachelor of Engineering (Environmental) (Honours)'
+2026-05-01 12:25:03,097 INFO bulk_approve: Done. approved=105  failed=0  (total matched=105)
+ flinders_live 
+---------------
+            99
+(1 row)
+
+root@university-and-course-data:~/University-and-Course-data/backend-py# 
