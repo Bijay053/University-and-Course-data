@@ -1,0 +1,57 @@
+Your branch and 'origin/main' have diverged,
+and have 8 and 8 different commits each, respectively.
+
+You are currently cherry-picking commit 0279075.
+  (all conflicts fixed: run "git cherry-pick --continue")
+  (use "git cherry-pick --skip" to skip this patch)
+  (use "git cherry-pick --abort" to cancel the cherry-pick operation)
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+        backend-py/baselines/
+        drizzle-kit
+
+nothing added to commit but untracked files present (use "git add" to track)
+The previous cherry-pick is now empty, possibly due to conflict resolution.
+If you wish to commit it anyway, use:
+
+    git commit --allow-empty
+
+Otherwise, please use 'git cherry-pick --skip'
+488a17e (HEAD -> main) chore(acap): mark Phase 6 TODO as DONE in comment
+e7bfd9a fix(migration-012): drop/recreate course_search_view around ALTER COLUMN
+9c3090a fix(alembic): escape % in DATABASE_URL for ConfigParser
+58d5f0c fix(models): courses.duration Float->Numeric(6,2) + Alembic migration 012
+411f8ab fix(duration): block Year-12/schooling boilerplate from tournament
+1f1e81f fix(duration): same-N cross-check + grad-cert sanity cap + new tests
+add1bdd fix(kbs): disable vision OCR + normalise slash-separated location format
+44b049f feat(option-c): wire strip_patterns into location extractor (ACAP footnote fix)
+f95d75f Phase 6: add 3 regression tests for completion-deadline anti-context fix
+root@university-and-course-data:~/University-and-Course-data# git log --oneline | head -9
+488a17e chore(acap): mark Phase 6 TODO as DONE in comment
+e7bfd9a fix(migration-012): drop/recreate course_search_view around ALTER COLUMN
+9c3090a fix(alembic): escape % in DATABASE_URL for ConfigParser
+58d5f0c fix(models): courses.duration Float->Numeric(6,2) + Alembic migration 012
+411f8ab fix(duration): block Year-12/schooling boilerplate from tournament
+1f1e81f fix(duration): same-N cross-check + grad-cert sanity cap + new tests
+add1bdd fix(kbs): disable vision OCR + normalise slash-separated location format
+44b049f feat(option-c): wire strip_patterns into location extractor (ACAP footnote fix)
+f95d75f Phase 6: add 3 regression tests for completion-deadline anti-context fix
+root@university-and-course-data:~/University-and-Course-data# cd ~/University-and-Course-data
+git cherry-pick --skip
+git log --oneline | head -9
+488a17e chore(acap): mark Phase 6 TODO as DONE in comment
+e7bfd9a fix(migration-012): drop/recreate course_search_view around ALTER COLUMN
+9c3090a fix(alembic): escape % in DATABASE_URL for ConfigParser
+58d5f0c fix(models): courses.duration Float->Numeric(6,2) + Alembic migration 012
+411f8ab fix(duration): block Year-12/schooling boilerplate from tournament
+1f1e81f fix(duration): same-N cross-check + grad-cert sanity cap + new tests
+add1bdd fix(kbs): disable vision OCR + normalise slash-separated location format
+44b049f feat(option-c): wire strip_patterns into location extractor (ACAP footnote fix)
+f95d75f Phase 6: add 3 regression tests for completion-deadline anti-context fix
+root@university-and-course-data:~/University-and-Course-data# git fetch origin
+git tag archive/bundled-deploy-attempt origin/main
+git tag -l | grep archive
+archive/bundled-deploy-attempt
+bundled-deploy-archive
+root@university-and-course-data:~/University-and-Course-data# 
