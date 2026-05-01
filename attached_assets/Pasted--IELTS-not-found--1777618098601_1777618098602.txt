@@ -1,0 +1,55 @@
+                     +| 
+   IELTS: ❌ not found                                                                                                                                                                                             
+                                                                                                                                                                                                                   
+                       +| 
+   Duration: ❌ not found                                                                                                                                                                                          
+                                                                                                                                                                                                                   
+                       +| 
+   Intake: ✅ "['January']" [regex conf=0.40]                                                                                                                                                                      
+                                                                                                                                                                                                                   
+                       +| 
+   StudyMode: ✅ 'Online' [study_mode:rule conf=0.50]                                                                                                                                                              
+                                                                                                                                                                                                                   
+                        | 
+ [GP-DEBUG] raw_response='```json\n{\n  "international_fee": null,\n  "domestic_fee": null,\n  "fee_term": null,\n  "duration_value": null,\n  "duration_unit": null,\n  "duration_text": null,\n  "ielts_overall":
+ null,\n  "pte_overall": null,\n  "toefl_overall": null,\n  "cambridge_overall": null,\n  "duolingo_overall": null,\n  "sub_category": null,\n  "category": null,\n  "mode": "Online",\n  "intake_text": null,\n  "
+location_text": null\n' | 2026-05-01 06:17:43.259321+00
+ [GP-DEBUG] raw_response='```json\n{\n  "international_fee": null,\n  "domestic_fee": null,\n  "fee_term": null,\n  "duration_value": null,\n  "duration_unit": null,\n  "duration_text": null,\n  "ielts_overall":
+ null,\n  "pte_overall": null,\n  "toefl_overall": null,\n  "cambridge_overall": null,\n  "duolingo_overall": null,\n  "sub_category": null,\n  "category": "Business & Management",\n  "mode": "Blended",\n  "inta
+ke_text": null,\n  "l'  | 2026-05-01 06:17:43.259909+00
+ [GP-DEBUG] raw_response='```json\n{\n  "international_fee": null,\n  "domestic_fee": null,\n  "fee_term": null,\n  "duration_value": 2,\n  "duration_unit": "years",\n  "duration_text": "2 years",\n  "ielts_over
+all": null,\n  "pte_overall": null,\n  "toefl_overall": null,\n  "cambridge_overall": null,\n  "duolingo_overall": null,\n  "sub_category": "Business Administration",\n  "category": "Business & Management",\n  "
+mode": "On Campus",'    | 2026-05-01 06:17:43.383988+00
+ [GP-DEBUG] raw_response='```json\n{\n  "international_fee": null,\n  "domestic_fee": null,\n  "fee_term": null,\n  "duration_value": 2,\n  "duration_unit": "years",\n  "duration_text": "two years",\n  "ielts_ov
+erall": null,\n  "pte_overall": null,\n  "toefl_overall": null,\n  "cambridge_overall": null,\n  "duolingo_overall": null,\n  "sub_category": "Master of Business Administration",\n  "category": "Business & Manag
+ement",\n  "mode": '    | 2026-05-01 06:17:43.585933+00
+ [per-course browser ✓] https://www.kbs.edu.au/courses/mba-master-of-business-administration — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]                                                                         
+                                                                                                                                                                                                                   
+                        | 2026-05-01 06:17:59.339781+00
+ [FALLBACK] AI enriching https://www.kbs.edu.au/courses/mba-master-of-business-administration (missing: international_fee, domestic_fee, ielts_overall)                                                                                                                                                                                                                                                                                                       | 2026-05-01 06:17:59.354502+00
+ [per-course browser ✓] https://www.kbs.edu.au/courses/non-award-single-subject-enrolment — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]                                                                            
+                                                                                                                                                                                                                   
+                        | 2026-05-01 06:18:00.08571+00
+ [FALLBACK] AI enriching https://www.kbs.edu.au/courses/non-award-single-subject-enrolment (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)                    
+                                                                                                                                                                                                                   
+                        | 2026-05-01 06:18:00.097416+00
+ [per-course browser ✓] https://www.kbs.edu.au/ultimate-guide-doing-mba-australia — IELTS=— PTE=— TOEFL=— CAE=— fee=67000 filled=[]                                                                                
+                                                                                                                                                                                                                   
+                        | 2026-05-01 06:18:00.374545+00
+ [FALLBACK] AI enriching https://www.kbs.edu.au/ultimate-guide-doing-mba-australia (missing: domestic_fee, ielts_overall, intake_text, location_text)                                                              
+                                                                                                                                                                                                                   
+                        | 2026-05-01 06:18:00.394937+00
+ [WARN] MBA - Master of Business Administration — English section detected in HTML but all scores blank                                                                                                            
+                                                                                                                                                                                                                   
+                        | 2026-05-01 06:18:00.82699+00
+ [WARN] MBA - Master of Business Administration — Fee section detected but fee is blank                                                                                                                            
+                                                                                                                                                                                                                   
+                        | 2026-05-01 06:18:00.830738+00
+ ⚠️ [WARN 75/100] MBA - Master of Business Administration — missing: english | mba-master-of-business-administration                                                                                                
+                                                                                                                                                                                                                   
+                        | 2026-05-01 06:18:00.834133+00
+                                                                                                                                                                                                                   
+                        | 2026-05-01 06:18:01.27097+00
+(20 rows)
+
+(END)

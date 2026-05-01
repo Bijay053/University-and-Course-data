@@ -1,0 +1,54 @@
+                       +| 
+   Duration: ❌ not found                                                                                                                                                                                          
+                                                                                                                                                                                                                   
+                       +| 
+   Intake: ✅ "['May']" [regex conf=0.40]                                                                                                                                                                          
+                                                                                                                                                                                                                   
+                       +| 
+   StudyMode: ✅ 'Online' [study_mode:rule conf=0.70]                                                                                                                                                              
+                                                                                                                                                                                                                   
+                        | 
+ [FIELD SUMMARY] Non-award Single Subject Enrolment                                                                                                                                                                
+                                                                                                                                                                                                                   
+                       +| 2026-05-01 06:17:37.890678+00
+   Fee: ❌ not found                                                                                                                                                                                               
+                                                                                                                                                                                                                   
+                       +| 
+   IELTS: ❌ not found                                                                                                                                                                                             
+                                                                                                                                                                                                                   
+                       +| 
+   Duration: ❌ not found                                                                                                                                                                                          
+                                                                                                                                                                                                                   
+                       +| 
+   Intake: ✅ "['May']" [regex conf=0.40]                                                                                                                                                                          
+                                                                                                                                                                                                                   
+                       +| 
+   StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]                                                                                                                                                           
+                                                                                                                                                                                                                   
+                        | 
+ [FIELD SUMMARY] MBA - Master of Business Administration                                                                                                                                                           
+                                                                                                                                                                                                                   
+                       +| 2026-05-01 06:17:38.929984+00
+   Fee: ❌ not found                                                                                                                                                                                               
+                                                                                                                                                                                                                   
+                       +| 
+   IELTS: ❌ not found                                                                                                                                                                                             
+                                                                                                                                                                                                                   
+                       +| 
+   Duration: ✅ '2.0' [regex conf=0.75]                                                                                                                                                                            
+                                                                                                                                                                                                                   
+                       +| 
+   Intake: ✅ "['March', 'May', 'July', 'Sept" [regex conf=0.70]                                                                                                                                                   
+                                                                                                                                                                                                                   
+                       +| 
+   StudyMode: ✅ 'Online' [study_mode:rule conf=0.50]                                                                                                                                                              
+                                                                                                                                                                                                                   
+                        | 
+ [FIELD SUMMARY] The Ultimate Guide to Doing An MBA in Australia                                                                                                                                                   
+                                                                                                                                                                                                                   
+                       +| 2026-05-01 06:17:39.782129+00
+   Fee: ✅ '67000' [regex conf=1.00]                                                                                                                                                                               
+                                                                                                                                                                                                                   
+                       +| 
+                       +| 
+   IELTS: ❌ not found         

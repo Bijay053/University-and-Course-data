@@ -1,0 +1,92 @@
+The forensics on the zombie-job mechanism are good. Three things you cleared up cleanly:
+
+- The auto-reap is happening in the start handler at `scrape.py:695`, not the beat task. That explains why the first curl recovered cleanly — the start handler reaped the stale job before dispatching the new one.
+- The two "Stopped by user" jobs were from a parallel browser tab, not a code race. UI concurrency, not a bug.
+- The before-baseline timestamp (05:47, after Bug A landed at 05:26) confirms the Bug A.2 sweep was measuring Bug A.2's incremental effect, not Bug A + A.2 combined. Sweep is correctly attributed.
+
+Good detective work. The 22→21 question is worth one query as you suggested — if Bug A silently regressed one course, that's worth knowing before we move on.
+
+---
+
+**But the KBS fee/IELTS gap I flagged in my last reply isn't addressed anywhere in your response, and it should be the actual priority.**
+
+To recap what the dashboard showed: all 29 staged KBS courses have **empty IELTS, PTE, TOEFL, CAE, DET, AND International Fee columns**. Zero exceptions. The scrape log fires `English section detected in HTML but all scores blank` and `Fee section detected but fee is blank` warnings on every single course.
+
+The scrape log also confirms:
+
+```
+[CENTRAL] auto-discovered fee page: https://www.kbs.edu.au/admissions/fees
+[CENTRAL] fee page parsed — 0 program record(s) from https://www.kbs.edu.au/admissions/fees
+```
+
+The central fee page extractor IS running but returning zero records. So either the parser doesn't understand KBS's fee page format, or the fee page itself doesn't have parseable fee data and the actual fees live somewhere else.
+
+This is more user-facing than the 22→21 question, more user-facing than Bug B, and more user-facing than the Charles Sturt 92-course gap. From an international student's perspective looking at KBS in the dashboard:
+
+- Course names: ✅ visible
+- Duration: ✅ visible (just fixed by Bug A)
+- Locations: ✅ visible
+- Intakes: ✅ visible
+- **English requirements: ❌ blank on all 29 courses**
+- **Tuition fees: ❌ blank on all 29 courses**
+
+Duration was the third-most-important field. We just shipped fixes for duration. English requirements and fees are the FIRST and SECOND most important fields and they're missing across the entire university.
+
+---
+
+**The four diagnostic queries from my last reply are still the next step:**
+
+```
+# Q1: What did the central fee page actually return?
+sudo -u postgres psql university_portal -c "
+SELECT payload
+FROM scrape_runtime_logs
+WHERE runtime_job_id = (
+  SELECT runtime_job_id FROM scrape_runtime_jobs
+  WHERE university_id = 29 ORDER BY created_at DESC LIMIT 1
+)
+AND payload::text ILIKE '%admissions/fees%'
+ORDER BY sequence LIMIT 5;"
+
+# Q2: Does an English requirements page exist?
+curl -s 'https://www.kbs.edu.au/admissions/english-requirements' -I
+curl -s 'https://www.kbs.edu.au/admissions/english-language-requirements' -I
+curl -s 'https://www.kbs.edu.au/admissions/entry-requirements' -I
+
+# Q3: Fee page HTML structure
+curl -s 'https://www.kbs.edu.au/admissions/fees' \
+  | grep -A3 -B1 -iE 'fee|tuition|\\$[0-9]|aud' | head -50
+
+# Q4: English page HTML structure (use whichever URL Q2 confirmed)
+curl -s 'https://www.kbs.edu.au/admissions/english-language-requirements' \
+  | grep -A3 -B1 -iE 'ielts|pte|toefl' | head -50
+```
+
+Q1 tells us why the existing extractor returns zero records. Q2 finds the English page. Q3 and Q4 give us the HTML formats to parse against.
+
+The answers determine scope:
+- If KBS uses a unique fee/English format → per-uni override (KBS-specific parser)
+- If multiple unis use similar central-page-with-table-of-fees format → generic shared-code fix to the central parsers
+
+We can't design the fix until we see the format.
+
+---
+
+**Updated priority order:**
+
+1. **KBS fee/IELTS extraction** — the priority. Affects 29/29 courses on dashboard, two of the most important fields.
+2. **22→21 sanity check** — one diagnostic query, ~2 minutes. Worth doing while waiting on the KBS investigation results.
+3. **Charles Sturt 92-course promotion gap** — user-facing on a different uni.
+4. **Bug B (NULL duration drop policy)** — safety net, lower priority now A.2 shipped.
+5. **Other queue items** (Torrens, ACAP modal, sibling cache, etc.).
+
+---
+
+**Status check:**
+
+- Architecture/discipline: working as designed
+- Duration data quality: fixed end-to-end on KBS
+- Fee/English data quality: still completely broken on KBS, untouched
+- Other unis: unknown, probably similar
+
+We're spending time on the diagnostic edges (zombie jobs, 22→21) when the actual user-visible problem is sitting right in front of us in the dashboard. Run the four queries when you can — that's the next migration to design.

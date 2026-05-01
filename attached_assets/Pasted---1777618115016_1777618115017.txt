@@ -1,0 +1,55 @@
+                                                                                                                                                                                                                   
+          msg                                                                                                                                                                                                      
+                        |          created_at           
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+------------------------+-------------------------------
+ [CENTRAL] auto-discovered fee page: https://www.kbs.edu.au/admissions/fees                                                                                                                                        
+                                                                                                                                                                                                                   
+                        | 2026-05-01 06:17:29.21653+00
+ [CENTRAL] fee page parsed → 0 program record(s) from https://www.kbs.edu.au/admissions/fees                                                                                                                       
+                                                                                                                                                                                                                   
+                        | 2026-05-01 06:17:36.386945+00
+ [FIELD SUMMARY] Course Delivery Options                                                                                                                                                                           
+                                                                                                                                                                                                                   
+                       +| 2026-05-01 06:17:37.389308+00
+   Fee: ❌ not found                                                                                                                                                                                               
+                                                                                                                                                                                                                   
+                       +| 
+   IELTS: ❌ not found                                                                                                                                                                                             
+                                                                                                                                                                                                                   
+                       +| 
+   Duration: ❌ not found                                                                                                                                                                                          
+                                                                                                                                                                                                                   
+                       +| 
+   Intake: ✅ "['May']" [regex conf=0.40]                                                                                                                                                                          
+                                                                                                                                                                                                                   
+                       +| 
+   StudyMode: ✅ 'Online' [study_mode:rule conf=0.70]                                                                                                                                                              
+                                                                                                                                                                                                                   
+                        | 
+ [FIELD SUMMARY] Non-award Single Subject Enrolment                                                                                                                                                                
+                                                                                                                                                                                                                   
+                       +| 2026-05-01 06:17:37.890678+00
+   Fee: ❌ not found                                                                                                                                                                                               
+                                                                                                                                                                                                                   
+                       +| 
+   IELTS: ❌ not found                                                                                                                                                                                             
+                                                                                                                                                                                                                   
+                       +| 
+   Duration: ❌ not found                                                                                                                                                                                          
+                                                                                                                                                                                                                   
+                       +| 
+   Intake: ✅ "['May']" [regex conf=0.40]                                                                                                                                                                          
+                                                                                                                                                                                                                   
+                       +| 
+   StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]                                                                                                                                                           
+                                                                                                                                                                                                                   
+                        | 
+ [FIELD SUMMARY] MBA - Master of Business Administration                                                                                                                                                           
+                                                                                                                                                                                                                   
+                       +| 2026-05-01 06:17:38.929984+00
+   Fee: ❌ not found                                                                                                                                                                                               
+                                                                                                                                                                                                                   
+                       +| 
+   IELTS: ❌ not found    
