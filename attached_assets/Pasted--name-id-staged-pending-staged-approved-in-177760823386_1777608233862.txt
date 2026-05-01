@@ -1,0 +1,57 @@
+                          name                          | id | staged_pending | staged_approved | in_courses_table 
+--------------------------------------------------------+----+----------------+-----------------+------------------
+ Bond University                                        | 22 |            126 |               0 |                0
+ Flinders University                                    | 12 |            105 |               0 |                0
+ Australian Catholic University (ACU)                   | 51 |             99 |               0 |                0
+ aut                                                    | 20 |             92 |               0 |                0
+ Charles Sturt university                               |  4 |             41 |             271 |              173
+ APIC College                                           | 30 |             25 |               0 |                0
+ Kaplan Business School                                 | 29 |             22 |               0 |                0
+ VIT Victorian Institute of Technology                  | 38 |             19 |               0 |                0
+ Auckland University of Technology (AUT)                | 87 |             13 |               0 |                0
+ University of Tasmania                                 |  5 |             13 |               0 |                0
+ UNE                                                    | 14 |             12 |               0 |                0
+ ACAP University College                                | 41 |             11 |               0 |                0
+ asa                                                    |  2 |              9 |               8 |                8
+ AIBI                                                   | 47 |              8 |               0 |                0
+ AIT Academy of Interactive Technology                  | 37 |              6 |               0 |                0
+ SCU                                                    | 17 |              6 |               0 |                0
+ ATMC New Zealand                                       | 93 |              4 |               0 |                0
+ cqu                                                    | 18 |              4 |               0 |                0
+ UOW                                                    | 13 |              3 |               0 |                0
+ Canterbury Institute of Management (CIM)               | 33 |              0 |               0 |                0
+ Stanley College                                        | 34 |              0 |               0 |                0
+ ASA Institute of Higher Education                      | 35 |              0 |               0 |                0
+ ECA College of Health Science                          | 36 |              0 |               0 |                0
+ UHE                                                    | 39 |              0 |               0 |                0
+ La Trobe University Sydney                             | 40 |              0 |               0 |                0
+ Western Sydney University Sydney City Campus           | 42 |              0 |               0 |                0
+ Charles Sturt University Sydney & Melbourne            | 43 |              0 |               0 |                0
+ SAE University College                                 | 44 |              0 |               0 |                0
+ Australian International Institute of Higher Education | 45 |              0 |               0 |                0
+ Federation University                                  | 46 |              0 |               0 |                0
+ Excelsia University College                            | 48 |              0 |               0 |                0
+ Murdoch College                                        | 49 |              0 |               0 |                0
+ University of Newcastle College                        | 50 |              0 |               0 |                0
+ Bond University                                        | 52 |              0 |               0 |                0
+ Griffith University                                    | 53 |              0 |               0 |                0
+ James Cook University (JCU)                            | 54 |              0 |               0 |                0
+ La Trobe University Main Campus                        | 55 |              0 |               0 |                0
+ Macquarie University                                   | 56 |              0 |               0 |                0
+ Queensland University of Technology (QUT)              | 57 |              0 |               0 |                0
+ RMIT University                                        | 58 |              0 |               0 |                0
+ The University of Adelaide                             | 59 |              0 |               0 |                0
+ The University of New South Wales (UNSW)               | 60 |              0 |               0 |                0
+ The University of Queensland (UQ)                      | 61 |              0 |               0 |                0
+ University of Technology Sydney (UTS)                  | 62 |              0 |               0 |                0
+ Box Hill TAFE                                          | 63 |              0 |               0 |                0
+ Canberra Institute of Technology (CIT)                 | 64 |              0 |               0 |                0
+ Chisholm TAFE                                          | 65 |              0 |               0 |                0
+ Holmesglen TAFE                                        | 66 |              0 |               0 |                0
+ TAFE NSW                                               | 67 |              0 |               0 |                0
+ TAFE Queensland                                        | 68 |              0 |               0 |                0
+ TAFE SA                                                | 69 |              0 |               0 |                0
+ TasTAFE & GETI                                         | 70 |              0 |               0 |                0
+ Holmes Institute                                       | 71 |              0 |               0 |                0
+ Blue Mountains International Hotel Management School   | 72 |              0 |               0 |                0
+:
