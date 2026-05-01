@@ -1,0 +1,98 @@
+Final close-out checks out. The numbers stack up correctly: +131 live courses, zero duplicates, zero pending gaps across all 8 universities.
+
+---
+
+**The verified state, with one correction:**
+
+| University | Live courses | Change |
+|---|---|---|
+| USQ (1) | 67 | ±0 (legacy field updates only) |
+| ASA (2) | 8 | ±0 (legacy field updates only) |
+| CSU (4) | 184 | +11 net (after dedup of 8 garbled rows) |
+| UTas (5) | 1 | +1 |
+| VIT (6) | 38 | +19 |
+| KBS (8) | 29 | +29 |
+| SCU (17) | 1 | +1 |
+| AUT (20) | 70 | +70 |
+| **Total live** | **398** | **+131** |
+
+A correction: the prior Bug F summary had said +123 but VIT also picked up 19 (was 19 → now 38) once the 36 review rows were force-promoted and then 6 prefix-code duplicates were cleaned. Net is +131. Bigger win than the prior tally suggested.
+
+VIT 38 live, KBS 29 live, both with verified clean names — these two unis went from "nothing visible" to "complete clean catalog" inside this engagement.
+
+---
+
+**Three open items — ranked by what blocks what:**
+
+**Issue 1 (BLOCKER for next migration) — Pipeline code gap.**
+
+From the summary: "The Replit-side fixes (VIT specialization fix, KBS English guard, CSU diploma fix) are NOT deployed to prod. Before running Bond or Flinders scrapes, push Replit → GitHub via Replit's GitHub integration button, then `git pull origin main` on prod."
+
+This is the same loss-on-rebuild risk pattern that's come up multiple times this week. The `git push` you ran reported "Everything up-to-date" — which means prod's local branch already matched origin. So one of two things is true:
+
+- The Replit-side fixes were authored but never pushed to either prod or GitHub (Replit → prod path didn't run). They live only in the Replit workspace.
+- The Replit-side fixes were pulled to prod but never committed. They live only as uncommitted changes on the prod server.
+
+Quick check before Bond:
+
+```
+cd ~/University-and-Course-data
+git status
+git log --oneline -5
+# If git status shows uncommitted changes — commit and push them.
+# If git log doesn't show the recent VIT/KBS/CSU pipeline fixes — 
+# they need to be pushed from Replit to GitHub first, then pulled here.
+```
+
+Needs confirmation either way. Running Bond's scrape with the old extractors means Bond gets the same garbled-name and CRICOS-suffix issues we just spent a week fixing on VIT and CSU. We'd be re-creating bug debt to clean up.
+
+**Issue 2 (admin attention, not engineering) — CSU 11 review rows.**
+
+The summary correctly notes these were left intentionally because completeness is 54-69% with missing fees and academic data. The decision "resolve in the next CSU targeted scrape, not via force-promotion" is the right call — force-promoting low-completeness data shows incomplete information to users, which is worse than not showing the courses.
+
+Worth noting in the project tracking that these 11 are deliberately deferred, not forgotten. When Bond is done and we come back to CSU for a re-scrape, these should re-extract with the now-fixed extractors and either auto-promote or surface specific missing fields the admin can fill in manually.
+
+**Issue 3 (operational gap) — backups + safer DELETE patterns still pending.**
+
+The table-wipe incident from the KBS round exposed both gaps. Worth getting these in before Bond just in case:
+
+```
+# Quick logical backup before Bond migration
+sudo -u postgres pg_dump university_portal | gzip > /var/backups/university_portal_$(date +%Y%m%d_%H%M%S).sql.gz
+```
+
+Not a permanent backup solution, but a one-shot snapshot before the next big change is worth 30 seconds of work.
+
+---
+
+**Recommended sequence for Bond (uni_id=22):**
+
+1. **Confirm pipeline fixes are deployed** (Issue 1 above) — run `git status` and `git log --oneline -5` to verify the VIT/KBS/CSU pipeline-side fixes from Replit are actually on prod
+2. **One-shot pg_dump backup** (Issue 3 above)
+3. **Diagnostic query first** — understand what state Bond is in before touching anything:
+```
+sudo -u postgres psql university_portal -c "
+SELECT status, auto_publish_status, COUNT(*),
+       MIN(created_at) AS oldest, MAX(created_at) AS newest
+FROM scraped_courses
+WHERE university_id = 22
+GROUP BY status, auto_publish_status
+ORDER BY status, auto_publish_status;"
+```
+This tells us whether Bond's 126 staged rows are recently-scraped (use them as-is) or stale from old runs (rescrape first).
+4. **If staged rows are stale**: rescrape Bond, then do the standard cycle
+5. **If staged rows are fresh**: dry-run bulk_approve, review what would land, commit, verify
+6. **Name quality check** — Bond has 126 courses, run the same `name ~* ' Of '` and abbreviated-name spot-checks we did on CSU before declaring done
+7. **Final verification**: live count + duplicate check + ground-truth spot check against bond.edu.au for one degree from each level
+
+Same playbook as VIT/CSU/KBS. Should take ~30 minutes if pipeline is up to date and rows are fresh. Longer if either condition isn't met.
+
+---
+
+**Honest framing:**
+
+This was the best week of the engagement. Concrete numbers: +131 live courses, 162 name fixes, 8 universities cleared. The discipline of "diagnose, dry-run, commit, verify" landed properly on every action. The hardest moments (KBS table wipe, IELTS=6.5 hallucination, sweep PASSing on stale data) were caught and corrected within the same cycle they appeared.
+
+The pipeline code gap is the one shadow over the close-out. Get that resolved, then Bond is the next clean target. Same playbook, larger impact (126 courses).
+
+Ready when you are.
