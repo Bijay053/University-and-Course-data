@@ -1,0 +1,187 @@
+from playwright.async_api import async_playwright
+
+async def main():
+    async with async_playwright() as pw:
+        browser = await pw.chromium.launch(headless=True)
+        page = await browser.new_page()
+        hits = {}
+
+        async def on_response(resp):
+            url = resp.url
+            if 'bond.edu.au' not in url:
+                return
+            try:
+                body = (await resp.body()).decode('utf-8', errors='ignore')
+                if any(x in body.lower() for x in ['fee','tuition','cost','ielts','english','intake']):
+                    hits[url] = body[:800]
+            except:
+                pass
+
+        page.on('response', on_response)
+
+        # domcontentloaded — never hangs, then give JS 10s to hydrate
+        await page.goto('https://bond.edu.au/program/bachelor-arts',
+                        wait_until='domcontentloaded', timeout=30000)
+        await page.wait_for_timeout(10000)
+
+        print("=== XHR/fetch responses containing fee/ielts data ===")
+        for url, body in hits.items():
+            print(f"\n-- {url}")
+            print(body[:600])
+
+        print("\n=== Rendered page: fee/ielts/English lines ===")
+        html = await page.content()
+        for m in re.findall(r'.{0,60}(?:international fee|tuition|ielts|english req|AUD|\$\d{4,}).{0,120}',
+                            html, re.IGNORECASE):
+PYEOFio.run(main())er.close()p()[:180]))
+final URL: https://bond.edu.au/page-not-found?q=api+program+fees+432
+=== XHR/fetch responses containing fee/ielts data ===
+
+-- https://bond.edu.au/program/bachelor-of-arts
+<!DOCTYPE html>
+<html lang="en" dir="ltr" prefix="og: https://ogp.me/ns#">
+<head>
+  <meta charset="utf-8" />
+<script nonce="ATdPsIDRw8OEDNLXypnme7rjTJWHDy9N">dataLayer = [];</script>
+<script nonce="ATdPsIDRw8OEDNLXypnme7rjTJWHDy9N" id="gtmScript" data-nonce="ATdPsIDRw8OEDNLXypnme7rjTJWHDy9N">(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;var n=d.querySelector('[nonce]');n&&j.setAttribute('nonc
+
+-- https://bond.edu.au/libraries/bond/css/fonts.css?tdjz4g
+@import"https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;800&display=swap";@import"https://p.typekit.net/p.css?s=1&k=sfo6vle&ht=tk&f=31141.31142.31143.31144.31145.31146.31147.31148.31162.31163.31164.31165.31166.31167.31168.31169&a=69787314&app=typekit&e=css";@font-face{font-family:interstate;src:url(https://use.typekit.net/af/e5199f/00000000000000003b9ae7f4/27/l?primer=7cdcb44be4a7db8877ffa5c0007b8dd865b3bbc383831fe2ea177f62257a9191&fvd=n4&v=3) format("woff2");font-display:swap;font-style:normal;font-weight:400}@font-face{font-family:interstate;src:url(https://use.typekit.net
+
+-- https://bond.edu.au/api/menu/main
+[{"title":"Study","url":"\/study","children":[{"title":"Program finder","url":"\/study\/program-finder","children":[],"is_break":false,"large":false},{"title":"Why study at Bond","url":"\/study\/why-study-at-bond","children":[{"title":"Our rankings","url":"\/study\/why-study-at-bond\/our-rankings","children":[],"is_break":false,"large":false},{"title":"Personal attention","url":"\/study\/why-study-at-bond\/personal-attention","children":[],"is_break":false,"large":false},{"title":"Accelerated degrees","url":"\/study\/why-study-at-bond\/accelerated-degrees","children":[],"is_break":false,"large
+
+-- https://bond.edu.au/libraries/bond/module/chunks/Translate-KTLFgCp5.js
+class e{constructor(){this.popup=[],this.menu=null}attachPopup(e,t){this.popup.push({id:e,closefn:t})}detachPopup(e){this.popup=this.popup.filter(t=>t.id!==e)}attachMenu(e,t){this.menu={context:e,items:t}}detachMenu(){this.menu=null}getNextFocusableMenuItem(e,t){return t?0===e?this.menu.items.length-1:e-1:this.menu.items.length>e+1?e+1:0}moveFocus(e,t){let n=0;this.menu.items.forEach((t,a)=>{t===e&&(n=a)});let a=this.getNextFocusableMenuItem(n,t),s=this.menu.items[a].offsetParent;if(s&&this.menu.items[a].focus(),!s){for(;null===s;)a=this.getNextFocusableMenuItem(a,t),s=this.menu.items[a].offse
+
+-- https://bond.edu.au/libraries/bond/module/icon.entry.js?tdjz4g
+import{g as t}from"./chunks/_commonjsHelpers-CXUWDbkB.js";import{A as e}from"./chunks/uikit-2p6iEowb.js";import{l as c}from"./chunks/load-Cxc99xkD.js";var i,h={exports:{}};const l=t((i||(i=1,h.exports=function(){function t(e){t.installed||e.icon.add({"500px":'<svg width="20" height="20" viewBox="0 0 20 20"><path d="M9.624,11.866c-0.141,0.132,0.479,0.658,0.662,0.418c0.051-0.046,0.607-0.61,0.662-0.664c0,0,0.738,0.719,0.814,0.719 c0.1,0,0.207-0.055,0.322-0.17c0.27-0.269,0.135-0.416,0.066-0.495l-0.631-0.616l0.658-0.668c0.146-0.156,0.021-0.314-0.1-0.449 c-0.182-0.18-0.359-0.226-0.471-0.125l-0.656,0
+
+-- https://bond.edu.au/libraries/bond/module/chunks/search.entry-DtkC3qj5.js
+import{defineAsyncComponent as e}from"./vue.esm-browser-B6QLgPhR.js";import{L as t}from"./LazyLoader-CltRUzEa.js";import{l as r}from"./load-Cxc99xkD.js";const a=(e,t)=>{const[r,a]=e.split(" "),[s,c]=t.split(" ");if(Number(a)!==Number(c))return Number(a)-Number(c);const i=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];return i.indexOf(r.substr(0,3))-i.indexOf(s.substr(0,3))},s=e=>e.map(e=>e.semesters_offered||[]).reduce((e,t)=>[...new Set(e.concat(t))],[]),c=["Undergraduate","Postgraduate","Postgraduate research","Microcredential","Academic and English Pathways"];r(()
+
+-- https://bond.edu.au/libraries/bond/module/chunks/video-player-PfnF14lU.js
+import{ref as e,computed as t,onMounted as i,createElementBlock as s,openBlock as n,createCommentVNode as a}from"./vue.esm-browser-B6QLgPhR.js";import{g as l}from"./_commonjsHelpers-CXUWDbkB.js";import{t as r}from"./analytics-HyPBskzJ.js";function o(e,t){for(var i=0;i<t.length;i++){var s=t[i];s.enumerable=s.enumerable||!1,s.configurable=!0,"value"in s&&(s.writable=!0),Object.defineProperty(e,s.key,s)}}function c(e,t,i){return t in e?Object.defineProperty(e,t,{value:i,enumerable:!0,configurable:!0,writable:!0}):e[t]=i,e}function u(e,t){var i=Object.keys(e);if(Object.getOwnPropertySymbols){var s
+
+-- https://www.youtube.com/embed/PNBfpAcfofg?autoplay=0&controls=1&disablekb=0&playsinline=1&cc_load_policy=0&cc_lang_pref=auto&widget_referrer=https%3A%2F%2Fbond.edu.au%2Fprogram%2Fbachelor-of-arts&rel=0&showinfo=0&iv_load_policy=3&modestbranding=1&customControls=true&noCookie=false&fs=1&enablejsapi=1&origin=https%3A%2F%2Fbond.edu.au&widgetid=1&forigin=https%3A%2F%2Fbond.edu.au%2Fprogram%2Fbachelor-of-arts&aoriginsup=1&vf=1
+<!DOCTYPE html><html lang="en-GB" dir="ltr" data-cast-api-enabled="true"><head><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex"><script nonce="WVeExgJTCfOoRAXTUrn4GQ">if ('undefined' == typeof Symbol || 'undefined' == typeof Symbol.iterator) {delete Array.prototype.entries;}</script><style name="www-roboto" nonce="V38b3KyEDpsYS5KWBwOS0Q">@font-face{font-family:'Roboto';font-style:normal;font-weight:400;font-stretch:100%;src:url(//fonts.gstatic.com/s/roboto/v48/KFO7CnqEu92Fr1ME7kSn66aGLdTylUAMa3GUBGEe.woff2)format('woff2');unicode-range:U
+
+-- https://bond.edu.au/sites/default/files/styles/hero_l/public/2022-07/2022_FSD_BachelorOfArts_GettyImages-1081160214.jpg.avif%3Fh%3Db16986b4?itok=8YJS7tEr
+ftypavifmif1miafmeta!hdlrpictpitmilocD#iinfinfeav01Viprp8ipcoispe@y
+                                                                   av1C?pipmamdat
+
+?qZ2db I0FYďf18f7䂛qW
+                     C쳯`x>
+;sE.S^
+^+ep1utupQTUm6a9PǛrl60ݮ鋻2c@>dˢǊκA*˖
+    C'rh*VaS%Ȱ
+R]b\LI3?)`L649&!'>'$*'
+a*Zm9/ܓ09uoO<(Ś9[֤׻c8O|Jݩa,-69ؚO[hW:EUvϭAyXԚvT^Vފ7t* Wt?\c̷"hW++>hBEzRE+ޖ}(mHf=iv'S^!3],6i9%&7,-hgy;Cvuxn=+'\zEs=k*0rVȍ_u&$CAS]I
+
+-- https://bond.edu.au/sitewide_alert/load
+{"sitewideAlerts":[{"uuid":"0da040c8-1a55-48ae-8b46-aba423eb33ba","dismissible":false,"dismissalIgnoreBefore":0,"styleClass":"alert-warning","showOnPages":["\/program\/master-of-arts-tesol","\/program\/master-of-arts-tesol\/graduate_outcomes","\/program\/master-of-arts-tesol\/subjects","\/program\/master-of-arts-tesol\/entry_requirements","\/program\/master-of-arts-tesol\/fees"],"negateShowOnPages":false,"renderedAlert":"\u003Csection role=\u0022status\u0022 class=\u0022alert alert-warning sitewide-alert\u0022 id=\u00229\u0022 data-uuid=\u00270da040c8-1a55-48ae-8b46-aba423eb33ba\u0027 \u003E\n
+
+=== Rendered page: fee/ielts/English lines ===
+'elations_GettyImages-119705367.jpg.avif%3Fh%3D92711d33?itok=AuDCVaM8 2x&quot;,&quot;media&quot;:&quot;(min-width: 640px) and (max-width: 959px)&quot;},{&quot;type&quot;:&quot;image'
+root@university-and-course-data:~/University-and-Course-data/backend-py# # The sitewide_alert showed /program/master-of-arts-tesol/fees exists
+# Bond course pages redirect: bachelor-arts → bachelor-of-arts
+# So try both slug forms:
+
+curl -sL "https://bond.edu.au/program/bachelor-of-arts/fees" | python3 -c "
+import sys, re
+html = sys.stdin.read()
+print('Page length:', len(html))
+# Static fee values
+fees = re.findall(r'[\$AUD][\d,]{4,}|\d{4,6}(?=\s*(?:per|/)\s*(?:year|semester))', html)
+print('Static fee values:', fees[:20])
+# data-* fee attributes
+for m in re.findall(r'data-[a-z-]*(?:fee|cost|tuition)[^=]*=[\"\']\S+[\"\']\s*', html, re.IGNORECASE)[:10]:
+    print('attr:', m)
+# Canonical URL (tells us if it redirected to 404)
+for m in re.findall(r'<link rel=[\"\'](canonical)[\"\']\s+href=[\"\'](https?://[^\"\']+)[\"\']\s*/?>', html):
+    print('canonical:', m[1])
+# Any fee-looking text blocks
+for m in re.findall(r'.{0,40}(?:total.{0,15}cost|tuition|semester fee|program fee).{0,200}', html, re.IGNORECASE)[:5]:
+    print('text:', repr(m.strip()[:200]))
+" 2>&1
+
+# Also try: does Bond have a program search/data API?
+curl -sL "https://bond.edu.au/api/programs/search?q=bachelor+arts" 2>&1 | head -5
+curl -sL "https://bond.edu.au/program/bachelor-of-arts/fees" -o /dev/null -w "status: %{http_code}  final: %{url_effective}\n"
+Page length: 154700
+Static fee values: ['$2,000']
+attr: data-fees-url="/api/program-fees/432/HS-20003"
+canonical: https://bond.edu.au/program/bachelor-of-arts
+text: 'Program fees'
+text: '><span>To view the program’s associated tuition fees, select the year you would like to commence study below. You can also view specific subject fee information by visiting the subjects tab and follow'
+text: 'e</span></a><span>.</span><br><br><span>Tuition fees are subject to change on an annual basis and will be charged at the appropriate fee for the year of enrolment.</span></p></div>'
+text: '><span>To view the program’s associated tuition fees, select the year you would like to commence study below. You can also view specific subject fee information by visiting the subjects tab and follow'
+text: 'e</span></a><span>.</span><br><br><span>Tuition fees are subject to change on an annual basis and will be charged at the appropriate fee for the year of enrolment.</span></p></div>'
+<!DOCTYPE html>
+<html lang="en" dir="ltr" prefix="og: https://ogp.me/ns#">
+<head>
+  <meta charset="utf-8" />
+<script nonce="O9s17uf7LzqICAaoVDw_FkHo3yHkinb3">dataLayer = [];</script>
+status: 200  final: https://bond.edu.au/program/bachelor-of-arts/fees
+root@university-and-course-data:~/University-and-Course-data/backend-py# # The correct fee API endpoint — both ID and code required
+curl -sL "https://bond.edu.au/api/program-fees/432/HS-20003" | python3 -m json.tool 2>&1 | head -80
+
+# Try with year parameter (page says "select the year you'd like to commence")
+curl -sL "https://bond.edu.au/api/program-fees/432/HS-20003?year=2026" | python3 -m json.tool 2>&1 | head -80
+
+# Also check the entry_requirements subpage for IELTS (seen in sitewide_alert URL list)
+curl -sL "https://bond.edu.au/program/bachelor-of-arts/entry_requirements" | python3 -c "
+import sys, re
+html = sys.stdin.read()
+print('Length:', len(html))
+for m in re.findall(r'data-[a-z-]*(?:entry|requirement|english|ielts)[^=]*=[\"\']\S+[\"\']\s*', html, re.IGNORECASE)[:10]:
+    print('attr:', m)
+for m in re.findall(r'.{0,30}(?:ielts|english.{0,10}score|english.{0,10}req).{0,150}', html, re.IGNORECASE)[:5]:
+    print('text:', repr(m.strip()[:180]))
+" 2>&1
+{
+    "fees": [
+        {
+            "year": "2026",
+            "width": 2,
+            "domestic": {
+                "semester": 18400,
+                "semester_note": "<p>The semester fees listed are displayed to provide an indicative program cost only. Fees may vary based on which subjects are selected and the number of subjects enrolled in for each semester. Tuition fees are subject to change on an annual basis and will be charged at the appropriate fee for the year of enrolment.</p>",
+                "total": 110400,
+                "total_note": "<p><span>The total fees listed provide an indicative program cost only. Tuition fees are subject to change on an annual basis and will be charged at the appropriate fee for the year of enrolment.</span></p>"
+            },
+            "international": {
+                "semester": 25040,
+                "semester_note": "<p>The semester fees listed are displayed to provide an indicative program cost only. Fees may vary based on which subjects are selected and the number of subjects enrolled in for each semester. Tuition fees are subject to change on an annual basis and will be charged at the appropriate fee for the year of enrolment.</p>",
+                "total": 150240,
+                "total_note": "<p><span>The total fees listed provide an indicative program cost only. Tuition fees are subject to change on an annual basis and will be charged at the appropriate fee for the year of enrolment.</span></p>"
+            }
+        }
+    ]
+}
+{
+    "fees": [
+        {
+            "year": "2026",
+            "width": 2,
+            "domestic": {
+                "semester": 18400,
+                "semester_note": "<p>The semester fees listed are displayed to provide an indicative program cost only. Fees may vary based on which subjects are selected and the number of subjects enrolled in for each semester. Tuition fees are subject to change on an annual basis and will be charged at the appropriate fee for the year of enrolment.</p>",
+                "total": 110400,
+                "total_note": "<p><span>The total fees listed provide an indicative program cost only. Tuition fees are subject to change on an annual basis and will be charged at the appropriate fee for the year of enrolment.</span></p>"
+            },
+            "international": {
+                "semester": 25040,
+                "semester_note": "<p>The semester fees listed are displayed to provide an indicative program cost only. Fees may vary based on which subjects are selected and the number of subjects enrolled in for each semester. Tuition fees are subject to change on an annual basis and will be charged at the appropriate fee for the year of enrolment.</p>",
+                "total": 150240,
+                "total_note": "<p><span>The total fees listed provide an indicative program cost only. Tuition fees are subject to change on an annual basis and will be charged at the appropriate fee for the year of enrolment.</span></p>"
+            }
+        }
+    ]
+}
+Length: 147332
+attr: data-international-requirement-url="/api/international-requirements/432/HS-20003" 
+text: 'ssed in English, so there are English language requirements you need to meet to gain entry into this program. However, if you successfully completed your secondary education in Aus'
+text: 'lish Language Testing System (IELTS) Academic</dt>'
+text: 'lish Language Testing System (IELTS) Academic Overall score 6.5 with no sub score less than 6.0'
+root@university-and-course-data:~/University-and-Course-data/backend-py# 
