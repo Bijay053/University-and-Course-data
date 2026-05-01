@@ -1,0 +1,131 @@
+remote: Total 5 (delta 4), reused 0 (delta 0), pack-reused 0 (from 0)
+Unpacking objects: 100% (5/5), 664 bytes | 664.00 KiB/s, done.
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+   65b983c..f249dc3  main       -> origin/main
+Updating 65b983c..f249dc3
+Fast-forward
+ backend-py/scripts/bond_enrich.py | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
+Traceback (most recent call last):
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+psycopg2.errors.UndefinedColumn: column "source_url" does not exist
+LINE 3:                    COALESCE(source_url, course_url) AS sourc...
+                                    ^
+
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/root/University-and-Course-data/backend-py/scripts/bond_enrich.py", line 347, in <module>
+    main()
+  File "/root/University-and-Course-data/backend-py/scripts/bond_enrich.py", line 290, in main
+    rows = conn.execute(text(q), params).mappings().all()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1419, in execute
+    return meth(
+           ^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/sql/elements.py", line 527, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1641, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1846, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1986, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 2363, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+sqlalchemy.exc.ProgrammingError: (psycopg2.errors.UndefinedColumn) column "source_url" does not exist
+LINE 3:                    COALESCE(source_url, course_url) AS sourc...
+                                    ^
+
+[SQL: 
+            SELECT id,
+                   COALESCE(source_url, course_url) AS source_url,
+                   course_name
+            FROM scraped_courses
+            WHERE university_id = %(uid)s
+              AND status IN ('pending', 'review')
+         ORDER BY id]
+[parameters: {'uid': 22}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+root@university-and-course-data:~/University-and-Course-data/backend-py# cd ~/University-and-Course-data && git pull origin main
+cd backend-py
+PYTHONPATH=. venv/bin/python3 scripts/bond_enrich.py --workers 8
+remote: Enumerating objects: 9, done.
+remote: Counting objects: 100% (9/9), done.
+remote: Compressing objects: 100% (5/5), done.
+remote: Total 5 (delta 4), reused 0 (delta 0), pack-reused 0 (from 0)
+Unpacking objects: 100% (5/5), 444 bytes | 222.00 KiB/s, done.
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+   f249dc3..44ff000  main       -> origin/main
+Updating f249dc3..44ff000
+Fast-forward
+ backend-py/scripts/bond_enrich.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+Traceback (most recent call last):
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+psycopg2.errors.UndefinedColumn: column "course_url" does not exist
+LINE 3:                    course_url AS source_url,
+                           ^
+HINT:  Perhaps you meant to reference the column "scraped_courses.course_id".
+
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/root/University-and-Course-data/backend-py/scripts/bond_enrich.py", line 347, in <module>
+    main()
+  File "/root/University-and-Course-data/backend-py/scripts/bond_enrich.py", line 290, in main
+    rows = conn.execute(text(q), params).mappings().all()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1419, in execute
+    return meth(
+           ^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/sql/elements.py", line 527, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1641, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1846, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1986, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 2363, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+sqlalchemy.exc.ProgrammingError: (psycopg2.errors.UndefinedColumn) column "course_url" does not exist
+LINE 3:                    course_url AS source_url,
+                           ^
+HINT:  Perhaps you meant to reference the column "scraped_courses.course_id".
+
+[SQL: 
+            SELECT id,
+                   course_url AS source_url,
+                   course_name
+            FROM scraped_courses
+            WHERE university_id = %(uid)s
+              AND status IN ('pending', 'review')
+         ORDER BY id]
+[parameters: {'uid': 22}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+root@university-and-course-data:~/University-and-Course-data/backend-py# 
