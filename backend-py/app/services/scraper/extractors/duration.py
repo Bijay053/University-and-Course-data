@@ -184,6 +184,23 @@ _COMPOUND_DURATION_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Bug A (KBS grad certs): slash-structured program-info cells.
+# Pages like KBS publish duration as "8 months / 4 subjects / 2 trimesters"
+# where the first slash-separated token is the real duration and subsequent
+# tokens are delivery structure (subject count, delivery period).
+# These sentences contain NO duration-context word ("course", "full-time",
+# etc.) so the loose Pattern-2 guard (_DURATION_CONTEXT) refuses to fire,
+# leaving (8, Month) absent from `parsed`.  A candidature-deadline sentence
+# elsewhere ("complete within 8 years") then wins the tournament and is later
+# nullified by the grad-cert sanity cap, dropping the course entirely.
+# Fix: detect the slash pattern at the start of a sentence and add the first
+# token directly to `parsed` at Pattern-0 priority (×100) so it beats any
+# fallback match for the same number in a different unit.
+_SLASH_PROGRAM_STRUCTURE_RE = re.compile(
+    r"^\s*(\d+(?:\.\d+)?)\s*(years?|months?|weeks?|semesters?|trimesters?)\s*/",
+    re.IGNORECASE,
+)
+
 _UNIT_RANK = {"Year": 4, "Semester": 3, "Trimester": 3, "Month": 2, "Week": 1}
 _WEEKS = {"Year": 52, "Semester": 20, "Trimester": 14, "Month": 4, "Week": 1}
 # Per-unit extraction caps.  Values above these are almost certainly
@@ -446,6 +463,27 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
         # don't need either gate.
         duration_context = bool(_DURATION_CONTEXT.search(s))
         anti_duration_context = bool(_DURATION_ANTI_CONTEXT.search(s))
+
+        # Bug A (KBS grad certs): slash-structured program-info cell.
+        # "8 months / 4 subjects / 2 trimesters" — first token is real duration.
+        # No duration-context word exists so Pattern-2 is blocked; add the first
+        # token directly at Pattern-0 priority (×100) before anything else fires.
+        slash_m = _SLASH_PROGRAM_STRUCTURE_RE.match(s)
+        if slash_m and not _ACCELERATED.search(s) and not credit_context:
+            try:
+                _sl_amount = float(slash_m.group(1))
+                _sl_unit = _normalise_unit(slash_m.group(2))
+                if _sl_unit and 0 < _sl_amount <= _DURATION_CAP[_sl_unit]:
+                    _sl_weeks = _sl_amount * _WEEKS[_sl_unit]
+                    parsed.append((
+                        (_sl_weeks * 100 + _UNIT_RANK[_sl_unit]) * 100.0,
+                        _sl_amount,
+                        _sl_unit,
+                        s.strip()[:240],
+                    ))
+                    continue  # first token is definitive; skip other patterns
+            except (ValueError, IndexError):
+                pass
 
         # Bug 3: compound "N year(s), M month(s)" match — check before the
         # single-unit patterns so "1 year, 8 months" → 20 months, not "1 Year".

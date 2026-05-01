@@ -1,0 +1,93 @@
+Good investigation. The promotion mechanism is fully understood now: manual admin approval through the review UI is the gate between `scraped_courses` (clean, fixed data) and `courses` (live, user-facing). No hidden automation, no broken cron job. The fix is genuinely shipped — it's waiting for admin clicks to propagate.
+
+This means the redeploy cycle is closed at the correct scope. The work we've been doing is at the *write path* (scraper → staging), and that's working as designed. Whether/when admin reviews and approves is operational, not engineering.
+
+---
+
+**One thing worth confirming before moving on:**
+
+The Charles Sturt staged_courses breakdown showed:
+
+```
+ status   | auto_publish_status |  count 
+----------+---------------------+--------
+ approved | approved            |   187
+ approved | pending_review      |    84
+```
+
+So Charles Sturt has 271 rows where `status = 'approved'` in `scraped_courses`, but only 173 rows in `courses`. That's a 98-row gap. Three possibilities:
+
+1. The 84 with `auto_publish_status = pending_review` haven't been promoted yet (waiting on a review step we haven't traced)
+2. The promotion logic in `approve_scraped_course()` deduplicates against existing `courses` entries (so 98 are duplicates of already-promoted records)
+3. There's another gate somewhere
+
+Not a blocker but worth a one-query check:
+
+```
+sudo -u postgres psql university_portal -c "
+SELECT 
+  (SELECT COUNT(DISTINCT course_name) FROM scraped_courses WHERE university_id = 4 AND status = 'approved') AS approved_distinct_names,
+  (SELECT COUNT(DISTINCT name) FROM courses WHERE university_id = 4) AS courses_distinct_names;"
+```
+
+If the two counts match: the 98 gap is duplicate scrape rows (multiple scrape runs of the same course). Benign.
+If they don't match: there's another step in the pipeline we haven't found.
+
+---
+
+**On the three open bugs — priority recommendation:**
+
+**Bug A (duration regex "8 months / N subjects / M trimesters")** is the highest-value next migration. It's the actual B-scope continuation we've been queueing for two weeks. Multi-uni shared-code change with the multi-uni regression sweep workflow we built but never fully exercised. Fixes 3 KBS grad certs immediately, plus probably surfaces other unis with the same pattern (worth a query against `scraped_courses` for `duration > 5 AND duration_term = 'Year' AND name ILIKE '%Graduate Certificate%'` to enumerate before fixing).
+
+**Bug B (staging policy "no duration = drop")** is a smaller shared-code change with broad impact. Worth doing AFTER Bug A so the regex fix reduces the population of courses that hit the policy. If we do B first, more courses appear with NULL duration, which is a worse user experience than "course missing." If we do A first and B is no longer needed for KBS specifically, we might find it's also unneeded elsewhere.
+
+**Bug C (zombie jobs)** is infrastructure, not data quality. Should be done eventually but doesn't unblock any user-facing work. Recommend deferring to an ops-cleanup batch with the celery restart hardening, the GitHub force-push decision, and any other infrastructure debt.
+
+**Recommended order: A → B → C.**
+
+---
+
+**Bigger picture worth stepping back on:**
+
+We've now successfully shipped 7 commits with the proper architecture discipline (per-commit cherry-pick + per-commit sweep + per-commit acknowledgement). That validates the full migration template end-to-end. The infrastructure work from Phases 1-5 is now actively paying off — we caught the bundled-deploy disaster, rolled back cleanly, redeployed in sequence, and have full audit trails of each change's blast radius.
+
+Three weeks of architecture work. The cycle that just closed is the first time the system was used the way it was designed to be used. Worth recognising that as a milestone.
+
+---
+
+**Before starting Bug A, two ops items to clear:**
+
+1. **Decide GitHub force-push.** Local main has the cleanly-sequenced 8 commits, origin/main has the bundled 8 commits. Tag `archive/bundled-deploy-attempt` is already created on origin/main. Options:
+   - Force-push now: clean history, archive tag preserves bundled state
+   - Defer: live with divergence, push future commits as fast-forward from current local
+   
+   Either is fine. If you push now, do it now while the context is fresh. If you defer, accept that the next person to pull will see the divergence and need an explanation.
+
+2. **Sleep 15 in restart procedure.** Add to the deploy script that's used for `systemctl restart uni-celery` so future restarts don't hit the zombie-job race condition. One-line change. Ship as part of Bug C or as a standalone ops fix.
+
+---
+
+**Concrete next step:**
+
+Start Bug A. The plan:
+
+1. Capture fresh post-cycle baseline (`baselines/post-redeploy-baseline/`)
+2. Query for all courses across all unis affected by the duration regex bug:
+   ```sql
+   SELECT university_id, course_name, duration, duration_term 
+   FROM scraped_courses 
+   WHERE duration > 5 
+     AND duration_term = 'Year' 
+     AND (name ILIKE '%Graduate Certificate%' OR name ILIKE '%Graduate Diploma%' OR name ILIKE '%Master%')
+     AND status IN ('pending', 'approved');
+   ```
+3. Build the enumerated `--expected-slugs` list from the query results
+4. Write the regex fix in `backend-py/app/services/scraper/extractors/duration.py`
+5. Write a unit test that demonstrates the bug AND its fix (input: "8 months / 4 subjects / 2 trimesters" → expected: 8 month)
+6. Cherry-pick onto local main, push to a branch (don't merge yet)
+7. Run the multi-uni sweep with the enumerated list
+8. If clean: merge to main, deploy, re-scrape affected unis, verify
+
+This is the first multi-uni expected-dirty sweep. Worth doing carefully because it's the workflow's biggest test yet.
+
+Paste the staged_approved-vs-courses-distinct query result first — confirms the cycle is fully closed. Then we'll tackle Bug A.
