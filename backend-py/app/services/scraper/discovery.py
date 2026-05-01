@@ -554,6 +554,7 @@ async def discover_course_links(
     max_courses: int = 200,
     emit=None,
     _blocked_fee_urls_sink: list | None = None,
+    discovery_config=None,  # DiscoveryConfig | None — avoids circular import
 ) -> list[dict]:
     """BFS crawl from ``start_url`` with rule-based page-type classification
     and a sitemap fallback when the crawl yields too few candidates.
@@ -1043,6 +1044,99 @@ async def discover_course_links(
                     "discovery: alt listing probe failed for %s: %s",
                     _alt_url,
                     _alt_exc,
+                )
+
+    # ── Tier 2: per-uni subdomain probes ────────────────────────────────────
+    # When BFS + sitemap + alt-listing-paths all return fewer than 5 candidates
+    # the university may host its course catalogue on a separate subdomain
+    # (e.g. handbook.myuni.edu.au, courses.myuni.edu.au).  The per-uni YAML
+    # config may declare these via DiscoveryConfig.fallback_subdomains as
+    # patterns like "handbook.{domain}" or literal hostnames.
+    #
+    # Only fires when:
+    #   - discovery_config is provided and has fallback_subdomains entries
+    #   - current candidate count is below _SUBDOMAIN_PROBE_THRESHOLD
+    _SUBDOMAIN_PROBE_THRESHOLD = 5
+    _fallback_subdomains: list[str] = (
+        discovery_config.fallback_subdomains
+        if discovery_config is not None
+        and hasattr(discovery_config, "fallback_subdomains")
+        and discovery_config.fallback_subdomains
+        else []
+    )
+    if len(found) < _SUBDOMAIN_PROBE_THRESHOLD and _fallback_subdomains and origin:
+        # Derive the "base" domain — strip leading www. so that
+        # "handbook.{domain}" expands to "handbook.myuni.edu.au" not
+        # "handbook.www.myuni.edu.au".
+        _parsed_origin = urlparse(origin)
+        _netloc = _parsed_origin.netloc.lower()
+        _apex = _netloc.removeprefix("www.")
+        _scheme = _parsed_origin.scheme or "https"
+        if emit:
+            await emit(
+                "status",
+                f"[DISCOVER] only {len(found)} candidate(s) — probing "
+                f"{len(_fallback_subdomains)} configured fallback subdomain(s)…",
+                phase="discover",
+                kind="subdomain_probe",
+            )
+        for _sd_pattern in _fallback_subdomains:
+            if len(found) >= max_courses:
+                break
+            try:
+                _sd_host = _sd_pattern.format(domain=_apex)
+            except (KeyError, ValueError):
+                _sd_host = _sd_pattern  # literal hostname, no placeholder
+            _sd_origin = f"{_scheme}://{_sd_host}"
+            _sd_url = _sd_origin + "/"
+            if _sd_url in visited:
+                continue
+            log.info("discovery: Tier-2 subdomain probe → %s", _sd_url)
+            if emit:
+                await emit(
+                    "status",
+                    f"[DISCOVER] Tier-2 subdomain probe: {_sd_url}",
+                    phase="discover",
+                    kind="subdomain_probe",
+                )
+            _sd_html = await fetch_html(_sd_url, retries=1)
+            if not _sd_html:
+                log.debug("discovery: Tier-2 subdomain %s — no response", _sd_host)
+                continue
+            visited.add(_sd_url)
+            try:
+                from bs4 import BeautifulSoup as _BS4_sd
+
+                _sd_soup = _BS4_sd(_sd_html, "html.parser")
+                _sd_added = 0
+                for _a in _sd_soup.find_all("a", href=True):
+                    _href = (_a.get("href") or "").strip()
+                    _text = _a.get_text(" ", strip=True)[:200]
+                    if not _href or _href.startswith(("#", "mailto:", "tel:", "javascript:")):
+                        continue
+                    _full = _resolve(_href, _sd_url, _sd_origin)
+                    if not _full or _full in found:
+                        continue
+                    if _looks_like_course(_full, _text):
+                        found[_full] = _text
+                        _sd_added += 1
+                        if len(found) >= max_courses:
+                            break
+                if _sd_added and emit:
+                    await emit(
+                        "status",
+                        f"[DISCOVER] Tier-2 subdomain {_sd_host}: +{_sd_added} course link(s)",
+                        phase="discover",
+                        kind="subdomain_probe",
+                    )
+                log.info(
+                    "discovery: Tier-2 subdomain %s → %d new course link(s)",
+                    _sd_host, _sd_added,
+                )
+            except Exception as _sd_exc:
+                log.warning(
+                    "discovery: Tier-2 subdomain probe failed for %s: %s",
+                    _sd_host, _sd_exc,
                 )
 
     # ── Unconditional sitemap supplement for JS-heavy catalogues ────────────
