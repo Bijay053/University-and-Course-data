@@ -1,0 +1,174 @@
+Rollback ran cleanly. `HEAD is now at f95d75f Phase 6: add 3 regression tests`. Services restarted (`celery@university-and-course-data ready`, `uni-api-py.service` started). Prod code is back at the post-Phase-5 stable state. That part worked.
+
+Four things surfaced from the output that need addressing before the next step.
+
+---
+
+**1. The sweep result is contaminated and can't be used to validate Fix 2.**
+
+The staging DB was created by `pg_restore` from a prod backup taken AFTER the bundled deploy code was active. The staging DB then got the Fix 2 ALTER COLUMN applied. So `baselines/fix2-staging-after/` represents:
+
+- Fix 2's schema change (column type Numeric instead of Float)
+- PLUS all the code changes from commits `629e5de`, `be3df67`, `b38134f`, `0279075`, `bbea119`, `9b95125`
+- PLUS whatever scrapes ran between April 30 and the staging snapshot capture
+
+We can't isolate Fix 2's contribution from the rest. The sweep result of "asahe and kbs are dirty" doesn't prove Fix 2 is unsafe — it proves the bundle as a whole has differences from the April 30 baseline. Most of those differences are from KBS vision OCR being disabled (intentional, that's `b38134f`) and from `:null` provenance suffixes appearing (intentional, from earlier work).
+
+**To validate Fix 2 properly:**
+
+```
+# Step A: Capture FRESH baseline from current post-rollback prod state
+cd ~/University-and-Course-data/backend-py
+set -a && source .env && set +a
+PYTHONPATH=. venv/bin/python3 scripts/capture_baseline.py \
+  --out-dir baselines/post-rollback-baseline/
+
+# Step B: Drop the contaminated staging DB and recreate it from a fresh prod backup
+sudo -u postgres dropdb university_portal_staging
+sudo -u postgres pg_dump university_portal -F c -f /tmp/prod_backup_$(date +%Y%m%d_%H%M).dump
+sudo -u postgres createdb university_portal_staging
+sudo -u postgres pg_restore -d university_portal_staging /tmp/prod_backup_*.dump 2>/dev/null
+
+# Step C: Apply ONLY Fix 2's ALTER COLUMN to staging (no code changes, schema only)
+sudo -u postgres psql university_portal_staging << 'SQL'
+DROP MATERIALIZED VIEW IF EXISTS course_search_view;
+ALTER TABLE courses ALTER COLUMN duration TYPE NUMERIC(6, 2) USING ROUND(duration::numeric, 2);
+SQL
+
+# Step D: Recreate the materialised view on staging (use the same DDL as before)
+sudo -u postgres bash << 'OUTER'
+pg_dump university_portal --schema-only -t course_search_view 2>/dev/null \
+  | grep -Ev "^--|^SET |^SELECT pg_catalog" \
+  | sed '/^[[:space:]]*$/d' \
+  > /tmp/view_ddl.sql
+psql university_portal_staging -f /tmp/view_ddl.sql
+psql university_portal_staging -c "GRANT SELECT ON course_search_view TO uniportal;"
+psql university_portal_staging -c "REFRESH MATERIALIZED VIEW course_search_view;"
+OUTER
+
+# Step E: Capture baseline from the isolated staging DB
+DATABASE_URL="postgresql+asyncpg://uniportal:Bij%40y12345@127.0.0.1:5432/university_portal_staging" \
+  PYTHONPATH=. venv/bin/python3 scripts/capture_baseline.py \
+  --out-dir baselines/fix2-staging-isolated/
+
+# Step F: Run sweep with post-rollback as before, isolated staging as after
+PYTHONPATH=. venv/bin/python3 scripts/regression_sweep.py \
+  --before baselines/post-rollback-baseline/ \
+  --after  baselines/fix2-staging-isolated/ \
+  --verbose
+
+# Expected: zero diffs across all 23 unis.
+# This is the actual Fix 2 validation. If clean, Fix 2 is safe to apply to prod.
+```
+
+The key difference: staging in step C only has the ALTER COLUMN, no other code changes. The `capture_baseline.py` running against it in step E uses the SAME prod code (post-rollback) that's running for the "before" baseline. Only the column type differs. That's the isolated test.
+
+---
+
+**2. The April 30 sweep dirty-uni results need separate investigation.**
+
+Even setting aside Fix 2 contamination, the sweep showed two real concerns:
+
+**asahe (uni_id=2):** 8 courses with method-only changes. Pattern is `per_course_vision ↔ per_course_vision_cached` flipping plus `:null` provenance suffix appearing. This is partly the cache-hit non-determinism we discussed (which is non-blocking, just provenance noise) and partly the `:null` provenance addition from earlier work that wasn't in the April 30 baseline. Not a regression. Just noise from baseline staleness.
+
+**kbs (uni_id=29):** 8 courses removed (Graduate Cert in Business Administration, Graduate Cert in Business Analytics, Graduate Diploma of Business Administration, MBA – Data-driven Leadership, MBA – Digital Management, MBA – Tourism and Hospitality Leadership, Master of Business Analytics, Master of Professional Accounting). Plus 21 changed with `ielts: 6.5 → None`.
+
+The `ielts: 6.5 → None` is the KBS vision OCR fix doing exactly what it should — disabling vision OCR removes the hallucinated 6.5 values. That's intentional, but it shouldn't be visible in a sweep against post-rollback state because the rollback removed `b38134f`. Worth confirming: are these 21 courses ACTUALLY showing IELTS=null in current post-rollback prod, or do they still show 6.5 because the bundled-deploy code applied them to the DB and the rollback only reverted the code, not the data?
+
+The 8 *removed* courses are more concerning. Three possibilities:
+- Real KBS website change between April 30 and now (8 courses delisted)
+- Filter rule change rejecting them differently (e.g., `online_only` catching more courses)
+- Extraction failure on those 8 specific courses
+
+**To investigate, on the post-rollback prod DB:**
+
+```
+sudo -u postgres psql university_portal -c "
+SELECT name, status, approval_status 
+FROM courses 
+WHERE university_id = 29 
+ORDER BY name;"
+```
+
+Count the rows. Compare to the 29 KBS courses in the April 30 baseline. If post-rollback prod shows all 29 → the sweep diff was a staging artifact (the staging DB had stale extraction data). If post-rollback prod shows 21 → the 8 courses really are gone and we need to understand why.
+
+---
+
+**3. The 0.00 durations are a real bug worth its own ticket.**
+
+From the query you ran on prod:
+
+```
+Bachelor Of Applied Research Honours          | 0.00
+Bachelor Of Arts Social Science Honours       | 0.00
+Bachelor Of Food Science Nutrition            | 0.00
+Bachelor Of Islamic Studies Honours           | 0.00
+Bachelor Of Laws                              | 0.00
+Bachelor Of Of Education Secondary            | 0.00
+Bachelor Of Psychology                        | 0.00
+... (20 of 59 total)
+```
+
+All 20 visible are Charles Sturt University courses. These are real courses with real durations (3-4 years for Bachelors, 0.5-1 year for Grad Certs). Storing 0.0 is wrong — should be NULL if extraction failed, or the actual value if it succeeded.
+
+Worth a quick scope check:
+
+```
+sudo -u postgres psql university_portal -c "
+SELECT u.name, COUNT(*) 
+FROM courses c JOIN universities u ON u.id = c.university_id 
+WHERE c.duration = 0.0 
+GROUP BY u.name 
+ORDER BY COUNT(*) DESC;"
+```
+
+If it's only Charles Sturt: uni-specific extraction issue, fix per-uni.
+If it's many unis: shared-code bug where "couldn't parse" became "0.0" instead of "NULL". Fix that bug first, then UPDATE the existing 0.0 values to NULL so they get re-extracted on next scrape.
+
+This is a separate bug from Fix 2 and from the duration regex (Fixes 1+3). Worth tracking as its own item, not folding into any of those.
+
+---
+
+**4. Stray `=` file in working directory.**
+
+From `git status`:
+
+```
+Untracked files:
+        =
+        backend-py/baselines/
+        drizzle-kit
+```
+
+The `=` is suspicious — usually a stray file from a redirected command (`> =` shell error). Worth checking:
+
+```
+ls -la =
+# If empty/cruft:
+rm =
+```
+
+`backend-py/baselines/` and `drizzle-kit` are expected.
+
+---
+
+**Recommended next sequence:**
+
+1. Clean up the stray `=` file.
+2. Run Step A (capture fresh post-rollback baseline). This is the NEW "before" baseline for all subsequent work — the April 30 baseline is too stale to use as a comparison point because too much has shifted.
+3. Run the KBS investigation query (Section 2 above) to determine if the 8 removed courses are real or staging-artefact.
+4. Run the Charles Sturt scope query (Section 3 above) to determine if the 0.00 duration bug is uni-specific or shared.
+5. Cherry-pick Option C (`be3df67`). Run sweep against the FRESH post-rollback baseline. Expected: 22 clean + ACAP acknowledged-dirty (location strip).
+6. If C is clean, ship. Then cherry-pick KBS fix (`b38134f`). Sweep. Ship.
+7. THEN do the isolated Fix 2 validation (Steps B-F above). Ship Fix 2 to prod only after sweep returns zero diffs.
+8. Then Fixes 1+3 as proper Option B PR with multi-uni enumerated `--expected-slugs`.
+
+The order matters: Option C and KBS fix should ship first (they're per-uni overrides, low risk, clear value). Fix 2 needs the isolated validation after both are stable. Fixes 1+3 last because they need the fresh post-Fix-2 baseline.
+
+Don't pull anything onto prod yet. Steps 1-4 are read-only investigations that determine whether the queue I just outlined is correct or needs adjustment based on what the queries return.
+
+Paste the output of:
+- `ls -la =` (and `rm =` if cruft)
+- Step A baseline capture summary line
+- KBS course count query result
+- Charles Sturt 0.00 duration scope query result
