@@ -1260,6 +1260,28 @@ async def extract_course(
                 if _gp_k in ("duration_value", "duration_unit"):
                     continue  # consumed by the mapped keys above
 
+                # Bug A.2 (KBS grad certs — atomic duration tuple guard):
+                # `duration` and `duration_term` are an atomic pair — they must
+                # come from the same extractor.  The general "course page wins"
+                # guard at line ~1340 protects `duration` because the duration
+                # extractor emits an ExtractionResult with field_key="duration"
+                # and method="regex", which IS in _STRUCTURAL_COURSE_PAGE_EXACT.
+                # However `duration_term` has NO separate evidence row
+                # (field_key="duration_term" is never emitted; it only lives in
+                # the `normalized` dict of the `field_key="duration"` result).
+                # So _best_ev_method("duration_term") returns None, and the guard
+                # below never fires for it — Gemini silently overwrites Month→Year.
+                # Result: duration=8.0 (regex, protected) + duration_term=Year
+                # (Gemini, unprotected) → 8.0 Year → sanity cap nullifies → drop.
+                #
+                # Fix: if `duration` is already owned by a structural extractor,
+                # treat `duration_term` as atomic with it.  Gemini may not split
+                # the pair by supplying only a unit from its own reading.
+                if _gp_k == "duration_term":
+                    _dur_owner = _best_ev_method("duration")
+                    if _dur_owner and _is_structural_course_page_method(_dur_owner):
+                        continue  # duration is structural → term is locked too
+
                 # Issue 3: Don't let Gemini PRIMARY override a regex-extracted
                 # intake_months.  The intake regex reads structured DOM text
                 # (e.g. "Intake Options: January, April, July, October") and is

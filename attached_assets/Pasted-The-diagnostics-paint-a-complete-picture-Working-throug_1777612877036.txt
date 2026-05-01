@@ -1,0 +1,102 @@
+The diagnostics paint a complete picture. Working through what the queries actually showed:
+
+**The regex fired correctly. The sanity cap is what's dropping the courses.**
+
+From log sequence 169 on KBS Graduate Certificate in Accounting:
+
+```
+"duration": {"found": true, "value": 8.0, "method": "regex"}
+```
+
+Bug A's regex extracted `8.0` as the duration value. Good. But then sequence 184 shows Gemini ALSO ran and returned its own answer:
+
+```
+"duration_value": 0.6666666666666666,
+"duration_unit": "years",
+"duration_text": "8 months"
+```
+
+Gemini saw "8 months" and converted it to 0.67 years (mathematically correct). Then sequence 212 shows the AI fallback ALSO ran and filled `duration_value, duration_unit` again. So three different extractors produced three different views of the duration.
+
+The winner: sequence 219 shows the final stored value:
+
+```
+[NULLIFIED] Graduate Certificate in Accounting — duration 8.0 year (8.0 yrs) 
+  exceeds sanity limit; cleared
+```
+
+**The duration that reached the sanity cap was `8.0 year`.** Not `8 month` (regex's answer), not `0.67 year` (Gemini's answer). Somewhere in the merge logic, the `8.0` value from the regex got combined with the wrong unit (probably `year` because that's what Gemini eventually wrote into the duration_unit field via ai_fallback).
+
+This is a unit-confusion bug in the multi-extractor merge, not a regex bug. Bug A's fix correctly extracted `8.0 month`, but the downstream merge:
+1. Took `value=8.0` from regex (correct)
+2. Took `unit=year` from Gemini/ai_fallback (incorrect)
+3. Combined them into `8.0 year`
+4. Sanity cap nullified (correct, because 8 years for grad cert is impossible)
+5. Course dropped
+
+So the real root cause is the merge layer treating `value` and `unit` as independent fields that can come from different extractors. They need to be a single atomic unit — if the regex won the value, it should also win the unit (and the term, and the text).
+
+**The `confidence_55_missing_english_duration` reject reason in Q3 confirms this.** 7 courses got that exact rejection in this run. That's the 3 grad certs we know about plus 4 others — worth checking which ones.
+
+---
+
+**You're right about the method-only diff interpretation.**
+
+Good catch on `_VALUE_FIELDS`. The `extraction_method.duration_term: 'gemini_primary' → None` is provenance-dict change, not value change. The actual `duration_term` column on those 3 courses still has its value. My read of that as "value disappeared" was wrong — the sweep diff format is correct.
+
+So on the 3 "changed" courses: data is intact, only provenance metadata shifted. Truly benign.
+
+---
+
+**The MISSING-AFTER sweep fix is the right call.**
+
+`exit 1` on missing snapshots by default + `--allow-missing` flag for deliberate cases is exactly the right design. Ship that fix to prod through the same per-commit cycle as Bug A.
+
+---
+
+**So where does Bug A actually stand?**
+
+Bug A is *partially* shipped. The regex fix works for the case it targets (a sentence starting with `8 months /`). But the multi-extractor merge layer overrides the regex's unit with the AI fallback's unit, so the fix doesn't propagate to the final stored value.
+
+Three options for resolving:
+
+**Option 1 — Atomic-tuple merge (the proper fix).** Change the merge logic so when `duration_value` comes from regex, `duration_unit` MUST also come from regex (not from a different extractor). Same for Gemini, ai_fallback. The four duration sub-fields (`duration_value`, `duration_unit`, `duration_term`, `duration_text`) become an atomic group. Risk: medium-high. Touches multi-extractor merge code that affects every uni. Needs a full regression sweep.
+
+**Option 2 — Higher-priority gate for regex (smaller fix).** When the regex fires with a definitive answer (Pattern-0, slash-structure pre-check), don't run Gemini OR ai_fallback for that course's duration fields. Skip the entire AI extraction for those four fields. Risk: low. Touches the orchestrator's "missing fields" check.
+
+**Option 3 — Sanity cap respects source priority.** When the sanity cap considers nullifying a value, check the provenance. If the value came from regex with a sane unit, trust it over a conflicting AI value. Risk: medium. Touches the sanity cap logic which other unis depend on.
+
+My recommendation: **Option 2.** It's the cleanest semantically ("regex won, don't second-guess"), the smallest change, and most likely to reveal whether there are other places the same merge confusion happens. If Option 2 ships and the grad certs still get dropped, then Option 1 or 3 is needed.
+
+---
+
+**Updated Bug A scope:**
+
+- The regex fix (`_SLASH_PROGRAM_STRUCTURE_RE`) is committed and deployed. KEEP it — it's necessary, just not sufficient.
+- Add Bug A.2: orchestrator skip rule — when duration came from regex with a valid unit, don't request `duration_value, duration_unit, duration_term, duration_text` from Gemini/ai_fallback.
+- Bug B (NULL duration drop policy) becomes a SAFETY NET, not the primary fix. With Bug A.2 in place, the 3 grad certs reach staging with correct values. Bug B then catches *future* extraction failures across all unis.
+
+---
+
+**Concrete next steps:**
+
+1. **Cleanup query first** — confirm the unit-confusion pattern across all 7 `confidence_55_missing_english_duration` rejections in this run:
+
+```
+sudo -u postgres psql university_portal -c "
+SELECT payload->>'message' AS message, payload->>'url' AS url
+FROM scrape_runtime_logs
+WHERE runtime_job_id = 'job_a35b3c37e8fc'
+  AND payload->>'reason' = 'rejected: confidence_55_missing_english_duration'
+ORDER BY sequence;"
+```
+
+If all 7 are the unit-confusion pattern, Bug A.2 fixes all of them. If some are different (e.g., regex didn't fire at all for them), there's another sub-case to investigate.
+
+2. **Sweep script fix** — ship the MISSING-AFTER-as-error fix as its own commit through the proper per-commit cycle. This is a small low-risk shared-code change that immediately makes future sweeps more trustworthy. Do this BEFORE Bug A.2 so the next sweep can't pass falsely.
+
+3. **Bug A.2** — implement Option 2 (regex-wins skip rule), unit test, regression sweep with `--expected-slugs kbs`, expect 3 ADDED on this sweep.
+
+4. **Bug B** — stays in queue. After A.2 ships and the grad certs return, decide whether B is still needed.
+
+The sweep script fix (step 2) is the discipline play: don't ship more fixes through a tool we now know lies. Get the tool honest first, then trust it for the next migration.

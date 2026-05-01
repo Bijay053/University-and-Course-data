@@ -324,3 +324,47 @@ def test_bug_a_slash_structure_multiple_kbs_variants():
             f"{course}: structural pre-pass must fire on <dt>Duration</dt>; "
             f"got method={out[0].method!r}"
         )
+
+
+def test_bug_a2_slash_sentence_no_label_returns_regex_method():
+    """Bug A.2 regression: when no DOM Duration label exists, the slash
+    sentence-level regex fires and returns method='regex'.
+
+    'regex' must be in _STRUCTURAL_COURSE_PAGE_EXACT in single_course.py so
+    the atomic duration-term guard (Bug A.2 fix) protects duration_term from
+    being overwritten by Gemini primary when it runs afterwards.
+
+    This test verifies the extractor correctly extracts 8 Month via the
+    tournament path and that it returns method='regex', which is what
+    single_course.py uses to decide whether to lock the duration_term.
+    """
+    # compact() collapses <p> newlines to spaces, so sentence-boundary
+    # detection needs a period to split the slash sentence from the rest.
+    # Real pages have the slash text in a cell that starts a period-terminated
+    # "sentence" after compaction (e.g. a table cell whose value ends with ".").
+    # We simulate that here: the slash sentence MUST end with "." so the
+    # sentence splitter (r"(?<=[.!?])\s+|\n") isolates it as its own segment
+    # that starts with "8 months" — the position _SLASH_PROGRAM_STRUCTURE_RE
+    # requires (re.match anchors at the start of the string).
+    html = (
+        # No <dt>Duration</dt> label — structural pre-pass will NOT fire.
+        "<p>8 months / 4 subjects / 2 trimesters. "
+        "Candidates must complete their studies within 8 years of enrolment.</p>"
+    )
+    out = _run(duration.extract(html, "https://www.kbs.edu.au/courses/grad-cert-accounting/"))
+    assert out, "extractor must find a duration from the slash sentence"
+    n = out[0].normalized
+    assert n["duration"] == 8.0, (
+        f"Expected duration=8.0 from '8 months / 4 subjects', got {n!r}"
+    )
+    assert n["duration_term"] == "Month", (
+        f"Expected duration_term=Month, got {n!r}. "
+        f"The slash regex must lock BOTH value AND unit so the downstream "
+        f"atomic guard in single_course.py can protect duration_term from "
+        f"Gemini overwrite."
+    )
+    assert out[0].method == "regex", (
+        f"Expected method='regex' for tournament path; got {out[0].method!r}. "
+        f"'regex' must be in _STRUCTURAL_COURSE_PAGE_EXACT so the Bug A.2 "
+        f"atomic guard fires in single_course.py."
+    )

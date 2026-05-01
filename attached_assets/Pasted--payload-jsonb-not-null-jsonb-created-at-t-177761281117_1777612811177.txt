@@ -1,0 +1,789 @@
+ payload        | jsonb                    |           | not null | '{}'::jsonb
+ created_at     | timestamp with time zone |           | not null | now()
+Indexes:
+    "scrape_runtime_logs_pkey" PRIMARY KEY, btree (id)
+    "scrape_runtime_logs_runtime_job_sequence_idx" UNIQUE, btree (runtime_job_id, sequence)
+Foreign-key constraints:
+    "scrape_runtime_logs_runtime_job_id_scrape_runtime_jobs_runtime_" FOREIGN KEY (runtime_job_id) REFERENCES scrape_runtime_jobs(runtime_job_id) ON DELETE CASCADE
+
+ERROR:  column "job_id" does not exist
+LINE 3: WHERE job_id = 'job_4190bd464ea6'
+              ^
+root@university-and-course-data:~/University-and-Course-data# sudo -u postgres psql university_portal -c "
+SELECT event, payload
+FROM scrape_runtime_logs
+WHERE runtime_job_id = 'job_4190bd464ea6'
+  AND (payload::text ILIKE '%Graduate Certificate in Accounting%'
+    OR payload::text ILIKE '%Graduate Certificate in Business Admin%'
+    OR payload::text ILIKE '%Graduate Certificate in Business Analytics%'
+    OR payload::text ILIKE '%sanity%'
+    OR payload::text ILIKE '%skip%'
+    OR payload::text ILIKE '%reject%')
+ORDER BY sequence
+LIMIT 20;"
+root@university-and-course-data:~/University-and-Course-data# # Also — what event types exist for this job?
+sudo -u postgres psql university_portal -c "
+SELECT event, COUNT(*) 
+FROM scrape_runtime_logs
+WHERE runtime_job_id = 'job_4190bd464ea6'
+GROUP BY event
+ORDER BY count DESC;"
+  event   | count 
+----------+-------
+ status   |   618
+ progress |    36
+ done     |     1
+(3 rows)
+
+root@university-and-course-data:~/University-and-Course-data# sudo -u postgres psql university_portal -c "
+SELECT u.name, u.id,
+       COUNT(DISTINCT sc.id) FILTER (WHERE sc.status = 'pending')    AS staged_pending,
+       COUNT(DISTINCT sc.id) FILTER (WHERE sc.status = 'approved')   AS staged_approved,
+       COUNT(DISTINCT c.id)                                           AS in_courses_table
+FROM universities u
+LEFT JOIN scraped_courses sc ON sc.university_id = u.id
+LEFT JOIN courses c          ON c.university_id  = u.id
+GROUP BY u.name, u.id
+ORDER BY staged_pending DESC;"
+root@university-and-course-data:~/University-and-Course-data# sudo -u postgres psql university_portal -c "
+SELECT u.name, u.id,
+       COUNT(DISTINCT sc.id) FILTER (WHERE sc.status = 'pending')    AS staged_pending,
+       COUNT(DISTINCT sc.id) FILTER (WHERE sc.status = 'approved')   AS staged_approved,
+       COUNT(DISTINCT c.id)                                           AS in_courses_table
+FROM universities u
+LEFT JOIN scraped_courses sc ON sc.university_id = u.id
+LEFT JOIN courses c          ON c.university_id  = u.id
+GROUP BY u.name, u.id
+ORDER BY staged_pending DESC;"
+root@university-and-course-data:~/University-and-Course-data# sudo -u postgres psql university_portal -c "
+SELECT u.name, u.id,
+       COUNT(DISTINCT sc.id) FILTER (WHERE sc.status = 'pending')    AS staged_pending,
+       COUNT(DISTINCT sc.id) FILTER (WHERE sc.status = 'approved')   AS staged_approved,
+       COUNT(DISTINCT c.id)                                           AS in_courses_table
+FROM universities u
+LEFT JOIN scraped_courses sc ON sc.university_id = u.id
+LEFT JOIN courses c          ON c.university_id  = u.id
+GROUP BY u.name, u.id
+ORDER BY staged_pending DESC;"
+root@university-and-course-data:~/University-and-Course-data# # ── 1. How does promotion from approved→courses work? ──
+# Is there a trigger, a cron job, or a manual step?
+sudo -u postgres psql university_portal -c "
+SELECT trigger_name, event_manipulation, event_object_table, action_statement
+FROM information_schema.triggers
+WHERE event_object_schema = 'public'
+  AND event_object_table IN ('scraped_courses','courses')
+ORDER BY trigger_name;"
+
+# ── 2. What's the Charles Sturt staging_approved→courses gap about? ──
+# 271 approved vs 173 in courses — are the 98 delta recent approvals waiting promotion?
+sudo -u postgres psql university_portal -c "
+SELECT sc.status, sc.auto_publish_status, COUNT(*)
+FROM scraped_courses sc
+WHERE sc.university_id = 4
+GROUP BY sc.status, sc.auto_publish_status
+ORDER BY count DESC;"
+ trigger_name | event_manipulation | event_object_table | action_statement 
+--------------+--------------------+--------------------+------------------
+(0 rows)
+
+  status  | auto_publish_status | count 
+----------+---------------------+-------
+ approved | approved            |   187
+ rejected | review              |   184
+ rejected | pending_review      |   169
+ approved | pending_review      |    84
+ pending  | ready               |    30
+ pending  | review              |    11
+ rejected | approved            |    11
+ rejected | ready               |     9
+ rejected | rejected            |     9
+(9 rows)
+
+root@university-and-course-data:~/University-and-Course-data# grep -r "auto_publish\|publish_status\|courses.*INSERT\|promote" \
+  ~/University-and-Course-data/backend-py/app/tasks/ \
+  ~/University-and-Course-data/backend-py/app/services/ \
+  --include="*.py" -l
+/root/University-and-Course-data/backend-py/app/services/auto_publish.py
+/root/University-and-Course-data/backend-py/app/services/scraper/completeness.py
+/root/University-and-Course-data/backend-py/app/services/scraper/per_course_vision.py
+/root/University-and-Course-data/backend-py/app/services/scraper/stage_course.py
+/root/University-and-Course-data/backend-py/app/services/scraper/approve_course.py
+/root/University-and-Course-data/backend-py/app/services/scraper/orchestrator.py
+/root/University-and-Course-data/backend-py/app/services/scraper/pipelines/single_course.py
+/root/University-and-Course-data/backend-py/app/services/scraper/extractors/degree_level.py
+/root/University-and-Course-data/backend-py/app/services/scraper/home_page_redirect.py
+/root/University-and-Course-data/backend-py/app/services/scraper/sibling_cache.py
+root@university-and-course-data:~/University-and-Course-data# grep -r "auto_publish_status.*approved\|status.*approved.*courses" \
+  ~/University-and-Course-data/backend-py/app/ \
+  --include="*.py" -n | head -20
+/root/University-and-Course-data/backend-py/app/services/scraper/approve_course.py:154:    sc.auto_publish_status = "approved" if decision.auto_publish else "manual_approved"
+root@university-and-course-data:~/University-and-Course-data# sudo -u postgres psql university_portal -c "
+SELECT 
+  (SELECT COUNT(DISTINCT course_name) FROM scraped_courses WHERE university_id = 4 AND status = 'approved') AS approved_distinct_names,
+  (SELECT COUNT(DISTINCT name) FROM courses WHERE university_id = 4) AS courses_distinct_names;"
+ approved_distinct_names | courses_distinct_names 
+-------------------------+------------------------
+                     265 |                    173
+(1 row)
+
+root@university-and-course-data:~/University-and-Course-data# # ── 1. Capture pre-Bug-A baseline on prod ──
+cd ~/University-and-Course-data
+python backend-py/scripts/capture_baseline.py \
+  --slug post-bug-a-baseline \
+  --unis kbs
+
+# ── 2. Pull the fix ──
+git pull origin main   # or cherry-pick if on a branch
+
+# ── 3. Restart Celery (after 15s guard) ──
+systemctl restart uni-celery.service && sleep 15
+
+# ── 4. Trigger KBS re-scrape ──
+curl -X POST http://localhost:80/api/admin/scrape \
+  -H "Content-Type: application/json" \
+  -d '{"university_slug": "kbs"}'
+
+# ── 5. Regression sweep (after scrape completes) ──
+python backend-py/scripts/regression_sweep.py \
+  --baseline post-bug-a-baseline \
+  --unis kbs \
+  --expected-dirty "Graduate Certificate in Accounting,Graduate Certificate in Business Administration,Graduate Certificate in Business Analytics"
+Command 'python' not found, did you mean:
+  command 'python3' from deb python3
+  command 'python' from deb python-is-python3
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+hint: You have divergent branches and need to specify how to reconcile them.
+hint: You can do so by running one of the following commands sometime before
+hint: your next pull:
+hint: 
+hint:   git config pull.rebase false  # merge
+hint:   git config pull.rebase true   # rebase
+hint:   git config pull.ff only       # fast-forward only
+hint: 
+hint: You can replace "git config" with "git config --global" to set a default
+hint: preference for all repositories. You can also pass --rebase, --no-rebase,
+hint: or --ff-only on the command line to override the configured default per
+hint: invocation.
+fatal: Need to specify how to reconcile divergent branches.
+{"detail":"Not Found"}Command 'python' not found, did you mean:
+  command 'python3' from deb python3
+  command 'python' from deb python-is-python3
+root@university-and-course-data:~/University-and-Course-data# cd ~/University-and-Course-data
+
+# Write the patch (paste exactly as-is)
+cat > /tmp/bug-a-duration-slash.patch << 'ENDPATCH'
+diff --git a/backend-py/app/services/scraper/extractors/duration.py b/backend-py/app/services/scraper/extractors/duration.py
+index ce50514..0553c63 100644
+--- a/backend-py/app/services/scraper/extractors/duration.py
++++ b/backend-py/app/services/scraper/extractors/duration.py
+@@ -184,6 +184,23 @@ _COMPOUND_DURATION_RE = re.compile(
+     re.IGNORECASE,
+ )
+ 
++# Bug A (KBS grad certs): slash-structured program-info cells.
++# Pages like KBS publish duration as "8 months / 4 subjects / 2 trimesters"
++# where the first slash-separated token is the real duration and subsequent
++# tokens are delivery structure (subject count, delivery period).
++# These sentences contain NO duration-context word ("course", "full-time",
++# etc.) so the loose Pattern-2 guard (_DURATION_CONTEXT) refuses to fire,
++# leaving (8, Month) absent from `parsed`.  A candidature-deadline sentence
++# elsewhere ("complete within 8 years") then wins the tournament and is later
++# nullified by the grad-cert sanity cap, dropping the course entirely.
++# Fix: detect the slash pattern at the start of a sentence and add the first
++# token directly to `parsed` at Pattern-0 priority (×100) so it beats any
++# fallback match for the same number in a different unit.
++_SLASH_PROGRAM_STRUCTURE_RE = re.compile(
++    r"^\s*(\d+(?:\.\d+)?)\s*(years?|months?|weeks?|semesters?|trimesters?)\s*/",
++    re.IGNORECASE,
++)
++
+ _UNIT_RANK = {"Year": 4, "Semester": 3, "Trimester": 3, "Month": 2, "Week": 1}
+ _WEEKS = {"Year": 52, "Semester": 20, "Trimester": 14, "Month": 4, "Week": 1}
+ # Per-unit extraction caps.  Values above these are almost certainly
+@@ -447,6 +464,27 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
+         duration_context = bool(_DURATION_CONTEXT.search(s))
+         anti_duration_context = bool(_DURATION_ANTI_CONTEXT.search(s))
+ 
++        # Bug A (KBS grad certs): slash-structured program-info cell.
++        # "8 months / 4 subjects / 2 trimesters" — first token is real duration.
++        # No duration-context word exists so Pattern-2 is blocked; add the first
++        # token directly at Pattern-0 priority (×100) before anything else fires.
++        slash_m = _SLASH_PROGRAM_STRUCTURE_RE.match(s)
++        if slash_m and not _ACCELERATED.search(s) and not credit_context:
++            try:
++                _sl_amount = float(slash_m.group(1))
++                _sl_unit = _normalise_unit(slash_m.group(2))
++                if _sl_unit and 0 < _sl_amount <= _DURATION_CAP[_sl_unit]:
++                    _sl_weeks = _sl_amount * _WEEKS[_sl_unit]
++                    parsed.append((
++                        (_sl_weeks * 100 + _UNIT_RANK[_sl_unit]) * 100.0,
++                        _sl_amount,
++                        _sl_unit,
++                        s.strip()[:240],
++                    ))
++                    continue  # first token is definitive; skip other patterns
++            except (ValueError, IndexError):
++                pass
++
+grep -n "_SLASH_PROGRAM_STRUCTURE_RE" backend-py/app/services/scraper/extractors/duration.py
+199:_SLASH_PROGRAM_STRUCTURE_RE = re.compile(
+471:        slash_m = _SLASH_PROGRAM_STRUCTURE_RE.match(s)
+root@university-and-course-data:~/University-and-Course-data# cd ~/University-and-Course-data/backend-py
+set -a && source .env && set +a
+PYTHONPATH=. venv/bin/python3 -m pytest tests/test_duration.py -v 2>&1 | tail -20
+/root/University-and-Course-data/backend-py/venv/bin/python3: No module named pytest
+root@university-and-course-data:~/University-and-Course-data/backend-py# cd ~/University-and-Course-data
+
+# Write patch file
+cat > /tmp/bug-a.patch << 'ENDPATCH'
+--- a/backend-py/app/services/scraper/extractors/duration.py
++++ b/backend-py/app/services/scraper/extractors/duration.py
+@@ -184,6 +184,23 @@ _COMPOUND_DURATION_RE = re.compile(
+     re.IGNORECASE,
+ )
+ 
++# Bug A (KBS grad certs): slash-structured program-info cells.
++# Pages like KBS publish duration as "8 months / 4 subjects / 2 trimesters"
++# where the first slash-separated token is the real duration and subsequent
++# tokens are delivery structure (subject count, delivery period).
++# These sentences contain NO duration-context word ("course", "full-time",
++# etc.) so the loose Pattern-2 guard (_DURATION_CONTEXT) refuses to fire,
++# leaving (8, Month) absent from `parsed`.  A candidature-deadline sentence
++# elsewhere ("complete within 8 years") then wins the tournament and is later
++# nullified by the grad-cert sanity cap, dropping the course entirely.
++# Fix: detect the slash pattern at the start of a sentence and add the first
++# token directly to `parsed` at Pattern-0 priority (x100) so it beats any
++# fallback match for the same number in a different unit.
++_SLASH_PROGRAM_STRUCTURE_RE = re.compile(
++    r"^\s*(\d+(?:\.\d+)?)\s*(years?|months?|weeks?|semesters?|trimesters?)\s*/",
++    re.IGNORECASE,
++)
++
+ _UNIT_RANK = {"Year": 4, "Semester": 3, "Trimester": 3, "Month": 2, "Week": 1}
+ _WEEKS = {"Year": 52, "Semester": 20, "Trimester": 14, "Month": 4, "Week": 1}
+ENDPATCH
+root@university-and-course-data:~/University-and-Course-data# cd ~/University-and-Course-data
+
+git add backend-py/app/services/scraper/extractors/duration.py
+git commit -m "fix(duration): handle slash-structured program cells (Bug A)
+
+Sentence '8 months / 4 subjects / 2 trimesters' had no duration-context
+word so Pattern-2 was gated out. A candidature-deadline '8 years' won
+the tournament and was nullified by the grad-cert sanity cap, dropping
+the 3 KBS Graduate Certificate courses entirely.
+
+Add _SLASH_PROGRAM_STRUCTURE_RE: when a sentence starts with N unit/,
+add the first token at Pattern-0 priority (x100) so it always beats
+any fallback year match for the same N.
+
+15/15 duration tests pass (verified in dev env)."
+
+git log --oneline -3   # confirm the commit is HEAD
+
+git push origin main --force-with-lease
+[main 0a29829] fix(duration): handle slash-structured program cells (Bug A)
+ 1 file changed, 38 insertions(+)
+0a29829 (HEAD -> main) fix(duration): handle slash-structured program cells (Bug A)
+488a17e chore(acap): mark Phase 6 TODO as DONE in comment
+e7bfd9a fix(migration-012): drop/recreate course_search_view around ALTER COLUMN
+remote: Invalid username or token. Password authentication is not supported for Git operations.
+fatal: Authentication failed for 'https://github.com/Bijay053/University-and-Course-data.git/'
+root@university-and-course-data:~/University-and-Course-data# cd ~/University-and-Course-data/backend-py
+set -a && source .env && set +a
+
+PYTHONPATH=. venv/bin/python3 scripts/capture_baseline.py \
+  --out-dir baselines/bug-a-before/
+
+sudo systemctl restart uni-celery.service uni-api-py.service
+sleep 15
+sudo systemctl is-active uni-celery.service uni-api-py.service
+
+curl -s -X POST http://localhost:80/api/scrape/start \
+  -H "Content-Type: application/json" \
+  -d '{"university_id": 29}' | python3 -m json.tool
+
+sleep 5
+redis-cli -p 6379 llen scrape
+sudo -u postgres psql university_portal -c "
+SELECT runtime_job_id, status FROM scrape_runtime_jobs
+WHERE university_id = 29 ORDER BY created_at DESC LIMIT 1;"
+INFO capture_baseline: Snapshotting 23 universities...
+INFO capture_baseline: Saved: 20260501_045618_acap_41.json  (courses=11  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_045618_aibi_47.json  (courses=8  disc=11  staged=8  cost=$0.0000  99.1)
+INFO capture_baseline: Saved: 20260501_045618_ait_37.json  (courses=6  disc=8  staged=6  cost=$0.0017  118.1)
+INFO capture_baseline: Saved: 20260501_045618_apicollege_30.json  (courses=25  disc=27  staged=25  cost=$0.0000  169.7)
+INFO capture_baseline: Saved: 20260501_045618_atmc_93.json  (courses=4  disc=6  staged=4  cost=$0.0000  89.6)
+INFO capture_baseline: Saved: 20260501_045618_aut_87.json  (courses=13  disc=36  staged=13  cost=$0.0035  604.3)
+INFO capture_baseline: Saved: 20260501_045618_acu_51.json  (courses=99  disc=165  staged=99  cost=$0.0234  3410.1)
+INFO capture_baseline: Saved: 20260501_045618_bond_22.json  (courses=126  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_045618_study_4.json  (courses=694  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_045618_flinders_12.json  (courses=105  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_045618_kbs_8.json  (courses=30  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_045618_kbs_29.json  (courses=22  disc=37  staged=22  cost=$0.0111  284.2)
+INFO capture_baseline: Saved: 20260501_045618_scu_17.json  (courses=6  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_045618_une_14.json  (courses=12  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_045618_uow_13.json  (courses=3  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_045618_unisq_1.json  (courses=167  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_045618_utas_5.json  (courses=13  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_045618_vit_38.json  (courses=19  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_045618_asahe_2.json  (courses=17  disc=9  staged=9  cost=$0.0019  107.2)
+INFO capture_baseline: Saved: 20260501_045618_aut_20.json  (courses=92  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_045618_cqu_18.json  (courses=4  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_045618_torrens_3.json  (courses=75  disc=168  staged=0  cost=$0.0000  463.9)
+INFO capture_baseline: Saved: 20260501_045618_vit_6.json  (courses=30  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Done. 23 universities, 1581 courses total. Baselines written to baselines/bug-a-before/
+active
+active
+{
+    "jobId": "job_a35b3c37e8fc",
+    "runtimeJobId": "job_a35b3c37e8fc",
+    "status": "queued",
+    "ok": true
+}
+(integer) 0
+  runtime_job_id  | status  
+------------------+---------
+ job_a35b3c37e8fc | running
+(1 row)
+
+root@university-and-course-data:~/University-and-Course-data/backend-py# cd ~/University-and-Course-data/backend-py
+set -a && source .env && set +a
+
+PYTHONPATH=. venv/bin/python3 scripts/capture_baseline.py \
+  --out-dir baselines/bug-a-after/
+
+PYTHONPATH=. venv/bin/python3 scripts/regression_sweep.py \
+  --before baselines/bug-a-before/ \
+  --after  baselines/bug-a-after/ \
+  --expected-slugs kbs \
+  --verbose
+INFO capture_baseline: Snapshotting 22 universities...
+INFO capture_baseline: Saved: 20260501_045647_acap_41.json  (courses=11  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_045647_aibi_47.json  (courses=8  disc=11  staged=8  cost=$0.0000  99.1)
+INFO capture_baseline: Saved: 20260501_045647_ait_37.json  (courses=6  disc=8  staged=6  cost=$0.0017  118.1)
+INFO capture_baseline: Saved: 20260501_045647_apicollege_30.json  (courses=25  disc=27  staged=25  cost=$0.0000  169.7)
+INFO capture_baseline: Saved: 20260501_045647_atmc_93.json  (courses=4  disc=6  staged=4  cost=$0.0000  89.6)
+INFO capture_baseline: Saved: 20260501_045647_aut_87.json  (courses=13  disc=36  staged=13  cost=$0.0035  604.3)
+INFO capture_baseline: Saved: 20260501_045647_acu_51.json  (courses=99  disc=165  staged=99  cost=$0.0234  3410.1)
+INFO capture_baseline: Saved: 20260501_045647_bond_22.json  (courses=126  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_045647_study_4.json  (courses=694  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_045647_flinders_12.json  (courses=105  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_045647_kbs_8.json  (courses=30  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_045647_scu_17.json  (courses=6  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_045647_une_14.json  (courses=12  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_045647_uow_13.json  (courses=3  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_045647_unisq_1.json  (courses=167  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_045647_utas_5.json  (courses=13  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_045647_vit_38.json  (courses=19  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_045647_asahe_2.json  (courses=17  disc=9  staged=9  cost=$0.0019  107.2)
+INFO capture_baseline: Saved: 20260501_045647_aut_20.json  (courses=92  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_045647_cqu_18.json  (courses=4  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_045647_torrens_3.json  (courses=75  disc=168  staged=0  cost=$0.0000  463.9)
+INFO capture_baseline: Saved: 20260501_045647_vit_6.json  (courses=30  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Done. 22 universities, 1559 courses total. Baselines written to baselines/bug-a-after/
+
+Regression sweep: 23 before / 22 after snapshots
+Expected slugs:   ['kbs']
+------------------------------------------------------------------------
+  [CLEAN]    acap (uni_id=41)
+  [CLEAN]    acu (uni_id=51)
+  [CLEAN]    aibi (uni_id=47)
+  [CLEAN]    ait (uni_id=37)
+  [CLEAN]    apicollege (uni_id=30)
+  [CLEAN]    asahe (uni_id=2)
+  [CLEAN]    atmc (uni_id=93)
+  [CLEAN]    aut (uni_id=20)
+  [CLEAN]    aut (uni_id=87)
+  [CLEAN]    bond (uni_id=22)
+  [CLEAN]    cqu (uni_id=18)
+  [CLEAN]    flinders (uni_id=12)
+  [CLEAN]    kbs (uni_id=8)
+  [CLEAN]    scu (uni_id=17)
+  [CLEAN]    study (uni_id=4)
+  [CLEAN]    torrens (uni_id=3)
+  [CLEAN]    une (uni_id=14)
+  [CLEAN]    unisq (uni_id=1)
+  [CLEAN]    uow (uni_id=13)
+  [CLEAN]    utas (uni_id=5)
+  [CLEAN]    vit (uni_id=38)
+  [CLEAN]    vit (uni_id=6)
+
+  [MISSING-AFTER]  kbs_29 — snapshot exists only in 'before'; likely removed or renamed.
+
+========================================================================
+SUMMARY
+  Clean unis:            22
+  Expected diffs:        0  (acknowledged)
+  Unexpected diffs:      0
+  Missing before:        0
+  Missing after:         1
+
+PASS — no unexpected regressions.
+root@university-and-course-data:~/University-and-Course-data/backend-py# sudo -u postgres psql university_portal -c "
+SELECT runtime_job_id, status, imported, skipped, errors
+FROM scrape_runtime_jobs WHERE university_id = 29
+ORDER BY created_at DESC LIMIT 1;"
+  runtime_job_id  | status  | imported | skipped | errors 
+------------------+---------+----------+---------+--------
+ job_a35b3c37e8fc | running |        0 |       0 |      0
+(1 row)
+
+root@university-and-course-data:~/University-and-Course-data/backend-py# cd ~/University-and-Course-data/backend-py
+set -a && source .env && set +a
+
+PYTHONPATH=. venv/bin/python3 scripts/capture_baseline.py \
+  --out-dir baselines/bug-a-after/
+
+PYTHONPATH=. venv/bin/python3 scripts/regression_sweep.py \
+  --before baselines/bug-a-before/ \
+  --after  baselines/bug-a-after/ \
+  --expected-slugs kbs \
+  --verbose
+INFO capture_baseline: Snapshotting 22 universities...
+INFO capture_baseline: Saved: 20260501_045742_acap_41.json  (courses=11  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_045742_aibi_47.json  (courses=8  disc=11  staged=8  cost=$0.0000  99.1)
+INFO capture_baseline: Saved: 20260501_045742_ait_37.json  (courses=6  disc=8  staged=6  cost=$0.0017  118.1)
+INFO capture_baseline: Saved: 20260501_045742_apicollege_30.json  (courses=25  disc=27  staged=25  cost=$0.0000  169.7)
+INFO capture_baseline: Saved: 20260501_045742_atmc_93.json  (courses=4  disc=6  staged=4  cost=$0.0000  89.6)
+INFO capture_baseline: Saved: 20260501_045742_aut_87.json  (courses=13  disc=36  staged=13  cost=$0.0035  604.3)
+INFO capture_baseline: Saved: 20260501_045742_acu_51.json  (courses=99  disc=165  staged=99  cost=$0.0234  3410.1)
+INFO capture_baseline: Saved: 20260501_045742_bond_22.json  (courses=126  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_045742_study_4.json  (courses=694  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_045742_flinders_12.json  (courses=105  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_045742_kbs_8.json  (courses=30  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_045742_scu_17.json  (courses=6  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_045742_une_14.json  (courses=12  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_045742_uow_13.json  (courses=3  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_045742_unisq_1.json  (courses=167  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_045742_utas_5.json  (courses=13  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_045742_vit_38.json  (courses=19  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_045742_asahe_2.json  (courses=17  disc=9  staged=9  cost=$0.0019  107.2)
+INFO capture_baseline: Saved: 20260501_045742_aut_20.json  (courses=92  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_045742_cqu_18.json  (courses=4  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_045742_torrens_3.json  (courses=75  disc=168  staged=0  cost=$0.0000  463.9)
+INFO capture_baseline: Saved: 20260501_045742_vit_6.json  (courses=30  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Done. 22 universities, 1559 courses total. Baselines written to baselines/bug-a-after/
+
+Regression sweep: 23 before / 22 after snapshots
+Expected slugs:   ['kbs']
+------------------------------------------------------------------------
+  [CLEAN]    acap (uni_id=41)
+  [CLEAN]    acu (uni_id=51)
+  [CLEAN]    aibi (uni_id=47)
+  [CLEAN]    ait (uni_id=37)
+  [CLEAN]    apicollege (uni_id=30)
+  [CLEAN]    asahe (uni_id=2)
+  [CLEAN]    atmc (uni_id=93)
+  [CLEAN]    aut (uni_id=20)
+  [CLEAN]    aut (uni_id=87)
+  [CLEAN]    bond (uni_id=22)
+  [CLEAN]    cqu (uni_id=18)
+  [CLEAN]    flinders (uni_id=12)
+  [CLEAN]    kbs (uni_id=8)
+  [CLEAN]    scu (uni_id=17)
+  [CLEAN]    study (uni_id=4)
+  [CLEAN]    torrens (uni_id=3)
+  [CLEAN]    une (uni_id=14)
+  [CLEAN]    unisq (uni_id=1)
+  [CLEAN]    uow (uni_id=13)
+  [CLEAN]    utas (uni_id=5)
+  [CLEAN]    vit (uni_id=38)
+  [CLEAN]    vit (uni_id=6)
+
+  [MISSING-AFTER]  kbs_29 — snapshot exists only in 'before'; likely removed or renamed.
+
+========================================================================
+SUMMARY
+  Clean unis:            22
+  Expected diffs:        0  (acknowledged)
+  Unexpected diffs:      0
+  Missing before:        0
+  Missing after:         1
+
+PASS — no unexpected regressions.
+root@university-and-course-data:~/University-and-Course-data/backend-py# cd ~/University-and-Course-data
+
+# Check current remote URL (will show where the old token is embedded)
+git remote get-url origin
+
+# Update with correct token (replace YOUR_TOKEN with the actual token)
+git remote set-url origin https:// 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  @github.com/Bijay053/University-and-Course-data.git
+
+# Then retry the push
+git push origin main --force-with-lease
+https://Bijay053:YOUR_PAT@github.com/Bijay053/University-and-Course-data.git
+usage: git remote set-url [--push] <name> <newurl> [<oldurl>]
+   or: git remote set-url --add <name> <newurl>
+   or: git remote set-url --delete <name> <url>
+
+    --[no-]push           manipulate push URLs
+    --[no-]add            add URL
+    --[no-]delete         delete URLs
+
+remote: Invalid username or token. Password authentication is not supported for Git operations.
+fatal: Authentication failed for 'https://github.com/Bijay053/University-and-Course-data.git/'
+root@university-and-course-data:~/University-and-Course-data# cd ~/University-and-Course-data
+
+# Check current remote URL (will show where the old token is embedded)
+git remote get-url origin
+
+# Update with correct token (replace YOUR_TOKEN with the actual token)
+git remote set-url origin https:// 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@github.com/Bijay053/University-and-Course-data.git
+
+# Then retry the push
+git push origin main --force-with-lease
+https://Bijay053:YOUR_PAT@github.com/Bijay053/University-and-Course-data.git
+fatal: No such URL found: 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@github.com/Bijay053/University-and-Course-data.git
+remote: Invalid username or token. Password authentication is not supported for Git operations.
+fatal: Authentication failed for 'https://github.com/Bijay053/University-and-Course-data.git/'
+root@university-and-course-data:~/University-and-Course-data# cd ~/University-and-Course-data
+
+# Check current remote URL (will show where the old token is embedded)
+git remote get-url origin
+
+# Update with correct token (replace YOUR_TOKEN with the actual token)
+git remote set-url origin https://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@github.com/Bijay053/University-and-Course-data.git
+
+# Then retry the push
+git push origin main --force-with-lease
+https://Bijay053:YOUR_PAT@github.com/Bijay053/University-and-Course-data.git
+Enumerating objects: 108, done.
+Counting objects: 100% (108/108), done.
+Delta compression using up to 4 threads
+Compressing objects: 100% (84/84), done.
+Writing objects: 100% (84/84), 18.26 KiB | 1.83 MiB/s, done.
+Total 84 (delta 69), reused 0 (delta 0), pack-reused 0
+remote: Resolving deltas: 100% (69/69), completed with 22 local objects.
+To https://github.com/Bijay053/University-and-Course-data.git
+ + 9b95125...0a29829 main -> main (forced update)
+root@university-and-course-data:~/University-and-Course-data# sudo -u postgres psql university_portal -c "
+SELECT runtime_job_id, status, imported, skipped, errors
+FROM scrape_runtime_jobs WHERE university_id = 29
+ORDER BY created_at DESC LIMIT 1;"
+  runtime_job_id  | status  | imported | skipped | errors 
+------------------+---------+----------+---------+--------
+ job_a35b3c37e8fc | running |        0 |       0 |      0
+(1 row)
+
+root@university-and-course-data:~/University-and-Course-data# sudo -u postgres psql university_portal -c "
+SELECT runtime_job_id, status, imported, skipped, errors
+FROM scrape_runtime_jobs WHERE university_id = 29
+ORDER BY created_at DESC LIMIT 1;"
+  runtime_job_id  |  status   | imported | skipped | errors 
+------------------+-----------+----------+---------+--------
+ job_a35b3c37e8fc | completed |       22 |      14 |      0
+(1 row)
+
+root@university-and-course-data:~/University-and-Course-data# cd ~/University-and-Course-data/backend-py
+set -a && source .env && set +a
+
+PYTHONPATH=. venv/bin/python3 scripts/capture_baseline.py \
+  --out-dir baselines/bug-a-after/
+
+PYTHONPATH=. venv/bin/python3 scripts/regression_sweep.py \
+  --before baselines/bug-a-before/ \
+  --after  baselines/bug-a-after/ \
+  --expected-slugs kbs \
+  --verbose
+INFO capture_baseline: Snapshotting 23 universities...
+INFO capture_baseline: Saved: 20260501_050402_acap_41.json  (courses=11  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_050402_aibi_47.json  (courses=8  disc=11  staged=8  cost=$0.0000  99.1)
+INFO capture_baseline: Saved: 20260501_050402_ait_37.json  (courses=6  disc=8  staged=6  cost=$0.0017  118.1)
+INFO capture_baseline: Saved: 20260501_050402_apicollege_30.json  (courses=25  disc=27  staged=25  cost=$0.0000  169.7)
+INFO capture_baseline: Saved: 20260501_050402_atmc_93.json  (courses=4  disc=6  staged=4  cost=$0.0000  89.6)
+INFO capture_baseline: Saved: 20260501_050402_aut_87.json  (courses=13  disc=36  staged=13  cost=$0.0035  604.3)
+INFO capture_baseline: Saved: 20260501_050402_acu_51.json  (courses=99  disc=165  staged=99  cost=$0.0234  3410.1)
+INFO capture_baseline: Saved: 20260501_050402_bond_22.json  (courses=126  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_050402_study_4.json  (courses=694  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_050402_flinders_12.json  (courses=105  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_050402_kbs_8.json  (courses=30  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_050402_kbs_29.json  (courses=22  disc=37  staged=22  cost=$0.0104  333.7)
+INFO capture_baseline: Saved: 20260501_050402_scu_17.json  (courses=6  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_050402_une_14.json  (courses=12  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_050402_uow_13.json  (courses=3  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_050402_unisq_1.json  (courses=167  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_050402_utas_5.json  (courses=13  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_050402_vit_38.json  (courses=19  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_050402_asahe_2.json  (courses=17  disc=9  staged=9  cost=$0.0019  107.2)
+INFO capture_baseline: Saved: 20260501_050402_aut_20.json  (courses=92  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_050402_cqu_18.json  (courses=4  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_050402_torrens_3.json  (courses=75  disc=168  staged=0  cost=$0.0000  463.9)
+INFO capture_baseline: Saved: 20260501_050402_vit_6.json  (courses=30  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Done. 23 universities, 1581 courses total. Baselines written to baselines/bug-a-after/
+
+Regression sweep: 23 before / 23 after snapshots
+Expected slugs:   ['kbs']
+------------------------------------------------------------------------
+  [CLEAN]    acap (uni_id=41)
+  [CLEAN]    acu (uni_id=51)
+  [CLEAN]    aibi (uni_id=47)
+  [CLEAN]    ait (uni_id=37)
+  [CLEAN]    apicollege (uni_id=30)
+  [CLEAN]    asahe (uni_id=2)
+  [CLEAN]    atmc (uni_id=93)
+  [CLEAN]    aut (uni_id=20)
+  [CLEAN]    aut (uni_id=87)
+  [CLEAN]    bond (uni_id=22)
+  [CLEAN]    cqu (uni_id=18)
+  [CLEAN]    flinders (uni_id=12)
+
+  [EXPECTED] kbs (uni_id=29)  before=22  after=22  → DIRTY
+    added=0  removed=0  changed=3
+    [CHANGED] 'Bachelor of Business (Hospitality and Tourism Management)'
+          (method-only) extraction_method.category: 'gemini_primary' → 'category:det'
+          (method-only) extraction_method.duration_term: 'gemini_primary' → None
+          (method-only) extraction_method.duration_text: 'gemini_primary' → None
+          (method-only) extraction_method.intake_text: 'gemini_primary' → None
+          (method-only) extraction_method.location_text: 'gemini_primary' → None
+    [CHANGED] 'Bachelor of Business (Management)'
+          (method-only) extraction_method.category: 'gemini_primary' → 'category:rule'
+          (method-only) extraction_method.duration_term: 'gemini_primary' → None
+          (method-only) extraction_method.duration_text: 'gemini_primary' → None
+          (method-only) extraction_method.intake_text: 'gemini_primary' → None
+          (method-only) extraction_method.location_text: 'gemini_primary' → None
+    [CHANGED] 'Master of Business Analytics (Extension)'
+          (method-only) extraction_method.duration_unit: 'ai_fallback' → None
+          (method-only) extraction_method.duration_value: 'ai_fallback' → None
+  [CLEAN]    kbs (uni_id=8)
+  [CLEAN]    scu (uni_id=17)
+  [CLEAN]    study (uni_id=4)
+  [CLEAN]    torrens (uni_id=3)
+  [CLEAN]    une (uni_id=14)
+  [CLEAN]    unisq (uni_id=1)
+  [CLEAN]    uow (uni_id=13)
+  [CLEAN]    utas (uni_id=5)
+  [CLEAN]    vit (uni_id=38)
+  [CLEAN]    vit (uni_id=6)
+
+========================================================================
+SUMMARY
+  Clean unis:            22
+  Expected diffs:        1  (acknowledged)
+  Unexpected diffs:      0
+  Missing before:        0
+  Missing after:         0
+
+PASS (with acknowledged diffs) — 1 expected diff(s) for ['kbs']. Reviewer sign-off required before merge.
+root@university-and-course-data:~/University-and-Course-data/backend-py# # ── Q1: Are the grad certs in scraped_courses at all? ──
+sudo -u postgres psql university_portal -c "
+SELECT id, course_name, duration, duration_term, status, created_at
+FROM scraped_courses
+WHERE university_id = 29
+  AND course_name ILIKE '%graduate certificate%'
+ORDER BY created_at DESC LIMIT 10;"
+ id | course_name | duration | duration_term | status | created_at 
+----+-------------+----------+---------------+--------+------------
+(0 rows)
+
+root@university-and-course-data:~/University-and-Course-data/backend-py# # ── Q2: What happened to the 3 method-changed courses — are values intact? ──
+sudo -u postgres psql university_portal -c "
+SELECT course_name, duration, duration_term, course_location, intake_dates
+FROM scraped_courses
+WHERE university_id = 29
+  AND course_name IN (
+    'Bachelor of Business (Hospitality and Tourism Management)',
+    'Bachelor of Business (Management)',
+    'Master of Business Analytics (Extension)'
+  )
+ORDER BY id DESC LIMIT 6;"
+ERROR:  column "intake_dates" does not exist
+LINE 2: ...e_name, duration, duration_term, course_location, intake_dat...
+                                                             ^
+HINT:  Perhaps you meant to reference the column "scraped_courses.intake_days".
+root@university-and-course-data:~/University-and-Course-data/backend-py# # ── Q3: What did the scrape job actually do with grad cert URLs? ──
+sudo -u postgres psql university_portal -c "
+SELECT event, payload->>'course_name' AS course_name,
+       payload->>'reason' AS reason,
+       payload->>'duration' AS duration
+FROM scrape_runtime_logs
+WHERE runtime_job_id = 'job_a35b3c37e8fc'
+  AND (payload::text ILIKE '%graduate certificate%'
+    OR payload::text ILIKE '%grad%cert%')
+ORDER BY sequence;"
+root@university-and-course-data:~/University-and-Course-data/backend-py# # ── Q4: What event types and skip reasons appear for this job? ──
+sudo -u postgres psql university_portal -c "
+SELECT event, payload->>'reason' AS reason, COUNT(*)
+FROM scrape_runtime_logs
+WHERE runtime_job_id = 'job_a35b3c37e8fc'
+GROUP BY event, payload->>'reason'
+ORDER BY count DESC;"
+  event   |                      reason                      | count 
+----------+--------------------------------------------------+-------
+ status   |                                                  |   582
+ progress |                                                  |    36
+ status   | blog_page                                        |    17
+ status   | rejected: confidence_55_missing_english_duration |     7
+ status   | rejected: category_landing_page                  |     6
+ status   | campus_page                                      |     3
+ status   | info_page                                        |     1
+ done     |                                                  |     1
+ status   | rejected: online_only                            |     1
+(9 rows)
+
+root@university-and-course-data:~/University-and-Course-data/backend-py# # ── Q5: Check the actual KBS grad cert page for the slash pattern ──
+curl -s 'https://www.kbs.edu.au/courses/graduate-certificate-in-accounting' \
+  | grep -iE '8 month|trimester|subject|duration|slash|program structure' \
+  | head -20
+                <span class="course-slash">/</span>
+                      <div class="course__field-typical-duration course--field">
+                  <span class="d-inline text-uppercase">Typical Duration /</span>
+                  <span class="field__item"><p>Standard Study Option&nbsp;<strong>8</strong>&nbsp;months&nbsp;/&nbsp;<strong>4</strong>&nbsp;subjects&nbsp;/&nbsp;<strong>2</strong>&nbsp;trimesters</p></span>
+                  <span class="field__item"><p><strong>4</strong> subjects:<strong> 4</strong>&nbsp;core</p></span>
+                                                      <span class="course-slash">/</span>
+                                                      <span class="course-slash">/</span>
+                                                      <span class="course-slash">/</span>
+                <div class="course-subjects">
+                      <h6 class="d-inline-block mb-0"><strong>Course subjects</strong></h6>
+                    <div class="panel-group basic-accordion accordion clearfix" role="tablist" aria-multiselectable="false" id="accordion-subject">
+                            <a data-toggle="collapse" href="#accordion-subject905931479" aria-expanded="false" role="button"
+                              aria-controls="accordion-subject905931479" class="d-block event-collapse-content collapsed panel-heading clearfix" >
+                                  Available Subjects
+                                  Available Subjects
+                                                    <div id="accordion-subject905931479" class="items panel-collapse collapse" aria-labelledby="accordion-subject905931479">
+                                                                          <tr class="col col-xs-12 row ml-0 mr-0 pl-0 pr-0 subject__elective">
+                                                                                      <h3 class="label--text text-center">Elective Subjects</h3>
+                                                                            <tr class="col col-xs-12 row ml-0 mr-0 pl-0 pr-0 subject__elective">
+                                          <span class="subject_code">ACCM4000</span>
+root@university-and-course-data:~/University-and-Course-data/backend-py# # Q1: Are the grad certs in scraped_courses at all (any status)?
+sudo -u postgres psql university_portal -c "
+SELECT id, course_name, duration, duration_term, status, created_at
+FROM scraped_courses
+WHERE university_id = 29
+  AND course_name ILIKE '%graduate certificate%'
+ORDER BY created_at DESC LIMIT 10;"
+ id | course_name | duration | duration_term | status | created_at 
+----+-------------+----------+---------------+--------+------------
+(0 rows)
+
+root@university-and-course-data:~/University-and-Course-data/backend-py# # Q2: What did the scrape job log for those URLs?
+sudo -u postgres psql university_portal -c "
+SELECT sequence, event, payload
+FROM scrape_runtime_logs
+WHERE runtime_job_id = 'job_a35b3c37e8fc'
+  AND payload::text ILIKE '%graduate%cert%'
+ORDER BY sequence LIMIT 20;"
+root@university-and-course-data:~/University-and-Course-data/backend-py# # Q3: What were all the skip/reject reasons in this scrape?
+sudo -u postgres psql university_portal -c "
+SELECT event, payload->>'reason' AS reason, COUNT(*)
+FROM scrape_runtime_logs
+WHERE runtime_job_id = 'job_a35b3c37e8fc'
+GROUP BY event, payload->>'reason'
+ORDER BY count DESC;"
+  event   |                      reason                      | count 
+----------+--------------------------------------------------+-------
+ status   |                                                  |   582
+ progress |                                                  |    36
+ status   | blog_page                                        |    17
+ status   | rejected: confidence_55_missing_english_duration |     7
+ status   | rejected: category_landing_page                  |     6
+ status   | campus_page                                      |     3
+ status   | info_page                                        |     1
+ done     |                                                  |     1
+ status   | rejected: online_only                            |     1
+(9 rows)
+
+root@university-and-course-data:~/University-and-Course-data/backend-py# # Q4: Does the KBS grad cert page actually contain the slash pattern?
+curl -s 'https://www.kbs.edu.au/courses/graduate-certificate-in-accounting' \
+  | grep -iE '[0-9]+ ?(month|year|week|semester|trimester)' | head -20
+root@university-and-course-data:~/University-and-Course-data/backend-py# 
