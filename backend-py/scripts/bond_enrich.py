@@ -260,7 +260,15 @@ def main() -> None:
         log.error("DATABASE_URL not set")
         sys.exit(1)
 
-    engine = create_engine(db_url, pool_pre_ping=True)
+    # DATABASE_URL may use the async asyncpg driver (postgresql+asyncpg://...).
+    # Swap to psycopg2 for synchronous use in this script.
+    sync_url = (
+        db_url
+        .replace("postgresql+asyncpg://", "postgresql+psycopg2://")
+        .replace("postgresql+asyncpg+ssl://", "postgresql+psycopg2://")
+    )
+    # Plain postgresql:// is already sync-compatible with psycopg2.
+    engine = create_engine(sync_url, pool_pre_ping=True)
 
     with engine.connect() as conn:
         q = """
