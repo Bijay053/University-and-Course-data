@@ -1,0 +1,106 @@
+root@university-and-course-data:~/University-and-Course-data# curl -sL "https://bond.edu.au/api/program-details/432" \
+  | python3 -c "
+import sys, json
+try:
+    d = json.load(sys.stdin)
+    print('Keys:', list(d.keys()) if isinstance(d, dict) else type(d).__name__)
+    # Print any key that looks like fees or English
+    if isinstance(d, dict):
+        for k, v in d.items():
+            if any(x in k.lower() for x in ['fee','english','ielts','intake','cost','tuition','require']):
+                print(f'  {k}: {json.dumps(v)[:200]}')
+        # Also print full structure at 2 levels
+        print()
+        print('Full (truncated):')
+        print(json.dumps(d, indent=2)[:3000])
+except Exception as e:
+    print('Not JSON or error:', e)
+    # Print raw first 500 chars
+    sys.stdin = open('/dev/stdin')
+" 2>&1
+
+# Also try the program list API — may give us all 126 IDs at once
+curl -sL "https://bond.edu.au/api/programs?level=all&limit=200" 2>&1 | head -20
+curl -sL "https://bond.edu.au/api/program-list" 2>&1 | head -20
+Keys: ['programs']
+
+Full (truncated):
+{
+  "programs": [
+    {
+      "id": "HS-20003",
+      "duration": "2 years (6 semesters)",
+      "name": "Bachelor of Arts - HS-20003",
+      "type": "Bachelor Degree",
+      "studyAreas": [
+        {
+          "label": "International Relations, Politics, and Arts",
+          "uri": "https://bond.edu.au/study/our-study-areas/international-relations-politics-and-arts"
+        }
+      ],
+      "offerings": [
+        {
+          "semester": "May 2026",
+          "deliveryMode": "On-Campus",
+          "location": "Gold Coast Campus"
+        },
+        {
+          "semester": "September 2026",
+          "deliveryMode": "On-Campus",
+          "location": "Gold Coast Campus"
+        },
+        {
+          "semester": "January 2027",
+          "deliveryMode": "On-Campus",
+          "location": "Gold Coast Campus"
+        },
+        {
+          "semester": "May 2027",
+          "deliveryMode": "On-Campus",
+          "location": "Gold Coast Campus"
+        }
+      ]
+    }
+  ]
+}
+<!DOCTYPE html>
+<html lang="en" dir="ltr" prefix="og: https://ogp.me/ns#">
+<head>
+  <meta charset="utf-8" />
+<script nonce="O9s17uf7LzqICAaoVDw_FkHo3yHkinb3">dataLayer = [];</script>
+<script nonce="O9s17uf7LzqICAaoVDw_FkHo3yHkinb3" id="gtmScript" data-nonce="O9s17uf7LzqICAaoVDw_FkHo3yHkinb3">(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;var n=d.querySelector('[nonce]');n&&j.setAttribute('nonce',n.nonce||n.getAttribute('nonce'));f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','GTM-TLRQMZ');</script>
+<link rel="canonical" href="https://bond.edu.au/page-not-found" />
+<meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex, notranslate" />
+<link rel="shortlink" href="https://bond.edu.au/page-not-found" />
+<meta property="og:site_name" content="Bond University" />
+<meta property="og:type" content="Website" />
+<meta property="og:url" content="https://bond.edu.au/page-not-found" />
+<meta property="og:title" content="Page not found" />
+<meta name="twitter:title" content="Page not found" />
+<meta name="MobileOptimized" content="width" />
+<meta name="HandheldFriendly" content="true" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>Page not found | Bond University | Gold Coast, Queensland, Australia</title>
+
+<!DOCTYPE html>
+<html lang="en" dir="ltr" prefix="og: https://ogp.me/ns#">
+<head>
+  <meta charset="utf-8" />
+<script nonce="O9s17uf7LzqICAaoVDw_FkHo3yHkinb3">dataLayer = [];</script>
+<script nonce="O9s17uf7LzqICAaoVDw_FkHo3yHkinb3" id="gtmScript" data-nonce="O9s17uf7LzqICAaoVDw_FkHo3yHkinb3">(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;var n=d.querySelector('[nonce]');n&&j.setAttribute('nonce',n.nonce||n.getAttribute('nonce'));f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','GTM-TLRQMZ');</script>
+<link rel="canonical" href="https://bond.edu.au/page-not-found" />
+<meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex, notranslate" />
+<link rel="shortlink" href="https://bond.edu.au/page-not-found" />
+<meta property="og:site_name" content="Bond University" />
+<meta property="og:type" content="Website" />
+<meta property="og:url" content="https://bond.edu.au/page-not-found" />
+<meta property="og:title" content="Page not found" />
+<meta name="twitter:title" content="Page not found" />
+<meta name="MobileOptimized" content="width" />
+<meta name="HandheldFriendly" content="true" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>Page not found | Bond University | Gold Coast, Queensland, Australia</title>
+
+root@university-and-course-data:~/University-and-Course-data# 
