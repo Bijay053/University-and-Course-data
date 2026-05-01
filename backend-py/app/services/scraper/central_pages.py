@@ -566,6 +566,42 @@ def _html_has_fee_signal(html: str | None) -> bool:
     return len(_CURRENCY_RE.findall(html)) >= 3
 
 
+def _html_has_js_rendering_signal(html: str | None) -> bool:
+    """Return True when the HTML page is a JS-rendered shell with little static content.
+
+    Detects DXPR Builder (Drupal), React/Vue shells, and other CMS patterns
+    that require Playwright to reveal actual content.  Used to decide whether
+    to auto-retry an English-requirements page fetch with the browser when the
+    plain-HTTP response returned no English scores.
+
+    Detection signals (any one is sufficient):
+    - ``data-az-mode="dynamic"`` — DXPR Builder dynamic content placeholder
+    - ``dxpr_builder`` in the page HTML — Drupal DXPR CMS fingerprint
+    - ``data-dxpr-builder-libraries`` attribute — DXPR element marker
+    - Very sparse text content (< 400 chars of visible text) on a 200 response
+    """
+    if not html:
+        return False
+    sample = html[:8000]
+    if 'data-az-mode="dynamic"' in sample:
+        return True
+    if "dxpr_builder" in sample:
+        return True
+    if "data-dxpr-builder-libraries" in sample:
+        return True
+    try:
+        from bs4 import BeautifulSoup
+        soup = BeautifulSoup(html[:20000], "html.parser")
+        for tag in soup(["script", "style", "noscript"]):
+            tag.decompose()
+        visible = soup.get_text(" ", strip=True)
+        if len(visible) < 400:
+            return True
+    except Exception:
+        pass
+    return False
+
+
 async def _fetch_with_browser_fallback(url: str) -> str | None:
     """Fetch a central page, trying plain HTTP first and Playwright as fallback.
 
@@ -955,6 +991,71 @@ async def prefetch_central_pages(
                                     _pdf_exc,
                                 )
 
+                        # ── Hub sub-page follower ─────────────────────────
+                        # When the fee URL is a navigational hub (0 inline
+                        # records AND no PDF found data either), probe child
+                        # sub-pages of that hub.  Example: KBS publishes an
+                        # /admissions/fees hub that links to
+                        # /admissions/fees/international-fees which has the
+                        # actual HTML table.  Generic: any same-domain child
+                        # path containing "international" and "fee" tokens is
+                        # tried (up to 2 candidates, international-first).
+                        if not records and fee_html:
+                            from urllib.parse import urlparse as _urlparse_hub
+                            _hub_parsed = _urlparse_hub(fee_url)
+                            _base_domain = (
+                                f"{_hub_parsed.scheme}://{_hub_parsed.netloc}"
+                            )
+                            _sub_candidates = _extract_fee_hub_subpage_links(
+                                fee_html, fee_url, _base_domain
+                            )
+                            if _sub_candidates:
+                                log.info(
+                                    "central_pages: hub sub-page follower — "
+                                    "trying %d candidate(s): %s",
+                                    len(_sub_candidates),
+                                    _sub_candidates[:2],
+                                )
+                            for _sub_url in _sub_candidates[:2]:
+                                try:
+                                    _sub_html = await _fetch_with_browser_fallback(
+                                        _sub_url
+                                    )
+                                    if not _sub_html:
+                                        continue
+                                    _sub_records = _parse_fee_page_html(
+                                        _sub_html, _sub_url
+                                    )
+                                    if _sub_records:
+                                        records = _sub_records
+                                        result["fees"] = records
+                                        result["fee_page_url"] = _sub_url
+                                        log.info(
+                                            "central_pages: sub-page fee parse "
+                                            "(%s) → %d record(s)",
+                                            _sub_url,
+                                            len(_sub_records),
+                                        )
+                                        if emit:
+                                            await emit(
+                                                "status",
+                                                f"[CENTRAL] sub-page fee parsed → "
+                                                f"{len(_sub_records)} record(s) "
+                                                f"from {_sub_url}",
+                                                phase="discover",
+                                                kind="central_fee_subpage_parsed",
+                                                count=len(_sub_records),
+                                                url=_sub_url,
+                                            )
+                                        break
+                                except Exception as _sub_exc:
+                                    log.warning(
+                                        "central_pages: sub-page fee fetch/parse "
+                                        "failed (%s): %s",
+                                        _sub_url,
+                                        _sub_exc,
+                                    )
+
                     # Store in cache
                     if university_id is not None:
                         await _cache_set(
@@ -1041,6 +1142,60 @@ async def prefetch_central_pages(
                     # Flat parse — first-seen value wins (typically UG for ASA).
                     english_vals = await _parse_english_page_html_async(eng_html, english_url)
                     result["english"] = english_vals
+
+                    # ── Auto browser-fallback for JS-rendered English pages ──
+                    # When plain HTTP returned a JS shell (e.g. Drupal DXPR
+                    # Builder) the static response has no IELTS scores.  Detect
+                    # that signal and re-fetch with Playwright so the rendered
+                    # HTML exposes the actual requirement tables.  Skipped when
+                    # we already used the browser path (_use_browser_for_english).
+                    if (
+                        not english_vals
+                        and not _use_browser_for_english
+                        and _html_has_js_rendering_signal(eng_html)
+                    ):
+                        log.info(
+                            "central_pages: english page %s looks JS-rendered "
+                            "(no scores + JS signal) — retrying with browser",
+                            english_url,
+                        )
+                        if emit:
+                            await emit(
+                                "status",
+                                f"[CENTRAL] english page JS-shell detected — "
+                                f"retrying with browser: {english_url}",
+                                phase="discover",
+                                kind="central_english_browser_retry",
+                                url=english_url,
+                            )
+                        try:
+                            _br_eng_html = await asyncio.wait_for(
+                                _fetch_english_with_browser(english_url),
+                                timeout=75,
+                            )
+                            if _br_eng_html:
+                                _br_vals = await _parse_english_page_html_async(
+                                    _br_eng_html, english_url
+                                )
+                                if _br_vals:
+                                    english_vals = _br_vals
+                                    eng_html = _br_eng_html
+                                    result["english"] = english_vals
+                                    # Treat subsequent by_level parse as browser
+                                    _use_browser_for_english = True
+                                    log.info(
+                                        "central_pages: browser retry found "
+                                        "english scores for %s: %s",
+                                        english_url,
+                                        english_vals,
+                                    )
+                        except Exception as _br_exc:
+                            log.warning(
+                                "central_pages: english browser retry failed "
+                                "(%s): %s",
+                                english_url,
+                                _br_exc,
+                            )
 
                     # Level-aware parse — only meaningful when the browser
                     # rendered a page with separate UG / PG sections.
@@ -1259,6 +1414,89 @@ def _extract_fee_link_candidates(html: str, base_domain: str) -> list[str]:
             candidates.append(clean)
 
     return candidates
+
+
+def _extract_fee_hub_subpage_links(
+    html: str, hub_url: str, base_domain: str
+) -> list[str]:
+    """Extract sub-page links from a hub-style fee page that yielded 0 records.
+
+    When a central fee page is a navigational hub (e.g. KBS ``/admissions/fees``
+    links to ``/admissions/fees/international-fees``), the top-level HTML table
+    parser finds no parseable fee data.  This function finds child links under
+    the hub URL and ranks ones mentioning "international" first so the caller
+    can try fetching the richer sub-page instead.
+
+    Only returns same-domain URLs whose path starts with the hub URL's path
+    followed by ``/`` (i.e. genuine child pages, not siblings or parents).
+    Links that are identical to the hub URL are excluded.
+
+    Args:
+        html: HTML content of the hub page already fetched.
+        hub_url: The hub URL that returned 0 fee records.
+        base_domain: Scheme + netloc (e.g. ``"https://www.kbs.edu.au"``).
+
+    Returns:
+        Deduplicated list, "international" child pages first, at most 4 items.
+    """
+    try:
+        from bs4 import BeautifulSoup
+        from urllib.parse import urljoin, urlparse
+    except ImportError:
+        return []
+
+    try:
+        soup = BeautifulSoup(html, "html.parser")
+    except Exception:
+        return []
+
+    hub_parsed = urlparse(hub_url)
+    hub_path = hub_parsed.path.rstrip("/").lower()
+    parsed_base = urlparse(base_domain)
+    base_netloc = parsed_base.netloc.lower()
+
+    _INTL_TOKENS = ("international", "intl", "overseas", "offshore")
+    _FEE_TOKENS = ("fee", "tuition", "cost", "schedule", "rate")
+
+    seen: set[str] = set()
+    intl: list[str] = []
+    other: list[str] = []
+
+    for a in soup.find_all("a", href=True):
+        href: str = (a.get("href") or "").strip()
+        if not href or href.startswith(("#", "mailto:", "tel:", "javascript:")):
+            continue
+
+        abs_url = urljoin(hub_url, href)
+        parsed = urlparse(abs_url)
+
+        if parsed.netloc.lower() != base_netloc:
+            continue
+
+        child_path = parsed.path.rstrip("/").lower()
+
+        # Must be a genuine child page of the hub (path starts with hub_path/)
+        if not child_path.startswith(hub_path + "/"):
+            continue
+
+        # Skip exact-same URL as hub
+        clean = f"{parsed.scheme}://{parsed.netloc}{parsed.path}"
+        if clean.rstrip("/") == hub_url.rstrip("/"):
+            continue
+        if clean in seen:
+            continue
+        seen.add(clean)
+
+        anchor_text = a.get_text(" ", strip=True).lower()
+        is_intl = any(t in child_path or t in anchor_text for t in _INTL_TOKENS)
+        has_fee = any(t in child_path or t in anchor_text for t in _FEE_TOKENS)
+
+        if is_intl and has_fee:
+            intl.append(clean)
+        elif is_intl or has_fee:
+            other.append(clean)
+
+    return (intl + other)[:4]
 
 
 def _fee_url_specificity(url: str) -> int:
