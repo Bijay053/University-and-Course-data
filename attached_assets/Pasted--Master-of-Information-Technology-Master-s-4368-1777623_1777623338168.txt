@@ -1,0 +1,252 @@
+ Master of Information Technology                          | Master's             |             43680 |               |             | 
+ Master of Information Technology (Extension)              | Master's             |             57140 |               |             | 
+ Master of Professional Accounting                         | Master's             |             40800 |               |             | 
+(29 rows)
+
+ page_type | english_vals | by_level | fetched_at 
+-----------+--------------+----------+------------
+(0 rows)
+
+root@university-and-course-data:~/University-and-Course-data/backend-py# # ── 1. Write BOTH URLs correctly using single-level jsonb_set + merge ──────
+sudo -u postgres psql university_portal -c "
+UPDATE universities
+SET scrape_config = jsonb_set(
+  COALESCE(scrape_config, '{}'),
+  '{uniPages}',
+  COALESCE(scrape_config->'uniPages', '{}') || jsonb_build_object(
+    'feePage',   'https://www.kbs.edu.au/admissions/fees',
+    'entryPage', 'https://www.kbs.edu.au/admissions/entry-requirements/english-entry-requirements'
+  ),
+  true
+)
+WHERE id = 29
+RETURNING scrape_config->'uniPages' AS uni_pages;"
+# Must print BOTH keys in uni_pages — if either is missing the UPDATE is still broken
+
+# ── 2. Wipe ALL KBS cache rows ─────────────────────────────────────────────
+sudo -u postgres psql university_portal -c "
+DELETE FROM central_page_cache WHERE university_id = 29
+RETURNING page_type, url;"
+
+# ── 3. Fresh scrape ────────────────────────────────────────────────────────
+KBS_JOB=$(curl -s -X POST http://localhost:80/api/scrape/start \
+  -H "Content-Type: application/json" -d '{"university_id": 29}' \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['jobId'])")
+echo "KBS job: $KBS_JOB"
+
+while true; do
+  STATUS=$(curl -s "http://localhost:80/api/scrape/status/$KBS_JOB" \
+    | python3 -c "import sys,json; print(json.load(sys.stdin)['status'])")
+  echo "$(date '+%H:%M:%S') $STATUS"
+  [[ "$STATUS" == "completed" || "$STATUS" == "failed" ]] && break
+  sleep 20
+done
+
+# ── 4. Confirm central page cache was written (must have 2 rows now) ───────
+sudo -u postgres psql university_portal -c "
+SELECT page_type,
+       parsed_data->'english'          AS english_vals,
+       parsed_data->'english_by_level' AS by_level,
+       fetched_at
+FROM central_page_cache
+WHERE university_id = 29
+ORDER BY fetched_at;"
+# Must show TWO rows: fee_schedule AND english_requirements
+# english_vals must contain ielts_overall=6.0 (NOT null, NOT 6.5)
+
+# ── 5. Confirm column-keyed parser fired ──────────────────────────────────
+sudo -u postgres psql university_portal -c "
+SELECT payload->>'message' AS msg
+FROM scrape_runtime_logs
+WHERE runtime_job_id = '$KBS_JOB'
+  AND payload->>'message' ILIKE '%column-keyed%'
+ORDER BY sequence;"
+# Must return at least one row with 'postgraduate: ielts_overall=6.0'
+# Zero rows here = parser still not firing, paste full central log
+
+#   Master's    → ielts_overall=6.0, pte_overall=50,  ielts_source != 'ai_fallback'
+                                                                       uni_pages                                                                       
+-------------------------------------------------------------------------------------------------------------------------------------------------------
+ {"feePage": "https://www.kbs.edu.au/admissions/fees", "entryPage": "https://www.kbs.edu.au/admissions/entry-requirements/english-entry-requirements"}
+(1 row)
+
+UPDATE 1
+ page_type | url 
+-----------+-----
+(0 rows)
+
+DELETE 0
+KBS job: job_f751547d941d
+08:07:09 queued
+08:07:29 queued
+08:07:49 queued
+08:08:09 queued
+08:08:29 queued
+08:08:49 queued
+08:09:09 queued
+08:09:29 queued
+08:09:49 queued
+08:10:09 queued
+08:10:29 stopped
+^C
+ msg 
+-----
+(0 rows)
+
+                        course_name                        |     degree_level     | international_fee | ielts_overall | pte_overall | ielts_source 
+-----------------------------------------------------------+----------------------+-------------------+---------------+-------------+--------------
+ Bachelor of Business (Accounting)                         | Bachelor's           |                   |               |             | 
+ Bachelor of Business (Hospitality and Tourism Management) | Bachelor's           |                   |               |             | 
+ Bachelor of Business (Management)                         | Bachelor's           |                   |               |             | 
+ Bachelor of Business (Marketing)                          | Bachelor's           |                   |               |             | 
+ Bachelor of Information Technology                        | Bachelor's           |             74880 |               |             | 
+ Diploma of Business                                       | Diploma              |             23040 |               |             | 
+ Diploma of Information Technology                         | Diploma              |             24960 |               |             | 
+ Graduate Certificate in Accounting                        | Graduate Certificate |             13600 |               |             | 
+ Graduate Certificate in Business Administration           | Graduate Certificate |             19640 |               |             | 
+ Graduate Certificate in Business Analytics                | Graduate Certificate |             13600 |               |             | 
+ Graduate Certificate in Information Technology            | Graduate Certificate |             14560 |               |             | 
+ Graduate Diploma of Business Administration               | Graduate Diploma     |             39280 |               |             | 
+ Graduate Diploma of Business Analytics                    | Graduate Diploma     |             27200 |               |             | 
+ Graduate Diploma of Information Technology                | Graduate Diploma     |             29120 |               |             | 
+ MBA - Master of Business Administration                   | Master's             |             58920 |               |             | 
+ MBA – (Women in Leadership)                               | Master's             |                   |               |             | 
+ MBA – Data-driven Leadership                              | Master's             |                   |               |             | 
+ MBA – Digital Management                                  | Master's             |                   |               |             | 
+ MBA – Health Services Management                          | Master's             |                   |               |             | 
+ MBA – International Leadership                            | Master's             |                   |               |             | 
+ MBA – Project Management                                  | Master's             |                   |               |             | 
+ MBA – Tourism and Hospitality Leadership                  | Master's             |                   |               |             | 
+ Master of Accounting                                      | Master's             |             54400 |               |             | 
+ Master of Business Analytics                              | Master's             |             40800 |               |             | 
+ Master of Business Analytics (Extension)                  | Master's             |             54020 |               |             | 
+ Master of Business Analytics (Information Technology)     | Master's             |             55460 |               |             | 
+ Master of Information Technology                          | Master's             |             43680 |               |             | 
+ Master of Information Technology (Extension)              | Master's             |             57140 |               |             | 
+ Master of Professional Accounting                         | Master's             |             40800 |               |             | 
+(29 rows)
+
+root@university-and-course-data:~/University-and-Course-data/backend-py# # ── 1. Write BOTH URLs correctly using single-level jsonb_set + merge ──────
+sudo -u postgres psql university_portal -c "
+UPDATE universities
+SET scrape_config = jsonb_set(
+  COALESCE(scrape_config, '{}'),
+  '{uniPages}',
+  COALESCE(scrape_config->'uniPages', '{}') || jsonb_build_object(
+    'feePage',   'https://www.kbs.edu.au/admissions/fees',
+    'entryPage', 'https://www.kbs.edu.au/admissions/entry-requirements/english-entry-requirements'
+  ),
+  true
+)
+WHERE id = 29
+RETURNING scrape_config->'uniPages' AS uni_pages;"
+# Must print BOTH keys in uni_pages — if either is missing the UPDATE is still broken
+
+# ── 2. Wipe ALL KBS cache rows ─────────────────────────────────────────────
+sudo -u postgres psql university_portal -c "
+DELETE FROM central_page_cache WHERE university_id = 29
+RETURNING page_type, url;"
+
+# ── 3. Fresh scrape ────────────────────────────────────────────────────────
+KBS_JOB=$(curl -s -X POST http://localhost:80/api/scrape/start \
+  -H "Content-Type: application/json" -d '{"university_id": 29}' \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['jobId'])")
+echo "KBS job: $KBS_JOB"
+
+while true; do
+  STATUS=$(curl -s "http://localhost:80/api/scrape/status/$KBS_JOB" \
+    | python3 -c "import sys,json; print(json.load(sys.stdin)['status'])")
+  echo "$(date '+%H:%M:%S') $STATUS"
+  [[ "$STATUS" == "completed" || "$STATUS" == "failed" ]] && break
+  sleep 20
+done
+
+# ── 4. Confirm central page cache was written (must have 2 rows now) ───────
+sudo -u postgres psql university_portal -c "
+SELECT page_type,
+       parsed_data->'english'          AS english_vals,
+       parsed_data->'english_by_level' AS by_level,
+       fetched_at
+FROM central_page_cache
+WHERE university_id = 29
+ORDER BY fetched_at;"
+# Must show TWO rows: fee_schedule AND english_requirements
+# english_vals must contain ielts_overall=6.0 (NOT null, NOT 6.5)
+
+# ── 5. Confirm column-keyed parser fired ──────────────────────────────────
+sudo -u postgres psql university_portal -c "
+SELECT payload->>'message' AS msg
+FROM scrape_runtime_logs
+WHERE runtime_job_id = '$KBS_JOB'
+  AND payload->>'message' ILIKE '%column-keyed%'
+ORDER BY sequence;"
+# Must return at least one row with 'postgraduate: ielts_overall=6.0'
+# Zero rows here = parser still not firing, paste full central log
+
+#   Master's    → ielts_overall=6.0, pte_overall=50,  ielts_source != 'ai_fallback'
+                                                                       uni_pages                                                                       
+-------------------------------------------------------------------------------------------------------------------------------------------------------
+ {"feePage": "https://www.kbs.edu.au/admissions/fees", "entryPage": "https://www.kbs.edu.au/admissions/entry-requirements/english-entry-requirements"}
+(1 row)
+
+UPDATE 1
+      page_type       |                                       url                                       
+----------------------+---------------------------------------------------------------------------------
+ fee_schedule         | https://www.kbs.edu.au/admissions/fees
+ english_requirements | https://www.kbs.edu.au/admissions/entry-requirements/english-entry-requirements
+(2 rows)
+
+DELETE 2
+KBS job: job_133f9ba55941
+08:10:47 running
+08:11:07 running
+08:11:27 running
+08:11:47 running
+08:12:07 running
+08:12:28 running
+08:12:48 running
+08:13:08 running
+08:13:28 running
+08:13:48 running
+08:14:08 running
+08:14:28 running
+08:14:48 running
+08:15:08 completed
+ page_type | english_vals | by_level | fetched_at 
+-----------+--------------+----------+------------
+(0 rows)
+
+                        course_name                        |     degree_level     | international_fee | ielts_overall | pte_overall |        ielts_source        
+-----------------------------------------------------------+----------------------+-------------------+---------------+-------------+----------------------------
+ Bachelor of Business (Accounting)                         | Bachelor's           |                   |           6.5 |          50 | ai_fallback
+ Bachelor of Business (Hospitality and Tourism Management) | Bachelor's           |                   |             6 |          50 | central_page:english_level
+ Bachelor of Business (Management)                         | Bachelor's           |                   |             6 |          50 | central_page:english_level
+ Bachelor of Business (Marketing)                          | Bachelor's           |                   |             6 |          50 | central_page:english_level
+ Bachelor of Information Technology                        | Bachelor's           |             74880 |             6 |          50 | central_page:english_level
+ Diploma of Business                                       | Diploma              |             23040 |             6 |          50 | central_page:english_level
+ Diploma of Information Technology                         | Diploma              |             24960 |             6 |          50 | central_page:english_level
+ Graduate Certificate in Accounting                        | Graduate Certificate |             13600 |             6 |          50 | central_page:english_level
+ Graduate Certificate in Business Administration           | Graduate Certificate |             19640 |             6 |          50 | central_page:english_level
+ Graduate Certificate in Business Analytics                | Graduate Certificate |             13600 |             6 |          50 | central_page:english_level
+ Graduate Certificate in Information Technology            | Graduate Certificate |             14560 |             6 |          50 | central_page:english_level
+ Graduate Diploma of Business Administration               | Graduate Diploma     |             39280 |             6 |          50 | central_page:english_level
+ Graduate Diploma of Business Analytics                    | Graduate Diploma     |             27200 |             6 |          50 | central_page:english_level
+ Graduate Diploma of Information Technology                | Graduate Diploma     |             29120 |             6 |          50 | central_page:english_level
+ MBA - Master of Business Administration                   | Master's             |             58920 |             6 |          50 | central_page:english_level
+ MBA – (Women in Leadership)                               | Master's             |                   |             6 |          50 | central_page:english_level
+ MBA – Data-driven Leadership                              | Master's             |                   |             6 |          50 | central_page:english_level
+ MBA – Digital Management                                  | Master's             |                   |             6 |          50 | central_page:english_level
+ MBA – Health Services Management                          | Master's             |                   |             6 |          50 | central_page:english_level
+ MBA – International Leadership                            | Master's             |                   |             6 |          50 | central_page:english_level
+ MBA – Project Management                                  | Master's             |                   |             6 |          50 | central_page:english_level
+ MBA – Tourism and Hospitality Leadership                  | Master's             |                   |             6 |          50 | central_page:english_level
+ Master of Accounting                                      | Master's             |             54400 |             6 |          50 | central_page:english_level
+ Master of Business Analytics                              | Master's             |             40800 |             6 |          50 | central_page:english_level
+ Master of Business Analytics (Extension)                  | Master's             |             54020 |             6 |          50 | central_page:english_level
+ Master of Business Analytics (Information Technology)     | Master's             |             55460 |             6 |          50 | central_page:english_level
+ Master of Information Technology                          | Master's             |             43680 |             6 |          50 | central_page:english_level
+ Master of Information Technology (Extension)              | Master's             |             57140 |             6 |          50 | central_page:english_level
+ Master of Professional Accounting                         | Master's             |             40800 |             6 |          50 | central_page:english_level
+(29 rows)
+
+root@university-and-course-data:~/University-and-Course-data/backend-py# 
