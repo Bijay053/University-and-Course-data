@@ -1,0 +1,27 @@
+root@university-and-course-data:~/University-and-Course-data/backend-py# cd ~/University-and-Course-data
+
+# Check baselines before cleaning
+ls backend-py/baselines/
+ls baselines/
+
+# Backup (correct user)
+mkdir -p /root/backups
+sudo -u postgres pg_dump university_portal | gzip > /root/backups/uni_portal_$(date +%Y%m%d_%H%M%S).sql.gz
+ls -lh /root/backups/
+20260430_024437_acu_51.json         20260430_024437_aut_87.json       20260430_024437_torrens_3.json  after               fix2-staging-after
+20260430_024437_aibi_47.json        20260430_024437_bond_22.json      20260430_024437_une_14.json     before              kbs-after
+20260430_024437_ait_37.json         20260430_024437_cqu_18.json       20260430_024437_unisq_1.json    bug-a-after         option-c-after
+20260430_024437_apicollege_30.json  20260430_024437_flinders_12.json  20260430_024437_uow_13.json     bug-a-before        phase5-after
+20260430_024437_asahe_2.json        20260430_024437_kbs_29.json       20260430_024437_utas_5.json     bug-f-after         phase6-after
+20260430_024437_asahe_35.json       20260430_024437_kbs_8.json        20260430_024437_vit_38.json     bug-f-clean         post-rollback-baseline
+20260430_024437_atmc_93.json        20260430_024437_scu_17.json       20260430_024437_vit_6.json      duration-fix-after  re-fix-after
+20260430_024437_aut_20.json         20260430_024437_study_4.json      20260430_024556_acap_41.json    fix2-prod-before    re-fix-before
+after-bug-a2  before-bug-a2
+total 45M
+-r--r--r-- 1 root root  15M Apr 23 10:01 before_python_migration_20260423.sql
+drwxr-xr-x 2 root root 4.0K Apr 21 05:42 nginx-sites-enabled-20260423-115821
+-rw-r--r-- 1 root root   20 May  1 12:32 uni_portal_20260501_123211.sql.gz
+-rw-r--r-- 1 root root 9.8M May  1 12:33 uni_portal_20260501_123314.sql.gz
+-rw-r--r-- 1 root root 9.8M May  1 12:38 uni_portal_20260501_123837.sql.gz
+-rw-r--r-- 1 root root 9.8M May  1 12:39 uni_portal_20260501_123935.sql.gz
+root@university-and-course-data:~/University-and-Course-data# 
