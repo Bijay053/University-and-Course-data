@@ -1,0 +1,23 @@
+root@university-and-course-data:~/University-and-Course-data# # ── Full KBS failure log (02:29–02:33) — no truncation ──
+sudo journalctl -u uni-celery \
+  --since "2026-05-01 02:29:00" \
+  --until "2026-05-01 02:33:00" \
+  --no-pager | grep -v "blob data" > /tmp/kbs_failure.log
+
+wc -l /tmp/kbs_failure.log
+grep -E "ERROR|error|FAIL|fail|Traceback|Exception|reject|stage|Stage|complet" \
+  /tmp/kbs_failure.log | tail -40
+286 /tmp/kbs_failure.log
+May 01 02:29:47 university-and-course-data celery[1263177]: [2026-05-01 02:29:47,570: INFO/ForkPoolWorker-4] HTTP Request: GET https://www.kbs.edu.au/study-australia-complete-guide-international-students "HTTP/1.1 200 OK"
+May 01 02:30:27 university-and-course-data celery[1263177]: [2026-05-01 02:30:27,409: WARNING/ForkPoolWorker-4] Gemini generate failed [primary_full]: 503 UNAVAILABLE. {'error': {'code': 503, 'message': 'This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.', 'status': 'UNAVAILABLE'}}
+May 01 02:30:27 university-and-course-data celery[1263177]: [2026-05-01 02:30:27,410: INFO/ForkPoolWorker-4] AI fallback skipped for https://www.kbs.edu.au/courses/mba-master-of-business-administration: 503 UNAVAILABLE. {'error': {'code': 503, 'message': 'This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.', 'status': 'UNAVAILABLE'}}
+May 01 02:31:39 university-and-course-data celery[1263170]: [2026-05-01 02:31:39,269: ERROR/MainProcess] Process 'ForkPoolWorker-2' pid:1263175 exited with 'signal 15 (SIGTERM)'
+May 01 02:31:39 university-and-course-data celery[1263170]: [2026-05-01 02:31:39,283: ERROR/MainProcess] Process 'ForkPoolWorker-1' pid:1263174 exited with 'signal 15 (SIGTERM)'
+May 01 02:31:39 university-and-course-data celery[1263170]: [2026-05-01 02:31:39,827: ERROR/MainProcess] Process 'ForkPoolWorker-3' pid:1263176 exited with 'signal 15 (SIGTERM)'
+May 01 02:32:36 university-and-course-data celery[1263170]: [2026-05-01 02:32:36,882: ERROR/MainProcess] Process 'ForkPoolWorker-4' pid:1263177 exited with 'signal 15 (SIGTERM)'
+May 01 02:32:36 university-and-course-data celery[1263170]: [2026-05-01 02:32:36,895: ERROR/MainProcess] Task handler raised error: WorkerLostError('Worker exited prematurely: signal 15 (SIGTERM) Job: 0.')
+May 01 02:32:36 university-and-course-data celery[1263170]: Traceback (most recent call last):
+May 01 02:32:36 university-and-course-data celery[1263170]: billiard.einfo.ExceptionWithTraceback:
+May 01 02:32:36 university-and-course-data celery[1263170]: Traceback (most recent call last):
+May 01 02:32:36 university-and-course-data celery[1263170]: Traceback (most recent call last):
+root@university-and-course-data:~/University-and-Course-data# 
