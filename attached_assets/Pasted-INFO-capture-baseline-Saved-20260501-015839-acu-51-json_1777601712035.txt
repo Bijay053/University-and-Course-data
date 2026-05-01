@@ -1,0 +1,305 @@
+INFO capture_baseline: Saved: 20260501_015839_acu_51.json  (courses=99  disc=165  staged=99  cost=$0.0234  3410.1)
+INFO capture_baseline: Saved: 20260501_015839_bond_22.json  (courses=126  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_015839_study_4.json  (courses=694  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_015839_flinders_12.json  (courses=105  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_015839_kbs_8.json  (courses=30  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_015839_kbs_29.json  (courses=21  disc=37  staged=21  cost=$0.0056  393.1)
+INFO capture_baseline: Saved: 20260501_015839_scu_17.json  (courses=6  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_015839_une_14.json  (courses=12  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_015839_uow_13.json  (courses=3  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_015839_unisq_1.json  (courses=167  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_015839_utas_5.json  (courses=13  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_015839_vit_38.json  (courses=19  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_015839_asahe_2.json  (courses=17  disc=9  staged=9  cost=$0.0019  107.2)
+INFO capture_baseline: Saved: 20260501_015839_aut_20.json  (courses=92  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_015839_cqu_18.json  (courses=4  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_015839_torrens_3.json  (courses=75  disc=168  staged=0  cost=$0.0000  463.9)
+INFO capture_baseline: Saved: 20260501_015839_vit_6.json  (courses=30  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Done. 23 universities, 1580 courses total. Baselines written to baselines/post-rollback-baseline/
+root@university-and-course-data:~/University-and-Course-data/backend-py# # ── 3. Investigate 0.00 durations — scope across all unis ──
+sudo -u postgres psql university_portal -c "
+SELECT u.name, COUNT(*) AS zero_duration_count
+FROM courses c
+JOIN universities u ON u.id = c.university_id
+WHERE c.duration = 0.0
+GROUP BY u.name
+ORDER BY COUNT(*) DESC;"
+           name           | zero_duration_count 
+--------------------------+---------------------
+ Charles Sturt university |                  59
+(1 row)
+
+root@university-and-course-data:~/University-and-Course-data/backend-py# # ── 4. Confirm the 8 KBS courses exist in current prod (post-rollback) ──
+sudo -u postgres psql university_portal -c "
+SELECT name FROM courses WHERE university_id = 29 ORDER BY name;"
+ name 
+------
+(0 rows)
+
+root@university-and-course-data:~/University-and-Course-data/backend-py# # ── 1. Stray = file ──
+ls -la ~/University-and-Course-data/=
+rm ~/University-and-Course-data/= 2>/dev/null && echo "removed" || echo "not found"
+ls: cannot access '/root/University-and-Course-data/=': No such file or directory
+not found
+root@university-and-course-data:~/University-and-Course-data/backend-py# # ── 2. Fresh post-rollback baseline (new "before" for all future sweeps) ──
+cd ~/University-and-Course-data/backend-py
+set -a && source .env && set +a
+PYTHONPATH=. venv/bin/python3 scripts/capture_baseline.py \
+  --out-dir baselines/post-rollback-baseline/
+INFO capture_baseline: Snapshotting 23 universities...
+INFO capture_baseline: Saved: 20260501_015912_acap_41.json  (courses=11  disc=27  staged=11  cost=$0.0028  81.0)
+INFO capture_baseline: Saved: 20260501_015912_aibi_47.json  (courses=8  disc=11  staged=8  cost=$0.0000  99.1)
+INFO capture_baseline: Saved: 20260501_015912_ait_37.json  (courses=6  disc=8  staged=6  cost=$0.0017  118.1)
+INFO capture_baseline: Saved: 20260501_015912_apicollege_30.json  (courses=25  disc=27  staged=25  cost=$0.0000  169.7)
+INFO capture_baseline: Saved: 20260501_015912_atmc_93.json  (courses=4  disc=6  staged=4  cost=$0.0000  89.6)
+INFO capture_baseline: Saved: 20260501_015912_aut_87.json  (courses=13  disc=36  staged=13  cost=$0.0035  604.3)
+INFO capture_baseline: Saved: 20260501_015912_acu_51.json  (courses=99  disc=165  staged=99  cost=$0.0234  3410.1)
+INFO capture_baseline: Saved: 20260501_015912_bond_22.json  (courses=126  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_015912_study_4.json  (courses=694  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_015912_flinders_12.json  (courses=105  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_015912_kbs_8.json  (courses=30  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_015912_kbs_29.json  (courses=21  disc=37  staged=21  cost=$0.0056  393.1)
+INFO capture_baseline: Saved: 20260501_015912_scu_17.json  (courses=6  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_015912_une_14.json  (courses=12  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_015912_uow_13.json  (courses=3  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_015912_unisq_1.json  (courses=167  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_015912_utas_5.json  (courses=13  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_015912_vit_38.json  (courses=19  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_015912_asahe_2.json  (courses=17  disc=9  staged=9  cost=$0.0019  107.2)
+INFO capture_baseline: Saved: 20260501_015912_aut_20.json  (courses=92  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_015912_cqu_18.json  (courses=4  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_015912_torrens_3.json  (courses=75  disc=168  staged=0  cost=$0.0000  463.9)
+INFO capture_baseline: Saved: 20260501_015912_vit_6.json  (courses=30  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Done. 23 universities, 1580 courses total. Baselines written to baselines/post-rollback-baseline/
+root@university-and-course-data:~/University-and-Course-data/backend-py# # ── 3. KBS investigation: all 29 courses present? ──
+sudo -u postgres psql university_portal -c "
+SELECT name, status, approval_status
+FROM courses
+WHERE university_id = 29
+ORDER BY name;"
+ name | status | approval_status 
+------+--------+-----------------
+(0 rows)
+
+root@university-and-course-data:~/University-and-Course-data/backend-py# # ── 4. Charles Sturt 0.00 duration — scope across all unis ──
+sudo -u postgres psql university_portal -c "
+SELECT u.name, COUNT(*) AS zero_duration_count
+FROM courses c
+JOIN universities u ON u.id = c.university_id
+WHERE c.duration = 0.0
+GROUP BY u.name
+ORDER BY COUNT(*) DESC;"
+           name           | zero_duration_count 
+--------------------------+---------------------
+ Charles Sturt university |                  59
+(1 row)
+
+root@university-and-course-data:~/University-and-Course-data/backend-py# # ── 1. Remove stray = file ──
+rm ~/University-and-Course-data/= 2>/dev/null && echo "removed" || echo "already gone"
+already gone
+root@university-and-course-data:~/University-and-Course-data/backend-py# # ── 2. Fresh post-rollback baseline (gate for all subsequent sweeps) ──
+cd ~/University-and-Course-data/backend-py
+set -a && source .env && set +a
+PYTHONPATH=. venv/bin/python3 scripts/capture_baseline.py \
+  --out-dir baselines/post-rollback-baseline/
+INFO capture_baseline: Snapshotting 23 universities...
+INFO capture_baseline: Saved: 20260501_020038_acap_41.json  (courses=11  disc=27  staged=11  cost=$0.0028  81.0)
+INFO capture_baseline: Saved: 20260501_020038_aibi_47.json  (courses=8  disc=11  staged=8  cost=$0.0000  99.1)
+INFO capture_baseline: Saved: 20260501_020038_ait_37.json  (courses=6  disc=8  staged=6  cost=$0.0017  118.1)
+INFO capture_baseline: Saved: 20260501_020038_apicollege_30.json  (courses=25  disc=27  staged=25  cost=$0.0000  169.7)
+INFO capture_baseline: Saved: 20260501_020038_atmc_93.json  (courses=4  disc=6  staged=4  cost=$0.0000  89.6)
+INFO capture_baseline: Saved: 20260501_020038_aut_87.json  (courses=13  disc=36  staged=13  cost=$0.0035  604.3)
+INFO capture_baseline: Saved: 20260501_020038_acu_51.json  (courses=99  disc=165  staged=99  cost=$0.0234  3410.1)
+INFO capture_baseline: Saved: 20260501_020038_bond_22.json  (courses=126  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_020038_study_4.json  (courses=694  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_020038_flinders_12.json  (courses=105  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_020038_kbs_8.json  (courses=30  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_020038_kbs_29.json  (courses=21  disc=37  staged=21  cost=$0.0056  393.1)
+INFO capture_baseline: Saved: 20260501_020038_scu_17.json  (courses=6  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_020038_une_14.json  (courses=12  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_020038_uow_13.json  (courses=3  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_020038_unisq_1.json  (courses=167  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_020038_utas_5.json  (courses=13  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_020038_vit_38.json  (courses=19  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_020038_asahe_2.json  (courses=17  disc=9  staged=9  cost=$0.0019  107.2)
+INFO capture_baseline: Saved: 20260501_020038_aut_20.json  (courses=92  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_020038_cqu_18.json  (courses=4  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_020038_torrens_3.json  (courses=75  disc=168  staged=0  cost=$0.0000  463.9)
+INFO capture_baseline: Saved: 20260501_020038_vit_6.json  (courses=30  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Done. 23 universities, 1580 courses total. Baselines written to baselines/post-rollback-baseline/
+root@university-and-course-data:~/University-and-Course-data/backend-py# # ── 3. KBS course count on current prod — confirms 8 "removed" were staging artifact ──
+sudo -u postgres psql university_portal -c "
+SELECT COUNT(*), status, approval_status
+FROM courses WHERE university_id = 29
+GROUP BY status, approval_status ORDER BY status;"
+
+# ── 4. 0.00 scope across all unis ──
+sudo -u postgres psql university_portal -c "
+SELECT u.name, COUNT(*) AS zero_count
+FROM courses c JOIN universities u ON u.id = c.university_id
+WHERE c.duration = 0.0
+GROUP BY u.name ORDER BY COUNT(*) DESC;"
+ count | status | approval_status 
+-------+--------+-----------------
+(0 rows)
+
+           name           | zero_count 
+--------------------------+------------
+ Charles Sturt university |         59
+(1 row)
+
+root@university-and-course-data:~/University-and-Course-data/backend-py# # ── Cherry-pick Option C only ──
+cd ~/University-and-Course-data
+git cherry-pick be3df67
+
+git log --oneline -3
+git status
+[main 44b049f] feat(option-c): wire strip_patterns into location extractor (ACAP footnote fix)
+ Author: Bijay053 <au@studyinfocentre.com>
+ Date: Thu Apr 30 23:36:05 2026 +1000
+ 4 files changed, 99 insertions(+), 2 deletions(-)
+44b049f (HEAD -> main) feat(option-c): wire strip_patterns into location extractor (ACAP footnote fix)
+f95d75f Phase 6: add 3 regression tests for completion-deadline anti-context fix
+e3b7847 Phase 6: extend _DURATION_ANTI_CONTEXT for completion-deadline clauses
+On branch main
+Your branch and 'origin/main' have diverged,
+and have 1 and 8 different commits each, respectively.
+  (use "git pull" if you want to integrate the remote branch with yours)
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+        backend-py/baselines/
+        drizzle-kit
+
+nothing added to commit but untracked files present (use "git add" to track)
+root@university-and-course-data:~/University-and-Course-data# # ── Restart services to load the location.py change ──
+sudo systemctl restart uni-api-py.service uni-celery.service
+sleep 3
+sudo systemctl status uni-api-py.service --no-pager | tail -3
+sudo journalctl -u uni-celery -n 3 --no-pager | grep "celery@\|ERROR"
+             └─1262402 /root/University-and-Course-data/backend-py/venv/bin/python -c "from multiprocessing.spawn import spawn_main; spawn_main(tracker_fd=7, pipe_handle=13)" --multiprocessing-fork
+
+May 01 02:03:22 university-and-course-data systemd[1]: Started uni-api-py.service - University Portal Python API (FastAPI + Uvicorn).
+May 01 02:03:25 university-and-course-data celery[1262408]: [2026-05-01 02:03:25,748: INFO/MainProcess] celery@university-and-course-data ready.
+root@university-and-course-data:~/University-and-Course-data# # ── Capture post-Option-C baseline ──
+cd ~/University-and-Course-data/backend-py
+set -a && source .env && set +a
+PYTHONPATH=. venv/bin/python3 scripts/capture_baseline.py \
+  --out-dir baselines/option-c-after/
+INFO capture_baseline: Snapshotting 23 universities...
+INFO capture_baseline: Saved: 20260501_020331_acap_41.json  (courses=11  disc=27  staged=11  cost=$0.0028  81.0)
+INFO capture_baseline: Saved: 20260501_020331_aibi_47.json  (courses=8  disc=11  staged=8  cost=$0.0000  99.1)
+INFO capture_baseline: Saved: 20260501_020331_ait_37.json  (courses=6  disc=8  staged=6  cost=$0.0017  118.1)
+INFO capture_baseline: Saved: 20260501_020331_apicollege_30.json  (courses=25  disc=27  staged=25  cost=$0.0000  169.7)
+INFO capture_baseline: Saved: 20260501_020331_atmc_93.json  (courses=4  disc=6  staged=4  cost=$0.0000  89.6)
+INFO capture_baseline: Saved: 20260501_020331_aut_87.json  (courses=13  disc=36  staged=13  cost=$0.0035  604.3)
+INFO capture_baseline: Saved: 20260501_020331_acu_51.json  (courses=99  disc=165  staged=99  cost=$0.0234  3410.1)
+INFO capture_baseline: Saved: 20260501_020331_bond_22.json  (courses=126  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_020331_study_4.json  (courses=694  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_020331_flinders_12.json  (courses=105  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_020331_kbs_8.json  (courses=30  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_020331_kbs_29.json  (courses=21  disc=37  staged=21  cost=$0.0056  393.1)
+INFO capture_baseline: Saved: 20260501_020331_scu_17.json  (courses=6  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_020331_une_14.json  (courses=12  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_020331_uow_13.json  (courses=3  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_020331_unisq_1.json  (courses=167  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_020331_utas_5.json  (courses=13  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_020331_vit_38.json  (courses=19  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_020331_asahe_2.json  (courses=17  disc=9  staged=9  cost=$0.0019  107.2)
+INFO capture_baseline: Saved: 20260501_020331_aut_20.json  (courses=92  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_020331_cqu_18.json  (courses=4  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_020331_torrens_3.json  (courses=75  disc=168  staged=0  cost=$0.0000  463.9)
+INFO capture_baseline: Saved: 20260501_020331_vit_6.json  (courses=30  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Done. 23 universities, 1580 courses total. Baselines written to baselines/option-c-after/
+root@university-and-course-data:~/University-and-Course-data/backend-py# # ── 1. Trigger ACAP scrape with the new Option C code active ──
+cd ~/University-and-Course-data/backend-py
+set -a && source .env && set +a
+
+PYTHONPATH=. venv/bin/python3 -c "
+from app.tasks.scrape import run_scrape
+result = run_scrape.delay(university_id=41)
+print(f'Triggered ACAP scrape task: {result.id}')
+"
+Traceback (most recent call last):
+  File "<string>", line 2, in <module>
+ModuleNotFoundError: No module named 'app.tasks.scrape'
+root@university-and-course-data:~/University-and-Course-data/backend-py# # ── 1. Trigger ACAP scrape via the API (creates job record + dispatches to Celery) ──
+curl -s -X POST http://localhost:80/api/scrape/start \
+  -H "Content-Type: application/json" \
+  -d '{"university_id": 41}' | python3 -m json.tool
+{
+    "jobId": "job_3754ce25ba4b",
+    "runtimeJobId": "job_3754ce25ba4b",
+    "status": "queued",
+    "ok": true
+}
+root@university-and-course-data:~/University-and-Course-data/backend-py# # ── 2. Watch Celery logs until ACAP scrape completes (Ctrl+C after "completed" or "Staged") ──
+sudo journalctl -u uni-celery -f \
+  | grep -E --line-buffered 'acap|ACAP|LOCATION|location_strip|strip_pattern|Staged|staged|completed|ERROR'
+# Wait for a line like: "Staged 11 courses" or "[STAGE]" or job status "completed"
+# Ctrl+C once done
+May 01 02:06:38 university-and-course-data celery[1262415]: [2026-05-01 02:06:38,234: INFO/ForkPoolWorker-4] AI fallback filled ['duration_value', 'duration_unit'] for https://www.acap.edu.au/courses/graduate-certificate-in-business-administration/ (cost=$0.000493)
+May 01 02:06:38 university-and-course-data celery[1262415]: [2026-05-01 02:06:38,528: WARNING/ForkPoolWorker-4] gemini_primary: failed on https://www.acap.edu.au/courses/graduate-certificate-of-human-services/ — cannot access local variable '_gp_cost' where it is not associated with a value
+May 01 02:06:38 university-and-course-data celery[1262415]: [2026-05-01 02:06:38,528: INFO/ForkPoolWorker-4] [VISION SKIP] trust_vision_ocr=false for this uni — skipping vision OCR pass on https://www.acap.edu.au/courses/graduate-certificate-of-human-services/
+May 01 02:06:39 university-and-course-data celery[1262415]: [2026-05-01 02:06:39,057: INFO/ForkPoolWorker-4] [CRICOS] extracted 118231E from https://www.acap.edu.au/courses/graduate-certificate-in-business-administration/
+May 01 02:06:39 university-and-course-data celery[1262415]: [2026-05-01 02:06:39,362: INFO/ForkPoolWorker-4] HTTP Request: GET https://www.acap.edu.au/courses/graduate-certificate-of-psychological-science/ "HTTP/1.1 200 OK"
+May 01 02:06:39 university-and-course-data celery[1262415]: [2026-05-01 02:06:39,643: INFO/ForkPoolWorker-4] HTTP Request: GET https://www.acap.edu.au/courses/graduate-diploma-of-business-administration/ "HTTP/1.1 200 OK"
+May 01 02:06:41 university-and-course-data celery[1262415]: [2026-05-01 02:06:41,435: INFO/ForkPoolWorker-4] AI fallback filled ['duration_value', 'duration_unit'] for https://www.acap.edu.au/courses/graduate-certificate-of-human-services/ (cost=$0.000493)
+May 01 02:06:41 university-and-course-data celery[1262415]: [2026-05-01 02:06:41,449: WARNING/ForkPoolWorker-4] gemini_primary: failed on https://www.acap.edu.au/courses/graduate-certificate-of-professional-accounting/ — cannot access local variable '_gp_cost' where it is not associated with a value
+May 01 02:06:41 university-and-course-data celery[1262415]: [2026-05-01 02:06:41,449: INFO/ForkPoolWorker-4] [VISION SKIP] trust_vision_ocr=false for this uni — skipping vision OCR pass on https://www.acap.edu.au/courses/graduate-certificate-of-professional-accounting/
+May 01 02:06:42 university-and-course-data celery[1262415]: [2026-05-01 02:06:42,149: INFO/ForkPoolWorker-4] [CRICOS] extracted 084932E from https://www.acap.edu.au/courses/graduate-certificate-of-human-services/
+May 01 02:06:42 university-and-course-data celery[1262415]: [2026-05-01 02:06:42,517: INFO/ForkPoolWorker-4] [VISION SKIP] trust_vision_ocr=false for this uni — skipping vision OCR pass on https://www.acap.edu.au/courses/graduate-certificate-of-applied-coaching/
+May 01 02:06:42 university-and-course-data celery[1262415]: [2026-05-01 02:06:42,706: INFO/ForkPoolWorker-4] HTTP Request: GET https://www.acap.edu.au/courses/graduate-diploma-of-professional-accounting/ "HTTP/1.1 200 OK"
+May 01 02:06:44 university-and-course-data celery[1262415]: [2026-05-01 02:06:44,783: INFO/ForkPoolWorker-4] AI fallback filled ['fee_currency', 'duration_value', 'duration_unit'] for https://www.acap.edu.au/courses/graduate-certificate-of-professional-accounting/ (cost=$0.000494)
+May 01 02:06:44 university-and-course-data celery[1262415]: [2026-05-01 02:06:44,786: INFO/ForkPoolWorker-4] AI fallback filled ['fee_currency', 'duration_value', 'duration_unit'] for https://www.acap.edu.au/courses/graduate-certificate-of-applied-coaching/ (cost=$0.000503)
+May 01 02:06:45 university-and-course-data celery[1262415]: [2026-05-01 02:06:45,104: WARNING/ForkPoolWorker-4] gemini_primary: failed on https://www.acap.edu.au/courses/graduate-diploma-of-business-administration/ — cannot access local variable '_gp_cost' where it is not associated with a value
+May 01 02:06:45 university-and-course-data celery[1262415]: [2026-05-01 02:06:45,104: INFO/ForkPoolWorker-4] [VISION SKIP] trust_vision_ocr=false for this uni — skipping vision OCR pass on https://www.acap.edu.au/courses/graduate-diploma-of-business-administration/
+May 01 02:06:45 university-and-course-data celery[1262415]: [2026-05-01 02:06:45,732: INFO/ForkPoolWorker-4] [CRICOS] extracted 113893G from https://www.acap.edu.au/courses/graduate-certificate-of-professional-accounting/
+May 01 02:06:46 university-and-course-data celery[1262415]: [2026-05-01 02:06:46,079: INFO/ForkPoolWorker-4] HTTP Request: GET https://www.acap.edu.au/courses/graduate-diploma-of-psychological-science/ "HTTP/1.1 200 OK"
+May 01 02:06:46 university-and-course-data celery[1262415]: [2026-05-01 02:06:46,105: INFO/ForkPoolWorker-4] HTTP Request: GET https://www.acap.edu.au/courses/master-of-counselling-and-psychotherapy/ "HTTP/1.1 200 OK"
+May 01 02:06:46 university-and-course-data celery[1262415]: [2026-05-01 02:06:46,361: INFO/ForkPoolWorker-4] HTTP Request: GET https://www.acap.edu.au/courses/master-of-professional-psychology/ "HTTP/1.1 200 OK"
+May 01 02:06:46 university-and-course-data celery[1262415]: [2026-05-01 02:06:46,382: INFO/ForkPoolWorker-4] HTTP Request: GET https://www.acap.edu.au/courses/master-of-psychology-clinical/ "HTTP/1.1 200 OK"
+May 01 02:06:48 university-and-course-data celery[1262415]: [2026-05-01 02:06:48,613: INFO/ForkPoolWorker-4] AI fallback filled ['duration_value', 'duration_unit'] for https://www.acap.edu.au/courses/graduate-diploma-of-business-administration/ (cost=$0.000493)
+May 01 02:06:50 university-and-course-data celery[1262415]: [2026-05-01 02:06:50,724: WARNING/ForkPoolWorker-4] gemini_primary: failed on https://www.acap.edu.au/courses/graduate-diploma-of-professional-accounting/ — cannot access local variable '_gp_cost' where it is not associated with a value
+May 01 02:06:50 university-and-course-data celery[1262415]: [2026-05-01 02:06:50,724: INFO/ForkPoolWorker-4] [VISION SKIP] trust_vision_ocr=false for this uni — skipping vision OCR pass on https://www.acap.edu.au/courses/graduate-diploma-of-professional-accounting/
+May 01 02:06:51 university-and-course-data celery[1262415]: [2026-05-01 02:06:51,721: INFO/ForkPoolWorker-4] [CRICOS] extracted 118230F from https://www.acap.edu.au/courses/graduate-diploma-of-business-administration/
+May 01 02:06:52 university-and-course-data celery[1262415]: [2026-05-01 02:06:52,051: INFO/ForkPoolWorker-4] HTTP Request: GET https://www.acap.edu.au/courses/master-of-psychology-practice-clinical/ "HTTP/1.1 200 OK"
+May 01 02:06:53 university-and-course-data celery[1262415]: [2026-05-01 02:06:53,686: INFO/ForkPoolWorker-4] AI fallback filled ['fee_currency', 'duration_value', 'duration_unit'] for https://www.acap.edu.au/courses/graduate-diploma-of-professional-accounting/ (cost=$0.000493)
+May 01 02:06:54 university-and-course-data celery[1262415]: [2026-05-01 02:06:54,055: WARNING/ForkPoolWorker-4] gemini_primary: failed on https://www.acap.edu.au/courses/master-of-professional-psychology/ — cannot access local variable '_gp_cost' where it is not associated with a value
+May 01 02:06:54 university-and-course-data celery[1262415]: [2026-05-01 02:06:54,055: INFO/ForkPoolWorker-4] [VISION SKIP] trust_vision_ocr=false for this uni — skipping vision OCR pass on https://www.acap.edu.au/courses/master-of-professional-psychology/
+May 01 02:06:54 university-and-course-data celery[1262415]: [2026-05-01 02:06:54,056: WARNING/ForkPoolWorker-4] gemini_primary: failed on https://www.acap.edu.au/courses/master-of-psychology-clinical/ — cannot access local variable '_gp_cost' where it is not associated with a value
+May 01 02:06:54 university-and-course-data celery[1262415]: [2026-05-01 02:06:54,056: INFO/ForkPoolWorker-4] [VISION SKIP] trust_vision_ocr=false for this uni — skipping vision OCR pass on https://www.acap.edu.au/courses/master-of-psychology-clinical/
+May 01 02:06:54 university-and-course-data celery[1262415]: [2026-05-01 02:06:54,580: INFO/ForkPoolWorker-4] [CRICOS] extracted 113892H from https://www.acap.edu.au/courses/graduate-diploma-of-professional-accounting/
+May 01 02:06:54 university-and-course-data celery[1262415]: [2026-05-01 02:06:54,964: INFO/ForkPoolWorker-4] HTTP Request: GET https://www.acap.edu.au/courses/master-of-social-work-qualifying/ "HTTP/1.1 200 OK"
+May 01 02:06:57 university-and-course-data celery[1262415]: [2026-05-01 02:06:57,526: INFO/ForkPoolWorker-4] AI fallback filled ['duration_value', 'duration_unit'] for https://www.acap.edu.au/courses/master-of-psychology-clinical/ (cost=$0.000493)
+May 01 02:06:57 university-and-course-data celery[1262415]: [2026-05-01 02:06:57,528: INFO/ForkPoolWorker-4] gemini_primary: https://www.acap.edu.au/courses/master-of-psychology-practice-clinical/ → 9 fields filled, cost=$0.000532
+May 01 02:06:57 university-and-course-data celery[1262415]: [2026-05-01 02:06:57,530: INFO/ForkPoolWorker-4] AI fallback filled ['duration_value', 'duration_unit'] for https://www.acap.edu.au/courses/master-of-professional-psychology/ (cost=$0.000493)
+May 01 02:06:58 university-and-course-data celery[1262415]: [2026-05-01 02:06:58,336: INFO/ForkPoolWorker-4] [CRICOS] extracted 103524D from https://www.acap.edu.au/courses/master-of-psychology-clinical/
+May 01 02:06:58 university-and-course-data celery[1262415]: [2026-05-01 02:06:58,751: INFO/ForkPoolWorker-4] [CRICOS] extracted 103525C from https://www.acap.edu.au/courses/master-of-professional-psychology/
+May 01 02:06:59 university-and-course-data celery[1262415]: [2026-05-01 02:06:59,038: INFO/ForkPoolWorker-4] HTTP Request: GET https://www.acap.edu.au/courses/undergraduate-certificate-of-psychological-science/ "HTTP/1.1 200 OK"
+May 01 02:06:59 university-and-course-data celery[1262415]: [2026-05-01 02:06:59,066: INFO/ForkPoolWorker-4] HTTP Request: GET https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice/ "HTTP/1.1 200 OK"
+May 01 02:07:01 university-and-course-data celery[1262415]: [2026-05-01 02:07:01,548: WARNING/ForkPoolWorker-4] gemini_primary: failed on https://www.acap.edu.au/courses/master-of-social-work-qualifying/ — cannot access local variable '_gp_cost' where it is not associated with a value
+May 01 02:07:01 university-and-course-data celery[1262415]: [2026-05-01 02:07:01,548: INFO/ForkPoolWorker-4] [VISION SKIP] trust_vision_ocr=false for this uni — skipping vision OCR pass on https://www.acap.edu.au/courses/master-of-social-work-qualifying/
+May 01 02:07:01 university-and-course-data celery[1262415]: [2026-05-01 02:07:01,898: INFO/ForkPoolWorker-4] HTTP Request: GET https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice-nsw/ "HTTP/1.1 200 OK"
+May 01 02:07:03 university-and-course-data celery[1262415]: [2026-05-01 02:07:03,549: INFO/ForkPoolWorker-4] AI fallback filled ['fee_currency', 'duration_value', 'duration_unit'] for https://www.acap.edu.au/courses/master-of-social-work-qualifying/ (cost=$0.000493)
+May 01 02:07:03 university-and-course-data celery[1262415]: [2026-05-01 02:07:03,552: INFO/ForkPoolWorker-4] gemini_primary: https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice/ → 10 fields filled, cost=$0.000601
+May 01 02:07:04 university-and-course-data celery[1262415]: [2026-05-01 02:07:04,394: INFO/ForkPoolWorker-4] [CRICOS] extracted 082661F from https://www.acap.edu.au/courses/master-of-social-work-qualifying/
+May 01 02:07:04 university-and-course-data celery[1262415]: [2026-05-01 02:07:04,645: INFO/ForkPoolWorker-4] [VISION SKIP] trust_vision_ocr=false for this uni — skipping vision OCR pass on https://www.acap.edu.au/courses/master-of-psychology-practice-clinical/
+May 01 02:07:05 university-and-course-data celery[1262415]: [2026-05-01 02:07:05,097: INFO/ForkPoolWorker-4] HTTP Request: GET https://www.acap.edu.au/courses/master-of-business-administration/ "HTTP/1.1 200 OK"
+May 01 02:07:07 university-and-course-data celery[1262415]: [2026-05-01 02:07:07,610: INFO/ForkPoolWorker-4] gemini_primary: https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice-nsw/ → 11 fields filled, cost=$0.000517
+May 01 02:07:07 university-and-course-data celery[1262415]: [2026-05-01 02:07:07,612: INFO/ForkPoolWorker-4] AI fallback filled ['duration_value', 'duration_unit'] for https://www.acap.edu.au/courses/master-of-psychology-practice-clinical/ (cost=$0.000502)
+May 01 02:07:08 university-and-course-data celery[1262415]: [2026-05-01 02:07:08,391: INFO/ForkPoolWorker-4] [CRICOS] extracted 103525C from https://www.acap.edu.au/courses/master-of-psychology-practice-clinical/
+May 01 02:07:08 university-and-course-data celery[1262415]: [2026-05-01 02:07:08,655: INFO/ForkPoolWorker-4] [VISION SKIP] trust_vision_ocr=false for this uni — skipping vision OCR pass on https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice/
+May 01 02:07:09 university-and-course-data celery[1262415]: [2026-05-01 02:07:09,479: WARNING/ForkPoolWorker-4] gemini_primary: failed on https://www.acap.edu.au/courses/master-of-business-administration/ — cannot access local variable '_gp_cost' where it is not associated with a value
+May 01 02:07:09 university-and-course-data celery[1262415]: [2026-05-01 02:07:09,479: INFO/ForkPoolWorker-4] [VISION SKIP] trust_vision_ocr=false for this uni — skipping vision OCR pass on https://www.acap.edu.au/courses/master-of-business-administration/
+May 01 02:07:09 university-and-course-data celery[1262415]: [2026-05-01 02:07:09,738: INFO/ForkPoolWorker-4] AI fallback filled ['fee_currency'] for https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice/ (cost=$0.000502)
+May 01 02:07:10 university-and-course-data celery[1262415]: [2026-05-01 02:07:10,505: INFO/ForkPoolWorker-4] AI fallback filled ['duration_value', 'duration_unit'] for https://www.acap.edu.au/courses/master-of-business-administration/ (cost=$0.000493)
+May 01 02:07:10 university-and-course-data celery[1262415]: [2026-05-01 02:07:10,835: INFO/ForkPoolWorker-4] [CRICOS] extracted 118229K from https://www.acap.edu.au/courses/master-of-business-administration/
+May 01 02:07:11 university-and-course-data celery[1262415]: [2026-05-01 02:07:11,122: INFO/ForkPoolWorker-4] [VISION SKIP] trust_vision_ocr=false for this uni — skipping vision OCR pass on https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice-nsw/
+May 01 02:07:12 university-and-course-data celery[1262415]: [2026-05-01 02:07:12,611: INFO/ForkPoolWorker-4] AI fallback filled ['fee_currency', 'duration_value', 'duration_unit'] for https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice-nsw/ (cost=$0.000497)
+May 01 02:07:13 university-and-course-data celery[1262415]: [2026-05-01 02:07:13,063: INFO/ForkPoolWorker-4] shadow[acap/41] applying new-path transformation to 27 extracted results
+May 01 02:07:13 university-and-course-data celery[1262415]: [parameters: ('job_3754ce25ba4b', 41, 'https://www.acap.edu.au/courses/bachelor-of-social-work/', 'classification_only', 'gemini-2.5-flash-lite', 492, 18, 4.23e-05, 4883, True, None)]
+May 01 02:07:13 university-and-course-data celery[1262415]: [2026-05-01 02:07:13,440: INFO/ForkPoolWorker-4] Scrape job_3754ce25ba4b completed: {'discovered': 28, 'staged': 11, 'skipped': 16, 'errors': 0, 'fetch_failed': 0}
+
+
+
