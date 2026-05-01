@@ -1,0 +1,980 @@
+ 310 | Master of Int Education
+ 277 | Graduate Certificate of Digital Health
+ 278 | Graduate Certificate of Environmental Management
+ 280 | Graduate Certificate of Industrial Relations
+ 281 | Graduate Certificate of Information Studies
+ 284 | Graduate Certificate of Leadership Human Services
+ 286 | Graduate Certificate of Learning Teaching Higher Education
+ 287 | Graduate Certificate of Nursing Clinical Education
+ 288 | Graduate Certificate of Organisational Coaching Leadership
+ 289 | Graduate Certificate of Nursing Leadership Management
+ 290 | Graduate Certificate of Nursing Aged Care
+ 291 | Graduate Certificate of Research
+ 292 | Graduate Certificate of Terrorism Security Studies
+ 294 | Graduate Certificate of Theological Studies
+ 321 | Graduate Diploma of Adult Vocational Education
+ 212 | Graduate Certificate of Ministry
+ 320 | Diploma of Exercise Studies
+ 205 | Bachelor of Nuclear Science Safety
+ 214 | Graduate Certificate of Professional Supervision Pastoral
+ 218 | Graduate Diploma of Mammography
+ 219 | Graduate Diploma of Dental Implantology
+ 159 | Master of Nursing Pre Registration
+ 155 | Bachelor of Education Technology Applied Studies
+ 158 | Master of Ageing Pastoral Studies
+ 164 | Master of Clinical Exercise Physiology
+ 165 | Master of Teaching Primary
+ 166 | Master of Speech Pathology
+ 173 | Bachelor of Education Secondary Science
+ 174 | Bachelor of Education Secondary English
+ 244 | Master of Vocational Ed
+ 248 | Master of Clinical Psych
+ 177 | Bachelor of Education Secondary Creative Arts
+ 179 | Bachelor of Education Secondary Industry Entry Program
+ 180 | Bachelor of Education K 12
+ 182 | Bachelor of Social Work
+ 187 | Bachelor of Adult Vocational Education
+ 196 | Bachelor of Podiatric Medicine
+ 197 | Bachelor of Clinical Science Medicine Doctor Medicine
+ 200 | Bachelor of Exercise Sport Science
+ 208 | Diploma of Agricultural Studies
+ 240 | Diploma of Exercise
+ 242 | Master of Pro Psych
+ 209 | Diploma of Psychological Studies
+ 223 | Master of Professional Psychology
+ 236 | Master of Speech
+ 245 | Master of Exercise Physiology
+ 247 | Master of Ageing Pastoral
+ 327 | Master of Nursing
+ 203 | Bachelor of Information Studies
+ 204 | Bachelor of Human Services
+ 239 | Master of Info Studies
+ 265 | Bachelor of Health Science Mental Health
+ 319 | Bachelor of Pharmacy Honours
+ 276 | Graduate Certificate of In Fish Conservation And Management
+ 213 | Graduate Certificate of Nuclear Safeguards Security
+ 168 | Bachelor of Education Secondary Hsie
+ 176 | Bachelor of Education Secondary Mathematics
+ 185 | Bachelor of Education Early Childhood Primary
+(143 rows)
+
+UPDATE 143
+ id  |                           name                           
+-----+----------------------------------------------------------
+ 276 | Graduate Certificate in Fish Conservation And Management
+(1 row)
+
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+COMMIT
+root@university-and-course-data:~/University-and-Course-data/backend-py# # Final state check
+sudo -u postgres psql university_portal -c "
+SELECT u.id, u.name,
+       (SELECT COUNT(*) FROM courses c WHERE c.university_id = u.id) AS live_courses,
+       (SELECT COUNT(*) FROM scraped_courses sc
+        WHERE sc.university_id = u.id AND sc.status = 'pending'
+          AND sc.auto_publish_status = 'ready') AS pending_ready,
+       (SELECT COUNT(*) FROM scraped_courses sc
+        WHERE sc.university_id = u.id AND sc.status = 'approved'
+          AND sc.auto_publish_status = 'pending_review') AS legacy_gap
+FROM universities u
+WHERE u.id IN (1, 2, 4, 5, 6, 8, 17, 20)
+ORDER BY u.id;"
+
+# Check for remaining "Of" capitalisation issues in CSU
+sudo -u postgres psql university_portal -c "
+SELECT id, name FROM courses
+WHERE university_id = 4 AND name ~ ' Of | Of Of '
+ORDER BY name LIMIT 20;"
+
+# Check for remaining truncated CSU names
+sudo -u postgres psql university_portal -c "
+SELECT id, name FROM courses
+WHERE university_id = 4
+  AND (name ~* '\bOf It \d+\b' OR name ~ '\bOf Of\b'
+       OR name ~* '\bPro Psych\b|\bInt Edu|\bOf Speech$|\bOf Exercise$|\bOf Info |\bAgeing Pastoral$')
+ORDER BY name;"
+ id |               name               | live_courses | pending_ready | legacy_gap 
+----+----------------------------------+--------------+---------------+------------
+  1 | University of Southern Queenland |           67 |             0 |          0
+  2 | asa                              |            8 |             0 |          0
+  4 | Charles Sturt university         |          192 |             0 |          0
+  5 | University of Tasmania           |            1 |             0 |          0
+  6 | vit                              |           30 |             0 |          0
+  8 | KBS                              |           29 |             0 |          0
+ 17 | SCU                              |            1 |             0 |          0
+ 20 | aut                              |           70 |             0 |          0
+(8 rows)
+
+ id | name 
+----+------
+(0 rows)
+
+ id | name 
+----+------
+(0 rows)
+
+root@university-and-course-data:~/University-and-Course-data/backend-py# sudo -u postgres psql university_portal -c "
+SELECT id, name, course_website FROM courses
+WHERE id = 241;"
+ id  |      name       |            course_website             
+-----+-----------------+---------------------------------------
+ 241 | Master of It 12 | https://study.csu.edu.au/master-it-12
+(1 row)
+
+root@university-and-course-data:~/University-and-Course-data/backend-py# -- Run this on prod to confirm duplicates:
+sudo -u postgres psql university_portal -c "
+SELECT id, name FROM courses
+WHERE university_id = 4
+  AND lower(name) IN (
+    'graduate diploma of business data analytics',
+    'master of business data analytics',
+    'graduate diploma of project management and leadership'
+  )
+ORDER BY name, id;"
+--: command not found
+ id  |                         name                          
+-----+-------------------------------------------------------
+ 216 | Graduate Diploma of Business Data Analytics
+ 524 | Graduate Diploma of Business Data Analytics
+ 313 | Graduate Diploma of Project Management And Leadership
+ 525 | Graduate Diploma of Project Management and Leadership
+ 255 | Master of Business Data Analytics
+ 530 | Master of Business Data Analytics
+(6 rows)
+
+root@university-and-course-data:~/University-and-Course-data/backend-py# sudo -u postgres psql university_portal -c "
+BEGIN;
+-- Keep id=524 (fresh scrape), delete id=216 (old garbled, now name-fixed)
+DELETE FROM courses WHERE id = 216;
+-- Keep id=530, delete id=255
+DELETE FROM courses WHERE id = 255;
+-- Fix 313's remaining capital 'And', making it match 525, then delete 313
+UPDATE courses SET name = 'Graduate Diploma of Project Management and Leadership'
+  WHERE id = 525;
+DELETE FROM courses WHERE id = 313;
+COMMIT;
+SELECT id, name FROM courses
+WHERE university_id = 4
+  AND lower(name) IN (
+    'graduate diploma of business data analytics',
+    'master of business data analytics',
+    'graduate diploma of project management and leadership'
+  )
+ORDER BY name;"
+BEGIN
+DELETE 1
+DELETE 1
+UPDATE 1
+DELETE 1
+COMMIT
+ id  |                         name                          
+-----+-------------------------------------------------------
+ 524 | Graduate Diploma of Business Data Analytics
+ 525 | Graduate Diploma of Project Management and Leadership
+ 530 | Master of Business Data Analytics
+(3 rows)
+
+root@university-and-course-data:~/University-and-Course-data/backend-py# sudo -u postgres psql university_portal -c "
+UPDATE courses 
+SET name = 'Master of Information Technology (12 months)'
+WHERE id = 241
+RETURNING id, name;"
+ id  |                     name                     
+-----+----------------------------------------------
+ 241 | Master of Information Technology (12 months)
+(1 row)
+
+UPDATE 1
+root@university-and-course-data:~/University-and-Course-data/backend-py# sudo -u postgres psql university_portal -c "
+SELECT id, name FROM courses
+WHERE university_id = 4
+  AND (
+    name ~* '\bVocational Ed\b'
+    OR name ~* '\bApp Digital\b'
+    OR name ~* '\bClinical Psych\b'
+    OR name ~* '\bAg Science\b'
+    OR name ~* '\bGis\b'
+    OR name ~* '\bIntel Analysis\b'
+    OR name ~* '\bAnti Money\b'
+    OR name ~ '\bBachelor Veterinary Science\b'
+    OR name ~* '\bof It \d+\b'
+  )
+ORDER BY name;"
+ id | name 
+----+------
+(0 rows)
+
+root@university-and-course-data:~/University-and-Course-data/backend-py# sudo -u postgres psql university_portal << 'ENDSQL'
+BEGIN;
+
+-- ── 1. Delete true duplicates (name-fix created same name as fresh-scrape row) ──
+-- 216 = 524 "Graduate Diploma of Business Data Analytics"
+DELETE FROM courses WHERE id = 216;
+-- 255 = 530 "Master of Business Data Analytics"
+DELETE FROM courses WHERE id = 255;
+-- 239 = 220 "Master of Information Studies" (abbreviated dup of full-name row)
+DELETE FROM courses WHERE id = 239;
+-- 254 "Master of Arts Theological Studies" ≈ 529 "Master of Arts (Theological Studies)"
+DELETE FROM courses WHERE id = 254;
+
+-- ── 2. Fix "And" → "and" in mid-title + align 313 with 525 then delete 313 ──
+UPDATE courses SET name = 'Graduate Diploma of Project Management and Leadership'
+  WHERE id = 525;
+DELETE FROM courses WHERE id = 313;
+UPDATE courses SET name = 'Master of Project Management and Leadership'
+  WHERE id = 299;
+
+-- ── 3. Fix Master of It 12 (URL slug confirms: master-it-12) ──
+UPDATE courses SET name = 'Master of Information Technology (12 months)'
+  WHERE id = 241;
+
+-- ── 4. Fix remaining abbreviated CSU names ──
+UPDATE courses SET name = 'Master of Digital Marketing'
+  WHERE id = 246;   -- "Master of App Digital Marketing"
+UPDATE courses SET name = 'Master of Agricultural Science'
+  WHERE id = 249;   -- "Master of Ag Science"
+UPDATE courses SET name = 'Master of GIS'
+  WHERE id = 307;   -- "Master of Gis"
+UPDATE courses SET name = 'Master of Intelligence Analysis'
+  WHERE id = 308;   -- "Master of Intel Analysis"  (308 is dup of 257 if same course)
+UPDATE courses SET name = 'Master of Anti-Money Laundering'
+  WHERE id = 311;   -- "Master of Anti Money Laundering"
+UPDATE courses SET name = 'Master of Vocational Education'
+  WHERE id = 244;   -- "Master of Vocational Ed"
+UPDATE courses SET name = 'Bachelor of Veterinary Biology / Bachelor of Veterinary Science'
+  WHERE id = 199;   -- "Bachelor of Veterinary Biology Bachelor Veterinary Science" (missing slash)
+UPDATE courses SET name = 'Bachelor of Education (Secondary)'
+  WHERE id = 258;   -- "Bachelor of Education Secondary"
+
+-- ── 5. Fix VIT garbled names (Bbus / Mba old-scraper prefix) ──
+UPDATE courses SET name = 'Bachelor of Business (Accounting)'
+  WHERE id = 48;
+ENDSQLBY u.id;(1, 2, 4, 5, 6, 8, 17, 20)HERE c.university_id = u.id) AS live_coursesoney\b|\bVocational Ed\b|\bGis\b|\bIt 12\b')
+BEGIN
+DELETE 0
+DELETE 0
+DELETE 1
+DELETE 1
+UPDATE 1
+DELETE 0
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+COMMIT
+ id | name 
+----+------
+(0 rows)
+
+               lname               | cnt |    ids    
+-----------------------------------+-----+-----------
+ master of intelligence analysis   |   2 | {257,308}
+ master of professional psychology |   2 | {223,242}
+ master of speech pathology        |   2 | {166,236}
+(3 rows)
+
+ id |                                  name                                  
+----+------------------------------------------------------------------------
+ 25 | Advanced Diploma of Hospitality Management
+ 20 | Advanced Diploma of Information Technology
+ 49 | Bachelor Of Business
+ 48 | Bachelor of Business (Accounting)
+ 47 | Bachelor of Business (Business Technology)
+ 46 | Bachelor of Business (Human Resource Management)
+ 44 | Bachelor of Business (International Business)
+ 45 | Bachelor of Business (Marketing)
+ 43 | Bachelor of Business (Tourism and Hospitality Management)
+ 33 | Bachelor of Information Technology and Systems (BITS)
+ 22 | Certificate III in Carpentry
+ 28 | Certificate III in Commercial Cookery
+ 27 | Certificate III in Patisserie
+ 21 | Certificate IV in Information Technology
+ 29 | Certificate IV in Kitchen Management
+ 24 | Certificate IV in Patisserie
+ 41 | Diploma Of Business
+ 26 | Diploma of Hospitality Management
+ 23 | Diploma of Information Technology
+ 34 | GCBA - Graduate Certificate of Business Administration
+ 30 | GCITS-Graduate Certificate of Information Technology and Systems
+ 37 | GDBA - Graduate Diploma of Business Administration
+ 31 | GDITS-Graduate Diploma of Information Technology and Systems
+ 35 | Master of Business Administration
+ 42 | Master of Business Administration (Finance)
+ 40 | Master of Business Administration (Information Systems)
+ 38 | Master of Business Administration (Leadership and Management)
+ 39 | Master of Business Administration (Project Management)
+ 36 | Master of Business Administration (Tourism and Hospitality Management)
+ 32 | Master of Information Technology and Systems
+(30 rows)
+
+ id |               name               | live_courses 
+----+----------------------------------+--------------
+  1 | University of Southern Queenland |           67
+  2 | asa                              |            8
+  4 | Charles Sturt university         |          187
+  5 | University of Tasmania           |            1
+  6 | vit                              |           30
+  8 | KBS                              |           29
+ 17 | SCU                              |            1
+ 20 | aut                              |           70
+(8 rows)
+
+root@university-and-course-data:~/University-and-Course-data/backend-py# sudo -u postgres psql university_portal << 'ENDSQL'
+BEGIN;
+
+-- Delete the 3 remaining CSU duplicate rows (old garbled ≡ clean after fix)
+DELETE FROM courses WHERE id IN (242, 236, 308);
+
+-- Fix 2 remaining VIT "Of" cases missed by the CSU-only bulk fix
+UPDATE courses SET name = 'Bachelor of Business' WHERE id = 49;
+UPDATE courses SET name = 'Diploma of Business'  WHERE id = 41;
+
+COMMIT;
+
+-- ── Final verification ──
+
+-- 1. No more CSU duplicates
+SELECT lower(name) AS lname, COUNT(*) AS cnt, array_agg(id ORDER BY id) AS ids
+FROM courses WHERE university_id = 4
+GROUP BY lower(name) HAVING COUNT(*) > 1 ORDER BY lname;
+
+-- 2. VIT full course list (confirm all clean)
+SELECT id, name FROM courses WHERE university_id = 6 ORDER BY id;
+
+-- 3. Live counts across all universities
+SELECT u.id, u.name,
+       (SELECT COUNT(*) FROM courses c WHERE c.university_id = u.id) AS live_courses
+FROM universities u WHERE u.id IN (1, 2, 4, 5, 6, 8, 17, 20) ORDER BY u.id;
+ENDSQL
+BEGIN
+DELETE 3
+UPDATE 1
+UPDATE 1
+COMMIT
+ lname | cnt | ids 
+-------+-----+-----
+(0 rows)
+
+ id |                                  name                                  
+----+------------------------------------------------------------------------
+ 20 | Advanced Diploma of Information Technology
+ 21 | Certificate IV in Information Technology
+ 22 | Certificate III in Carpentry
+ 23 | Diploma of Information Technology
+ 24 | Certificate IV in Patisserie
+ 25 | Advanced Diploma of Hospitality Management
+ 26 | Diploma of Hospitality Management
+ 27 | Certificate III in Patisserie
+ 28 | Certificate III in Commercial Cookery
+ 29 | Certificate IV in Kitchen Management
+ 30 | GCITS-Graduate Certificate of Information Technology and Systems
+ 31 | GDITS-Graduate Diploma of Information Technology and Systems
+ 32 | Master of Information Technology and Systems
+ 33 | Bachelor of Information Technology and Systems (BITS)
+ 34 | GCBA - Graduate Certificate of Business Administration
+ 35 | Master of Business Administration
+ 36 | Master of Business Administration (Tourism and Hospitality Management)
+ 37 | GDBA - Graduate Diploma of Business Administration
+ 38 | Master of Business Administration (Leadership and Management)
+ 39 | Master of Business Administration (Project Management)
+ 40 | Master of Business Administration (Information Systems)
+ 41 | Diploma of Business
+ 42 | Master of Business Administration (Finance)
+ 43 | Bachelor of Business (Tourism and Hospitality Management)
+ 44 | Bachelor of Business (International Business)
+ 45 | Bachelor of Business (Marketing)
+ 46 | Bachelor of Business (Human Resource Management)
+ 47 | Bachelor of Business (Business Technology)
+ 48 | Bachelor of Business (Accounting)
+ 49 | Bachelor of Business
+(30 rows)
+
+ id |               name               | live_courses 
+----+----------------------------------+--------------
+  1 | University of Southern Queenland |           67
+  2 | asa                              |            8
+  4 | Charles Sturt university         |          184
+  5 | University of Tasmania           |            1
+  6 | vit                              |           30
+  8 | KBS                              |           29
+ 17 | SCU                              |            1
+ 20 | aut                              |           70
+(8 rows)
+
+root@university-and-course-data:~/University-and-Course-data/backend-py# cd ~/University-and-Course-data
+
+# Step 1: see what prod has locally that GitHub doesn't
+git log origin/main..HEAD --oneline
+
+# Step 2: see if GitHub has anything prod doesn't
+git fetch origin
+git log HEAD..origin/main --oneline
+root@university-and-course-data:~/University-and-Course-data# git push origin main
+Everything up-to-date
+root@university-and-course-data:~/University-and-Course-data# # Merge, don't rebase — preserves both histories safely
+git merge origin/main --no-edit
+git push origin main
+Already up to date.
+Everything up-to-date
+root@university-and-course-data:~/University-and-Course-data# sudo -u postgres psql university_portal << 'ENDSQL'
+-- How many review rows exist per university?
+SELECT u.name AS uni,
+       sc.status,
+       COUNT(*) AS total_review,
+       COUNT(*) FILTER (WHERE sc.international_fee IS NULL)     AS fee_missing,
+       COUNT(*) FILTER (WHERE sc.ielts_overall IS NULL)         AS ielts_missing,
+       COUNT(*) FILTER (WHERE sc.duration IS NULL OR sc.duration = 0) AS duration_missing,
+       COUNT(*) FILTER (WHERE sc.confidence < 0.5)              AS low_confidence
+FROM scraped_courses sc
+JOIN universities u ON u.id = sc.university_id
+WHERE sc.university_id IN (4, 6)
+  AND sc.auto_publish_status = 'review'
+GROUP BY u.name, sc.status
+ORDER BY u.name, sc.status;
+
+-- Sample rows — what's actually blocking them?
+SELECT sc.id, u.name AS uni, sc.status, sc.course_name, sc.confidence,
+       sc.international_fee, sc.ielts_overall, sc.duration,
+       sc.auto_publish_notes
+FROM scraped_courses sc
+JOIN universities u ON u.id = sc.university_id
+WHERE sc.university_id IN (4, 6)
+  AND sc.auto_publish_status = 'review'
+ORDER BY u.id, sc.confidence
+LIMIT 30;
+ENDSQL
+ERROR:  column sc.confidence does not exist
+LINE 7:        COUNT(*) FILTER (WHERE sc.confidence < 0.5)          ...
+                                      ^
+ERROR:  column sc.confidence does not exist
+LINE 1: ... sc.id, u.name AS uni, sc.status, sc.course_name, sc.confide...
+                                                             ^
+root@university-and-course-data:~/University-and-Course-data# sudo -u postgres psql university_portal -c "
+SELECT status, auto_publish_status, COUNT(*)
+FROM scraped_courses
+WHERE university_id = 4
+GROUP BY status, auto_publish_status
+ORDER BY status, auto_publish_status;"
+  status  | auto_publish_status | count 
+----------+---------------------+-------
+ approved | approved            |   187
+ approved | manual_approved     |   114
+ pending  | review              |    11
+ rejected | approved            |    11
+ rejected | pending_review      |   169
+ rejected | ready               |     9
+ rejected | rejected            |     9
+ rejected | review              |   184
+(8 rows)
+
+root@university-and-course-data:~/University-and-Course-data# sudo -u postgres psql university_portal << 'ENDSQL'
+-- 1. Count and classify what's blocking each review bucket
+SELECT u.name AS uni,
+       sc.status,
+       COUNT(*)                                                          AS total,
+       COUNT(*) FILTER (WHERE sc.international_fee IS NULL)             AS fee_missing,
+       COUNT(*) FILTER (WHERE sc.ielts_overall IS NULL)                 AS ielts_missing,
+       COUNT(*) FILTER (WHERE sc.duration IS NULL OR sc.duration = 0)   AS duration_missing,
+       COUNT(*) FILTER (WHERE sc.completeness < 50)                     AS low_completeness,
+       COUNT(*) FILTER (WHERE sc.eligibility_status = 'ineligible')     AS ineligible
+FROM scraped_courses sc
+JOIN universities u ON u.id = sc.university_id
+WHERE sc.university_id IN (4, 6)
+  AND sc.status = 'pending'
+  AND sc.auto_publish_status = 'review'
+GROUP BY u.name, sc.status
+ORDER BY u.name;
+
+-- 2. Sample rows — what fields are actually NULL or flagged?
+SELECT sc.id,
+       u.name AS uni,
+       sc.course_name,
+       sc.completeness,
+       sc.decision_score,
+       sc.international_fee,
+       sc.ielts_overall,
+       sc.duration,
+       sc.eligibility_status,
+       sc.eligibility_reason,
+       sc.rejection_reason,
+       sc.scrape_warnings
+FROM scraped_courses sc
+JOIN universities u ON u.id = sc.university_id
+WHERE sc.university_id IN (4, 6)
+  AND sc.status = 'pending'
+  AND sc.auto_publish_status = 'review'
+ORDER BY u.id, sc.completeness NULLS FIRST
+LIMIT 30;
+ENDSQL
+           uni            | status  | total | fee_missing | ielts_missing | duration_missing | low_completeness | ineligible 
+--------------------------+---------+-------+-------------+---------------+------------------+------------------+------------
+ Charles Sturt university | pending |    11 |           4 |             0 |                0 |                0 |          0
+ vit                      | pending |    36 |           0 |             0 |                0 |                0 |          0
+(2 rows)
+
+  id   |           uni            |                              course_name                               | completeness | decision_score | international_fee | ielts_overall | duration | eligibility_status |                                                                                  eligibility_reason                                                                                  | rejection_reason | scrape_warnings 
+-------+--------------------------+------------------------------------------------------------------------+--------------+----------------+-------------------+---------------+----------+--------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+------------------+-----------------
+  8730 | Charles Sturt university | Associate Degree in Policing Practice                                  |           54 |              0 |                   |             6 |        2 | review             | Missing: category, intakeMonths, internationalFee, academicLevel, academicScore, otherRequirement | Warnings: missing academic requirement, missing category, completeness 54% < 75% |                  | 
+  8761 | Charles Sturt university | Graduate Diploma of Ageing and Pastoral Studies                        |           62 |              0 |                   |             6 |        2 | review             | Missing: category, internationalFee, academicLevel, academicScore, otherRequirement | Warnings: missing academic requirement, missing category, completeness 62% < 75%               |                  | 
+  8760 | Charles Sturt university | Graduate Certificate in Theological Studies                            |           69 |              0 |             12280 |             6 |      0.5 | review             | Missing: category, academicLevel, academicScore, otherRequirement | Warnings: missing academic requirement, missing category, completeness 69% < 75%                                 |                  | 
+  8764 | Charles Sturt university | Graduate Diploma of Theological Studies                                |           69 |              0 |             24560 |             6 |        1 | review             | Missing: category, academicLevel, academicScore, otherRequirement | Warnings: missing academic requirement, missing category, completeness 69% < 75%                                 |                  | 
+  8741 | Charles Sturt university | Bachelor of Education (Secondary) - Pdhpe                              |           69 |              0 |                   |           7.5 |        4 | review             | Missing: internationalFee, academicLevel, academicScore, otherRequirement | Warnings: missing academic requirement, completeness 69% < 75%                                           |                  | 
+  8749 | Charles Sturt university | Bachelor of Oral Health (Therapy and Hygiene)                          |           69 |              0 |             44560 |             7 |        3 | review             | Missing: category, academicLevel, academicScore, otherRequirement | Warnings: missing academic requirement, missing category, completeness 69% < 75%                                 |                  | 
+  8750 | Charles Sturt university | Bachelor of Paramedicine                                               |           69 |              0 |             37120 |             7 |        3 | review             | Missing: category, academicLevel, academicScore, otherRequirement | Warnings: missing academic requirement, missing category, completeness 69% < 75%                                 |                  | 
+  8753 | Charles Sturt university | Bachelor of Theology                                                   |           69 |              0 |             24560 |             6 |        3 | review             | Missing: category, academicLevel, academicScore, otherRequirement | Warnings: missing academic requirement, missing category, completeness 69% < 75%                                 |                  | 
+  8754 | Charles Sturt university | Bachelor of Theology (Honours)                                         |           69 |              0 |             24560 |             6 |        1 | review             | Missing: category, academicLevel, academicScore, otherRequirement | Warnings: missing academic requirement, missing category, completeness 69% < 75%                                 |                  | 
+  8729 | Charles Sturt university | Bachelor of Education (Primary)                                        |           69 |              0 |                   |           7.5 |        4 | review             | Missing: internationalFee, academicLevel, academicScore, otherRequirement | Warnings: missing academic requirement, completeness 69% < 75%                                           |                  | 
+  8759 | Charles Sturt university | Graduate Certificate in Fish Conservation and Management               |           69 |              0 |             17920 |             6 |        1 | review             | Missing: category, academicLevel, academicScore, otherRequirement | Warnings: missing academic requirement, missing category, completeness 69% < 75%                                 |                  | 
+ 13116 | vit                      | Graduate Diploma of Information Technology and Systems                 |           77 |              0 |             18000 |           6.5 |       12 | ready              | ok                                                                                                                                                                                   |                  | 
+ 13119 | vit                      | Master of Business Administration (Finance)                            |           77 |              0 |             28000 |           6.5 |        2 | ready              | ok                                                                                                                                                                                   |                  | 
+ 13117 | vit                      | Graduate Certificate of Information Technology and Systems             |           77 |              0 |              9000 |           6.5 |        6 | ready              | ok                                                                                                                                                                                   |                  | 
+ 13118 | vit                      | Master of Business Administration                                      |           77 |              0 |             28000 |           6.5 |        2 | ready              | ok                                                                                                                                                                                   |                  | 
+ 13120 | vit                      | Master of Business Administration (Information Systems)                |           77 |              0 |             48000 |           6.5 |        2 | ready              | ok                                                                                                                                                                                   |                  | 
+ 13121 | vit                      | Master of Business Administration (Leadership and Management)          |           77 |              0 |             28000 |           6.5 |        2 | ready              | ok                                                                                                                                                                                   |                  | 
+ 13122 | vit                      | Master of Business Administration (Tourism and Hospitality Management) |           77 |              0 |             48000 |           6.5 |        2 | ready              | ok                                                                                                                                                                                   |                  | 
+ 13123 | vit                      | Master of Business Administration (Project Management)                 |           77 |              0 |             28000 |           6.5 |        2 | ready              | ok                                                                                                                                                                                   |                  | 
+ 13124 | vit                      | Graduate Diploma of Business Administration                            |           77 |              0 |             14000 |           6.5 |        1 | ready              | ok                                                                                                                                                                                   |                  | 
+ 13125 | vit                      | Graduate Certificate of Business Administration                        |           77 |              0 |              7000 |           6.5 |        6 | ready              | ok                                                                                                                                                                                   |                  | 
+ 13126 | vit                      | Bachelor of Business (International Business Management)               |           77 |              0 |             36000 |             6 |        3 | ready              | ok                                                                                                                                                                                   |                  | 
+ 13127 | vit                      | Bachelor of Business (Tourism and Hospitality Management)              |           77 |              0 |             36000 |             6 |        3 | ready              | ok                                                                                                                                                                                   |                  | 
+ 13128 | vit                      | Bachelor of Business (Accounting)                                      |           77 |              0 |             36000 |             6 |        3 | ready              | ok                                                                                                                                                                                   |                  | 
+ 13129 | vit                      | Bachelor of Business (Human Resource Management)                       |           77 |              0 |             36000 |             6 |        3 | ready              | ok                                                                                                                                                                                   |                  | 
+ 13130 | vit                      | Bachelor of Business (Business Technology)                             |           77 |              0 |             36000 |             6 |        3 | ready              | ok                                                                                                                                                                                   |                  | 
+ 13133 | vit                      | Certificate IV in Kitchen Management                                   |           77 |              0 |             14919 |           5.5 |        2 | ready              | ok                                                                                                                                                                                   |                  | 
+ 13131 | vit                      | Diploma of Business                                                    |           77 |              0 |             12000 |           5.5 |        1 | ready              | ok                                                                                                                                                                                   |                  | 
+ 13134 | vit                      | Certificate III in Patisserie                                          |           77 |              0 |             13169 |           5.5 |        1 | ready              | ok                                                                                                                                                                                   |                  | 
+ 13137 | vit                      | Advanced Diploma of Hospitality Management                             |           77 |              0 |             17219 |           5.5 |        2 | ready              | ok                                                                                                                                                                                   |                  | 
+(30 rows)
+
+root@university-and-course-data:~/University-and-Course-data# # Step 1: upgrade VIT's 36 review rows to ready so standard bulk_approve picks them up
+sudo -u postgres psql university_portal -c "
+UPDATE scraped_courses
+SET auto_publish_status = 'ready'
+WHERE university_id = 6
+  AND status = 'pending'
+  AND auto_publish_status = 'review'
+RETURNING id, course_name;"
+
+# Step 2: dry-run then promote
+cd ~/University-and-Course-data/backend-py
+set -a && source .env && set +a
+
+PYTHONPATH=. venv/bin/python3 scripts/bulk_approve.py --university-id 6 --dry-run
+PYTHONPATH=. venv/bin/python3 scripts/bulk_approve.py --university-id 6
+
+# Step 3: verify
+sudo -u postgres psql university_portal -c "
+SELECT (SELECT COUNT(*) FROM courses WHERE university_id = 6) AS vit_live,
+       (SELECT COUNT(*) FROM scraped_courses
+        WHERE university_id = 6 AND status = 'pending'
+          AND auto_publish_status IN ('ready', 'review')) AS vit_remaining;"
+  id   |                                    course_name                                     
+-------+------------------------------------------------------------------------------------
+ 13106 | Bachelor of Information Technology and Systems
+ 13107 | Bachelor of Information Technology and Systems (Artificial Intelligence Analytics)
+ 13108 | Bachelor of Information Technology and Systems (Application Development)
+ 13109 | Bachelor of Information Technology and Systems (Cyber Security)
+ 13110 | Bachelor of Information Technology and Systems (Networking)
+ 13111 | Master of Information Technology and Systems
+ 13114 | Master of Information Technology and Systems (Information Systems)
+ 13112 | Master of Information Technology and Systems (Business Analytics)
+ 13113 | Master of Information Technology and Systems (Cybersecurity)
+ 13115 | Master of Information Technology and Systems (Software Engineering)
+ 13116 | Graduate Diploma of Information Technology and Systems
+ 13119 | Master of Business Administration (Finance)
+ 13117 | Graduate Certificate of Information Technology and Systems
+ 13118 | Master of Business Administration
+ 13120 | Master of Business Administration (Information Systems)
+ 13121 | Master of Business Administration (Leadership and Management)
+ 13122 | Master of Business Administration (Tourism and Hospitality Management)
+ 13123 | Master of Business Administration (Project Management)
+ 13124 | Graduate Diploma of Business Administration
+ 13125 | Graduate Certificate of Business Administration
+ 13126 | Bachelor of Business (International Business Management)
+ 13127 | Bachelor of Business (Tourism and Hospitality Management)
+ 13128 | Bachelor of Business (Accounting)
+ 13129 | Bachelor of Business (Human Resource Management)
+ 13130 | Bachelor of Business (Business Technology)
+ 13133 | Certificate IV in Kitchen Management
+ 13131 | Diploma of Business
+ 13134 | Certificate III in Patisserie
+ 13137 | Advanced Diploma of Hospitality Management
+ 13132 | Certificate III in Commercial Cookery
+ 13135 | Certificate IV in Patisserie
+ 13138 | Certificate IV in Information Technology
+ 13141 | Certificate III in Carpentry
+ 13136 | Diploma of Hospitality Management
+ 13139 | Diploma of Information Technology
+ 13140 | Advanced Diploma of Information Technology
+(36 rows)
+
+UPDATE 36
+2026-05-01 10:41:28,417 INFO: University: vit (id=6) | status='pending' ap='ready' | matched: 36 rows
+2026-05-01 10:41:28,417 INFO: DRY-RUN — not committing. Sample names:
+2026-05-01 10:41:28,417 INFO:   [13106] Bachelor of Information Technology and Systems
+2026-05-01 10:41:28,417 INFO:   [13107] Bachelor of Information Technology and Systems (Artificial Intelligence Analytics)
+2026-05-01 10:41:28,417 INFO:   [13108] Bachelor of Information Technology and Systems (Application Development)
+2026-05-01 10:41:28,417 INFO:   [13109] Bachelor of Information Technology and Systems (Cyber Security)
+2026-05-01 10:41:28,417 INFO:   [13110] Bachelor of Information Technology and Systems (Networking)
+2026-05-01 10:41:28,417 INFO:   [13111] Master of Information Technology and Systems
+2026-05-01 10:41:28,417 INFO:   [13112] Master of Information Technology and Systems (Business Analytics)
+2026-05-01 10:41:28,417 INFO:   [13113] Master of Information Technology and Systems (Cybersecurity)
+2026-05-01 10:41:28,417 INFO:   [13114] Master of Information Technology and Systems (Information Systems)
+2026-05-01 10:41:28,417 INFO:   [13115] Master of Information Technology and Systems (Software Engineering)
+2026-05-01 10:41:29,346 INFO: University: vit (id=6) | status='pending' ap='ready' | matched: 36 rows
+2026-05-01 10:41:29,390 INFO:   approved sc_id=13106 → course_id=533  'Bachelor of Information Technology and Systems'
+2026-05-01 10:41:29,405 INFO:   approved sc_id=13107 → course_id=534  'Bachelor of Information Technology and Systems (Artificial Intelligence Analytics)'
+2026-05-01 10:41:29,418 INFO:   approved sc_id=13108 → course_id=535  'Bachelor of Information Technology and Systems (Application Development)'
+2026-05-01 10:41:29,433 INFO:   approved sc_id=13109 → course_id=536  'Bachelor of Information Technology and Systems (Cyber Security)'
+2026-05-01 10:41:29,446 INFO:   approved sc_id=13110 → course_id=537  'Bachelor of Information Technology and Systems (Networking)'
+2026-05-01 10:41:29,458 INFO:   approved sc_id=13111 → course_id=32  'Master of Information Technology and Systems'
+2026-05-01 10:41:29,471 INFO:   approved sc_id=13112 → course_id=538  'Master of Information Technology and Systems (Business Analytics)'
+2026-05-01 10:41:29,484 INFO:   approved sc_id=13113 → course_id=539  'Master of Information Technology and Systems (Cybersecurity)'
+2026-05-01 10:41:29,498 INFO:   approved sc_id=13114 → course_id=540  'Master of Information Technology and Systems (Information Systems)'
+2026-05-01 10:41:29,509 INFO:   approved sc_id=13115 → course_id=541  'Master of Information Technology and Systems (Software Engineering)'
+2026-05-01 10:41:29,520 INFO:   approved sc_id=13116 → course_id=542  'Graduate Diploma of Information Technology and Systems'
+2026-05-01 10:41:29,533 INFO:   approved sc_id=13117 → course_id=543  'Graduate Certificate of Information Technology and Systems'
+2026-05-01 10:41:29,544 INFO:   approved sc_id=13118 → course_id=35  'Master of Business Administration'
+2026-05-01 10:41:29,556 INFO:   approved sc_id=13119 → course_id=42  'Master of Business Administration (Finance)'
+2026-05-01 10:41:29,568 INFO:   approved sc_id=13120 → course_id=40  'Master of Business Administration (Information Systems)'
+2026-05-01 10:41:29,580 INFO:   approved sc_id=13121 → course_id=38  'Master of Business Administration (Leadership and Management)'
+2026-05-01 10:41:29,592 INFO:   approved sc_id=13122 → course_id=36  'Master of Business Administration (Tourism and Hospitality Management)'
+2026-05-01 10:41:29,604 INFO:   approved sc_id=13123 → course_id=39  'Master of Business Administration (Project Management)'
+2026-05-01 10:41:29,616 INFO:   approved sc_id=13124 → course_id=544  'Graduate Diploma of Business Administration'
+2026-05-01 10:41:29,627 INFO:   approved sc_id=13125 → course_id=545  'Graduate Certificate of Business Administration'
+2026-05-01 10:41:29,639 INFO:   approved sc_id=13126 → course_id=546  'Bachelor of Business (International Business Management)'
+2026-05-01 10:41:29,650 INFO:   approved sc_id=13127 → course_id=43  'Bachelor of Business (Tourism and Hospitality Management)'
+2026-05-01 10:41:29,662 INFO:   approved sc_id=13128 → course_id=48  'Bachelor of Business (Accounting)'
+2026-05-01 10:41:29,673 INFO:   approved sc_id=13129 → course_id=46  'Bachelor of Business (Human Resource Management)'
+2026-05-01 10:41:29,683 INFO:   approved sc_id=13130 → course_id=47  'Bachelor of Business (Business Technology)'
+2026-05-01 10:41:29,694 INFO:   approved sc_id=13131 → course_id=41  'Diploma of Business'
+2026-05-01 10:41:29,705 INFO:   approved sc_id=13132 → course_id=28  'Certificate III in Commercial Cookery'
+2026-05-01 10:41:29,717 INFO:   approved sc_id=13133 → course_id=29  'Certificate IV in Kitchen Management'
+2026-05-01 10:41:29,727 INFO:   approved sc_id=13134 → course_id=27  'Certificate III in Patisserie'
+2026-05-01 10:41:29,738 INFO:   approved sc_id=13135 → course_id=24  'Certificate IV in Patisserie'
+2026-05-01 10:41:29,750 INFO:   approved sc_id=13136 → course_id=26  'Diploma of Hospitality Management'
+2026-05-01 10:41:29,761 INFO:   approved sc_id=13137 → course_id=25  'Advanced Diploma of Hospitality Management'
+2026-05-01 10:41:29,772 INFO:   approved sc_id=13138 → course_id=21  'Certificate IV in Information Technology'
+2026-05-01 10:41:29,783 INFO:   approved sc_id=13139 → course_id=23  'Diploma of Information Technology'
+2026-05-01 10:41:29,795 INFO:   approved sc_id=13140 → course_id=20  'Advanced Diploma of Information Technology'
+2026-05-01 10:41:29,808 INFO:   approved sc_id=13141 → course_id=22  'Certificate III in Carpentry'
+2026-05-01 10:41:29,808 INFO: Done. approved=36  failed=0
+ vit_live | vit_remaining 
+----------+---------------
+       44 |             0
+(1 row)
+
+root@university-and-course-data:~/University-and-Course-data/backend-py# sudo -u postgres psql university_portal << 'ENDSQL'
+-- Confirm the VIT duplicate pairs before deleting
+SELECT id, name FROM courses WHERE university_id = 6
+ORDER BY name;
+ENDSQL
+ id  |                                        name                                        
+-----+------------------------------------------------------------------------------------
+  25 | Advanced Diploma of Hospitality Management
+  20 | Advanced Diploma of Information Technology
+  49 | Bachelor of Business
+  48 | Bachelor of Business (Accounting)
+  47 | Bachelor of Business (Business Technology)
+  46 | Bachelor of Business (Human Resource Management)
+ 546 | Bachelor of Business (International Business Management)
+  44 | Bachelor of Business (International Business)
+  45 | Bachelor of Business (Marketing)
+  43 | Bachelor of Business (Tourism and Hospitality Management)
+ 533 | Bachelor of Information Technology and Systems
+ 535 | Bachelor of Information Technology and Systems (Application Development)
+ 534 | Bachelor of Information Technology and Systems (Artificial Intelligence Analytics)
+  33 | Bachelor of Information Technology and Systems (BITS)
+ 536 | Bachelor of Information Technology and Systems (Cyber Security)
+ 537 | Bachelor of Information Technology and Systems (Networking)
+  22 | Certificate III in Carpentry
+  28 | Certificate III in Commercial Cookery
+  27 | Certificate III in Patisserie
+  21 | Certificate IV in Information Technology
+  29 | Certificate IV in Kitchen Management
+  24 | Certificate IV in Patisserie
+  41 | Diploma of Business
+  26 | Diploma of Hospitality Management
+  23 | Diploma of Information Technology
+  34 | GCBA - Graduate Certificate of Business Administration
+  30 | GCITS-Graduate Certificate of Information Technology and Systems
+  37 | GDBA - Graduate Diploma of Business Administration
+  31 | GDITS-Graduate Diploma of Information Technology and Systems
+ 545 | Graduate Certificate of Business Administration
+ 543 | Graduate Certificate of Information Technology and Systems
+ 544 | Graduate Diploma of Business Administration
+ 542 | Graduate Diploma of Information Technology and Systems
+  35 | Master of Business Administration
+  42 | Master of Business Administration (Finance)
+  40 | Master of Business Administration (Information Systems)
+  38 | Master of Business Administration (Leadership and Management)
+  39 | Master of Business Administration (Project Management)
+  36 | Master of Business Administration (Tourism and Hospitality Management)
+  32 | Master of Information Technology and Systems
+ 538 | Master of Information Technology and Systems (Business Analytics)
+ 539 | Master of Information Technology and Systems (Cybersecurity)
+ 540 | Master of Information Technology and Systems (Information Systems)
+ 541 | Master of Information Technology and Systems (Software Engineering)
+(44 rows)
+
+root@university-and-course-data:~/University-and-Course-data/backend-py# sudo -u postgres psql university_portal << 'ENDSQL'
+BEGIN;
+
+-- Delete old prefix-code names; keep the new clean-name versions
+-- id=30 "GCITS-Graduate Certificate of IT and Systems"  → id=543 (clean)
+DELETE FROM courses WHERE id = 30;
+-- id=31 "GDITS-Graduate Diploma of IT and Systems"      → id=542 (clean)
+DELETE FROM courses WHERE id = 31;
+-- id=34 "GCBA - Graduate Certificate of Business Admin" → id=545 (clean)
+DELETE FROM courses WHERE id = 34;
+-- id=37 "GDBA - Graduate Diploma of Business Admin"    → id=544 (clean)
+DELETE FROM courses WHERE id = 37;
+
+-- Delete "(BITS)" abbreviated version; keep plain clean name
+-- id=33 "Bachelor of IT and Systems (BITS)"             → id=533 (clean)
+DELETE FROM courses WHERE id = 33;
+
+-- Delete short-form International Business; keep full correct name
+-- id=44 "Bachelor of Business (International Business)" → id=546 "(International Business Management)"
+DELETE FROM courses WHERE id = 44;
+
+COMMIT;
+
+-- Verify: no more VIT duplicates, clean final count
+SELECT lower(name) AS lname, COUNT(*) AS cnt, array_agg(id ORDER BY id) AS ids
+FROM courses WHERE university_id = 6
+GROUP BY lower(name) HAVING COUNT(*) > 1;
+
+SELECT COUNT(*) AS vit_live FROM courses WHERE university_id = 6;
+
+-- Final live count across all 8 universities
+SELECT u.id, u.name,
+       (SELECT COUNT(*) FROM courses c WHERE c.university_id = u.id) AS live_courses
+FROM universities u WHERE u.id IN (1, 2, 4, 5, 6, 8, 17, 20) ORDER BY u.id;
+ENDSQL
+BEGIN
+DELETE 1
+DELETE 1
+DELETE 1
+DELETE 1
+DELETE 1
+DELETE 1
+COMMIT
+ lname | cnt | ids 
+-------+-----+-----
+(0 rows)
+
+ vit_live 
+----------
+       38
+(1 row)
+
+ id |               name               | live_courses 
+----+----------------------------------+--------------
+  1 | University of Southern Queenland |           67
+  2 | asa                              |            8
+  4 | Charles Sturt university         |          184
+  5 | University of Tasmania           |            1
+  6 | vit                              |           38
+  8 | KBS                              |           29
+ 17 | SCU                              |            1
+ 20 | aut                              |           70
+(8 rows)
+
+root@university-and-course-data:~/University-and-Course-data/backend-py# cd ~/University-and-Course-data
+
+# Pull our Bond/CSU/ECU commits from today
+git pull origin main
+
+# Verify the Bond extractor is now on disk
+ls -la backend-py/app/services/scraper/bond_static_extract.py
+grep -c "bond_static_extract" backend-py/app/services/scraper/pipelines/single_course.py
+
+# Restart Celery so it picks up the new pipeline code
+systemctl restart uni-celery
+systemctl status uni-celery --no-pager | head -10
+remote: Enumerating objects: 13, done.
+remote: Counting objects: 100% (13/13), done.
+remote: Compressing objects: 100% (10/10), done.
+remote: Total 10 (delta 4), reused 0 (delta 0), pack-reused 0 (from 0)
+Unpacking objects: 100% (10/10), 2.84 KiB | 323.00 KiB/s, done.
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+   83e53e5..93497af  main       -> origin/main
+Updating 83e53e5..93497af
+error: The following untracked working tree files would be overwritten by merge:
+        backend-py/scripts/bulk_approve.py
+Please move or remove them before you merge.
+Aborting
+-rw-r--r-- 1 root root 11303 Apr 28 13:57 backend-py/app/services/scraper/bond_static_extract.py
+2
+● uni-celery.service - University Portal Celery Worker (scraper)
+     Loaded: loaded (/etc/systemd/system/uni-celery.service; enabled; preset: enabled)
+     Active: active (running) since Fri 2026-05-01 11:00:34 UTC; 9ms ago
+   Main PID: 1288187 (celery)
+      Tasks: 1 (limit: 9483)
+     Memory: 2.3M (peak: 2.3M)
+        CPU: 7ms
+     CGroup: /system.slice/uni-celery.service
+             └─1288187 /root/University-and-Course-data/backend-py/venv/bin/python3.12 /root/University-and-Course-data/backend-py/venv/bin/celery -A app.tasks.celery_app worker --concurrency=4 --loglevel=info -Q scrape
+
+root@university-and-course-data:~/University-and-Course-data# sudo -u postgres psql university_portal -c "
+SELECT status, auto_publish_status, COUNT(*),
+       MIN(created_at)::date AS oldest,
+       MAX(created_at)::date AS newest,
+       COUNT(*) FILTER (WHERE international_fee IS NOT NULL) AS has_fee,
+       COUNT(*) FILTER (WHERE ielts_overall IS NOT NULL) AS has_ielts
+FROM scraped_courses
+WHERE university_id = 22
+GROUP BY status, auto_publish_status
+ORDER BY status, auto_publish_status;"
+ status  | auto_publish_status | count |   oldest   |   newest   | has_fee | has_ielts 
+---------+---------------------+-------+------------+------------+---------+-----------
+ pending | review              |   126 | 2026-04-28 | 2026-04-28 |       0 |         0
+(1 row)
+
+root@university-and-course-data:~/University-and-Course-data# cd ~/University-and-Course-data
+# The file content is identical — safe to remove and let git pull track it
+rm backend-py/scripts/bulk_approve.py
+git pull origin main
+# Verify
+ls -la backend-py/scripts/bulk_approve.py
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+Updating 83e53e5..93497af
+Fast-forward
+ backend-py/scripts/bulk_approve.py | 136 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 136 insertions(+)
+ create mode 100644 backend-py/scripts/bulk_approve.py
+-rw-r--r-- 1 root root 4433 May  1 11:02 backend-py/scripts/bulk_approve.py
+root@university-and-course-data:~/University-and-Course-data# # First, identify Bond's fee API endpoint
+# Open a Bond program page and watch Network tab for XHR/fetch calls
+# Likely pattern: https://api.bond.edu.au/api/programs/{id}/fees or similar
+# OR look at the Bond page source for a data attribute with program code
+
+# Quick check — look at what a sample Bond course page actually contains
+curl -s "https://bond.edu.au/program/bachelor-arts" \
+  | python3 -c "
+import sys, re
+html = sys.stdin.read()
+# Look for API endpoint hints, program codes, or data-* attributes
+for pattern in [r'api\.bond', r'programCode', r'data-program', r'_fees', r'intake.*json', r'fees.*json']:
+    matches = re.findall(rf'.{{0,30}}{pattern}.{{0,60}}', html, re.IGNORECASE)
+    for m in matches[:3]:
+        print(repr(m.strip()))
+"
+root@university-and-course-data:~/University-and-Course-data# cd ~/University-and-Course-data
+# The prod heredoc version and GitHub version are identical — safe to remove
+rm backend-py/scripts/bulk_approve.py
+git pull origin main
+# Verify all new files landed
+ls backend-py/app/services/scraper/bond_static_extract.py \
+   backend-py/app/services/scraper/csu_static_extract.py \
+   backend-py/app/services/scraper/ecu_static_extract.py \
+   backend-py/scripts/bulk_approve.py
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+Already up to date.
+ls: cannot access 'backend-py/scripts/bulk_approve.py': No such file or directory
+backend-py/app/services/scraper/bond_static_extract.py  backend-py/app/services/scraper/csu_static_extract.py  backend-py/app/services/scraper/ecu_static_extract.py
+root@university-and-course-data:~/University-and-Course-data# # Check a sample Bond program page for API endpoint hints
+curl -sL "https://bond.edu.au/program/bachelor-arts" \
+  | python3 -c "
+import sys, re
+html = sys.stdin.read()
+patterns = [r'api[._/-]bond', r'programCode[\":\s]+[\w-]+', r'fees[\":\s]+https?://\S+',
+            r'apiUrl[\":\s]+[\"]\S+', r'data-program[-\w]+', r'_next/data', r'/api/programs']
+for p in patterns:
+    for m in re.findall(rf'.{{0,40}}{p}.{{0,60}}', html, re.IGNORECASE):
+        print(repr(m.strip()))
+print('--- script src lines ---')
+for m in re.findall(r'<script[^>]+src=[\"\'](https?://[^\"\']+)[\"\']\s*>', html):
+    print(m)
+" 2>&1 | head -60
+
+# Also check the Bond international fees page directly
+curl -sL "https://bond.edu.au/international/fees" \
+  | python3 -c "
+import sys, re
+html = sys.stdin.read()
+# Look for fee tables or JSON data
+fees = re.findall(r'\$[\d,]+|\bAUD[\d,]+|\d{4,6}(?=\s*(?:per|/)\s*year)', html)
+print('Fee values found:', fees[:20])
+jsdata = re.findall(r'__NEXT_DATA__.*?</script>', html, re.DOTALL)
+if jsdata: print('Next.js data block found, length:', len(jsdata[0]))
+"
+'il notranslate" data-program="HS-20003" data-program-detail-url="/api/program-details/432"><div class="skeleton skeleton--a'
+'data-program-title="Bachelor of Arts"'
+'data-program-code="HS-20003"'
+'data-program-study-area="International Relations, Politics, and Arts"'
+'data-program-level="Undergraduate"'
+'data-program-type="Bachelor Degree"'
+'data-program-guid="82618B4D-AF7A-E911-A866-000D3AE0E4EF"'
+--- script src lines ---
+Fee values found: []
+root@university-and-course-data:~/University-and-Course-data# # 1. Fix the git conflict, then pull the pipeline code
+cd ~/University-and-Course-data
+rm backend-py/scripts/bulk_approve.py
+git pull origin main
+
+# 2. Investigate Bond's fee data source
+curl -sL "https://bond.edu.au/program/bachelor-arts" \
+  | python3 -c "
+import sys, re
+html = sys.stdin.read()
+patterns = [r'api[._/-]bond', r'programCode[\":\s]+[\w-]+', r'fees[\":\s]+https?://\S+',
+            r'apiUrl[\":\s]+[\"]\S+', r'data-program[-\w]+', r'_next/data', r'/api/programs']
+for p in patterns:
+    for m in re.findall(rf'.{{0,40}}{p}.{{0,60}}', html, re.IGNORECASE):
+        print(repr(m.strip()))
+print('--- script src lines ---')
+for m in re.findall(r'<script[^>]+src=[\"\'](https?://[^\"\']+)[\"\']\s*>', html):
+    print(m)
+" 2>&1 | head -60
+
+curl -sL "https://bond.edu.au/international/fees" \
+  | python3 -c "
+import sys, re
+html = sys.stdin.read()
+fees = re.findall(r'\$[\d,]+|\bAUD[\d,]+|\d{4,6}(?=\s*(?:per|/)\s*year)', html)
+print('Fee values found:', fees[:20])
+jsdata = re.findall(r'__NEXT_DATA__.*?</script>', html, re.DOTALL)
+if jsdata: print('Next.js data block found, length:', len(jsdata[0]))
+" 2>&1
+rm: cannot remove 'backend-py/scripts/bulk_approve.py': No such file or directory
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+Already up to date.
+'il notranslate" data-program="HS-20003" data-program-detail-url="/api/program-details/432"><div class="skeleton skeleton--a'
+'data-program-title="Bachelor of Arts"'
+'data-program-code="HS-20003"'
+'data-program-study-area="International Relations, Politics, and Arts"'
+'data-program-level="Undergraduate"'
+'data-program-type="Bachelor Degree"'
+'data-program-guid="82618B4D-AF7A-E911-A866-000D3AE0E4EF"'
+--- script src lines ---
+Fee values found: []
+root@university-and-course-data:~/University-and-Course-data# 
