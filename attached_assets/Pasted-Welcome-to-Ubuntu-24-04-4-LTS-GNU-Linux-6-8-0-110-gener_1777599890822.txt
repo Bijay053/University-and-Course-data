@@ -1,0 +1,103 @@
+Welcome to Ubuntu 24.04.4 LTS (GNU/Linux 6.8.0-110-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/pro
+
+ System information as of Fri May  1 01:42:11 UTC 2026
+
+  System load:           0.0
+  Usage of /:            3.6% of 231.44GB
+  Memory usage:          22%
+  Swap usage:            0%
+  Processes:             194
+  Users logged in:       1
+  IPv4 address for eth0: 159.65.152.72
+  IPv4 address for eth0: 10.47.0.13
+  IPv6 address for eth0: 2400:6180:100:d0:0:1:3615:5001
+
+Expanded Security Maintenance for Applications is not enabled.
+
+5 updates can be applied immediately.
+To see these additional updates run: apt list --upgradable
+
+1 additional security update can be applied with ESM Apps.
+Learn more about enabling ESM Apps service at https://ubuntu.com/esm
+
+
+Last login: Thu Apr 30 14:30:57 2026 from 162.243.190.66
+root@university-and-course-data:~# cd ~/University-and-Course-data
+
+# Abort any in-progress rebase
+git rebase --abort 2>/dev/null || true
+
+# Fetch
+git fetch origin main
+
+# Check what's on prod right now
+git log --oneline -6
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+9b95125 (HEAD -> main, origin/main) fix(migration-012): drop/recreate course_search_view around ALTER COLUMN
+bbea119 fix(alembic): escape % in DATABASE_URL for ConfigParser
+0279075 chore(acap): mark Phase 6 TODO as DONE in comment
+b38134f fix(kbs): disable vision OCR + normalise slash-separated location format
+be3df67 feat(option-c): wire strip_patterns into location extractor (ACAP footnote fix)
+629e5de fix(models): courses.duration Float->Numeric(6,2) + Alembic migration 012
+root@university-and-course-data:~/University-and-Course-data# # Step 1: Take a prod backup FIRST
+sudo -u postgres pg_dump university_portal -F c -f /tmp/university_portal_backup_$(date +%Y%m%d_%H%M).dump
+echo "Backup done: $(ls -lh /tmp/university_portal_backup_*.dump | tail -1)"
+
+# Step 2: Restore to a staging DB
+sudo -u postgres createdb university_portal_staging 2>/dev/null || true
+sudo -u postgres pg_restore -d university_portal_staging /tmp/university_portal_backup_*.dump 2>/dev/null; echo "restore done"
+
+# Step 3: Apply the migration on staging only
+sudo -u postgres psql university_portal_staging << 'SQL'
+DROP MATERIALIZED VIEW IF EXISTS course_search_view;
+ALTER TABLE courses ALTER COLUMN duration TYPE NUMERIC(6, 2) USING ROUND(duration::numeric, 2);
+SQL
+echo "Staging migration applied"
+
+# Step 4: Verify no value drift on staging
+sudo -u postgres psql university_portal_staging -c "
+SELECT duration, COUNT(*) FROM courses 
+WHERE duration IS NOT NULL 
+GROUP BY duration ORDER BY COUNT(*) DESC LIMIT 20;"
+Backup done: -rw-rw-r-- 1 postgres postgres 9.0M May  1 01:42 /tmp/university_portal_backup_20260501_0142.dump
+restore done
+DROP MATERIALIZED VIEW
+ALTER TABLE
+Staging migration applied
+ duration | count 
+----------+-------
+     3.00 |    72
+     0.00 |    59
+     2.00 |    54
+     1.00 |    47
+     4.00 |    34
+     0.50 |    29
+     1.50 |    17
+     6.00 |     5
+     1.70 |     4
+     5.00 |     3
+    18.00 |     3
+     2.25 |     2
+     7.00 |     2
+     0.70 |     2
+   104.00 |     2
+    52.00 |     2
+    88.00 |     2
+    64.00 |     1
+     4.75 |     1
+    66.00 |     1
+(20 rows)
+
+root@university-and-course-data:~/University-and-Course-data# cd ~/University-and-Course-data && git log --oneline -6
+9b95125 (HEAD -> main, origin/main) fix(migration-012): drop/recreate course_search_view around ALTER COLUMN
+bbea119 fix(alembic): escape % in DATABASE_URL for ConfigParser
+0279075 chore(acap): mark Phase 6 TODO as DONE in comment
+b38134f fix(kbs): disable vision OCR + normalise slash-separated location format
+be3df67 feat(option-c): wire strip_patterns into location extractor (ACAP footnote fix)
+629e5de fix(models): courses.duration Float->Numeric(6,2) + Alembic migration 012
+root@university-and-course-data:~/University-and-Course-data# 
