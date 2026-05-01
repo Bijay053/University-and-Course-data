@@ -1,0 +1,41 @@
+root@university-and-course-data:~/University-and-Course-data# sudo -u postgres psql university_portal -c "
+SELECT 
+  COUNT(*) FILTER (WHERE international_fee IS NOT NULL) AS has_fee,
+  COUNT(*) FILTER (WHERE ielts_overall IS NOT NULL)     AS has_ielts,
+  COUNT(*) FILTER (WHERE duration IS NOT NULL)          AS has_duration,
+  COUNT(*) FILTER (WHERE degree_level IS NOT NULL)      AS has_degree_level,
+  COUNT(*) FILTER (WHERE description IS NOT NULL)       AS has_description,
+  COUNT(*) FILTER (WHERE intake_months IS NOT NULL)     AS has_intakes,
+  COUNT(*) FILTER (WHERE course_location IS NOT NULL)   AS has_location,
+  COUNT(*) FILTER (WHERE course_website IS NOT NULL)    AS has_website,
+  COUNT(*)                                              AS total
+FROM scraped_courses
+WHERE university_id = 12 AND status = 'pending';"
+
+# Also check a sample of names for quality
+sudo -u postgres psql university_portal -c "
+SELECT id, course_name, degree_level, completeness, international_fee, ielts_overall
+FROM scraped_courses
+WHERE university_id = 12 AND status = 'pending'
+ORDER BY completeness DESC
+LIMIT 10;"
+ has_fee | has_ielts | has_duration | has_degree_level | has_description | has_intakes | has_location | has_website | total 
+---------+-----------+--------------+------------------+-----------------+-------------+--------------+-------------+-------
+     105 |       105 |          105 |              105 |             105 |          91 |          103 |         105 |   105
+(1 row)
+
+  id   |                          course_name                          | degree_level | completeness | international_fee | ielts_overall 
+-------+---------------------------------------------------------------+--------------+--------------+-------------------+---------------
+ 10267 | Bachelor of Business Majoring in Event Management and Tourism | Bachelor's   |           77 |             39000 |             6
+ 10277 | Bachelor of Criminology                                       | Bachelor's   |           77 |             36300 |             6
+ 10275 | Bachelor of Commerce                                          | Bachelor's   |           77 |             39000 |             6
+ 10264 | Bachelor of Accounting                                        | Bachelor's   |           77 |             39000 |             6
+ 10266 | Bachelor of Business                                          | Bachelor's   |           77 |             39000 |             6
+ 10268 | Bachelor of Business Majoring in Human Resource Management    | Bachelor's   |           77 |             39000 |             6
+ 10271 | Bachelor of Business Majoring in Management                   | Bachelor's   |           77 |             39000 |             6
+ 10274 | Bachelor of Business Majoring in Sports Management            | Bachelor's   |           77 |             39000 |             6
+ 10269 | Bachelor of Business Majoring in International Business       | Bachelor's   |           77 |             39000 |             6
+ 10270 | Bachelor of Business Majoring in Leading Change               | Bachelor's   |           77 |             39000 |             6
+(10 rows)
+
+root@university-and-course-data:~/University-and-Course-data# 
