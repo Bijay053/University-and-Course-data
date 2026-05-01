@@ -1,0 +1,857 @@
+Course Name	Score	Level	Duration	Intl. Fee	IELTS	PTE	TOEFL	CAE	DET	Intakes	Course Location	Mode	Actions
+	
+Graduate Diploma of Research Studies
+Publish: review
+Eligibility: review
+62%	Graduate Diploma	1 Year	A$29,500/Annual	7	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Graduate Certificate in Autism and Neurodivergent Studies
+Publish: review
+Eligibility: review
+62%	Graduate Certificate	6 Month	A$28,100/Annual	6.5	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Master of Information Technology (Advanced)
+Computer Science & IT
+Publish: review
+Eligibility: review
+69%	Master	2 Year	A$14,050/Annual	6.5	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Master of Cybersecurity (Advanced)
+Publish: review
+Eligibility: review
+54%	Master	2 Year		6.5	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Master of Cybersecurity
+Publish: review
+Eligibility: review
+54%	Master	1.7000000476837158 Year		6.5	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Graduate Diploma of Information Technology
+Computer Science & IT
+Publish: review
+Eligibility: review
+69%	Graduate Diploma	7 Month	A$36,000/Annual	6.5	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Graduate Diploma of Cybersecurity
+Publish: review
+Eligibility: review
+62%	Graduate Diploma	1 Year	A$39,800/Annual	6.5	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Graduate Certificate of Information Technology
+Computer Science & IT
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	7 Month	A$18,000/Annual	6.5	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Graduate Certificate of Cybersecurity
+Publish: review
+Eligibility: review
+62%	Graduate Certificate	7 Month	A$19,900/Annual	6.5	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Diploma of Information Technology
+Computer Science & IT
+Publish: review
+Eligibility: review
+69%	Diploma	12 Month	A$31,600/Annual	6	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Diploma of Cybersecurity
+Publish: review
+Eligibility: review
+62%	Diploma	1 Year	A$33,725/Annual	6	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Bachelor of Cybersecurity
+Publish: review
+Eligibility: review
+54%	Bachelor	3 Year		6	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Master of International Hotel Management
+Hospitality, Tourism & Events
+Publish: review
+Eligibility: review
+69%	Master	2 Year	A$68,400/Full Course	6	-	-	-	-	Apr, Jul, Sep	-	Blended	
+
+
+
+	
+Associate Degree of Business (Hospitality and Tourism Management)
+Hospitality, Tourism & Events
+Publish: review
+Eligibility: review
+69%	Associate Degree	0.5 Year	A$74,970/Full Course	6	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Master of Professional Accounting (Advanced)
+Business & Management
+Publish: review
+Eligibility: review
+69%	Master	2 Year	A$72,000/Full Course	6.5	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Master of Professional Accounting
+Business & Management
+Publish: review
+Eligibility: review
+69%	Master	12 Month	A$72,000/Full Course	6.5	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Master of Global Project Management and Master of Public Health
+Business & Management
+Publish: review
+Eligibility: review
+69%	Master	2 Year	A$63,600/Full Course	6.5	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Master of Global Project Management (Advanced)
+Business & Management
+Publish: review
+Eligibility: review
+69%	Master	2 Year	A$72,000/Full Course	6.5	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Master of Global Project Management
+Business & Management
+Publish: review
+Eligibility: ready
+77%	Master	1.5 Year	A$54,000/Full Course	6.5	59	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane, Adelaide	Blended	
+
+
+
+	
+Master of Engineering Management
+Engineering & Technology
+Publish: review
+Eligibility: review
+69%	Master	2 Year	A$72,000/Full Course	6.5	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Master of Business Analytics (Advanced)
+Business & Management
+Publish: review
+Eligibility: ready
+77%	Master	2 Year	A$72,000/Full Course	6.5	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane, Adelaide	Blended	
+
+
+
+	
+Master of Business Analytics
+Business & Management
+Publish: review
+Eligibility: review
+69%	Master	1.7000000476837158 Year	A$54,000/Full Course	6.5	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Master of Business Administration
+Business & Management
+Publish: review
+Eligibility: ready
+77%	Master	12 Month	A$54,000/Full Course	6.5	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane, Adelaide	Blended	
+
+
+
+	
+Master of Business Administration and Master of Public Health
+Business & Management
+Publish: review
+Eligibility: ready
+77%	Master	2 Year	A$63,600/Full Course	6.5	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane, Adelaide	Blended	
+
+
+
+	
+Graduate Diploma of Global Project Management
+Business & Management
+Publish: review
+Eligibility: ready
+77%	Graduate Diploma	1 Year	A$36,000/Annual	6.5	59	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane, Adelaide	Blended	
+
+
+
+	
+Graduate Diploma of Business Analytics
+Business & Management
+Publish: review
+Eligibility: ready
+77%	Graduate Diploma	1 Year	A$36,000/Annual	6.5	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane, Adelaide	Blended	
+
+
+
+	
+Graduate Diploma of Business Administration
+Business & Management
+Publish: review
+Eligibility: ready
+77%	Graduate Diploma	1 Year	A$36,000/Annual	6.5	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane, Adelaide	Blended	
+
+
+
+	
+Graduate Certificate of Global Project Management
+Business & Management
+Publish: review
+Eligibility: ready
+77%	Graduate Certificate	2 Trimester	A$18,000/Annual	6.5	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane, Adelaide	Blended	
+
+
+
+	
+Graduate Certificate of Business Analytics
+Business & Management
+Publish: review
+Eligibility: ready
+77%	Graduate Certificate	0.699999988079071 Year	A$18,000/Annual	6.5	-	-	-	-	Jun, Sep	Sydney, Adelaide, Melbourne, Brisbane	Blended	
+
+
+
+	
+Graduate Certificate of Business Administration
+Business & Management
+Publish: review
+Eligibility: ready
+77%	Graduate Certificate	0.5 Year	A$18,000/Annual	6	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane, Adelaide	Blended	
+
+
+
+	
+Graduate Certificate of Analytics
+Business & Management
+Publish: review
+Eligibility: ready
+77%	Graduate Certificate	0.699999988079071 Year	A$18,000/Annual	6.5	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane, Adelaide	Blended	
+
+
+
+	
+Diploma of Business (Marketing)
+Business & Management
+Publish: review
+Eligibility: review
+69%	Diploma	0.5 Year		6	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane, Adelaide	Blended	
+
+
+
+	
+Diploma of Business (Event Management)
+Hospitality, Tourism & Events
+Publish: review
+Eligibility: ready
+77%	Diploma	0.5 Year	A$31,600/Annual	6	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane, Adelaide	Blended	
+
+
+
+	
+Diploma of Business (Sport Management)
+Business & Management
+Publish: review
+Eligibility: ready
+77%	Diploma	1 Year	A$31,600/Annual	6	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane, Adelaide	Blended	
+
+
+
+	
+Diploma of Business (Entrepreneurship)
+Business & Management
+Publish: review
+Eligibility: review
+69%	Diploma	0.5 Year		6	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane, Adelaide	Blended	
+
+
+
+	
+Diploma of Business (Accounting)
+Business & Management
+Publish: review
+Eligibility: review
+62%	Diploma	1 Year		6	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Diploma of Business
+Business & Management
+Publish: review
+Eligibility: review
+62%	Diploma	1 Year		6	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Bachelor of Business (Marketing)
+Business & Management
+Publish: review
+Eligibility: review
+69%	Bachelor	1 Year	A$94,800/Full Course	6	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Bachelor of Business (Event Management)
+Hospitality, Tourism & Events
+Publish: review
+Eligibility: review
+69%	Bachelor	12 Month	A$94,800/Full Course	6	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Bachelor of Business (Entrepreneurship)
+Business & Management
+Publish: review
+Eligibility: review
+69%	Bachelor	1 Year	A$109,206/Annual	6	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Bachelor of Business (Accounting)
+Business & Management
+Publish: review
+Eligibility: review
+69%	Bachelor	3 Year	A$94,800/Full Course	6	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Master of Public Health (Advanced)
+Medicine & Health
+Publish: review
+Eligibility: review
+69%	Master	2 Year	A$63,600/Full Course	6.5	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Master of Public Health
+Medicine & Health
+Publish: review
+Eligibility: review
+69%	Master	2 Year	A$47,700/Full Course	6.5	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Master of Counselling (Advanced)
+Education & Social Work
+Publish: review
+Eligibility: review
+62%	Master	2 Year	A$59,000/Full Course	6.5	-	-	-	-		-	Blended	
+
+
+
+	
+Graduate Diploma of Counselling
+Education & Social Work
+Publish: review
+Eligibility: review
+62%	Graduate Diploma	1 Year		6.5	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Graduate Certificate of Public Health
+Medicine & Health
+Publish: review
+Eligibility: review
+62%	Graduate Certificate	6 Month		6.5	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Graduate Certificate of Counselling
+Education & Social Work
+Publish: review
+Eligibility: review
+62%	Graduate Certificate	2 Trimester		6.5	-	-	-	-	Feb, Jun, Sep	-	Blended	
+
+
+
+	
+Diploma of Sport Development
+Publish: review
+Eligibility: review
+62%	Diploma	1 Year	A$94,800/Full Course	6	-	-	-	-	Apr, May	-	Blended	
+
+
+
+	
+Diploma of Health and Wellbeing
+Publish: review
+Eligibility: review
+54%	Diploma	-	A$87,990/Full Course	6	-	-	-	-	Apr, May	-	Blended	
+
+
+
+	
+Diploma of Beauty and Spa Practice
+Publish: review
+Eligibility: review
+62%	Diploma	1 Year	A$34,990/Annual	6	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Bachelor of Nursing
+Medicine & Health
+Publish: review
+Eligibility: review
+69%	Bachelor	3 Year	A$96,000/Annual	7	66	94	-	-	Sep	-	Blended	
+
+
+
+	
+Bachelor of Health Science (Western Herbal Medicine)
+Medicine & Health
+Publish: review
+Eligibility: review
+69%	Bachelor	3 Year	A$87,990/Full Course	6.5	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Bachelor of Health Science (Naturopathy)
+Medicine & Health
+Publish: review
+Eligibility: review
+69%	Bachelor	4 Year	A$117,320/Annual	6.5	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Bachelor of Health Science (Dermal Therapies)
+Medicine & Health
+Publish: review
+Eligibility: review
+69%	Bachelor	3 Year	A$94,500/Full Course	6	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Bachelor of Health Science (Chinese Medicine)
+Medicine & Health
+Publish: review
+Eligibility: review
+69%	Bachelor	4 Year	A$117,320/Full Course	7	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Bachelor of Community Services
+Education & Social Work
+Publish: review
+Eligibility: review
+69%	Bachelor	3 Year	A$79,008/Annual	6	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Master of Design
+Architecture, Building & Design
+Publish: review
+Eligibility: review
+62%	Master	2 Year		6.5	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Graduate Certificate of Ux Design
+Architecture, Building & Design
+Publish: review
+Eligibility: review
+54%	Graduate Certificate	6 Month		6.5	-	-	-	-		-	Blended	
+
+
+
+	
+Graduate Certificate of Design
+Architecture, Building & Design
+Publish: review
+Eligibility: review
+62%	Graduate Certificate	6 Month		6.5	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Diploma of Ux and Web Design
+Architecture, Building & Design
+Publish: review
+Eligibility: review
+62%	Diploma	1.7000000476837158 Year		6	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Diploma of Photography and Photo Imaging
+Publish: review
+Eligibility: review
+62%	Diploma	1.7000000476837158 Year	A$37,500/Full Course	6	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Diploma of Interior Design and Decoration
+Architecture, Building & Design
+Publish: review
+Eligibility: review
+69%	Diploma	1 Year	A$25,000/Annual	6	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Advanced Diploma of Interior Design and Decoration
+Architecture, Building & Design
+Publish: review
+Eligibility: review
+69%	Advanced Diploma	1.7000000476837158 Year	A$37,500/Full Course	6	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Diploma of Graphic Design
+Architecture, Building & Design
+Publish: review
+Eligibility: review
+69%	Diploma	1.7000000476837158 Year	A$37,500/Full Course	6	-	-	-	-	Jun, Sep, Feb, May	-	Blended	
+
+
+
+	
+Diploma of Fashion Marketing and Enterprise
+Business & Management
+Publish: review
+Eligibility: review
+69%	Diploma	1 Year	A$37,500/Annual	6	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Advanced Diploma of Game Programming
+Publish: review
+Eligibility: review
+54%	Advanced Diploma	7 Month		6	-	-	-	-	Jun, Sep, Feb, May	-	Blended	
+
+
+
+	
+Advanced Diploma of Game Design and Development
+Media & Communications
+Publish: review
+Eligibility: review
+69%	Advanced Diploma	1.7000000476837158 Year	A$75,000/Full Course	6	-	-	-	-	Jun, Sep, Feb, May	-	Blended	
+
+
+
+	
+Diploma of Branded Fashion Design
+Architecture, Building & Design
+Publish: review
+Eligibility: review
+62%	Diploma	1 Year		6	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Diploma of 3D Design and Animation
+Architecture, Building & Design
+Publish: review
+Eligibility: review
+69%	Diploma	1.7000000476837158 Year	A$37,500/Full Course	6	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Bachelor of Ux and Web Design
+Architecture, Building & Design
+Publish: review
+Eligibility: review
+62%	Bachelor	1.7000000476837158 Year		6	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Bachelor of Interior Design (Residential)
+Architecture, Building & Design
+Publish: review
+Eligibility: review
+69%	Bachelor	3 Year	A$112,500/Full Course	6	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Bachelor of Interior Design (Commercial)
+Architecture, Building & Design
+Publish: review
+Eligibility: review
+69%	Bachelor	1.7000000476837158 Year	A$112,500/Full Course	6	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Bachelor of Fashion Marketing and Enterprise
+Business & Management
+Publish: review
+Eligibility: review
+69%	Bachelor	3 Year	A$75,000/Full Course	6	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Diploma of Media Production
+Media & Communications
+Publish: review
+Eligibility: review
+62%	Diploma	1 Year		6	-	-	-	-	Feb	-	Blended	
+
+
+
+	
+Bachelor of Media Production and Communication
+Media & Communications
+Publish: review
+Eligibility: review
+62%	Bachelor	3 Year		6	-	-	-	-	Feb	-	Blended	
+
+
+
+	
+Bachelor of Communication Design
+Architecture, Building & Design
+Publish: review
+Eligibility: review
+69%	Bachelor	3 Year	A$112,500/Full Course	6	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Bachelor of Branded Fashion Design
+Architecture, Building & Design
+Publish: review
+Eligibility: review
+69%	Bachelor	3 Year	A$112,500/Full Course	6	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Bachelor of Game Programming
+Publish: review
+Eligibility: review
+54%	Bachelor	1 Year		6	-	-	-	-	Jun, Sep, Feb, May	-	Blended	
+
+
+
+	
+Bachelor of Game Design and Development
+Media & Communications
+Publish: review
+Eligibility: review
+69%	Bachelor	1 Year	A$37,500/Full Course	6	-	-	-	-	Jun, Sep, Feb, May	-	Blended	
+
+
+
+	
+Bachelor of 3D Design and Animation
+Architecture, Building & Design
+Publish: review
+Eligibility: review
+69%	Bachelor	3 Year	A$112,500/Full Course	6	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Bachelor of Architectural Technology
+Publish: review
+Eligibility: review
+62%	Bachelor	3 Year	A$112,500/Full Course	6	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Bachelor of Business
+Business & Management
+Publish: review
+Eligibility: review
+69%	Bachelor	3 Year	A$94,800/Full Course	6	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Diploma of Design
+Architecture, Building & Design
+Publish: review
+Eligibility: review
+62%	Diploma	1 Year		6	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Master of Research Studies
+Publish: review
+Eligibility: review
+62%	Master	2 Year	A$59,000/Full Course	6.5	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Graduate Certificate of Research Studies
+Publish: review
+Eligibility: review
+54%	Graduate Certificate	6 Month		7	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Master of Philosophy
+Arts, Humanities & Social Sciences
+Publish: review
+Eligibility: review
+69%	Master	2 Year	A$59,000/Full Course	7	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Master of Education (Inclusive Education)
+Education & Social Work
+Publish: review
+Eligibility: review
+69%	Master	1.5 Year	A$42,150/Full Course	6.5	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Master of Information Technology
+Computer Science & IT
+Publish: review
+Eligibility: review
+69%	Master	1.7000000476837158 Year	A$14,050/Annual	6.5	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Bachelor of Information Technology
+Computer Science & IT
+Publish: review
+Eligibility: review
+69%	Bachelor	3 Year	A$31,600/Annual	6	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Diploma of Business (Hospitality and Tourism Management)
+Hospitality, Tourism & Events
+Publish: review
+Eligibility: review
+69%	Diploma	1 Year	A$31,600/Annual	6	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Bachelor of Business (Hospitality and Tourism Management)
+Hospitality, Tourism & Events
+Publish: review
+Eligibility: review
+62%	Bachelor	-	A$82,800/Annual	6	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Master of Business Administration and Master of Global Project Management
+Business & Management
+Publish: review
+Eligibility: ready
+77%	Master	2 Year	A$72,000/Full Course	6.5	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane, Adelaide	Blended	
+
+
+
+	
+Bachelor of Business (Sport Management)
+Business & Management
+Publish: review
+Eligibility: ready
+77%	Bachelor	1 Year	A$94,800/Full Course	6	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane, Adelaide	Blended	
+
+
+
+	
+Master of Business Administration (Advanced)
+Business & Management
+Publish: review
+Eligibility: ready
+77%	Master	2 Year	A$72,000/Full Course	6.5	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane, Adelaide	Blended	
+
+
+
+	
+Graduate Diploma of Public Health
+Health Sciences
+Publish: review
+Eligibility: ready
+77%	Graduate Diploma	1 Year	A$31,800/Annual	6.5	-	-	-	-	Jun, Sep, Feb, May	Adelaide, Brisbane, Melbourne, Sydney	Blended	
+
+
+
+	
+Diploma of Health Science
+Health Sciences
+Publish: review
+Eligibility: ready
+77%	Diploma	1 Year	A$29,330/Annual	6	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane	Blended	
+
+
+
+	
+Bachelor of Health Science (Clinical Nutrition)
+Health Sciences
+Publish: review
+Eligibility: ready
+77%	Bachelor	3 Year	A$87,990/Full Course	6.5	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane	Blended	
+
+
+

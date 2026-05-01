@@ -1,0 +1,232 @@
+Evidence Review
+Master of Professional Accounting
+Eligibility: ready - ok
+category
+selected
+selected
+/ gemini_primary
+confidence 75%
+Accounting & Finance
+gemini_primary: category=Accounting & Finance
+https://www.torrens.edu.au/courses/business/master-of-professional-accounting
+course_location
+selected
+selected
+/ gemini_primary
+confidence 75%
+Sydney, Melbourne
+gemini_primary: course_location=Sydney, Melbourne
+https://www.torrens.edu.au/courses/business/master-of-professional-accounting
+course_name
+selected
+selected
+/ course_name.h1
+confidence 90%
+Master of Professional Accounting
+Master of Professional Accounting
+https://www.torrens.edu.au/courses/business/master-of-professional-accounting
+cricos_code
+selected
+selected
+/ regex:cricos
+confidence 95%
+095358F
+CRICOS code extracted from course page: 095358F
+https://www.torrens.edu.au/courses/business/master-of-professional-accounting
+currency
+selected
+selected
+/ uni_pdf:fees:per_course
+confidence 70%
+AUD
+uni_pdf fee: currency=AUD
+https://cdn.intelligencebank.com/au/share/RyzZ/D1G8V/jlMdo/original/2026-International-Fee-Schedule
+degree_level
+selected
+selected
+/ degree_level:name
+confidence 90%
+Master's
+Master of Professional Accounting
+https://www.torrens.edu.au/courses/business/master-of-professional-accounting
+description
+selected
+selected
+/ description.meta
+confidence 95%
+Become a sought-after accounting graduate with a Torrens' Master of Professional Accounting course. Study accounting in Sydney, Adelaide or online.
+https://www.torrens.edu.au/courses/business/master-of-professional-accounting
+https://www.torrens.edu.au/courses/business/master-of-professional-accounting
+duration
+selected
+selected
+/ regex
+confidence 75%
+12.0
+95% of international graduates are employed full time within 12 months Gain in-demand skills and graduate with qualifications respected worldwide.
+https://www.torrens.edu.au/courses/business/master-of-professional-accounting
+duration_text
+selected
+selected
+/ gemini_primary
+confidence 75%
+1.5 years full time
+gemini_primary: duration_text=1.5 years full time
+https://www.torrens.edu.au/courses/business/master-of-professional-accounting
+duration_unit
+selected
+selected
+/ ai_fallback
+confidence 50%
+years
+ai_fallback: duration_unit=years
+https://www.torrens.edu.au/courses/business/master-of-professional-accounting
+duration_value
+selected
+selected
+/ ai_fallback
+confidence 50%
+1.5
+ai_fallback: duration_value=1.5
+https://www.torrens.edu.au/courses/business/master-of-professional-accounting
+fee_term
+selected
+selected
+/ uni_pdf:fees:per_course
+confidence 70%
+Full Course
+uni_pdf fee: fee_term=Full Course
+https://cdn.intelligencebank.com/au/share/RyzZ/D1G8V/jlMdo/original/2026-International-Fee-Schedule
+fee_year
+selected
+selected
+/ uni_pdf:fees:per_course
+confidence 70%
+2026
+uni_pdf fee: fee_year=2026
+https://cdn.intelligencebank.com/au/share/RyzZ/D1G8V/jlMdo/original/2026-International-Fee-Schedule
+ielts_listening
+selected
+selected
+/ per_course_vision
+confidence 85%
+6.0
+How to apply
+https://www.torrens.edu.au/-/media/project/laureate/shared/how-to-apply/how-to-apply-1-tua.jpg?rev=4c253be6934f47dcadd6447dcb4089ef
+ielts_overall
+selected
+selected
+/ per_course_vision
+confidence 85%
+6.5
+How to apply
+https://www.torrens.edu.au/-/media/project/laureate/shared/how-to-apply/how-to-apply-1-tua.jpg?rev=4c253be6934f47dcadd6447dcb4089ef
+selected
+selected
+/ gemini_primary
+confidence 75%
+6.5
+gemini_primary: ielts_overall=6.5
+https://www.torrens.edu.au/courses/business/master-of-professional-accounting
+superseded
+/ regex
+confidence 85%
+6.5
+Master of Professional Accounting | Torrens University Apply now Contact us News & articles Our impact Employer solutions About Apply now International students Find a course Design Health Business Ho
+https://www.torrens.edu.au/courses/business/master-of-professional-accounting
+ielts_reading
+selected
+selected
+/ per_course_vision
+confidence 85%
+6.0
+How to apply
+https://www.torrens.edu.au/-/media/project/laureate/shared/how-to-apply/how-to-apply-1-tua.jpg?rev=4c253be6934f47dcadd6447dcb4089ef
+ielts_speaking
+selected
+selected
+/ per_course_vision
+confidence 85%
+6.0
+How to apply
+https://www.torrens.edu.au/-/media/project/laureate/shared/how-to-apply/how-to-apply-1-tua.jpg?rev=4c253be6934f47dcadd6447dcb4089ef
+ielts_writing
+selected
+selected
+/ per_course_vision
+confidence 85%
+6.0
+How to apply
+https://www.torrens.edu.au/-/media/project/laureate/shared/how-to-apply/how-to-apply-1-tua.jpg?rev=4c253be6934f47dcadd6447dcb4089ef
+intake_months
+selected
+selected
+/ regex
+confidence 70%
+["June", "September"]
+ble, 1 year accelerated Start date 01 Jun 2026 14 Sep 2026 View all key dates Fee Learn more This is an AQF Level 9 course delivered by Torrens University Australia Ltd. Tap into the best business minds Their insights will help shape you in
+https://www.torrens.edu.au/courses/business/master-of-professional-accounting
+intake_text
+selected
+selected
+/ gemini_primary
+confidence 75%
+June, September
+gemini_primary: intake_text=June, September
+https://www.torrens.edu.au/courses/business/master-of-professional-accounting
+international_eligible
+selected
+selected
+/ eligibility.positive
+confidence 85%
+True
+CRICOS 095358F
+https://www.torrens.edu.au/courses/business/master-of-professional-accounting
+international_fee
+selected
+selected
+/ uni_pdf:fees:per_course
+confidence 70%
+72000
+uni_pdf fee: international_fee=72000
+https://cdn.intelligencebank.com/au/share/RyzZ/D1G8V/jlMdo/original/2026-International-Fee-Schedule
+location_text
+selected
+selected
+/ gemini_primary
+confidence 75%
+Sydney, Melbourne
+gemini_primary: location_text=Sydney, Melbourne
+https://www.torrens.edu.au/courses/business/master-of-professional-accounting
+mode
+selected
+selected
+/ gemini_primary
+confidence 75%
+Blended
+gemini_primary: mode=Blended
+https://www.torrens.edu.au/courses/business/master-of-professional-accounting
+pte_overall
+selected
+selected
+/ per_course_vision
+confidence 85%
+62.0
+How to apply
+https://www.torrens.edu.au/-/media/project/laureate/shared/how-to-apply/how-to-apply-1-tua.jpg?rev=4c253be6934f47dcadd6447dcb4089ef
+study_mode
+selected
+selected
+/ study_mode:rule
+confidence 70%
+Blended
+Assignment, Report Delivery Mode: On Campus, Online Economic Principles
+https://www.torrens.edu.au/courses/business/master-of-professional-accounting
+sub_category
+selected
+selected
+/ gemini_primary
+confidence 75%
+Professional Accounting
+gemini_primary: sub_category=Professional Accounting
+https://www.torrens.edu.au/courses/business/master-of-professional-accounting
