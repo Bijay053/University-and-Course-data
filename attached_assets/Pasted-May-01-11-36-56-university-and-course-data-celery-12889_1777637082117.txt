@@ -1,0 +1,839 @@
+May 01 11:36:56 university-and-course-data celery[1288933]: [2026-05-01 11:36:56,922: INFO/ForkPoolWorker-2] AFC is enabled with max remote calls: 10.
+May 01 11:37:02 university-and-course-data celery[1288933]: [2026-05-01 11:37:02,480: INFO/ForkPoolWorker-2] [VISION] attempting OCR on https://www.torrens.edu.au/-/media/project/laureate/shared/career-opportunities/business/business-courses-ducere-career-opportunities.jpg?rev=e1be04bb7f88440b9eb3aab224a90c88&amp;extension=webp&amp;w=550&amp;hash=56A783246683A377AB832CAA159EE699
+May 01 11:37:04 university-and-course-data celery[1288933]: [2026-05-01 11:37:04,479: INFO/ForkPoolWorker-2] HTTP Request: GET https://www.torrens.edu.au/-/media/project/laureate/shared/career-opportunities/business/business-courses-ducere-career-opportunities.jpg?rev=e1be04bb7f88440b9eb3aab224a90c88&amp;extension=webp&amp;w=550&amp;hash=56A783246683A377AB832CAA159EE699 "HTTP/1.1 200 OK"
+May 01 11:37:08 university-and-course-data celery[1288933]: [2026-05-01 11:37:08,760: INFO/ForkPoolWorker-2] [VISION OK] https://www.torrens.edu.au/-/media/project/laureate/shared/career-opportunities/business/business-courses-ducere-career-opportunities.jpg?rev=e1be04bb7f88440b9eb3aab224a90c88&amp;extension=webp&amp;w=550&amp;hash=56A783246683A377AB832CAA159EE699: extracted ielts_listening=7.0 ielts_overall=7.0 ielts_reading=6.5 ielts_speaking=7.0 ielts_writing=6.5 pte_overall=65.0 toefl_listening=1.0 toefl_overall=100.0 toefl_reading=1.0 toefl_speaking=1.0 toefl_writing=1.0
+May 01 11:37:20 university-and-course-data celery[1288933]: [2026-05-01 11:37:20,922: INFO/ForkPoolWorker-2] HTTP Request: GET https://www.torrens.edu.au/-/media/project/laureate/shared/course-hero/business/bachelor-of-business-accounting/bachelor-of-business-accounting-lg.jpg?rev=0011d283f97943f98ade95add6738358 "HTTP/1.1 200 OK"
+May 01 11:37:32 university-and-course-data celery[1288933]: [2026-05-01 11:37:32,225: INFO/ForkPoolWorker-2] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+May 01 11:37:32 university-and-course-data celery[1288933]: [2026-05-01 11:37:32,228: WARNING/ForkPoolWorker-2] [VISION FAIL] https://www.torrens.edu.au/-/media/project/laureate/shared/career-oppo: Gemini skipped — None (likely quota exhausted)
+May 01 11:37:33 university-and-course-data celery[1288933]: [2026-05-01 11:37:33,878: INFO/ForkPoolWorker-2] [VISION] attempting OCR on https://www.torrens.edu.au/-/media/project/laureate/shared/course-hero/business/diploma-of-business-accounting/diploma-of-business-accounting-large.jpg?w=450&rev=f802bd39773c4d41b4a92dba945c9a1a&hash=5F6C365B216EC4C3076BD22C2A69DF82
+May 01 11:37:34 university-and-course-data celery[1288933]: [2026-05-01 11:37:34,007: INFO/ForkPoolWorker-2] [VISION] attempting OCR on https://www.torrens.edu.au/-/media/project/laureate/shared/career-opportunities/business/business-courses-event-management-career-opportunities.jpg?rev=6dcf6edb6469423d8f127a26160e86f7&w=550&hash=F8B5D17D7735B46CC226408A64CC2B34
+May 01 11:37:34 university-and-course-data celery[1288933]: [2026-05-01 11:37:34,158: INFO/ForkPoolWorker-2] HTTP Request: GET https://www.torrens.edu.au/-/media/project/laureate/shared/course-hero/business/diploma-of-business-accounting/diploma-of-business-accounting-large.jpg?w=450&rev=f802bd39773c4d41b4a92dba945c9a1a&hash=5F6C365B216EC4C3076BD22C2A69DF82 "HTTP/1.1 200 OK"
+May 01 11:37:34 university-and-course-data celery[1288933]: [2026-05-01 11:37:34,553: INFO/ForkPoolWorker-2] [CRICOS] extracted 095229D from https://www.torrens.edu.au/courses/business/bachelor-of-business-entrepreneurship
+May 01 11:37:35 university-and-course-data celery[1288933]: [2026-05-01 11:37:35,154: INFO/ForkPoolWorker-2] HTTP Request: GET https://www.torrens.edu.au/-/media/project/laureate/shared/career-opportunities/business/business-courses-event-management-career-opportunities.jpg?rev=6dcf6edb6469423d8f127a26160e86f7&w=550&hash=F8B5D17D7735B46CC226408A64CC2B34 "HTTP/1.1 200 OK"
+May 01 11:37:38 university-and-course-data celery[1288933]: [2026-05-01 11:37:38,947: INFO/ForkPoolWorker-2] [VISION OK] https://www.torrens.edu.au/-/media/project/laureate/shared/course-hero/business/diploma-of-business-accounting/diploma-of-business-accounting-large.jpg?w=450&rev=f802bd39773c4d41b4a92dba945c9a1a&hash=5F6C365B216EC4C3076BD22C2A69DF82: extracted ielts_listening=6.0 ielts_overall=6.5 ielts_reading=6.0 ielts_speaking=6.0 ielts_writing=6.0 toefl_listening=17.0 toefl_overall=85.0 toefl_reading=17.0 toefl_speaking=17.0 toefl_writing=17.0
+May 01 11:37:38 university-and-course-data celery[1288933]: [2026-05-01 11:37:38,947: INFO/ForkPoolWorker-2] [VISION FILTER] https://www.torrens.edu.au/-/media/project/laureate/shared/course-hero/business/diploma-of-business-accounting/diploma-of-business-accounting-large.jpg?w=450&rev=f802bd39773c4d41b4a92dba945c9a1a&hash=5F6C365B216EC4C3076BD22C2A69DF82: discarded toefl_overall=85.0, toefl_listening=17.0, toefl_reading=17.0, toefl_writing=17.0, toefl_speaking=17.0 — test keyword not found on page
+May 01 11:37:51 university-and-course-data celery[1288933]: [2026-05-01 11:37:51,173: INFO/ForkPoolWorker-2] [VISION] attempting OCR on https://www.torrens.edu.au/-/media/project/laureate/shared/logos/channel-seven-design-creative-technology-industry.png?h=202&amp;iar=0&amp;w=229&amp;rev=3de635fbaf804f6b8ea2e3960a8d061b&amp;hash=0B4BAA3CF2FB229D508B667F84D9AAE6
+May 01 11:37:51 university-and-course-data celery[1288933]: [2026-05-01 11:37:51,719: INFO/ForkPoolWorker-2] HTTP Request: GET https://www.torrens.edu.au/-/media/project/laureate/shared/logos/channel-seven-design-creative-technology-industry.png?h=202&amp;iar=0&amp;w=229&amp;rev=3de635fbaf804f6b8ea2e3960a8d061b&amp;hash=0B4BAA3CF2FB229D508B667F84D9AAE6 "HTTP/1.1 200 OK"
+May 01 11:37:54 university-and-course-data celery[1288933]: [2026-05-01 11:37:54,413: INFO/ForkPoolWorker-2] [VISION OK] https://www.torrens.edu.au/-/media/project/laureate/shared/course-hero/business/diploma-of-business-accounting/diploma-of-business-accounting-large.jpg?rev=f802bd39773c4d41b4a92dba945c9a1a: extracted cambridge_overall=185.0 duolingo_overall=115.0 ielts_listening=6.5 ielts_overall=7.0 ielts_reading=6.5 ielts_speaking=7.0 ielts_writing=6.0 pte_overall=65.0 toefl_listening=22.0 toefl_overall=94.0 toefl_reading=22.0 toefl_speaking=22.0 toefl_writing=22.0
+May 01 11:37:54 university-and-course-data celery[1288933]: [2026-05-01 11:37:54,413: INFO/ForkPoolWorker-2] [VISION FILTER] https://www.torrens.edu.au/-/media/project/laureate/shared/course-hero/business/diploma-of-business-accounting/diploma-of-business-accounting-large.jpg?rev=f802bd39773c4d41b4a92dba945c9a1a: discarded toefl_overall=94.0, toefl_listening=22.0, toefl_reading=22.0, toefl_writing=22.0, toefl_speaking=22.0, cambridge_overall=185.0, duolingo_overall=115.0 — test keyword not found on page
+May 01 11:38:02 university-and-course-data celery[1288933]: [2026-05-01 11:38:02,879: INFO/ForkPoolWorker-2] [VISION] attempting OCR on https://www.torrens.edu.au/-/media/project/laureate/shared/career-opportunities/business/business-courses-event-management-career-opportunities.jpg?rev=6dcf6edb6469423d8f127a26160e86f7&w=550&hash=F8B5D17D7735B46CC226408A64CC2B34
+May 01 11:38:03 university-and-course-data celery[1288933]: [2026-05-01 11:38:03,921: INFO/ForkPoolWorker-2] HTTP Request: GET https://www.torrens.edu.au/-/media/project/laureate/shared/career-opportunities/business/business-courses-event-management-career-opportunities.jpg?rev=6dcf6edb6469423d8f127a26160e86f7&w=550&hash=F8B5D17D7735B46CC226408A64CC2B34 "HTTP/1.1 200 OK"
+May 01 11:38:05 university-and-course-data celery[1288933]: [2026-05-01 11:38:05,748: INFO/ForkPoolWorker-2] [VISION] attempting OCR on https://www.torrens.edu.au/-/media/project/laureate/shared/video/courses/business/love-what-you-do-business-course-video.jpg?rev=d8bc578391a84f16825886d649ea7221
+May 01 11:38:05 university-and-course-data celery[1288933]: [2026-05-01 11:38:05,817: INFO/ForkPoolWorker-2] [VISION OK] https://www.torrens.edu.au/-/media/project/laureate/shared/career-opportunities/business/business-courses-event-management-career-opportunities.jpg?rev=6dcf6edb6469423d8f127a26160e86f7&w=550&hash=F8B5D17D7735B46CC226408A64CC2B34: extracted ielts_listening=7.0 ielts_overall=7.0 ielts_reading=6.5 ielts_speaking=6.5 ielts_writing=6.5 toefl_overall=90.0
+May 01 11:38:05 university-and-course-data celery[1288933]: [2026-05-01 11:38:05,817: INFO/ForkPoolWorker-2] [VISION FILTER] https://www.torrens.edu.au/-/media/project/laureate/shared/career-opportunities/business/business-courses-event-management-career-opportunities.jpg?rev=6dcf6edb6469423d8f127a26160e86f7&w=550&hash=F8B5D17D7735B46CC226408A64CC2B34: discarded toefl_overall=90.0 — test keyword not found on page
+May 01 11:38:06 university-and-course-data celery[1288933]: [2026-05-01 11:38:06,055: INFO/ForkPoolWorker-2] HTTP Request: GET https://www.torrens.edu.au/-/media/project/laureate/shared/video/courses/business/love-what-you-do-business-course-video.jpg?rev=d8bc578391a84f16825886d649ea7221 "HTTP/1.1 200 OK"
+May 01 11:38:08 university-and-course-data celery[1288933]: [2026-05-01 11:38:08,852: INFO/ForkPoolWorker-2] [VISION OK] https://www.torrens.edu.au/-/media/project/laureate/shared/video/courses/business/love-what-you-do-business-course-video.jpg?rev=d8bc578391a84f16825886d649ea7221: extracted cambridge_overall=176.0 ielts_listening=6.0 ielts_overall=6.5 ielts_reading=6.0 ielts_speaking=6.0 ielts_writing=6.0 toefl_overall=80.0
+May 01 11:38:08 university-and-course-data celery[1288933]: [2026-05-01 11:38:08,852: INFO/ForkPoolWorker-2] [VISION FILTER] https://www.torrens.edu.au/-/media/project/laureate/shared/video/courses/business/love-what-you-do-business-course-video.jpg?rev=d8bc578391a84f16825886d649ea7221: discarded toefl_overall=80.0, cambridge_overall=176.0 — test keyword not found on page
+May 01 11:38:19 university-and-course-data celery[1288933]: [2026-05-01 11:38:19,498: INFO/ForkPoolWorker-2] [VISION] attempting OCR on https://www.torrens.edu.au/-/media/project/laureate/shared/career-opportunities/business/business-courses-business-analytics-career-opportunities.jpg?rev=1141f921fcb34152b9d292c4a6d2fd20&w=550&hash=C0D38F4E11ED874E83712FF52792246D
+May 01 11:38:20 university-and-course-data celery[1288933]: [2026-05-01 11:38:20,617: INFO/ForkPoolWorker-2] HTTP Request: GET https://www.torrens.edu.au/-/media/project/laureate/shared/career-opportunities/business/business-courses-business-analytics-career-opportunities.jpg?rev=1141f921fcb34152b9d292c4a6d2fd20&w=550&hash=C0D38F4E11ED874E83712FF52792246D "HTTP/1.1 200 OK"
+May 01 11:38:22 university-and-course-data celery[1288933]: [2026-05-01 11:38:22,177: INFO/ForkPoolWorker-2] [FEE] no per-course PDF row for 'Doctor of Business Leadership (Partnership with Australian Graduate School of Leadership)' — leaving fee NULL (schedule has 76 rows; uni-wide stamp suppressed)
+May 01 11:38:22 university-and-course-data celery[1288933]: [2026-05-01 11:38:22,184: INFO/ForkPoolWorker-2] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+May 01 11:38:22 university-and-course-data celery[1288933]: [2026-05-01 11:38:22,187: INFO/ForkPoolWorker-2] AI fallback filled ['duration_value', 'duration_unit'] for https://www.torrens.edu.au/courses/business/graduate-certificate-of-applied-business-partnership-with-ducere (cost=$0.000395)
+May 01 11:38:22 university-and-course-data celery[1288933]: [2026-05-01 11:38:22,361: INFO/ForkPoolWorker-2] [CRICOS] extracted 090282F from https://www.torrens.edu.au/courses/business/graduate-certificate-of-applied-business-partnership-with-ducere
+May 01 11:38:22 university-and-course-data celery[1288933]: [2026-05-01 11:38:22,362: INFO/ForkPoolWorker-2] [FEE] no per-course PDF row for 'Graduate Certificate of Applied Business (Partnership with Ducere)' — leaving fee NULL (schedule has 76 rows; uni-wide stamp suppressed)
+May 01 11:38:29 university-and-course-data celery[1288933]: [2026-05-01 11:38:29,222: INFO/ForkPoolWorker-2] [CRICOS] extracted 095349G from https://www.torrens.edu.au/courses/business/graduate-certificate-of-business-administration
+May 01 11:38:29 university-and-course-data celery[1288933]: [2026-05-01 11:38:29,222: INFO/ForkPoolWorker-2] [FEE] per-course PDF row matched for 'Graduate Certificate of Business Administration' via cricos_match: $18000 (Annual)
+May 01 11:38:33 university-and-course-data celery[1288933]: [2026-05-01 11:38:33,863: INFO/ForkPoolWorker-2] [VISION OK] https://www.torrens.edu.au/-/media/project/laureate/shared/career-opportunities/business/business-courses-business-analytics-career-opportunities.jpg?rev=1141f921fcb34152b9d292c4a6d2fd20&w=550&hash=C0D38F4E11ED874E83712FF52792246D: extracted ielts_listening=7.0 ielts_overall=7.0 ielts_reading=7.0 ielts_speaking=7.0 ielts_writing=7.0 toefl_overall=90.0
+May 01 11:38:33 university-and-course-data celery[1288933]: [2026-05-01 11:38:33,864: INFO/ForkPoolWorker-2] [VISION FILTER] https://www.torrens.edu.au/-/media/project/laureate/shared/career-opportunities/business/business-courses-business-analytics-career-opportunities.jpg?rev=1141f921fcb34152b9d292c4a6d2fd20&w=550&hash=C0D38F4E11ED874E83712FF52792246D: discarded toefl_overall=90.0 — test keyword not found on page
+May 01 11:38:40 university-and-course-data celery[1288933]: [2026-05-01 11:38:40,322: INFO/ForkPoolWorker-2] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+May 01 11:38:43 university-and-course-data celery[1288933]: [2026-05-01 11:38:43,656: INFO/ForkPoolWorker-2] [VISION FILTER] https://www.torrens.edu.au/-/media/project/laureate/shared/career-opportunities/business/business-courses-business-analytics-career-opportunities.jpg?rev=1141f921fcb34152b9d292c4a6d2fd20&w=550&hash=C0D38F4E11ED874E83712FF52792246D: discarded toefl_overall=90.0 — test keyword not found on page
+May 01 11:39:03 university-and-course-data celery[1288933]: [2026-05-01 11:39:03,002: INFO/ForkPoolWorker-2] [VISION FILTER] https://www.torrens.edu.au/-/media/project/laureate/shared/career-opportunities/business/business-courses-business-analytics-career-opportunities.jpg?rev=1141f921fcb34152b9d292c4a6d2fd20&w=550&hash=C0D38F4E11ED874E83712FF52792246D: discarded toefl_overall=90.0 — test keyword not found on page
+May 01 11:39:15 university-and-course-data celery[1288933]: [2026-05-01 11:39:15,828: INFO/ForkPoolWorker-2] [VISION FILTER] https://www.torrens.edu.au/-/media/project/laureate/shared/video/courses/business/love-what-you-do-business-course-video.jpg?rev=d8bc578391a84f16825886d649ea7221: discarded toefl_overall=80.0, cambridge_overall=176.0 — test keyword not found on page
+May 01 11:39:22 university-and-course-data celery[1288933]: [2026-05-01 11:39:22,221: INFO/ForkPoolWorker-2] [CRICOS] extracted 090242C from https://www.torrens.edu.au/courses/business/master-of-business-administration-and-master-of-public-health
+May 01 11:39:22 university-and-course-data celery[1288933]: [2026-05-01 11:39:22,222: INFO/ForkPoolWorker-2] [FEE] per-course PDF row matched for 'Master of Business Administration and Master of Public Health' via cricos_match: $63600 (Full Course)
+May 01 11:39:22 university-and-course-data celery[1288933]: [2026-05-01 11:39:22,639: INFO/ForkPoolWorker-2] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+May 01 11:39:22 university-and-course-data celery[1288933]: [2026-05-01 11:39:22,643: INFO/ForkPoolWorker-2] gemini_primary: https://www.torrens.edu.au/courses/business/master-of-business-administration-mba → 9 fields filled, cost=$0.001084
+May 01 11:39:22 university-and-course-data celery[1288933]: [2026-05-01 11:39:22,969: INFO/ForkPoolWorker-2] [VISION] page mentions tests: ielts, pte — https://www.torrens.edu.au/courses/business/master-of-business-administration-mba
+May 01 11:39:22 university-and-course-data celery[1288933]: [2026-05-01 11:39:22,969: INFO/ForkPoolWorker-2] [VISION] 4 candidate image(s) found — starting OCR pass for https://www.torrens.edu.au/courses/business/master-of-business-administration-mba
+May 01 11:39:22 university-and-course-data celery[1288933]: [2026-05-01 11:39:22,973: INFO/ForkPoolWorker-2] [VISION FILTER] https://www.torrens.edu.au/-/media/project/laureate/shared/how-to-apply/how-to-apply-2-tua.jpg?rev=0152f8a7bd394fb49b063cd6e3c1bbdb: discarded toefl_overall=80.0, cambridge_overall=176.0, duolingo_overall=110.0 — test keyword not found on page
+May 01 11:39:22 university-and-course-data celery[1288933]: [2026-05-01 11:39:22,977: INFO/ForkPoolWorker-2] [VISION SUBBAND REJECT] https://www.torrens.edu.au/courses/business/master-of-business-administration-mba: ielts_listening=6.0 from tier-1/2 image rejected — below ielts_overall=6.5 established by 'gemini_primary'
+May 01 11:39:22 university-and-course-data celery[1288933]: [2026-05-01 11:39:22,977: INFO/ForkPoolWorker-2] [VISION SUBBAND REJECT] https://www.torrens.edu.au/courses/business/master-of-business-administration-mba: ielts_reading=6.0 from tier-1/2 image rejected — below ielts_overall=6.5 established by 'gemini_primary'
+May 01 11:39:22 university-and-course-data celery[1288933]: [2026-05-01 11:39:22,977: INFO/ForkPoolWorker-2] [VISION SUBBAND REJECT] https://www.torrens.edu.au/courses/business/master-of-business-administration-mba: ielts_speaking=6.0 from tier-1/2 image rejected — below ielts_overall=6.5 established by 'gemini_primary'
+May 01 11:39:22 university-and-course-data celery[1288933]: [2026-05-01 11:39:22,977: INFO/ForkPoolWorker-2] [VISION SUBBAND REJECT] https://www.torrens.edu.au/courses/business/master-of-business-administration-mba: ielts_writing=6.0 from tier-1/2 image rejected — below ielts_overall=6.5 established by 'gemini_primary'
+May 01 11:39:33 university-and-course-data celery[1288933]: [2026-05-01 11:39:33,867: INFO/ForkPoolWorker-2] [VISION FILTER] https://www.torrens.edu.au/-/media/project/laureate/shared/career-opportunities/business/business-courses-business-analytics-career-opportunities.jpg?rev=1141f921fcb34152b9d292c4a6d2fd20&w=550&hash=C0D38F4E11ED874E83712FF52792246D: discarded toefl_overall=90.0 — test keyword not found on page
+May 01 11:39:40 university-and-course-data celery[1288933]: [2026-05-01 11:39:40,739: INFO/ForkPoolWorker-2] [VISION FILTER] https://www.torrens.edu.au/-/media/project/laureate/shared/career-opportunities/business/business-courses-business-analytics-career-opportunities.jpg?rev=1141f921fcb34152b9d292c4a6d2fd20&w=550&hash=C0D38F4E11ED874E83712FF52792246D: discarded toefl_overall=90.0 — test keyword not found on page
+May 01 11:39:45 university-and-course-data celery[1288933]: [2026-05-01 11:39:45,951: INFO/ForkPoolWorker-2] [VISION] attempting OCR on https://www.torrens.edu.au/-/media/project/laureate/shared/career-opportunities/business/business-courses-engineering-management-career-opportunities.jpg?rev=f9592246d35d474f8fa46b5829273bb3&w=550&hash=AA7368A6EC62054890CB127BFA85CC3F
+May 01 11:39:47 university-and-course-data celery[1288933]: [2026-05-01 11:39:47,125: INFO/ForkPoolWorker-2] HTTP Request: GET https://www.torrens.edu.au/-/media/project/laureate/shared/career-opportunities/business/business-courses-engineering-management-career-opportunities.jpg?rev=f9592246d35d474f8fa46b5829273bb3&w=550&hash=AA7368A6EC62054890CB127BFA85CC3F "HTTP/1.1 200 OK"
+May 01 11:39:56 university-and-course-data celery[1288933]: [2026-05-01 11:39:56,725: INFO/ForkPoolWorker-2] [VISION FILTER] https://www.torrens.edu.au/-/media/project/laureate/shared/video/courses/business/love-what-you-do-business-course-video.jpg?rev=d8bc578391a84f16825886d649ea7221: discarded toefl_overall=80.0, cambridge_overall=176.0 — test keyword not found on page
+May 01 11:39:57 university-and-course-data celery[1288933]: [2026-05-01 11:39:57,092: INFO/ForkPoolWorker-2] [VISION] attempting OCR on https://www.torrens.edu.au/-/media/project/laureate/shared/video/courses/business/accounting-commerce-course-video.jpg?rev=6d9d504ce5694224bf4fdc46f1ecfa6c
+May 01 11:40:00 university-and-course-data celery[1288933]: [2026-05-01 11:40:00,062: INFO/ForkPoolWorker-2] HTTP Request: GET https://www.torrens.edu.au/-/media/project/laureate/shared/video/courses/business/accounting-commerce-course-video.jpg?rev=6d9d504ce5694224bf4fdc46f1ecfa6c "HTTP/1.1 200 OK"
+May 01 11:40:07 university-and-course-data celery[1288933]: [2026-05-01 11:40:07,561: INFO/ForkPoolWorker-2] [VISION SKIP OCR] https://www.torrens.edu.au/-/media/project/laureate/shared/video/courses/business/accounting-commerce-course-video.jpg?rev=6d9d504ce5694224bf4fdc46f1ecfa6c: Gemini returned text but no IELTS/PTE/TOEFL/Cambridge/Duolingo keyword found — likely a non-requirements image (logo, diagram, etc.)
+May 01 11:40:18 university-and-course-data celery[1288933]: [2026-05-01 11:40:18,576: INFO/ForkPoolWorker-2] [VISION] attempting OCR on https://www.torrens.edu.au/-/media/project/laureate/shared/cards/brand-proofpoints/design-courses-design-degrees-proof-point-course-future-proof-career-technology-card.jpg?rev=92111b93b95f46f1979337998325a229&amp;extension=webp
+May 01 11:40:18 university-and-course-data celery[1288933]: [2026-05-01 11:40:18,810: INFO/ForkPoolWorker-2] HTTP Request: GET https://www.torrens.edu.au/-/media/project/laureate/shared/cards/brand-proofpoints/design-courses-design-degrees-proof-point-course-future-proof-career-technology-card.jpg?rev=92111b93b95f46f1979337998325a229&amp;extension=webp "HTTP/1.1 200 OK"
+May 01 11:40:21 university-and-course-data celery[1288933]: [2026-05-01 11:40:21,640: INFO/ForkPoolWorker-2] [VISION SKIP OCR] https://www.torrens.edu.au/-/media/project/laureate/shared/cards/brand-proofpoints/design-courses-design-degrees-proof-point-course-future-proof-career-technology-card.jpg?rev=92111b93b95f46f1979337998325a229&amp;extension=webp: Gemini returned text but no IELTS/PTE/TOEFL/Cambridge/Duolingo keyword found — likely a non-requirements image (logo, diagram, etc.)
+May 01 11:40:22 university-and-course-data celery[1288933]: [2026-05-01 11:40:22,004: INFO/ForkPoolWorker-2] HTTP Request: GET https://www.torrens.edu.au/courses/business/business-analytics "HTTP/1.1 200 OK"
+May 01 11:40:44 university-and-course-data celery[1288933]: [2026-05-01 11:40:44,658: INFO/ForkPoolWorker-2] [VISION] attempting OCR on https://www.torrens.edu.au/-/media/project/laureate/shared/career-opportunities/bmihms/hospitality-management-courses-hotel-resort-management-career-opportunities.jpg?rev=cfdbb4122079441a8ff4617e0922defa&w=550&hash=BD44BB69387FAFA81277C3E66D2A1E16
+May 01 11:40:44 university-and-course-data celery[1288933]: [2026-05-01 11:40:44,891: INFO/ForkPoolWorker-2] HTTP Request: GET https://www.torrens.edu.au/-/media/project/laureate/shared/career-opportunities/bmihms/hospitality-management-courses-hotel-resort-management-career-opportunities.jpg?rev=cfdbb4122079441a8ff4617e0922defa&w=550&hash=BD44BB69387FAFA81277C3E66D2A1E16 "HTTP/1.1 200 OK"
+May 01 11:40:46 university-and-course-data celery[1288933]: [2026-05-01 11:40:46,722: INFO/ForkPoolWorker-2] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+May 01 11:40:48 university-and-course-data celery[1288933]: [2026-05-01 11:40:48,942: INFO/ForkPoolWorker-2] [VISION SKIP OCR] https://www.torrens.edu.au/-/media/project/laureate/shared/career-opportunities/bmihms/hospitality-management-courses-hotel-resort-management-career-opportunities.jpg?rev=cfdbb4122079441a8ff4617e0922defa&w=550&hash=BD44BB69387FAFA81277C3E66D2A1E16: Gemini returned text but no IELTS/PTE/TOEFL/Cambridge/Duolingo keyword found — likely a non-requirements image (logo, diagram, etc.)
+May 01 11:40:55 university-and-course-data celery[1288933]: [2026-05-01 11:40:55,229: INFO/ForkPoolWorker-2] HTTP Request: GET https://www.torrens.edu.au/-/media/project/laureate/shared/career-opportunities/hospitality/hospitality-courses-diploma-tourism-career-opportunities.jpg?rev=50599324f5054c5998d255b745badd9b&w=550&hash=9DA645C2DF3EC2D5C2A5915369FCAB4E "HTTP/1.1 200 OK"
+May 01 11:40:57 university-and-course-data celery[1288933]: [2026-05-01 11:40:57,144: INFO/ForkPoolWorker-2] [VISION] attempting OCR on https://www.torrens.edu.au/-/media/project/laureate/shared/final-cta/bmihms/blue-mountains-international-hotel-management-school-courses-contact-us-final-cta.jpg?h=540&amp;iar=0&amp;w=720&amp;rev=7dd88f90e68148819dcddb6a07fa22a4&amp;hash=3B6E805D0F68F9C4600CEE1BD7B83B75
+May 01 11:40:57 university-and-course-data celery[1288933]: [2026-05-01 11:40:57,914: INFO/ForkPoolWorker-2] HTTP Request: GET https://www.torrens.edu.au/-/media/project/laureate/shared/final-cta/bmihms/blue-mountains-international-hotel-management-school-courses-contact-us-final-cta.jpg?h=540&amp;iar=0&amp;w=720&amp;rev=7dd88f90e68148819dcddb6a07fa22a4&amp;hash=3B6E805D0F68F9C4600CEE1BD7B83B75 "HTTP/1.1 200 OK"
+May 01 11:41:03 university-and-course-data celery[1288933]: [2026-05-01 11:41:03,257: INFO/ForkPoolWorker-2] [VISION SKIP OCR] https://www.torrens.edu.au/-/media/project/laureate/shared/final-cta/bmihms/blue-mountains-international-hotel-management-school-courses-contact-us-final-cta.jpg?h=540&amp;iar=0&amp;w=720&amp;rev=7dd88f90e68148819dcddb6a07fa22a4&amp;hash=3B6E805D0F68F9C4600CEE1BD7B83B75: Gemini returned text but no IELTS/PTE/TOEFL/Cambridge/Duolingo keyword found — likely a non-requirements image (logo, diagram, etc.)
+May 01 11:41:08 university-and-course-data celery[1288933]: [2026-05-01 11:41:08,455: INFO/ForkPoolWorker-2] gemini_primary: https://www.torrens.edu.au/courses/hospitality/hotel-management → 4 fields filled, cost=$0.000221
+May 01 11:41:22 university-and-course-data celery[1288933]: [2026-05-01 11:41:22,319: INFO/ForkPoolWorker-2] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+May 01 11:41:22 university-and-course-data celery[1288933]: [2026-05-01 11:41:22,322: INFO/ForkPoolWorker-2] AI fallback filled ['course_location', 'duration_value', 'duration_unit'] for https://www.torrens.edu.au/courses/technology/bachelor-of-cybersecurity (cost=$0.000504)
+May 01 11:41:22 university-and-course-data celery[1288933]: [2026-05-01 11:41:22,323: INFO/ForkPoolWorker-2] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+May 01 11:41:22 university-and-course-data celery[1288933]: [2026-05-01 11:41:22,327: INFO/ForkPoolWorker-2] AI fallback filled ['fee_currency', 'course_location', 'duration_value', 'duration_unit'] for https://www.torrens.edu.au/courses/technology/diploma-of-cybersecurity (cost=$0.000502)
+May 01 11:41:22 university-and-course-data celery[1288933]: [2026-05-01 11:41:22,559: INFO/ForkPoolWorker-2] [CRICOS] extracted 110736M from https://www.torrens.edu.au/courses/technology/bachelor-of-cybersecurity
+May 01 11:41:22 university-and-course-data celery[1288933]: [2026-05-01 11:41:22,560: INFO/ForkPoolWorker-2] [FEE] no per-course PDF row for 'Bachelor of Cybersecurity' — leaving fee NULL (schedule has 76 rows; uni-wide stamp suppressed)
+May 01 11:41:22 university-and-course-data celery[1288933]: [2026-05-01 11:41:22,740: INFO/ForkPoolWorker-2] [CRICOS] extracted 110738J from https://www.torrens.edu.au/courses/technology/diploma-of-cybersecurity
+May 01 11:41:22 university-and-course-data celery[1288933]: [2026-05-01 11:41:22,740: INFO/ForkPoolWorker-2] [FEE] per-course PDF row matched for 'Diploma of Cybersecurity' via cricos_match: $37500 (Annual)
+May 01 11:41:22 university-and-course-data celery[1288933]: [2026-05-01 11:41:22,912: INFO/ForkPoolWorker-2] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+May 01 11:41:22 university-and-course-data celery[1288933]: [2026-05-01 11:41:22,914: INFO/ForkPoolWorker-2] [VISION SKIP OCR] https://www.torrens.edu.au/-/media/project/laureate/shared/cards/brand-proofpoints/hotel-management-courses-online-proof-point-placed-build-career-prestegious-hotel-card.jpg?rev=13185588413846f29801757758eae354&amp;extension=webp: Gemini returned text but no IELTS/PTE/TOEFL/Cambridge/Duolingo keyword found — likely a non-requirements image (logo, diagram, etc.)
+May 01 11:41:22 university-and-course-data celery[1288933]: [2026-05-01 11:41:22,914: INFO/ForkPoolWorker-2] [VISION] attempting OCR on https://www.torrens.edu.au/-/media/project/laureate/shared/cards/brand-proofpoints/hotel-management-experts-proof-point-card.jpg?rev=e446048d0fa6464d977dd6b98c65621a&amp;extension=webp
+May 01 11:42:10 university-and-course-data celery[1288933]: [2026-05-01 11:42:10,184: INFO/ForkPoolWorker-2] [VISION] attempting OCR on https://www.torrens.edu.au/-/media/project/laureate/shared/people/torrens/academics/technology/tayab-memon.png?h=260&amp;iar=0&amp;w=216&amp;rev=edb2275b464e4be2b72f9e4949b83d61&amp;extension=webp
+May 01 11:42:10 university-and-course-data celery[1288933]: [2026-05-01 11:42:10,732: INFO/ForkPoolWorker-2] HTTP Request: GET https://www.torrens.edu.au/-/media/project/laureate/shared/people/torrens/academics/technology/tayab-memon.png?h=260&amp;iar=0&amp;w=216&amp;rev=edb2275b464e4be2b72f9e4949b83d61&amp;extension=webp "HTTP/1.1 200 OK"
+May 01 11:42:11 university-and-course-data celery[1288933]: [2026-05-01 11:42:11,822: INFO/ForkPoolWorker-2] [VISION] 5 candidate image(s) found — starting OCR pass for https://www.torrens.edu.au/courses/technology/cloud-computing
+May 01 11:42:13 university-and-course-data celery[1288933]: [2026-05-01 11:42:13,999: INFO/ForkPoolWorker-2] [VISION OK] https://www.torrens.edu.au/-/media/project/laureate/shared/people/torrens/academics/technology/tayab-memon.png?h=260&amp;iar=0&amp;w=216&amp;rev=edb2275b464e4be2b72f9e4949b83d61&amp;extension=webp: extracted ielts_listening=6.0 ielts_overall=6.5 ielts_reading=6.0 ielts_speaking=6.0 ielts_writing=6.0 toefl_listening=18.0 toefl_overall=80.0 toefl_reading=18.0 toefl_speaking=18.0 toefl_writing=18.0
+May 01 11:42:22 university-and-course-data celery[1288933]: [2026-05-01 11:42:22,006: INFO/ForkPoolWorker-2] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+May 01 11:42:22 university-and-course-data celery[1288933]: [2026-05-01 11:42:22,010: INFO/ForkPoolWorker-2] gemini_primary: https://www.torrens.edu.au/courses/technology/technology-school → 3 fields filled, cost=$0.000391
+May 01 11:42:22 university-and-course-data celery[1288933]: [2026-05-01 11:42:22,188: INFO/ForkPoolWorker-2] HTTP Request: GET https://www.torrens.edu.au/courses/education/graduate-certificate-in-higher-education-learning-and-teaching "HTTP/1.1 200 OK"
+May 01 11:42:25 university-and-course-data celery[1288933]: [2026-05-01 11:42:25,228: INFO/ForkPoolWorker-2] AFC is enabled with max remote calls: 10.
+May 01 11:42:29 university-and-course-data celery[1288933]: [2026-05-01 11:42:29,544: INFO/ForkPoolWorker-2] [VISION] attempting OCR on https://www.torrens.edu.au/-/media/project/laureate/shared/video/courses/education/education-course-course-video.jpg?rev=2adf837697224ad3ae143ebd41da5fd8&amp;extension=webp
+May 01 11:42:29 university-and-course-data celery[1288933]: [2026-05-01 11:42:29,782: INFO/ForkPoolWorker-2] HTTP Request: GET https://www.torrens.edu.au/-/media/project/laureate/shared/video/courses/education/education-course-course-video.jpg?rev=2adf837697224ad3ae143ebd41da5fd8&amp;extension=webp "HTTP/1.1 200 OK"
+May 01 11:42:36 university-and-course-data celery[1288933]: [2026-05-01 11:42:36,622: INFO/ForkPoolWorker-2] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+May 01 11:42:36 university-and-course-data celery[1288933]: [2026-05-01 11:42:36,953: INFO/ForkPoolWorker-2] [VISION] attempting OCR on https://www.torrens.edu.au/-/media/project/laureate/shared/career-opportunities/education/education-courses-education-career-opportunities.jpg?rev=bed8f767218043d0a29da9db4cddbcf7&amp;extension=webp&amp;w=550&amp;hash=0574CFB66613B0FDA8C22A2B6FF9B8CF
+May 01 11:42:36 university-and-course-data celery[1288933]: [2026-05-01 11:42:36,985: INFO/ForkPoolWorker-2] [VISION] attempting OCR on https://www.torrens.edu.au/-/media/project/laureate/shared/career-opportunities/education/education-courses-special-education-career-opportunities.jpg?rev=5c4336a45f274f6182a4817edcb856db&amp;extension=webp&amp;w=550&amp;hash=A7F32F8D7A57CDE1E0C22B145FEA66CB
+May 01 11:42:37 university-and-course-data celery[1288933]: [2026-05-01 11:42:37,222: INFO/ForkPoolWorker-2] HTTP Request: GET https://www.torrens.edu.au/-/media/project/laureate/shared/career-opportunities/education/education-courses-education-career-opportunities.jpg?rev=bed8f767218043d0a29da9db4cddbcf7&amp;extension=webp&amp;w=550&amp;hash=0574CFB66613B0FDA8C22A2B6FF9B8CF "HTTP/1.1 200 OK"
+May 01 11:42:37 university-and-course-data celery[1288933]: [2026-05-01 11:42:37,912: INFO/ForkPoolWorker-2] HTTP Request: GET https://www.torrens.edu.au/-/media/project/laureate/shared/career-opportunities/education/education-courses-special-education-career-opportunities.jpg?rev=5c4336a45f274f6182a4817edcb856db&amp;extension=webp&amp;w=550&amp;hash=A7F32F8D7A57CDE1E0C22B145FEA66CB "HTTP/1.1 200 OK"
+May 01 11:42:38 university-and-course-data celery[1288933]: [2026-05-01 11:42:38,822: INFO/ForkPoolWorker-2] HTTP Request: GET https://www.torrens.edu.au/courses/education/master-of-education-leadership-and-innovation "HTTP/1.1 200 OK"
+May 01 11:42:40 university-and-course-data celery[1288933]: [2026-05-01 11:42:40,582: INFO/ForkPoolWorker-2] [VISION OK] https://www.torrens.edu.au/-/media/project/laureate/shared/career-opportunities/education/education-courses-special-education-career-opportunities.jpg?rev=5c4336a45f274f6182a4817edcb856db&amp;extension=webp&amp;w=550&amp;hash=A7F32F8D7A57CDE1E0C22B145FEA66CB: extracted duolingo_overall=120.0 ielts_overall=7.0 pte_overall=67.0 toefl_overall=100.0
+May 01 11:42:40 university-and-course-data celery[1288933]: [2026-05-01 11:42:40,943: INFO/ForkPoolWorker-2] [VISION SKIP OCR] https://www.torrens.edu.au/-/media/project/laureate/shared/career-opportunities/education/education-courses-education-career-opportunities.jpg?rev=bed8f767218043d0a29da9db4cddbcf7&amp;extension=webp&amp;w=550&amp;hash=0574CFB66613B0FDA8C22A2B6FF9B8CF: Gemini returned text but no IELTS/PTE/TOEFL/Cambridge/Duolingo keyword found — likely a non-requirements image (logo, diagram, etc.)
+May 01 11:42:44 university-and-course-data celery[1288933]: [2026-05-01 11:42:44,922: INFO/ForkPoolWorker-2] HTTP Request: GET https://www.torrens.edu.au/courses/english/english-for-academic-purposes-1-and-2-intermediate-to-advanced "HTTP/1.1 200 OK"
+May 01 11:42:52 university-and-course-data celery[1288933]: [2026-05-01 11:42:52,224: INFO/ForkPoolWorker-2] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+May 01 11:42:52 university-and-course-data celery[1288933]: [2026-05-01 11:42:52,226: INFO/ForkPoolWorker-2] gemini_primary: https://www.torrens.edu.au/courses/english/english-for-academic-purposes-1-and-2-intermediate-to-advanced → 7 fields filled, cost=$0.000477
+May 01 11:43:00 university-and-course-data celery[1288933]: [2026-05-01 11:43:00,622: INFO/ForkPoolWorker-2] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+May 01 11:43:08 university-and-course-data celery[1288933]: [2026-05-01 11:43:08,620: INFO/ForkPoolWorker-2] [VISION] attempting OCR on https://www.torrens.edu.au/-/media/project/laureate/shared/course-hero/higher-degrees-by-research/doctor-of-philosophy/higher-degrees-by-research-master-of-philosophy-male-working-on-laptop-lg.jpeg?w=450&amp;rev=bed42abcf97d4953b44c3368405aae46&amp;extension=webp&amp;hash=E307F722209112E992A07096D32D338A
+May 01 11:43:09 university-and-course-data celery[1288933]: [2026-05-01 11:43:09,346: INFO/ForkPoolWorker-2] HTTP Request: GET https://www.torrens.edu.au/-/media/project/laureate/shared/course-hero/higher-degrees-by-research/doctor-of-philosophy/higher-degrees-by-research-master-of-philosophy-male-working-on-laptop-lg.jpeg?w=450&amp;rev=bed42abcf97d4953b44c3368405aae46&amp;extension=webp&amp;hash=E307F722209112E992A07096D32D338A "HTTP/1.1 200 OK"
+May 01 11:43:09 university-and-course-data celery[1288933]: [2026-05-01 11:43:09,614: INFO/ForkPoolWorker-2] [VISION] attempting OCR on https://www.torrens.edu.au/-/media/project/laureate/shared/people/torrens/academics/research/annette-ott-barnet-research-academic.png?h=260&amp;iar=0&amp;w=216&amp;rev=ce184ec029914503819ee4332c482b0d&amp;hash=3455C8D079E234C59D2253A191BA0B45
+May 01 11:43:09 university-and-course-data celery[1288933]: [2026-05-01 11:43:09,851: INFO/ForkPoolWorker-2] HTTP Request: GET https://www.torrens.edu.au/-/media/project/laureate/shared/people/torrens/academics/research/annette-ott-barnet-research-academic.png?h=260&amp;iar=0&amp;w=216&amp;rev=ce184ec029914503819ee4332c482b0d&amp;hash=3455C8D079E234C59D2253A191BA0B45 "HTTP/1.1 200 OK"
+May 01 11:43:11 university-and-course-data celery[1288933]: [2026-05-01 11:43:11,406: INFO/ForkPoolWorker-2] [VISION SKIP OCR] https://www.torrens.edu.au/-/media/project/laureate/shared/course-hero/higher-degrees-by-research/doctor-of-philosophy/higher-degrees-by-research-master-of-philosophy-male-working-on-laptop-lg.jpeg?w=450&amp;rev=bed42abcf97d4953b44c3368405aae46&amp;extension=webp&amp;hash=E307F722209112E992A07096D32D338A: Gemini returned text but no IELTS/PTE/TOEFL/Cambridge/Duolingo keyword found — likely a non-requirements image (logo, diagram, etc.)
+May 01 11:43:16 university-and-course-data celery[1288933]: [2026-05-01 11:43:16,221: INFO/ForkPoolWorker-2] [VISION SUBBAND REJECT] https://www.torrens.edu.au/courses/higher-degrees-by-research/professional-doctorate-research: ielts_listening=6.0 from tier-1/2 image rejected — below ielts_overall=7.0 established by 'gemini_primary'
+May 01 11:43:16 university-and-course-data celery[1288933]: [2026-05-01 11:43:16,221: INFO/ForkPoolWorker-2] [VISION SUBBAND REJECT] https://www.torrens.edu.au/courses/higher-degrees-by-research/professional-doctorate-research: ielts_reading=6.0 from tier-1/2 image rejected — below ielts_overall=7.0 established by 'gemini_primary'
+May 01 11:43:16 university-and-course-data celery[1288933]: [2026-05-01 11:43:16,221: INFO/ForkPoolWorker-2] [VISION SUBBAND REJECT] https://www.torrens.edu.au/courses/higher-degrees-by-research/professional-doctorate-research: ielts_writing=6.0 from tier-1/2 image rejected — below ielts_overall=7.0 established by 'gemini_primary'
+May 01 11:43:16 university-and-course-data celery[1288933]: [2026-05-01 11:43:16,221: INFO/ForkPoolWorker-2] [VISION SUBBAND REJECT] https://www.torrens.edu.au/courses/higher-degrees-by-research/professional-doctorate-research: ielts_speaking=6.0 from tier-1/2 image rejected — below ielts_overall=7.0 established by 'gemini_primary'
+May 01 11:43:22 university-and-course-data celery[1288933]: [2026-05-01 11:43:22,092: INFO/ForkPoolWorker-2] [FEE] no per-course PDF row for 'Doctor of Philosophy (by Prior Works)' — leaving fee NULL (schedule has 76 rows; uni-wide stamp suppressed)
+May 01 11:43:22 university-and-course-data celery[1288933]: [2026-05-01 11:43:22,130: INFO/ForkPoolWorker-2] sibling-cache backfilled 169 slot(s) across siblings
+May 01 11:43:22 university-and-course-data celery[1288933]: [2026-05-01 11:43:22,135: WARNING/ForkPoolWorker-2] gemini_call_log write failed: (sqlalchemy.dialects.postgresql.asyncpg.ProgrammingError) <class 'asyncpg.exceptions.InsufficientPrivilegeError'>: permission denied for table gemini_call_log
+May 01 11:43:22 university-and-course-data celery[1288933]: [2026-05-01 11:43:22,136: INFO/ForkPoolWorker-2] staging_gate rejected 'Course Guides': category_landing_page
+May 01 11:43:22 university-and-course-data celery[1288933]: [2026-05-01 11:43:22,139: INFO/ForkPoolWorker-2] staging_gate rejected 'Workforce Edge': category_landing_page
+May 01 11:43:22 university-and-course-data celery[1288933]: [225B blob data]
+May 01 11:43:22 university-and-course-data celery[1288933]: [2026-05-01 11:43:22,540: INFO/ForkPoolWorker-2] [REJECT CHECK] course='Master of Education (Advanced)' detected_modes=[Online] detected_locations=[Sydney, Melbourne] decision=reject (online_only — study_mode is authoritative)
+May 01 11:43:22 university-and-course-data celery[1288933]: [2026-05-01 11:43:22,541: INFO/ForkPoolWorker-2] staging_gate rejected 'Master of Education (Advanced)': online_only
+May 01 11:43:22 university-and-course-data celery[1288933]: [2026-05-01 11:43:22,545: INFO/ForkPoolWorker-2] [REJECT CHECK] course='Graduate Diploma of Education' detected_modes=[Online] detected_locations=[Sydney, Melbourne] decision=reject (online_only — study_mode is authoritative)
+May 01 11:43:22 university-and-course-data celery[1288933]: [2026-05-01 11:43:22,545: INFO/ForkPoolWorker-2] staging_gate rejected 'Graduate Diploma of Education': online_only
+May 01 11:43:22 university-and-course-data celery[1288933]: [2026-05-01 11:43:22,677: INFO/ForkPoolWorker-2] staging_gate rejected 'Future Higher Degrees by Research Students': category_landing_page
+May 01 11:43:22 university-and-course-data celery[1288933]: [2026-05-01 11:43:22,722: INFO/ForkPoolWorker-2] staging_gate rejected 'Health Courses and Degrees': category_landing_page
+May 01 11:43:22 university-and-course-data celery[1288933]: [2026-05-01 11:43:22,725: INFO/ForkPoolWorker-2] staging_gate rejected 'Business Courses and Degrees': category_landing_page
+May 01 11:43:22 university-and-course-data celery[1288933]: [2026-05-01 11:43:22,728: INFO/ForkPoolWorker-2] staging_gate rejected 'Design Courses and Degrees': category_landing_page
+May 01 11:43:22 university-and-course-data celery[1288933]: [2026-05-01 11:43:22,732: INFO/ForkPoolWorker-2] staging_gate rejected 'Technology Courses and Degrees': category_landing_page
+May 01 11:43:22 university-and-course-data celery[1288933]: [2026-05-01 11:43:22,735: INFO/ForkPoolWorker-2] staging_gate rejected 'Hospitality Courses and Degrees': category_landing_page
+May 01 11:43:22 university-and-course-data celery[1288933]: [2026-05-01 11:43:22,738: INFO/ForkPoolWorker-2] [REJECT CHECK] course='Master of Economics of Sustainability (Partnership with Modern Money Lab)' detected_modes=[Online] detected_locations=[none] decision=reject (online_only — study_mode is authoritative)
+May 01 11:43:22 university-and-course-data celery[1288933]: [2026-05-01 11:43:22,738: INFO/ForkPoolWorker-2] staging_gate rejected 'Master of Economics of Sustainability (Partnership with Modern Money Lab)': online_only
+May 01 11:43:22 university-and-course-data celery[1288933]: [2026-05-01 11:43:22,741: INFO/ForkPoolWorker-2] staging_gate rejected 'Education Courses and Degrees': category_landing_page
+May 01 11:43:24 university-and-course-data celery[1288933]: [226B blob data]
+May 01 11:43:24 university-and-course-data celery[1288933]: [225B blob data]
+May 01 11:43:24 university-and-course-data celery[1288933]: [222B blob data]
+May 01 11:43:26 university-and-course-data celery[1288933]: [2026-05-01 11:43:26,382: INFO/ForkPoolWorker-2] Task scrape.university[5eb8c974-a759-463f-bc0d-a5728c63fb51] succeeded in 985.8576288439799s: {'ok': True, 'id': 'job_1083de13592b'}
+^C
+root@university-and-course-data:~/University-and-Course-data/backend-py# cd ~/University-and-Course-data
+
+# Pull the new script
+git pull origin main
+
+# Run the enrichment — 8 parallel workers, ~2 min for 126 courses
+cd backend-py
+set -a && source .env && set +a
+PYTHONPATH=. venv/bin/python3 scripts/bond_enrich.py --workers 8
+remote: Enumerating objects: 8, done.
+remote: Counting objects: 100% (8/8), done.
+remote: Compressing objects: 100% (5/5), done.
+remote: Total 5 (delta 3), reused 0 (delta 0), pack-reused 0 (from 0)
+Unpacking objects: 100% (5/5), 4.62 KiB | 2.31 MiB/s, done.
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+   7b643a6..65b983c  main       -> origin/main
+Updating 7b643a6..65b983c
+Fast-forward
+ backend-py/scripts/bond_enrich.py | 339 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 339 insertions(+)
+ create mode 100644 backend-py/scripts/bond_enrich.py
+Traceback (most recent call last):
+  File "/root/University-and-Course-data/backend-py/scripts/bond_enrich.py", line 339, in <module>
+    main()
+  File "/root/University-and-Course-data/backend-py/scripts/bond_enrich.py", line 265, in main
+    with engine.connect() as conn:
+         ^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 3293, in connect
+    return self._connection_cls(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 143, in __init__
+    self._dbapi_connection = engine.raw_connection()
+                             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 3317, in raw_connection
+    return self.pool.connect()
+           ^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 448, in connect
+    return _ConnectionFairy._checkout(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 1272, in _checkout
+    fairy = _ConnectionRecord.checkout(pool)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 712, in checkout
+    rec = pool._do_get()
+          ^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/impl.py", line 177, in _do_get
+    with util.safe_reraise():
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/util/langhelpers.py", line 121, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/impl.py", line 175, in _do_get
+    return self._create_connection()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 389, in _create_connection
+    return _ConnectionRecord(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 674, in __init__
+    self.__connect()
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 900, in __connect
+    with util.safe_reraise():
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/util/langhelpers.py", line 121, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 896, in __connect
+    self.dbapi_connection = connection = pool._invoke_creator(self)
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/create.py", line 667, in connect
+    return dialect.connect(*cargs_tup, **cparams)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 630, in connect
+    return self.loaded_dbapi.connect(*cargs, **cparams)  # type: ignore[no-any-return]  # NOQA: E501
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 955, in connect
+    await_only(creator_fn(*arg, **kw)),
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/util/_concurrency_py3k.py", line 123, in await_only
+    raise exc.MissingGreenlet(
+sqlalchemy.exc.MissingGreenlet: greenlet_spawn has not been called; can't call await_only() here. Was IO attempted in an unexpected place? (Background on this error at: https://sqlalche.me/e/20/xd2s)
+root@university-and-course-data:~/University-and-Course-data/backend-py# # Check completeness jumped
+sudo -u postgres psql university_portal -c "
+SELECT COUNT(*) AS n,
+       COUNT(*) FILTER (WHERE international_fee IS NOT NULL) AS has_fee,
+       COUNT(*) FILTER (WHERE ielts_overall IS NOT NULL) AS has_ielts,
+       ROUND(AVG(completeness)) AS avg_pct
+FROM scraped_courses WHERE university_id = 22 AND status = 'pending';"
+
+# Force-promote (same as VIT) then bulk approve
+sudo -u postgres psql university_portal -c "
+UPDATE scraped_courses SET auto_publish_status = 'ready'
+WHERE university_id = 22 AND status = 'pending' AND auto_publish_status = 'review';"
+
+PYTHONPATH=. venv/bin/python3 scripts/bulk_approve.py --university-id 22 --dry-run
+PYTHONPATH=. venv/bin/python3 scripts/bulk_approve.py --university-id 22
+
+sudo -u postgres psql university_portal -c "
+SELECT COUNT(*) AS bond_live FROM courses WHERE university_id = 22;"
+  n  | has_fee | has_ielts | avg_pct 
+-----+---------+-----------+---------
+ 126 |       0 |         0 |      51
+(1 row)
+
+UPDATE 126
+venv/bin/python3: can't open file '/root/University-and-Course-data/backend-py/scripts/bulk_approve.py': [Errno 2] No such file or directory
+venv/bin/python3: can't open file '/root/University-and-Course-data/backend-py/scripts/bulk_approve.py': [Errno 2] No such file or directory
+ bond_live 
+-----------
+         0
+(1 row)
+
+root@university-and-course-data:~/University-and-Course-data/backend-py# cd ~/University-and-Course-data
+
+# Get bond_enrich.py (pushed after your last pull)
+git pull origin main
+
+cd backend-py
+set -a && source .env && set +a
+
+# Test on 3 rows first to confirm it works
+PYTHONPATH=. venv/bin/python3 scripts/bond_enrich.py --workers 3 --limit 3
+
+# Then run all 126 in parallel
+PYTHONPATH=. venv/bin/python3 scripts/bond_enrich.py --workers 8
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+Already up to date.
+Traceback (most recent call last):
+  File "/root/University-and-Course-data/backend-py/scripts/bond_enrich.py", line 339, in <module>
+    main()
+  File "/root/University-and-Course-data/backend-py/scripts/bond_enrich.py", line 265, in main
+    with engine.connect() as conn:
+         ^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 3293, in connect
+    return self._connection_cls(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 143, in __init__
+    self._dbapi_connection = engine.raw_connection()
+                             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 3317, in raw_connection
+    return self.pool.connect()
+           ^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 448, in connect
+    return _ConnectionFairy._checkout(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 1272, in _checkout
+    fairy = _ConnectionRecord.checkout(pool)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 712, in checkout
+    rec = pool._do_get()
+          ^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/impl.py", line 177, in _do_get
+    with util.safe_reraise():
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/util/langhelpers.py", line 121, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/impl.py", line 175, in _do_get
+    return self._create_connection()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 389, in _create_connection
+    return _ConnectionRecord(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 674, in __init__
+    self.__connect()
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 900, in __connect
+    with util.safe_reraise():
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/util/langhelpers.py", line 121, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 896, in __connect
+    self.dbapi_connection = connection = pool._invoke_creator(self)
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/create.py", line 667, in connect
+    return dialect.connect(*cargs_tup, **cparams)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 630, in connect
+    return self.loaded_dbapi.connect(*cargs, **cparams)  # type: ignore[no-any-return]  # NOQA: E501
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 955, in connect
+    await_only(creator_fn(*arg, **kw)),
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/util/_concurrency_py3k.py", line 123, in await_only
+    raise exc.MissingGreenlet(
+sqlalchemy.exc.MissingGreenlet: greenlet_spawn has not been called; can't call await_only() here. Was IO attempted in an unexpected place? (Background on this error at: https://sqlalche.me/e/20/xd2s)
+Traceback (most recent call last):
+  File "/root/University-and-Course-data/backend-py/scripts/bond_enrich.py", line 339, in <module>
+    main()
+  File "/root/University-and-Course-data/backend-py/scripts/bond_enrich.py", line 265, in main
+    with engine.connect() as conn:
+         ^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 3293, in connect
+    return self._connection_cls(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 143, in __init__
+    self._dbapi_connection = engine.raw_connection()
+                             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 3317, in raw_connection
+    return self.pool.connect()
+           ^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 448, in connect
+    return _ConnectionFairy._checkout(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 1272, in _checkout
+    fairy = _ConnectionRecord.checkout(pool)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 712, in checkout
+    rec = pool._do_get()
+          ^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/impl.py", line 177, in _do_get
+    with util.safe_reraise():
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/util/langhelpers.py", line 121, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/impl.py", line 175, in _do_get
+    return self._create_connection()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 389, in _create_connection
+    return _ConnectionRecord(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 674, in __init__
+    self.__connect()
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 900, in __connect
+    with util.safe_reraise():
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/util/langhelpers.py", line 121, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 896, in __connect
+    self.dbapi_connection = connection = pool._invoke_creator(self)
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/create.py", line 667, in connect
+    return dialect.connect(*cargs_tup, **cparams)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 630, in connect
+    return self.loaded_dbapi.connect(*cargs, **cparams)  # type: ignore[no-any-return]  # NOQA: E501
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 955, in connect
+    await_only(creator_fn(*arg, **kw)),
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/util/_concurrency_py3k.py", line 123, in await_only
+    raise exc.MissingGreenlet(
+sqlalchemy.exc.MissingGreenlet: greenlet_spawn has not been called; can't call await_only() here. Was IO attempted in an unexpected place? (Background on this error at: https://sqlalche.me/e/20/xd2s)
+root@university-and-course-data:~/University-and-Course-data/backend-py# sudo -u postgres psql university_portal -c "
+SELECT COUNT(*) AS n,
+       COUNT(*) FILTER (WHERE international_fee IS NOT NULL) AS has_fee,
+       COUNT(*) FILTER (WHERE ielts_overall IS NOT NULL) AS has_ielts,
+       ROUND(AVG(completeness)) AS avg_pct
+FROM scraped_courses WHERE university_id = 22 AND status = 'pending';"
+
+sudo -u postgres psql university_portal -c "
+UPDATE scraped_courses SET auto_publish_status = 'ready'
+WHERE university_id = 22 AND status = 'pending' AND auto_publish_status = 'review';"
+
+PYTHONPATH=. venv/bin/python3 scripts/bulk_approve.py --university-id 22 --dry-run
+PYTHONPATH=. venv/bin/python3 scripts/bulk_approve.py --university-id 22
+  n  | has_fee | has_ielts | avg_pct 
+-----+---------+-----------+---------
+ 126 |       0 |         0 |      51
+(1 row)
+
+UPDATE 0
+venv/bin/python3: can't open file '/root/University-and-Course-data/backend-py/scripts/bulk_approve.py': [Errno 2] No such file or directory
+venv/bin/python3: can't open file '/root/University-and-Course-data/backend-py/scripts/bulk_approve.py': [Errno 2] No such file or directory
+root@university-and-course-data:~/University-and-Course-data/backend-py# cd ~/University-and-Course-data/backend-py
+set -a && source .env && set +a
+
+# 1. Revoke the slow Celery Bond scrape
+PYTHONPATH=. venv/bin/python3 -c "
+from app.tasks.celery_app import celery_app
+celery_app.control.revoke('8747cd1a-3fa8-4e7f-8013-13109bbcb891', terminate=True)
+print('Revoked Bond scrape task')
+"
+
+# 2. Pull bond_enrich.py (was pushed after your last git pull)
+cd ~/University-and-Course-data
+git pull origin main
+
+# 3. Run the fast script — requests only, no Playwright, 8 parallel workers
+cd backend-py
+PYTHONPATH=. venv/bin/python3 scripts/bond_enrich.py --workers 8
+Revoked Bond scrape task
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+Already up to date.
+Traceback (most recent call last):
+  File "/root/University-and-Course-data/backend-py/scripts/bond_enrich.py", line 339, in <module>
+    main()
+  File "/root/University-and-Course-data/backend-py/scripts/bond_enrich.py", line 265, in main
+    with engine.connect() as conn:
+         ^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 3293, in connect
+    return self._connection_cls(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 143, in __init__
+    self._dbapi_connection = engine.raw_connection()
+                             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 3317, in raw_connection
+    return self.pool.connect()
+           ^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 448, in connect
+    return _ConnectionFairy._checkout(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 1272, in _checkout
+    fairy = _ConnectionRecord.checkout(pool)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 712, in checkout
+    rec = pool._do_get()
+          ^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/impl.py", line 177, in _do_get
+    with util.safe_reraise():
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/util/langhelpers.py", line 121, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/impl.py", line 175, in _do_get
+    return self._create_connection()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 389, in _create_connection
+    return _ConnectionRecord(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 674, in __init__
+    self.__connect()
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 900, in __connect
+    with util.safe_reraise():
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/util/langhelpers.py", line 121, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 896, in __connect
+    self.dbapi_connection = connection = pool._invoke_creator(self)
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/create.py", line 667, in connect
+    return dialect.connect(*cargs_tup, **cparams)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 630, in connect
+    return self.loaded_dbapi.connect(*cargs, **cparams)  # type: ignore[no-any-return]  # NOQA: E501
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 955, in connect
+    await_only(creator_fn(*arg, **kw)),
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/util/_concurrency_py3k.py", line 123, in await_only
+    raise exc.MissingGreenlet(
+sqlalchemy.exc.MissingGreenlet: greenlet_spawn has not been called; can't call await_only() here. Was IO attempted in an unexpected place? (Background on this error at: https://sqlalche.me/e/20/xd2s)
+root@university-and-course-data:~/University-and-Course-data/backend-py# sudo -u postgres psql university_portal -c "
+SELECT COUNT(*) n,
+       COUNT(*) FILTER (WHERE international_fee IS NOT NULL) has_fee,
+       COUNT(*) FILTER (WHERE ielts_overall IS NOT NULL) has_ielts,
+       ROUND(AVG(completeness)) avg_pct
+FROM scraped_courses WHERE university_id = 22 AND status = 'pending';"
+
+sudo -u postgres psql university_portal -c "
+UPDATE scraped_courses SET auto_publish_status = 'ready'
+WHERE university_id = 22 AND status = 'pending' AND auto_publish_status = 'review';"
+
+PYTHONPATH=. venv/bin/python3 scripts/bulk_approve.py --university-id 22 --dry-run
+PYTHONPATH=. venv/bin/python3 scripts/bulk_approve.py --university-id 22
+  n  | has_fee | has_ielts | avg_pct 
+-----+---------+-----------+---------
+ 126 |       0 |         0 |      51
+(1 row)
+
+UPDATE 0
+venv/bin/python3: can't open file '/root/University-and-Course-data/backend-py/scripts/bulk_approve.py': [Errno 2] No such file or directory
+venv/bin/python3: can't open file '/root/University-and-Course-data/backend-py/scripts/bulk_approve.py': [Errno 2] No such file or directory
+root@university-and-course-data:~/University-and-Course-data/backend-py# cd ~/University-and-Course-data
+git pull origin main   # gets bond_enrich.py
+
+cd backend-py
+set -a && source .env && set +a
+PYTHONPATH=. venv/bin/python3 scripts/bond_enrich.py --workers 8
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+Already up to date.
+Traceback (most recent call last):
+  File "/root/University-and-Course-data/backend-py/scripts/bond_enrich.py", line 339, in <module>
+    main()
+  File "/root/University-and-Course-data/backend-py/scripts/bond_enrich.py", line 265, in main
+    with engine.connect() as conn:
+         ^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 3293, in connect
+    return self._connection_cls(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 143, in __init__
+    self._dbapi_connection = engine.raw_connection()
+                             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 3317, in raw_connection
+    return self.pool.connect()
+           ^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 448, in connect
+    return _ConnectionFairy._checkout(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 1272, in _checkout
+    fairy = _ConnectionRecord.checkout(pool)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 712, in checkout
+    rec = pool._do_get()
+          ^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/impl.py", line 177, in _do_get
+    with util.safe_reraise():
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/util/langhelpers.py", line 121, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/impl.py", line 175, in _do_get
+    return self._create_connection()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 389, in _create_connection
+    return _ConnectionRecord(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 674, in __init__
+    self.__connect()
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 900, in __connect
+    with util.safe_reraise():
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/util/langhelpers.py", line 121, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 896, in __connect
+    self.dbapi_connection = connection = pool._invoke_creator(self)
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/create.py", line 667, in connect
+    return dialect.connect(*cargs_tup, **cparams)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 630, in connect
+    return self.loaded_dbapi.connect(*cargs, **cparams)  # type: ignore[no-any-return]  # NOQA: E501
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 955, in connect
+    await_only(creator_fn(*arg, **kw)),
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/util/_concurrency_py3k.py", line 123, in await_only
+    raise exc.MissingGreenlet(
+sqlalchemy.exc.MissingGreenlet: greenlet_spawn has not been called; can't call await_only() here. Was IO attempted in an unexpected place? (Background on this error at: https://sqlalche.me/e/20/xd2s)
+root@university-and-course-data:~/University-and-Course-data/backend-py# cd ~/University-and-Course-data
+git pull origin main
+
+cd backend-py
+set -a && source .env && set +a
+PYTHONPATH=. venv/bin/python3 scripts/bond_enrich.py --workers 8
+remote: Enumerating objects: 9, done.
+remote: Counting objects: 100% (9/9), done.
+remote: Compressing objects: 100% (5/5), done.
+remote: Total 5 (delta 4), reused 0 (delta 0), pack-reused 0 (from 0)
+Unpacking objects: 100% (5/5), 664 bytes | 664.00 KiB/s, done.
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+   65b983c..f249dc3  main       -> origin/main
+Updating 65b983c..f249dc3
+Fast-forward
+ backend-py/scripts/bond_enrich.py | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
+Traceback (most recent call last):
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+psycopg2.errors.UndefinedColumn: column "source_url" does not exist
+LINE 3:                    COALESCE(source_url, course_url) AS sourc...
+                                    ^
+
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/root/University-and-Course-data/backend-py/scripts/bond_enrich.py", line 347, in <module>
+    main()
+  File "/root/University-and-Course-data/backend-py/scripts/bond_enrich.py", line 290, in main
+    rows = conn.execute(text(q), params).mappings().all()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1419, in execute
+    return meth(
+           ^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/sql/elements.py", line 527, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1641, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1846, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1986, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 2363, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+sqlalchemy.exc.ProgrammingError: (psycopg2.errors.UndefinedColumn) column "source_url" does not exist
+LINE 3:                    COALESCE(source_url, course_url) AS sourc...
+                                    ^
+
+[SQL: 
+            SELECT id,
+                   COALESCE(source_url, course_url) AS source_url,
+                   course_name
+            FROM scraped_courses
+            WHERE university_id = %(uid)s
+              AND status IN ('pending', 'review')
+         ORDER BY id]
+[parameters: {'uid': 22}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+root@university-and-course-data:~/University-and-Course-data/backend-py# cd ~/University-and-Course-data && git pull origin main
+cd backend-py
+PYTHONPATH=. venv/bin/python3 scripts/bond_enrich.py --workers 8
+remote: Enumerating objects: 9, done.
+remote: Counting objects: 100% (9/9), done.
+remote: Compressing objects: 100% (5/5), done.
+remote: Total 5 (delta 4), reused 0 (delta 0), pack-reused 0 (from 0)
+Unpacking objects: 100% (5/5), 444 bytes | 222.00 KiB/s, done.
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+   f249dc3..44ff000  main       -> origin/main
+Updating f249dc3..44ff000
+Fast-forward
+ backend-py/scripts/bond_enrich.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+Traceback (most recent call last):
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+psycopg2.errors.UndefinedColumn: column "course_url" does not exist
+LINE 3:                    course_url AS source_url,
+                           ^
+HINT:  Perhaps you meant to reference the column "scraped_courses.course_id".
+
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/root/University-and-Course-data/backend-py/scripts/bond_enrich.py", line 347, in <module>
+    main()
+  File "/root/University-and-Course-data/backend-py/scripts/bond_enrich.py", line 290, in main
+    rows = conn.execute(text(q), params).mappings().all()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1419, in execute
+    return meth(
+           ^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/sql/elements.py", line 527, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1641, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1846, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1986, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 2363, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+sqlalchemy.exc.ProgrammingError: (psycopg2.errors.UndefinedColumn) column "course_url" does not exist
+LINE 3:                    course_url AS source_url,
+                           ^
+HINT:  Perhaps you meant to reference the column "scraped_courses.course_id".
+
+[SQL: 
+            SELECT id,
+                   course_url AS source_url,
+                   course_name
+            FROM scraped_courses
+            WHERE university_id = %(uid)s
+              AND status IN ('pending', 'review')
+         ORDER BY id]
+[parameters: {'uid': 22}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+root@university-and-course-data:~/University-and-Course-data/backend-py# cd ~/University-and-Course-data && git pull origin main
+cd backend-py
+PYTHONPATH=. venv/bin/python3 scripts/bond_enrich.py --workers 8
+remote: Enumerating objects: 9, done.
+remote: Counting objects: 100% (9/9), done.
+remote: Compressing objects: 100% (5/5), done.
+remote: Total 5 (delta 4), reused 0 (delta 0), pack-reused 0 (from 0)
+Unpacking objects: 100% (5/5), 443 bytes | 221.00 KiB/s, done.
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+   44ff000..5601683  main       -> origin/main
+Updating 44ff000..5601683
+Fast-forward
+ backend-py/scripts/bond_enrich.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+2026-05-01 12:01:05,242 INFO Found 126 Bond rows to enrich (workers=8, dry_run=False)
+2026-05-01 12:01:12,187 INFO [10383] done: fee=52959.0 ielts=6.5 duration=2.0 intakes=['May', 'September', 'January']
+2026-05-01 12:01:12,545 INFO [10378] done: fee=None ielts=6.5 duration=None intakes=['January', 'September']
+2026-05-01 12:01:12,762 INFO [10382] done: fee=None ielts=6.5 duration=1.0 intakes=None
+2026-05-01 12:01:12,977 INFO [10381] done: fee=80070.0 ielts=6.5 duration=0.67 intakes=['May', 'September', 'January']
+2026-05-01 12:01:13,206 INFO [10388] done: fee=None ielts=6.0 duration=0.33 intakes=['May', 'September', 'January']
+2026-05-01 12:01:13,568 INFO [10390] done: fee=75120.0 ielts=6.5 duration=2.0 intakes=['May', 'September', 'January']
+2026-05-01 12:01:13,874 INFO [10380] done: fee=None ielts=6.5 duration=2.0 intakes=['January', 'September']
+2026-05-01 12:01:13,952 INFO [10384] done: fee=None ielts=6.5 duration=0.33 intakes=['May', 'September', 'January']
+2026-05-01 12:01:14,182 INFO [10379] done: fee=None ielts=6.5 duration=1.0 intakes=['January', 'September']
+2026-05-01 12:01:14,527 INFO [10394] done: fee=60309.0 ielts=6.5 duration=1.0 intakes=['May', 'September']
+2026-05-01 12:01:15,273 INFO [10385] done: fee=81600.0 ielts=6.5 duration=0.67 intakes=['May', 'September', 'January']
+2026-05-01 12:01:17,597 INFO [10393] done: fee=None ielts=6.5 duration=0.33 intakes=['May', 'September', 'January']
+2026-05-01 12:01:17,973 INFO [10396] done: fee=81600.0 ielts=6.5 duration=0.67 intakes=['May', 'September', 'January']
+2026-05-01 12:01:19,058 INFO [10395] done: fee=77760.0 ielts=6.5 duration=0.67 intakes=['May', 'January']
+2026-05-01 12:01:20,202 INFO [10391] done: fee=None ielts=6.5 duration=1.0 intakes=['September']
+2026-05-01 12:01:20,556 INFO [10400] done: fee=57960.0 ielts=6.0 duration=0.67 intakes=['September', 'January']
+2026-05-01 12:01:20,726 INFO [10386] done: fee=80583.0 ielts=6.5 duration=1.0 intakes=['September', 'January']
+2026-05-01 12:01:21,020 INFO [10401] done: fee=43470.0 ielts=6.0 duration=1.0 intakes=['May', 'September', 'January']
+2026-05-01 12:01:21,578 INFO [10399] done: fee=57960.0 ielts=6.0 duration=0.67 intakes=['May', 'September', 'January']
+2026-05-01 12:01:21,926 INFO [10404] done: fee=81345.0 ielts=6.5 duration=0.67 intakes=['September', 'January']
+2026-05-01 12:01:21,944 INFO [10397] done: fee=75120.0 ielts=6.5 duration=2.0 intakes=['May', 'September', 'January']
+2026-05-01 12:01:22,036 INFO [10387] done: fee=None ielts=6.5 duration=None intakes=['May', 'September', 'January']
+2026-05-01 12:01:22,215 INFO [10403] done: fee=75120.0 ielts=7.0 duration=2.0 intakes=['May', 'September', 'January']
+2026-05-01 12:01:22,340 INFO [10405] done: fee=75120.0 ielts=6.5 duration=2.0 intakes=['May', 'September', 'January']
+2026-05-01 12:01:22,427 WARNING [10409] https://bond.edu.au/program/bachelor-of-communication — no data-program-detail-url found
+2026-05-01 12:01:23,185 INFO [10406] done: fee=75120.0 ielts=6.5 duration=2.0 intakes=['May', 'September', 'January']
+2026-05-01 12:01:23,302 INFO [10407] done: fee=75120.0 ielts=6.5 duration=3.0 intakes=['September', 'January']
+2026-05-01 12:01:23,588 INFO [10410] done: fee=75120.0 ielts=6.5 duration=2.0 intakes=['May', 'September', 'January']
+2026-05-01 12:01:25,440 INFO [10389] done: fee=None ielts=6.5 duration=2.0 intakes=['September', 'January']
+2026-05-01 12:01:25,788 INFO [10414] done: fee=75120.0 ielts=6.5 duration=2.0 intakes=['May', 'September', 'January']
+2026-05-01 12:01:25,885 INFO [10392] done: fee=None ielts=6.5 duration=None intakes=['May', 'September']
+2026-05-01 12:01:26,953 INFO [10398] done: fee=None ielts=6.5 duration=1.0 intakes=['May', 'January']
+2026-05-01 12:01:27,137 INFO [10416] done: fee=75120.0 ielts=6.5 duration=2.0 intakes=['May', 'September', 'January']
+2026-05-01 12:01:27,149 INFO [10415] done: fee=75120.0 ielts=6.5 duration=2.0 intakes=['May', 'September', 'January']
+2026-05-01 12:01:28,158 INFO [10413] done: fee=75120.0 ielts=7.0 duration=4.0 intakes=['May', 'January']
+2026-05-01 12:01:28,286 INFO [10417] done: fee=75120.0 ielts=7.0 duration=4.0 intakes=['May', 'September', 'January']
+2026-05-01 12:01:28,431 INFO [10419] done: fee=69615.0 ielts=6.5 duration=0.67 intakes=['May', 'September', 'January']
+2026-05-01 12:01:28,476 INFO [10418] done: fee=75120.0 ielts=6.5 duration=2.0 intakes=['May', 'September', 'January']
+2026-05-01 12:01:29,309 INFO [10408] done: fee=62361.0 ielts=6.5 duration=1.0 intakes=['May', 'September', 'January']
+2026-05-01 12:01:29,346 INFO [10420] done: fee=75120.0 ielts=7.0 duration=3.0 intakes=['May', 'September', 'January']
+2026-05-01 12:01:29,365 INFO [10411] done: fee=None ielts=6.5 duration=3.0 intakes=None
+2026-05-01 12:01:32,480 INFO [10402] done: fee=None ielts=6.5 duration=0.33 intakes=['May', 'September']
+2026-05-01 12:01:33,103 INFO [10412] done: fee=84480.0 ielts=7.0 duration=0.67 intakes=['May']
+2026-05-01 12:01:36,503 INFO [10427] done: fee=81600.0 ielts=6.5 duration=0.67 intakes=['May', 'September', 'January']
+2026-05-01 12:01:36,679 INFO [10423] done: fee=None ielts=6.5 duration=1.0 intakes=['May', 'September', 'January']
+2026-05-01 12:01:36,867 INFO [10424] done: fee=75120.0 ielts=6.5 duration=2.0 intakes=['May', 'September', 'January']
+2026-05-01 12:01:37,395 INFO [10422] done: fee=None ielts=6.5 duration=0.33 intakes=['May', 'September', 'January']
+2026-05-01 12:01:37,629 INFO [10425] done: fee=None ielts=6.5 duration=3.0 intakes=['September', 'January']
+2026-05-01 12:01:37,880 INFO [10421] done: fee=None ielts=6.5 duration=0.67 intakes=['May', 'September', 'January']
+2026-05-01 12:01:38,601 INFO [10426] done: fee=60264.0 ielts=6.5 duration=2.0 intakes=['May', 'September', 'January']
+2026-05-01 12:01:38,883 INFO [10428] done: fee=59670.0 ielts=6.5 duration=1.0 intakes=['May', 'September', 'January']
+2026-05-01 12:01:39,823 INFO [10433] done: fee=81345.0 ielts=6.5 duration=0.67 intakes=['May', 'September', 'January']
+2026-05-01 12:01:40,036 INFO [10436] done: fee=75120.0 ielts=7.0 duration=2.0 intakes=['May', 'September', 'January']
+2026-05-01 12:01:41,176 INFO [10438] done: fee=75120.0 ielts=7.0 duration=3.0 intakes=['May', 'September', 'January']
+2026-05-01 12:01:42,282 INFO [10431] done: fee=None ielts=6.5 duration=None intakes=['May', 'September', 'January']
+2026-05-01 12:01:42,338 INFO [10439] done: fee=75120.0 ielts=7.0 duration=3.0 intakes=['May', 'September', 'January']
+2026-05-01 12:01:43,158 INFO [10435] done: fee=None ielts=6.5 duration=None intakes=None
+2026-05-01 12:01:43,817 INFO [10434] done: fee=None ielts=6.5 duration=1.0 intakes=None
+2026-05-01 12:01:44,395 INFO [10442] done: fee=57960.0 ielts=6.0 duration=0.67 intakes=['May', 'September', 'January']
+2026-05-01 12:01:44,648 INFO [10429] done: fee=None ielts=6.5 duration=0.42 intakes=['May', 'September', 'January']
+2026-05-01 12:01:44,852 INFO [10441] done: fee=57960.0 ielts=6.0 duration=0.67 intakes=['May', 'September', 'January']
+2026-05-01 12:01:44,959 INFO [10443] done: fee=75120.0 ielts=6.5 duration=2.0 intakes=['May', 'September', 'January']
+2026-05-01 12:01:46,779 INFO [10437] done: fee=None ielts=6.5 duration=None intakes=['May', 'September', 'January']
+2026-05-01 12:01:47,638 INFO [10432] done: fee=None ielts=6.5 duration=0.33 intakes=['May', 'September', 'January']
+2026-05-01 12:01:47,735 INFO [10430] done: fee=60564.0 ielts=6.5 duration=1.0 intakes=['May', 'September', 'January']
+2026-05-01 12:01:48,016 INFO [10450] done: fee=75120.0 ielts=6.5 duration=2.0 intakes=['May', 'September', 'January']
+2026-05-01 12:01:48,345 INFO [10451] done: fee=75120.0 ielts=6.5 duration=2.0 intakes=['May', 'September', 'January']
+2026-05-01 12:01:48,893 INFO [10449] done: fee=75120.0 ielts=6.5 duration=2.0 intakes=['May', 'September', 'January']
+2026-05-01 12:01:48,994 INFO [10448] done: fee=None ielts=6.5 duration=2.0 intakes=None
+2026-05-01 12:01:49,882 INFO [10440] done: fee=75120.0 ielts=7.0 duration=3.0 intakes=['May', 'September', 'January']
+2026-05-01 12:01:50,115 INFO [10454] done: fee=75120.0 ielts=7.0 duration=3.0 intakes=['May', 'September', 'January']
+2026-05-01 12:01:51,034 INFO [10455] done: fee=75120.0 ielts=6.5 duration=2.0 intakes=['May', 'September', 'January']
+2026-05-01 12:01:51,190 INFO [10453] done: fee=75120.0 ielts=7.0 duration=3.0 intakes=['May', 'September', 'January']
+2026-05-01 12:01:51,668 INFO [10444] done: fee=None ielts=6.5 duration=0.33 intakes=['May', 'September', 'January']
+2026-05-01 12:01:52,542 INFO [10446] done: fee=None ielts=6.5 duration=None intakes=['May', 'September', 'January']
+2026-05-01 12:01:52,686 INFO [10445] done: fee=61851.0 ielts=6.5 duration=1.0 intakes=['May', 'September', 'January']
+2026-05-01 12:01:53,009 INFO [10447] done: fee=49074.0 ielts=6.5 duration=2.0 intakes=['May', 'September', 'January']
+2026-05-01 12:01:53,325 INFO [10462] done: fee=75120.0 ielts=6.5 duration=2.0 intakes=['May', 'September', 'January']
+2026-05-01 12:01:53,833 INFO [10461] done: fee=75120.0 ielts=7.0 duration=3.0 intakes=['May', 'September', 'January']
+2026-05-01 12:01:54,202 INFO [10464] done: fee=75120.0 ielts=6.5 duration=2.0 intakes=['May', 'January']
+2026-05-01 12:01:55,500 INFO [10465] done: fee=75120.0 ielts=7.0 duration=2.0 intakes=['January']
+2026-05-01 12:01:56,162 INFO [10456] done: fee=None ielts=6.5 duration=None intakes=None
+2026-05-01 12:01:56,743 INFO [10452] done: fee=None ielts=6.5 duration=2.0 intakes=None
+2026-05-01 12:01:58,098 INFO [10467] done: fee=87960.0 ielts=7.0 duration=2.0 intakes=['May']
+2026-05-01 12:01:58,335 INFO [10457] done: fee=None ielts=6.5 duration=1.0 intakes=None
+2026-05-01 12:01:58,950 INFO [10459] done: fee=None ielts=6.5 duration=1.0 intakes=None
+2026-05-01 12:01:59,849 INFO [10458] done: fee=60369.0 ielts=6.5 duration=1.0 intakes=['May', 'September', 'January']
+2026-05-01 12:02:00,764 INFO [10463] done: fee=75120.0 ielts=6.5 duration=2.0 intakes=['May', 'September', 'January']
+2026-05-01 12:02:00,788 INFO [10460] done: fee=None ielts=6.5 duration=None intakes=['May', 'September', 'January']
+2026-05-01 12:02:01,302 INFO [10471] done: fee=75120.0 ielts=7.0 duration=2.0 intakes=['May', 'September', 'January']
+2026-05-01 12:02:01,980 INFO [10473] done: fee=75120.0 ielts=7.0 duration=2.0 intakes=['May', 'September', 'January']
+2026-05-01 12:02:02,093 INFO [10468] done: fee=81600.0 ielts=7.0 duration=2.0 intakes=['May', 'September']
+2026-05-01 12:02:02,405 INFO [10477] done: fee=None ielts=7.0 duration=0.67 intakes=['May']
+2026-05-01 12:02:02,670 WARNING [10472] https://bond.edu.au/program/master-occupational-therapy/master-occupational-therapy-prerequisites — no data-program-detail-url found
+2026-05-01 12:02:03,735 INFO [10466] done: fee=None ielts=6.5 duration=2.0 intakes=None
+2026-05-01 12:02:04,113 INFO [10469] done: fee=81600.0 ielts=7.0 duration=0.67 intakes=['May', 'September']
+2026-05-01 12:02:05,859 INFO [10470] done: fee=58929.0 ielts=6.5 duration=1.0 intakes=['May', 'September', 'January']
+2026-05-01 12:02:06,133 INFO [10481] done: fee=57960.0 ielts=6.0 duration=0.67 intakes=['May', 'September', 'January']
+2026-05-01 12:02:06,178 INFO [10474] done: fee=61074.0 ielts=6.5 duration=1.0 intakes=['September', 'January']
+2026-05-01 12:02:06,440 INFO [10476] done: fee=60435.0 ielts=6.5 duration=1.0 intakes=['May', 'September', 'January']
+2026-05-01 12:02:06,496 INFO [10483] done: fee=54399.0 ielts=7.0 duration=2.0 intakes=['May']
+2026-05-01 12:02:07,196 INFO [10486] done: fee=75120.0 ielts=6.5 duration=2.0 intakes=['May', 'September', 'January']
+2026-05-01 12:02:07,590 INFO [10485] done: fee=75120.0 ielts=6.5 duration=2.0 intakes=['May', 'September', 'January']
+2026-05-01 12:02:08,464 INFO [10475] done: fee=60309.0 ielts=6.5 duration=1.0 intakes=['May', 'September', 'January']
+2026-05-01 12:02:10,670 INFO [10479] done: fee=60309.0 ielts=6.5 duration=1.0 intakes=['May', 'September', 'January']
+2026-05-01 12:02:10,699 INFO [10478] done: fee=None ielts=6.5 duration=None intakes=['May', 'September', 'January']
+2026-05-01 12:02:10,732 INFO [10480] done: fee=None ielts=6.5 duration=2.0 intakes=None
+2026-05-01 12:02:11,511 INFO [10492] done: fee=49983.0 ielts=6.5 duration=1.0 intakes=['May', 'September', 'January']
+2026-05-01 12:02:12,063 INFO [10484] done: fee=75120.0 ielts=7.0 duration=3.0 intakes=['May', 'September', 'January']
+2026-05-01 12:02:13,026 INFO [10482] done: fee=None ielts=7.0 duration=2.0 intakes=['May', 'September', 'January']
+2026-05-01 12:02:14,556 INFO [10487] done: fee=None ielts=6.5 duration=2.0 intakes=['January']
+2026-05-01 12:02:15,378 INFO [10488] done: fee=None ielts=6.5 duration=1.0 intakes=['January']
+2026-05-01 12:02:15,623 INFO [10491] done: fee=63600.0 ielts=7.0 duration=2.0 intakes=['May']
+2026-05-01 12:02:15,641 INFO [10497] done: fee=None ielts=7.0 duration=2.0 intakes=['May', 'January']
+2026-05-01 12:02:15,910 INFO [10498] done: fee=None ielts=7.0 duration=2.0 intakes=['January']
+2026-05-01 12:02:15,918 INFO [10499] done: fee=None ielts=7.0 duration=2.0 intakes=['May', 'September', 'January']
+2026-05-01 12:02:16,773 INFO [10500] done: fee=75120.0 ielts=6.5 duration=2.0 intakes=['May', 'September', 'January']
+2026-05-01 12:02:17,129 INFO [10501] done: fee=75120.0 ielts=7.0 duration=3.0 intakes=['May', 'September', 'January']
+2026-05-01 12:02:17,150 INFO [10502] done: fee=75120.0 ielts=7.0 duration=3.0 intakes=['May', 'September', 'January']
+2026-05-01 12:02:18,141 INFO [10494] done: fee=61074.0 ielts=6.5 duration=1.0 intakes=['May', 'September', 'January']
+2026-05-01 12:02:19,688 INFO [10489] done: fee=None ielts=6.5 duration=1.0 intakes=None
+2026-05-01 12:02:19,936 INFO [10493] done: fee=None ielts=6.5 duration=0.67 intakes=None
+2026-05-01 12:02:21,063 INFO [10490] done: fee=None ielts=6.5 duration=3.0 intakes=None
+2026-05-01 12:02:21,837 INFO [10496] done: fee=81600.0 ielts=6.5 duration=0.67 intakes=['May', 'September', 'January']
+2026-05-01 12:02:22,947 INFO [10495] done: fee=None ielts=6.5 duration=1.0 intakes=['May', 'September', 'January']
+2026-05-01 12:02:24,630 INFO [10503] done: fee=None ielts=None duration=2.0 intakes=['May', 'September', 'January']
+2026-05-01 12:02:24,633 INFO Done in 79.4s — updated 124/126 rows  (fee=77  ielts=123)
+2026-05-01 12:02:24,634 INFO Next step: run scripts/bulk_approve.py --university-id 22
+root@university-and-course-data:~/University-and-Course-data/backend-py# 
