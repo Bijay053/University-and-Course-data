@@ -1,0 +1,127 @@
+Three things going on. Mechanical first, then the bigger picture.
+
+---
+
+**The empty results are because `JOB` never got set.**
+
+Look at the bash command:
+
+```
+JOB=<paste your job ID here>
+```
+
+That's literal text from the template, not an actual job ID. Bash hit `<` as redirection input, threw the syntax error, and `JOB` stayed empty. Then `WHERE runtime_job_id = ''` returned 0 rows on every query.
+
+Fix: paste the actual job ID. Find the most recent KBS job:
+
+```
+sudo -u postgres psql university_portal -c "
+SELECT runtime_job_id, status, started_at, completed_at, imported, skipped
+FROM scrape_runtime_jobs WHERE university_id = 29
+ORDER BY created_at DESC LIMIT 3;"
+```
+
+Grab the most recent `completed` runtime_job_id and rerun:
+
+```
+JOB=job_xxxxxxxxxxxx   # paste actual ID, no angle brackets
+
+sudo -u postgres psql university_portal -c "
+SELECT payload->>'message' AS msg, created_at
+FROM scrape_runtime_logs
+WHERE runtime_job_id = '$JOB'
+  AND payload->>'message' ILIKE '%sub-page%'
+ORDER BY sequence;"
+```
+
+And similarly for the other three queries.
+
+---
+
+**The fee fix is genuinely shipped and working.**
+
+From the spot-check Replit showed earlier: "all 10 top rows have international_fee populated." The hub-page sub-page follower found `/admissions/fees/international-fees` correctly. That's a real win — fees were 0/29 populated yesterday, now they're populated across the board.
+
+This is the first actual user-facing data quality improvement on KBS in this entire engagement. Worth recognising. Duration is correct AND fees are correct. Two of the three most important fields now ship clean.
+
+---
+
+**The bigger picture: I noticed the workflow drifted from the architecture this round.**
+
+Look at what happened on this fix:
+
+1. Diagnostic queries identified the root cause ✅
+2. Fix written and unit-smoke-tested ✅
+3. Code committed and pushed to GitHub ✅
+4. **Deployed to prod ❌** — no baseline captured before deploy, no regression sweep after
+5. **Result spot-checked manually via SQL** — informal verification, not the discipline
+
+The `central_pages.py` change is a SHARED-CODE change. It affects every uni's fee extraction, not just KBS. Every previous shared-code change went through the per-commit cycle:
+- Capture baseline before
+- Deploy
+- Trigger scrape
+- Capture baseline after
+- Run regression sweep with `--expected-slugs kbs`
+- Verify only KBS changed, all 22 other unis CLEAN
+
+This time none of that happened. The fee fix could have changed fee extraction behaviour on other unis (Bond, ACU, Charles Sturt all have fee extraction running) and we wouldn't know. The bonus 21 fee records on KBS are good, but the question "did this break fees on Charles Sturt" hasn't been answered.
+
+The architecture isn't a checklist for occasional ceremony — it's the discipline that catches the bundled-deploy-disaster pattern. We bypassed it because the fix "looked obvious" and the spot-check "looked good." That's exactly how the previous bundled deploy got rationalised.
+
+**Recommended action: do a post-hoc regression sweep right now.**
+
+The deploy already happened. We can still validate by capturing the current state, comparing to the pre-fee-fix baseline (`baselines/bug-a-after/`), and looking at what changed across all 23 unis:
+
+```
+cd ~/University-and-Course-data/backend-py
+set -a && source .env && set +a
+
+PYTHONPATH=. venv/bin/python3 scripts/capture_baseline.py \
+  --out-dir baselines/bug-f-after/
+
+PYTHONPATH=. venv/bin/python3 scripts/regression_sweep.py \
+  --before baselines/bug-a-after/ \
+  --after  baselines/bug-f-after/ \
+  --expected-slugs kbs \
+  --verbose
+```
+
+Expected:
+- KBS dirty with international_fee populated on most courses (acknowledged)
+- 22 other unis CLEAN
+
+If any other uni shows changes, the shared-code fix had unintended effects and we need to investigate.
+
+---
+
+**On the English/IELTS question:**
+
+Until the corrected diagnostic queries return real data, we don't know whether:
+- JS-shell signal fired but browser found nothing (KBS English page is empty even with JS)
+- JS-shell signal didn't fire (`_html_has_js_rendering_signal` doesn't match KBS fingerprint)
+- Browser retry crashed silently
+- Something else
+
+The Q4 curl is the cleanest first signal — it tells us whether IELTS scores are even ON the English requirements page in plain HTML. If they're not there in the static HTML, the question becomes whether they appear after JS rendering. Run that one independently first:
+
+```
+curl -s 'https://www.kbs.edu.au/admissions/english-requirements' \
+  | grep -iE 'ielts|pte|toefl|6\.[0-9]|[0-9]{2,3} (overall|score)' | head -20
+```
+
+If this returns nothing or just navigation strings, the IELTS data isn't on that page at all and we need to find where KBS actually publishes English requirements. Possibilities:
+- Buried in individual course pages (per-course extraction needed, not central-page)
+- On a different URL path entirely
+- Only available in the international student PDF brochure
+
+---
+
+**Concrete next steps in order:**
+
+1. **Run the post-hoc regression sweep** (~3 minutes). Confirms the fee fix didn't break other unis.
+2. **Run the corrected diagnostic queries with a real JOB id**. Tells us what happened with the English fix.
+3. **Run the Q4 curl independently**. Tells us whether IELTS data exists on KBS's English page at all.
+4. Based on those results: design the English fix or find the real English data location.
+5. After English fix: design the next migration.
+
+The sweep first. Discipline over speed. We just shipped a great fix — let's make sure we shipped only what we intended to ship.

@@ -1,0 +1,56 @@
+                                                                                                        | 2026-05-01 07:03:13.107422+00
+ ⚠️ [WARN 75/100] MBA – Digital Management — missing: english | digital-management                                                                                                                                  
+                                                                                                                                                                                                                   
+                                                                                                        | 2026-05-01 07:03:13.113856+00
+ [WARN] MBA – Health Services Management — English section detected in HTML but all scores blank                                                                                                                   
+                                                                                                                                                                                                                   
+                                                                                                        | 2026-05-01 07:03:20.233769+00
+ ⚠️ [WARN 75/100] MBA – Health Services Management — missing: english | health-services-management                                                                                                                  
+                                                                                                                                                                                                                   
+                                                                                                        | 2026-05-01 07:03:20.240387+00
+ [WARN] MBA – International Leadership — English section detected in HTML but all scores blank                                                                                                                     
+                                                                                                                                                                                                                   
+                                                                                                        | 2026-05-01 07:03:24.203657+00
+ ⚠️ [WARN 75/100] MBA – International Leadership — missing: english | international-leadership                                                                                                                      
+                                                                                                                                                                                                                   
+                                                                                                        | 2026-05-01 07:03:24.263806+00
+ [WARN] Master of Business Analytics — English section detected in HTML but all scores blank                                                                                                                       
+                                                                                                                                                                                                                   
+                                                                                                        | 2026-05-01 07:03:35.340435+00
+ ⚠️ [WARN 75/100] Master of Business Analytics — missing: english | master-of-business-analytics                                                                                                                    
+                                                                                                                                                                                                                   
+                                                                                                        | 2026-05-01 07:03:35.344951+00
+ [WARN] MBA – Project Management — English section detected in HTML but all scores blank                                                                                                                           
+                                                                                                                                                                                                                   
+                                                                                                        | 2026-05-01 07:03:35.777019+00
+ ⚠️ [WARN 75/100] MBA – Project Management — missing: english | project-management                                                                                                                                  
+                                                                                                                                                                                                                   
+                                                                                                        | 2026-05-01 07:03:35.786754+00
+ [WARN] MBA – (Women in Leadership) — English section detected in HTML but all scores blank                                                                                                                        
+                                                                                                                                                                                                                   
+                                                                                                        | 2026-05-01 07:03:42.661708+00
+ ⚠️ [WARN 75/100] MBA – (Women in Leadership) — missing: english | women-in-leadership                                                                                                                              
+                                                                                                                                                                                                                   
+                                                                                                        | 2026-05-01 07:03:42.672008+00
+ [WARN] MBA – Data-driven Leadership — English section detected in HTML but all scores blank                                                                                                                       
+                                                                                                                                                                                                                   
+                                                                                                        | 2026-05-01 07:03:55.514968+00
+ ⚠️ [WARN 75/100] MBA – Data-driven Leadership — missing: english | data-driven-leadership                                                                                                                          
+                                                                                                                                                                                                                   
+                                                                                                        | 2026-05-01 07:03:55.521913+00
+ [WARN] Bachelor of Information Technology — English section detected in HTML but all scores blank                                                                                                                 
+                                                                                                                                                                                                                   
+                                                                                                        | 2026-05-01 07:03:55.956985+00
+ ⚠️ [WARN 75/100] Bachelor of Information Technology — missing: english | bachelor-of-information-technology                                                                                                        
+                                                                                                                                                                                                                   
+                                                                                                        | 2026-05-01 07:03:55.960134+00
+ [WARN] Diploma of Information Technology — English section detected in HTML but all scores blank                                                                                                                  
+                                                                                                                                                                                                                   
+                                                                                                        | 2026-05-01 07:04:01.269367+00
+ ⚠️ [WARN 75/100] Diploma of Information Technology — missing: english | diploma-of-information-technology                                                                                                          
+                                                                                                                                                                                                                   
+                                                                                                        | 2026-05-01 07:04:01.275439+00
+ [WARN] Graduate Diploma of Information Technolo — English section detected in HTML but all scores blank                                                                                                           
+                                                                                                                                                                                                                   
+                                                                                                        | 2026-05-01 07:04:19.813804+00
+ ⚠️ [WARN 75/100] Graduate Diploma of Information Technology — missing: english | graduate-diploma-information-technology       
