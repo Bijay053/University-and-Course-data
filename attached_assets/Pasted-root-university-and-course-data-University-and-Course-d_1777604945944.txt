@@ -1,0 +1,99 @@
+root@university-and-course-data:~/University-and-Course-data/backend-py# # ── Re-trigger KBS scrape ──
+curl -s -X POST http://localhost:80/api/scrape/start \
+  -H "Content-Type: application/json" \
+  -d '{"university_id": 29}' | python3 -m json.tool
+{
+    "jobId": "job_6f1ff0470cfd",
+    "runtimeJobId": "job_6f1ff0470cfd",
+    "status": "queued",
+    "ok": true
+}
+root@university-and-course-data:~/University-and-Course-data/backend-py# watch -n 60 "sudo -u postgres psql university_portal -c \"
+SELECT runtime_job_id, status, started_at, completed_at, imported, skipped, errors
+FROM scrape_runtime_jobs WHERE university_id = 29
+ORDER BY created_at DESC LIMIT 1;\""
+root@university-and-course-data:~/University-and-Course-data/backend-py# watch -n 60 "sudo -u postgres psql university_portal -c \"
+SELECT runtime_job_id, status, started_at, completed_at, imported, skipped, errors
+FROM scrape_runtime_jobs WHERE university_id = 29
+ORDER BY created_at DESC LIMIT 1;\""
+root@university-and-course-data:~/University-and-Course-data/backend-py# sudo -u postgres psql university_portal -c "
+SELECT runtime_job_id, status, started_at, completed_at, imported, skipped, errors
+FROM scrape_runtime_jobs WHERE university_id = 29
+ORDER BY created_at DESC LIMIT 1;"
+  runtime_job_id  | status |          started_at           | completed_at | imported | skipped | errors 
+------------------+--------+-------------------------------+--------------+----------+---------+--------
+ job_6f1ff0470cfd | queued | 2026-05-01 03:03:37.795975+00 |              |        0 |       0 |      0
+(1 row)
+
+root@university-and-course-data:~/University-and-Course-data/backend-py# ^[[200~sudo -u postgres psql university_portal -c "
+> SELECT runtime_job_id, status, started_at, completed_at, imported, skipped, errors
+> FROM scrape_runtime_jobs WHERE university_id = 29
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> q
+> ^C
+root@university-and-course-data:~/University-and-Course-data/backend-py# sudo -u postgres psql university_portal -c "
+SELECT runtime_job_id, status, started_at, completed_at, imported, skipped, errors
+FROM scrape_runtime_jobs WHERE university_id = 29
+ORDER BY created_at DESC LIMIT 1;"
+  runtime_job_id  | status |          started_at           | completed_at | imported | skipped | errors 
+------------------+--------+-------------------------------+--------------+----------+---------+--------
+ job_6f1ff0470cfd | queued | 2026-05-01 03:03:37.795975+00 |              |        0 |       0 |      0
+(1 row)
+
+root@university-and-course-data:~/University-and-Course-data/backend-py# # ── 1. Current job status ──
+sudo -u postgres psql university_portal -c "
+SELECT runtime_job_id, status, started_at, completed_at, imported, skipped, errors
+FROM scrape_runtime_jobs WHERE university_id = 29
+ORDER BY created_at DESC LIMIT 1;"
+
+# ── 2. Is prod Celery actually working on it? ──
+sudo journalctl -u uni-celery --since "2026-05-01 03:03:00" --no-pager \
+  | grep -v "blob data" | grep -E "kbs|KBS|job_6f1ff|scrape_university|ForkPoolWorker" \
+  | tail -20
+  runtime_job_id  | status |          started_at           | completed_at | imported | skipped | errors 
+------------------+--------+-------------------------------+--------------+----------+---------+--------
+ job_6f1ff0470cfd | queued | 2026-05-01 03:03:37.795975+00 |              |        0 |       0 |      0
+(1 row)
+
+root@university-and-course-data:~/University-and-Course-data/backend-py# # ── Check if the Celery queue actually has the job ──
+redis-cli -p 6379 llen scrape
+redis-cli -p 6379 lrange scrape 0 5 | python3 -m json.tool 2>/dev/null | grep -E "job_6f|kwargs"
+(integer) 0
+root@university-and-course-data:~/University-and-Course-data/backend-py# # ── Step 1: Mark the zombie job as failed so it doesn't block a new dispatch ──
+sudo -u postgres psql university_portal -c "
+UPDATE scrape_runtime_jobs
+SET status='failed', completed_at=NOW()
+WHERE runtime_job_id='job_6f1ff0470cfd' AND status='queued';"
+UPDATE 1
+root@university-and-course-data:~/University-and-Course-data/backend-py# # ── Step 2: Re-trigger KBS scrape ──
+curl -s -X POST http://localhost:80/api/scrape/start \
+  -H "Content-Type: application/json" \
+  -d '{"university_id": 29}' | python3 -m json.tool
+{
+    "jobId": "job_291af5ab41bd",
+    "runtimeJobId": "job_291af5ab41bd",
+    "status": "queued",
+    "ok": true
+}
+root@university-and-course-data:~/University-and-Course-data/backend-py# # ── Step 3: Immediately verify the task actually landed in Redis ──
+sleep 2
+redis-cli -p 6379 llen scrape
+sudo -u postgres psql university_portal -c "
+SELECT runtime_job_id, status FROM scrape_runtime_jobs
+WHERE university_id = 29 ORDER BY created_at DESC LIMIT 1;"
+(integer) 0
+  runtime_job_id  | status  
+------------------+---------
+ job_291af5ab41bd | running
+(1 row)
+
+root@university-and-course-data:~/University-and-Course-data/backend-py# sudo journalctl -u uni-celery --since "now" --no-pager -f | grep -v "blob data" | head -5
