@@ -1,0 +1,111 @@
+The KBS scrape result is genuinely good. Three things to acknowledge, then one thing to push back on, then next steps.
+
+---
+
+**The wins:**
+
+**1. The grad certs returned.** All three target courses are in the ADDED list:
+- Graduate Certificate in Accounting ✓
+- Graduate Certificate in Business Administration ✓
+- Graduate Certificate in Business Analytics ✓
+
+Plus 5 BONUS courses I didn't expect: Graduate Certificate in Information Technology, Graduate Diploma of Business Administration, Master of Business Analytics, Master of Information Technology, Master of Professional Accounting. That's the unit-confusion bug fix surfacing other affected courses too — same root cause was dropping them silently. KBS staged count went from 22 to 29 (+8 net). Bigger blast radius than the original 3-course estimate, in the good direction.
+
+**2. The MISSING-AFTER sweep fix shipped.** No more silent passes when a uni snapshot doesn't get captured. Sweep is now honest about incomplete runs.
+
+**3. The zombie-job fix shipped.** `_sync_dispose()` working on prod, `sleep 15` workaround no longer needed.
+
+Three fixes in one cycle, all clean. Architecture working.
+
+---
+
+**The pushback:**
+
+You wrote: "The 16 method-only changes (`extraction_method.duration_term: 'gemini_primary' → None`) are the Bug A.2 fix doing its job — Gemini can no longer quietly override `duration_term` when `duration` is already owned by a structural method."
+
+We established yesterday that `extraction_method.duration_term: 'gemini_primary' → None` is a *provenance metadata* change — not a value change. The actual `duration_term` field on those 16 courses is unchanged. The sweep diff format only labels something method-only when `_VALUE_FIELDS` are unaffected.
+
+So "Gemini can no longer quietly override `duration_term`" is the wrong reading. Gemini was never *overriding* the term value — it was *being credited as the source* in the provenance dict, while the actual term value came from regex/structural extraction. After Bug A.2, Gemini correctly isn't credited as the source anymore (because the orchestrator skips Gemini for those fields when regex won), but the values were always coming from regex, both before and after.
+
+The Bug A.2 fix is real and shipped — the proof is the 8 ADDED courses, not the provenance dict cleanup. The provenance cleanup is a side effect, not the primary effect.
+
+This matters because if we don't get the interpretation right, the next migration's sweep diff might be misread the same way and we'll miss a real signal hiding in metadata churn.
+
+---
+
+**On the swap to 21 vs 22 in the before-baseline:**
+
+Look at the sweep header:
+
+```
+[EXPECTED] kbs (uni_id=29)  before=21  after=29
+```
+
+21, not 22. Earlier baselines all showed 22. Either:
+- The before-baseline was captured at a different time than the after-baseline (different uni state)
+- Something dropped a course between the previous post-Bug-A baseline and the new before-baseline
+
+Worth confirming the before-baseline is from the right point in time. If it's from before Bug A landed, the diff is showing Bug A + A.2 + zombie-fix combined effects, not just A.2's effect. Not a problem if so, just label it correctly.
+
+```
+ls -lah ~/University-and-Course-data/baselines/before-bug-a2/
+ls -lah ~/University-and-Course-data/baselines/after-bug-a2/
+```
+
+The file timestamps will tell us when each baseline was captured.
+
+---
+
+**On the first scrape job stalling (job_8d3660df58cb → stopped):**
+
+You wrote: "likely killed when you restarted the Celery service before dispatching the second one — that's expected behaviour."
+
+The log shows the first job went to `queued` then `stopped` within 20 seconds, before any second job was dispatched. The second scrape (`job_2d29494bfd5e`) was triggered AFTER you saw the first one stuck. That's the original zombie-job pattern, not a Celery restart artifact.
+
+Meaning: the `_sync_dispose()` fix doesn't fully address the race. It worked on the second attempt (clean run all the way through), but the first attempt still hit the stall. Either:
+- The fix shipped after the first attempt but before the second
+- The race condition still exists, just less consistently
+
+Worth noting in the Bug C ticket. If the fix shipped between the two attempts, the `before-bug-a2` baseline might have been captured on a slightly different code state than the `after-bug-a2` baseline. Not blocking, but worth understanding.
+
+---
+
+**Where things stand:**
+
+- **Bug A + A.2:** SHIPPED. 3 targeted grad certs back + 5 bonus courses recovered. Net +8 to KBS staging.
+- **Sweep MISSING-AFTER fix:** SHIPPED. Sweep can no longer false-pass.
+- **Zombie-job fix:** PARTIALLY shipped (worked on retry, first attempt still stalled). Watch for recurrence.
+- **Bug B:** Still queued. With A.2 in place, B is a smaller-scope safety net.
+- **Charles Sturt 92-course gap:** Still queued.
+- **Reviewer sign-off:** 8 new KBS courses sitting in `scraped_courses` waiting for admin approve clicks before they reach the user-facing `courses` table.
+
+---
+
+**Concrete next actions:**
+
+1. **Confirm the before-baseline timestamp.** `ls -lah` on both directories. Tells us whether this sweep is measuring just A.2's effect or A+A.2+zombie-fix combined.
+
+2. **Check the bonus 5 courses are real.** Spot-query staged data:
+
+```
+sudo -u postgres psql university_portal -c "
+SELECT course_name, duration, duration_term, course_location
+FROM scraped_courses
+WHERE university_id = 29
+  AND course_name IN (
+    'Graduate Certificate in Information Technology',
+    'Graduate Diploma of Business Administration',
+    'Master of Business Analytics',
+    'Master of Information Technology',
+    'Master of Professional Accounting'
+  )
+ORDER BY course_name;"
+```
+
+Duration values should be sensible (8 months, 1-2 years, etc.). If any of them have weird values, the unit-confusion fix has a corner case we haven't caught.
+
+3. **Ship the deploy script template fix** (the one I flagged before Bug A: replace `python` with `venv/bin/python3`, fix arg names, etc.). This is overdue and Bug B will hit the same problems if it isn't done.
+
+4. **Decide on Bug B priority.** Now that A.2 is in, Bug B is a safety net rather than a primary fix. Worth opening as a tracked ticket but probably not the next thing to ship. Charles Sturt 92-course gap is more user-facing and might be higher priority.
+
+Paste the timestamp and bonus-course-values queries, then we can decide what's next.
