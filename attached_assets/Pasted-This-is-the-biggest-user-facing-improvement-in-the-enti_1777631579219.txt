@@ -1,0 +1,130 @@
+This is the biggest user-facing improvement in the entire engagement. Genuine, verified, ground-truth-checked progress.
+
+---
+
+**The wins, in plain numbers:**
+
+| University | Before | After | Change |
+|---|---|---|---|
+| AUT (20) | 0 | 70 | +70 |
+| KBS (8) | 0 | 29 | +29 |
+| CSU (4) | 173 | 184 | +11 (after dedup of 8 garbled-row duplicates) |
+| UTas (5) | 0 | 1 | +1 |
+| VIT (6) | 19 | 30 | +11 |
+| SCU (17) | 0 | 1 | +1 |
+| **Total live courses added** | | | **+123** |
+
+Plus name quality cleanup that admin reviewers were going to have to handle manually anyway:
+- 5 "Of Of" double-preposition fixes
+- 143 capitalised mid-title "Of" → "of" normalisations
+- 6 truncated names expanded (Info Studies, Pro Psych, Int Education, Speech Pathology, Diploma of Exercise, Ageing Pastoral)
+- 8 duplicate rows safely deleted (the deduplication after the name-fix is the right pattern)
+- 11 VIT old-format Bbus/Mba prefix names → proper format
+- "Master of It 12" → "Master of Information Technology (12 months)" (URL slug verified)
+
+Final state across all 8 universities: `pending_ready = 0`, `legacy_gap = 0`, zero duplicates. Verifiable end-to-end.
+
+---
+
+**Two things flagged in the summary that need addressing before this is fully done:**
+
+**Issue 1 — GitHub push conflict.**
+
+From the summary: "local is 10+ commits ahead of github/main — the bulk_approve endpoint and pipeline fixes from Replit haven't been pushed to GitHub yet, so prod is running from the heredoc script only."
+
+This is the same divergence pattern that caused the bundled-deploy disaster three weeks ago. Prod has code that GitHub doesn't have. If prod ever rebuilds from GitHub (server replacement, container redeploy, anything), all of this work disappears.
+
+What needs to happen:
+
+```
+cd ~/University-and-Course-data
+git status                                # confirm what's local-only
+git log origin/main..HEAD --oneline       # see the divergent commits
+
+# Either fast-forward push if local is a clean superset:
+git push origin main
+
+# Or if there's been remote work (unlikely but check):
+git fetch origin
+git log HEAD..origin/main --oneline       # any new remote commits?
+```
+
+If it's a clean superset, just push. If there's remote-only commits we need to reconcile carefully — don't force-push without knowing what we'd lose. The bulk_approve script and pipeline fixes need to land on GitHub today.
+
+**Issue 2 — The pending/review queue is not actually empty.**
+
+The live count summary showed `legacy_gap = 0` and `pending_ready = 0`, which is true for the categories we ran bulk_approve on. But the summary also flagged:
+
+> 36 VIT pending/review fresh-scrape rows need admin review before promotion
+> 19 CSU pending/review rows similarly need review
+> They failed the quality gate — likely a fee/IELTS field issue on specific courses
+
+That's 55 courses sitting in `auto_publish_status = 'needs_review'` that we didn't bulk-approve because they have unknown quality issues. Worth running the diagnostic:
+
+```
+sudo -u postgres psql university_portal -c "
+SELECT u.name AS uni,
+       sc.id AS sc_id,
+       sc.course_name,
+       sc.confidence,
+       sc.auto_publish_status,
+       CASE WHEN sc.international_fee IS NULL THEN 'fee_missing' ELSE NULL END AS fee_issue,
+       CASE WHEN sc.ielts_overall IS NULL THEN 'ielts_missing' ELSE NULL END AS ielts_issue,
+       CASE WHEN sc.duration IS NULL OR sc.duration = 0 THEN 'duration_missing' ELSE NULL END AS duration_issue
+FROM scraped_courses sc
+JOIN universities u ON u.id = sc.university_id
+WHERE sc.university_id IN (4, 6)
+  AND sc.auto_publish_status = 'needs_review'
+ORDER BY u.id, sc.confidence;"
+```
+
+This reveals what's blocking those 55. If it's all fee-missing on VIT (which would track with the CRICOS-suffix scraper issue we acknowledged-without-investigating earlier), we have a path. If it's mixed issues, each row needs different treatment.
+
+---
+
+**On the CSU rejected-row backlog:**
+
+The summary mentions "~370 rejected rows from old scraper runs — these are pre-pipeline artifacts and can be ignored unless a re-scrape is triggered."
+
+Worth one more sanity query:
+
+```
+sudo -u postgres psql university_portal -c "
+SELECT status, auto_publish_status, COUNT(*)
+FROM scraped_courses
+WHERE university_id = 4
+GROUP BY status, auto_publish_status
+ORDER BY status, auto_publish_status;"
+```
+
+If those 370 are all `status='rejected'`, fine, leave them. If any are `pending` with weird ap_status values we haven't handled, we should clear them out before the next CSU scrape so they don't pollute the next sweep.
+
+---
+
+**Updated KBS-and-friends status:**
+
+Bugs F (KBS fee + English): DONE, ground-truth verified.
+Promotion gap (8 universities): DONE, 123 live courses added.
+Name quality (CSU + VIT): DONE, all visible quality issues fixed.
+
+**Outstanding for next migration:**
+
+1. **Push to GitHub** — critical, prevents loss-on-rebuild. Run today.
+2. **Investigate the 55 needs_review rows** — if they're systematic (all fee-missing), they're a single bug; if scattered, each needs admin attention.
+3. **vit CRICOS-suffix scraper bug** — still owed investigation since it was acknowledged-without-investigating during Bug F.
+4. **Backup cron + safer DELETE patterns** — still pending from earlier round (the table-wipe incident exposed both gaps).
+
+---
+
+**Honest framing on this round:**
+
+This was the best round we've had. Diagnostic queries before action, dry-run before commit, ground-truth verification at every step (URL slug check, course name check, duplicate check, final live-count verification). The pattern of "check current state → plan transformation → dry-run → commit → verify" is exactly the discipline that should be standard.
+
+The one thing I'd flag: the VIT 36 + CSU 19 needs_review rows weren't surfaced as a blocker until the very end, almost in passing. If we'd been on watch from the start, we'd have caught "55 courses still aren't promoting" earlier in the diagnostic phase. Worth structuring the next migration to ask up front: "what rows aren't going to make it through this batch, and why?"
+
+Get GitHub pushed, investigate the 55, then we can pick the next target. Two strong candidates:
+
+- **Bond (uni_id=22)** — 126 courses staged, 0 live. Same promotion gap pattern but on a uni we haven't touched yet.
+- **Flinders (uni_id=12)** — 105 courses, similar profile.
+
+My recommendation: Bond. Largest single user-facing impact and the same playbook we just proved works.
