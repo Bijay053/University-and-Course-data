@@ -1,0 +1,127 @@
+root@university-and-course-data:~/University-and-Course-data# cd ~/University-and-Course-data/backend-py
+
+PYTHONPATH=. venv/bin/python3 scripts/bulk_approve.py --university-id 51 --dry-run
+PYTHONPATH=. venv/bin/python3 scripts/bulk_approve.py --university-id 51
+
+sudo -u postgres psql university_portal -c "
+SELECT COUNT(*) AS acu_live FROM courses WHERE university_id = 51;"
+2026-05-01 12:37:58,134 INFO bulk_approve: University: Australian Catholic University (ACU) (id=51) | filter: status='pending' auto_publish_status='ready' | matched: 99 rows
+2026-05-01 12:37:58,134 INFO bulk_approve: DRY-RUN — no rows will be committed.
+2026-05-01 12:37:58,135 INFO bulk_approve: Sample names (up to 10):
+2026-05-01 12:37:58,135 INFO bulk_approve:   [11903] Bachelor of Psychological Science/Bachelor of Exercise and Sports Science
+2026-05-01 12:37:58,135 INFO bulk_approve:   [11904] Diploma in Biomedical Science
+2026-05-01 12:37:58,135 INFO bulk_approve:   [11905] Diploma in Nutrition Science
+2026-05-01 12:37:58,135 INFO bulk_approve:   [11906] Diploma in Exercise Science
+2026-05-01 12:37:58,135 INFO bulk_approve:   [11907] Graduate Certificate in Catholic Studies
+2026-05-01 12:37:58,135 INFO bulk_approve:   [11908] Bachelor of Education (Primary and Special Education)
+2026-05-01 12:37:58,135 INFO bulk_approve:   [11909] Bachelor of Education (Secondary and Special Education)
+2026-05-01 12:37:58,135 INFO bulk_approve:   [11910] Bachelor of Computer Science
+2026-05-01 12:37:58,135 INFO bulk_approve:   [11911] Bachelor of Arts (Western Civilisation)
+2026-05-01 12:37:58,135 INFO bulk_approve:   [11912] Master of Religious Education
+2026-05-01 12:37:59,071 INFO bulk_approve: University: Australian Catholic University (ACU) (id=51) | filter: status='pending' auto_publish_status='ready' | matched: 99 rows
+2026-05-01 12:37:59,110 INFO bulk_approve:   approved sc_id=11903 → course_id=772  'Bachelor of Psychological Science/Bachelor of Exercise and Sports Science'
+2026-05-01 12:37:59,123 INFO bulk_approve:   approved sc_id=11904 → course_id=773  'Diploma in Biomedical Science'
+2026-05-01 12:37:59,135 INFO bulk_approve:   approved sc_id=11905 → course_id=774  'Diploma in Nutrition Science'
+2026-05-01 12:37:59,149 INFO bulk_approve:   approved sc_id=11906 → course_id=775  'Diploma in Exercise Science'
+2026-05-01 12:37:59,160 INFO bulk_approve:   approved sc_id=11907 → course_id=776  'Graduate Certificate in Catholic Studies'
+2026-05-01 12:37:59,171 INFO bulk_approve:   approved sc_id=11908 → course_id=777  'Bachelor of Education (Primary and Special Education)'
+2026-05-01 12:37:59,183 INFO bulk_approve:   approved sc_id=11909 → course_id=778  'Bachelor of Education (Secondary and Special Education)'
+2026-05-01 12:37:59,194 INFO bulk_approve:   approved sc_id=11910 → course_id=779  'Bachelor of Computer Science'
+2026-05-01 12:37:59,205 INFO bulk_approve:   approved sc_id=11911 → course_id=780  'Bachelor of Arts (Western Civilisation)'
+2026-05-01 12:37:59,215 INFO bulk_approve:   approved sc_id=11912 → course_id=781  'Master of Religious Education'
+2026-05-01 12:37:59,227 INFO bulk_approve:   approved sc_id=11913 → course_id=782  'Master of Public Health'
+2026-05-01 12:37:59,237 INFO bulk_approve:   approved sc_id=11914 → course_id=783  'Graduate Diploma in Theological Studies'
+2026-05-01 12:37:59,246 INFO bulk_approve:   approved sc_id=11915 → course_id=784  'Graduate Certificate in Theological Studies'
+2026-05-01 12:37:59,256 INFO bulk_approve:   approved sc_id=11916 → course_id=785  'Master of Spiritual Direction'
+2026-05-01 12:37:59,270 INFO bulk_approve:   approved sc_id=11917 → course_id=786  'Bachelor of Nursing'
+2026-05-01 12:37:59,283 INFO bulk_approve:   approved sc_id=11918 → course_id=787  'Graduate Certificate in Public Health'
+2026-05-01 12:37:59,296 INFO bulk_approve:   approved sc_id=11919 → course_id=788  'Graduate Diploma in Spiritual Direction'
+2026-05-01 12:37:59,309 INFO bulk_approve:   approved sc_id=11920 → course_id=789  'Certificate in Liberal Arts'
+2026-05-01 12:37:59,322 INFO bulk_approve:   approved sc_id=11921 → course_id=790  'Certificate in Theology'
+2026-05-01 12:37:59,335 INFO bulk_approve:   approved sc_id=11922 → course_id=791  'Certificate in Philosophy'
+2026-05-01 12:37:59,349 INFO bulk_approve:   approved sc_id=11923 → course_id=792  'Doctor of Philosophy'
+2026-05-01 12:37:59,361 INFO bulk_approve:   approved sc_id=11924 → course_id=793  'Master of Family and Systemic Therapy'
+2026-05-01 12:37:59,375 INFO bulk_approve:   approved sc_id=11925 → course_id=794  'Master of Business Administration'
+2026-05-01 12:37:59,390 INFO bulk_approve:   approved sc_id=11926 → course_id=795  'Graduate Certificate in Data Analytics'
+2026-05-01 12:37:59,401 INFO bulk_approve:   approved sc_id=11927 → course_id=796  'Graduate Certificate in Global Health'
+2026-05-01 12:37:59,408 INFO bulk_approve:   approved sc_id=11928 → course_id=797  'Graduate Diploma in Information Technology'
+2026-05-01 12:37:59,417 INFO bulk_approve:   approved sc_id=11929 → course_id=798  'Bachelor of Paramedicine (Honours)'
+2026-05-01 12:37:59,425 INFO bulk_approve:   approved sc_id=11930 → course_id=799  'Graduate Certificate in Liberal Arts (Western Civilisation)'
+2026-05-01 12:37:59,435 INFO bulk_approve:   approved sc_id=11931 → course_id=800  'Bachelor of Arts/Bachelor of Laws'
+2026-05-01 12:37:59,443 INFO bulk_approve:   approved sc_id=11932 → course_id=801  'Bachelor of Theology/Bachelor of Global Studies'
+2026-05-01 12:37:59,452 INFO bulk_approve:   approved sc_id=11933 → course_id=802  'Bachelor of Paramedicine'
+2026-05-01 12:37:59,461 INFO bulk_approve:   approved sc_id=11934 → course_id=803  'Bachelor of Visual Arts and Design'
+2026-05-01 12:37:59,470 INFO bulk_approve:   approved sc_id=11935 → course_id=804  'Bachelor of Creative Arts'
+2026-05-01 12:37:59,479 INFO bulk_approve:   approved sc_id=11936 → course_id=805  'Diploma in Creative Arts'
+2026-05-01 12:37:59,487 INFO bulk_approve:   approved sc_id=11937 → course_id=806  'Graduate Certificate in Religious Education'
+2026-05-01 12:37:59,494 INFO bulk_approve:   approved sc_id=11938 → course_id=807  'Graduate Diploma in Professional Accounting'
+2026-05-01 12:37:59,503 INFO bulk_approve:   approved sc_id=11939 → course_id=808  'Diploma in Visual Arts and Design'
+2026-05-01 12:37:59,510 INFO bulk_approve:   approved sc_id=11940 → course_id=809  'Graduate Certificate in Higher Education'
+2026-05-01 12:37:59,520 INFO bulk_approve:   approved sc_id=11941 → course_id=810  'Bachelor of Education (Early Childhood and Primary)'
+2026-05-01 12:37:59,528 INFO bulk_approve:   approved sc_id=11942 → course_id=811  'Graduate Diploma in Religious Education'
+2026-05-01 12:37:59,538 INFO bulk_approve:   approved sc_id=11943 → course_id=812  'Diploma in Business'
+2026-05-01 12:37:59,545 INFO bulk_approve:   approved sc_id=11944 → course_id=813  'Graduate Certificate in Philosophy (Healthcare Ethics)'
+2026-05-01 12:37:59,555 INFO bulk_approve:   approved sc_id=11945 → course_id=814  'Bachelor of Midwifery (Indigenous Cohort)'
+2026-05-01 12:37:59,564 INFO bulk_approve:   approved sc_id=11946 → course_id=815  'Bachelor of Midwifery'
+2026-05-01 12:37:59,573 INFO bulk_approve:   approved sc_id=11947 → course_id=816  'Bachelor of Commerce'
+2026-05-01 12:37:59,582 INFO bulk_approve:   approved sc_id=11948 → course_id=817  'Bachelor of Arts/Bachelor of Commerce'
+2026-05-01 12:37:59,590 INFO bulk_approve:   approved sc_id=11949 → course_id=818  'Master of Philosophy'
+2026-05-01 12:37:59,599 INFO bulk_approve:   approved sc_id=11950 → course_id=819  'Bachelor of Business Administration'
+2026-05-01 12:37:59,607 INFO bulk_approve:   approved sc_id=11951 → course_id=820  'Diploma in Criminology'
+2026-05-01 12:37:59,616 INFO bulk_approve:   approved sc_id=11952 → course_id=821  'Bachelor of Arts/Bachelor of Laws (Honours)'
+2026-05-01 12:37:59,625 INFO bulk_approve:   approved sc_id=11953 → course_id=822  'Master of Psychology (Clinical)'
+2026-05-01 12:37:59,634 INFO bulk_approve:   approved sc_id=11954 → course_id=785  'Master of Spiritual Direction'
+2026-05-01 12:37:59,644 INFO bulk_approve:   approved sc_id=11955 → course_id=823  'Diploma in Liberal Arts'
+2026-05-01 12:37:59,653 INFO bulk_approve:   approved sc_id=11956 → course_id=824  'Master of Leadership and Management in Healthcare'
+2026-05-01 12:37:59,662 INFO bulk_approve:   approved sc_id=11957 → course_id=825  'Graduate Certificate in Application Development'
+2026-05-01 12:37:59,672 INFO bulk_approve:   approved sc_id=11958 → course_id=826  'Bachelor of Psychological Science (Honours)'
+2026-05-01 12:37:59,681 INFO bulk_approve:   approved sc_id=11959 → course_id=827  'Graduate Certificate in Family and Systemic Therapy'
+2026-05-01 12:37:59,689 INFO bulk_approve:   approved sc_id=11960 → course_id=828  'Certificate in Educational Studies'
+2026-05-01 12:37:59,697 INFO bulk_approve:   approved sc_id=11961 → course_id=829  'Graduate Certificate in Supervision'
+2026-05-01 12:37:59,705 INFO bulk_approve:   approved sc_id=11962 → course_id=793  'Master of Family and Systemic Therapy'
+2026-05-01 12:37:59,714 INFO bulk_approve:   approved sc_id=11963 → course_id=830  'Graduate Certificate in Clinical Exercise Rehabilitation'
+2026-05-01 12:37:59,723 INFO bulk_approve:   approved sc_id=11964 → course_id=831  'Bachelor of Theology (Honours)'
+2026-05-01 12:37:59,732 INFO bulk_approve:   approved sc_id=11965 → course_id=832  'Graduate Certificate in Culinary Nutrition Science'
+2026-05-01 12:37:59,741 INFO bulk_approve:   approved sc_id=11966 → course_id=833  'Master of Psychology (Educational and Developmental)'
+2026-05-01 12:37:59,749 INFO bulk_approve:   approved sc_id=11967 → course_id=834  'Graduate Certificate in Professional Accounting'
+2026-05-01 12:37:59,757 INFO bulk_approve:   approved sc_id=11968 → course_id=835  'Graduate Diploma in Educational Leadership'
+2026-05-01 12:37:59,766 INFO bulk_approve:   approved sc_id=11969 → course_id=836  'Certificate in Youth Work'
+2026-05-01 12:37:59,776 INFO bulk_approve:   approved sc_id=11970 → course_id=837  'Diploma in Philosophy'
+2026-05-01 12:37:59,786 INFO bulk_approve:   approved sc_id=11971 → course_id=838  'Bachelor of Youth Work'
+2026-05-01 12:37:59,796 INFO bulk_approve:   approved sc_id=11972 → course_id=839  'Graduate Diploma in Educational Studies'
+2026-05-01 12:37:59,806 INFO bulk_approve:   approved sc_id=11973 → course_id=840  'Graduate Diploma in Business Administration'
+2026-05-01 12:37:59,815 INFO bulk_approve:   approved sc_id=11974 → course_id=841  'Graduate Certificate in Educational Studies'
+2026-05-01 12:37:59,825 INFO bulk_approve:   approved sc_id=11975 → course_id=842  'Master of Educational Leadership'
+2026-05-01 12:37:59,835 INFO bulk_approve:   approved sc_id=11976 → course_id=843  'Certificate in Teaching and Learning'
+2026-05-01 12:37:59,844 INFO bulk_approve:   approved sc_id=11977 → course_id=844  'Graduate Certificate in Leadership and Catholic Culture'
+2026-05-01 12:37:59,854 INFO bulk_approve:   approved sc_id=11978 → course_id=845  'Diploma in Educational Studies (Tertiary Preparation) (Away From Base Mode)'
+2026-05-01 12:37:59,863 INFO bulk_approve:   approved sc_id=11979 → course_id=846  'Graduate Diploma in Education'
+2026-05-01 12:37:59,874 INFO bulk_approve:   approved sc_id=11980 → course_id=847  'Bachelor of Physiotherapy'
+2026-05-01 12:37:59,884 INFO bulk_approve:   approved sc_id=11981 → course_id=792  'Doctor of Philosophy'
+2026-05-01 12:37:59,893 INFO bulk_approve:   approved sc_id=11982 → course_id=847  'Bachelor of Physiotherapy'
+2026-05-01 12:37:59,902 INFO bulk_approve:   approved sc_id=11983 → course_id=848  'Bachelor of Physiotherapy (Honours)'
+2026-05-01 12:37:59,910 INFO bulk_approve:   approved sc_id=11984 → course_id=849  'Master of Teaching (Secondary) (Leading Learning)'
+2026-05-01 12:37:59,919 INFO bulk_approve:   approved sc_id=11985 → course_id=850  'Graduate Certificate in Cyber Security'
+2026-05-01 12:37:59,928 INFO bulk_approve:   approved sc_id=11986 → course_id=851  'Bachelor of Social Work'
+2026-05-01 12:37:59,936 INFO bulk_approve:   approved sc_id=11987 → course_id=852  'Bachelor of Social Work (Honours)'
+2026-05-01 12:37:59,944 INFO bulk_approve:   approved sc_id=11988 → course_id=853  'Graduate Certificate in Innovation and Entrepreneurship'
+2026-05-01 12:37:59,953 INFO bulk_approve:   approved sc_id=11989 → course_id=854  'Diploma in Educational Studies (Tertiary Preparation)'
+2026-05-01 12:37:59,962 INFO bulk_approve:   approved sc_id=11990 → course_id=855  'Graduate Certificate in Educational Leadership'
+2026-05-01 12:37:59,970 INFO bulk_approve:   approved sc_id=11991 → course_id=856  'Doctor of Ministry'
+2026-05-01 12:37:59,978 INFO bulk_approve:   approved sc_id=11992 → course_id=857  'Graduate Diploma in Family and Systemic Therapy'
+2026-05-01 12:37:59,986 INFO bulk_approve:   approved sc_id=11993 → course_id=858  'Graduate Diploma in Design and Technologies Education'
+2026-05-01 12:37:59,996 INFO bulk_approve:   approved sc_id=11994 → course_id=859  'Graduate Certificate in Information Technology (Acu Online)'
+2026-05-01 12:38:00,004 INFO bulk_approve:   approved sc_id=11995 → course_id=860  'Graduate Diploma in Liberal Arts (Western Civilisation)'
+2026-05-01 12:38:00,013 INFO bulk_approve:   approved sc_id=11996 → course_id=861  'Diploma in Theology'
+2026-05-01 12:38:00,024 INFO bulk_approve:   approved sc_id=11997 → course_id=862  'Graduate Certificate in Education'
+2026-05-01 12:38:00,034 INFO bulk_approve:   approved sc_id=11998 → course_id=863  'Graduate Certificate in Data Science'
+2026-05-01 12:38:00,042 INFO bulk_approve:   approved sc_id=11999 → course_id=864  'Master of Education'
+2026-05-01 12:38:00,052 INFO bulk_approve:   approved sc_id=12000 → course_id=865  'Master of Professional Psychology'
+2026-05-01 12:38:00,062 INFO bulk_approve:   approved sc_id=12001 → course_id=866  'Master of Public Health (Global Health and Advocacy)'
+2026-05-01 12:38:00,062 INFO bulk_approve: Done. approved=99  failed=0  (total matched=99)
+ acu_live 
+----------
+       95
+(1 row)
+
+root@university-and-course-data:~/University-and-Course-data/backend-py# 
