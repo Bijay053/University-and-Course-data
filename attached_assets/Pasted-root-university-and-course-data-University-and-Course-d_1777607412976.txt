@@ -1,0 +1,36 @@
+root@university-and-course-data:~/University-and-Course-data# # ── Why were the 3 grad certs skipped? Check scrape_runtime_logs ──
+sudo -u postgres psql university_portal -c "
+SELECT url, message, level
+FROM scrape_runtime_logs
+WHERE job_id = 'job_4190bd464ea6'
+  AND (message ILIKE '%Graduate Certificate in Accounting%'
+    OR message ILIKE '%Graduate Certificate in Business Admin%'
+    OR message ILIKE '%Graduate Certificate in Business Analytics%'
+    OR message ILIKE '%skip%' OR message ILIKE '%reject%' OR message ILIKE '%sanity%')
+ORDER BY created_at
+LIMIT 20;"
+ERROR:  column "url" does not exist
+LINE 2: SELECT url, message, level
+               ^
+root@university-and-course-data:~/University-and-Course-data# # ── Also check ACAP scraped_courses (any job) for location verification ──
+sudo -u postgres psql university_portal -c "
+SELECT sc.course_name, sc.course_location, sc.ielts_overall
+FROM scraped_courses sc
+WHERE sc.university_id = 41
+ORDER BY sc.created_at DESC LIMIT 12;"
+                   course_name                   |                course_location                | ielts_overall 
+-------------------------------------------------+-----------------------------------------------+---------------
+ Master of Business Administration (MBA)         | Perth, Australia                              |           6.5
+ Graduate Diploma of Legal Practice (Plt)        | Sydney, Australia                             |           6.5
+ Master of Social Work (Qualifying)              | Adelaide, Melbourne, Sydney, Perth, Australia |             7
+ Master of Psychology (Clinical)                 | Sydney, Australia                             |             7
+ Master of Professional Psychology               | Sydney, Australia                             |             7
+ Graduate Diploma of Professional Accounting     | Perth, Australia                              |           6.5
+ Graduate Diploma of Business Administration     | Perth, Australia                              |           6.5
+ Graduate Certificate of Professional Accounting | Perth, Australia                              |           6.5
+ Graduate Certificate of Human Services          | Adelaide, Melbourne, Sydney, Perth, Australia |           6.5
+ Graduate Certificate in Business Administration | Perth, Australia                              |           6.5
+ Bachelor of Social Work                         | Melbourne, Sydney, Australia                  |             6
+(11 rows)
+
+root@university-and-course-data:~/University-and-Course-data# 
