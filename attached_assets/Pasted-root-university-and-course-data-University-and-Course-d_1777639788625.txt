@@ -1,0 +1,33 @@
+root@university-and-course-data:~/University-and-Course-data/backend-py# cd ~/University-and-Course-data
+git pull origin main
+
+# Re-run the test — both assertions should now pass
+cd backend-py
+PYTHONPATH=. venv/bin/python3 scripts/test_zombie_beat.py
+echo "Exit: $?"
+remote: Enumerating objects: 17, done.
+remote: Counting objects: 100% (17/17), done.
+remote: Compressing objects: 100% (11/11), done.
+remote: Total 11 (delta 8), reused 0 (delta 0), pack-reused 0 (from 0)
+Unpacking objects: 100% (11/11), 3.14 KiB | 1.05 MiB/s, done.
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+   5601683..a9017d1  main       -> origin/main
+Updating 5601683..a9017d1
+error: The following untracked working tree files would be overwritten by merge:
+        backend-py/scripts/test_zombie_beat.py
+Please move or remove them before you merge.
+Aborting
+
+[TEST] job_id=zombie-test-7d02f28a
+[TEST] Firing two concurrent beat ticks …
+WARNING app.tasks.scrape_tasks: requeue_stale_queued: could not increment requeue_count for zombie-test-7d02f28a: (sqlalchemy.dialects.postgresql.asyncpg.ProgrammingError) <class 'asyncpg.exceptions.IndeterminateDatatypeError'>: could not determine data type of parameter $1
+[SQL: UPDATE scrape_runtime_jobs SET requeue_count = requeue_count + 1,     requeue_events = COALESCE(requeue_events, '[]'::jsonb) ||         jsonb_build_array(jsonb_build_object(             'number', requeue_count + 1,             'stale_minutes', $1,             'timestamp', to_char(                NOW() AT TIME ZONE 'UTC',                 'YYYY-MM-DD"T"HH24:MI:SS"Z"'            )         )) WHERE runtime_job_id = $2]
+[parameters: (5, 'zombie-test-7d02f28a')]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+WARNING app.tasks.scrape_tasks: requeue_stale_queued: re-dispatched stale scrape job zombie-test-7d02f28a (queued for >5 min with no worker activity, requeue #1)
+
+[RESULT] dispatch calls  = 1  (want 1)
+[RESULT] DB requeue_count = 0  (want 1)
+[PASS] Exactly 1 dispatch.
+[FAIL] requeue_count=0, expected 1.
