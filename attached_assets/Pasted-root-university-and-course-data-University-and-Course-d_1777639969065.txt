@@ -1,0 +1,39 @@
+root@university-and-course-data:~/University-and-Course-data/backend-py# cd ~/University-and-Course-data
+
+# Remove the untracked copy so git can write the GitHub version
+rm backend-py/scripts/test_zombie_beat.py
+
+git pull origin main
+
+# Now re-run — this time the fixed scrape_tasks.py is in place
+cd backend-py
+PYTHONPATH=. venv/bin/python3 scripts/test_zombie_beat.py
+echo "Exit: $?"
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+Updating 5601683..a9017d1
+Fast-forward
+ backend-py/app/tasks/scrape_tasks.py   |   2 +-
+ backend-py/scripts/test_zombie_beat.py | 186 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 187 insertions(+), 1 deletion(-)
+ create mode 100644 backend-py/scripts/test_zombie_beat.py
+
+[TEST] Zombie double-dispatch test — job_id=zombie-test-ac52307f
+[TEST] Inserting fake stale queued job …
+[TEST] Firing two concurrent beat ticks …
+WARNING app.tasks.scrape_tasks: requeue_stale_queued: could not increment requeue_count for zombie-test-ac52307f: (sqlalchemy.dialects.postgresql.asyncpg.ProgrammingError) <class 'asyncpg.exceptions.PostgresSyntaxError'>: syntax error at or near ":"
+[SQL: UPDATE scrape_runtime_jobs SET requeue_count = requeue_count + 1,     requeue_events = COALESCE(requeue_events, '[]'::jsonb) ||         jsonb_build_array(jsonb_build_object(             'number', requeue_count + 1,             'stale_minutes', :stale_min::int,             'timestamp', to_char(                NOW() AT TIME ZONE 'UTC',                 'YYYY-MM-DD"T"HH24:MI:SS"Z"'            )         )) WHERE runtime_job_id = $1]
+[parameters: ('zombie-test-ac52307f',)]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+WARNING app.tasks.scrape_tasks: requeue_stale_queued: re-dispatched stale scrape job zombie-test-ac52307f (queued for >5 min with no worker activity, requeue #1)
+
+
+[RESULT] dispatch_calls   = 1  (want exactly 1)
+[RESULT] requeue_count DB = 0  (want 1)
+[RESULT] tick results     = [{'ok': True, 'requeued': ['zombie-test-ac52307f'], 'exhausted': []}]
+[PASS] Exactly 1 dispatch — double-dispatch protection works.
+[FAIL] requeue_count in DB is 0, expected 1 — counter not incremented correctly.
+
+[TEST] Cleaning up …
+[TEST] Done.
+
