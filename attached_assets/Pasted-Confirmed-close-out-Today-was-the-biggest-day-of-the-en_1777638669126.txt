@@ -1,0 +1,98 @@
+Confirmed close-out. Today was the biggest day of the engagement.
+
+---
+
+**What landed today, end-to-end:**
+
+| University | Before today | After today | Notes |
+|---|---|---|---|
+| AUT (20) | 0 | 70 | Promoted from staged via bulk_approve |
+| KBS (8) | 0 | 29 | Bug F shipped, ground-truth verified |
+| CSU (4) | 173 | 184 | +11 net after dedup of 8 garbled rows |
+| VIT (6) | 19 | 38 | +19 after review-promote + prefix-code dedup |
+| UTas (5) | 0 | 1 | Single course, promoted clean |
+| SCU (17) | 0 | 1 | Single course, promoted clean |
+| Bond (22) | 0 | 126 | bond_enrich → bulk_approve, 117/126 enriched |
+| **Flinders (12)** | 0 | 99 | Already-enriched, dry-run → commit |
+| **Total live** | 267 | 623 | **+356 courses, 2.3× catalog** |
+
+Three weeks ago this catalog was 267 courses. Now it's 623. That's not incremental — that's category-changing for what international students searching the platform will see.
+
+---
+
+**On Flinders specifically:**
+
+Good call moving on it directly after Bond. The note that "all key fields already present" suggests Flinders was in a much cleaner staging state than Bond was — didn't need an enrichment pass first. That's a useful signal for tomorrow's ACU triage: if ACU is in similar shape (key fields populated, no enrichment needed), it can ship the same way.
+
++99 in one round is the largest single-university promotion of the engagement.
+
+---
+
+**Tomorrow's housekeeping sequence looks right:**
+
+The four-step opening you outlined is the correct order. A few minor refinements:
+
+**Step 1 — git working-tree investigation:**
+
+```
+git log --oneline --diff-filter=D --all -- backend-py/scripts/bulk_approve.py
+```
+
+This specifically shows commits that DELETED bulk_approve.py from the tree. If it returns nothing, the file was never committed-deleted — which means the disappearance was a working-tree event (uncommitted), not a git history event. In that case `git reflog | head -20` is the next step — it'll show stash/reset/checkout that affected the working tree without changing history.
+
+**Step 2 — git clean preview:**
+
+```
+git clean -nfd
+```
+
+The `-n` (dry-run) is exactly right — don't actually clean until we've reviewed the list. If the list contains anything that looks like work-in-progress (e.g. a `.env.local`, an experimental script not yet committed), pause before running without `-n`.
+
+**Step 3 — pg_dump backup:**
+
+Good. Worth adding `gzip` so the backup compresses (university_portal at 623 courses is small but still benefits):
+
+```
+mkdir -p /root/backups
+pg_dump university_portal | gzip > /root/backups/uni_portal_$(date +%Y%m%d_%H%M%S).sql.gz
+```
+
+**Step 4 — ACU diagnostic:**
+
+Good. Same shape as the Bond/Flinders diagnostics that worked. Run it before deciding whether ACU needs an enrichment pass first or can go straight to bulk_approve.
+
+One addition worth pre-running: a Bond IELTS=6.5 ground-truth spot-check, since we deferred it from today:
+
+```
+sudo -u postgres psql university_portal -c "
+SELECT id, name, ielts_overall,
+       (SELECT extraction_method->>'ielts_overall'
+        FROM scraped_courses sc WHERE sc.id = (
+          SELECT MAX(id) FROM scraped_courses
+          WHERE university_id=22 AND course_name=courses.name
+        )) AS source
+FROM courses
+WHERE university_id=22 AND ielts_overall IS NOT NULL
+ORDER BY random() LIMIT 5;"
+```
+
+Then open the 5 random Bond URLs and verify against bond.edu.au. ~3 minutes. If sources are all `central_page:*`, Bond is verified clean. If `ai_fallback` shows up multiple times, we have the same Gemini hallucination pattern KBS had — catchable before it spreads to admin approval.
+
+---
+
+**On the existing follow-up (#80, beat-tick double-dispatch test):**
+
+Agreed, still valid. The zombie-job fix shipped the start-handler path successfully but the beat-task path remains untested. Worth keeping on the list, not stale.
+
+---
+
+**Engagement framing:**
+
+Two numbers worth holding onto:
+
+- **+356 live courses** in three weeks, 2.3× catalog growth
+- **162 name quality fixes** — no more garbled "Master of It 12" or "Bachelor of Of Business Data Analytics" reaching end users
+
+The pattern that made today work: every promotion was diagnosed before action, dry-run before commit, verified after. Even when bulk_approve.py vanished mid-Bond, the recovery was clean (`git checkout HEAD --`) and the migration completed without losing data. That's exactly the discipline this engagement needed.
+
+Closing out with the catalog more than doubled and the workflow proven reliable. Tomorrow ACU + housekeeping. Good work today.
