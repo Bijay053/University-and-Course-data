@@ -1,0 +1,35 @@
+root@university-and-course-data:~/University-and-Course-data/backend-py# # ── Check if the ACAP job already completed ──
+curl -s http://localhost:80/api/scrape/job_0b456ceff603 | python3 -m json.tool | grep -E '"status"|"progress"|"error"'
+root@university-and-course-data:~/University-and-Course-data/backend-py# # ── Watch raw Celery log (no grep filter) — last 30 lines, then follow ──
+sudo journalctl -u uni-celery -n 30 --no-pager
+May 01 02:07:13 university-and-course-data celery[1262415]: [171B blob data]
+May 01 02:07:13 university-and-course-data celery[1262415]: [2026-05-01 02:07:13,292: INFO/ForkPoolWorker-4] staging_gate rejected 'Graduate Diploma Of Psychological Science': domestic_only
+May 01 02:07:13 university-and-course-data celery[1262415]: [169B blob data]
+May 01 02:07:13 university-and-course-data celery[1262415]: [2026-05-01 02:07:13,296: INFO/ForkPoolWorker-4] staging_gate rejected 'Master Of Counselling And Psychotherapy': domestic_only
+May 01 02:07:13 university-and-course-data celery[1262415]: [178B blob data]
+May 01 02:07:13 university-and-course-data celery[1262415]: [176B blob data]
+May 01 02:07:13 university-and-course-data celery[1262415]: [182B blob data]
+May 01 02:07:13 university-and-course-data celery[1262415]: [2026-05-01 02:07:13,342: INFO/ForkPoolWorker-4] [REJECT CHECK] course='Master of Psychology Practice (Clinical)' detected_modes=[Online] detected_locations=[none] decision=reject (online_only — study_mode is authoritative)
+May 01 02:07:13 university-and-course-data celery[1262415]: [2026-05-01 02:07:13,342: INFO/ForkPoolWorker-4] staging_gate rejected 'Master of Psychology Practice (Clinical)': online_only
+May 01 02:07:13 university-and-course-data celery[1262415]: [199B blob data]
+May 01 02:07:13 university-and-course-data celery[1262415]: [180B blob data]
+May 01 02:07:13 university-and-course-data celery[1262415]: [2026-05-01 02:07:13,366: INFO/ForkPoolWorker-4] staging_gate rejected 'Undergraduate Certificate Of Psychological Science': category_landing_page
+May 01 02:07:13 university-and-course-data celery[1262415]: [204B blob data]
+May 01 02:07:13 university-and-course-data celery[1262415]: [2026-05-01 02:07:13,370: INFO/ForkPoolWorker-4] [REJECT CHECK] course='Graduate Diploma of Legal Practice' detected_modes=[Online] detected_locations=[none] decision=reject (online_only — study_mode is authoritative)
+May 01 02:07:13 university-and-course-data celery[1262415]: [2026-05-01 02:07:13,370: INFO/ForkPoolWorker-4] staging_gate rejected 'Graduate Diploma of Legal Practice': online_only
+May 01 02:07:13 university-and-course-data celery[1262415]: [193B blob data]
+May 01 02:07:13 university-and-course-data celery[1262415]: [204B blob data]
+May 01 02:07:13 university-and-course-data celery[1262415]: [123B blob data]
+May 01 02:07:13 university-and-course-data celery[1262415]: [2026-05-01 02:07:13,440: INFO/ForkPoolWorker-4] Scrape job_3754ce25ba4b completed: {'discovered': 28, 'staged': 11, 'skipped': 16, 'errors': 0, 'fetch_failed': 0}
+May 01 02:07:13 university-and-course-data celery[1262415]: [2026-05-01 02:07:13,448: WARNING/ForkPoolWorker-4] [METRICS] failed for run job_3754ce25ba4b: (sqlalchemy.dialects.postgresql.asyncpg.ProgrammingError) <class 'asyncpg.exceptions.UndefinedTableError'>: relation "scrape_run_metrics" does not exist
+May 01 02:07:13 university-and-course-data celery[1262415]: [SQL: DELETE FROM scrape_run_metrics WHERE scrape_run_metrics.scrape_run_id = $1::VARCHAR]
+May 01 02:07:13 university-and-course-data celery[1262415]: [parameters: ('job_3754ce25ba4b',)]
+May 01 02:07:13 university-and-course-data celery[1262415]: (Background on this error at: https://sqlalche.me/e/20/f405)
+May 01 02:07:13 university-and-course-data celery[1262415]: [2026-05-01 02:07:13,455: WARNING/ForkPoolWorker-4] [ALERTS] failed for run job_3754ce25ba4b: (sqlalchemy.dialects.postgresql.asyncpg.Error) <class 'asyncpg.exceptions.InFailedSQLTransactionError'>: current transaction is aborted, commands ignored until end of transaction block
+May 01 02:07:13 university-and-course-data celery[1262415]: [SQL: SELECT scrape_run_metrics.id, scrape_run_metrics.scrape_run_id, scrape_run_metrics.university_id, scrape_run_metrics.field_key, scrape_run_metrics.method, scrape_run_metrics.count, scrape_run_metrics.courses_total, scrape_run_metrics.fill_rate, scrape_run_metrics.computed_at
+May 01 02:07:13 university-and-course-data celery[1262415]: FROM scrape_run_metrics
+May 01 02:07:13 university-and-course-data celery[1262415]: WHERE scrape_run_metrics.scrape_run_id = $1::VARCHAR]
+May 01 02:07:13 university-and-course-data celery[1262415]: [parameters: ('job_3754ce25ba4b',)]
+May 01 02:07:13 university-and-course-data celery[1262415]: (Background on this error at: https://sqlalche.me/e/20/dbapi)
+May 01 02:07:13 university-and-course-data celery[1262415]: [2026-05-01 02:07:13,459: INFO/ForkPoolWorker-4] Task scrape.university[333de4ac-acbd-465a-aec7-c3fd3bee13df] succeeded in 61.17196092894301s: {'ok': True, 'id': 'job_3754ce25ba4b'}
+root@university-and-course-data:~/University-and-Course-data/backend-py# 
