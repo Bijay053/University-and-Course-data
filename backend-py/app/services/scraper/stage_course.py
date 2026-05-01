@@ -67,7 +67,22 @@ _SPECIALIZATION_AUGMENT_HOSTS: frozenset[str] = frozenset({
 })
 
 def _augment_specialization_name(course_name: str, source_url: str | None) -> str:
-    """Return course_name augmented with specialisation label when the URL encodes one."""
+    """Return course_name augmented with specialisation label when the URL encodes one.
+
+    VIT URL conventions:
+      /<program>/<program>-<spec>   e.g. /bits/bits-artificial-intelligence-analytics
+      /<parent>/<abbrev>-<spec>     e.g. /bachelor-of-business/bbus-accounting
+      /<program>/<code>             e.g. /mits/gdits  (standalone degree, NOT a spec)
+      /vocational/<aqf>-<name>      e.g. /vocational/ict40120-certificate-iv-in-...
+
+    Algorithm: split spec_slug on first hyphen.
+      - No hyphen → standalone degree URL (gdits, gcba) → do not augment.
+      - First component contains a digit → AQF unit code (ict40120) → do not augment.
+      - Otherwise → first component is the program short code; strip it and use the
+        rest as the specialisation label.  This covers both the "bits-*" pattern
+        (where parent matches short code) and the "bbus-*" pattern (where parent is
+        long-form but the slug uses the abbreviation).
+    """
     if not source_url:
         return course_name
     try:
@@ -78,12 +93,30 @@ def _augment_specialization_name(course_name: str, source_url: str | None) -> st
         parts = [p for p in parsed.path.strip("/").split("/") if p]
         if len(parts) < 2:
             return course_name
-        parent_code = parts[0]        # e.g. "bits"
-        spec_slug   = parts[1]        # e.g. "bits-artificial-intelligence-analytics"
-        prefix = f"{parent_code}-"
-        if spec_slug.startswith(prefix):
-            spec_slug = spec_slug[len(prefix):]
-        spec_words = spec_slug.replace("-", " ").title()
+        spec_slug = parts[1]  # e.g. "bits-artificial-intelligence-analytics"
+
+        # Split on the first hyphen only.
+        slug_parts = spec_slug.split("-", 1)
+        if len(slug_parts) < 2:
+            # Single-component slug (e.g. "gdits", "gcba") — standalone degree URL,
+            # not a specialisation of the parent.
+            return course_name
+
+        first_part, rest = slug_parts
+        if not first_part.isalpha():
+            # First component contains digits → AQF national unit code (e.g.
+            # "ict40120", "sit40521") embedded in a vocational course URL.  The
+            # full slug does not represent a parent+spec hierarchy.
+            return course_name
+
+        # `rest` is the spec label slug (e.g. "artificial-intelligence-analytics",
+        # "accounting", "finance").  Use _smart_case so prepositions ("and",
+        # "of", "in", …) stay lowercase inside the spec label.
+        try:
+            from app.services.scraper.extractors.course_name import _smart_case
+            spec_words = _smart_case(rest.replace("-", " "))
+        except Exception:  # noqa: BLE001
+            spec_words = rest.replace("-", " ").title()
         if spec_words and spec_words.lower() not in course_name.lower():
             return f"{course_name} ({spec_words})"
     except Exception:  # noqa: BLE001

@@ -1,0 +1,95 @@
+Spot-checked the final table against the KBS website. **It's clean.**
+
+```
+Bachelor of Business (Accounting)         | Bachelor's | 6   | 50 | central_page:english_level
+Diploma of Business                       | Diploma    | 5.5 | 46 | central_page:english_level
+Master of Information Technology          | Master's   | 6   | 50 | central_page:english_level
+Graduate Certificate in Accounting        | Grad Cert  | 6   | 50 | central_page:english_level
+```
+
+Matching against `https://www.kbs.edu.au/admissions/entry-requirements/english-entry-requirements`:
+
+- Bachelor + all Postgraduate: IELTS 6.0 ✅ (was 6.5)
+- Diploma: IELTS 5.5 ✅ (was 6.5)
+- All sources: `central_page:english_level` ✅ (was `ai_fallback`)
+- All 29 courses populated, no duplicates, no NULL rows
+
+This is the first time in this engagement that a KBS data quality check has passed against external ground truth. Real win.
+
+---
+
+**What actually fixed it (commit 1a1c95a):**
+
+Two separate bugs were stacked on top of each other:
+
+**Fix 1 — Diploma column key.** The column-keyed parser was emitting all rows under `undergraduate` regardless of source column. So when Bachelor+PG (6.0) and Diploma (5.5) were both parsed, the Bachelor value overwrote the Diploma value. Renaming the Diploma column key to `diploma` lets Diploma courses pick up their own 5.5/46 values without contention.
+
+**Fix 2 — Override guard for low-authority sources.** Even after the parser fired correctly and cached the right values, individual course rows were still showing 6.5 from `ai_fallback`. The orchestrator was treating Gemini's hallucinated 6.5 as already-set, so the central-page values from the verified-URL parser couldn't replace them. Now `ai_fallback` and `gemini_primary` are explicitly low-authority — if a verified central-page URL has a better value, it overrides.
+
+The Path 1 + Path 2 split in `single_course.py` is the right architecture for this: a clear authority hierarchy with central-page values from verified URLs winning over AI guesses.
+
+---
+
+**The diagnostic sequence that got us here was actually disciplined this time:**
+
+1. Q1 returned `id=29, scrape_config={}` — confirmed the URL config was empty
+2. The two-key UPDATE with `jsonb_build_object` set both feePage and entryPage atomically, verified by the `RETURNING uni_pages` showing both keys
+3. Cache wipe returned both rows (`fee_schedule` AND `english_requirements`)
+4. Worker logs confirmed `column-keyed english table override` fired with the right values
+5. `central_english_level_applied` count = 36 (Path 1 fired)
+6. But final spot-check showed `ai_fallback` still winning on one row — caught the override authority bug
+7. Fix shipped, rescraped, ground-truth match achieved
+
+Going from "caught the bug" to "verified clean against external website" within one commit cycle is what the workflow should look like every time.
+
+---
+
+**Where this leaves KBS:**
+
+| Field | Status |
+|---|---|
+| Course names | All 29 populated |
+| Duration | Correct (Bug A + A.2 shipped) |
+| Locations | Populated |
+| Intakes | Populated |
+| International fees | 15+ courses populated, correct (sub-page follower) |
+| IELTS Overall | All 29 populated, **matches KBS website** |
+| PTE Overall | All 29 populated, **matches KBS website** |
+| Duplicate rows | None |
+
+The MBA specialisation pages (Health Services, International Leadership, etc.) still show no fee — they're sub-pages of the main MBA URL, so the scraper sees them as variants of one course rather than as priced standalone offerings. Worth investigating later but lower priority than the next migration.
+
+---
+
+**Recommended next moves:**
+
+1. **Promote KBS to admin approval** — the data is good enough for the live `courses` table now. Worth flagging the MBA specialisation fee gap to the admin reviewer so they know what they're seeing.
+
+2. **Capture fresh baseline as the new reference** — the current `bug-f-after/` baseline has stale data from the buggy intermediate state. Recapture so future sweeps compare against this clean state.
+
+```
+cd ~/University-and-Course-data/backend-py
+set -a && source .env && set +a
+PYTHONPATH=. venv/bin/python3 scripts/capture_baseline.py \
+  --out-dir baselines/bug-f-clean/
+```
+
+3. **Open as a separate ticket: backups + safer DELETE patterns.** Today's wipe-to-zero confirmed there's no recovery path. Two operational things to fix before the next migration:
+   - Add a postgres logical backup cron (nightly `pg_dump`)
+   - Replace placeholder substitution patterns in deploy templates (twice now: `<paste your job ID here>` and `<NEWEST_JOB_ID>` both caused production damage)
+
+4. **Pick the next migration target.** Based on the open queue, the strongest user-facing candidates are:
+   - **vit (uni_id=6) CRICOS-suffixed duplication** — we acknowledged-without-investigating last round, this is real bug
+   - **Charles Sturt 92-course approved-but-not-live promotion gap** — affects live courses table directly
+
+My recommendation: vit first. We owe that investigation since we acknowledged it away. Then Charles Sturt.
+
+---
+
+**Honest framing on the round:**
+
+This round had real chaos in the middle (URL config silently empty, IELTS=6.5 hallucination, full table wipe, sweep PASSing on stale data). But it ended with verified-clean data shipped against external ground truth. The pattern of catching bugs early enough to fix them in the same cycle is the discipline that should be standard.
+
+Also worth recognising: the final commit (1a1c95a) was correctly designed — two distinct fixes targeting two distinct symptoms, sized so each one is independently verifiable, central_pages and single_course changes both small and clearly attributable. That's good engineering.
+
+KBS is done. Pick next target when ready.
