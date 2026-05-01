@@ -1,0 +1,110 @@
+Five for five. That's a clean Variant 1 day, plus four bonus deliverables that weren't in the plan.
+
+---
+
+**Confirmed shipped today:**
+
+| Block | Status |
+|---|---|
+| 1 — Housekeeping | ✅ (5 sub-steps) |
+| 2 — Zombie beat-task test | ✅ PASS, 1 dispatch + requeue_count=1 |
+| 3 — Tier 7 operator alert | ✅ model + migration 013 + orchestrator hook |
+| 4 — Nightly sweep cron + drift alerts | ✅ first real run tonight 02:00 UTC |
+| 5 — Tier 2 subdomain probes | ✅ code live, inert until YAML configured |
+
+Plus four bonus shipments that weren't in the original plan:
+
+- ACU promotion (+95 live courses)
+- Torrens promotion (+74 live courses)
+- Daily snapshot cron (03:00 UTC)
+- Weekly baseline refresh cron (Sun 04:00 UTC)
+
+**Engagement headline now: 267 → 792 live courses (+525, 2.96× catalog growth) across 12 universities in three weeks.** Today alone added 169 courses (Bond + Flinders + ACU + Torrens between morning and now).
+
+---
+
+**Two things noted, three things to check tomorrow:**
+
+**Noted (no action needed):**
+
+1. The Tier 2 "inert until YAML configured" design is exactly right. Zero regression risk on the deploy itself, and it lets us roll out probing one uni at a time using the seven-step discipline. We've turned a big-bang shared-code change into a controlled per-uni opt-in. Better design than my original spec implied.
+
+2. The 02:00 UTC slot this morning fired on the pre-`--beat` worker, so no nightly sweep ran. Expected. Tonight (May 2 02:00 UTC) is the first real run.
+
+**Three checks for tomorrow morning:**
+
+```
+# 1. Verify the nightly sweep wrote baseline files
+ls -lh /root/University-and-Course-data/backend-py/baselines/nightly/20260502/
+# Expect: one JSON file per uni (~12 files), few MB total
+
+# 2. Confirm no errors in the sweep run
+journalctl -u uni-celery.service \
+  --since "2026-05-02 02:00" --until "2026-05-02 02:10" \
+  --no-pager | grep -i nightly
+
+# 3. Confirm Bug E (Torrens discovery=0) is closed
+sudo -u postgres psql university_portal -c "
+SELECT COUNT(*) AS torrens_live FROM courses WHERE university_id = 3;
+-- Expect: 74
+SELECT COUNT(*) AS torrens_staged_pending FROM scraped_courses
+WHERE university_id = 3 AND status = 'pending';"
+```
+
+If check 1 returns empty: investigate via check 2 logs. If check 2 shows errors: paste them back and we triage.
+
+The SQLAlchemy f405 error in the 02:07 logs you mentioned ("could not determine data type of parameter $1") is worth a separate ticket — it's the same `IndeterminateDatatypeError` that the zombie beat-test surfaced and that you fixed in commit `af3fd1d`. Worth confirming the fix covers all call sites of that UPDATE pattern, not just the one in `requeue_stale_queued`. Probably a 15-minute audit.
+
+---
+
+**Bond IELTS spot-check follow-up (carried over from this morning):**
+
+The query I sent returned 0 rows because of the JOIN structure. Fixed version for tomorrow:
+
+```
+sudo -u postgres psql university_portal -c "
+SELECT 
+  c.id, 
+  c.name,
+  er.overall AS ielts_overall,
+  er.test_type,
+  c.course_website,
+  (SELECT extraction_method->>'ielts_overall'
+   FROM scraped_courses sc 
+   WHERE sc.university_id = 22 
+     AND lower(sc.course_name) = lower(c.name)
+   ORDER BY sc.id DESC LIMIT 1) AS source
+FROM courses c
+JOIN english_requirements er ON er.course_id = c.id
+WHERE c.university_id = 22
+  AND er.test_type = 'ielts'
+ORDER BY random() LIMIT 5;"
+```
+
+Then verify the 5 returned rows against bond.edu.au URLs. Pass criteria same as before: all 5 match, no `ai_fallback` source more than once.
+
+---
+
+**Tomorrow's opening sequence (revised based on today's finishes):**
+
+1. Run the three morning checks above (5 min)
+2. Bond IELTS spot-check with the corrected query (5 min) — confirms KBS-pattern hallucination didn't sneak into Bond enrichment
+3. If both pass: pick 1-2 low-yield unis for Tier 2 activation rollout (Torrens already promoted to 74, so SCU + UTas are the obvious candidates)
+4. Add `fallback_subdomains` YAML entries, capture baseline, re-scrape, verify Tier 2 fires in job log, ground-truth check any newly-found URLs
+5. Then start on next-week deferred work: Tier 3 (playbook replay) OR Tier 4 (PDF discovery) — your call which one
+
+The Tier 2 per-uni opt-in cycle is the day's best discipline test — if it lands clean on SCU and UTas tomorrow, the same playbook works for Tiers 3-4-5.
+
+---
+
+**Three-week engagement state:**
+
+**Code:** Per-uni YAML configs, ContextVar plumbing, Bug A duration regex, Bug A.2 orchestrator skip, Bug F KBS fee+English (ground-truth verified), Tier 2 subdomain probes, Tier 7 operator alert, nightly sweep + drift alerts, daily backup cron, weekly baseline refresh, zombie beat-task fix (both paths verified), Float→Numeric DB migration, 13/13 tests passing for new features.
+
+**Data:** 267 → 792 live courses (2.96×), 191 name quality fixes, 12 universities populated.
+
+**Workflow:** Diagnose, dry-run, commit, verify pattern held through every action today. The hardest moments earlier in the engagement (KBS table wipe, IELTS hallucination, sweep PASSing on stale data, bulk_approve.py disappearance) all caught and corrected within their own cycles. Today proved the pattern can sustain a high-throughput day without breaking down.
+
+**Bug queue:** Tier 3, Tier 4, Tier 5 deep-dive, CI integration deferred to next week with explicit reasons. Bug B/D/E and ACAP modal still open but lower priority than the work that landed today.
+
+Great day. Tomorrow's checks first thing, then we keep moving.
