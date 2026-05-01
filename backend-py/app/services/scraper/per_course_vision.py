@@ -154,6 +154,40 @@ _DECORATIVE_EXACT_STEMS: Final = frozenset({
     "plus", "minus", "caret", "dot", "bullet",
 })
 
+# URL *path* substrings (checked against the full lowercased URL, not just
+# the filename) that indicate a site-wide marketing or application-process
+# image — never a per-course English-requirement table.
+#
+# These fire BEFORE Gemini is called so we don't pay for OCR on images like
+#   /shared/how-to-apply/how-to-apply-1-tua.jpg   (generic apply steps)
+#   /shared/marketing/hero-international.jpg       (branding photo)
+#   /site-assets/apply-now-banner.png              (CTA graphic)
+#
+# Rule: if the full image URL (lowercased) contains any of these substrings
+# it is skipped, even if its filename would otherwise survive _DECORATIVE_HINTS.
+_GENERIC_MARKETING_PATH_BLOCKS: Final = (
+    "/how-to-apply",
+    "/how-to-enrol",
+    "/how-to-enroll",
+    "/apply-now",
+    "/application-process",
+    "/applying-to",
+    "/admissions-process",
+    "/site-assets",
+    "/shared/marketing",
+    "/shared/site-wide",
+    "/shared/global",
+    "/shared/header",
+    "/shared/footer",
+    "/shared/nav",
+    "/shared/apply",
+    "/shared/how-to",
+    "/shared/cta",
+    "/shared/callout",
+    "/global/",
+    "/marketing/",
+)
+
 # URL path-segment keywords that strongly suggest the image contains
 # English language requirement scores.  Images whose URL (lower-cased)
 # contains any of these move to the FRONT of the processing queue so
@@ -522,6 +556,12 @@ def _extract_img_candidates(
         # don't contain any _DECORATIVE_HINTS substring but are clearly icons.
         _stem = _filename.rsplit(".", 1)[0]
         if _stem in _DECORATIVE_EXACT_STEMS:
+            continue
+        # Generic marketing path block: check the FULL URL (lowercased) for
+        # known site-wide image directories that never contain per-course
+        # English-requirement tables (e.g. /shared/how-to-apply/, /marketing/).
+        _src_lower = src.lower()
+        if any(block in _src_lower for block in _GENERIC_MARKETING_PATH_BLOCKS):
             continue
         try:
             absolute = urljoin(base_url, src)

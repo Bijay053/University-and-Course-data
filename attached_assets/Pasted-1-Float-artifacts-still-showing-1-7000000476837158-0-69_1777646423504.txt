@@ -1,0 +1,35 @@
+1. Float artifacts still showing (1.7000000476837158, 0.699999988079071)
+Master of Cybersecurity, Master of Business Analytics, Master of Information Technology, Diploma of Ux and Web Design, Diploma of Photography, Advanced Diploma of Game Design and Development, Diploma of 3D Design and Animation, Bachelor of Ux and Web Design, Bachelor of Interior Design (Commercial), Diploma of Graphic Design, Advanced Diploma of Interior Design and Decoration, Graduate Certificate of Business Analytics, Graduate Certificate of Analytics — all still showing the float32 artifact.
+But your terminal output last night showed:
+ALTER TABLE
+UPDATE 0
+UPDATE 0 means the cleanup query found zero rows matching the regex '0{4}|9{4}'. That's because the values don't actually contain four-zero or four-nine runs in their string representation — 1.7000000476837158 has 0000 early but the regex matched on staged_courses after the ALTER had already cast everything to Numeric(6,2), which would have rounded them. So the ALTER ran, but the values you're seeing in the admin screen are coming from somewhere that wasn't cast.
+The most likely explanations, in order:
+
+The admin screen reads from a different column or denormalised field that wasn't migrated. Check what field the review screen is reading — is it duration (the Numeric column) or something like duration_value cast to text, or a field in extraction_method JSON?
+The frontend is caching stale data. Hard refresh (Ctrl+Shift+R) and check again.
+These rows weren't actually re-saved after the ALTER. ALTER would have rounded them in-place to 1.70, but if the admin screen is showing data from a cached query result or a denormalised read model that wasn't refreshed, you'd still see the old values.
+
+Quick check:
+sqlSELECT id, course_name, duration, duration::text 
+FROM scraped_courses 
+WHERE university_id = 3 
+  AND course_name = 'Master of Cybersecurity';
+If duration::text shows 1.70, the DB is clean and the bug is in the frontend rendering. If it shows 1.7000000476837158, the ALTER didn't take effect on these rows.
+2. Vision cache still pulling unrelated images
+Look at Master of Professional Accounting evidence panel:
+ielts_overall = 6.5, source: per_course_vision (NOT per_course_vision_cached)
+image: how-to-apply/how-to-apply-1-tua.jpg
+This is a generic "How to apply" marketing image used across the entire site — definitely not specific to the Accounting course. The source is per_course_vision, not per_course_vision_cached, which means the fix you made addressed the cache contamination, but the underlying problem is broader: vision is mining IELTS values from any image on the page, including generic site-wide marketing imagery.
+The composite cache key fix prevents one course's cached value from leaking to another. It does not prevent vision from extracting IELTS from the wrong image in the first place. The "how-to-apply" image likely contains text like "IELTS 6.5 / PTE 62 / IELTS bands 6.0" because it's the generic application requirements graphic — and vision is happy to scrape those numbers regardless of what course page it's on.
+In this Accounting case the value happens to match what regex also found (6.5), so it's not actively wrong. But the evidence is junk. And on courses where a generic marketing image happens to show different numbers than the actual course requirement, this would silently produce wrong values.
+3. What this means
+Last night's "0 promoted vision_cached" audit was correct for the question it asked. But it asked the wrong question. The real question is: how many promoted courses got IELTS from per_course_vision (without the _cached suffix) where the image URL doesn't belong to that course?
+Updated audit:
+sqlSELECT COUNT(*) AS promoted_vision_unrelated_image
+FROM courses c
+JOIN scraped_courses sc ON sc.course_id = c.id
+WHERE sc.extraction_method->>'ielts_overall' IN ('per_course_vision', 'per_course_vision_cached')
+  AND sc.status = 'promoted';
+If that number is greater than 0, the live catalog has the same issue. The fix is bigger than caching — vision needs a relevance check (does this image's URL path or alt-text relate to this course?) before its IELTS values are accepted.
+My honest take: the Bug 1 fix from last night was real progress (cache no longer leaks across courses), but the underlying vision-OCR-mining-generic-images problem wasn't actually solved. We addressed a symptom, not the disease. Bug 2 might be a frontend/caching issue rather than a DB issue — easy to verify with the SQL above.
