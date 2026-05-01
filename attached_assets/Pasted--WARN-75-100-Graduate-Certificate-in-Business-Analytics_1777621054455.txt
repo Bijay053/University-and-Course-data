@@ -1,0 +1,55 @@
+ ⚠️ [WARN 75/100] Graduate Certificate in Business Analytics — missing: english | graduate-certificate-in-business-analyti                                                                                          
+                                                                                                                                                                                                                   
+                                                                                                        | 2026-05-01 07:27:21.306959+00
+ [WARN] Graduate Diploma of Business Analytics — English section detected in HTML but all scores blank                                                                                                             
+                                                                                                                                                                                                                   
+                                                                                                        | 2026-05-01 07:27:28.764124+00
+ ⚠️ [WARN 75/100] Graduate Diploma of Business Analytics — missing: english | graduate-diploma-of-business-analytics                                                                                                
+                                                                                                                                                                                                                   
+                                                                                                        | 2026-05-01 07:27:28.769051+00
+ [WARN] Master of Accounting — English section detected in HTML but all scores blank                                                                                                                               
+                                                                                                                                                                                                                   
+                                                                                                        | 2026-05-01 07:27:38.964594+00
+ ⚠️ [WARN 75/100] Master of Accounting — missing: english | master-of-accounting                                                                                                                                    
+                                                                                                                                                                                                                   
+                                                                                                        | 2026-05-01 07:27:38.969515+00
+ [WARN] Master of Business Analytics (Extension) — English section detected in HTML but all scores blank                                                                                                           
+                                                                                                                                                                                                                   
+                                                                                                        | 2026-05-01 07:27:43.846773+00
+ ⚠️ [WARN 75/100] Master of Business Analytics (Extension) — missing: english | master-of-business-analytics-extension                                                                                              
+                                                                                                                                                                                                                   
+                                                                                                        | 2026-05-01 07:27:43.850443+00
+ [WARN] Graduate Diploma of Business Administrat — English section detected in HTML but all scores blank                                                                                                           
+                                                                                                                                                                                                                   
+                                                                                                        | 2026-05-01 07:27:52.603614+00
+ ⚠️ [WARN 75/100] Graduate Diploma of Business Administration — missing: english | graduate-diploma-of-business-administrat                                                                                         
+                                                                                                                                                                                                                   
+                                                                                                        | 2026-05-01 07:27:52.607473+00
+ [WARN] MBA – Digital Management — English section detected in HTML but all scores blank                                                                                                                           
+                                                                                                                                                                                                                   
+                                                                                                        | 2026-05-01 07:27:55.014997+00
+ ⚠️ [WARN 75/100] MBA – Digital Management — missing: english | digital-management                                                                                                                                  
+                                                                                                                                                                                                                   
+                                                                                                        | 2026-05-01 07:27:55.020588+00
+ [WARN] MBA – Health Services Management — English section detected in HTML but all scores blank                                                                                                                   
+                                                                                                                                                                                                                   
+                                                                                                        | 2026-05-01 07:27:59.170014+00
+ ⚠️ [WARN 75/100] MBA – Health Services Management — missing: english | health-services-management                                                                                                                  
+                                                                                                                                                                                                                   
+                                                                                                        | 2026-05-01 07:27:59.187923+00
+ [WARN] MBA – International Leadership — English section detected in HTML but all scores blank                                                                                                                     
+                                                                                                                                                                                                                   
+                                                                                                        | 2026-05-01 07:28:10.999288+00
+ ⚠️ [WARN 75/100] MBA – International Leadership — missing: english | international-leadership                                                                                                                      
+                                                                                                                                                                                                                   
+                                                                                                        | 2026-05-01 07:28:11.005642+00
+ [WARN] MBA – Project Management — English section detected in HTML but all scores blank                                                                                                                           
+                                                                                                                                                                                                                   
+                                                                                                        | 2026-05-01 07:28:13.680174+00
+ ⚠️ [WARN 75/100] MBA – Project Management — missing: english | project-management                                                                                                                                  
+                                                                                                                                                                                                                   
+                                                                                                        | 2026-05-01 07:28:13.686091+00
+ [WARN] Master of Business Analytics — English section detected in HTML but all scores blank                                                                                                                       
+                                                                                                                                                                                                                   
+                                                                                                        | 2026-05-01 07:28:17.433113+00
+ ⚠️ [WARN 75/100] Master of Business Analytics — missing: english | master-of-business-analytics                      

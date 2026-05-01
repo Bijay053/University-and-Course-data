@@ -1,0 +1,56 @@
+                                                                                                                                                                                                                  
+                                                  msg                                                                                                                                                              
+                                                                                                        |          created_at           
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+--------------------------------------------------------------------------------------------------------+-------------------------------
+ ❌ [LOW 55/100] Course Delivery Options — missing: english, duration | course-delivery-options                                                                                                                    
+                                                                                                                                                                                                                   
+                                                                                                        | 2026-05-01 07:25:47.122993+00
+ ❌ [LOW 55/100] Non-award Single Subject Enrolment — missing: english, duration | non-award-single-subject-enrolment                                                                                              
+                                                                                                                                                                                                                   
+                                                                                                        | 2026-05-01 07:25:49.518435+00
+ [WARN] The Ultimate Guide to Doing An MBA in Au — English section detected in HTML but all scores blank                                                                                                           
+                                                                                                                                                                                                                   
+                                                                                                        | 2026-05-01 07:25:49.997336+00
+ [WARN] MBA - Master of Business Administration — English section detected in HTML but all scores blank                                                                                                            
+                                                                                                                                                                                                                   
+                                                                                                        | 2026-05-01 07:25:50.003301+00
+ ⚠️ [WARN 75/100] The Ultimate Guide to Doing An MBA in Australia — missing: english | ultimate-guide-doing-mba-australia                                                                                           
+                                                                                                                                                                                                                   
+                                                                                                        | 2026-05-01 07:25:50.035026+00
+ ⚠️ [WARN 75/100] MBA - Master of Business Administration — missing: english | mba-master-of-business-administration                                                                                                
+                                                                                                                                                                                                                   
+                                                                                                        | 2026-05-01 07:25:50.042934+00
+ [WARN] Diploma of Business — English section detected in HTML but all scores blank                                                                                                                                
+                                                                                                                                                                                                                   
+                                                                                                        | 2026-05-01 07:26:11.569295+00
+ ⚠️ [WARN 75/100] Diploma of Business — missing: english | diploma-of-business                                                                                                                                      
+                                                                                                                                                                                                                   
+                                                                                                        | 2026-05-01 07:26:11.574003+00
+ [WARN] Bachelor of Business — English section detected in HTML but all scores blank                                                                                                                               
+                                                                                                                                                                                                                   
+                                                                                                        | 2026-05-01 07:26:15.934044+00
+ ⚠️ [WARN 75/100] Bachelor of Business — missing: english | bachelor-of-business                                                                                                                                    
+                                                                                                                                                                                                                   
+                                                                                                        | 2026-05-01 07:26:15.939138+00
+ [WARN] Bachelor of Business (Accounting) — English section detected in HTML but all scores blank                                                                                                                  
+                                                                                                                                                                                                                   
+                                                                                                        | 2026-05-01 07:26:16.145533+00
+ ⚠️ [WARN 75/100] Bachelor of Business (Accounting) — missing: english | bachelor-of-business-accounting                                                                                                            
+                                                                                                                                                                                                                   
+                                                                                                        | 2026-05-01 07:26:16.182391+00
+ [WARN] Bachelor of Business (Marketing) — English section detected in HTML but all scores blank                                                                                                                   
+                                                                                                                                                                                                                   
+                                                                                                        | 2026-05-01 07:26:35.37891+00
+ ⚠️ [WARN 75/100] Bachelor of Business (Marketing) — missing: english | bachelor-of-business-marketing                                                                                                              
+                                                                                                                                                                                                                   
+                                                                                                        | 2026-05-01 07:26:35.384888+00
+ [WARN] Graduate Certificate in Accounting — English section detected in HTML but all scores blank                                                                                                                 
+                                                                                                                                                                                                                   
+                                                                                                        | 2026-05-01 07:26:39.0684+00
+ ⚠️ [WARN 75/100] Graduate Certificate in Accounting — missing: english | graduate-certificate-in-accounting                                                                                                        
+                                                                                                                                                                                                                   
+                                                                                                        | 2026-05-01 07:26:39.073269+00
+ [WARN] Master of Professional Accounting — English section detected in HTML but all scores blank                                                                                                                  
+                                                                                                               
