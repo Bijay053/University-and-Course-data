@@ -1,0 +1,314 @@
+          (method-only) extraction_method.cambridge_overall: None → 'uni_pdf:requirements:null'
+          (method-only) extraction_method.duolingo_overall: None → 'uni_pdf:requirements:null'
+          (method-only) extraction_method.duration_text: 'gemini_primary' → None
+          (method-only) extraction_method.intake_text: 'gemini_primary' → None
+    [CHANGED] 'Master of Information Technology (Cyber Security)'
+          (method-only) extraction_method.cambridge_overall: None → 'uni_pdf:requirements:null'
+          (method-only) extraction_method.duolingo_overall: None → 'uni_pdf:requirements:null'
+          (method-only) extraction_method.duration_term: None → 'gemini_primary'
+          (method-only) extraction_method.ielts_listening: 'per_course_vision_cached' → 'per_course_vision'
+          (method-only) extraction_method.ielts_overall: 'per_course_vision_cached' → 'per_course_vision'
+    [CHANGED] 'Master of Information Technology (Software Application Development)'
+          (method-only) extraction_method.cambridge_overall: None → 'uni_pdf:requirements:null'
+          (method-only) extraction_method.duolingo_overall: None → 'uni_pdf:requirements:null'
+    [CHANGED] 'Master of Project Management'
+          (method-only) extraction_method.cambridge_overall: None → 'uni_pdf:requirements:null'
+          (method-only) extraction_method.duolingo_overall: None → 'uni_pdf:requirements:null'
+          (method-only) extraction_method.ielts_listening: 'per_course_vision' → 'per_course_vision_cached'
+          (method-only) extraction_method.ielts_overall: 'per_course_vision' → 'per_course_vision_cached'
+root@university-and-course-data:~/University-and-Course-data/backend-py# # Alternative if above fails — create a "before" dir from the April 30 files
+mkdir -p baselines/fix2-prod-before/
+cp baselines/20260430_024437_*.json baselines/fix2-prod-before/
+
+PYTHONPATH=. venv/bin/python3 scripts/regression_sweep.py \
+  --before baselines/fix2-prod-before/ \
+  --after  baselines/fix2-staging-after/ \
+  --verbose 2>&1 | head -80
+
+Regression sweep: 23 before / 23 after snapshots
+Expected slugs:   (none)
+------------------------------------------------------------------------
+  [CLEAN]    acu (uni_id=51)
+  [CLEAN]    aibi (uni_id=47)
+  [CLEAN]    ait (uni_id=37)
+  [CLEAN]    apicollege (uni_id=30)
+
+  [UNEXPECTED] asahe (uni_id=2)  before=17  after=17  → DIRTY
+    added=0  removed=0  changed=8
+    [CHANGED] 'Bachelor of Business'
+          (method-only) extraction_method.cambridge_overall: 'per_course_vision' → 'per_course_vision_cached'
+          (method-only) extraction_method.ielts_listening: 'per_course_vision' → 'per_course_vision_cached'
+          (method-only) extraction_method.ielts_overall: 'per_course_vision' → 'per_course_vision_cached'
+          (method-only) extraction_method.ielts_reading: 'per_course_vision' → 'per_course_vision_cached'
+          (method-only) extraction_method.ielts_speaking: 'per_course_vision' → 'per_course_vision_cached'
+    [CHANGED] 'Bachelor of Business Hospitality Management'
+          (method-only) extraction_method.duration_text: 'gemini_primary' → None
+    [CHANGED] 'Bachelor of Business International Business'
+          (method-only) extraction_method.cambridge_overall: 'per_course_vision_cached' → 'per_course_vision'
+          (method-only) extraction_method.duration_term: None → 'gemini_primary'
+          (method-only) extraction_method.ielts_listening: 'per_course_vision_cached' → 'per_course_vision'
+          (method-only) extraction_method.ielts_overall: 'per_course_vision_cached' → 'per_course_vision'
+          (method-only) extraction_method.ielts_reading: 'per_course_vision_cached' → 'per_course_vision'
+    [CHANGED] 'Bachelor of Business Technology Management'
+          (method-only) extraction_method.duration_text: None → 'gemini_primary'
+    [CHANGED] 'Master of Information Technology (Artificial Intelligence)'
+          (method-only) extraction_method.cambridge_overall: None → 'uni_pdf:requirements:null'
+          (method-only) extraction_method.duolingo_overall: None → 'uni_pdf:requirements:null'
+          (method-only) extraction_method.duration_text: 'gemini_primary' → None
+          (method-only) extraction_method.intake_text: 'gemini_primary' → None
+    [CHANGED] 'Master of Information Technology (Cyber Security)'
+          (method-only) extraction_method.cambridge_overall: None → 'uni_pdf:requirements:null'
+          (method-only) extraction_method.duolingo_overall: None → 'uni_pdf:requirements:null'
+          (method-only) extraction_method.duration_term: None → 'gemini_primary'
+          (method-only) extraction_method.ielts_listening: 'per_course_vision_cached' → 'per_course_vision'
+          (method-only) extraction_method.ielts_overall: 'per_course_vision_cached' → 'per_course_vision'
+    [CHANGED] 'Master of Information Technology (Software Application Development)'
+          (method-only) extraction_method.cambridge_overall: None → 'uni_pdf:requirements:null'
+          (method-only) extraction_method.duolingo_overall: None → 'uni_pdf:requirements:null'
+    [CHANGED] 'Master of Project Management'
+          (method-only) extraction_method.cambridge_overall: None → 'uni_pdf:requirements:null'
+          (method-only) extraction_method.duolingo_overall: None → 'uni_pdf:requirements:null'
+          (method-only) extraction_method.ielts_listening: 'per_course_vision' → 'per_course_vision_cached'
+          (method-only) extraction_method.ielts_overall: 'per_course_vision' → 'per_course_vision_cached'
+          (method-only) extraction_method.ielts_reading: 'per_course_vision' → 'per_course_vision_cached'
+  [CLEAN]    atmc (uni_id=93)
+  [CLEAN]    aut (uni_id=20)
+  [CLEAN]    aut (uni_id=87)
+  [CLEAN]    bond (uni_id=22)
+  [CLEAN]    cqu (uni_id=18)
+  [CLEAN]    flinders (uni_id=12)
+
+  [UNEXPECTED] kbs (uni_id=29)  before=29  after=21  → DIRTY
+    added=0  removed=8  changed=21
+    [REMOVED] 'Graduate Certificate in Business Administration'
+    [REMOVED] 'Graduate Certificate in Business Analytics'
+    [REMOVED] 'Graduate Diploma of Business Administration'
+    [REMOVED] 'MBA – Data-driven Leadership'
+    [REMOVED] 'MBA – Digital Management'
+    [REMOVED] 'MBA – Tourism and Hospitality Leadership'
+    [REMOVED] 'Master of Business Analytics'
+    [REMOVED] 'Master of Professional Accounting'
+    [CHANGED] 'Bachelor of Business (Accounting)'
+          ielts: 6.5 → None
+          (method-only) extraction_method.ielts_listening: 'per_course_vision' → None
+          (method-only) extraction_method.ielts_overall: 'per_course_vision' → None
+          (method-only) extraction_method.ielts_reading: 'per_course_vision' → None
+          (method-only) extraction_method.ielts_speaking: 'per_course_vision' → None
+    [CHANGED] 'Bachelor of Business (Hospitality and Tourism Management)'
+          ielts: 6.5 → None
+          (method-only) extraction_method.ielts_listening: 'per_course_vision' → None
+          (method-only) extraction_method.ielts_overall: 'per_course_vision' → None
+          (method-only) extraction_method.ielts_reading: 'per_course_vision' → None
+          (method-only) extraction_method.ielts_speaking: 'per_course_vision' → None
+    ... (19 more courses omitted)
+  [CLEAN]    kbs (uni_id=8)
+  [CLEAN]    scu (uni_id=17)
+  [CLEAN]    study (uni_id=4)
+root@university-and-course-data:~/University-and-Course-data/backend-py# # ── URGENT: Fix broken prod search (view not populated) ──
+# This is not part of the migration — just restoring the view to working state
+sudo -u postgres psql university_portal -c \
+  "REFRESH MATERIALIZED VIEW course_search_view;"
+sudo -u postgres psql university_portal -c \
+  "SELECT COUNT(*) FROM course_search_view;"
+REFRESH MATERIALIZED VIEW
+ count 
+-------
+   352
+(1 row)
+
+root@university-and-course-data:~/University-and-Course-data/backend-py# # ── Rollback prod code to pre-batch stable state ──
+cd ~/University-and-Course-data
+git fetch origin main
+git log --oneline -10   # confirm f95d75fc590c is visible
+
+git reset --hard f95d75fc590c
+
+# Confirm
+git log --oneline -3
+git status
+
+# Restart services
+sudo systemctl restart uni-api-py.service uni-celery.service
+sleep 3
+sudo systemctl status uni-api-py.service --no-pager | tail -5
+sudo journalctl -u uni-celery -n 3 --no-pager | grep "celery@\|ERROR"
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+9b95125 (HEAD -> main, origin/main) fix(migration-012): drop/recreate course_search_view around ALTER COLUMN
+bbea119 fix(alembic): escape % in DATABASE_URL for ConfigParser
+0279075 chore(acap): mark Phase 6 TODO as DONE in comment
+b38134f fix(kbs): disable vision OCR + normalise slash-separated location format
+be3df67 feat(option-c): wire strip_patterns into location extractor (ACAP footnote fix)
+629e5de fix(models): courses.duration Float->Numeric(6,2) + Alembic migration 012
+fba79b1 fix(duration): block Year-12/schooling boilerplate from tournament
+ede9354 fix(duration): same-N cross-check + grad-cert sanity cap + new tests
+f95d75f Phase 6: add 3 regression tests for completion-deadline anti-context fix
+e3b7847 Phase 6: extend _DURATION_ANTI_CONTEXT for completion-deadline clauses
+HEAD is now at f95d75f Phase 6: add 3 regression tests for completion-deadline anti-context fix
+f95d75f (HEAD -> main) Phase 6: add 3 regression tests for completion-deadline anti-context fix
+e3b7847 Phase 6: extend _DURATION_ANTI_CONTEXT for completion-deadline clauses
+1503896 Phase 5: update acap.yaml TODO/DONE comments
+On branch main
+Your branch is behind 'origin/main' by 8 commits, and can be fast-forwarded.
+  (use "git pull" to update your local branch)
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+        =
+        backend-py/baselines/
+        drizzle-kit
+
+nothing added to commit but untracked files present (use "git add" to track)
+             ├─1262112 /root/University-and-Course-data/backend-py/venv/bin/python -c "from multiprocessing.resource_tracker import main;main(6)"
+             ├─1262113 /root/University-and-Course-data/backend-py/venv/bin/python -c "from multiprocessing.spawn import spawn_main; spawn_main(tracker_fd=7, pipe_handle=9)" --multiprocessing-fork
+             └─1262114 /root/University-and-Course-data/backend-py/venv/bin/python -c "from multiprocessing.spawn import spawn_main; spawn_main(tracker_fd=7, pipe_handle=13)" --multiprocessing-fork
+
+May 01 01:52:20 university-and-course-data systemd[1]: Started uni-api-py.service - University Portal Python API (FastAPI + Uvicorn).
+May 01 01:52:25 university-and-course-data celery[1262124]: [2026-05-01 01:52:25,168: INFO/MainProcess] celery@university-and-course-data ready.
+root@university-and-course-data:~/University-and-Course-data# # ── Investigate the 0.00 durations (data quality check, no writes) ──
+sudo -u postgres psql university_portal -c "
+SELECT c.id, c.name, c.duration, u.name AS uni
+FROM courses c
+JOIN universities u ON u.id = c.university_id
+WHERE c.duration = 0.0
+ORDER BY u.name, c.name
+LIMIT 20;"
+ id  |                           name                            | duration |           uni            
+-----+-----------------------------------------------------------+----------+--------------------------
+ 263 | Bachelor Of Applied Research Honours                      |     0.00 | Charles Sturt university
+ 317 | Bachelor Of Arts Social Science Honours                   |     0.00 | Charles Sturt university
+ 318 | Bachelor Of Food Science Nutrition                        |     0.00 | Charles Sturt university
+ 266 | Bachelor Of Islamic Studies Honours                       |     0.00 | Charles Sturt university
+ 259 | Bachelor Of Laws                                          |     0.00 | Charles Sturt university
+ 258 | Bachelor Of Of Education Secondary                        |     0.00 | Charles Sturt university
+ 267 | Bachelor Of Psychology                                    |     0.00 | Charles Sturt university
+ 268 | Bachelor Of Science                                       |     0.00 | Charles Sturt university
+ 316 | Bachelor Of Social Science Psychology Honours             |     0.00 | Charles Sturt university
+ 260 | Bachelor Of Veterinary Technology                         |     0.00 | Charles Sturt university
+ 261 | Bachelor Of Viticulture                                   |     0.00 | Charles Sturt university
+ 262 | Diploma Of Environmental Studies                          |     0.00 | Charles Sturt university
+ 269 | Graduate Certificate Of Applied Data Science              |     0.00 | Charles Sturt university
+ 270 | Graduate Certificate Of Business Administration Computing |     0.00 | Charles Sturt university
+ 271 | Graduate Certificate Of Classical Arabic                  |     0.00 | Charles Sturt university
+ 273 | Graduate Certificate Of Computing Career Transition       |     0.00 | Charles Sturt university
+ 274 | Graduate Certificate Of Cyber Security                    |     0.00 | Charles Sturt university
+ 277 | Graduate Certificate Of Digital Health                    |     0.00 | Charles Sturt university
+ 278 | Graduate Certificate Of Environmental Management          |     0.00 | Charles Sturt university
+ 280 | Graduate Certificate Of Industrial Relations              |     0.00 | Charles Sturt university
+(20 rows)
+
+root@university-and-course-data:~/University-and-Course-data# # ── 1. Clean up the stray = file ──
+ls -la ~/University-and-Course-data/=
+rm ~/University-and-Course-data/= 2>/dev/null && echo "removed" || echo "not found or already gone"
+-rw-r--r-- 1 root root 0 Apr 30 10:24 '/root/University-and-Course-data/='
+removed
+root@university-and-course-data:~/University-and-Course-data# # ── 2. Capture fresh post-rollback baseline (the new "before" for everything) ──
+cd ~/University-and-Course-data/backend-py
+set -a && source .env && set +a
+
+PYTHONPATH=. venv/bin/python3 scripts/capture_baseline.py \
+  --out-dir baselines/post-rollback-baseline/
+INFO capture_baseline: Snapshotting 23 universities...
+INFO capture_baseline: Saved: 20260501_015839_acap_41.json  (courses=11  disc=27  staged=11  cost=$0.0028  81.0)
+INFO capture_baseline: Saved: 20260501_015839_aibi_47.json  (courses=8  disc=11  staged=8  cost=$0.0000  99.1)
+INFO capture_baseline: Saved: 20260501_015839_ait_37.json  (courses=6  disc=8  staged=6  cost=$0.0017  118.1)
+INFO capture_baseline: Saved: 20260501_015839_apicollege_30.json  (courses=25  disc=27  staged=25  cost=$0.0000  169.7)
+INFO capture_baseline: Saved: 20260501_015839_atmc_93.json  (courses=4  disc=6  staged=4  cost=$0.0000  89.6)
+INFO capture_baseline: Saved: 20260501_015839_aut_87.json  (courses=13  disc=36  staged=13  cost=$0.0035  604.3)
+INFO capture_baseline: Saved: 20260501_015839_acu_51.json  (courses=99  disc=165  staged=99  cost=$0.0234  3410.1)
+INFO capture_baseline: Saved: 20260501_015839_bond_22.json  (courses=126  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_015839_study_4.json  (courses=694  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_015839_flinders_12.json  (courses=105  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_015839_kbs_8.json  (courses=30  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_015839_kbs_29.json  (courses=21  disc=37  staged=21  cost=$0.0056  393.1)
+INFO capture_baseline: Saved: 20260501_015839_scu_17.json  (courses=6  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_015839_une_14.json  (courses=12  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_015839_uow_13.json  (courses=3  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_015839_unisq_1.json  (courses=167  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_015839_utas_5.json  (courses=13  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_015839_vit_38.json  (courses=19  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_015839_asahe_2.json  (courses=17  disc=9  staged=9  cost=$0.0019  107.2)
+INFO capture_baseline: Saved: 20260501_015839_aut_20.json  (courses=92  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_015839_cqu_18.json  (courses=4  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_015839_torrens_3.json  (courses=75  disc=168  staged=0  cost=$0.0000  463.9)
+INFO capture_baseline: Saved: 20260501_015839_vit_6.json  (courses=30  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Done. 23 universities, 1580 courses total. Baselines written to baselines/post-rollback-baseline/
+root@university-and-course-data:~/University-and-Course-data/backend-py# # ── 3. Investigate 0.00 durations — scope across all unis ──
+sudo -u postgres psql university_portal -c "
+SELECT u.name, COUNT(*) AS zero_duration_count
+FROM courses c
+JOIN universities u ON u.id = c.university_id
+WHERE c.duration = 0.0
+GROUP BY u.name
+ORDER BY COUNT(*) DESC;"
+           name           | zero_duration_count 
+--------------------------+---------------------
+ Charles Sturt university |                  59
+(1 row)
+
+root@university-and-course-data:~/University-and-Course-data/backend-py# # ── 4. Confirm the 8 KBS courses exist in current prod (post-rollback) ──
+sudo -u postgres psql university_portal -c "
+SELECT name FROM courses WHERE university_id = 29 ORDER BY name;"
+ name 
+------
+(0 rows)
+
+root@university-and-course-data:~/University-and-Course-data/backend-py# # ── 1. Stray = file ──
+ls -la ~/University-and-Course-data/=
+rm ~/University-and-Course-data/= 2>/dev/null && echo "removed" || echo "not found"
+ls: cannot access '/root/University-and-Course-data/=': No such file or directory
+not found
+root@university-and-course-data:~/University-and-Course-data/backend-py# # ── 2. Fresh post-rollback baseline (new "before" for all future sweeps) ──
+cd ~/University-and-Course-data/backend-py
+set -a && source .env && set +a
+PYTHONPATH=. venv/bin/python3 scripts/capture_baseline.py \
+  --out-dir baselines/post-rollback-baseline/
+INFO capture_baseline: Snapshotting 23 universities...
+INFO capture_baseline: Saved: 20260501_015912_acap_41.json  (courses=11  disc=27  staged=11  cost=$0.0028  81.0)
+INFO capture_baseline: Saved: 20260501_015912_aibi_47.json  (courses=8  disc=11  staged=8  cost=$0.0000  99.1)
+INFO capture_baseline: Saved: 20260501_015912_ait_37.json  (courses=6  disc=8  staged=6  cost=$0.0017  118.1)
+INFO capture_baseline: Saved: 20260501_015912_apicollege_30.json  (courses=25  disc=27  staged=25  cost=$0.0000  169.7)
+INFO capture_baseline: Saved: 20260501_015912_atmc_93.json  (courses=4  disc=6  staged=4  cost=$0.0000  89.6)
+INFO capture_baseline: Saved: 20260501_015912_aut_87.json  (courses=13  disc=36  staged=13  cost=$0.0035  604.3)
+INFO capture_baseline: Saved: 20260501_015912_acu_51.json  (courses=99  disc=165  staged=99  cost=$0.0234  3410.1)
+INFO capture_baseline: Saved: 20260501_015912_bond_22.json  (courses=126  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_015912_study_4.json  (courses=694  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_015912_flinders_12.json  (courses=105  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_015912_kbs_8.json  (courses=30  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_015912_kbs_29.json  (courses=21  disc=37  staged=21  cost=$0.0056  393.1)
+INFO capture_baseline: Saved: 20260501_015912_scu_17.json  (courses=6  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_015912_une_14.json  (courses=12  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_015912_uow_13.json  (courses=3  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_015912_unisq_1.json  (courses=167  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_015912_utas_5.json  (courses=13  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_015912_vit_38.json  (courses=19  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_015912_asahe_2.json  (courses=17  disc=9  staged=9  cost=$0.0019  107.2)
+INFO capture_baseline: Saved: 20260501_015912_aut_20.json  (courses=92  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_015912_cqu_18.json  (courses=4  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260501_015912_torrens_3.json  (courses=75  disc=168  staged=0  cost=$0.0000  463.9)
+INFO capture_baseline: Saved: 20260501_015912_vit_6.json  (courses=30  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Done. 23 universities, 1580 courses total. Baselines written to baselines/post-rollback-baseline/
+root@university-and-course-data:~/University-and-Course-data/backend-py# # ── 3. KBS investigation: all 29 courses present? ──
+sudo -u postgres psql university_portal -c "
+SELECT name, status, approval_status
+FROM courses
+WHERE university_id = 29
+ORDER BY name;"
+ name | status | approval_status 
+------+--------+-----------------
+(0 rows)
+
+root@university-and-course-data:~/University-and-Course-data/backend-py# # ── 4. Charles Sturt 0.00 duration — scope across all unis ──
+sudo -u postgres psql university_portal -c "
+SELECT u.name, COUNT(*) AS zero_duration_count
+FROM courses c
+JOIN universities u ON u.id = c.university_id
+WHERE c.duration = 0.0
+GROUP BY u.name
+ORDER BY COUNT(*) DESC;"
+           name           | zero_duration_count 
+--------------------------+---------------------
+ Charles Sturt university |                  59
+(1 row)
+
+root@university-and-course-data:~/University-and-Course-data/backend-py# 
