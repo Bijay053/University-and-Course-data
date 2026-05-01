@@ -1,0 +1,180 @@
+Code work on Bug A is good. Root cause traced cleanly (`_DURATION_CONTEXT` gate excluding the slash-structure pattern, candidature-deadline sentence winning the tournament by default), fix is targeted at Pattern-0 priority ×100 with a slash-structure pre-check, 15/15 tests pass, no new regressions in the broader suite.
+
+**Charles Sturt distinct-names result confirms the cycle bookkeeping:**
+
+```
+approved_distinct_names | courses_distinct_names 
+-------------------------+------------------------
+                     265 |                    173
+```
+
+265 distinct approved staged names, only 173 in `courses` table. So 92 distinct courses approved in staging are NOT in the live courses table. The earlier 271 vs 173 (98-row gap) included some duplicate scrape runs of the same name, but even after de-duplicating, 92 approved courses haven't propagated.
+
+This is NOT "duplicates of already-promoted records." It's a real gap. Either:
+- `approve_scraped_course()` doesn't always copy approved scraped_courses into `courses` (some path failing silently)
+- Charles Sturt has a separate workflow where admin can mark approved without auto-promote
+- Some other gate in the promotion logic
+
+**This is a real engineering bug** — 92 courses sitting in approved-but-not-live limbo. Worth a separate ticket. Not blocking Bug A, but should be queued. Question for the ticket: when you click Approve in the review UI for one of those 92 Charles Sturt courses, does it appear in `courses` immediately? If yes, those 92 were never re-clicked after some past failure. If no, the promotion code path is broken.
+
+---
+
+**Now the bigger concern: the deploy commands you pasted have multiple problems and need fixing before running.**
+
+**Issue 1: `python` command not found.**
+
+```
+Command 'python' not found, did you mean: 'python3'
+```
+
+The deploy script uses `python` but prod only has `python3`. Both `capture_baseline.py` and `regression_sweep.py` will fail this way. Use `venv/bin/python3` or `python3` explicitly.
+
+**Issue 2: `git pull origin main` fails with divergent branches.**
+
+```
+fatal: Need to specify how to reconcile divergent branches.
+```
+
+This is the GitHub force-push decision biting us. Local has 8 sequenced commits, origin has 8 bundled commits, divergent histories. `git pull` doesn't know which to apply.
+
+Three options for getting Bug A onto prod:
+
+*Option 1 — Force-push the clean local history to origin first.* Then `git pull origin main` works as fast-forward. This is the cleanest long-term but the most destructive (overwrites origin's bundled-deploy history, though the `archive/bundled-deploy-attempt` tag preserves it).
+
+*Option 2 — Cherry-pick Bug A directly onto local main, push as a separate branch, merge.* Avoids the force-push but creates more divergence on origin.
+
+*Option 3 — Develop Bug A on the dev environment, push to a branch on origin (e.g., `bug-a-duration-slash`), then on prod do `git fetch origin bug-a-duration-slash && git cherry-pick origin/bug-a-duration-slash`.* Cleanest if Bug A is a single commit, doesn't need force-push, and keeps both histories independent.
+
+My recommendation: **Option 1.** Force-push origin to match local. The bundled-deploy history is an embarrassment, not a reference — the tag preserves it for forensic purposes if anyone ever needs it. Clean history going forward is more valuable than preserving the divergence.
+
+If you go with Option 1:
+
+```
+# On local (where you developed Bug A)
+git push origin main --force-with-lease
+
+# On prod
+cd ~/University-and-Course-data
+git fetch origin main
+git reset --hard origin/main
+```
+
+`--force-with-lease` is safer than `--force` — it'll fail if someone else has pushed to origin since you last fetched.
+
+**Issue 3: `capture_baseline.py` arguments don't match the script signature.**
+
+From your previous successful runs:
+
+```
+PYTHONPATH=. venv/bin/python3 scripts/capture_baseline.py \
+  --out-dir baselines/post-rollback-baseline/
+```
+
+But the new deploy block uses:
+
+```
+python backend-py/scripts/capture_baseline.py \
+  --slug post-bug-a-baseline \
+  --unis kbs
+```
+
+Different argument names (`--out-dir` vs `--slug`, no `--unis` flag exists in previous runs). Either the script was updated to add these args, or someone wrote the deploy commands without checking. Worth confirming by running:
+
+```
+cd ~/University-and-Course-data/backend-py
+venv/bin/python3 scripts/capture_baseline.py --help
+```
+
+If `--slug` and `--unis` aren't supported, use the old `--out-dir baselines/bug-a-before/` pattern and capture all 23 unis (which is what the sweep script expects anyway).
+
+**Issue 4: `regression_sweep.py` arguments are wrong.**
+
+The deploy block uses:
+
+```
+python backend-py/scripts/regression_sweep.py \
+  --baseline post-bug-a-baseline \
+  --unis kbs \
+  --expected-dirty "Graduate Certificate in Accounting,..."
+```
+
+But every previous successful sweep used:
+
+```
+PYTHONPATH=. venv/bin/python3 scripts/regression_sweep.py \
+  --before baselines/X/ \
+  --after  baselines/Y/ \
+  --expected-slugs kbs
+```
+
+Different flag names. `--baseline` vs `--before/--after`, `--expected-dirty` (course-name list) vs `--expected-slugs` (uni-slug list). The new commands look like they were written from memory rather than from working examples.
+
+**Issue 5: `--expected-dirty` with course names is the WRONG semantics for this sweep.**
+
+The regression sweep's `--expected-slugs` acknowledges entire universities as expected-to-change. The proposed `--expected-dirty` with course names would only acknowledge those specific courses returning, while flagging any OTHER KBS course change as unexpected.
+
+This matters because Bug A might also fix duration on the 12 "changed" KBS courses from the previous sweep (the ones with `(method-only) extraction_method.duration_unit: None → 'ai_fallback'`). If the regex now correctly handles "8 months / N" patterns, those courses might switch from `ai_fallback` source to `regex` source for duration_unit. That's a method-only change and benign — but `--expected-dirty <course names>` would flag it as unexpected and fail the sweep.
+
+Safer for this sweep: `--expected-slugs kbs` (acknowledge any KBS change), then manually inspect the diff to confirm changes are: (a) the 3 grad certs reappearing, (b) duration extraction method on existing KBS courses moving from ai_fallback to regex (improvement), (c) nothing else.
+
+---
+
+**Corrected deploy sequence:**
+
+```
+# ON LOCAL (where Bug A was developed)
+git log --oneline -3   # confirm Bug A is HEAD
+git push origin main --force-with-lease
+
+# ON PROD
+cd ~/University-and-Course-data
+git fetch origin main
+git reset --hard origin/main
+git log --oneline -3   # confirm Bug A is HEAD on prod
+
+# Capture pre-Bug-A baseline (current prod state, all 23 unis)
+cd backend-py
+set -a && source .env && set +a
+PYTHONPATH=. venv/bin/python3 scripts/capture_baseline.py \
+  --out-dir baselines/bug-a-before/
+
+# Restart Celery (with sleep 15 for the zombie-job race)
+sudo systemctl restart uni-celery.service uni-api-py.service
+sleep 15
+sudo systemctl is-active uni-celery.service uni-api-py.service
+
+# Trigger KBS re-scrape
+curl -s -X POST http://localhost:80/api/scrape/start \
+  -H "Content-Type: application/json" \
+  -d '{"university_id": 29}' | python3 -m json.tool
+
+# Wait for completion (poll scrape_runtime_jobs)
+# ... then capture after-baseline
+
+PYTHONPATH=. venv/bin/python3 scripts/capture_baseline.py \
+  --out-dir baselines/bug-a-after/
+
+# Sweep
+PYTHONPATH=. venv/bin/python3 scripts/regression_sweep.py \
+  --before baselines/bug-a-before/ \
+  --after  baselines/bug-a-after/ \
+  --expected-slugs kbs \
+  --verbose
+```
+
+**Expected sweep result:**
+- 22 unis CLEAN
+- KBS expected-dirty: 
+  - 3 ADDED: Graduate Certificate in Accounting, Graduate Certificate in Business Administration, Graduate Certificate in Business Analytics (now staging because regex correctly returns 8 Month)
+  - Possibly some CHANGED entries on existing KBS courses where `extraction_method.duration_*` flips from `ai_fallback` to a regex source (method-only, benign)
+  - Nothing else
+
+If the sweep matches that exactly: ship. If it shows additional changes (other unis dirty, or KBS course values changing not just methods), stop and investigate.
+
+---
+
+**Decision needed before this can proceed:** Force-push origin main to match local? Or use the branch/cherry-pick option?
+
+My recommendation stands: force-push. The archive tag preserves the bundled history. Clean main going forward is worth more than preserving the divergence record.
+
+Confirm the force-push approach (or pick an alternative), then I'll give you the exact `git push` command to run from local.
