@@ -1,0 +1,69 @@
+root@university-and-course-data:~/University-and-Course-data# # Check scope of the suffix bug
+sudo -u postgres psql university_portal -c "
+SELECT COUNT(*) AS suffix_count
+FROM scraped_courses
+WHERE university_id = 51 AND course_name LIKE '%| Acu Courses%';
+
+-- Preview the cleaned names
+SELECT id, course_name,
+       trim(split_part(course_name, '|', 1)) AS cleaned_name
+FROM scraped_courses
+WHERE university_id = 51 AND course_name LIKE '%| Acu Courses%'
+LIMIT 10;"
+
+# Apply the name fix
+sudo -u postgres psql university_portal -c "
+UPDATE scraped_courses
+SET course_name = trim(split_part(course_name, '|', 1))
+WHERE university_id = 51 AND course_name LIKE '%| Acu Courses%'
+RETURNING id, course_name;"
+
+# Fix the lowercase 'bachelor' mid-name case
+sudo -u postgres psql university_portal -c "
+SELECT id, course_name FROM scraped_courses
+WHERE university_id = 51 AND course_name ~ '/bachelor'
+LIMIT 10;"
+ suffix_count 
+--------------
+           24
+(1 row)
+
+  id   |                                course_name                                
+-------+---------------------------------------------------------------------------
+ 11903 | Bachelor of Psychological Science/bachelor of Exercise and Sports Science
+ 11904 | Diploma in Biomedical Science
+ 11905 | Diploma in Nutrition Science
+ 11906 | Diploma in Exercise Science
+ 11907 | Graduate Certificate in Catholic Studies
+ 11908 | Bachelor of Education (Primary and Special Education)
+ 11915 | Graduate Certificate in Theological Studies
+ 11918 | Graduate Certificate in Public Health
+ 11909 | Bachelor of Education (Secondary and Special Education)
+ 11916 | Master of Spiritual Direction
+ 11910 | Bachelor of Computer Science
+ 11911 | Bachelor of Arts (Western Civilisation)
+ 11913 | Master of Public Health
+ 11912 | Master of Religious Education
+ 11914 | Graduate Diploma in Theological Studies
+ 11917 | Bachelor of Nursing
+ 11919 | Graduate Diploma in Spiritual Direction
+ 11920 | Certificate in Liberal Arts
+ 11921 | Certificate in Theology
+ 11922 | Certificate in Philosophy
+ 11923 | Doctor of Philosophy
+ 11924 | Master of Family and Systemic Therapy
+ 11926 | Graduate Certificate in Data Analytics
+ 11925 | Master of Business Administration
+(24 rows)
+
+UPDATE 24
+  id   |                                course_name                                
+-------+---------------------------------------------------------------------------
+ 11931 | Bachelor of Arts/bachelor of Laws
+ 11932 | Bachelor of Theology/bachelor of Global Studies
+ 11948 | Bachelor of Arts/bachelor of Commerce
+ 11903 | Bachelor of Psychological Science/bachelor of Exercise and Sports Science
+ 11952 | Bachelor of Arts/bachelor of Laws (Honours)
+(5 rows)
+
+root@university-and-course-data:~/University-and-Course-data# 
