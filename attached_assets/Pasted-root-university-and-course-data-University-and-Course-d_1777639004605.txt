@@ -1,0 +1,49 @@
+root@university-and-course-data:~/University-and-Course-data# # Preview the fix
+sudo -u postgres psql university_portal -c "
+SELECT id, course_name,
+       regexp_replace(course_name, '/bachelor\b', '/Bachelor', 'g') AS fixed
+FROM scraped_courses
+WHERE university_id = 51 AND course_name ~ '/bachelor';"
+
+# Apply
+sudo -u postgres psql university_portal -c "
+UPDATE scraped_courses
+SET course_name = regexp_replace(course_name, '/bachelor\b', '/Bachelor', 'g')
+WHERE university_id = 51 AND course_name ~ '/bachelor'
+RETURNING id, course_name;"
+  id   |                                course_name                                |                                   fixed                                   
+-------+---------------------------------------------------------------------------+---------------------------------------------------------------------------
+ 11931 | Bachelor of Arts/bachelor of Laws                                         | Bachelor of Arts/bachelor of Laws
+ 11932 | Bachelor of Theology/bachelor of Global Studies                           | Bachelor of Theology/bachelor of Global Studies
+ 11948 | Bachelor of Arts/bachelor of Commerce                                     | Bachelor of Arts/bachelor of Commerce
+ 11903 | Bachelor of Psychological Science/bachelor of Exercise and Sports Science | Bachelor of Psychological Science/bachelor of Exercise and Sports Science
+ 11952 | Bachelor of Arts/bachelor of Laws (Honours)                               | Bachelor of Arts/bachelor of Laws (Honours)
+(5 rows)
+
+  id   |                                course_name                                
+-------+---------------------------------------------------------------------------
+ 11931 | Bachelor of Arts/bachelor of Laws
+ 11932 | Bachelor of Theology/bachelor of Global Studies
+ 11948 | Bachelor of Arts/bachelor of Commerce
+ 11903 | Bachelor of Psychological Science/bachelor of Exercise and Sports Science
+ 11952 | Bachelor of Arts/bachelor of Laws (Honours)
+(5 rows)
+
+UPDATE 5
+root@university-and-course-data:~/University-and-Course-data# sudo -u postgres psql university_portal -c "
+SELECT id, course_name, international_fee,
+       extraction_method->>'international_fee' AS fee_source
+FROM scraped_courses
+WHERE university_id = 51 AND international_fee IS NOT NULL
+ORDER BY id
+LIMIT 5;"
+  id   |                                course_name                                | international_fee | fee_source 
+-------+---------------------------------------------------------------------------+-------------------+------------
+ 11903 | Bachelor of Psychological Science/bachelor of Exercise and Sports Science |             32392 | regex
+ 11904 | Diploma in Biomedical Science                                             |             28344 | regex
+ 11905 | Diploma in Nutrition Science                                              |             28344 | regex
+ 11906 | Diploma in Exercise Science                                               |             28344 | regex
+ 11909 | Bachelor of Education (Secondary and Special Education)                   |             35624 | regex
+(5 rows)
+
+root@university-and-course-data:~/University-and-Course-data# 
