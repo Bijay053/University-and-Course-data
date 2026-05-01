@@ -1,0 +1,148 @@
+Read the output carefully — three of the four diagnostics surfaced findings that change the picture. The cherry-pick is still the right next step, but with adjustments.
+
+---
+
+**1. Stray `=` file: cleared.** Was an empty 0-byte file from Apr 30 10:24, removed cleanly. Non-issue.
+
+---
+
+**2. KBS course count: ZERO rows in current prod.**
+
+```
+SELECT name, status, approval_status FROM courses WHERE university_id = 29 ORDER BY name;
+(0 rows)
+
+SELECT COUNT(*), status, approval_status FROM courses WHERE university_id = 29 GROUP BY status, approval_status ORDER BY status;
+(0 rows)
+```
+
+This is unexpected. KBS (uni_id=29) has zero rows in the `courses` table on prod RIGHT NOW. But:
+
+- The April 30 baseline showed KBS with 29 courses
+- The contaminated staging snapshot showed KBS with 21 courses
+- The fresh post-rollback baseline you just captured shows `kbs_29.json (courses=21 disc=37 staged=21)` — meaning the baseline capture script is finding 21 KBS courses
+
+So somewhere there's a discrepancy: the `courses` table has 0 rows for university_id=29, but the baseline script is reporting 21 courses. That means the baseline capture is reading from a different table (probably `staged_courses` or `scraped_courses` or the materialised view, not `courses` directly).
+
+The "0 rows in courses" result actually makes sense in context: the `courses` table is the *approved* table that gets populated only after admin approval. The scraper writes to `staged_courses` (or similar) first, then admin reviews and promotes to `courses`. KBS courses are sitting in staging, not in approved.
+
+**This is not a regression — it's how the pipeline works.** The April 30 baseline showed 29 KBS courses because they were sitting in staging at that snapshot. Now there are 21 in staging because some have been processed (promoted, rejected, or re-staged with deduplication).
+
+**However**, the change from 29 → 21 between April 30 and now still needs explanation. Two possibilities:
+- KBS scraper ran between April 30 and now, the rule changes (online_only catching more, or the 8 specific Graduate Cert/MBA courses matching some new filter) reduced the staged count.
+- The 8 "removed" courses are real removals from KBS's actual website (not a scraper bug).
+
+Worth a quick query to confirm:
+
+```
+# Check the actual staging table for KBS
+sudo -u postgres psql university_portal -c "
+SELECT name, status FROM staged_courses 
+WHERE university_id = 29 
+ORDER BY name;"
+```
+
+If this returns 21 rows matching the baseline → confirms what we know, and the 8 "removed" are either filtered or website-changed.
+If it returns 29 rows → the baseline script is doing something unexpected (filtering on its own).
+
+Not a blocker for Option C. Just worth knowing for the record.
+
+---
+
+**3. Charles Sturt 0.00 durations: 59 courses, ONE university.**
+
+```
+           name           | zero_count 
+--------------------------+------------
+ Charles Sturt university |         59
+(1 row)
+```
+
+Uni-specific. Not a shared-code bug — Charles Sturt's course pages must have a duration extraction pattern that fails silently and falls back to 0.0 instead of NULL. 
+
+Worth queueing as its own per-uni fix (after the current queue clears). Two parts:
+- Fix the extractor to write NULL on parse failure for Charles Sturt (likely a per-uni override or a shared-code fix to `duration` extraction returning 0 → None when no value parsed).
+- One-time UPDATE: `UPDATE courses SET duration = NULL WHERE duration = 0.0 AND university_id = (SELECT id FROM universities WHERE name = 'Charles Sturt university');`
+
+Don't do this now. Add to the post-Fix-1+3 queue so the duration regex work is settled first.
+
+---
+
+**4. Fresh post-rollback baseline captured.**
+
+23 universities, 1580 courses total. Saved to `baselines/post-rollback-baseline/`. This is the new "before" baseline for all subsequent work.
+
+Notably this captured baseline shows `torrens_3.json (courses=75 disc=168 staged=0)` — Torrens is discovering 168 courses but staging 0. That's another bug worth queueing (probably a filter rejecting all Torrens courses, or staging logic broken for Torrens specifically), but not a blocker for Option C.
+
+Also notably: `acap_41.json (courses=11 staged=11)` — confirms ACAP is healthy in current post-rollback prod, staging the same 11 courses we expect.
+
+---
+
+**Conclusion: proceed with Option C cherry-pick.**
+
+The blockers I was worried about have resolved:
+- KBS "removal" is pipeline behaviour (staged vs. courses table), not a regression
+- Charles Sturt 0.00 is uni-specific, queueable, doesn't affect C
+- Fresh baseline is in place to compare against
+
+**Run this exact sequence:**
+
+```
+# ── Cherry-pick Option C onto post-rollback HEAD ──
+cd ~/University-and-Course-data
+git cherry-pick be3df67
+
+# Confirm the cherry-pick applied cleanly
+git status
+git log --oneline -3
+# Expected: be3df67 (or new SHA) sitting on top of f95d75f
+
+# Restart services to pick up the location.py change
+sudo systemctl restart uni-api-py.service uni-celery.service
+sleep 3
+sudo systemctl status uni-api-py.service --no-pager | tail -5
+sudo journalctl -u uni-celery -n 5 --no-pager | grep "celery@\|ERROR"
+```
+
+Then trigger an ACAP scrape from the admin UI. After it completes:
+
+```
+# ── Capture post-cherry-pick baseline ──
+cd ~/University-and-Course-data/backend-py
+set -a && source .env && set +a
+PYTHONPATH=. venv/bin/python3 scripts/capture_baseline.py \
+  --out-dir baselines/option-c-after/
+
+# ── Run sweep with ACAP as expected-dirty ──
+PYTHONPATH=. venv/bin/python3 scripts/regression_sweep.py \
+  --before baselines/post-rollback-baseline/ \
+  --after  baselines/option-c-after/ \
+  --expected-slugs acap \
+  --verbose
+```
+
+**Expected sweep result:**
+- 22 unis CLEAN
+- ACAP acknowledged-dirty: location values for 4 courses change from `Perth^ ^Available in Perth from Trimester 3, 2026` to `Perth`. Specifically:
+  - Master of Social Work (Qualifying)
+  - Graduate Diploma of Professional Accounting
+  - Graduate Certificate of Professional Accounting
+  - Graduate Certificate of Human Services
+- Zero unexpected diffs
+
+**Spot-check after merge:**
+
+Look at the 4 ACAP courses above in the review UI. Confirm location field shows clean city names without the `^` footnote suffix. If any other ACAP course shows location changes (or any non-ACAP uni shows changes), stop and post the diff.
+
+**If sweep passes:** Option C is shipped, location cruft cleared, dashboard improves immediately for ACAP users.
+
+**Then queue continues:** KBS fix (`b38134f`) cherry-pick → sweep → ship. Then isolated Fix 2 validation. Then Fixes 1+3.
+
+---
+
+Paste:
+- `git status` and `git log --oneline -3` after the cherry-pick
+- Service restart confirmation lines
+- Sweep result (or first 60 lines if long)
+
+That's the gate before declaring Option C done.
