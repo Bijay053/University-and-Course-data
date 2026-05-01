@@ -1,0 +1,57 @@
+                                         Table "public.courses"
+         Column         |           Type           | Collation | Nullable |               Default               
+------------------------+--------------------------+-----------+----------+-------------------------------------
+ id                     | integer                  |           | not null | nextval('courses_id_seq'::regclass)
+ university_id          | integer                  |           | not null | 
+ name                   | text                     |           | not null | 
+ category               | text                     |           |          | 
+ sub_category           | text                     |           |          | 
+ course_website         | text                     |           |          | 
+ duration               | numeric(6,2)             |           |          | 
+ duration_term          | text                     |           |          | 
+ study_mode             | text                     |           |          | 
+ degree_level           | text                     |           |          | 
+ study_load             | text                     |           |          | 
+ language               | text                     |           |          | 
+ description            | text                     |           |          | 
+ course_structure       | text                     |           |          | 
+ career_outcomes        | text                     |           |          | 
+ other_test             | text                     |           |          | 
+ other_test_score       | text                     |           |          | 
+ other_requirement      | text                     |           |          | 
+ status                 | text                     |           | not null | 'active'::text
+ created_at             | timestamp with time zone |           | not null | now()
+ updated_at             | timestamp with time zone |           | not null | now()
+ course_location        | text                     |           |          | 
+ student_market         | text                     |           |          | 
+ delivery_mode          | text                     |           |          | 
+ international_eligible | boolean                  |           |          | 
+ on_campus_available    | boolean                  |           |          | 
+ eligibility_status     | text                     |           | not null | 'unknown'::text
+ eligibility_reason     | text                     |           |          | 
+ eligibility_confidence | real                     |           |          | 
+ approval_status        | text                     |           | not null | 'approved'::text
+ approval_score         | real                     |           |          | 
+ approved_at            | timestamp with time zone |           |          | 
+ last_reviewed_at       | timestamp with time zone |           |          | 
+ last_edited_at         | timestamp with time zone |           |          | 
+ last_edited_by         | text                     |           |          | 
+Indexes:
+    "courses_pkey" PRIMARY KEY, btree (id)
+    "idx_courses_category" btree (category)
+    "idx_courses_degree_level" btree (degree_level)
+    "idx_courses_duration" btree (duration)
+    "idx_courses_name_trgm" gin (name gin_trgm_ops)
+    "idx_courses_status" btree (status)
+    "idx_courses_sub_category" btree (sub_category)
+    "idx_courses_university_id" btree (university_id)
+    "idx_courses_university_level" btree (university_id, degree_level)
+Foreign-key constraints:
+    "courses_university_id_universities_id_fk" FOREIGN KEY (university_id) REFERENCES universities(id) ON DELETE CASCADE
+Referenced by:
+    TABLE "academic_requirements" CONSTRAINT "academic_requirements_course_id_courses_id_fk" FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE
+    TABLE "course_audit_log" CONSTRAINT "course_audit_log_course_id_courses_id_fk" FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE
+    TABLE "course_field_approvals" CONSTRAINT "course_field_approvals_course_id_courses_id_fk" FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE
+    TABLE "english_requirements" CONSTRAINT "english_requirements_course_id_courses_id_fk" FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE
+    TABLE "fees" CONSTRAINT "fees_course_id_courses_id_fk" FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE
+:
