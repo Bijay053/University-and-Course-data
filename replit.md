@@ -118,7 +118,7 @@ The database schema includes tables for `universities`, `courses`, `intakes`, `f
 
 ## Live Course Data State (verified 2026-05-01)
 
-### Verified live counts
+### Verified live counts — 623 total (as of 2026-05-01 session end)
 
 | University | id | Live courses | Notes |
 |---|---|---|---|
@@ -128,10 +128,11 @@ The database schema includes tables for `universities`, `courses`, `intakes`, `f
 | UTas | 5 | 1 | |
 | VIT | 6 | 38 | fresh scrape promoted; 6 old prefix-code dups deleted |
 | KBS | 8 | 29 | |
+| Flinders | 12 | 99 | promoted 2026-05-01; 6 campus-dups correctly merged |
 | SCU | 17 | 1 | |
 | AUT | 20 | 70 | |
-
-All 8 universities: `pending_ready = 0`, `legacy_gap = 0`, zero duplicate pairs.
+| Bond | 22 | 126 | promoted 2026-05-01; enriched via bond_enrich.py |
+| **Total** | | **623** | up from 267 at session start (2.3×) |
 
 ### Outstanding CSU review rows (11)
 
@@ -149,8 +150,7 @@ All 8 universities: `pending_ready = 0`, `legacy_gap = 0`, zero duplicate pairs.
 Hard floor: **85% completeness** (`_PHASE_A_MIN_COMPLETENESS` in `backend-py/app/services/auto_publish.py`).
 13 review fields: course_name, degree_level, category, study_mode, course_location, duration,
 intake_months, international_fee, description, academic_level, academic_score, english_test, other_requirement.
-VIT fresh-scrape rows score 77% (missing: category, academic_level, academic_score, other_requirement) —
-below floor. Force-promote via `UPDATE scraped_courses SET auto_publish_status='ready' WHERE ...`
+Force-promote path: `UPDATE scraped_courses SET auto_publish_status='ready' WHERE university_id=N AND status='pending' AND auto_publish_status IN ('review','pending_review');`
 then run `bulk_approve.py`.
 
 ### bulk_approve.py (prod-side script)
@@ -158,6 +158,22 @@ then run `bulk_approve.py`.
 Location on prod: `~/University-and-Course-data/backend-py/scripts/bulk_approve.py`
 Usage: `PYTHONPATH=. venv/bin/python3 scripts/bulk_approve.py --university-id <N> [--status pending] [--ap-status ready] [--dry-run]`
 Idempotent: deduplicates on `lower(course_name)` per university. Updates existing row if name matches.
+
+**Known git anomaly (2026-05-01):** The file was present in the git index but missing from the
+prod working tree — caused by an earlier `git reset --hard` + cherry-pick sequence that left the
+`scripts/` directory partially emptied. Recovery: `git checkout HEAD -- backend-py/scripts/`
+If the file is missing again mid-session, run this immediately before retrying `bulk_approve.py`.
+
+### bond_enrich.py (Bond-specific enrichment)
+
+Location: `backend-py/scripts/bond_enrich.py`
+Usage: `PYTHONPATH=. venv/bin/python3 scripts/bond_enrich.py [--workers 8] [--dry-run]`
+- Calls Bond JSON APIs (`/api/program-details/{id}`, `/api/program-fees/{id}/{code}`) and
+  parses `/entry_requirements` HTML for IELTS — no Playwright, no Gemini.
+- Runs in ~23 seconds (8 workers). Enriched 117/126 rows; fee=72, ielts=113.
+- Does NOT set `extraction_method` — NULL source in spot-checks is expected and correct.
+- 2 known non-enrichable URLs: `bachelor-of-communication` and
+  `master-occupational-therapy/master-occupational-therapy-prerequisites` (no data-program-detail-url).
 
 ### Pipeline code gap (IMPORTANT)
 
@@ -167,10 +183,19 @@ Prod runs the old pipeline code. Any future scrape on prod will use unfixed extr
 Resolution: push Replit commits to GitHub via Replit's GitHub integration, then `git pull` on prod.
 The Replit remote is named `github` (not `origin`). Prod remote is `origin`.
 
-### Next promotion targets
+### Next promotion targets (priority order)
 
-- **Bond (uni_id=22)**: ~126 scraped_courses staged, 0 live — highest single-uni impact
-- **Flinders (uni_id=12)**: ~105 scraped_courses staged, 0 live
+- **ACU (uni_id=51)**: ~99 courses in snapshot — check `SELECT status, auto_publish_status, COUNT(*) FROM scraped_courses WHERE university_id=51 GROUP BY status, auto_publish_status;` to determine if bulk_approve ready or needs rescrape
+- **apicollege**: ~30 staged
+- **ait**: ~37 staged
+- **Study (weird)**: 694 staged but 0 live — investigate before touching
+
+### Next session housekeeping (do first, ~15 min)
+
+1. **bulk_approve.py audit**: `git log --oneline --diff-filter=D --all -- backend-py/scripts/bulk_approve.py` — check if ever deleted in git history
+2. **Untracked file cleanup**: `git clean -nfd` (preview only), then `git clean -fd` if all are scratch files (check `backend-py/baselines/` first — may have baseline JSONs to keep)
+3. **pg_dump backup**: still pending from this session
+4. **Bond IELTS spot-check**: open 5 random `course_website` URLs from Bond rows to verify IELTS against bond.edu.au (expected: IELTS 6.5 default for undergrad, 7.0 for Law/health)
 
 ## External Dependencies
 

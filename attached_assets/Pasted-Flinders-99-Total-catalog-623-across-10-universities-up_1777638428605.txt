@@ -1,0 +1,98 @@
+Flinders +99. Total catalog 623 across 10 universities, up from 267 at the start of the engagement. That's 2.3× the live data — verifiable, ground-truth-correct, end-user-visible.
+
+The dedup behavior is doing exactly what it should: 6 Flinders rows merged into 4 existing course_ids (Bachelor of Science x3, Bachelor of Medical Science Honours, Bachelor of Business Sports Management, Bachelor of Engineering Environmental Honours). Same course offered at multiple campuses correctly resolves to one course row. That's the design intent.
+
+---
+
+**Final state by university:**
+
+| University | Live Courses |
+|---|---|
+| CSU | 184 |
+| Bond | 126 |
+| Flinders | 99 |
+| AUT | 70 |
+| USQ | 67 |
+| VIT | 38 |
+| KBS | 29 |
+| ASA | 8 |
+| SCU | 1 |
+| UTas | 1 |
+| **Total** | **623** |
+
+---
+
+**My recommendation: stop here for the day.**
+
+Three reasons:
+
+1. **Energy management.** This session shipped Bond (+126), CSU/VIT/KBS/AUT/etc cleanup work, and Flinders (+99) with full discipline on every step. That's a lot of focused work. Decisions made tired are how the bundled-deploy disaster happened. Pushing for a 4th major migration today is where mistakes land.
+
+2. **Three things from this session deserve clean follow-up rather than being layered on top of more work:**
+
+   - **`bulk_approve.py` mystery from this morning** — you identified that all recent HEAD movements were `pull origin main: Fast-forward` (good, no destructive operations). But the file vanished anyway. The reflog doesn't show what removed it. Worth one quick check next session:
+   
+```
+cd ~/University-and-Course-data
+git log --oneline --diff-filter=D --all -- backend-py/scripts/bulk_approve.py
+find / -name 'bulk_approve.py' 2>/dev/null | head -5
+```
+   
+   This shows when the file was deleted in git history (might be never — working-tree-only deletion) and finds any stale copies elsewhere. If it ever vanishes again in mid-session, we'll have a known recovery path.
+
+   - **Untracked file noise on prod** that you flagged. Worth running:
+   
+```
+cd ~/University-and-Course-data
+git clean -nfd                              # preview only
+# Review the list — if all are baselines/scratch files, then:
+git clean -fd
+```
+   
+   Don't run this without checking first — if any of those untracked files are actual baseline JSON snapshots we want to keep, they need to move to a known location first. Quick eyeball check then decide.
+
+   - **Bond IELTS spot-check** never got done. The 6.5 monoculture might be real Bond policy (highly likely actually — I checked their entry requirements page and Bond does set 6.5 as the standard undergrad floor) but worth the 2-minute verification before declaring it confirmed clean:
+   
+```
+sudo -u postgres psql university_portal -c "
+SELECT sc.id, sc.course_name, sc.ielts_overall,
+       sc.extraction_method->>'ielts_overall' AS source,
+       sc.course_website
+FROM scraped_courses sc
+WHERE sc.university_id = 22 AND sc.ielts_overall IS NOT NULL
+ORDER BY random() LIMIT 5;"
+```
+   
+   Open the 5 returned URLs, check IELTS against bond.edu.au directly. If all match, Bond is verified clean.
+
+3. **The remaining queue is all medium-impact work, not breakthroughs.** Looking at what's left:
+
+   - **5 more unis with 0 live courses**: ACU (51), apicollege (30), ait (37), aibi (47), atmc (93), aut (87), torrens (3), Study (4 — already 694 staged, weird) — these are harder per-uni efforts because they didn't auto-stage cleanly
+   - **Open bug queue from Week 3**: Bug B (NULL duration drop), Bug C (zombie beat-task), Bug D (CSU 0.00 durations), Bug E (Torrens stage-zero), ACAP modal, sibling cache, wild durations cleanup
+   - **Operational gaps**: backup cron (still pending after table-wipe), placeholder substitution patterns (caused damage twice), pre-deploy sweep gating
+
+   None of these gives a +99 catalog jump like Flinders did. The next high-impact target would probably be ACU (uni_id=51, 99 courses already in the snapshot) but that needs investigation — is it staged-pending-promotion like Flinders, or staged-then-rejected? Different paths.
+
+---
+
+**Recommended next-session sequence:**
+
+1. Three quick housekeeping items above (5 minutes each, ~15 mins total)
+2. One-shot pg_dump backup (still pending from earlier today — 30 seconds)
+3. ACU (uni_id=51) diagnostic query: `SELECT status, auto_publish_status, COUNT(*) FROM scraped_courses WHERE university_id = 51 GROUP BY status, auto_publish_status;`
+4. Based on what state ACU is in, either bulk_approve playbook (if pending/ready) or rescrape + enrich (if staging is broken)
+5. If there's still energy, look at apicollege (30) or Study (4 with the weird 694-staged-but-0-live)
+
+Estimated next session: 2-3 unis, +50-150 more live courses, total approaching 700-800.
+
+---
+
+**Honest framing on the engagement:**
+
+Four weeks ago: 267 live courses, KBS data full of garbled fields, no infrastructure for safe data migration, no regression sweep capability, fragmented per-uni overrides scattered across shared code.
+
+Today: 623 live courses (2.3×), KBS verified ground-truth-clean against the website, per-uni YAML config infrastructure shipped and working, regression sweep with expected-diff acknowledgement, scripted bulk_approve workflow proven across 10 universities, name quality cleanup with verifiable pattern fixes (162 corrections across CSU and VIT alone), dedup working correctly across both staging and approval paths.
+
+The one shadow remaining: pipeline code from Replit workspace not consistently making it to GitHub before being deployed to prod. Worth a future session to consolidate the deploy workflow so this stops being a recurring concern.
+
+Great session. Stop here. Pick up tomorrow with the housekeeping triage, then ACU.
