@@ -1,0 +1,47 @@
+Week 1 — Data correctness fixes
+
+Vision OCR hallucination filter (filter decorative images by filename, validate OCR text contains test keywords, only tier-4 authority for English-section images)
+Sibling cache fix (write evidence rows with provenance, block propagation from vision/AI sources, require ≥2 sources for consensus)
+AI fallback strictness (tighten prompt, block override of regex values, validate against page text)
+Re-verify ASAHE, VIT, ACAP after fixes
+
+Week 2 — Observability + pathway handling
+
+Priority 5 Component 1: scrape_run_metrics table + automatic collection
+Priority 5 Component 2: university_field_baselines table + seed script + weekly refresh job
+Priority 5 Component 3: alert evaluator with rules (fill-rate, method-distribution, URL-pattern)
+Priority 5 Component 4: alert delivery (dashboard SQL views + critical email/Slack)
+Priority 4: pathway program detection + skip central English propagation + lower sanity floors + don't revert vision values found in page text
+Verify UniSQ UniPrep no longer gets IELTS=6.5 from central page
+
+Week 3 — Cost optimisation + CRICOS matching
+
+Gemini Component 4: gemini_call_log table + per-call cost recording
+Gemini Component 1: skip Gemini when regex/CSS already has high-value fields + classification-only prompt
+Gemini Component 2: quota wrapper + circuit breaker
+Gemini Component 3: per-job cost ceiling + alert on breach
+Gemini Component 5: confirm model is gemini-2.0-flash (switch if more expensive)
+Gemini SQL views: per-uni cost, per-call-type cost, top spenders, skip efficiency
+Priority 3 Component 1: CRICOS extractor for course pages
+Priority 3 Component 2: CRICOS extraction in PDF parser
+Priority 3 Component 3: CRICOS-first matcher in orchestrator
+Priority 3 Component 4: authority tier 1.5 for CRICOS-matched PDF values
+Priority 3 Component 5: cricos_code column in scraped_courses
+Verify cost down 30-50% on UniSQ; verify CRICOS coverage 70%+ on AU unis
+
+Week 4 — Production scale-up (top 10 universities)
+
+Re-scrape all top 10 universities through new pipeline
+Manual spot-check 2-3 courses per university before approval
+Approve clean universities to production courses table
+Fix per-university extractor configs for any uni triggering data quality alerts
+Document patterns for onboarding remaining 70+ universities
+Review Gemini spend vs budget for full 80-uni operation
+
+Week 5 — Scale-up continues + next-sprint planning
+
+Re-scrape next 20 universities (top 11-30)
+Manual spot-check + approve
+Triage any new failure modes the larger sample reveals
+Decide next priorities: sibling cache replacement, NZQA matching for NZ unis, dashboard UI, cross-scrape caching, embedding-based fuzzy matching
+Update architecture doc with everything learned over weeks 1-4
