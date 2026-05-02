@@ -1,0 +1,165 @@
+Evidence Review
+Graduate Diploma of Legal Practice (L6b)
+Eligibility: ready — ok
+25 fields with evidence
+Show 5 suppressed fields
+category
+Law
+✓ used
+gemini primary
+75%
+Law
+gemini_primary: category=Law
+https://www.utas.edu.au/courses/arts-soc/courses/l6b-graduate-diploma-of-legal-practice
+course_location
+Hobart Legal Practice
+✓ used
+location.div panel
+88%
+Hobart Legal Practice
+Hobart Legal Practice
+https://www.utas.edu.au/courses/arts-soc/courses/l6b-graduate-diploma-of-legal-practice
+course_name
+Graduate Diploma of Legal Practice (L6b)
+✓ used
+course name.h1
+90%
+Graduate Diploma of Legal Practice (L6b)
+Graduate Diploma of Legal Practice (L6B)
+https://www.utas.edu.au/courses/arts-soc/courses/l6b-graduate-diploma-of-legal-practice
+cricos_code
+040663G
+✓ used
+regex:cricos
+95%
+040663G
+CRICOS code extracted from course page: 040663G
+https://www.utas.edu.au/courses/arts-soc/courses/l6b-graduate-diploma-of-legal-practice
+degree_level
+Graduate Diploma
+✓ used
+degree level:name
+90%
+Graduate Diploma
+Graduate Diploma of Legal Practice (L6b)
+https://www.utas.edu.au/courses/arts-soc/courses/l6b-graduate-diploma-of-legal-practice
+description
+Minimum 0.5 years, up to a maximum of 0.5 years.
+✓ used
+description.main p
+65%
+Minimum 0.5 years, up to a maximum of 0.5 years.
+https://www.utas.edu.au/courses/arts-soc/courses/l6b-graduate-diploma-of-legal-practice
+https://www.utas.edu.au/courses/arts-soc/courses/l6b-graduate-diploma-of-legal-practice
+domestic_fee
+16531.0
+✓ used
+gemini primary
+75%
+16531.0
+gemini_primary: domestic_fee=16531.0
+https://www.utas.edu.au/courses/arts-soc/courses/l6b-graduate-diploma-of-legal-practice
+duration
+0.5
+✓ used
+regex
+75%
+0.5
+Remove content prioritisation Update Close Choose a login Student portalStaff portaleStudentMyLO Back to Arts and Society Graduate Diploma of Legal Practice (L6B) Home Courses and units Arts and Society L6B Graduate Diploma of Legal Practic
+https://www.utas.edu.au/courses/arts-soc/courses/l6b-graduate-diploma-of-legal-practice
+duration_text
+Minimum 0.5 years, up to a maximum of 0.5 years.
+✓ used
+gemini primary
+75%
+Minimum 0.5 years, up to a maximum of 0.5 years.
+gemini_primary: duration_text=Minimum 0.5 years, up to a maximum of 0.5 years.
+https://www.utas.edu.au/courses/arts-soc/courses/l6b-graduate-diploma-of-legal-practice
+duration_unit
+years
+✓ used
+ai fallback
+50%
+years
+ai_fallback: duration_unit=years
+https://www.utas.edu.au/courses/arts-soc/courses/l6b-graduate-diploma-of-legal-practice
+duration_value
+0.5
+✓ used
+ai fallback
+50%
+0.5
+ai_fallback: duration_value=0.5
+https://www.utas.edu.au/courses/arts-soc/courses/l6b-graduate-diploma-of-legal-practice
+fee_currency
+AUD
+✓ used
+ai fallback
+50%
+AUD
+ai_fallback: fee_currency=AUD
+https://www.utas.edu.au/courses/arts-soc/courses/l6b-graduate-diploma-of-legal-practice
+fee_term
+Annual
+✓ used
+gemini primary
+75%
+Annual
+gemini_primary: fee_term=Annual
+https://www.utas.edu.au/courses/arts-soc/courses/l6b-graduate-diploma-of-legal-practice
+intake_months
+["February"]
+✓ used
+gemini primary
+75%
+["February"]
+gemini_primary: intake_months=['February']
+https://www.utas.edu.au/courses/arts-soc/courses/l6b-graduate-diploma-of-legal-practice
+intake_text
+February
+✓ used
+gemini primary
+75%
+February
+gemini_primary: intake_text=February
+https://www.utas.edu.au/courses/arts-soc/courses/l6b-graduate-diploma-of-legal-practice
+international_fee
+51900
+✓ used
+regex
+100%
+51900
+ound at Australian Government Study Assist. International students 2026 Total Tuition Fee (international students): $25,950 AUD* Tuition fee based on a rate of $51,900 AUD per standard, full-time year of study (100 credit points). * Please
+https://www.utas.edu.au/courses/arts-soc/courses/l6b-graduate-diploma-of-legal-practice
+location_text
+Hobart
+✓ used
+gemini primary
+75%
+Hobart
+gemini_primary: location_text=Hobart
+https://www.utas.edu.au/courses/arts-soc/courses/l6b-graduate-diploma-of-legal-practice
+mode
+On Campus
+✓ used
+gemini primary
+75%
+On Campus
+gemini_primary: mode=On Campus
+https://www.utas.edu.au/courses/arts-soc/courses/l6b-graduate-diploma-of-legal-practice
+study_mode
+On Campus
+✓ used
+study mode:rule
+70%
+On Campus
+es in Hobart. The course runs on campus and in person from February t
+https://www.utas.edu.au/courses/arts-soc/courses/l6b-graduate-diploma-of-legal-practice
+sub_category
+Legal Practice
+✓ used
+gemini primary
+75%
+Legal Practice
+gemini_primary: sub_category=Legal Practice
+https://www.utas.edu.au/courses/arts-soc/courses/l6b-graduate-diploma-of-legal-practice
