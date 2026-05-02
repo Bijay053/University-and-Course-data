@@ -1,0 +1,148 @@
+Welcome to Ubuntu 24.04.4 LTS (GNU/Linux 6.8.0-110-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/pro
+
+ System information as of Sat May  2 05:50:14 UTC 2026
+
+  System load:           1.01
+  Usage of /:            3.7% of 231.44GB
+  Memory usage:          23%
+  Swap usage:            0%
+  Processes:             205
+  Users logged in:       1
+  IPv4 address for eth0: 159.65.152.72
+  IPv4 address for eth0: 10.47.0.13
+  IPv6 address for eth0: 2400:6180:100:d0:0:1:3615:5001
+
+Expanded Security Maintenance for Applications is not enabled.
+
+17 updates can be applied immediately.
+To see these additional updates run: apt list --upgradable
+
+1 additional security update can be applied with ESM Apps.
+Learn more about enabling ESM Apps service at https://ubuntu.com/esm
+
+
+Last login: Sat May  2 04:37:10 2026 from 162.243.188.66
+root@university-and-course-data:~# cd /root/University-and-Course-data && git pull origin main && pnpm --filter @workspace/university-portal run build && systemctl restart uni-api-py.service uni-celery.service
+remote: Enumerating objects: 13, done.
+remote: Counting objects: 100% (13/13), done.
+remote: Compressing objects: 100% (7/7), done.
+remote: Total 7 (delta 6), reused 0 (delta 0), pack-reused 0 (from 0)
+Unpacking objects: 100% (7/7), 2.78 KiB | 568.00 KiB/s, done.
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+   67b948f..c433975  main       -> origin/main
+Updating 67b948f..c433975
+Fast-forward
+ artifacts/university-portal/src/pages/scraping.tsx | 218 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++---------------------------
+ 1 file changed, 164 insertions(+), 54 deletions(-)
+
+> @workspace/university-portal@0.0.0 build /root/University-and-Course-data/artifacts/university-portal
+> vite build --config vite.config.ts
+
+vite v7.3.1 building client environment for production...
+src/components/ui/tooltip.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/label.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/progress.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/dropdown-menu.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/select.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/command.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+✓ 1879 modules transformed.
+dist/public/index.html                                 0.74 kB │ gzip:   0.41 kB
+dist/public/assets/image_1776917782083-Beo3ixZx.png   10.01 kB
+dist/public/assets/index-wvunI1jQ.css                132.51 kB │ gzip:  21.89 kB
+dist/public/assets/index-BpsLQv_p.js                 871.19 kB │ gzip: 245.05 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 5.13s
+root@university-and-course-data:~/University-and-Course-data# cd /root/University-and-Course-data && git pull origin main && pnpm --filter @workspace/university-portal run build && systemctl restart uni-api-py.service uni-celery.service
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+Already up to date.
+
+> @workspace/university-portal@0.0.0 build /root/University-and-Course-data/artifacts/university-portal
+> vite build --config vite.config.ts
+
+vite v7.3.1 building client environment for production...
+src/components/ui/tooltip.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/label.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/progress.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/dropdown-menu.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/select.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/command.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+✓ 1879 modules transformed.
+dist/public/index.html                                 0.74 kB │ gzip:   0.41 kB
+dist/public/assets/image_1776917782083-Beo3ixZx.png   10.01 kB
+dist/public/assets/index-wvunI1jQ.css                132.51 kB │ gzip:  21.89 kB
+dist/public/assets/index-BpsLQv_p.js                 871.19 kB │ gzip: 245.05 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 4.96s
+root@university-and-course-data:~/University-and-Course-data# cd /root/University-and-Course-data && git pull origin main && systemctl restart uni-api-py.service uni-celery.service
+remote: Enumerating objects: 13, done.
+remote: Counting objects: 100% (13/13), done.
+remote: Compressing objects: 100% (7/7), done.
+remote: Total 7 (delta 6), reused 0 (delta 0), pack-reused 0 (from 0)
+Unpacking objects: 100% (7/7), 1.12 KiB | 573.00 KiB/s, done.
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+   c433975..33a7e83  main       -> origin/main
+Updating c433975..33a7e83
+Fast-forward
+ backend-py/app/services/scraper/stage_course.py | 18 +++++++++++++++++-
+ 1 file changed, 17 insertions(+), 1 deletion(-)
+root@university-and-course-data:~/University-and-Course-data# cd /root/University-and-Course-data && git pull origin main && systemctl restart uni-celery.service uni-api-py.service
+remote: Enumerating objects: 13, done.
+remote: Counting objects: 100% (13/13), done.
+remote: Compressing objects: 100% (7/7), done.
+remote: Total 7 (delta 6), reused 0 (delta 0), pack-reused 0 (from 0)
+Unpacking objects: 100% (7/7), 1.88 KiB | 642.00 KiB/s, done.
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+   33a7e83..f80c8ce  main       -> origin/main
+Updating 33a7e83..f80c8ce
+Fast-forward
+ backend-py/app/services/scraper/sibling_cache.py | 35 ++++++++++++++++++++++++++++++++---
+ 1 file changed, 32 insertions(+), 3 deletions(-)
+root@university-and-course-data:~/University-and-Course-data# -- Run on PROD DB
+SELECT sc.university_id, u.name,
+       sfe.field_key,
+       COUNT(*) as cnt
+FROM scraped_field_evidence sfe
+JOIN scraped_courses sc ON sfe.scraped_course_id = sc.id
+JOIN universities u ON sc.university_id = u.id
+WHERE sfe.extraction_method LIKE 'sibling_cache:%'
+  AND sfe.selected = true
+  AND sfe.field_key IN (
+      'ielts_overall','ielts_listening','ielts_reading',
+      'ielts_writing','ielts_speaking'
+  )
+  AND sc.status IN ('approved','published')
+GROUP BY sc.university_id, u.name, sfe.field_key
+ORDER BY sc.university_id, sfe.field_key;
+--: command not found
+SELECT: command not found
+sfe.field_key,: command not found
+-bash: syntax error near unexpected token `*'
+FROM: command not found
+JOIN: command not found
+JOIN: command not found
+WHERE: command not found
+AND: command not found
+-bash: syntax error near unexpected token `('
+ielts_overall,ielts_listening,ielts_reading,: command not found
+ielts_writing,ielts_speaking: command not found
+-bash: syntax error near unexpected token `)'
+-bash: syntax error near unexpected token `('
+GROUP: command not found
+ORDER: command not found
+root@university-and-course-data:~/University-and-Course-data# 
