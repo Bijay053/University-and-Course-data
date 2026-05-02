@@ -101,10 +101,16 @@ function ScrapeWarningsBadge({ warnings }: { warnings: string[] }) {
   );
 }
 
+/** Convert snake_case to camelCase so API field_keys match TS property names. */
+function toCamel(s: string): string {
+  return s.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase());
+}
+
 /**
  * Map evidence field_key → the matching value on the saved course record.
- * Used by EvidencePanel to show the actual final value at the top of each
- * field group and flag any mismatch with the row marked `selected=true`.
+ * Evidence field_keys arrive as snake_case from the API (e.g. "ielts_overall",
+ * "international_fee"). The switch normalises them to camelCase first so they
+ * match the TypeScript course object properties.
  */
 function finalValueForField(course: ReviewStagedCourse, fieldKey: string): string | null {
   const v = (x: unknown): string | null => {
@@ -112,7 +118,7 @@ function finalValueForField(course: ReviewStagedCourse, fieldKey: string): strin
     if (Array.isArray(x)) return x.length > 0 ? x.join(", ") : null;
     return String(x);
   };
-  switch (fieldKey) {
+  switch (toCamel(fieldKey)) {
     case "courseName":        return v(course.courseName);
     case "courseLocation":    return v(course.courseLocation);
     case "duration": {
