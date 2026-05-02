@@ -1,0 +1,34 @@
+Both fixes are the right shape. Q5 research-bucket isolation applies the same source-gating principle as the vision fix (data only flows within architecturally-trusted boundaries) at the bucket level. Q1 within-batch name dedup with confidence-ranked keep is exactly what was needed. The audit SQL going through `scraped_field_evidence` is also correct — nice catch that `english_requirements` doesn't carry provenance.
+
+**Recommended order**
+
+1. Deploy both commits to prod — single `git pull && systemctl restart uni-celery.service uni-api-py.service` covers both.
+2. **Run the audit SQL on prod before re-scraping anything.** This answers a handover-blocking question regardless of what Flinders staging does next. Three possible outcomes:
+   - Zero rows: live catalog is clean across all 12 unis. Best case, no remediation needed.
+   - Small count (<50 across catalog): targeted manual review of those specific courses, null the affected English fields, document for next operator. Doesn't block handover.
+   - Large count (hundreds): targeted re-scrape of affected unis required. The research-bucket fix means those courses will re-land with blank English fields, which then go through review properly. May push handover.
+3. Re-scrape Flinders.
+4. Walk 3 PhD + 3 postgrad coursework evidence panels:
+   - PhDs: confirm zero `sibling_cache:` provenance on any English field, confirm IELTS fields blank.
+   - Postgrad coursework (the ones that previously dropped at confidence=50): same check, plus confirm they're either still dropping or now landing with real data from the page.
+   - Look for the `[STAGE] dedup: N duplicate-name course(s) suppressed` line in the celery log to confirm Bug 3 fix fired.
+5. Manually reject 4 suspicious-fee rows in review UI: Master of Teaching (Secondary) $5k, Bachelor of Sport Health Honours 1Y $4k, Bachelor of Medical Science (Honours) 1Y $9,537. Doctor of Medicine $91,200 pending real-world spot check (user is verifying in parallel).
+6. Promote the rest.
+
+**One small ask**
+
+After step 2 returns its count, paste the full result back. The breakdown by university will tell us whether the contamination pattern is uniform (suggests sibling-cache has been a constant background issue) or concentrated on specific unis (suggests it's tied to specific catalog patterns we may have missed in those unis' configs).
+
+**The audit-first ordering matters because**
+
+If the prod audit returns large counts on multiple unis, we may want to delay the Flinders re-scrape to fold the remediation re-scrapes into a single coordinated pass, rather than running Flinders alone now and then having to re-walk the catalog after fixing other unis. Audit-first keeps options open.
+
+**Summary of what we've learned today**
+
+Vision OCR fabrication: shipped output → fabricated values from non-anchored images. Fixed with source-gating (tier-0 DOM-anchored only).
+
+Sibling-cache fabrication: bucket-level cross-course backfill → fabricated values from unrelated courses' pages. Fixed with bucket isolation (research bucket separated from postgraduate).
+
+Both bugs followed the same pattern: a code path that fills blank fields without verifying the source data is actually about *this course*. The architectural principle that's now consistent: data flows only from sources architecturally trusted to be about this specific course. Vision tier-0 = DOM-anchored to this course's requirements section. Sibling-cache = within the same degree-level bucket. Both encoded structurally, not via output-based heuristics.
+
+This is real progress. Good day.
