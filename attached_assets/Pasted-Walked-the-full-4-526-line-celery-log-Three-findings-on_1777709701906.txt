@@ -1,0 +1,80 @@
+Walked the full 4,526-line celery log. Three findings, one of them critical.
+
+**Critical regression: 87 valid courses silently dropped as `online_only`**
+
+The scrape ran with the new fixes active (PhD rows show `IELTS: ❌ not found` correctly, source-gating fires `tier1_skipped=N` on every course — both confirmed in log). But the staging summary at the end:
+
+```
+══ DONE ══ Found:390 | Staged:107 | Skipped:277 (rejected:_category_landing_page=108, rejected:_online_only=87, rejected:_domestic_only=82) | Errors:0
+```
+
+**87 rejections under `online_only`.** Walking the list:
+
+- Bachelor of Arts (real on-campus + online at Bedford Park)
+- Bachelor of Computer Science
+- Bachelor of Computer Science (Artificial Intelligence)
+- Bachelor of Education (Primary)
+- Bachelor of Education (Secondary)
+- Bachelor of Education (Inclusive Education)
+- Bachelor of Education (Secondary Health and Physical Education)
+- Bachelor of Engineering (Biomedical) (Honours)
+- Bachelor of Engineering (Civil) (Honours)
+- Bachelor of Engineering (Electrical & Electronic) (Honours)
+- Bachelor of Creative Arts (Costume Design)
+- Bachelor of Creative Arts (Fashion)
+- Bachelor of Creative Writing
+- Bachelor of Criminology (Honours)
+- Bachelor of Disability and Developmental Education
+- Bachelor of Early Childhood Education (Birth to 5)
+- Bachelor of Early Childhood Education (Birth to 8)
+- Bachelor of Business Analytics
+- Bachelor of Clinical Sciences / Doctor of Medicine
+- Bachelor of Arts and Science
+- All four Honours-1-Year coursework Bachelors
+- ...87 total
+
+These are real Flinders courses with international fees, real intakes, real campuses. They're being dropped because the study_mode extractor returned `'Online'` and a new (or recently-changed) filter in the stager is treating `study_mode == Online` as `online_only` and rejecting.
+
+Check a `[FIELD SUMMARY]` line for one of these: `Bachelor of Arts Fee: ✅ '35500' [regex conf=1.00] IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '3.0' Intake: ✅ "['March', 'July']" StudyMode: ✅ 'Online' [study_mode:rule conf=0.70]`
+
+The row has fee, IELTS, duration, intake — real data — but study_mode came back `Online` (incorrect; the page lists both On Campus and Online), and the stager rejected it entirely.
+
+This is two bugs interacting:
+
+1. The `study_mode:rule` extractor is misclassifying mixed-mode courses as `Online` instead of `Blended`. The previous spreadsheet had Bachelor of Arts staged with `Online` study mode — wrong but at least staged.
+2. The new staging filter is rejecting `study_mode='Online'` outright as `online_only`. Old behaviour: stage with wrong mode. New behaviour: drop entirely.
+
+**Why this matters more than the original Flinders concerns**
+
+The whole reason we did three Flinders re-scrapes was to clean up English data on ~95 courses. After today's fixes the catalog has gone from 145 dirty rows to 107 clean rows, but the 38-row reduction is mostly real on-campus courses being silently dropped, not just the postgrad coursework hold-back we discussed. **Bachelor of Arts is a flagship course; missing it from a 12-uni catalog is more visible to end users than the PhD English fields we've been chasing.**
+
+Needs urgent fix before promote.
+
+**Suggested fix shape**
+
+The stager's `online_only` filter needs to be "page explicitly says online students only" (which is what `domestic_only` does — it checks page text for "domestic students only"), not "study_mode field equals Online." A course can be available online and on-campus to international students; that's `Blended`, not `online_only`. Worth checking what predicate the stager is using and tightening it to require explicit page-text evidence rather than the structural `study_mode` value.
+
+Separately, the `study_mode:rule` extractor for Flinders course pages needs a look — it's defaulting to `Online` when both modes are present. Lower priority; can be a phase-2 fix.
+
+**Other findings from the log**
+
+**Good news — research bucket fix is working.** Doctor of Philosophy in Government and International Relations now shows `[FIELD SUMMARY] ... IELTS: ❌ not found` and `[per-course vision img 0/6 tier1_skipped=6]` and `[per-course browser ✓] ... IELTS=— PTE=— TOEFL=— CAE=—`. That's the truthful empty outcome. So why does the spreadsheet still show this row with IELTS=6 populated? Two possibilities:
+  - The spreadsheet UI is reading from a stale cache and the actual DB has IELTS=null
+  - The sibling-cache backfill is happening at a later stage (post-staging?) that's not in this log
+
+Worth confirming with a direct DB query: `SELECT course_name, ielts_overall, extraction_method FROM scraped_field_evidence sfe JOIN scraped_courses sc ON sfe.scraped_course_id=sc.id WHERE course_name LIKE '%Government and International Relations%' AND field_key='ielts_overall';`
+
+**Bug 3 dedup fix didn't fire — zero `[STAGE] dedup` lines in the log.** Both Bachelor of Science rows (`[STAGE] saved: Bachelor of Science` appears twice) and Bachelor of Business Sports Management (also appears twice) made it through. Either the dedup pass isn't being called, or the (course_name, degree_level) tuple is matching as different because of subtle whitespace/case differences. Worth checking with `git log --oneline backend-py/app/services/scraper/orchestrator.py | head -3` to confirm 938d198 is in the deployed file.
+
+**Stale cached fee page warning.** Log shows `[CACHE] fee_schedule hit → 5 record(s) (cached, skipping fetch...)` for the central fee page. If this cache pre-dates today's fixes, it might be the reason MBA parent fee remained blank — the cached fee table wasn't re-fetched. Worth a cache-bust.
+
+**Recommended order**
+
+1. **Run the prod audit SQL on `scraped_field_evidence` for `sibling_cache:%` provenance** — still needed regardless
+2. **Fix the `online_only` over-rejection** — blocking promote, 87 valid courses missing from the catalog
+3. **Confirm 938d198 is in deployed orchestrator.py and check why dedup didn't fire** — blocking promote, duplicates still visible
+4. **DB query on PhD row to confirm IELTS=null in the DB** (and figure out why the spreadsheet shows 6 if the DB is null)
+5. **Cache-bust + re-scrape Flinders**
+6. **Walk evidence panels + promote**
+
+The research-bucket and source-gating wins are real — those fixes are doing what they're supposed to. But we now have a different staging-side bug that's dropping more good courses than the original problems were corrupting. The catalog needs both fixes to be net-positive.

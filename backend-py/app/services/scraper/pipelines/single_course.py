@@ -899,23 +899,44 @@ async def extract_course(
     _study_mode_evidence = [e for e in evidence if e["field_key"] == "study_mode"]
     _was_online = payload.get("study_mode") == "Online"
     _has_physical_location = bool((payload.get("course_location") or "").strip())
-    # Low-confidence online: extractor rule fired at ≤50% confidence — try to
-    # derive the real mode from the physical campus list instead.
-    # We do NOT upgrade a confident "Online" to "Blended" just because the
-    # location list mentions a city.  Many universities (e.g. UniSQ) list the
-    # campus name in location_text even for purely online courses.
-    # "Online" mode is authoritative when confidently detected — those courses
-    # are filtered by the online_only guard later.
+    # Low-confidence online OR rule-only online with confirmed physical campus:
+    # upgrade to "On Campus" rather than letting the online_only guard reject.
+    #
+    # Case 1 (original): study_mode:rule fired at ≤50% confidence — bare
+    #   \bonline\b keyword fallback; a physical campus is a stronger signal.
+    # Case 2 (new): study_mode:rule is the ONLY evidence source (no structural
+    #   evidence such as span_id_delivery, data_attribute, or gemini_primary)
+    #   AND a physical campus is confirmed in course_location. The keyword rule
+    #   is routinely fooled by "Study online" / "online delivery" appearing in
+    #   university nav bars, footer links, or marketing copy that is flattened
+    #   into the page's tag-stripped body (e.g. Flinders). A confirmed physical
+    #   campus is architecturally stronger evidence of campus delivery than any
+    #   keyword match regardless of that match's confidence level.
+    #
+    # We do NOT upgrade when any high-authority method (span_id_delivery,
+    # data_attribute, gemini_primary, etc.) corroborates Online — those
+    # sources are explicitly anchored to the course's own delivery section
+    # and are treated as authoritative.
+    _rule_only_online = (
+        _was_online
+        and bool(_study_mode_evidence)
+        and all(
+            (e.get("method") or "").startswith("study_mode:rule")
+            for e in _study_mode_evidence
+        )
+        and _has_physical_location
+    )
     _low_conf_online = _was_online and any(
         e.get("confidence", 1.0) <= 0.5 and e.get("method") == "study_mode:rule"
         for e in _study_mode_evidence
     )
-    if _low_conf_online:
+    if _low_conf_online or _rule_only_online:
         from app.services.scraper.extractors.study_mode import derive_mode_from_location
 
         _derived_mode = derive_mode_from_location(payload.get("course_location"))
         if _derived_mode:
             payload["study_mode"] = _derived_mode
+            _upgrade_reason = "Low-confidence" if _low_conf_online else "Rule-only"
             evidence.append(
                 {
                     "field_key": "study_mode",
@@ -923,7 +944,7 @@ async def extract_course(
                     "confidence": 0.65,
                     "method": "study_mode:location_derived",
                     "snippet": (
-                        f"Low-confidence online overridden by location: "
+                        f"{_upgrade_reason} online overridden by physical campus: "
                         f"{(payload.get('course_location') or '')[:80]}"
                     ),
                 }

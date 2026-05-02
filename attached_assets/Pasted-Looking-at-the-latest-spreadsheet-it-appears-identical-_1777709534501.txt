@@ -1,0 +1,61 @@
+Looking at the latest spreadsheet — it appears identical to the one I reviewed before the two fixes shipped. Same 109 rows, same Bachelor of Science triple-row, same Bachelor of Business Sports Management duplicate, same 32 PhD rows all showing IELTS=6 with everything else blank, same MBA parent fee blank, same suspicious low fees.
+
+This means one of three things:
+
+1. The deploy hasn't happened yet — commits f80c8ce and 938d198 are on GitHub but not pulled to prod
+2. The deploy happened but Flinders hasn't been re-scraped since
+3. Flinders was re-scraped but something cached prevented the new code from taking effect
+
+Can you confirm the deploy state on prod (159.65.152.72)? Two quick checks:
+
+```
+cd /root/University-and-Course-data && git log --oneline -5
+systemctl status uni-celery.service uni-api-py.service | grep Active
+```
+
+First command shows whether f80c8ce and 938d198 are present. Second shows when the services last restarted.
+
+If the deploy hasn't happened, please run:
+
+```
+cd /root/University-and-Course-data && git pull origin main && systemctl restart uni-celery.service uni-api-py.service
+```
+
+Then trigger a fresh Flinders re-scrape.
+
+**Independent of the Flinders re-scrape, the prod audit SQL is worth running now**
+
+The audit query against `scraped_field_evidence` for `sibling_cache:%` provenance on approved/published English fields doesn't depend on any new scrape — it tells us whether the live 792 catalog already has fabricated English data sitting in production across the 12 unis. That's a handover question we need answered regardless of what Flinders staging does next.
+
+```sql
+-- Run on PROD DB
+SELECT sc.university_id, u.name,
+       sfe.field_key,
+       COUNT(*) as cnt
+FROM scraped_field_evidence sfe
+JOIN scraped_courses sc ON sfe.scraped_course_id = sc.id
+JOIN universities u ON sc.university_id = u.id
+WHERE sfe.extraction_method LIKE 'sibling_cache:%'
+  AND sfe.selected = true
+  AND sfe.field_key IN (
+      'ielts_overall','ielts_listening','ielts_reading',
+      'ielts_writing','ielts_speaking'
+  )
+  AND sc.status IN ('approved','published')
+GROUP BY sc.university_id, u.name, sfe.field_key
+ORDER BY sc.university_id, sfe.field_key;
+```
+
+Three possible outcomes:
+- Zero rows: live catalog is clean, only newly-staged rows were ever affected
+- Small count (<50 across catalog): targeted manual remediation, doesn't block handover
+- Large count (hundreds): coordinated remediation re-scrape across affected unis required, may shift handover timing
+
+Knowing this answer before re-scraping Flinders means we can decide whether to fold any catalog-wide remediation into a single coordinated pass rather than re-scraping Flinders alone now and discovering more work later.
+
+**Can you do this in two steps**
+
+1. Run the prod audit SQL and paste the result back — takes one minute, doesn't depend on anything else
+2. Confirm or run the deploy + Flinders re-scrape
+
+Once both are done we walk the new evidence panels and either promote or scope further work.
