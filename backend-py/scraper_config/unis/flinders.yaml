@@ -18,6 +18,15 @@
 #     _DOMESTIC_ONLY_RE intentionally excludes bare "domestic students only"
 #     phrases for this reason — only explicit "this course is only available to
 #     domestic/australian students" language triggers the filter.
+#   - Tier-1 vision OCR (images NOT anchored inside the Entry Requirements DOM
+#     section) hallucinated plausible-looking IELTS/PTE/TOEFL values from stock
+#     photos and AEM content fragments on other courses' pages.  Sub-gates A+B
+#     (IELTS-anchor mismatch / single-test-image filter) caught many cases but
+#     not all — Gemini hallucinated 6 test values from a student-laptops stock
+#     photo that was cross-contaminated from gc-digital-innovation---ai/.
+#     Disabling tier-1 English OCR entirely is the correct fix: regex/structural
+#     extractors reliably supply IELTS for every course that publishes it.
+#     Tier-0 (DOM-anchored) images remain trusted should they ever appear.
 
 discovery:
   # Flinders sitemap at https://www.flinders.edu.au/sitemap.xml lists all
@@ -26,6 +35,12 @@ discovery:
   always_sitemap_supplement: true
 
 extraction:
+  english:
+    # Disable tier-1 (non-DOM-anchored) vision OCR for English test score
+    # fields.  Tier-0 images (inside Entry Requirements DOM section) still
+    # trusted.  Regex+structural extraction is sufficient for Flinders.
+    trust_tier1_vision_ocr_english: false
+
   filters:
     domestic_only:
       # Explicitly set (same as the fail-open default) so behaviour is not
