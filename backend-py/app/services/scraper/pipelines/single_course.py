@@ -72,6 +72,12 @@ _DOMESTIC_ONLY_RE = _re.compile(
     # international student applications" — Federation and similar.
     r"|international\s+(?:student\s+)?applications?\s+(?:are\s+)?not\s+(?:accepted|available|open)"
     r"|not\s+currently\s+accepting\s+international\s+(?:student\s+)?applications?"
+    # "your application to study as a domestic student" — Torrens HDR-specific
+    # phrasing where the entire admissions section is framed for domestic
+    # applicants only (e.g. Doctor of Philosophy by Prior Works).  The phrase
+    # is unambiguous on a course-detail page: international-eligible courses
+    # have a parallel section framed for international applicants.
+    r"|(?:begin\s+your|your)\s+application\s+to\s+study\s+as\s+a\s+domestic\s+student"
     r")",
     _re.IGNORECASE,
 )

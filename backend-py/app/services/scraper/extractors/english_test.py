@@ -146,6 +146,76 @@ def _ielts(text: str) -> dict[str, float] | None:
         if 4 <= ov <= 9 and 4 <= mn <= 9:
             return {"overall": ov, "listening": mn, "reading": mn, "writing": mn, "speaking": mn}
 
+    # Pattern 1d (split-component): "IELTS 7.0 in three components (listening,
+    # reading, and speaking) and minimum score of 6.5 in writing"
+    # — NMBA / AHPRA standard phrasing for Nursing, Midwifery and allied-health
+    #   programs across all AU universities.  Three bands take the higher value;
+    #   one exception band (almost always writing) takes a lower value.
+    #
+    # Also handles the inverse form:
+    #   "IELTS 6.5 in writing and 7.0 in all other components"
+    #
+    # Rule: overall is set to the *higher* of the two values.  Per-band scores
+    # land in the normalized dict (not separate evidence rows) so the sibling
+    # cache cannot propagate them — intentional until source-type gating ships.
+
+    # Forward: higher score first, applied to 2-3 named bands, lower score to 1 band
+    _band_name = r"(?:listening|reading|writing|speaking)"
+    _band_list = (
+        r"("
+        + _band_name
+        + r"(?:(?:\s*,\s*|\s+)(?:and\s+|or\s+)?"
+        + _band_name
+        + r"){1,3})"
+    )
+    m = re.search(
+        r"(?:academic\s+)?ielts(?:\s+academic)?[^a-z0-9]{0,20}"
+        r"([0-9]+(?:\.[0-9]+)?)\s+in\s+"      # group 1: higher score
+        r"(?:(?:three|3|all|two|2)\s+)?(?:components?\s*)?"
+        r"\(?" + _band_list + r"\)?\s*"        # group 2: named bands
+        r"(?:,?\s*and\s+|;\s*|,\s*|\s+with\s+|\s+)"
+        r"(?:(?:minimum|min)\s+(?:score\s+)?of\s+|at\s+least\s+)?"
+        r"([0-9]+(?:\.[0-9]+)?)\s+in\s+"      # group 3: lower score
+        r"(listening|reading|writing|speaking)",  # group 4: exception band
+        text,
+        re.I,
+    )
+    if m:
+        higher, lower, exc = float(m.group(1)), float(m.group(3)), m.group(4).lower()
+        if 4 <= higher <= 9 and 4 <= lower <= 9 and lower <= higher:
+            result: dict[str, float | None] = {
+                "overall": higher,
+                "listening": higher, "reading": higher,
+                "writing": higher, "speaking": higher,
+            }
+            result[exc] = lower
+            return result
+
+    # Inverse: exception band first, remaining bands second ("all other components")
+    # Bridge uses [^0-9]{0,30}? (not [^a-z0-9]) so it can cross the word "and"
+    # between the exception band name and the higher score.
+    m = re.search(
+        r"(?:academic\s+)?ielts(?:\s+academic)?[^a-z0-9]{0,20}"
+        r"([0-9]+(?:\.[0-9]+)?)\s+in\s+"      # group 1: lower score
+        r"(listening|reading|writing|speaking)"  # group 2: exception band
+        r"[^0-9]{0,30}?"                        # bridge: allow "and", "with" etc.
+        r"(?:(?:minimum|min)\s+(?:score\s+)?of\s+|at\s+least\s+)?"
+        r"([0-9]+(?:\.[0-9]+)?)\s+in\s+"      # group 3: higher score
+        r"(?:all\s+)?(?:other\s+)?(?:components?|bands?|skills?|areas?)",
+        text,
+        re.I,
+    )
+    if m:
+        lower, exc, higher = float(m.group(1)), m.group(2).lower(), float(m.group(3))
+        if 4 <= higher <= 9 and 4 <= lower <= 9 and lower <= higher:
+            result = {
+                "overall": higher,
+                "listening": higher, "reading": higher,
+                "writing": higher, "speaking": higher,
+            }
+            result[exc] = lower
+            return result
+
     # Pattern 2: "IELTS 6.5 overall with 6.0 in each band"
     m = re.search(
         r"ielts(?:\s+academic)?[^a-z0-9]{0,20}([0-9]+(?:\.[0-9]+)?)\s*overall"

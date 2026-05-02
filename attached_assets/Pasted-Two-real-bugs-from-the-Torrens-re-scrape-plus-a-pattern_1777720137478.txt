@@ -1,0 +1,93 @@
+Two real bugs from the Torrens re-scrape, plus a pattern worth flagging.
+The Torrens scrape staged 104 courses cleanly and the IELTS floor extraction (af2ae03) is clearly working in many places — fees and overalls look right, and the per-band fix is firing on courses with the standard floor phrasing. But two specific issues need attention before any of these rows get promoted, and the second one points to something bigger than a single fix.
+
+Bug 1 — Doctor of Philosophy (by Prior Works) is staging despite being domestic-only
+URL: https://www.torrens.edu.au/courses/higher-degrees-by-research/doctor-of-philosophy-by-prior-works
+This course staged successfully (✅ [PASS 100/100]) and appears in the dashboard with international fees populated. But the page itself states it's domestic-only — same status as Master of Counselling and Bachelor of Counselling, both of which were correctly skipped earlier in the same run with [DOMESTIC ONLY] log lines:
+[DOMESTIC ONLY] https://www.torrens.edu.au/courses/health/master-of-counselling — course page states domestic-students-only; skipping
+[DOMESTIC ONLY] https://www.torrens.edu.au/courses/health/bachelor-of-counselling — course page states domestic-students-only; skipping
+Doctor of Philosophy (by Prior Works) didn't get the same treatment despite the same restriction on the page. Two possibilities:
+(a) The domestic-only filter's text-search scope or pattern doesn't catch the wording used on the PhD-by-Prior-Works page. Worth grepping the rendered text the scraper actually saw (text_len=9001 in the GP-DEBUG line) for "domestic", "Australian citizen", "permanent resident" etc. and comparing to what the filter looks for.
+(b) The filter is course-page-text-based and the PhD-by-Prior-Works page expresses the restriction in a way that's structurally different from the Master/Bachelor of Counselling pages (e.g., in a sidebar, a downloadable PDF, an admission requirements section the scraper renders separately).
+Diagnostic before fixing:
+bash# Check what text the scraper actually saw and what the filter rule for Torrens looks like
+grep -ni "domestic\|australian citizen\|permanent resident\|onshore" \
+  <captured-rendered-text-for-doctor-of-philosophy-by-prior-works>
+
+# Compare against the Master of Counselling page text where the filter DID fire
+Once we know whether it's a missed phrasing or a structural difference, the fix is either a pattern addition to the shared domestic_only filter or a per-uni override on torrens.yaml — depending on whether the same wording appears on other unis' pages.
+In the meantime: do not promote Doctor of Philosophy (by Prior Works) to the live courses table.
+
+Bug 2 — Bachelor of Nursing has IELTS=7.0 overall but the band scores are wrong
+URL: https://www.torrens.edu.au/courses/health/bachelor-of-nursing
+Dashboard shows IELTS 7.0 overall (correct) and PTE 66 / TOEFL 94 (correct on the overalls). But the individual IELTS bands the dashboard surfaces don't match what's actually on the page.
+Page wording:
+
+Academic IELTS 7.0 in three components (listening, reading, and speaking) and minimum score of 6.5 in writing; OR OET B in each of the three components (listening, reading, speaking) and C+ minimum in writing OR TOEFL iBT minimum score of 94 OR PTE Academic minimum score of 66
+
+The correct extraction is:
+
+ielts_overall = 7.0
+ielts_listening = 7.0
+ielts_reading = 7.0
+ielts_speaking = 7.0
+ielts_writing = 6.5
+
+This is a different per-band pattern than the floor clause Patch 1c was built for. Patch 1c handles "minimum overall band of X with no individual band below Y" — i.e., a single floor that applies to all four bands. Bachelor of Nursing uses a split per-band requirement: three bands at one value, one band (usually writing) at a lower value. The af2ae03 fix doesn't cover this shape.
+This phrasing is NOT rare in AU healthcare/nursing programs — it's the standard Nursing & Midwifery Board of Australia (NMBA) / AHPRA wording, used on most Bachelor of Nursing pages across the country. So this isn't a Torrens-specific issue; it'll show up on UTS, ACU, La Trobe, USQ, JCU, etc., wherever Nursing is offered.
+Suggested fix — extend Patch 1c with a "split-component" pattern. Approximate regex sketch (verify against 5 real examples first as you did with af2ae03):
+python# Match "X in [three|N] components (listening, reading, speaking)
+#        and (minimum|min|at least) score of Y in writing"
+# Also handle the inverse: "Y in writing and X in listening/reading/speaking"
+_SPLIT_COMPONENT_IELTS_RE = re.compile(r"""
+    ielts(?:\s+academic)?
+    .*?
+    (?P<higher>\d+\.?\d*)
+    \s+in\s+(?:three|3|all)?\s*components?\s*
+    \(?\s*(?P<bands>(?:listening|reading|speaking|writing)
+                  (?:\s*,\s*(?:and\s+)?(?:listening|reading|speaking|writing))+)\s*\)?
+    \s+and\s+(?:minimum\s+score\s+of\s+|min(?:imum)?\s+|at\s+least\s+)?
+    (?P<lower>\d+\.?\d*)
+    \s+in\s+(?P<remaining_band>listening|reading|speaking|writing)
+""", re.IGNORECASE | re.VERBOSE | re.DOTALL)
+Logic:
+
+Identify the higher value and which 3 bands it applies to (parse the bands group)
+Identify the lower value and which 1 band it applies to (remaining_band)
+Set those four band values explicitly
+ielts_overall should already be set by Pattern 1/1b/1c on the same page; if it's null, fall back to the higher value
+
+Same caveat as af2ae03: per-band values need to land in the normalized dict of the ielts_overall ExtractionResult so they don't create separate evidence rows that the sibling cache could propagate. Source-type gating still pending.
+Test cases for the new pattern (run before deploying):
+PhrasingExpected"IELTS 7.0 in three components (listening, reading, and speaking) and minimum score of 6.5 in writing"overall=7.0, L=R=S=7.0, W=6.5"IELTS 7.0 in listening, reading and speaking with 6.5 in writing"overall=7.0, L=R=S=7.0, W=6.5"IELTS 6.5 in writing and 7.0 in all other components"overall=7.0, W=6.5, L=R=S=7.0"IELTS 7.0 with no band below 6.5" (existing Patch 1c)overall=7.0, L=R=W=S=6.5 — must not regress
+Don't ship without the fourth one passing — the new pattern needs to coexist with the floor pattern, not replace it.
+In the meantime: do not promote Bachelor of Nursing.
+
+The bigger thing this points to
+The Bachelor of Nursing case isn't a one-off. AU Nursing programs across the fleet use this exact NMBA phrasing. Worth a query against the staged data before Bug 2 ships:
+sqlSELECT university_id, course_name, ielts_overall, 
+       ielts_listening, ielts_reading, ielts_writing, ielts_speaking
+FROM scraped_courses
+WHERE course_name ILIKE '%nursing%'
+  AND status IN ('pending', 'approved')
+ORDER BY university_id, course_name;
+If multiple unis show ielts_overall populated but bands mismatched against the page text (you can spot-check 3-4 of them by hand), that's the blast radius. The fix is a shared-code regex addition, so the regression sweep across all 23 baselined unis is the right gate. Expect dirty on every uni with a Nursing program after the fix lands.
+
+Side observations from the scrape (not blocking, just noting)
+
+Sibling cache cross-bucket leak still possible — the run logged:
+
+   [EXTRACT] [sibling cache ↻ build unknown] ielts_listening=6.0 ielts_overall=6.5 ...
+   [EXTRACT] [sibling cache ↻ backfill unknown] 139 slot(s) filled across siblings
+139 slots filled from an "unknown" bucket. What's the "unknown" bucket and which courses fall into it? If it's a catch-all that bridges undergraduate and postgraduate courses, the source-type gating + ≥2 source consensus work (still pending from Week 1) becomes more urgent than I'd previously implied.
+
+Gemini 503s on 4 courses, vision quota exhaustion on ~15 images — the run hit Google's rate limits noticeably. Quota wrapper / circuit breaker (also pending) would have made this less noisy.
+Per-course browser timeouts on ~25 courses (60s exceeded) — these all eventually completed via the vision fallback, but the failure mode is consistent enough that the 60s timeout might be too tight for Torrens specifically. Worth a per-uni override (browser_timeout_seconds: 90) before the next run rather than a shared-code change.
+
+
+Priority order I'd suggest:
+
+Bug 1 (PhD-by-Prior-Works domestic_only) — diagnostic query first, then either pattern addition or per-uni override. ~30 min.
+Bug 2 (Nursing split-component IELTS) — verify pattern against 5 real Nursing pages, write tests, ship through regression sweep. ~2 hours including sweep.
+Re-scrape Torrens after Bug 2 ships, then promote what's clean.
+Don't start the broader sibling cache work yet — finish Bug 2's sweep first to keep one shared-code change in flight at a time.
