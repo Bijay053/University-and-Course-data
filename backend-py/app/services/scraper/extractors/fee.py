@@ -54,6 +54,17 @@ _FIRST_YEAR_FEE_CTX = re.compile(
 )
 _YEAR_RE = re.compile(r"\b(20\d{2})\b")
 
+# Commonwealth Supported Place / HECS / student contribution labels signal
+# a domestic government-subsidised fee.  These amounts must never be stored
+# as the international tuition fee (e.g. UTAS CSP ~$9,000–$16,000/yr).
+_CSP_DOMESTIC_CTX = re.compile(
+    r"\b(?:commonwealth\s+supported(?:\s+place)?|"
+    r"HECS(?:-HELP)?|"
+    r"student\s+contribution(?:\s+amount)?|"
+    r"domestic\s+(?:student\s+)?(?:tuition\s+)?fee)\b",
+    re.IGNORECASE,
+)
+
 _COUNTRY_CURRENCY = {
     "australia": "AUD",
     "au": "AUD",
@@ -404,6 +415,14 @@ def _candidates(text: str) -> Iterable[tuple[int, str, str]]:
             default=float("inf"),
         )
         if sal_dist < tui_dist:
+            continue
+        # CSP / domestic fee guard: reject amounts whose immediate context
+        # mentions "Commonwealth Supported Place", "HECS", "student
+        # contribution", or "domestic fee".  These are government-subsidised
+        # domestic fees and must never be stored as the international tuition
+        # (e.g. UTAS CSP ~$9,000–$16,000/yr appearing alongside the real
+        # international fee of ~$35,000+/yr).
+        if _CSP_DOMESTIC_CTX.search(ctx):
             continue
         yield amount, cur, ctx
 
