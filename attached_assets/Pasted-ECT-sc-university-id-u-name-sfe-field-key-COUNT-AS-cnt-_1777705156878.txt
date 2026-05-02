@@ -1,0 +1,95 @@
+ECT sc.university_id, u.name,
+       sfe.field_key,
+       COUNT(*) AS cnt
+FROM scraped_field_evidence sfe
+JOIN scraped_courses sc ON sfe.scraped_course_id = sc.id
+JOIN universities u ON sc.university_id = u.id
+WHERE sfe.extraction_method LIKE 'sibling_cache:%'
+  AND sfe.selected = true
+  AND sfe.field_key IN (
+      'ielts_overall','ielts_listening','ielts_reading',
+      'ielts_writing','ielts_speaking'
+  )
+  AND sc.status IN ('approved','published')
+GROUP BY sc.university_id, u.name, sfe.field_key
+ORDER BY sc.university_id, sfe.field_key;
+SQL
+psql: error: could not translate host name "host" to address: Temporary failure in name resolution
+root@university-and-course-data:~/University-and-Course-data# # Get DATABASE_URL from the running service environment
+DB=$(systemctl show uni-api-py.service --property=Environment | grep -oP 'DATABASE_URL=\S+' | cut -d= -f2-)
+psql "$DB" << 'SQL'
+SELECT sc.university_id, u.name,
+       sfe.field_key,
+       COUNT(*) AS cnt
+FROM scraped_field_evidence sfe
+JOIN scraped_courses sc ON sfe.scraped_course_id = sc.id
+JOIN universities u ON sc.university_id = u.id
+WHERE sfe.extraction_method LIKE 'sibling_cache:%'
+  AND sfe.selected = true
+  AND sfe.field_key IN (
+      'ielts_overall','ielts_listening','ielts_reading',
+      'ielts_writing','ielts_speaking'
+  )
+  AND sc.status IN ('approved','published')
+GROUP BY sc.university_id, u.name, sfe.field_key
+ORDER BY sc.university_id, sfe.field_key;
+SQL
+psql: error: connection to server on socket "/var/run/postgresql/.s.PGSQL.5432" failed: FATAL:  role "root" does not exist
+root@university-and-course-data:~/University-and-Course-data# # Find where the env file lives
+grep -r EnvironmentFile /etc/systemd/system/uni-api-py.service
+
+# Then source it and retry (replace the path with what you see above)
+source /root/University-and-Course-data/backend-py/.env
+psql "$DATABASE_URL" << 'SQL'
+SELECT sc.university_id, u.name, sfe.field_key, COUNT(*) AS cnt
+FROM scraped_field_evidence sfe
+JOIN scraped_courses sc ON sfe.scraped_course_id = sc.id
+JOIN universities u ON sc.university_id = u.id
+WHERE sfe.extraction_method LIKE 'sibling_cache:%'
+  AND sfe.selected = true
+  AND sfe.field_key IN ('ielts_overall','ielts_listening','ielts_reading','ielts_writing','ielts_speaking')
+  AND sc.status IN ('approved','published')
+GROUP BY sc.university_id, u.name, sfe.field_key
+ORDER BY sc.university_id, sfe.field_key;
+SQL
+EnvironmentFile=/root/University-and-Course-data/backend-py/.env
+psql: error: connection to server on socket "/var/run/postgresql/.s.PGSQL.5432" failed: FATAL:  role "root" does not exist
+root@university-and-course-data:~/University-and-Course-data# # Find the DB name first
+sudo -u postgres psql -c "\l"
+
+# Then run the query (replace university_portal with the actual DB name)
+sudo -u postgres psql -d university_portal << 'SQL'
+SELECT sc.university_id, u.name, sfe.field_key, COUNT(*) AS cnt
+FROM scraped_field_evidence sfe
+JOIN scraped_courses sc ON sfe.scraped_course_id = sc.id
+JOIN universities u ON sc.university_id = u.id
+WHERE sfe.extraction_method LIKE 'sibling_cache:%'
+  AND sfe.selected = true
+  AND sfe.field_key IN ('ielts_overall','ielts_listening','ielts_reading','ielts_writing','ielts_speaking')
+  AND sc.status IN ('approved','published')
+GROUP BY sc.university_id, u.name, sfe.field_key
+ORDER BY sc.university_id, sfe.field_key;
+SQL
+                                                             List of databases
+           Name            |   Owner   | Encoding | Locale Provider | Collate |  Ctype  | ICU Locale | ICU Rules |    Access privileges    
+---------------------------+-----------+----------+-----------------+---------+---------+------------+-----------+-------------------------
+ postgres                  | postgres  | UTF8     | libc            | C.UTF-8 | C.UTF-8 |            |           | 
+ template0                 | postgres  | UTF8     | libc            | C.UTF-8 | C.UTF-8 |            |           | =c/postgres            +
+                           |           |          |                 |         |         |            |           | postgres=CTc/postgres
+ template1                 | postgres  | UTF8     | libc            | C.UTF-8 | C.UTF-8 |            |           | =c/postgres            +
+                           |           |          |                 |         |         |            |           | postgres=CTc/postgres
+ test                      | postgres  | UTF8     | libc            | C.UTF-8 | C.UTF-8 |            |           | =Tc/postgres           +
+                           |           |          |                 |         |         |            |           | postgres=CTc/postgres  +
+                           |           |          |                 |         |         |            |           | test=CTc/postgres
+ university_portal         | uniportal | UTF8     | libc            | C.UTF-8 | C.UTF-8 |            |           | =Tc/uniportal          +
+                           |           |          |                 |         |         |            |           | uniportal=CTc/uniportal
+ university_portal_staging | postgres  | UTF8     | libc            | C.UTF-8 | C.UTF-8 |            |           | 
+(6 rows)
+
+ university_id |        name         |   field_key   | cnt 
+---------------+---------------------+---------------+-----
+            12 | Flinders University | ielts_overall |  59
+            20 | aut                 | ielts_overall |   4
+(2 rows)
+
+root@university-and-course-data:~/University-and-Course-data# 
