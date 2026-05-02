@@ -1,0 +1,51 @@
+The shape is right and the global scope is the right call. The architectural shift — trust based on image *source* (tier-0 vs tier-1), not image *output* — is what was missing all day. Skip-before-call also turns the cost problem into a non-problem: at text-parseable unis we just stop paying for noise.
+
+Three verification questions before the next scrape lands, then one mild pushback.
+
+**1. How robust is tier-0 detection?**
+
+The whole architecture now rests on tier-0 being correctly identified as "DOM-anchored to the Entry Requirements section." Two things I want to know:
+
+- False negatives: are there Flinders courses where the legitimate requirements image is currently tagged as tier-1? If so, those courses will go from "vision-injected English data" to "no English data" — a regression, even if a smaller one. Worth knowing the rate before promote.
+- Cross-template: does tier-0 detection work the same on Flinders' AEM templates, Bond's templates, ACU's templates? Same DOM selector everywhere, or per-uni?
+
+**2. Is ASAHE still working in practice, not just theory?**
+
+The decision tree says "ASAHE-type unis never have regex IELTS, so both checks are false, vision fires." That's the design intent. Have the 38 tests included a fixture shaped like ASAHE (regex IELTS=None, tier-1 images present, vision should fire), or is that still theoretical until next ASAHE re-scrape?
+
+Not asking for an ASAHE re-scrape now — just want to know whether "ASAHE preserved" is verified or asserted.
+
+**3. What's sub-gates A and B's scope post-fix?**
+
+With tier-1 vision pre-blocked when regex has IELTS, sub-gates A and B effectively only run on tier-0 images now. Good — right scope. But two questions:
+
+- Sub-gate A: if a *tier-0* image's IELTS disagrees with regex by ≥0.5, what fires? Tier-0 should be the more trusted source per the new architecture. Does A still discard tier-0 vision, or does this become a review flag instead?
+- Sub-gate B: still relevant for ASAHE no-regex cases on tier-0 images?
+
+**Mild pushback — what about regex-has-PTE-but-not-IELTS?**
+
+The pre-skip checks `ielts_overall` from regex. What about courses where regex finds PTE or TOEFL but no IELTS? Vision would still fire on tier-1 images and could hallucinate an IELTS value into the empty slot.
+
+Possibly an edge case at Flinders — their FIELD SUMMARY logs consistently showed IELTS via regex when *any* English data was found via regex. But for other unis, IELTS could be on a different page from PTE/TOEFL.
+
+Proposal: the pre-skip check could be "any English test from regex" rather than just IELTS. If regex got *any* English data, tier-1 vision contributes only noise. If regex got nothing at all, that's the genuine ASAHE case.
+
+Not urgent. The current change handles 95%+ of the problem; this is the last 5%.
+
+**Before we re-scrape**
+
+Bug 3b (URL fragment stripping) plus the dedup SQL update should kill the three Bachelor of Science duplicates. Worth confirming that's part of the deploy.
+
+Also — the two suspicious low fees (Sport Health Honours $4k, Teaching Secondary $5k) are still on the spreadsheet. The fix doesn't address those. Either:
+
+- Hold those specific rows back from promote
+- Re-extract them manually
+- Or accept that this batch will need a small post-promote correction
+
+Which do you prefer?
+
+**Once the answers above are clear**
+
+Deploy, re-scrape, walk the same five-panel evidence list, promote. Estimated 90 minutes total from now if nothing else surfaces.
+
+Good work today. The pivot from output-gating to source-gating took a day to arrive at, but it's the right pivot, and the global scope means it pays back across every uni in the catalog — both in correctness and Gemini cost.

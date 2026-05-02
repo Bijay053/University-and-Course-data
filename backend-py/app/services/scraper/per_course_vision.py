@@ -841,11 +841,24 @@ async def maybe_vision_refetch(
     cache_hits = 0
     tier1_skipped = 0
 
-    # Pre-compute: does regex already have a reliable IELTS overall from page
-    # text?  We check payload rather than re-running extraction; payload holds
-    # only text-extraction results at this point (sibling-cache backfill and
+    # Pre-compute: did regex find ANY English test score from page text?
+    # We check payload rather than re-running extraction; payload holds only
+    # text-extraction results at this point (sibling-cache backfill and
     # central-data merge happen after this function returns in single_course.py).
-    _regex_has_ielts: bool = bool(payload.get("ielts_overall"))
+    #
+    # We check ALL five overalls, not just IELTS.  A course where regex found
+    # PTE=65 but no IELTS would otherwise let tier-1 vision fire and hallucinate
+    # an IELTS value into the empty slot.  If regex got *any* English test score,
+    # tier-1 vision contributes only noise — the ASAHE use-case (requirements
+    # exclusively in images, zero regex hits) is the only legitimate exception,
+    # and for those pages payload has none of these keys.
+    _ENGLISH_OVERALL_SLOTS_VISION: Final[tuple[str, ...]] = (
+        "ielts_overall", "pte_overall", "toefl_overall",
+        "cambridge_overall", "duolingo_overall",
+    )
+    _regex_has_english: bool = any(
+        payload.get(slot) for slot in _ENGLISH_OVERALL_SLOTS_VISION
+    )
 
     for img_url, alt in candidates:
         # Stop early once the vision pass ITSELF has found every overall
@@ -875,12 +888,12 @@ async def maybe_vision_refetch(
         # This is a pure cost/time saving: no Gemini call, no download, no
         # parse.  Tier-0 images (found inside the English requirements DOM
         # section) are always processed regardless of either flag.
-        if not is_tier0 and (skip_tier1_english or _regex_has_ielts):
+        if not is_tier0 and (skip_tier1_english or _regex_has_english):
             tier1_skipped += 1
             log.info(
                 "[VISION SKIP TIER1] %s: skipping tier-1 image %s "
-                "(skip_tier1_english=%s, regex_has_ielts=%s)",
-                url, img_url[-80:], skip_tier1_english, _regex_has_ielts,
+                "(skip_tier1_english=%s, regex_has_english=%s)",
+                url, img_url[-80:], skip_tier1_english, _regex_has_english,
             )
             continue
 
