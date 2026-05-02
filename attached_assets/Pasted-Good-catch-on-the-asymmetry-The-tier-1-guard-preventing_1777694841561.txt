@@ -1,0 +1,28 @@
+Good catch on the asymmetry. The tier-1 guard preventing IELTS override but still filling empty TOEFL/PTE slots is exactly the kind of bug that hides until you stare at run-to-run vision diffs. The coherence gate is the right shape — if the IELTS the image returned doesn't agree with regex, nothing else from that image should be trusted either. Better than the relevance check I was arguing for yesterday because it uses observable evidence (regex IELTS as ground truth) rather than trying to guess image relevance from URL/DOM heuristics.
+
+Will pull + restart on prod once the current scrape lands. Two follow-up questions before we promote anything:
+
+**1. Tier-0 / no-regex case.** The gate flags tier-1 images that disagree with regex IELTS. What happens on a course where regex didn't find IELTS at all (regex returns None)? Two reasonable behaviours:
+
+- **Permissive:** if no regex IELTS, gate doesn't fire, vision values flow through. Risk: courses where vision is hallucinating get vision values with no sanity check.
+- **Strict:** if no regex IELTS, only tier-0 (highly trusted) sources can supply test scores; tier-1 vision is suppressed entirely. Risk: legitimate courses where IELTS is genuinely only on an image (the original ASAHE use case) lose data.
+
+Which path did you take? Asking because the Flinders run had a few courses with regex IELTS = None (e.g. Bachelor of Computing and Mathematical Sciences (Honours) showed IELTS ❌ not found in FIELD SUMMARY). On those, the gate wouldn't have anything to compare against.
+
+**2. The 0.1 threshold.** That's tight. Real cases where regex and vision could legitimately differ by exactly 0.5 (6.0 vs 6.5): the page lists overall IELTS in main text but the image shows the band breakdown with a sub-score that happens to match overall. Worth confirming this isn't producing false-positive discards on courses where vision was actually reading correct band scores. The 28 unit tests passing is reassuring, but the test cases are constructed — worth checking against a few real Flinders evidence panels before locking in.
+
+**Plan once scrape finishes (~30 min from your last message):**
+
+1. Pull + restart prod (applies to next scrape, not the in-flight one)
+2. Walk 5 evidence panels on the just-finished batch:
+   - Bachelor of Arts — your suspect, check TOEFL/PTE source
+   - Bachelor of Science — your other suspect (was returning suspicious 50/70 values)
+   - Bachelor of Computing and Mathematical Sciences (Honours) — the regex-IELTS-None case
+   - Bachelor of Clinical Sciences/Doctor of Medicine — vision returned values that *agreed* with regex on this one, sanity check it stayed agreed
+   - One PhD in Law row — yesterday's poster child for the Bluesky bug, confirm clean
+3. If walks 1-3 look clean and the regex sources are doing the work: promote with the existing batch.
+4. If walks 1-3 still show vision pollution: don't promote, trigger one more re-scrape with the coherence gate active. Another hour but final clean.
+
+My honest preference is option 4 — the in-flight scrape doesn't have the gate, so any TOEFL/PTE injected from mismatched images is still in the data. Manual correction on 2-3 rows is fine; manual correction on 20-30 rows would be hours of admin work. A second re-scrape with the gate active is probably faster and cleaner, and it'd be the first scrape where all four bug fixes were active simultaneously.
+
+Net read on the work today: this is the first time this week the underlying problem has been correctly diagnosed and the fix targets the actual asymmetry, not a symptom. The pattern of "vision values look plausible but disagree run-to-run" was a strong signal that the values were untrustworthy regardless of source image, and the coherence gate is a clean way to encode that. Good day's work.

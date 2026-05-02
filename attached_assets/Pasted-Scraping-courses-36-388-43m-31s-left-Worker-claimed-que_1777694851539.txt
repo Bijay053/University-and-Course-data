@@ -1,0 +1,360 @@
+Scraping courses…
+36/388~43m 31s left
+Worker claimed queued scrape job
+Cleared 0 stale pending/rejected scraped_courses rows (>10m old) for university 12
+Fetching https://www.flinders.edu.au/...
+Discovering candidate course pages...
+[DISCOVER] Home page detected → course listing at https://www.flinders.edu.au/study/courses (high-priority probe)
+[DISCOVER] Crawling from https://www.flinders.edu.au/study/courses (max 25 pages, max 400 candidates)
+[DISCOVER] classified https://www.flinders.edu.au/study/courses: listing (7 course links found)
+[DISCOVER] Page 1/25: +343 candidates (total 343) — https://www.flinders.edu.au/study/courses
+[DISCOVER] classified https://www.flinders.edu.au/study/courses?level=postgraduate&student=international: listing (7 course links found)
+[DISCOVER] Page 2/25: +0 candidates (total 343) — https://www.flinders.edu.au/study/courses?level=postgraduate&student=international
+[DISCOVER] classified https://www.flinders.edu.au/study: listing (2 course links + listing title)
+[DISCOVER] Page 3/25: +0 candidates (total 343) — https://www.flinders.edu.au/study
+[DISCOVER] classified https://www.flinders.edu.au/study/business: listing (54 course links found)
+[DISCOVER] Page 4/25: +4 candidates (total 347) — https://www.flinders.edu.au/study/business
+[DISCOVER] classified https://www.flinders.edu.au/study/computer-science-information-technology: listing (33 course links found)
+[DISCOVER] Page 5/25: +1 candidates (total 348) — https://www.flinders.edu.au/study/computer-science-information-technology
+[DISCOVER] classified https://www.flinders.edu.au/study/creative-arts-media: listing (29 course links found)
+[DISCOVER] Page 6/25: +3 candidates (total 351) — https://www.flinders.edu.au/study/creative-arts-media
+[DISCOVER] classified https://www.flinders.edu.au/study/criminology: listing (12 course links found)
+[DISCOVER] Page 7/25: +1 candidates (total 352) — https://www.flinders.edu.au/study/criminology
+[DISCOVER] classified https://www.flinders.edu.au/study/defence-national-security: listing (39 course links found)
+[DISCOVER] Page 8/25: +3 candidates (total 355) — https://www.flinders.edu.au/study/defence-national-security
+[DISCOVER] classified https://www.flinders.edu.au/study/education: listing (49 course links found)
+[DISCOVER] Page 9/25: +2 candidates (total 357) — https://www.flinders.edu.au/study/education
+[DISCOVER] classified https://www.flinders.edu.au/study/engineering: listing (40 course links found)
+[DISCOVER] Page 10/25: +8 candidates (total 365) — https://www.flinders.edu.au/study/engineering
+[DISCOVER] classified https://www.flinders.edu.au/study/environment: listing (29 course links found)
+[DISCOVER] Page 11/25: +4 candidates (total 369) — https://www.flinders.edu.au/study/environment
+[DISCOVER] classified https://www.flinders.edu.au/study/health: listing (74 course links found)
+[DISCOVER] Page 12/25: +3 candidates (total 372) — https://www.flinders.edu.au/study/health
+[DISCOVER] classified https://www.flinders.edu.au/study/humanities-social-sciences: listing (29 course links found)
+[DISCOVER] Page 13/25: +1 candidates (total 373) — https://www.flinders.edu.au/study/humanities-social-sciences
+[DISCOVER] classified https://www.flinders.edu.au/study/innovation-enterprise: listing (2 course links + listing title)
+[DISCOVER] Page 14/25: +0 candidates (total 373) — https://www.flinders.edu.au/study/innovation-enterprise
+[DISCOVER] classified https://www.flinders.edu.au/study/international-relations-political-science: listing (19 course links found)
+[DISCOVER] Page 15/25: +2 candidates (total 375) — https://www.flinders.edu.au/study/international-relations-political-science
+[DISCOVER] classified https://www.flinders.edu.au/study/languages: listing (13 course links found)
+[DISCOVER] Page 16/25: +3 candidates (total 378) — https://www.flinders.edu.au/study/languages
+[DISCOVER] classified https://www.flinders.edu.au/study/law: listing (15 course links found)
+[DISCOVER] Page 17/25: +2 candidates (total 380) — https://www.flinders.edu.au/study/law
+[DISCOVER] classified https://www.flinders.edu.au/study/medicine: listing (38 course links found)
+[DISCOVER] Page 18/25: +2 candidates (total 382) — https://www.flinders.edu.au/study/medicine
+[DISCOVER] classified https://www.flinders.edu.au/study/nursing-midwifery: listing (26 course links found)
+[DISCOVER] Page 19/25: +1 candidates (total 383) — https://www.flinders.edu.au/study/nursing-midwifery
+[DISCOVER] classified https://www.flinders.edu.au/study/psychology: listing (19 course links found)
+[DISCOVER] Page 20/25: +2 candidates (total 385) — https://www.flinders.edu.au/study/psychology
+[DISCOVER] classified https://www.flinders.edu.au/study/science: listing (46 course links found)
+[DISCOVER] Page 21/25: +1 candidates (total 386) — https://www.flinders.edu.au/study/science
+[DISCOVER] classified https://www.flinders.edu.au/study/social-work: listing (15 course links found)
+[DISCOVER] Page 22/25: +2 candidates (total 388) — https://www.flinders.edu.au/study/social-work
+[DISCOVER] classified https://www.flinders.edu.au/study/sport: listing (17 course links found)
+[DISCOVER] Page 23/25: +1 candidates (total 389) — https://www.flinders.edu.au/study/sport
+[DISCOVER] blocked info_page: https://www.flinders.edu.au/study/high-school-students
+[DISCOVER] classified https://www.flinders.edu.au/study/adult-entry: listing (3 course links found)
+[DISCOVER] Page 25/25: +1 candidates (total 390) — https://www.flinders.edu.au/study/adult-entry
+Discovered 390 candidate course links
+[CENTRAL] auto-discovered fee page: https://www.flinders.edu.au/international/apply/apply-research-degree
+[CACHE] fee_schedule hit → 5 record(s) (cached, skipping fetch of https://www.flinders.edu.au/international/apply/apply-research-degree)
+[EXTRACT] gate dropped (info_page): a future postgraduate student
+[EXTRACT] gate dropped (events_page): Postgraduate information sessions
+[EXTRACT] gate dropped 2 non-course candidate(s) — events_page=1, info_page=1
+Extracting course details (388 pages)...
+[EXTRACT] 1/388: Associate Degree in Disability and Community Practice
+[EXTRACT] 2/388: Associate Degree in Health Sciences
+[EXTRACT] 3/388: Associate Degree in Medical Science (Laboratory Medicine)
+[EXTRACT] 4/388: Bachelor of Accounting
+Fetching 1/388: Associate Degree in Disability and Community Practice
+Fetching 2/388: Associate Degree in Health Sciences
+Fetching 3/388: Associate Degree in Medical Science (Laboratory Medicine)
+Fetching 4/388: Bachelor of Accounting
+[DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/associate-degree-disability-community-practice — course page states domestic-students-only; skipping
+[DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/associate-degree-health-sciences — course page states domestic-students-only; skipping
+[DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/associate-degree-medical-science-laboratory-medicine — course page states domestic-students-only; skipping
+[EXTRACT] 5/388: Bachelor of Allied Health (Occupational Therapy)
+[EXTRACT] 6/388: Bachelor of Allied Health (Physiotherapy)
+[EXTRACT] 7/388: Bachelor of Allied Health (Speech Pathology)
+[FIELD SUMMARY] Bachelor of Accounting Fee: ✅ '39000' [regex conf=1.00] IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '3.0' [regex conf=0.75] Intake: ✅ "['March', 'July']" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+Fetching 5/388: Bachelor of Allied Health (Occupational Therapy)
+Fetching 6/388: Bachelor of Allied Health (Physiotherapy)
+Fetching 7/388: Bachelor of Allied Health (Speech Pathology)
+[DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-allied-health-physiotherapy — course page states domestic-students-only; skipping
+[EXTRACT] 8/388: Bachelor of Archaeology
+[DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-allied-health-occupational-therapy — course page states domestic-students-only; skipping
+[DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-allied-health-speech-pathology — course page states domestic-students-only; skipping
+Fetching 8/388: Bachelor of Archaeology
+[EXTRACT] 9/388: Bachelor of Arts
+[EXTRACT] 10/388: Bachelor of Arts and Science
+Fetching 10/388: Bachelor of Arts and Science
+Fetching 9/388: Bachelor of Arts
+[FIELD SUMMARY] Bachelor of Archaeology Fee: ✅ '35500' [regex conf=1.00] IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '3.0' [regex conf=0.75] Intake: ✅ "['March', 'July']" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Bachelor of Arts and Science Fee: ✅ '43500' [regex conf=1.00] IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '3.0' [regex conf=0.75] Intake: ✅ "['March', 'July']" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Bachelor of Arts Fee: ✅ '35500' [regex conf=1.00] IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '3.0' [regex conf=0.75] Intake: ✅ "['March', 'July']" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.70]
+[GEMINI] https://www.flinders.edu.au/study/courses/bachelor-accountin → classification_only cat='?' (cost=$0.000044)
+[VISION] 3 candidate image(s) found — starting OCR pass
+[GEMINI] https://www.flinders.edu.au/study/courses/bachelor-arts-scie → classification_only cat='?' (cost=$0.000044)
+[GEMINI] https://www.flinders.edu.au/study/courses/bachelor-archaeolo → classification_only cat='?' (cost=$0.000043)
+[VISION] 6 candidate image(s) found — starting OCR pass
+[VISION] 6 candidate image(s) found — starting OCR pass
+[GEMINI] https://www.flinders.edu.au/study/courses/bachelor-arts → classification_only cat='?' (cost=$0.000042)
+[VISION] 6 candidate image(s) found — starting OCR pass
+[VISION FAIL] https://www.flinders.edu.au/study/courses/bachelor-arts/_jcr_content/c: Gemini skipped — None (likely quota exhausted)
+[per-course vision img 3/3] https://www.flinders.edu.au/study/courses/bachelor-accounting — IELTS=6.5 PTE=59.0 TOEFL=85.0 CAE=—
+[FALLBACK] AI enriching https://www.flinders.edu.au/study/courses/bachelor-accounting (missing: domestic_fee, duration_text, intake_text, location_text)
+[VISION FAIL] https://www.flinders.edu.au/study/courses/bachelor-archaeology/_jcr_co: Gemini skipped — None (likely quota exhausted)
+[FALLBACK] AI filled 3 field(s) on https://www.flinders.edu.au/study/courses/bachelor-accounting: fee_currency, duration_value, duration_unit
+[FIELD TRACE] study_mode='On Campus' location='Bedford Park, City' method=study_mode:rule url=https://www.flinders.edu.au/study/courses/bachelor-accounting
+[CATEGORY det] Bachelor of Accounting → Business & Management / Accounting
+✅ [PASS 100/100] Bachelor of Accounting | bachelor-accounting
+[VISION FAIL] https://www.flinders.edu.au/study/courses/bachelor-arts/_jcr_content/c: Gemini skipped — None (likely quota exhausted)
+[EXTRACT] 11/388: Bachelor of Business
+Fetching 11/388: Bachelor of Business
+[FIELD SUMMARY] Bachelor of Business Fee: ✅ '39000' [regex conf=1.00] IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '3.0' [regex conf=0.75] Intake: ✅ "['March', 'July']" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[GEMINI] https://www.flinders.edu.au/study/courses/bachelor-business → classification_only cat='?' (cost=$0.000043)
+[VISION] 6 candidate image(s) found — starting OCR pass
+[per-course vision img 6/6] https://www.flinders.edu.au/study/courses/bachelor-arts-science — IELTS=7.0 PTE=65.0 TOEFL=90.0 CAE=—
+[FALLBACK] AI enriching https://www.flinders.edu.au/study/courses/bachelor-arts-science (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.flinders.edu.au/study/courses/bachelor-arts-science: fee_currency, duration_value, duration_unit
+[FIELD TRACE] study_mode='Online' location='Bedford Park' method=study_mode:rule url=https://www.flinders.edu.au/study/courses/bachelor-arts-science
+✅ [PASS 100/100] Bachelor of Arts and Science | bachelor-arts-science
+[per-course vision img 6/6] https://www.flinders.edu.au/study/courses/bachelor-arts — IELTS=6.5 PTE=58.0 TOEFL=85.0 CAE=—
+[FALLBACK] AI enriching https://www.flinders.edu.au/study/courses/bachelor-arts (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT] 12/388: Bachelor of Business (Online)
+Fetching 12/388: Bachelor of Business (Online)
+[DOMESTIC ONLY] https://www.flinders.edu.au/online/courses/bachelor-business — course page states domestic-students-only; skipping
+[EXTRACT] 13/388: Bachelor of Business Analytics
+Fetching 13/388: Bachelor of Business Analytics
+[per-course vision img 6/6] https://www.flinders.edu.au/study/courses/bachelor-archaeology — IELTS=7.0 PTE=— TOEFL=90.0 CAE=—
+[FALLBACK] AI enriching https://www.flinders.edu.au/study/courses/bachelor-archaeology (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.flinders.edu.au/study/courses/bachelor-arts: fee_currency, duration_value, duration_unit
+[FIELD TRACE] study_mode='Online' location='Bedford Park' method=study_mode:rule url=https://www.flinders.edu.au/study/courses/bachelor-arts
+✅ [PASS 100/100] Bachelor of Arts | bachelor-arts
+[EXTRACT] 14/388: Bachelor of Business majoring in Event Management and Tourism
+Fetching 14/388: Bachelor of Business majoring in Event Management and Tourism
+[FIELD SUMMARY] Bachelor of Business Majoring in Event Management Fee: ✅ '39000' [regex conf=1.00] IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '3.0' [regex conf=0.75] Intake: ✅ "['March', 'July']" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[FALLBACK] AI filled 3 field(s) on https://www.flinders.edu.au/study/courses/bachelor-archaeology: fee_currency, duration_value, duration_unit
+[VISION FAIL] https://www.flinders.edu.au/study/courses/bachelor-business/_jcr_conte: Gemini skipped — None (likely quota exhausted)
+[FIELD TRACE] study_mode='On Campus' location='Bedford Park' method=study_mode:rule url=https://www.flinders.edu.au/study/courses/bachelor-archaeology
+✅ [PASS 100/100] Bachelor of Archaeology | bachelor-archaeology
+[EXTRACT] 15/388: Bachelor of Business majoring in Human Resource Management
+Fetching 15/388: Bachelor of Business majoring in Human Resource Management
+[FIELD SUMMARY] Bachelor of Business Majoring in Human Resource Ma Fee: ✅ '39000' [regex conf=1.00] IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '3.0' [regex conf=0.75] Intake: ✅ "['March', 'July']" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[GEMINI] https://www.flinders.edu.au/study/courses/bachelor-business/ → classification_only cat='?' (cost=$0.000046)
+[FIELD SUMMARY] Bachelor of Business Analytics Fee: ✅ '39000' [regex conf=1.00] IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '3.0' [regex conf=0.75] Intake: ✅ "['March', 'July']" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.70]
+[VISION] 5 candidate image(s) found — starting OCR pass
+[GEMINI] https://www.flinders.edu.au/study/courses/bachelor-business/ → classification_only cat='?' (cost=$0.000044)
+[GEMINI] https://www.flinders.edu.au/study/courses/bachelor-business- → classification_only cat='?' (cost=$0.000044)
+[VISION] 6 candidate image(s) found — starting OCR pass
+[VISION] 3 candidate image(s) found — starting OCR pass
+[per-course vision img 6/6] https://www.flinders.edu.au/study/courses/bachelor-business — IELTS=7.0 PTE=— TOEFL=90.0 CAE=—
+[FALLBACK] AI enriching https://www.flinders.edu.au/study/courses/bachelor-business (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.flinders.edu.au/study/courses/bachelor-business: fee_currency, duration_value, duration_unit
+[per-course vision img 3/3] https://www.flinders.edu.au/study/courses/bachelor-business-analytics — IELTS=6.5 PTE=60.0 TOEFL=80.0 CAE=—
+[FIELD TRACE] study_mode='On Campus' location='Bedford Park, City' method=study_mode:rule url=https://www.flinders.edu.au/study/courses/bachelor-business
+[FALLBACK] AI enriching https://www.flinders.edu.au/study/courses/bachelor-business-analytics (missing: domestic_fee, duration_text, intake_text, location_text)
+✅ [PASS 100/100] Bachelor of Business | bachelor-business
+[EXTRACT] 16/388: Bachelor of Business majoring in International Business
+Fetching 16/388: Bachelor of Business majoring in International Business
+[VISION FAIL] https://www.flinders.edu.au/study/courses/bachelor-business/human-reso: Gemini skipped — None (likely quota exhausted)
+[FIELD SUMMARY] Bachelor of Business Majoring in International Bus Fee: ✅ '39000' [regex conf=1.00] IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '3.0' [regex conf=0.75] Intake: ✅ "['March', 'July']" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[FALLBACK] AI filled 3 field(s) on https://www.flinders.edu.au/study/courses/bachelor-business-analytics: fee_currency, duration_value, duration_unit
+[FIELD TRACE] study_mode='Online' location='Melbourne, Adelaide, Australia' method=study_mode:rule url=https://www.flinders.edu.au/study/courses/bachelor-business-analytics
+[CATEGORY det] Bachelor of Business Analytics → Business & Management / Business Analytics
+✅ [PASS 100/100] Bachelor of Business Analytics | bachelor-business-analytics
+[EXTRACT] 17/388: Bachelor of Business majoring in Leading Change
+Fetching 17/388: Bachelor of Business majoring in Leading Change
+[FIELD SUMMARY] Bachelor of Business Majoring in Leading Change Fee: ✅ '39000' [regex conf=1.00] IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '3.0' [regex conf=0.75] Intake: ✅ "['March', 'July']" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[GEMINI] https://www.flinders.edu.au/study/courses/bachelor-business/ → classification_only cat='?' (cost=$0.000044)
+[VISION] 6 candidate image(s) found — starting OCR pass
+[GEMINI] https://www.flinders.edu.au/study/courses/bachelor-business/ → classification_only cat='?' (cost=$0.000046)
+[VISION] 2 candidate image(s) found — starting OCR pass
+[per-course vision img 5/5] https://www.flinders.edu.au/study/courses/bachelor-business/event-management-tourism — IELTS=7.0 PTE=— TOEFL=100.0 CAE=—
+[FALLBACK] AI enriching https://www.flinders.edu.au/study/courses/bachelor-business/event-management-tourism (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.flinders.edu.au/study/courses/bachelor-business/event-management-tourism: fee_currency, duration_value, duration_unit
+[FIELD TRACE] study_mode='On Campus' location='Bedford Park, City' method=study_mode:rule url=https://www.flinders.edu.au/study/courses/bachelor-business/event-management-tourism
+[CATEGORY det] Bachelor of Business Majoring in Event M → Hospitality, Tourism & Events / Tourism Management
+✅ [PASS 100/100] Bachelor of Business Majoring in Event Management | event-management-tourism
+[EXTRACT] 18/388: Bachelor of Business majoring in Management
+Fetching 18/388: Bachelor of Business majoring in Management
+[FIELD SUMMARY] Bachelor of Business Majoring in Management Fee: ✅ '39000' [regex conf=1.00] IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '3.0' [regex conf=0.75] Intake: ✅ "['March', 'July']" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[GEMINI] https://www.flinders.edu.au/study/courses/bachelor-business/ → classification_only cat='?' (cost=$0.000043)
+[VISION] 2 candidate image(s) found — starting OCR pass
+[per-course vision img 2/2] https://www.flinders.edu.au/study/courses/bachelor-business/leading-change — IELTS=6.5 PTE=— TOEFL=79.0 CAE=—
+[FALLBACK] AI enriching https://www.flinders.edu.au/study/courses/bachelor-business/leading-change (missing: domestic_fee, duration_text, intake_text, location_text)
+[VISION FAIL] https://www.flinders.edu.au/study/courses/bachelor-business/human-reso: Gemini skipped — None (likely quota exhausted)
+[per-course vision img 6/6] https://www.flinders.edu.au/study/courses/bachelor-business/human-resource-management — IELTS=7.0 PTE=— TOEFL=100.0 CAE=—
+[FALLBACK] AI enriching https://www.flinders.edu.au/study/courses/bachelor-business/human-resource-management (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.flinders.edu.au/study/courses/bachelor-business/leading-change: fee_currency, duration_value, duration_unit
+[FIELD TRACE] study_mode='On Campus' location='Bedford Park, City' method=study_mode:rule url=https://www.flinders.edu.au/study/courses/bachelor-business/leading-change
+✅ [PASS 100/100] Bachelor of Business Majoring in Leading Change | leading-change
+[VISION FAIL] https://www.flinders.edu.au/study/courses/bachelor-business/internatio: Gemini skipped — None (likely quota exhausted)
+[EXTRACT] 19/388: Bachelor of Business majoring in Marketing
+Fetching 19/388: Bachelor of Business majoring in Marketing
+[FIELD SUMMARY] Bachelor of Business Majoring in Marketing Fee: ✅ '39000' [regex conf=1.00] IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '3.0' [regex conf=0.75] Intake: ✅ "['March', 'July']" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[FALLBACK] AI filled 3 field(s) on https://www.flinders.edu.au/study/courses/bachelor-business/human-resource-management: fee_currency, duration_value, duration_unit
+[FIELD TRACE] study_mode='On Campus' location='Bedford Park, City' method=study_mode:rule url=https://www.flinders.edu.au/study/courses/bachelor-business/human-resource-management
+[CATEGORY det] Bachelor of Business Majoring in Human R → Business & Management / Human Resources
+✅ [PASS 100/100] Bachelor of Business Majoring in Human Resource Ma | human-resource-management
+[EXTRACT] 20/388: Bachelor of Business majoring in Small Business Leadership
+Fetching 20/388: Bachelor of Business majoring in Small Business Leadership
+[GEMINI] https://www.flinders.edu.au/study/courses/bachelor-business/ → classification_only cat='?' (cost=$0.000044)
+[VISION] 1 candidate image(s) found — starting OCR pass
+[VISION FAIL] https://www.flinders.edu.au/study/courses/bachelor-business/internatio: Gemini skipped — None (likely quota exhausted)
+[per-course vision img 2/2] https://www.flinders.edu.au/study/courses/bachelor-business/management — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.flinders.edu.au/study/courses/bachelor-business/management (missing: domestic_fee, duration_text, intake_text, location_text)
+[per-course vision img 1/1] https://www.flinders.edu.au/study/courses/bachelor-business/marketing — IELTS=6.5 PTE=62.0 TOEFL=80.0 CAE=—
+[FALLBACK] AI enriching https://www.flinders.edu.au/study/courses/bachelor-business/marketing (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.flinders.edu.au/study/courses/bachelor-business/management: fee_currency, duration_value, duration_unit
+[FIELD TRACE] study_mode='On Campus' location='Bedford Park, City' method=study_mode:rule url=https://www.flinders.edu.au/study/courses/bachelor-business/management
+✅ [PASS 100/100] Bachelor of Business Majoring in Management | management
+[EXTRACT] 21/388: Bachelor of Business majoring in Sports Management
+Fetching 21/388: Bachelor of Business majoring in Sports Management
+[FALLBACK] AI filled 3 field(s) on https://www.flinders.edu.au/study/courses/bachelor-business/marketing: fee_currency, duration_value, duration_unit
+[FIELD TRACE] study_mode='On Campus' location='Bedford Park, City' method=study_mode:rule url=https://www.flinders.edu.au/study/courses/bachelor-business/marketing
+[CATEGORY det] Bachelor of Business Majoring in Marketi → Business & Management / Marketing
+[VISION FAIL] https://www.flinders.edu.au/study/courses/bachelor-business/internatio: Gemini skipped — None (likely quota exhausted)
+✅ [PASS 100/100] Bachelor of Business Majoring in Marketing | marketing
+[per-course vision img 6/6] https://www.flinders.edu.au/study/courses/bachelor-business/international-business — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT] 22/388: Bachelor of Clinical Sciences, Doctor of Medicine
+[FALLBACK] AI enriching https://www.flinders.edu.au/study/courses/bachelor-business/international-business (missing: domestic_fee, duration_text, intake_text, location_text)
+Fetching 22/388: Bachelor of Clinical Sciences, Doctor of Medicine
+[FALLBACK] AI filled 3 field(s) on https://www.flinders.edu.au/study/courses/bachelor-business/international-business: fee_currency, duration_value, duration_unit
+[FIELD TRACE] study_mode='On Campus' location='Bedford Park, City' method=study_mode:rule url=https://www.flinders.edu.au/study/courses/bachelor-business/international-business
+[CATEGORY det] Bachelor of Business Majoring in Interna → Business & Management / International Business
+✅ [PASS 100/100] Bachelor of Business Majoring in International Bus | international-business
+[EXTRACT] 23/388: Bachelor of Commerce
+Fetching 23/388: Bachelor of Commerce
+[FIELD SUMMARY] Bachelor of Clinical Sciences / Doctor of Medicine Fee: ✅ '52300' [regex conf=1.00] IELTS: ✅ '7.0' [regex conf=0.85] Duration: ✅ '6.0' [regex conf=0.75] Intake: ✅ "['February', 'March']" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Bachelor of Business Majoring in Sports Management Fee: ✅ '39000' [regex conf=1.00] IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '3.0' [regex conf=0.75] Intake: ✅ "['March', 'July']" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Bachelor of Business Majoring in Small Business Le Fee: ✅ '39000' [regex conf=1.00] IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '3.0' [regex conf=0.75] Intake: ✅ "['March', 'July']" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Bachelor of Commerce Fee: ✅ '39000' [regex conf=1.00] IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '3.0' [regex conf=0.75] Intake: ✅ "['March', 'July']" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[GEMINI] https://www.flinders.edu.au/study/courses/bachelor-clinical- → classification_only cat='?' (cost=$0.000043)
+[VISION] 6 candidate image(s) found — starting OCR pass
+[GEMINI] https://www.flinders.edu.au/study/courses/bachelor-commerce → classification_only cat='?' (cost=$0.000043)
+[GEMINI] https://www.flinders.edu.au/study/courses/bachelor-business/ → classification_only cat='?' (cost=$0.000044)
+[VISION] 4 candidate image(s) found — starting OCR pass
+[VISION] 4 candidate image(s) found — starting OCR pass
+[GEMINI] https://www.flinders.edu.au/study/courses/bachelor-business/ → classification_only cat='Business & Management' (cost=$0.000044)
+[VISION] 2 candidate image(s) found — starting OCR pass
+[VISION FAIL] https://www.flinders.edu.au/study/courses/bachelor-business/sports-man: Gemini skipped — None (likely quota exhausted)
+[per-course vision img 4/4] https://www.flinders.edu.au/study/courses/bachelor-business/sports-management — IELTS=6.5 PTE=— TOEFL=79.0 CAE=—
+[FALLBACK] AI enriching https://www.flinders.edu.au/study/courses/bachelor-business/sports-management (missing: domestic_fee, duration_text, intake_text, location_text)
+[per-course vision img 4/4] https://www.flinders.edu.au/study/courses/bachelor-commerce — IELTS=6.5 PTE=— TOEFL=80.0 CAE=—
+[FALLBACK] AI enriching https://www.flinders.edu.au/study/courses/bachelor-commerce (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.flinders.edu.au/study/courses/bachelor-commerce: fee_currency, duration_value, duration_unit
+[FIELD TRACE] study_mode='On Campus' location='Bedford Park, City' method=study_mode:rule url=https://www.flinders.edu.au/study/courses/bachelor-commerce
+✅ [PASS 100/100] Bachelor of Commerce | bachelor-commerce
+[EXTRACT] 24/388: Bachelor of Computer Science
+Fetching 24/388: Bachelor of Computer Science
+[FALLBACK] AI filled 3 field(s) on https://www.flinders.edu.au/study/courses/bachelor-business/sports-management: fee_currency, duration_value, duration_unit
+[FIELD TRACE] study_mode='On Campus' location='Bedford Park, City' method=study_mode:rule url=https://www.flinders.edu.au/study/courses/bachelor-business/sports-management
+✅ [PASS 100/100] Bachelor of Business Majoring in Sports Management | sports-management
+[EXTRACT] 25/388: Bachelor of Computer Science (Artificial Intelligence)
+Fetching 25/388: Bachelor of Computer Science (Artificial Intelligence)
+[per-course vision img 2/2] https://www.flinders.edu.au/study/courses/bachelor-business/small-business-leadership — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.flinders.edu.au/study/courses/bachelor-business/small-business-leadership (missing: domestic_fee, duration_text, intake_text, location_text)
+[FIELD SUMMARY] Bachelor of Computer Science Fee: ✅ '43600' [regex conf=1.00] IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '3.0' [regex conf=0.75] Intake: ✅ "['March', 'July', 'October']" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.70]
+[FALLBACK] AI filled 3 field(s) on https://www.flinders.edu.au/study/courses/bachelor-business/small-business-leadership: fee_currency, duration_value, duration_unit
+[FIELD SUMMARY] Bachelor of Computer Science (Artificial Intellige Fee: ✅ '43600' [regex conf=1.00] IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '3.0' [regex conf=0.75] Intake: ✅ "['March', 'July']" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.70]
+[FIELD TRACE] study_mode='On Campus' location='Bedford Park, City' method=study_mode:rule url=https://www.flinders.edu.au/study/courses/bachelor-business/small-business-leadership
+✅ [PASS 100/100] Bachelor of Business Majoring in Small Business Le | small-business-leadership
+[EXTRACT] 26/388: Bachelor of Computing and Mathematical Sciences (Honours)
+Fetching 26/388: Bachelor of Computing and Mathematical Sciences (Honours)
+[GEMINI] https://www.flinders.edu.au/study/courses/bachelor-computer- → classification_only cat='?' (cost=$0.000043)
+[VISION] 6 candidate image(s) found — starting OCR pass
+[GEMINI] https://www.flinders.edu.au/study/courses/bachelor-computer- → classification_only cat='?' (cost=$0.000045)
+[VISION] 5 candidate image(s) found — starting OCR pass
+[FIELD SUMMARY] Bachelor of Computing and Mathematical Sciences (H Fee: ✅ '43500' [regex conf=1.00] IELTS: ❌ not found Duration: ✅ '3.0' [regex conf=0.75] Intake: ✅ "['May']" [regex conf=0.40] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[per-course vision img 6/6] https://www.flinders.edu.au/study/courses/bachelor-clinical-sciences-doctor-medicine — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.flinders.edu.au/study/courses/bachelor-clinical-sciences-doctor-medicine (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.flinders.edu.au/study/courses/bachelor-clinical-sciences-doctor-medicine: fee_currency, duration_value, duration_unit
+[FIELD TRACE] study_mode='Online' location='Bedford Park' method=study_mode:rule url=https://www.flinders.edu.au/study/courses/bachelor-clinical-sciences-doctor-medicine
+✅ [PASS 100/100] Bachelor of Clinical Sciences / Doctor of Medicine | bachelor-clinical-sciences-doctor-medici
+[GP-DEBUG] static=552912B rendered=0B using=static text_len=102
+[EXTRACT] 27/388: Bachelor of Creative Arts (Costume Design)
+[GP-DEBUG] text[:500]='Key information. Delivery mode In person (Tonsley or City Campus) Annual fees $7,136 About these fees.'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": 7136,\n "fee_term": "Annual",\n "duration_value": null,\n "duration_unit": null,\n "duration_text": null,\n "ielts_overall": null,\n "pte_overall": null,\n "toefl_overall": null,\n "cambridge_overall": null,\n "duolingo_overall": null,\n "sub_category": "Computing and Mathematical Sciences",\n "category": "Computer Science & IT",\n "mode": "'
+Fetching 27/388: Bachelor of Creative Arts (Costume Design)
+[GEMINI] https://www.flinders.edu.au/study/courses/bachelor-computing → 6 field(s) (cost=$0.000147, in=1470 out=121)
+[per-course browser ↻] https://www.flinders.edu.au/study/courses/bachelor-computing-mathematical-sciences-honours
+[FIELD SUMMARY] Bachelor of Creative Arts (Costume Design) Fee: ✅ '35500' [regex conf=1.00] IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '3.0' [regex conf=0.75] Intake: ✅ "['February', 'July']" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.70]
+[per-course browser ✓] https://www.flinders.edu.au/study/courses/bachelor-computing-mathematical-sciences-honours — IELTS=— PTE=— TOEFL=— CAE=— fee=43500 filled=[]
+[VISION] 6 candidate image(s) found — starting OCR pass
+[GEMINI] https://www.flinders.edu.au/study/courses/bachelor-creative- → classification_only cat='?' (cost=$0.000043)
+[VISION] 4 candidate image(s) found — starting OCR pass
+[VISION FAIL] https://www.flinders.edu.au/study/courses/bachelor-computer-science/_j: Gemini skipped — 503 UNAVAILABLE. {'error': {'code': 503, 'message': 'This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.', 'status': 'UNAVAILABLE'}} (likely quota exhausted)
+[VISION FAIL] https://www.flinders.edu.au/content/dam/images/chass/course-simplifica: Gemini skipped — None (likely quota exhausted)
+[per-course vision img 5/5] https://www.flinders.edu.au/study/courses/bachelor-computer-science-artificial-intelligence — IELTS=6.5 PTE=58.0 TOEFL=80.0 CAE=—
+[FALLBACK] AI enriching https://www.flinders.edu.au/study/courses/bachelor-computer-science-artificial-intelligence (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.flinders.edu.au/study/courses/bachelor-computer-science-artificial-intelligence: fee_currency, duration_value, duration_unit
+[FIELD TRACE] study_mode='Online' location='Tonsley, City' method=study_mode:rule url=https://www.flinders.edu.au/study/courses/bachelor-computer-science-artificial-intelligence
+[CATEGORY det] Bachelor of Computer Science (Artificial → Computer Science & IT / Artificial Intelligence
+✅ [PASS 100/100] Bachelor of Computer Science (Artificial Intellige | bachelor-computer-science-artificial-int
+[EXTRACT] 28/388: Bachelor of Creative Arts (Dance)
+Fetching 28/388: Bachelor of Creative Arts (Dance)
+[DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-creative-arts-dance — course page states domestic-students-only; skipping
+[EXTRACT] 29/388: Bachelor of Creative Arts (Fashion)
+Fetching 29/388: Bachelor of Creative Arts (Fashion)
+[VISION FAIL] https://www.flinders.edu.au/study/courses/bachelor-computer-science/_j: Gemini skipped — None (likely quota exhausted)
+[per-course vision img 6/6] https://www.flinders.edu.au/study/courses/bachelor-computer-science — IELTS=7.0 PTE=— TOEFL=90.0 CAE=—
+[FALLBACK] AI enriching https://www.flinders.edu.au/study/courses/bachelor-computer-science (missing: domestic_fee, duration_text, intake_text, location_text)
+[per-course vision img 5/6 (cache hits 1)] https://www.flinders.edu.au/study/courses/bachelor-computing-mathematical-sciences-honours — IELTS=6.5 PTE=— TOEFL=80.0 CAE=—
+[FALLBACK] AI enriching https://www.flinders.edu.au/study/courses/bachelor-computing-mathematical-sciences-honours (missing: duration_text, intake_text)
+[FALLBACK] AI filled 3 field(s) on https://www.flinders.edu.au/study/courses/bachelor-computer-science: fee_currency, duration_value, duration_unit
+[FIELD TRACE] study_mode='Online' location='Tonsley, City' method=study_mode:rule url=https://www.flinders.edu.au/study/courses/bachelor-computer-science
+✅ [PASS 100/100] Bachelor of Computer Science | bachelor-computer-science
+[FIELD SUMMARY] Bachelor of Creative Arts (Fashion) Fee: ✅ '35500' [regex conf=1.00] IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '3.0' [regex conf=0.75] Intake: ✅ "['February', 'July']" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.70]
+[FALLBACK] AI filled 3 field(s) on https://www.flinders.edu.au/study/courses/bachelor-computing-mathematical-sciences-honours: fee_currency, duration_value, duration_unit
+[EXTRACT] 30/388: Bachelor of Creative Arts (Interior Design)
+[FIELD TRACE] study_mode='On Campus' location='Adelaide, Australia' method=study_mode:rule url=https://www.flinders.edu.au/study/courses/bachelor-computing-mathematical-sciences-honours
+Fetching 30/388: Bachelor of Creative Arts (Interior Design)
+✅ [PASS 100/100] Bachelor of Computing and Mathematical Sciences (H | bachelor-computing-mathematical-sciences
+[EXTRACT] 31/388: Bachelor of Creative Arts (Visual Arts)
+Fetching 31/388: Bachelor of Creative Arts (Visual Arts)
+[GEMINI] https://www.flinders.edu.au/study/courses/bachelor-creative- → classification_only cat='?' (cost=$0.000043)
+[VISION] 4 candidate image(s) found — starting OCR pass
+[DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-creative-arts-interior-design — course page states domestic-students-only; skipping
+[EXTRACT] 32/388: Bachelor of Creative Writing
+Fetching 32/388: Bachelor of Creative Writing
+[DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-creative-arts-visual-arts — course page states domestic-students-only; skipping
+[EXTRACT] 33/388: Bachelor of Criminology
+Fetching 33/388: Bachelor of Criminology
+[VISION FAIL] https://www.flinders.edu.au/study/courses/bachelor-creative-arts-fashi: Gemini skipped — None (likely quota exhausted)
+[per-course vision img 4/4] https://www.flinders.edu.au/study/courses/bachelor-creative-arts-costume-design — IELTS=7.0 PTE=65.0 TOEFL=95.0 CAE=—
+[FALLBACK] AI enriching https://www.flinders.edu.au/study/courses/bachelor-creative-arts-costume-design (missing: domestic_fee, duration_text, intake_text, location_text)
+[FIELD SUMMARY] Bachelor of Creative Writing Fee: ✅ '35500' [regex conf=1.00] IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '3.0' [regex conf=0.75] Intake: ✅ "['March', 'July']" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.70]
+[FALLBACK] AI filled 3 field(s) on https://www.flinders.edu.au/study/courses/bachelor-creative-arts-costume-design: fee_currency, duration_value, duration_unit
+[FIELD TRACE] study_mode='Online' location='Adelaide CBD' method=study_mode:rule url=https://www.flinders.edu.au/study/courses/bachelor-creative-arts-costume-design
+✅ [PASS 100/100] Bachelor of Creative Arts (Costume Design) | bachelor-creative-arts-costume-design
+[EXTRACT] 34/388: Bachelor of Criminology (Honours)
+Fetching 34/388: Bachelor of Criminology (Honours)
+[GEMINI] https://www.flinders.edu.au/study/courses/bachelor-creative- → classification_only cat='?' (cost=$0.000043)
+[VISION] 6 candidate image(s) found — starting OCR pass
+[FIELD SUMMARY] Bachelor of Criminology Fee: ✅ '36300' [regex conf=1.00] IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '3.0' [regex conf=0.75] Intake: ✅ "['March', 'July']" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[VISION FAIL] https://www.flinders.edu.au/study/courses/bachelor-creative-arts-fashi: Gemini skipped — None (likely quota exhausted)
+[FIELD SUMMARY] Bachelor of Criminology (Honours) Fee: ✅ '36300' [regex conf=1.00] IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '4.0' [regex conf=0.75] Intake: ✅ "['March', 'July']" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.70]
+[GEMINI] https://www.flinders.edu.au/study/courses/bachelor-criminolo → classification_only cat='?' (cost=$0.000042)
+[GEMINI] https://www.flinders.edu.au/study/courses/bachelor-criminolo → classification_only cat='?' (cost=$0.000042)
+[VISION] 6 candidate image(s) found — starting OCR pass
+[VISION] 6 candidate image(s) found — starting OCR pass
+[per-course vision img 4/4] https://www.flinders.edu.au/study/courses/bachelor-creative-arts-fashion — IELTS=7.0 PTE=— TOEFL=100.0 CAE=—
+[FALLBACK] AI enriching https://www.flinders.edu.au/study/courses/bachelor-creative-arts-fashion (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.flinders.edu.au/study/courses/bachelor-creative-arts-fashion: fee_currency, duration_value, duration_unit
+[FIELD TRACE] study_mode='Online' location='Adelaide CBD' method=study_mode:rule url=https://www.flinders.edu.au/study/courses/bachelor-creative-arts-fashion
+✅ [PASS 100/100] Bachelor of Creative Arts (Fashion) | bachelor-creative-arts-fashion
+[EXTRACT] 35/388: Bachelor of Disability and Community Inclusion
+Fetching 35/388: Bachelor of Disability and Community Inclusion
+[per-course vision img 2/6 (cache hits 4)] https://www.flinders.edu.au/study/courses/bachelor-criminology-honours — IELTS=6.5 PTE=58.0 TOEFL=70.0 CAE=—
+[FALLBACK] AI enriching https://www.flinders.edu.au/study/courses/bachelor-criminology-honours (missing: domestic_fee, duration_text, intake_text, location_text)
+[FIELD SUMMARY] Bachelor of Disability and Community Inclusion Fee: ✅ '46700' [regex conf=1.00] IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '3.0' [regex conf=0.75] Intake: ✅ "['March', 'July']" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[FALLBACK] AI filled 3 field(s) on https://www.flinders.edu.au/study/courses/bachelor-criminology-honours: fee_currency, duration_value, duration_unit
+[FIELD TRACE] study_mode='Online' location='Bedford Park, City' method=study_mode:rule url=https://www.flinders.edu.au/study/courses/bachelor-criminology-honours
+[CATEGORY det] Bachelor of Criminology (Honours) → Law & Legal Studies / Criminal Justice
+✅ [PASS 100/100] Bachelor of Criminology (Honours) | bachelor-criminology-honours
+[EXTRACT] 36/388: Bachelor of Disability and Developmental Education
+Fetching 36/388: Bachelor of Disability and Developmental Education
+[GEMINI] https://www.flinders.edu.au/study/courses/bachelor-disabilit → classification_only cat='?' (cost=$0.000043)
+[VISION] 4 candidate image(s) found — starting OCR pass
+[VISION FAIL] https://www.flinders.edu.au/study/courses/bachelor-creative-writing/_j: Gemini skipped — None (likely quota exhausted)
