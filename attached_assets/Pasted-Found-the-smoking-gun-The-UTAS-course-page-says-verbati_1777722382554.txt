@@ -1,0 +1,67 @@
+Found the smoking gun. The UTAS course page says, verbatim:
+
+"This course may not be available to international students."
+
+That phrase doesn't match any of our _DOMESTIC_ONLY_RE arms. None. Not the Counselling-style "not available to international students" arm (which requires definite "not available"), not the Torrens "begin your application as a domestic student" arm we just shipped, none of them.
+This explains both problems you saw on the dashboard:
+Problem 1 — domestic-only courses still showing: The dashboard you screenshotted is the UTAS dashboard (uni 5), not Torrens (uni 22). All 14+ courses listed are UTAS double-degree courses (93A, 93B, 93C, 93D, 93E, 93F, 93G, 93I, 93J, 93K, 93L) plus other UTAS courses. They use this softer "may not be available to international students" wording, the filter doesn't catch it, they get staged, they show in the dashboard. Torrens fix didn't apply because UTAS uses a different phrase, and we never re-checked UTAS after the Torrens fix shipped.
+Problem 2 — "all courses are missing" (data): Look at the dashboard data. International fees range from A$9,420 to A$82,450, IELTS is 6 or 6.5 or 7 or 7.5, durations are 1 Semester / 4 Year / 5 Year / 4 Month — these are landing page aggregates from the double-degree component pages, not actual international international-student fees. UTAS publishes domestic course info on these pages (international students aren't even eligible) and our extractor is capturing whatever fee/IELTS/duration appears in the text without distinguishing domestic vs international. A 1-semester duration on a 5-year double-degree is the giveaway. A$9,420/Annual on a 5-year combined Arts+Laws degree is the giveaway. A$82,450/Full Course on a 5-year Doctor of Medicine is also wrong — Australian Medicine is typically A$70k–A$90k per year, not full course.
+Here's the message to send Replit:
+
+UTAS is leaking domestic-only courses through the filter — and the data on the staged rows is wrong because it's domestic-degree info, not international.
+The dashboard you have in front of you is uni 5 (UTAS), and ~30+ rows shouldn't have been staged at all. Confirmed by direct page fetch — UTAS course pages say:
+
+"This course may not be available to international students. Please see the list of distance courses (i.e. online and taken outside Australia) that are offered to international students"
+
+This phrase appears on (at minimum) every UTAS double-degree page I checked: 93A, 93B, 93C, 93D, 93E, 93F, 93G, 93I, 93J, 93K, 93L. Likely on more. It doesn't match any of the existing _DOMESTIC_ONLY_RE arms — including the Torrens "begin your application to study as a domestic student" arm we shipped in 7754b37, because the Torrens fix was for a different phrasing pattern.
+Fix: add a new arm to _DOMESTIC_ONLY_RE in single_course.py.
+Suggested regex (handles both "may not be available" and "is not available", plus the punctuation/whitespace/"Please see" follow-on which is the canonical UTAS structure):
+pythonr"(?:this\s+course\s+)?(?:may\s+not|is\s+not)\s+(?:be\s+)?available\s+to\s+international\s+students"
+Note this is narrower than the existing "not available to international students" arm (Counselling case) because that arm has stricter context anchoring. UTAS uses "may not" (softener) and that softener is what's defeating the existing arm. Don't relax the existing arm — add a new one with both modal forms explicitly listed.
+Smoke tests required (do all of these before push):
+python# Should match (UTAS double-degree page):
+"This course may not be available to international students. Please see..."
+
+# Should match (UTAS hard variant):
+"This course is not available to international students."
+
+# Should match (no leading "This course"):
+"may not be available to international students"
+
+# Must NOT match (a generic mention of international students elsewhere on page):
+"International students should contact the international office"
+"This course is available to international students"
+"may not be available in some semesters"
+Plus the existing 6 Torrens smoke tests must still pass.
+Don't promote anything from UTAS until this re-scrapes clean. The 30+ rows currently in scraped_courses for uni 5 with status='pending' need to be hard-rejected on next run. Existing live courses rows for UTAS need a separate decision — see below.
+Second problem on the same dashboard — the staged data is structurally wrong, not just present-when-it-shouldn't-be.
+These are domestic-only courses, so the data captured is domestic-student fee/IELTS/duration that was on the page for domestic applicants. Examples giving the game away:
+
+Bachelor of Arts and Bachelor of Science (93E) — staged as 4 Year duration, A$9,887/Annual international fee. UTAS international undergrad is typically A$30k–A$45k/year. A$9,887 is roughly the domestic Commonwealth-supported contribution rate, not international.
+Bachelor of Arts and Bachelor of Information and Communication Technology (93I) — staged as A$9,420/Annual. Same problem.
+Bachelor of Medical Science and Doctor of Medicine (H3x) — staged as A$82,450/Full Course for a 5-year course. International Medicine in Australia is ~A$80k–A$100k per year, not full course. This is total fee being captured as annual, or annual being labelled full-course.
+Bachelor of Science (P3o) — staged with duration "1 Semester". It's a 3-year degree. Pattern broke.
+Bachelor of Education (Primary) (43B) — staged with duration "4 Month". It's a 4-year degree.
+
+Even after the domestic-only filter fix removes these from staging entirely, this is a flag: wherever the extraction was getting fee/IELTS/duration values, it was getting them wrong. This means UTAS pages have multiple values per field (domestic vs international, on-campus vs distance, full-time vs part-time) and the extractor is grabbing the first match without disambiguating. Not an immediate priority for production because all these rows will now be filtered out, but worth logging — when we eventually onboard UTAS distance courses (which DO accept international students), the extractor will hit the same multi-value problem and grab wrong values.
+Verification steps before promote:
+
+Apply the regex fix + smoke tests pass + push.
+Re-scrape UTAS (uni 5).
+Confirm 0 rows for double-degree courses (93*, 63*) reach [STAGE] saved — they should all be [DOMESTIC ONLY] and skipped pre-stage.
+SQL spot-check on what's left:
+
+sql   SELECT COUNT(*) FROM scraped_courses 
+   WHERE university_id = 5 AND status IN ('pending','approved');
+Compare to current count. Should drop substantially.
+5. Grep celery log for the new arm firing:
+bash   sudo journalctl -u uni-celery --since '1 hour ago' \
+     | grep 'utas.edu.au.*DOMESTIC ONLY' | wc -l
+Should be 30+ if the fix works.
+Live courses table — separate question.
+UTAS uni 5 currently has 173 live rows in courses table. An unknown number of those are double-degree courses with the same domestic-only-but-staged problem and likely with wrong fee/duration data (the Bachelor of Nursing all-bands-6.5 that we discussed earlier might have been only one symptom of this). Don't touch the live courses table from this fix — it would mass-hide rows from production. Once the filter fix is verified on staging, run a separate diagnostic:
+sqlSELECT id, course_name, course_url, international_fee, duration_text
+FROM courses 
+WHERE university_id = 5 
+  AND course_url LIKE '%/93%-bachelor-of-%'
+   OR course_url LIKE '%/63%-bachelor-of-%';
