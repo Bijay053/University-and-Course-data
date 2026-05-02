@@ -32,6 +32,9 @@ log = logging.getLogger(__name__)
 _HARD_FIELDS: dict[str, str] = {
     "international_fee": (
         "International tuition fee (number in local currency, e.g. 34500 or 125970). "
+        "MUST come from the International section of the page (see CRITICAL rule above). "
+        "NEVER use a Commonwealth Supported Place / CSP / HECS-HELP fee here — "
+        "those are domestic fees. "
         "PRIORITY ORDER — use the first that applies: "
         "(1) 'Full course fee' or 'Total course fee' label → extract that total amount "
         "     and set fee_term='Full Course'. "
@@ -39,10 +42,13 @@ _HARD_FIELDS: dict[str, str] = {
         "(3) Per-semester/trimester only → multiply to annual equivalent. "
         "NEVER extract a 'First year fee' or '1st year fee' when a 'Full course fee' is "
         "also shown on the same page — the full-course total is always preferred. "
-        "Null if not explicitly stated on this page."
+        "Null if not explicitly stated in the International section."
     ),
     "domestic_fee": (
-        "Annual domestic/local tuition fee (number only). Null if not stated."
+        "Annual domestic/local tuition fee (number only). "
+        "MUST come from the Domestic section of the page (see CRITICAL rule above). "
+        "Commonwealth Supported Place / CSP / HECS fees belong here, not in international_fee. "
+        "Null if not stated."
     ),
     "fee_term": (
         "Fee payment period matching the fee you extracted. Pick EXACTLY one: "
@@ -157,6 +163,32 @@ Return ONLY a single JSON object with exactly the keys listed below.
 Use JSON null (not the string "null") when a value is not explicitly stated on
 the page.  Do NOT invent values.  Do NOT add extra keys.
 
+CRITICAL — DOMESTIC / INTERNATIONAL TAB STRUCTURE:
+Many Australian university pages show a "Domestic" section and an
+"International" section on the same page (often rendered as tabs labelled
+"Domestic students" and "International students", or "For domestic
+applicants" and "For international applicants").
+
+Rules you MUST follow when this structure is present:
+1. Extract international_fee ONLY from content explicitly labelled for
+   international students (e.g. text near "International students",
+   "International tuition fee", "International student fee",
+   "For international applicants", "Total Tuition Fee (international
+   students)", "Tuition fee based on a rate of $X per year").
+2. Extract domestic_fee ONLY from content labelled for domestic students
+   (e.g. "Domestic students", "Commonwealth Supported Place",
+   "CSP fee", "HECS-HELP", "Student Contribution Amount").
+3. NEVER put a Commonwealth Supported Place / CSP / HECS / domestic
+   contribution amount into international_fee.  These are always
+   domestic-only fees and are typically much lower ($5,000–$15,000/yr)
+   than the real international tuition ($25,000–$55,000/yr).
+4. Extract ielts_overall, pte_overall, toefl_overall, cambridge_overall,
+   duolingo_overall from the International section ONLY.  Domestic
+   admission requirements (GPA, ATAR, ATARs) must be ignored.
+5. If the page says both a "Total course fee (international)" and an
+   "Annual rate per year" for international students, prefer the annual
+   rate for international_fee and set fee_term='Annual'.
+
 Fields to extract:
 {fields_block}
 
@@ -225,6 +257,68 @@ def _safe_strip(element: Any, tags: list[str], *, class_frags: tuple[str, ...] =
             pass
 
 
+# Patterns to locate domestic / international tab panels inside the raw DOM.
+# Matched against the element's id and class attributes (lowercase, joined).
+# Covers UTAS (tabInternational / tabDomestic), ACU, and similarly structured
+# Australian university pages that share the same tab idiom.
+_INTL_PANEL_RE = re.compile(
+    r"\btab[-_]?international\b"
+    r"|\binternational[-_]?tab\b"
+    r"|\binternational[-_]?(content|panel|section|pane)\b"
+    r"|\b(content|panel|section|pane)[-_]?international\b",
+    re.IGNORECASE,
+)
+_DOM_PANEL_RE = re.compile(
+    r"\btab[-_]?domestic\b"
+    r"|\bdomestic[-_]?tab\b"
+    r"|\bdomestic[-_]?(content|panel|section|pane)\b"
+    r"|\b(content|panel|section|pane)[-_]?domestic\b",
+    re.IGNORECASE,
+)
+
+
+def _promote_international_panel(soup: Any) -> None:
+    """Move the international tab/panel element *before* the domestic one.
+
+    Australian university pages (UTAS, ACU, etc.) render a "Domestic" tab
+    first in the DOM.  When both panels are serialised to plain text the
+    domestic section — including CSP/HECS fees — appears before the
+    international section.  Gemini then reads the domestic fee first and
+    erroneously emits ``international_fee=null, domestic_fee=<CSP>``.
+
+    We locate both panels by id/class, then use BeautifulSoup's
+    ``insert_before`` to reorder them so the international content leads.
+    This is a no-op when neither panel is found (safe for any page layout).
+    """
+    try:
+        from bs4.element import Tag
+
+        intl_panel: Any = None
+        dom_panel: Any = None
+
+        for el in soup.find_all(True):
+            if not isinstance(el, Tag):
+                continue
+            el_id = (el.get("id") or "").lower()
+            el_cls = " ".join(el.get("class") or []).lower()
+            combined = f"{el_id} {el_cls}"
+            if intl_panel is None and _INTL_PANEL_RE.search(combined):
+                intl_panel = el
+            if dom_panel is None and _DOM_PANEL_RE.search(combined):
+                dom_panel = el
+            if intl_panel and dom_panel:
+                break
+
+        if (
+            intl_panel is not None
+            and dom_panel is not None
+            and intl_panel is not dom_panel
+        ):
+            dom_panel.insert_before(intl_panel.extract())
+    except Exception:
+        pass  # never break on reorder failure
+
+
 def _extract_content_html(html: str) -> str:
     """Return the HTML fragment most likely to contain course-specific content.
 
@@ -239,6 +333,10 @@ def _extract_content_html(html: str) -> str:
 
     Uses :func:`_safe_strip` (collect-then-remove) throughout to avoid the
     NoneType crash that silently aborted the previous implementation.
+
+    Also calls :func:`_promote_international_panel` before content extraction
+    so the international-section text always precedes the domestic-section text
+    in the string Gemini receives (fixes UTAS / ACU domestic-tab-first bug).
     """
     try:
         from bs4 import BeautifulSoup, Tag
@@ -251,6 +349,9 @@ def _extract_content_html(html: str) -> str:
                 tag.decompose()
             except Exception:
                 pass
+
+        # Promote international panel before domestic panel (UTAS / ACU fix).
+        _promote_international_panel(soup)
 
         # ── Path 1: <main> ────────────────────────────────────────────────
         main = soup.find("main")
