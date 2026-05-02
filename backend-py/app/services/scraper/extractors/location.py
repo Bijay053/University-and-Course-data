@@ -729,6 +729,26 @@ def _from_panel_divs(soup: BeautifulSoup) -> str | None:
         if nxt is None:
             continue
         val = compact(nxt.get_text(" ", strip=True))
+        # Guard: when the value div contains city names mixed with non-geographic
+        # text (e.g. UTAS "Hobart Legal Practice" where "Legal Practice" is the
+        # qualification area, not a campus) and no comma/slash separators are
+        # present (which would indicate an already-structured list), strip the
+        # non-city noise and keep only the recognised city names.
+        # Does NOT fire for "Hobart, Launceston" (commas → structured list, safe).
+        # Does NOT fire for "Cradle Coast, Hobart" (commas present).
+        if val and "," not in val and "/" not in val and "|" not in val:
+            _city_hits = [
+                c for c in _COMMON_CITIES
+                if re.search(rf"\b{re.escape(c)}\b", val, re.I)
+            ]
+            if _city_hits:
+                _remainder = val
+                for _c in _city_hits:
+                    _remainder = re.sub(rf"\b{re.escape(_c)}\b", "", _remainder, flags=re.I)
+                _remainder = _remainder.strip(" ,;/|").strip()
+                if _remainder:
+                    # Non-city content mixed in — keep only the clean city names.
+                    val = ", ".join(_city_hits)
         result = _classify_location_value(val)
         if result:
             return result
