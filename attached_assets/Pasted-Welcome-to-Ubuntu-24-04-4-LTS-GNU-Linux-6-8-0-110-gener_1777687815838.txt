@@ -1,0 +1,128 @@
+Welcome to Ubuntu 24.04.4 LTS (GNU/Linux 6.8.0-110-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/pro
+
+ System information as of Sat May  2 01:42:30 UTC 2026
+
+  System load:           0.0
+  Usage of /:            3.7% of 231.44GB
+  Memory usage:          33%
+  Swap usage:            0%
+  Processes:             239
+  Users logged in:       1
+  IPv4 address for eth0: 159.65.152.72
+  IPv4 address for eth0: 10.47.0.13
+  IPv6 address for eth0: 2400:6180:100:d0:0:1:3615:5001
+
+Expanded Security Maintenance for Applications is not enabled.
+
+17 updates can be applied immediately.
+To see these additional updates run: apt list --upgradable
+
+1 additional security update can be applied with ESM Apps.
+Learn more about enabling ESM Apps service at https://ubuntu.com/esm
+
+
+Last login: Fri May  1 14:38:25 2026 from 198.211.111.194
+root@university-and-course-data:~# # Same pull + restart from before applies to all three extractors in one go
+cd /root/University-and-Course-data && git pull
+systemctl restart uni-fastapi.service
+# Then trigger a fresh Torrens scrape from admin
+remote: Enumerating objects: 24, done.
+remote: Counting objects: 100% (24/24), done.
+remote: Compressing objects: 100% (16/16), done.
+remote: Total 16 (delta 14), reused 0 (delta 0), pack-reused 0 (from 0)
+Unpacking objects: 100% (16/16), 3.95 KiB | 578.00 KiB/s, done.
+From https://github.com/Bijay053/University-and-Course-data
+   33f6e43..a142729  main       -> origin/main
+Updating 33f6e43..a142729
+Fast-forward
+ backend-py/app/services/scraper/extractors/location.py   | 51 ++++++++++++++++++++++++++++++++++++++++++++++++++-
+ backend-py/app/services/scraper/extractors/study_mode.py | 45 ++++++++++++++++++++++++++++++---------------
+ 2 files changed, 80 insertions(+), 16 deletions(-)
+Failed to restart uni-fastapi.service: Unit uni-fastapi.service not found.
+root@university-and-course-data:~/University-and-Course-data# -- Check column type on prod
+SELECT column_name, data_type, numeric_precision, numeric_scale
+FROM information_schema.columns
+WHERE table_name='scraped_courses' AND column_name='duration';
+
+-- If it comes back as 'real' not 'numeric', re-run the migration manually:
+-- ALTER TABLE scraped_courses ALTER COLUMN duration TYPE NUMERIC(6,2) USING ROUND(duration::numeric, 2);
+
+-- Then check the values are clean:
+SELECT id, course_name, duration::text
+FROM scraped_courses WHERE university_id = 5  -- Torrens
+  AND course_name ILIKE '%Master of Cybersecurity%';
+--: command not found
+SELECT: command not found
+FROM: command not found
+WHERE: command not found
+--: command not found
+-bash: syntax error near unexpected token `('
+--: command not found
+SELECT: command not found
+FROM: command not found
+AND: command not found
+root@university-and-course-data:~/University-and-Course-data# # 1. Pull the remaining 3 commits
+cd /root/University-and-Course-data && git pull
+
+# 2. Find the correct FastAPI service name
+systemctl list-units --type=service | grep -iE "uni|fastapi|uvicorn|university"
+
+# 3. Once you see the name, restart it (replace <name> with what shows above)
+systemctl restart <name>
+remote: Enumerating objects: 28, done.
+remote: Counting objects: 100% (28/28), done.
+remote: Compressing objects: 100% (19/19), done.
+remote: Total 19 (delta 15), reused 0 (delta 0), pack-reused 0 (from 0)
+Unpacking objects: 100% (19/19), 5.04 KiB | 468.00 KiB/s, done.
+From https://github.com/Bijay053/University-and-Course-data
+   a142729..c441059  main       -> origin/main
+Updating a142729..c441059
+Fast-forward
+ backend-py/app/routers/reviews.py                    | 113 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-------
+ backend-py/app/routers/scrape.py                     |  18 +++++++++++++++--
+ backend-py/app/services/scraper/per_course_vision.py |  17 ++++++++++------
+ 3 files changed, 133 insertions(+), 15 deletions(-)
+  UNIT                                           LOAD   ACTIVE SUB     DESCRIPTION
+  uni-api-py.service                             loaded active running University Portal Python API (FastAPI + Uvicorn)
+  uni-celery.service                             loaded active running University Portal Celery Worker (scraper)
+Legend: LOAD   → Reflects whether the unit definition was properly loaded.
+        ACTIVE → The high-level unit activation state, i.e. generalization of SUB.
+        SUB    → The low-level unit activation state, values depend on unit type.
+63 loaded units listed. Pass --all to see loaded but inactive units, too.
+To show all installed unit files use 'systemctl list-unit-files'.
+-bash: syntax error near unexpected token `newline'
+root@university-and-course-data:~/University-and-Course-data# sudo -u postgres psql university_portal -c "
+SELECT column_name, data_type, numeric_precision, numeric_scale
+FROM information_schema.columns
+WHERE table_name='scraped_courses' AND column_name='duration';
+"
+ column_name | data_type | numeric_precision | numeric_scale 
+-------------+-----------+-------------------+---------------
+ duration    | numeric   |                 6 |             2
+(1 row)
+
+root@university-and-course-data:~/University-and-Course-data# sudo -u postgres psql university_portal -c "
+SELECT id, course_name, duration::text
+FROM scraped_courses
+WHERE university_id = 5
+  AND course_name ILIKE '%Master of Cybersecurity%'
+ORDER BY created_at DESC
+LIMIT 3;
+"
+ id | course_name | duration 
+----+-------------+----------
+(0 rows)
+
+root@university-and-course-data:~/University-and-Course-data# sudo -u postgres psql university_portal -c "
+SELECT u.id, u.name FROM universities u WHERE u.name ILIKE '%torrens%';
+"
+ id |  name   
+----+---------
+  3 | torrens
+(1 row)
+
+root@university-and-course-data:~/University-and-Course-data# 
