@@ -1,0 +1,71 @@
+Fix is correct and minimal. The diagnostic before/after is clean. Two things worth flagging before promote, plus one process note that's now overdue.
+The 131 dev rows finding is the bigger story, not a side-note.
+You wrote "131 approved rows — all carrying fee=186544 which looks like a fee-schedule placeholder — and course names including 'Double Degrees', 'MBA Virtual Info Night', 'Doctor of Philosophy By Prior Works' and similar landing-page aggregates."
+This is structural and worse than the dashboard view suggested. Three problems mixed together:
+
+The domestic-only filter miss — fixed by 4accb5e, will drop the /93/63 doubles on next scrape.
+Landing-page-as-course staging — "Double Degrees" and "MBA Virtual Info Night" are not courses. They're discovery-stage classification failures. Same class of bug as Torrens "Course Guides" and "Workforce Edge" being staged before they were classified as category_landing_page. UTAS's discovery classifier is treating these as detail pages when they're listings/info pages.
+fee=186544 placeholder hitting every row — that's a fee-schedule global value being applied to every approved row regardless of course. This is exactly the cross-page contamination pattern the sibling cache fix was meant to address. Worth checking whether 186544 came from a UTAS central fee page that was parsed once and bled into every staged row, or whether it's a hardcoded default somewhere. Either way, every UTAS approved row carrying the same fee is structurally broken — promote-blocking on its own, separate from the domestic-only issue.
+
+Worth running before promote:
+sql-- How many rows share fee=186544? If it's most of them, that's the bug.
+SELECT international_fee, COUNT(*) 
+FROM scraped_courses 
+WHERE university_id = 5 AND status IN ('pending','approved')
+GROUP BY international_fee 
+ORDER BY COUNT(*) DESC LIMIT 10;
+And:
+sql-- Where did 186544 come from? Check evidence/extraction_method.
+SELECT extraction_method->>'international_fee' AS fee_source,
+       extraction_method->>'fee_term' AS fee_term_source,
+       COUNT(*)
+FROM scraped_courses
+WHERE university_id = 5 AND international_fee = 186544
+GROUP BY 1, 2;
+If the source is something like central_page or fee_schedule_pdf for all 131 rows, we have a propagation bug — UTAS doesn't have a single international fee, the fee is per-course and varies wildly. If the source is per-course extraction but all 131 happened to land on the same page that yielded 186544, that's a different (and worse) failure — every per-course fetch was failing and falling back to the same default.
+Don't approve UTAS to production until this is resolved, regardless of the domestic-only filter outcome. Even the rows that legitimately accept international students (distance courses) will have wrong fees if every one of them reads 186544.
+Verification on the filter fix itself — small additional step.
+Your verification queries cover staging cleanly. Add one provenance check on a previously-passing UTAS course that's not a /93/63 double-degree (e.g., one of the distance courses that genuinely accepts international students). After re-scrape, confirm it still stages and that none of the new arm fired on it accidentally:
+bash# UTAS distance courses that should still pass through:
+sudo journalctl -u uni-celery --since '30 min ago' \
+  | grep -i 'utas.edu.au' | grep -E '(STAGE.*saved|DOMESTIC ONLY)' \
+  | head -50
+If the new arm fires on a course that legitimately accepts international students, the regex is too broad. The 12/12 smoke tests are necessary but not sufficient — only the live page fetch tells us whether other UTAS pages happen to contain the phrase in a context where it shouldn't trigger (e.g. a fee schedule page that says "this course may not be available to international students at the Cradle Coast campus" or similar).
+The other two domestic-only commits — clean recap.
+You wrote "Three _DOMESTIC_ONLY_RE fixes were shipped across this session and the previous one" but listed only two commits in the table. The Counselling/health pages that originally worked were the existing pre-7754b37 arms — those weren't a fix, those were the baseline. So it's two fixes, not three:
+
+7754b37 — Torrens HDR ("begin your application to study as a domestic student")
+4accb5e — UTAS doubles ("may not be available to international students")
+
+Worth correcting in your records so the third regex change isn't phantom.
+Process note — third time, now writing it down.
+I'm not asking the regression sweep gate to be applied to a single regex arm in _DOMESTIC_ONLY_RE. The smoke test coverage on this and the bridge across the existing arms is fine.
+But I am asking for two things before the next shared-code change:
+
+A live audit on the other 21 unis in the regression baseline for the same domestic-only phrase miss. UTAS uses "may not be available". Other unis may use:
+
+"available only to domestic students" (forward form)
+"international applicants are not currently accepted"
+"domestic students only" (label-style on a sidebar)
+"Australian/New Zealand citizens and permanent residents only"
+"this course is closed to international applications"
+
+None of these match either of our two new arms. Worth scripting:
+
+bash   for uni in $(cat baselines/uni_list.txt); do
+     for url in $(grep -E "course_website" baselines/${uni}/*.json | head -5); do
+       curl -s "$url" | grep -iE "(available|accepted|admission).*international" | head -2
+     done
+   done
+Spot-check the output for phrases we don't already match. If any uni's pages use a phrase outside our existing arms, that uni has had wrong staging this whole time too. We just haven't looked.
+
+Document the sweep-exemption policy explicitly in the migration template doc. "Regex additions to extractor filters with smoke test coverage are exempt from the 23-uni sweep gate. Regex changes that modify or remove existing arms are not exempt." That's the policy we've been operating under for three commits. Write it down so it's a deliberate choice, not three ad-hoc skips.
+
+Promote criteria for UTAS:
+
+Filter fix verified working post-re-scrape (DOMESTIC ONLY count >= 30, no /93/63 rows in pending/approved): green light to clear staging.
+fee=186544 source identified and either fixed or rows with that fee removed from staging: blocker on promote.
+Distance-course spot-check confirms new arm didn't over-block: green light.
+Live courses table query results reviewed: separate session, don't touch until staging is clean.
+
+If the 186544 issue is a propagation bug rather than a single-source issue, that becomes the next priority over Gemini cost optimisation, CRICOS matching, and everything else in the Week 3 plan. A pipeline that emits the same wrong fee for 131 courses is a pipeline whose other "approved" outputs across other unis can't be trusted either.
