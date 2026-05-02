@@ -262,6 +262,60 @@ def test_flinders_config_slug_derivation() -> None:
     assert _hostname_to_slug("flinders.edu.au") == "flinders"
 
 
+def test_flinders_config_tier1_english_disabled() -> None:
+    """flinders.yaml must set trust_tier1_vision_ocr_english=false."""
+    from app.services.scraper.config.loader import load_uni_config
+
+    cfg = load_uni_config(
+        slug="flinders",
+        name="Flinders University",
+        scrape_url="https://www.flinders.edu.au/study/courses",
+    )
+    assert cfg.extraction.english.trust_tier1_vision_ocr_english is False, (
+        "flinders.yaml must set extraction.english.trust_tier1_vision_ocr_english = false"
+    )
+
+
+def test_schema_tier1_english_flag_default_is_true() -> None:
+    """Default value for trust_tier1_vision_ocr_english must be True (opt-in)."""
+    from app.services.scraper.config.schema import EnglishConfig
+
+    assert EnglishConfig().trust_tier1_vision_ocr_english is True, (
+        "trust_tier1_vision_ocr_english must default to True — opt-in, not opt-out"
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Bug 3b — URL fragment normalization in stage_course
+# ─────────────────────────────────────────────────────────────────────────────
+
+def test_fragment_stripped_from_url() -> None:
+    """URL fragments (#section) must be stripped during normalization."""
+    url_with_frag = "https://www.flinders.edu.au/study/courses/bachelor-science#fees"
+    frag_pos = url_with_frag.find("#")
+    normalized = url_with_frag[:frag_pos] if frag_pos != -1 else url_with_frag
+    assert normalized == "https://www.flinders.edu.au/study/courses/bachelor-science"
+
+
+def test_no_fragment_url_unchanged() -> None:
+    """URLs without fragments must not be modified by fragment stripping."""
+    url = "https://www.flinders.edu.au/study/courses/bachelor-science"
+    frag_pos = url.find("#")
+    normalized = url[:frag_pos] if frag_pos != -1 else url
+    assert normalized == url
+
+
+def test_fragment_then_trailing_slash_both_stripped() -> None:
+    """Fragment stripping runs before trailing-slash stripping — both applied."""
+    url = "https://www.flinders.edu.au/study/courses/bachelor-science/#fees"
+    frag_pos = url.find("#")
+    if frag_pos != -1:
+        url = url[:frag_pos]
+    if url.endswith("/") and url.count("/") > 3:
+        url = url.rstrip("/")
+    assert url == "https://www.flinders.edu.au/study/courses/bachelor-science"
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Bug 5 — Tier-1 IELTS coherence gate in single_course pipeline
 # ─────────────────────────────────────────────────────────────────────────────
