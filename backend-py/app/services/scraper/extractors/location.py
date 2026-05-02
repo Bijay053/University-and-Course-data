@@ -221,6 +221,14 @@ _PERIOD_LABEL_RE = re.compile(
     re.I,
 )
 
+# UTAS (and similar) panel divs store location as "Hobart Semester 1, Semester 2"
+# — the availability schedule is concatenated onto the campus name.  Strip these
+# trailing period/semester/trimester availability labels so only the city is kept.
+_PERIOD_SUFFIX_RE = re.compile(
+    r"(?:,?\s+(?:Semester|Trimester|Term|Quarter|S\d|T\d)\s*\d+)+\s*$",
+    re.IGNORECASE,
+)
+
 
 _CHECKMARK_CHARS = frozenset("✓✔✅√☑")
 _CROSS_CHARS = frozenset("✗✘✕✖❌")
@@ -336,6 +344,10 @@ def _normalise(raw: str | None) -> str | None:
     # normalised form.  Strip any trailing slash/comma/space left by the conversion.
     if " / " in cleaned:
         cleaned = re.sub(r"\s+/\s+", ", ", cleaned).strip(" ,/")
+    # Strip trailing semester/trimester availability suffixes before any other
+    # checks.  UTAS (and similar) panel divs concatenate availability schedule
+    # onto the campus name: "Hobart Semester 1, Semester 2".  We want "Hobart".
+    cleaned = _PERIOD_SUFFIX_RE.sub("", cleaned).strip().strip(",").strip()
     # Expand campus short-codes (e.g. "SYD | MEL | BNE" → "Sydney, Melbourne, Brisbane")
     # before any marketing / junk checks so the expanded text can be validated normally.
     cleaned = _expand_campus_codes(cleaned)
