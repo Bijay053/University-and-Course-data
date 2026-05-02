@@ -1,0 +1,203 @@
+Evidence Review
+Doctor of Philosophy (Phd) in Law
+Eligibility: ready - ok
+cambridge_overall
+selected
+selected
+/ per_course_vision
+confidence 85%
+176.0
+Bluesky - Flinders University
+https://www.flinders.edu.au/reference-components/social-footer/_jcr_content/content/section/par_0/section_1829014827/par_1/section/par_1/image_general.coreimg.png/1738625899473/bluesky-circle-mono.png
+category
+selected
+selected
+/ gemini_primary
+confidence 75%
+Law
+gemini_primary: category=Law
+https://www.flinders.edu.au/study/courses/doctor-philosophy-phd-law
+course_location
+selected
+selected
+/ location.strong
+confidence 90%
+Bedford Park
+Bedford Park
+https://www.flinders.edu.au/study/courses/doctor-philosophy-phd-law
+course_name
+selected
+selected
+/ course_name.h1
+confidence 90%
+Doctor of Philosophy (Phd) in Law
+Doctor of Philosophy (PhD) in Law
+https://www.flinders.edu.au/study/courses/doctor-philosophy-phd-law
+cricos_code
+selected
+selected
+/ regex:cricos
+confidence 95%
+011339D
+CRICOS code extracted from course page: 011339D
+https://www.flinders.edu.au/study/courses/doctor-philosophy-phd-law
+degree_level
+selected
+selected
+/ degree_level:name
+confidence 90%
+Doctorate
+Doctor of Philosophy (Phd) in Law
+https://www.flinders.edu.au/study/courses/doctor-philosophy-phd-law
+description
+selected
+selected
+/ description.meta
+confidence 95%
+A Flinders PhD in law can open the door to careers both inside the courtroom and out. With in-depth knowledge in a legal specialty you will be attractive to both national and international organisations.
+https://www.flinders.edu.au/study/courses/doctor-philosophy-phd-law
+https://www.flinders.edu.au/study/courses/doctor-philosophy-phd-law
+duolingo_overall
+selected
+selected
+/ per_course_vision
+confidence 85%
+110.0
+Bluesky - Flinders University
+https://www.flinders.edu.au/reference-components/social-footer/_jcr_content/content/section/par_0/section_1829014827/par_1/section/par_1/image_general.coreimg.png/1738625899473/bluesky-circle-mono.png
+duration
+selected
+selected
+/ duration.structural
+confidence 85%
+4.0
+<strong>Duration</strong> -> Duration: 4 years
+https://www.flinders.edu.au/study/courses/doctor-philosophy-phd-law
+duration_unit
+selected
+selected
+/ ai_fallback
+confidence 50%
+years
+ai_fallback: duration_unit=years
+https://www.flinders.edu.au/study/courses/doctor-philosophy-phd-law
+duration_value
+selected
+selected
+/ ai_fallback
+confidence 50%
+4.0
+ai_fallback: duration_value=4.0
+https://www.flinders.edu.au/study/courses/doctor-philosophy-phd-law
+fee_currency
+selected
+selected
+/ ai_fallback
+confidence 50%
+AUD
+ai_fallback: fee_currency=AUD
+https://www.flinders.edu.au/study/courses/doctor-philosophy-phd-law
+ielts_listening
+selected
+selected
+/ per_course_vision
+confidence 85%
+6.0
+Bluesky - Flinders University
+https://www.flinders.edu.au/reference-components/social-footer/_jcr_content/content/section/par_0/section_1829014827/par_1/section/par_1/image_general.coreimg.png/1738625899473/bluesky-circle-mono.png
+ielts_overall
+selected
+selected
+/ per_course_vision
+confidence 85%
+6.5
+Bluesky - Flinders University
+https://www.flinders.edu.au/reference-components/social-footer/_jcr_content/content/section/par_0/section_1829014827/par_1/section/par_1/image_general.coreimg.png/1738625899473/bluesky-circle-mono.png
+ielts_reading
+selected
+selected
+/ per_course_vision
+confidence 85%
+6.0
+Bluesky - Flinders University
+https://www.flinders.edu.au/reference-components/social-footer/_jcr_content/content/section/par_0/section_1829014827/par_1/section/par_1/image_general.coreimg.png/1738625899473/bluesky-circle-mono.png
+ielts_speaking
+selected
+selected
+/ per_course_vision
+confidence 85%
+6.0
+Bluesky - Flinders University
+https://www.flinders.edu.au/reference-components/social-footer/_jcr_content/content/section/par_0/section_1829014827/par_1/section/par_1/image_general.coreimg.png/1738625899473/bluesky-circle-mono.png
+ielts_writing
+selected
+selected
+/ per_course_vision
+confidence 85%
+6.0
+Bluesky - Flinders University
+https://www.flinders.edu.au/reference-components/social-footer/_jcr_content/content/section/par_0/section_1829014827/par_1/section/par_1/image_general.coreimg.png/1738625899473/bluesky-circle-mono.png
+intake_months
+selected
+selected
+/ regex
+confidence 40%
+["August"]
+Study a Doctor of Philosophy (PhD) in Law - Flinders University  Staff Students Library Study Study areas Business Computer science and information technology Creative arts and media Criminology Defence and national security Education Engi
+https://www.flinders.edu.au/study/courses/doctor-philosophy-phd-law
+international_eligible
+selected
+selected
+/ eligibility.positive
+confidence 85%
+True
+CRICOS code: 011339D
+https://www.flinders.edu.au/study/courses/doctor-philosophy-phd-law
+international_fee
+selected
+selected
+/ regex
+confidence 100%
+38100
+ How to apply  Enquire  Doctor of Philosophy (Law) Duration: 4 years Delivery mode: In Person Location: Bedford Park CRICOS code: 011339D Annual fees: 2025: $38,100 Further information on fees listed Research supervisors  How to apply 
+https://www.flinders.edu.au/study/courses/doctor-philosophy-phd-law
+mode
+selected
+selected
+/ gemini_primary
+confidence 75%
+On Campus
+gemini_primary: mode=On Campus
+https://www.flinders.edu.au/study/courses/doctor-philosophy-phd-law
+pte_overall
+selected
+selected
+/ per_course_vision
+confidence 85%
+59.0
+Bluesky - Flinders University
+https://www.flinders.edu.au/reference-components/social-footer/_jcr_content/content/section/par_0/section_1829014827/par_1/section/par_1/image_general.coreimg.png/1738625899473/bluesky-circle-mono.png
+study_mode
+selected
+selected
+/ study_mode:rule
+confidence 70%
+On Campus
+<strong>Delivery mode</strong> -> Delivery mode: In Person
+https://www.flinders.edu.au/study/courses/doctor-philosophy-phd-law
+sub_category
+selected
+selected
+/ gemini_primary
+confidence 75%
+Law
+gemini_primary: sub_category=Law
+https://www.flinders.edu.au/study/courses/doctor-philosophy-phd-law
+toefl_overall
+selected
+selected
+/ per_course_vision
+confidence 85%
+80.0
+Bluesky - Flinders University
+https://www.flinders.edu.au/reference-components/social-footer/_jcr_content/content/section/par_0/section_1829014827/par_1/section/par_1/image_general.coreimg.png/1738625899473/bluesky-circle-mono.png

@@ -153,6 +153,36 @@ _DURATION_RESEARCH_CAP_RE = re.compile(
 # Used in _classify_duration_value to skip digit matches embedded in these clauses.
 _EXTENSION_CTX_RE = re.compile(r"\bextension\b", re.I)
 
+# Sentences that describe a combined / add-on / double degree listed inline
+# on a course page must never win the duration tournament over the main
+# program's labeled "Duration: N years" sentence.
+#
+# Root cause (Flinders Bachelor of Science):
+#   Pattern-0 fires on BOTH:
+#     "Duration: 3 years"   → weight 1,560,400  (main degree, correct)
+#     "Add on Bachelor of Laws … SATAC code: 245041  Duration: 5 years"
+#                           → weight 2,600,400  (add-on, WRONG)
+#   The combined-degree sentence has a larger number, so it wins.
+#
+# Fix: demote Pattern-0 matches inside such sentences by a 0.001 multiplier
+# so the main degree's Duration label always dominates.  We do NOT drop them
+# entirely (demote-not-drop) so that if the main degree page only advertises a
+# combined duration we still emit something.
+_COMBINED_DEGREE_CONTEXT_RE = re.compile(
+    r"\b(?:add[- ]on|combined\s+degree|combined\s+program(?:me)?|"
+    r"double\s+degree|joint\s+degree|dual\s+degree|"
+    r"conjoint|bachelor[- ]?of[- ]?laws\s+combined|"
+    # SATAC codes appear in combined-degree blurbs on Flinders pages —
+    # a Duration: label immediately after a SATAC code is always a
+    # combined-degree duration, not the main program duration.
+    # Use \b after "code" (not after ":") so the word boundary fires at
+    # the transition from the word "code" to the non-word ":".
+    r"satac\s+code\b|"
+    # Generic: "as part of the combined/double program"
+    r"as\s+part\s+of\s+(?:the\s+)?(?:combined|double|dual|joint))\b",
+    re.IGNORECASE,
+)
+
 # Word-form numbers for common program durations (one, two, … eight).
 # Checked BEFORE the digit _DURATION_VALUE_RE so "Three years full-time, with
 # the possibility of a six to 12 month extension" yields (3, "Year") rather
@@ -463,6 +493,9 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
         # don't need either gate.
         duration_context = bool(_DURATION_CONTEXT.search(s))
         anti_duration_context = bool(_DURATION_ANTI_CONTEXT.search(s))
+        # Demote combined/add-on degree sentences so the main program's
+        # "Duration: N years" label always wins (see _COMBINED_DEGREE_CONTEXT_RE).
+        is_combined_degree_sentence = bool(_COMBINED_DEGREE_CONTEXT_RE.search(s))
 
         # Bug A (KBS grad certs): slash-structured program-info cell.
         # "8 months / 4 subjects / 2 trimesters" — first token is real duration.
@@ -531,6 +564,13 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
             # mentions duration in a credit-point sentence we still emit
             # something rather than nothing.
             weight_mod = 0.01 if credit_context else 1.0
+            # Demote combined/add-on degree sentences heavily (0.001×).
+            # Pattern-0 priority (×100) still means a combined-degree
+            # sentence's labeled duration beats a bare fallback match from
+            # the main program — but any Pattern-0 hit on the main degree
+            # (not a combined-degree sentence) will win by ×1000.
+            if is_combined_degree_sentence:
+                weight_mod *= 0.001
             # Cap depending on unit so we reject only true outliers
             # (e.g. "120 weeks" is 2 years, fine; "200 years" is junk).
             cap = {"Year": 12, "Semester": 24, "Trimester": 36, "Month": 96, "Week": 416}[unit]

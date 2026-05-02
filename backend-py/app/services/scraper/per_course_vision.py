@@ -188,6 +188,27 @@ _GENERIC_MARKETING_PATH_BLOCKS: Final = (
     "/marketing/",
 )
 
+# Regex applied to the FULL absolute URL (lower-cased) to catch social media
+# icons and chrome components that don't appear in the filename and whose
+# containing page element uses non-standard class names (e.g. Flinders AEM:
+# <div class="reference parbase"> rather than <footer> or class="footer").
+#
+# Rationale: static path block-lists fail on every new university because each
+# site uses its own asset paths.  Checking for social platform names and
+# "social-footer" path segments in the URL itself is both university-agnostic
+# and very low false-positive risk — course content URLs never contain
+# "facebook", "bluesky", "social-footer", etc.
+_SOCIAL_CHROME_PATH_RE = re.compile(
+    r"/"
+    r"(?:social[-_]?(?:footer|bar|media|icons?|links?|sharing)|"
+    r"reference[-_]components?/social|"
+    r"facebook|twitter(?:[-_]bird)?|instagram|linkedin|youtube|"
+    r"tiktok|bluesky|whatsapp|pinterest|snapchat|discord|"
+    r"x[-_](?:twitter|social)|threads[-_]?(?:app)?)"
+    r"(?:[/?_.-]|$)",
+    re.IGNORECASE,
+)
+
 # URL path-segment keywords that strongly suggest the image contains
 # English language requirement scores.  Images whose URL (lower-cased)
 # contains any of these move to the FRONT of the processing queue so
@@ -487,6 +508,54 @@ def _vision_fields_consistent_with_ocr(
     return True
 
 
+_CHROME_TAG_RE = re.compile(
+    # CSS class or id values that indicate the element is a chrome/global
+    # component rather than per-course content.  Checked against the
+    # *value* of each class token and the id attribute independently.
+    r"footer|header|nav(?:igation|bar)?|sidebar|side[-_]?bar|"
+    r"social(?:[-_]footer|[-_]bar|[-_]links?|[-_]icons?|[-_]media)?|"
+    r"breadcrumb|cookie|skip[-_]?(?:link|nav|to)|"
+    r"utility[-_]bar|chrome|global[-_](?:nav|header|footer)|"
+    r"site[-_](?:nav|header|footer)|top[-_]bar|bottom[-_]bar|"
+    r"reference[-_]components?",
+    re.IGNORECASE,
+)
+
+
+def _strip_chrome_html(html: str) -> str:
+    """Remove header/footer/nav/aside and social chrome elements from HTML.
+
+    The path-block and filename-hint filters are a block-list strategy that
+    fails for every new university because each site uses its own asset paths
+    (e.g. Torrens uses /shared/how-to-apply/, Flinders uses
+    /reference-components/social-footer/).  The only durable fix is to strip
+    structural chrome elements from the HTML *before* the image scan, using
+    the DOM itself rather than URL heuristics.
+
+    We decompose:
+    • Semantic HTML5 chrome tags: <header>, <footer>, <nav>, <aside>
+    • Any element whose class or id contains a chrome keyword (footer,
+      header, nav, sidebar, social-footer, reference-components, etc.)
+
+    The tier-0 English-section scan is unaffected — it already uses a
+    separate BeautifulSoup pass on the original HTML.
+    """
+    try:
+        soup = BeautifulSoup(html or "", "lxml")
+        # 1. Semantic chrome tags — always structural, never course-content.
+        for tag in soup.find_all(["header", "footer", "nav", "aside"]):
+            tag.decompose()
+        # 2. Class-based / id-based chrome elements.
+        for tag in soup.find_all(True):  # all elements
+            classes = " ".join(tag.get("class") or [])
+            tag_id = tag.get("id") or ""
+            if _CHROME_TAG_RE.search(classes) or _CHROME_TAG_RE.search(tag_id):
+                tag.decompose()
+        return str(soup)
+    except Exception:  # noqa: BLE001 — never crash the scrape over a strip failure
+        return html
+
+
 def _extract_img_candidates(
     html: str, base_url: str
 ) -> tuple[list[tuple[str, str]], frozenset[str]]:
@@ -522,9 +591,16 @@ def _extract_img_candidates(
     tier0 = _find_english_section_images(html, base_url)
     tier0_urls = {item[0] for item in tier0}
 
-    # ── Tiers 1 & 2: regex scan of raw <img> tags ─────────────────────────
+    # ── Tiers 1 & 2: regex scan of chrome-stripped <img> tags ─────────────
+    # Strip <header>, <footer>, <nav>, <aside>, and class/id-matched chrome
+    # elements BEFORE scanning so that social media icons, footer logos, and
+    # nav thumbnails never reach the Gemini vision API.  This is the durable
+    # replacement for the path-block list, which failed on both Torrens
+    # (/shared/how-to-apply/) and Flinders (/reference-components/social-footer/)
+    # because every university uses different asset paths.
+    _html_no_chrome = _strip_chrome_html(html)
     raw: list[tuple[str, str]] = []
-    for tag in _IMG_TAG_RE.findall(html or ""):
+    for tag in _IMG_TAG_RE.findall(_html_no_chrome):
         m_src = _SRC_RE.search(tag)
         src = (m_src.group(1) or m_src.group(2) or "").strip() if m_src else ""
         # Lazy-load fallback: data-src / data-lazy-src / data-lazy / data-original
@@ -571,6 +647,12 @@ def _extract_img_candidates(
         # English-requirement tables (e.g. /shared/how-to-apply/, /marketing/).
         _abs_lower = absolute.lower()
         if any(block in _abs_lower for block in _GENERIC_MARKETING_PATH_BLOCKS):
+            continue
+        # Social-chrome path regex: university-agnostic catch for social media
+        # icons and chrome components regardless of their hosting path.  Works
+        # where the static block-list fails (e.g. Flinders social footer at
+        # /reference-components/social-footer/ has no matching block-list entry).
+        if _SOCIAL_CHROME_PATH_RE.search(_abs_lower):
             continue
         # Skip images already captured as tier-0 English-section candidates.
         if absolute in tier0_urls:

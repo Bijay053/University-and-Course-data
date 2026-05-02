@@ -1879,7 +1879,8 @@ async def staged_dedup(
         WHERE id IN (
             SELECT id FROM (
                 SELECT id, ROW_NUMBER() OVER (
-                    PARTITION BY university_id, LOWER(course_website)
+                    PARTITION BY university_id,
+                        LOWER(RTRIM(course_website, '/'))
                     ORDER BY created_at DESC
                 ) AS rn
                 FROM scraped_courses

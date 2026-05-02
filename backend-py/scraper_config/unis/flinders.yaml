@@ -1,0 +1,33 @@
+# Flinders University
+# Hostname: www.flinders.edu.au
+#
+# Bug history / rationale:
+#   - Course catalogue (~250 courses) is rendered via a JS-heavy listing page.
+#     The orchestrator raises max_courses to 400 (hardcoded) to capture all
+#     bachelor + masters + combined programmes.
+#   - Combined/add-on degrees (e.g. "Add on Bachelor of Laws – Duration: 5 years")
+#     are listed inline on main-degree pages.  The duration extractor now demotes
+#     Pattern-0 matches inside combined-degree sentences (0.001× weight) so the
+#     main programme's "Duration: N years" always wins.
+#   - Social-footer icons (Bluesky, Facebook, Instagram, etc.) are hosted at
+#     /reference-components/social-footer/ using generic AEM div wrappers with
+#     no <footer> tag or "footer" class — the _SOCIAL_CHROME_PATH_RE regex in
+#     per_course_vision.py catches them by URL path before they reach Gemini.
+#   - SATAC application blocks on course pages include "Available to domestic
+#     students only" even when the course IS available internationally.
+#     _DOMESTIC_ONLY_RE intentionally excludes bare "domestic students only"
+#     phrases for this reason — only explicit "this course is only available to
+#     domestic/australian students" language triggers the filter.
+
+discovery:
+  # Flinders sitemap at https://www.flinders.edu.au/sitemap.xml lists all
+  # course detail pages.  Supplementing BFS with sitemap ensures we capture
+  # deep-faculty courses that BFS might miss after exhausting its page budget.
+  always_sitemap_supplement: true
+
+extraction:
+  filters:
+    domestic_only:
+      # Explicitly set (same as the fail-open default) so behaviour is not
+      # dependent on the config loader's fail-open policy.
+      enabled: true

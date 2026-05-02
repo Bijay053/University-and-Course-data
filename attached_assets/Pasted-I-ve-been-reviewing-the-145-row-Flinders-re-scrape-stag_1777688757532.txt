@@ -1,0 +1,82 @@
+I've been reviewing the 145-row Flinders re-scrape staged at 14:49 UTC. It's not in a state that can be promoted, and I want to be direct: the bug fixes shipped yesterday and this morning didn't actually solve the underlying problems. We've been moving fast and shipping fixes that look correct in code review but don't hold when verified against fresh scraped data.
+
+Four distinct issues in this batch. None are new — most are bugs we thought were closed.
+
+**1. Vision OCR is still mining test scores from unrelated images**
+
+Doctor of Philosophy (PhD) in Law evidence panel shows IELTS overall, all four IELTS sub-scores, PTE, TOEFL, Cambridge, and Duolingo — every single test score — sourced from a single image:
+
+```
+Bluesky - Flinders University
+.../reference-components/social-footer/.../bluesky-circle-mono.png
+```
+
+That's a Bluesky social media footer icon. A 32-pixel social button. Vision is OCR'ing test scores out of it (or hallucinating them outright since the icon almost certainly contains no text). This pattern repeats across most of the 145 rows — the social footer is on every Flinders page.
+
+This morning's path-block fix was supposed to catch this. It didn't. Reason: the block list was built from Torrens-specific paths (`/shared/`, `/cards/`, `/how-to-apply/`, `/career-opportunities/`). Flinders uses different generic asset paths (`/reference-components/`, `/social-footer/`, plus probably others). The block list approach has now failed twice — first on Torrens `how-to-apply`, now on Flinders `social-footer`. It can't be the strategy.
+
+**The proper fix is a positive relevance check, not a block list.** Before accepting a vision-extracted value, require evidence the image relates to the current course: course slug present in image URL, alt text contains course-relevant terms, image is in the main content area (not header/footer/sidebar), or the surrounding text mentions the course. If no positive signal, reject the value. The block-list approach will keep failing on the next university we scrape because every site has its own generic asset paths and we only discover them after they've polluted data.
+
+**2. Duration is systematically wrong on undergraduate degrees**
+
+Most Flinders bachelor's degrees show 5 or 6 years when the actual duration is 3 or 4. Spot examples from the batch:
+
+- Bachelor of Science — 5 Year (actually 3)
+- Bachelor of Commerce — 5 Year (actually 3)
+- Bachelor of Business — 5 Year (actually 3)
+- Bachelor of Criminology — 5 Year (actually 3)
+- Bachelor of Medical Science — 6 Year (actually 3)
+- Bachelor of International Relations — 4.5 Year (actually 3)
+- Bachelor of Engineering (Environmental) (Honours) — 5 Year (actually 4)
+
+The PhD in Law evidence panel shows the structural extractor working correctly — it reads `<strong>Duration</strong>` from the page and returns 4. So the right value is available. Something else is winning on the bachelor's pages.
+
+Most likely cause: Flinders pages list both full-time and maximum part-time duration ("3 years full-time, up to 6 years part-time" or similar), and the regex is grabbing the larger number. This is essentially the same family of bug as Bug A from Week 3 (slash-pattern), just a different surface form.
+
+Diagnosis needed: open the evidence panel on one wrong row (e.g. Bachelor of Science) and check what extractor source is winning and what text it matched. Fix is either a regex tightening (don't match "up to N years" or "N years part-time") or a priority rule (prefer minimum duration when multiple values found).
+
+**3. Duplicate rows for the same course**
+
+Two rows for "Bachelor of Science", both 77% completeness, both A$43,500/Annual, both Bedford Park, both Mar/Jul intake — same course, different test score values:
+
+- Row 1: IELTS 6, PTE 65, TOEFL 79
+- Row 2: IELTS 6, PTE 59, TOEFL 80
+
+The test score difference is itself a vision OCR artefact (Issue 1) — different images yielded different hallucinated numbers across the two scrapes of effectively the same page.
+
+This is dedup failing. Either two different Flinders URLs both surface as "Bachelor of Science" and dedup isn't merging them, or the same URL got scraped twice with slightly different normalisation (with/without trailing slash, with/without query string). Need to compare the two source URLs to know which.
+
+**4. Online-only and domestic-only courses are being staged**
+
+The domestic_only and online_only filters from Week 2 don't appear to have run on this batch — or aren't catching Flinders' specific page patterns. Need an audit query against the staged 145 rows asking: of these, which were marked international_eligible=False or had online-only signals, and why didn't they get filtered at staging time?
+
+This is the regression that worries me most. Domestic_only filtering was supposed to be config-driven and centrally enforced. If it's silently failing on Flinders, it may also be silently failing on the other unis we've scraped.
+
+**The pattern across all four issues**
+
+We're not catching these because we're not verifying on the admin screen after each fix. Yesterday's two bugs both shipped looking clean in terminal output, then the admin screen showed the same symptoms the next morning. This morning's vision path-block fix shipped looking clean in code review, then the next scrape (Flinders) showed the same class of problem with a different generic image path.
+
+The issues need a different verification standard before being closed:
+
+- Run a fresh scrape against the affected uni (or at least a 5-page sample)
+- Open 5 random staged rows in the admin review screen
+- Walk the evidence panel on each — read the source URL, the matched text, the extracted value
+- Confirm none show the failure mode the fix was supposed to address
+
+If any do, the fix isn't closed yet. Twenty extra minutes per fix; saves the cycle we're in now where every "clean" ship comes back broken in 12 hours.
+
+**What I'd suggest doing**
+
+1. **Don't promote the Flinders batch.** Leave the 145 rows as `pending`. Don't `bulk_approve` until the fixes below have actually held against a fresh scrape.
+
+2. **Bug 1 — replace the path-block list with a positive relevance check.** Block lists have failed twice; we shouldn't ship a third version. Cheapest first pass: only accept vision-extracted values where (a) the image URL contains the course slug, OR (b) the image is inside the main `<article>` / `<main>` / course-detail container, not in `<header>` / `<footer>` / `<aside>`. Stricter follow-up: alt text relevance.
+
+3. **Bug 2 (duration) — evidence panel diagnosis first.** Open Bachelor of Science staged row, check what extractor wins. Most likely fix is a regex tightening to ignore "up to N" / "part-time" / "maximum" qualifiers, plus a min-prefer rule when multiple durations found.
+
+4. **Bug 3 (dedup) — find the two source URLs for Bachelor of Science.** Determines whether it's a URL-normalisation issue (easy fix) or a genuine title-collision across distinct courses (harder fix, need a second key).
+
+5. **Bug 4 (filter regression) — audit query on the staged 145 rows.** Count rows where international_eligible=False, online_only=True, or domestic_only signals present in source HTML. If that count > 0, the filter regressed and the same audit needs to run against the live `courses` table to find any already-promoted rows that shouldn't be there.
+
+6. **After fixes ship: re-scrape Flinders, walk 5 random rows in the admin screen, verify on the surface where the bugs were observed.** Only then promote.
+
+I know this is a harder message than the work pace we've been at. But the pattern of fast-ship → broken-overnight → fast-fix → broken-on-next-uni is now established across Bug 1 (twice) and Bug 2 (once). The Flinders batch is showing four bugs simultaneously. Better to absorb a slow day fixing properly than ship 145 rows with hallucinated test scores into the live catalog and discover it from a student email next week.
