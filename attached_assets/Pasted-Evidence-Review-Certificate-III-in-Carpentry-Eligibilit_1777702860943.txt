@@ -1,0 +1,158 @@
+Evidence Review
+Certificate III in Carpentry
+Eligibility: ready - ok
+category
+selected
+selected
+/ category:det
+confidence 70%
+Trades & Construction
+Certificate III in Carpentry
+https://vit.edu.au/vocational/cpc30220-certificate-iii-in-carpentry
+course_location
+selected
+selected
+/ location.heading
+confidence 70%
+Melbourne, Australia
+Melbourne
+https://vit.edu.au/vocational/cpc30220-certificate-iii-in-carpentry
+course_name
+selected
+selected
+/ course_name.h1
+confidence 90%
+Certificate III in Carpentry
+CPC30220 - Certificate III in Carpentry
+https://vit.edu.au/vocational/cpc30220-certificate-iii-in-carpentry
+cricos_code
+selected
+selected
+/ regex:cricos
+confidence 95%
+104859F
+CRICOS code extracted from course page: 104859F
+https://vit.edu.au/vocational/cpc30220-certificate-iii-in-carpentry
+degree_level
+selected
+selected
+/ degree_level:name
+confidence 90%
+Certificate
+Certificate III in Carpentry
+https://vit.edu.au/vocational/cpc30220-certificate-iii-in-carpentry
+description
+selected
+selected
+/ description.meta
+confidence 95%
+The Certificate III in Carpentry provides comprehensive training, covering all practical and theoretical aspects of the trade. Join VIT Australia today!
+https://vit.edu.au/vocational/cpc30220-certificate-iii-in-carpentry
+https://vit.edu.au/vocational/cpc30220-certificate-iii-in-carpentry
+duration
+selected
+selected
+/ duration.structural
+confidence 85%
+2.0
+<strong>Duration</strong> -> Duration: 104 weeks including breaks
+https://vit.edu.au/vocational/cpc30220-certificate-iii-in-carpentry
+duration_unit
+selected
+selected
+/ ai_fallback
+confidence 50%
+years
+ai_fallback: duration_unit=years
+https://vit.edu.au/vocational/cpc30220-certificate-iii-in-carpentry
+duration_value
+selected
+selected
+/ ai_fallback
+confidence 50%
+2.0
+ai_fallback: duration_value=2.0
+https://vit.edu.au/vocational/cpc30220-certificate-iii-in-carpentry
+ielts_listening
+needs_review
+/ sibling_cache:undergraduate
+confidence 55%
+5.5
+sibling-cache backfill from undergraduate bucket (source: https://vit.edu.au/bits): ielts_listening=5.5
+https://vit.edu.au/bits
+ielts_overall
+selected
+selected
+/ regex
+confidence 85%
+5.5
+Carpentry course | Certificate III in Carpentry | VIT Australia BITS Bachelor of Information Technology and Systems (BITS) BITS focuses on delivering knowledge and skills in computer networking, appli
+https://vit.edu.au/vocational/cpc30220-certificate-iii-in-carpentry
+ielts_reading
+needs_review
+/ sibling_cache:undergraduate
+confidence 55%
+5.5
+sibling-cache backfill from undergraduate bucket (source: https://vit.edu.au/bits): ielts_reading=5.5
+https://vit.edu.au/bits
+ielts_speaking
+needs_review
+/ sibling_cache:undergraduate
+confidence 55%
+5.5
+sibling-cache backfill from undergraduate bucket (source: https://vit.edu.au/bits): ielts_speaking=5.5
+https://vit.edu.au/bits
+ielts_writing
+needs_review
+/ sibling_cache:undergraduate
+confidence 55%
+5.5
+sibling-cache backfill from undergraduate bucket (source: https://vit.edu.au/bits): ielts_writing=5.5
+https://vit.edu.au/bits
+intake_months
+selected
+selected
+/ regex
+confidence 70%
+["February", "March", "May", "June", "July", "August"]
+cations: Melbourne 2026 intakes: 09-Feb-2026 16-Mar-2026 04-May-2026 08-June-2026 20-July-2026 24-Aug-2026 Duration 104 Weeks (Course Breaks Included) Fees $24,000 You are considered a Domestic Student If you are An Australian citizen or An
+https://vit.edu.au/vocational/cpc30220-certificate-iii-in-carpentry
+international_eligible
+selected
+selected
+/ eligibility.positive
+confidence 85%
+True
+Cricos Code: 104859F
+https://vit.edu.au/vocational/cpc30220-certificate-iii-in-carpentry
+international_fee
+selected
+selected
+/ regex
+confidence 80%
+24000
+e Locations: Melbourne 2026 intakes: 09-Feb-2026 16-Mar-2026 04-May-2026 08-June-2026 20-July-2026 24-Aug-2026 Duration 104 Weeks (Course Breaks Included) Fees $24,000 You are considered a Domestic Student If you are An Australian citizen o
+https://vit.edu.au/vocational/cpc30220-certificate-iii-in-carpentry
+location_text
+selected
+selected
+/ vit_static_fallback
+confidence 85%
+Melbourne
+https://vit.edu.au/vocational/cpc30220-certificate-iii-in-carpentry
+study_mode
+selected
+selected
+/ study_mode:rule
+confidence 70%
+On Campus
+e, email, or visit our campus in person . Your success journey begins
+https://vit.edu.au/vocational/cpc30220-certificate-iii-in-carpentry
+sub_category
+selected
+selected
+/ category:det
+confidence 70%
+Carpentry
+Certificate III in Carpentry
+https://vit.edu.au/vocational/cpc30220-certificate-iii-in-carpentry
