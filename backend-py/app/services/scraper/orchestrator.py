@@ -1297,8 +1297,31 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # Multiple distinct URLs can yield the same course_name (e.g. Flinders
         # /study/bsc-computing and /study/bsc-biology both produce H1 =
         # "Bachelor of Science"). Stage only the highest-confidence result per
-        # (course_name, degree_level) pair; mark the rest so the staging loop
+        # (course_name, degree_tier) pair; mark the rest so the staging loop
         # skips them as rejected: duplicate_name_deduplicated.
+        #
+        # We key on a NORMALISED degree tier rather than the raw degree_level
+        # string because one duplicate may have degree_level="Bachelor's" while
+        # another (from a different URL that the pipeline processed slightly
+        # differently) has degree_level=None.  Both should collapse into the
+        # same bucket so dedup actually fires.
+        def _degree_tier(name: str, level: str) -> str:
+            """Map (course_name, degree_level) → a coarse comparable tier."""
+            combined = (name + " " + level).lower()
+            if any(w in combined for w in ("doctor", "phd", "doctorate")):
+                return "doctorate"
+            if any(w in combined for w in ("master", "mba", "msc", "mphil")):
+                return "master"
+            if any(w in combined for w in ("bachelor",)):
+                return "bachelor"
+            if "graduate" in combined and "diploma" in combined:
+                return "graduate diploma"
+            if "graduate" in combined and "certificate" in combined:
+                return "graduate certificate"
+            if any(w in combined for w in ("certificate", "diploma", "associate")):
+                return "cert/diploma"
+            return level.strip().lower()
+
         try:
             from app.services.scraper.confidence import (  # noqa: PLC0415
                 score_payload as _sc_score,
@@ -1309,9 +1332,10 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 if not isinstance(_r, dict) or _r.get("error"):
                     continue
                 _pl = _r.get("payload") or {}
+                _raw_name = (_pl.get("course_name") or _r.get("name") or "").strip()
                 _cn_key = (
-                    (_pl.get("course_name") or _r.get("name") or "").strip().lower(),
-                    (_pl.get("degree_level") or "").strip().lower(),
+                    _raw_name.lower(),
+                    _degree_tier(_raw_name, _pl.get("degree_level") or ""),
                 )
                 if not _cn_key[0]:
                     continue
