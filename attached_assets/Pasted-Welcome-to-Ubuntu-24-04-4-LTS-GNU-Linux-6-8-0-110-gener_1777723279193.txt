@@ -1,0 +1,91 @@
+Welcome to Ubuntu 24.04.4 LTS (GNU/Linux 6.8.0-110-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/pro
+
+ System information as of Sat May  2 12:00:41 UTC 2026
+
+  System load:           0.02
+  Usage of /:            3.7% of 231.44GB
+  Memory usage:          19%
+  Swap usage:            0%
+  Processes:             186
+  Users logged in:       1
+  IPv4 address for eth0: 159.65.152.72
+  IPv4 address for eth0: 10.47.0.13
+  IPv6 address for eth0: 2400:6180:100:d0:0:1:3615:5001
+
+Expanded Security Maintenance for Applications is not enabled.
+
+17 updates can be applied immediately.
+To see these additional updates run: apt list --upgradable
+
+1 additional security update can be applied with ESM Apps.
+Learn more about enabling ESM Apps service at https://ubuntu.com/esm
+
+
+Last login: Sat May  2 08:57:40 2026 from 198.211.111.194
+root@university-and-course-data:~# sudo -u postgres psql -d university_portal -c "
+SELECT COUNT(*) AS pending_approved_utas
+FROM scraped_courses
+WHERE university_id = 5
+  AND status IN ('pending','approved');
+"
+ pending_approved_utas 
+-----------------------
+                    13
+(1 row)
+
+root@university-and-course-data:~# sudo -u postgres psql -d university_portal -c "
+SELECT course_name, course_website, status
+FROM scraped_courses
+WHERE university_id = 5
+  AND (course_website ILIKE '%/93%' OR course_website ILIKE '%/63%')
+  AND status IN ('pending','approved');
+"
+ course_name | course_website | status 
+-------------+----------------+--------
+(0 rows)
+
+root@university-and-course-data:~# sudo -u postgres psql -d university_portal -c "
+SELECT international_fee, COUNT(*) AS n
+FROM scraped_courses
+WHERE university_id = 5
+  AND status IN ('pending','approved')
+GROUP BY international_fee
+ORDER BY n DESC
+LIMIT 10;
+"
+ international_fee | n 
+-------------------+---
+             41950 | 3
+              7520 | 1
+             11307 | 1
+             17225 | 1
+             19475 | 1
+              1722 | 1
+             36950 | 1
+             37250 | 1
+             37950 | 1
+             39950 | 1
+(10 rows)
+
+root@university-and-course-data:~# sudo -u postgres psql -d university_portal -c "
+SELECT
+  extraction_method->>'international_fee' AS fee_source,
+  extraction_method->>'fee_term' AS fee_term_source,
+  COUNT(*) AS n
+FROM scraped_courses
+WHERE university_id = 5
+  AND international_fee IS NOT NULL
+GROUP BY 1, 2
+ORDER BY n DESC;
+"
+   fee_source   | fee_term_source | n 
+----------------+-----------------+---
+ regex          |                 | 7
+ gemini_primary |                 | 6
+(2 rows)
+
+root@university-and-course-data:~# 
