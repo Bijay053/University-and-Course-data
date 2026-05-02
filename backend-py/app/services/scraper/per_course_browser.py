@@ -42,6 +42,13 @@ _INTERNATIONAL_TOGGLE_HOSTS = (
     # Without clicking International the rendered HTML shows domestic fees only
     # (hides Full course fee, IELTS requirements, intake dates).
     "murdoch.edu.au",
+    # UTAS: "DOMESTIC | INTERNATIONAL" tab bar rendered by JS on every course
+    # page. The Domestic tab is active by default — static HTML and the initial
+    # browser render show CSP / HECS domestic fees only. Clicking "INTERNATIONAL"
+    # reveals the international tuition fee, IELTS requirements, and international
+    # campus/location availability. The toggle button text is "INTERNATIONAL"
+    # (all-caps) which the JS lowercases before matching ^international$.
+    "utas.edu.au",
 )
 
 
@@ -144,6 +151,12 @@ _NETWORKIDLE_HOSTS: tuple[str, ...] = (
     # UniSQ: course detail panels (fees, entry requirements, study modes) are
     # React-rendered after page load. Need networkidle to catch the XHR content.
     "unisq.edu.au",
+    # UTAS: the DOMESTIC/INTERNATIONAL tab panels are JS-rendered. Without
+    # networkidle the tab button may not have mounted when the toggle JS fires,
+    # causing the click to miss and leaving the Domestic tab active. The 3s
+    # settle after networkidle also gives the tab-switch XHR time to complete
+    # before we snap the HTML.
+    "utas.edu.au",
 )
 
 # Hosts that need domcontentloaded + a longer-than-default JS settle window.
@@ -201,6 +214,14 @@ _FORCE_BROWSER_HOSTS: tuple[str, ...] = (
     # (even when english slots are filled from static) and override the fee
     # slot so the international fee replaces the domestic one.
     "vit.edu.au",
+    # UTAS: Cloudflare-protected. The Domestic tab is active by default so
+    # static HTML shows only CSP/HECS domestic fees. The browser must ALWAYS
+    # run (even if IELTS was somehow extracted from static HTML) and click the
+    # INTERNATIONAL tab to expose international fees, IELTS requirements and
+    # the correct campus/location list. The override flag ensures browser-
+    # rendered international values replace any domestic figures picked up
+    # during the static pass.
+    "utas.edu.au",
 )
 
 _NETWORKIDLE_SETTLE_MS = 3000
@@ -304,6 +325,12 @@ _EXTENDED_EXTRACT_HOSTS: frozenset[str] = frozenset({
     "www.unisq.edu.au",
     "vit.edu.au",
     "www.vit.edu.au",
+    # UTAS: after clicking the INTERNATIONAL tab, the rendered HTML contains
+    # the international fee, IELTS requirements, campus list and study mode.
+    # Run the full extractor suite so all those fields are populated from
+    # the browser-rendered International view rather than the static Domestic HTML.
+    "utas.edu.au",
+    "www.utas.edu.au",
 })
 
 # Field slots that each extended extractor fills — used to guard against
