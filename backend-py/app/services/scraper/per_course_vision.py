@@ -734,6 +734,7 @@ async def maybe_vision_refetch(
     emit: Callable[..., Awaitable[None]] | None = None,
     image_cache: VisionImageCache | None = None,
     degree_level: str | None = None,
+    skip_tier1_english: bool = False,
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     """Scan ``<img>`` tags on the course page and ask Gemini Vision to
     read any English-requirement tables found.
@@ -838,6 +839,14 @@ async def maybe_vision_refetch(
     evidence: list[dict[str, Any]] = []
     images_consumed = 0
     cache_hits = 0
+    tier1_skipped = 0
+
+    # Pre-compute: does regex already have a reliable IELTS overall from page
+    # text?  We check payload rather than re-running extraction; payload holds
+    # only text-extraction results at this point (sibling-cache backfill and
+    # central-data merge happen after this function returns in single_course.py).
+    _regex_has_ielts: bool = bool(payload.get("ielts_overall"))
+
     for img_url, alt in candidates:
         # Stop early once the vision pass ITSELF has found every overall
         # slot — saves Gemini calls on extra images once the requirements
@@ -849,6 +858,31 @@ async def maybe_vision_refetch(
         # wrong value (the ASAHE bug).
         if all(k in filled for k in _ENGLISH_OVERALL_SLOTS):
             break
+
+        is_tier0 = img_url in tier0_url_set
+
+        # ── Global tier-1 English OCR skip ───────────────────────────
+        # Skip Gemini OCR on tier-1 images (not DOM-anchored to the English
+        # requirements section) when EITHER:
+        #   A. skip_tier1_english=True — per-uni opt-out (e.g. Flinders: all
+        #      tier-1 images hallucinate; regex is the only reliable source).
+        #   B. regex already found ielts_overall from page text — a tier-1
+        #      image that AGREES would add nothing new; one that DISAGREES
+        #      would be discarded by sub-gate A in the caller anyway.
+        #      Exception: ASAHE-type unis where requirements are image-only
+        #      never have ielts_overall in payload at this point, so the
+        #      skip never fires for them.
+        # This is a pure cost/time saving: no Gemini call, no download, no
+        # parse.  Tier-0 images (found inside the English requirements DOM
+        # section) are always processed regardless of either flag.
+        if not is_tier0 and (skip_tier1_english or _regex_has_ielts):
+            tier1_skipped += 1
+            log.info(
+                "[VISION SKIP TIER1] %s: skipping tier-1 image %s "
+                "(skip_tier1_english=%s, regex_has_ielts=%s)",
+                url, img_url[-80:], skip_tier1_english, _regex_has_ielts,
+            )
+            continue
 
         # ── Per-image cache lookup with in-flight coalescing ─────────
         # Same image URL seen on a sibling course in this scrape? Reuse
@@ -1090,10 +1124,12 @@ async def maybe_vision_refetch(
             v = filled.get(k)
             return str(v) if v not in (None, "", 0) else "—"
 
-        cache_note = f" (cache hits {cache_hits})" if cache_hits else ""
+        skip_note = f" tier1_skipped={tier1_skipped}" if tier1_skipped else ""
+        cache_note = f" cache_hits={cache_hits}" if cache_hits else ""
         await emit(
             "status",
-            f"[per-course vision img {images_consumed}/{len(candidates)}{cache_note}] "
+            f"[per-course vision img {images_consumed}/{len(candidates)}"
+            f"{cache_note}{skip_note}] "
             f"{url} — IELTS={_fmt('ielts_overall')} "
             f"PTE={_fmt('pte_overall')} TOEFL={_fmt('toefl_overall')} "
             f"CAE={_fmt('cambridge_overall')}",
@@ -1102,6 +1138,7 @@ async def maybe_vision_refetch(
             url=url,
             consumed=images_consumed,
             cache_hits=cache_hits,
+            tier1_skipped=tier1_skipped,
             filled=list(filled.keys()),
         )
 
