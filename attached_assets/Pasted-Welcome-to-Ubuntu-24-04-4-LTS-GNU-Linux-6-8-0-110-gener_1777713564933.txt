@@ -1,0 +1,120 @@
+Welcome to Ubuntu 24.04.4 LTS (GNU/Linux 6.8.0-110-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/pro
+
+ System information as of Sat May  2 08:57:38 UTC 2026
+
+  System load:           0.01
+  Usage of /:            3.7% of 231.44GB
+  Memory usage:          18%
+  Swap usage:            0%
+  Processes:             187
+  Users logged in:       1
+  IPv4 address for eth0: 159.65.152.72
+  IPv4 address for eth0: 10.47.0.13
+  IPv6 address for eth0: 2400:6180:100:d0:0:1:3615:5001
+
+Expanded Security Maintenance for Applications is not enabled.
+
+17 updates can be applied immediately.
+To see these additional updates run: apt list --upgradable
+
+1 additional security update can be applied with ESM Apps.
+Learn more about enabling ESM Apps service at https://ubuntu.com/esm
+
+
+Last login: Sat May  2 05:50:16 2026 from 162.243.190.66
+root@university-and-course-data:~# cd /root/University-and-Course-data && git pull origin main && systemctl restart uni-celery.service uni-api-py.service
+remote: Enumerating objects: 23, done.
+remote: Counting objects: 100% (23/23), done.
+remote: Compressing objects: 100% (15/15), done.
+remote: Total 15 (delta 12), reused 0 (delta 0), pack-reused 0 (from 0)
+Unpacking objects: 100% (15/15), 3.64 KiB | 372.00 KiB/s, done.
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+   938d198..df26252  main       -> origin/main
+Updating 938d198..df26252
+Fast-forward
+ backend-py/app/services/scraper/orchestrator.py            | 30 +++++++++++++++++++++++++++---
+ backend-py/app/services/scraper/pipelines/single_course.py | 39 ++++++++++++++++++++++++++++++---------
+ 2 files changed, 57 insertions(+), 12 deletions(-)
+root@university-and-course-data:~/University-and-Course-data# sudo -u postgres psql -d university_portal -c "
+DELETE FROM fee_schedule_cache
+WHERE university_id = 12
+  AND (expires_at IS NULL OR expires_at < NOW() + INTERVAL '7 days');
+"
+ERROR:  relation "fee_schedule_cache" does not exist
+LINE 2: DELETE FROM fee_schedule_cache
+                    ^
+root@university-and-course-data:~/University-and-Course-data# sudo -u postgres psql -d university_portal << 'SQL'
+SELECT sc.course_name, sc.status, sc.created_at,
+       sfe.candidate_value AS ielts, sfe.extraction_method
+FROM scraped_field_evidence sfe
+JOIN scraped_courses sc ON sfe.scraped_course_id = sc.id
+WHERE sc.university_id = 12
+  AND sfe.field_key = 'ielts_overall'
+  AND sfe.selected = true
+  AND sc.course_name LIKE '%Government and International Relations%'
+ORDER BY sc.created_at DESC;
+SQL
+                             course_name                              |  status  |          created_at           | ielts |     extraction_method      
+----------------------------------------------------------------------+----------+-------------------------------+-------+----------------------------
+ Doctor of Philosophy (Phd) in Government and International Relations | approved | 2026-04-28 13:23:37.331154+00 | 6.0   | sibling_cache:postgraduate
+(1 row)
+
+root@university-and-course-data:~/University-and-Course-data# sudo -u postgres psql -d university_portal -c "
+DELETE FROM central_page_cache
+WHERE university_id = 12
+  AND page_type = 'fee_schedule';
+SELECT 'deleted ' || ROW_COUNT || ' fee_schedule cache row(s) for Flinders' AS result;
+"
+DELETE 1
+ERROR:  column "row_count" does not exist
+LINE 5: SELECT 'deleted ' || ROW_COUNT || ' fee_schedule cache row(s...
+                             ^
+root@university-and-course-data:~/University-and-Course-data# sudo -u postgres psql -d university_portal << 'SQL'
+DELETE FROM central_page_cache
+WHERE university_id = 12
+  AND page_type = 'fee_schedule';
+SQL
+DELETE 1
+root@university-and-course-data:~/University-and-Course-data# sudo -u postgres psql -d university_portal << 'SQL'
+SELECT sc.university_id, u.name AS university,
+       sfe.field_key,
+       COUNT(*) AS contaminated_rows
+FROM scraped_field_evidence sfe
+JOIN scraped_courses sc ON sfe.scraped_course_id = sc.id
+JOIN universities u ON sc.university_id = u.id
+WHERE sfe.extraction_method LIKE 'sibling_cache:%'
+  AND sfe.selected = true
+  AND sfe.field_key IN (
+      'ielts_overall','ielts_listening','ielts_reading',
+      'ielts_writing','ielts_speaking',
+      'pte_overall','toefl_overall','cambridge_overall'
+  )
+  AND sc.status IN ('approved','published')
+GROUP BY sc.university_id, u.name, sfe.field_key
+ORDER BY sc.university_id, sfe.field_key;
+SQL
+ university_id |        university        |     field_key     | contaminated_rows 
+---------------+--------------------------+-------------------+-------------------
+             4 | Charles Sturt university | pte_overall       |                 3
+             5 | University of Tasmania   | pte_overall       |                 1
+             5 | University of Tasmania   | toefl_overall     |                 1
+            12 | Flinders University      | ielts_overall     |                59
+            17 | SCU                      | cambridge_overall |                 2
+            17 | SCU                      | pte_overall       |                 2
+            17 | SCU                      | toefl_overall     |                 2
+            20 | aut                      | ielts_overall     |                 4
+            20 | aut                      | pte_overall       |                32
+(9 rows)
+
+root@university-and-course-data:~/University-and-Course-data# cd /root/University-and-Course-data && git pull origin main && systemctl restart uni-celery.service uni-api-py.service
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+Already up to date.
+
+root@university-and-course-data:~/University-and-Course-data# 
+root@university-and-course-data:~/University-and-Course-data# 
