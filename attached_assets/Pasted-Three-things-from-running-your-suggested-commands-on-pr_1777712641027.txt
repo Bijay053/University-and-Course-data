@@ -1,0 +1,66 @@
+Three things from running your suggested commands on prod.
+
+**1. Confirmed: live catalog has at least one sibling_cache fabrication on an approved row.**
+
+Direct DB query result for the PhD in Government and International Relations:
+
+```
+course_name: Doctor of Philosophy (Phd) in Government and International Relations
+status: approved
+created_at: 2026-04-28 13:23:37
+ielts: 6.0
+extraction_method: sibling_cache:postgraduate
+```
+
+This row is live in the catalog right now with fabricated IELTS data. It was approved four days ago. The research-bucket fix (f80c8ce) prevents new rows from being created this way, but existing approved rows still carry the fabricated values.
+
+This answers the spreadsheet/log mismatch from my last message: the spreadsheet shows IELTS=6 because the DB actually has IELTS=6 from sibling_cache. The log shows `IELTS: ❌ not found` because the new scrape (with the research-bucket fix active) correctly produced an empty value — but the new scrape's row hasn't been promoted yet, so the spreadsheet is showing the old approved row with the fabricated value.
+
+We need to run the catalog-wide audit now to scope the contamination across all 12 unis. Suggested query (covers all English test fields, not just IELTS sub-scores):
+
+```sql
+SELECT sc.university_id, u.name AS university,
+       sfe.field_key,
+       COUNT(*) AS contaminated_rows
+FROM scraped_field_evidence sfe
+JOIN scraped_courses sc ON sfe.scraped_course_id = sc.id
+JOIN universities u ON sc.university_id = u.id
+WHERE sfe.extraction_method LIKE 'sibling_cache:%'
+  AND sfe.selected = true
+  AND sfe.field_key IN (
+      'ielts_overall','ielts_listening','ielts_reading',
+      'ielts_writing','ielts_speaking',
+      'pte_overall','toefl_overall','cambridge_overall'
+  )
+  AND sc.status IN ('approved','published')
+GROUP BY sc.university_id, u.name, sfe.field_key
+ORDER BY sc.university_id, sfe.field_key;
+```
+
+Please run this and paste the breakdown by uni. The number determines remediation scope and may shift handover timing.
+
+**2. New commit df26252 — what's in it?**
+
+The `git pull` brought in `938d198..df26252` with changes to `orchestrator.py` (+30 lines) and `pipelines/single_course.py` (+39 lines). I don't have context on what this commit changes. Could you walk through what df26252 does? Particularly relevant if it touches the `online_only` rejection path I flagged in the previous message — we need to know whether the next re-scrape will still drop those 87 valid courses.
+
+**3. Cache-bust query failed — wrong table name.**
+
+Running your suggested cache-bust hit:
+
+```
+ERROR: relation "fee_schedule_cache" does not exist
+```
+
+What's the actual table name? Or is the fee schedule cache stored in a different mechanism (JSON column, in-memory, file-system)? Without a working cache-bust the next Flinders re-scrape will likely hit the same `[CACHE] fee_schedule hit → 5 record(s)` line and the MBA parent fee will stay blank for the same reason.
+
+**Before re-scraping Flinders**
+
+Three things need to land first:
+
+1. The catalog audit answer (one query, one minute)
+2. Confirmation of what df26252 does (does it fix online_only over-rejection or not?)
+3. Working cache-bust command for the fee schedule
+
+If df26252 doesn't fix the online_only regression, that's the third blocker for Flinders re-scrape. The other two blockers from my previous message remain: name dedup not firing in the log, and the online_only filter dropping 87 valid courses.
+
+The research-bucket fix is genuinely working at the scraping level — the log proves PhD rows now produce truthful empty IELTS. But until we know the contamination scope on the live catalog, we can't promote anything new to it without potentially compounding the existing problem.
