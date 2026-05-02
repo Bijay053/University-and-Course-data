@@ -1,0 +1,44 @@
+root@university-and-course-data:~/University-and-Course-data# cd /root/University-and-Course-data && git pull origin main
+systemctl restart uni-api-py.service uni-celery.service
+remote: Enumerating objects: 13, done.
+remote: Counting objects: 100% (13/13), done.
+remote: Compressing objects: 100% (7/7), done.
+remote: Total 7 (delta 6), reused 0 (delta 0), pack-reused 0 (from 0)
+Unpacking objects: 100% (7/7), 1.16 KiB | 394.00 KiB/s, done.
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+   4dfd812..67b948f  main       -> origin/main
+Updating 4dfd812..67b948f
+Fast-forward
+ artifacts/university-portal/src/components/review-scraped-courses-table.tsx | 36 +++++++++++++++++++++++++++++++++---
+ 1 file changed, 33 insertions(+), 3 deletions(-)
+root@university-and-course-data:~/University-and-Course-data# cd /root/University-and-Course-data && git pull origin main
+systemctl restart uni-api-py.service uni-celery.service
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+Already up to date.
+root@university-and-course-data:~/University-and-Course-data# cd /root/University-and-Course-data
+pnpm --filter @workspace/university-portal run build
+
+> @workspace/university-portal@0.0.0 build /root/University-and-Course-data/artifacts/university-portal
+> vite build --config vite.config.ts
+
+vite v7.3.1 building client environment for production...
+src/components/ui/tooltip.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/label.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/progress.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/dropdown-menu.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/select.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/command.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+✓ 1879 modules transformed.
+dist/public/index.html                                 0.74 kB │ gzip:   0.41 kB
+dist/public/assets/image_1776917782083-Beo3ixZx.png   10.01 kB
+dist/public/assets/index-S324g0sH.css                131.97 kB │ gzip:  21.79 kB
+dist/public/assets/index-DNqLHvIZ.js                 868.79 kB │ gzip: 244.57 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 5.35s
+root@university-and-course-data:~/University-and-Course-data# 
