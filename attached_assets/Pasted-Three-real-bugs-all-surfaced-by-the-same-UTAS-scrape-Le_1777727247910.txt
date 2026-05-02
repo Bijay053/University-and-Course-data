@@ -1,0 +1,117 @@
+Three real bugs, all surfaced by the same UTAS scrape. Let me lay them out cleanly before drafting the message.
+Bug A — international section ignored, domestic data captured instead
+Look at the L6b evidence panel you just sent. The page CLEARLY has international fee info — the regex found it: "International students 2026 Total Tuition Fee (international students): $25,950 AUD* Tuition fee based on a rate of $51,900 AUD per standard, full-time year of study". So extraction CAN see the international section. But Gemini still wrote domestic_fee=16531, fee_term=Annual, etc. — and the regex got international_fee=51900 separately.
+Then look at the 11 rejected no_international_fee rows. Their Gemini responses all read like:
+json{"international_fee": null, "domestic_fee": 9420, "fee_term": "Annual", ...}
+or
+json{"international_fee": null, "domestic_fee": 9887, "fee_term": "Annual", ...}
+These are UTAS pages with a "Domestic / International" tab structure. The Gemini prompt is reading the Domestic tab (default-rendered) and missing the International tab. Where regex catches international fee separately (L6b), the row stages with both. Where regex doesn't (the 11 rejects), only domestic_fee comes through and the row is rejected.
+This is the original Bug 2 from your dashboard — A$9,887 / A$13,152 / A$9,420 fees are domestic Commonwealth-supported rates, not international. They were domestic all along, the previous scrape just labelled them as international_fee. The new scrape correctly identified them as domestic and rejected the rows. The fact that 11 rows now flip to no_international_fee rejection is actually progress, not a regression — but only if the underlying capture-domestic-as-international bug is acknowledged and the international tab is reachable for the rows that should stage.
+Bug B — suppressed fields display in dashboard without admin approval
+You wrote: "Suppressed fields are shown in table without admin approval." The evidence panel shows "Show 5 suppressed fields" — meaning the system tagged 5 fields as suppressed (correctly — likely things flagged as low confidence or contaminated), but the dashboard table view is rendering them anyway. Suppression should mean don't-display, not just don't-promote. This is a UI bug separate from extraction.
+Bug C — location field is capturing intake/semester text
+L6b row in your dashboard: Course Location: "Hobart Legal Practice" — that one's actually clean.
+But other UTAS rows in the dashboard show:
+
+"Hobart Semester 1, Semester 2 Launceston Semester 1, Semester 2"
+"Cradle Coast Semester 1 Launceston Semester 1"
+"Hobart Semester 1, Semester 2 Launceston Semester 1, Semester 2 Spring"
+
+Those are not locations — those are intake/semester tags concatenated to location strings because the extractor is grabbing the whole "Locations and intakes" panel. The location should be "Hobart, Launceston". The intake should be a separate field that already has ["February", "July"].
+Look at the field traces in the log: study_mode:rule url=... lines like location='Hobart Semester 1, Semester 2 Launceston Semester 1, Semester 2'. The location extractor is concatenating the intake labels from the same DOM element. This isn't UTAS-only — Torrens had similar issues — but UTAS makes it visually obvious because their intake structure is denser.
+Now the message to send Replit.
+
+Three bugs from the UTAS re-scrape. None block the domestic-only filter fix you shipped — that part worked. But none of these 28 staged rows should promote until A and C are addressed.
+The 4accb5e domestic-only fix did its job: the 11 no_international_fee rejections include all the /93/63 doubles and a few other domestic-only courses. Filter side is clean. The new bugs surfaced by examining what did stage.
+
+Bug A — extractor reads the Domestic tab on UTAS pages, ignores the International tab
+UTAS course pages have a "Domestic / International" tab structure with Domestic shown by default. The Gemini prompt is reading the default-rendered Domestic content and emitting international_fee=null, domestic_fee=<low number>, fee_term=Annual. Evidence — every single one of the 11 [STAGE] skipped … no_international_fee rows has Gemini output of this exact shape. Examples:
+
+93G → domestic_fee=14485 (page actually says international = $38,950)
+93I → domestic_fee=9420 (international not captured)
+93E → domestic_fee=9887 (international not captured)
+93F → domestic_fee=10464
+21A (Diploma of University Studies) → domestic_fee=7520 (international actually visible at $25,950 for 50% credit-points, $51,900 annual, but Gemini missed it)
+
+Where the L6b row staged successfully it's because the regex caught international_fee=51900 from the page's plain text outside the tabbed panel — the Gemini portion of that same row STILL emits domestic_fee=16531, fee_term=Annual. So the row has both numbers but the international one came from regex luck, not from Gemini reading the right tab.
+This is also the original Bug 2 from the previous dashboard cycle. Last time, the dashboard showed A$9,887 / A$13,152 / A$9,420 labelled as international_fee because the prior scrape pipeline blindly treated whatever fee number appeared as international. The new scrape correctly identifies these as domestic — that's actually progress — but the international values are still missing because the Domestic-tab-only Gemini read can't see them.
+The fix needs to live in two places:
+
+Pre-Gemini text extraction must include the International tab content. UTAS uses a JS-toggled tab; static HTML may include both panels with one hidden via CSS, OR rendered HTML may need the browser to click the International tab before scraping text. Check what's in static=…B rendered=…B using=static for these UTAS pages. If rendered=0B it means we never rendered, only used static — and static may have International content present-but-hidden, in which case BeautifulSoup.get_text() should already see it. If it does see it, then problem 2:
+Gemini prompt is selecting the Domestic content over the International content. When both are in the input, Gemini is preferring Domestic because it appears first in the DOM and the prompt doesn't say "if international section exists, prefer international". Need to add an explicit instruction in the Gemini system prompt:
+
+"If the page has separate Domestic and International sections (common pattern: tabs labelled 'Domestic' and 'International'), extract international_fee, ielts_overall, etc. from the International section. Use Domestic only for domestic_fee. Never put a domestic-tab fee value into international_fee."
+
+Plus: log which section the value came from (e.g. add a _extraction_section debug field to Gemini output during dev) so we can verify the fix worked without manual page inspection.
+
+Verification queries before promote:
+sql-- How many staged UTAS rows have international_fee that came from regex vs Gemini?
+SELECT 
+  extraction_method->>'international_fee' AS source,
+  COUNT(*),
+  AVG(international_fee)
+FROM scraped_courses
+WHERE university_id = 27 AND status = 'pending'
+  AND international_fee IS NOT NULL
+GROUP BY source;
+If most successful international_fee values came from regex and Gemini's column is mostly null or domestic-shaped, the prompt fix is the priority over the pre-extraction fix.
+bash# Spot-check what Gemini is actually seeing on a UTAS double-degree page:
+curl -s 'https://www.utas.edu.au/courses/arts-soc/courses/93b-bachelor-of-economics-and-bachelor-of-laws' \
+  | grep -A2 -B2 -iE '(international students|tuition fee|fee.*per year|annual fee)' | head -60
+If the international fee number is in the static HTML response, Gemini has it and is choosing wrong → prompt fix. If it's not, the page renders International via JS only → need browser-render fallback for UTAS pages.
+
+Bug B — suppressed fields render in the dashboard table without admin approval
+The L6b evidence panel shows "Show 5 suppressed fields" — meaning 5 fields were marked suppressed by extraction logic (presumably low-confidence or contaminated data). But the dashboard table view (Course Location: "Hobart Legal Practice", IELTS: 6.5, etc.) is rendering full row data without checking the suppression flag.
+Suppression should mean field is hidden from production until admin approves. The flag is being set correctly during extraction. The dashboard table renderer is ignoring it.
+This is a UI/dashboard bug, not extractor. Find where the dashboard reads scraped_courses for the table view and add a WHERE NOT suppressed filter, or render the suppressed fields with an "Admin review required" treatment instead of plain values.
+If you want to verify before fixing, query:
+sqlSELECT id, course_name, suppressed_fields
+FROM scraped_courses
+WHERE university_id = 27 AND status = 'pending'
+  AND suppressed_fields IS NOT NULL AND suppressed_fields != '[]';
+(Adjust column name if it's stored differently — could be evidence->>'suppressed' or a separate column.) Compare what shows in the dashboard cells against what's in suppressed_fields. Cells that show a value but appear in the suppressed list = bug confirmed.
+
+Bug C — course_location field captures intake text instead of just locations
+Examples from this UTAS dashboard:
+
+93I row → Course Location: "Hobart Semester 1, Semester 2 Launceston Semester 1, Semester 2"
+43B row → Course Location: "Cradle Coast Semester 1 Launceston Semester 1"
+P3l row → Course Location: "Hobart, Australia"  ← clean
+L6b row → Course Location: "Hobart Legal Practice" ← clean (specialty subtitle is OK)
+
+What the location should be: "Hobart, Launceston" or "Cradle Coast, Launceston".
+What's being captured: location names concatenated with intake/semester labels from the same DOM panel.
+This isn't UTAS-only — Torrens had analogous issues with category labels bleeding into location. The pattern: UTAS renders a panel with structure like:
+Hobart
+  Semester 1
+  Semester 2
+Launceston
+  Semester 1
+  Semester 2
+The location extractor is grabbing the whole panel as one string. The intake extractor is correctly pulling ["February", "July"] from the same panel via a different mechanism (regex conf=0.70 per the field summary lines). So the intake parser knows how to disambiguate. The location parser doesn't.
+Fix: the location extractor needs to read only the campus-name nodes and stop at the first child element that looks like an intake label (contains "Semester", "Period", "Trimester", or month names). Or use the intake parser's segmentation logic and take only the parent campus nodes.
+Smoke tests required:
+python# These should all return clean campus names:
+assert extract_location("Hobart Semester 1, Semester 2 Launceston Semester 1, Semester 2") == "Hobart, Launceston"
+assert extract_location("Cradle Coast Semester 1 Launceston Semester 1") == "Cradle Coast, Launceston"
+assert extract_location("Hobart, Australia") == "Hobart, Australia"  # already clean
+assert extract_location("Hobart Legal Practice") == "Hobart Legal Practice"  # subtitle/specialty, not intake
+assert extract_location("Hobart Half Year Period 1, Half Year Period 2") == "Hobart"  # P3i pattern
+The "Hobart Legal Practice" case is tricky — it's a specialty descriptor not an intake. The discriminator is intake words specifically (Semester / Period / Trimester / month names), not all multi-word strings. Don't over-strip.
+
+Other observations that don't need immediate fixes but are worth logging
+The handbook-archive pages are getting scraped as courses. 2015–2024 course list pages each ate one extraction slot, all rejected as no_international_fee correctly, but they consumed Gemini calls (~$0.005 in wasted spend). Discovery should either filter /handbook-archive/ URLs or classify them as category_landing_page pre-extraction. Lower priority, but a recurring waste.
+HTTP-blocked + browser fallback is expensive. Every UTAS course page hit [BROWSER↑] HTTP blocked … retrying via browser. That's the static HTTP fetcher being blocked by Cloudflare and falling back to per-course browser. Doubles the per-course time. Worth a per-uni override: UTAS should skip static and go straight to browser. The 25.4s/course average vs Torrens 13.9s/course is mostly this.
+The category landing pages got trapped at discovery. "Education" landing page (/study/undergraduate/education) was extracted instead of being filtered at discovery. Got rejected as generic category page post-extraction but again wasted a Gemini call. Same pattern as Torrens "Course Guides" / "Workforce Edge" before the fix shipped.
+
+Promote criteria
+Don't promote any of the 28 staged UTAS rows yet. The L6b row that looks complete on the dashboard has a wrong domestic_fee (16531 from the wrong tab) being captured as a row attribute. The other rows have the location-bleed problem on the visible field. The 11 rejections are correct-by-luck (regex didn't catch international, so they were dropped) but the underlying bug isn't fixed.
+Order of fixes:
+
+Bug C (location field) — narrow, regex/parser change, should sweep clean. Fixes the visible mess on the dashboard.
+Bug A (Gemini prompt + tab handling) — bigger change. Affects every uni that uses tabbed Domestic/International structure. After fix, re-scrape UTAS and confirm the 11 rejected rows now stage with correct international_fee values.
+Bug B (dashboard suppression rendering) — UI fix, no extractor risk. Can ship in parallel with A or C.
+
+After all three: re-scrape UTAS, verify staging is clean, then a separate decision on the 173 live courses rows (likely all need re-promotion with corrected data, but that's a session in itself).
+One process question, same one as before, getting blunter. Bug A is the same bug we discussed two sessions ago — the dashboard was showing A$9,887 / A$13,152 as international fees. We fixed the symptom by improving classification (so the wrong values flip to domestic_fee correctly now). We never fixed the cause — the extractor never reads the International tab. Now the rows get rejected instead of being staged with wrong data, which is technically better, but the user-facing outcome is "UTAS courses are still missing from the platform." Worth deciding which is the actual fix: improve classification (current path) or fix tab-reading (root cause). The first path keeps us rejecting valid courses indefinitely.
+Send back the verification query results from the diagnostic above and I'll review before promote is considered.
