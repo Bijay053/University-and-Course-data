@@ -1533,10 +1533,24 @@ async def extract_course(
         else:
             from app.services.scraper.per_course_vision import maybe_vision_refetch
 
+            # Determine whether to skip tier-1 images before calling Gemini.
+            # This saves the API call entirely rather than calling then discarding.
+            #   • skip_tier1_english=True when the uni YAML sets
+            #     trust_tier1_vision_ocr_english=false (Flinders and any future
+            #     uni where tier-1 images are known to hallucinate).
+            #   • The function also skips tier-1 images automatically when
+            #     payload already has ielts_overall from regex (global cost-saver
+            #     for every uni — regex found it in text, vision adds nothing).
+            _uc_pre = get_uni_config()
+            _skip_tier1 = not (
+                _uc_pre is None
+                or _uc_pre.extraction.english.trust_tier1_vision_ocr_english
+            )
             vision_filled, vision_evidence = await maybe_vision_refetch(
                 url, rendered_html or html, payload, emit=emit,
                 image_cache=vision_image_cache,
                 degree_level=payload.get("degree_level"),
+                skip_tier1_english=_skip_tier1,
             )
         # Authority-aware merge: per_course_vision (tier 4) overrides any
         # tier-3 text extraction (regex, Gemini, browser, AI fallback).
@@ -1593,13 +1607,14 @@ async def extract_course(
 
         _incoherent_img_urls: set[str] = set()
 
-        # ── Per-uni tier-1 English OCR opt-out ───────────────────────────
-        # When extraction.english.trust_tier1_vision_ocr_english=false in the
-        # uni YAML, ALL tier-1 images are pre-emptively blocked from supplying
-        # English test scores.  Tier-0 (DOM-anchored requirements section)
-        # images are still trusted.  Sub-gates A/B run only if this flag is
-        # true (default).  Flinders is the canonical opt-out: regex reliably
-        # extracts IELTS from page text; tier-1 vision only hallucinated values.
+        # ── Per-uni tier-1 English OCR opt-out (safety net) ─────────────
+        # maybe_vision_refetch already skips tier-1 images before calling
+        # Gemini when skip_tier1_english=True or when payload has ielts_overall.
+        # This block is a belt-and-suspenders guard: any tier-1 evidence that
+        # somehow reached vision_evidence despite those pre-filters is added to
+        # _incoherent_img_urls so the merge loop discards it.  In normal
+        # operation this loop runs but adds nothing (vision_evidence has no
+        # tier-1 entries for skipped images).
         _uc = get_uni_config()
         _tier1_english_trusted = (
             _uc is None
@@ -1614,7 +1629,7 @@ async def extract_course(
             if _incoherent_img_urls:
                 log.info(
                     "[VISION TIER1 ENGLISH DISABLED] %s: %d tier-1 image(s) "
-                    "pre-blocked for English test fields (trust_tier1_vision_ocr_english=false)",
+                    "blocked for English test fields (trust_tier1_vision_ocr_english=false)",
                     url,
                     len(_incoherent_img_urls),
                 )
