@@ -533,6 +533,21 @@ async def extract_course(
         if changed:
             url = urlunparse(_parsed_url._replace(query=urlencode({k: v[0] for k, v in _qs.items()})))
 
+    # UTAS: course listing pages sometimes link to the domestic-tab anchor
+    # (``#tabDomestic``).  URL fragments are stripped by every HTTP client
+    # before sending the request so the server always returns the full-page
+    # HTML regardless of the fragment — BUT Playwright respects the fragment
+    # and activates the domestic tab via JavaScript, hiding the international
+    # section.  When the domestic tab is active the page body contains
+    # "may not be available to international students" and the domestic-only
+    # filter incorrectly rejects the course.  We strip the fragment so
+    # Playwright lands on the default (combined) view and both tabs are
+    # visible in the rendered DOM.
+    _parsed_url = urlparse(url)
+    if _parsed_url.netloc in ("www.utas.edu.au", "utas.edu.au"):
+        if (_parsed_url.fragment or "").lower() in ("tabdomestic", "tab-domestic"):
+            url = urlunparse(_parsed_url._replace(fragment=""))
+
     if html is None:
         html = await fetch_html(url)
     if not html:
