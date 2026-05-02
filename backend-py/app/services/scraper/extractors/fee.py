@@ -252,6 +252,12 @@ _FEE_LABEL_RE = re.compile(
     r"tuition\s+fees?\s*\(international\)|"
     r"fees?\s*\(international\)|"
     r"international\s+annual\s+fees?|"
+    # ── UTAS-style labels: "2026 annual international student tuition fee"
+    # The label includes an optional 4-digit year prefix (e.g. "2026 annual
+    # …") and the words "annual international student tuition fee".
+    # Must appear BEFORE the generic "annual …" block below so the more
+    # specific pattern wins when both could match.
+    r"(?:\d{4}\s+)?annual\s+international\s+(?:student\s+)?tuition\s+fees?|"
     # ── Generic annual / indicative labels (UOW, UniSQ, etc.) ──────────
     # These appear when the page is already filtered to the international
     # view (e.g. ?students=international query param) so "international"
