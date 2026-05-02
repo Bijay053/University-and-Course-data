@@ -1,0 +1,36 @@
+# University of Tasmania (UTAS)
+# Hostname: www.utas.edu.au
+# uni_id: 5 (prod)
+#
+# ── Browser behaviour (NOT in YAML schema — see per_course_browser.py) ──────
+#
+# UTAS is Cloudflare-protected. Static HTML is a JS challenge page so every
+# useful field comes from the Playwright browser pass.
+#
+# per_course_browser.py hardcoded lists (host-scoped to utas.edu.au):
+#   _INTERNATIONAL_TOGGLE_HOSTS — click the INTERNATIONAL tab before snapping
+#       HTML. The Domestic tab is active by default; without the click, the
+#       browser sees only CSP/HECS domestic fees.
+#   _FORCE_BROWSER_HOSTS        — always run the browser even when IELTS is
+#       already populated from static HTML.
+#   _EXTENDED_EXTRACT_HOSTS     — run the full extractor suite (fee, location,
+#       study_mode, intake, duration, english_test) on the rendered DOM, not
+#       just english_test.
+#   _NETWORKIDLE_HOSTS          — wait for networkidle + 3 s settle before the
+#       toggle JS fires; domcontentloaded + 1.5 s was too short for UTAS's
+#       JS tab panels to mount.
+#
+# These will be migrated to YAML once the schema adds browser_behavior fields.
+#
+# ── Text-level international section reorder (gemini_primary.py) ─────────────
+#
+# The Gemini step also has a text-level reorder (_promote_international_text)
+# that moves the "International students" section before the "Domestic students"
+# / CSP/HECS anchors in the flat plain-text passed to Gemini.  This is a
+# belt-and-suspenders fix for the cases where the browser tab-click misses
+# (e.g. Cloudflare CAPTCHA, tab not mounted yet).
+
+extraction:
+  filters:
+    domestic_only:
+      enabled: true   # UTAS lists some domestic-only short courses; drop them.
