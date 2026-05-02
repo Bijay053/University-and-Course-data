@@ -277,7 +277,7 @@ _DOM_PANEL_RE = re.compile(
 )
 
 
-def _promote_international_panel(soup: Any) -> None:
+def _promote_international_panel(soup: Any, url: str = "") -> None:
     """Move the international tab/panel element *before* the domestic one.
 
     Australian university pages (UTAS, ACU, etc.) render a "Domestic" tab
@@ -309,6 +309,14 @@ def _promote_international_panel(soup: Any) -> None:
             if intl_panel and dom_panel:
                 break
 
+        log.info(
+            "gemini_primary[dom_reorder]: url=%s found_intl=%s found_dom=%s applied=%s",
+            url,
+            intl_panel is not None,
+            dom_panel is not None,
+            intl_panel is not None and dom_panel is not None and intl_panel is not dom_panel,
+        )
+
         if (
             intl_panel is not None
             and dom_panel is not None
@@ -319,7 +327,87 @@ def _promote_international_panel(soup: Any) -> None:
         pass  # never break on reorder failure
 
 
-def _extract_content_html(html: str) -> str:
+# ---------------------------------------------------------------------------
+# Text-level international section promotion (fallback for unknown DOM layouts)
+# ---------------------------------------------------------------------------
+# Text-level markers for identifying section boundaries.
+#
+# ``_INTL_TEXT_RE`` matches "International students" (or "For international
+# students") as a standalone phrase — crucially it requires the word
+# "students" to follow so it does NOT fire on compressed nav-bar text like
+# "InternationalDomestic" or "International|Domestic".
+#
+# ``_DOM_ANCHOR_RE`` matches the domestic section by looking for the words
+# "Domestic students" OR the distinctive CSP/HECS labels that appear only in
+# the domestic-tab content.  This is more robust than a heading-only match on
+# pages where the domestic heading is rendered as inline text with no breaks.
+_INTL_TEXT_RE = re.compile(
+    r"(?:For\s+)?International\s+students?\b",
+    re.IGNORECASE,
+)
+_DOM_ANCHOR_RE = re.compile(
+    r"(?:For\s+)?Domestic\s+students?\b"
+    r"|Commonwealth\s+Supported\s+Place"
+    r"|HECS[- ]HELP"
+    r"|Student\s+Contribution\s+Amount",
+    re.IGNORECASE,
+)
+
+
+def _promote_international_text(text: str, url: str = "") -> str:
+    """Text-level fallback: move the International section before the Domestic one.
+
+    ``html_to_text`` renders most pages as flat single-line strings without
+    block separators.  The DOM-level ``_promote_international_panel`` reorder
+    therefore cannot rely on newline markers.  This function works by finding
+    the first occurrence of an **international-section anchor**
+    (``"International students"``  — specifically requiring the word "students"
+    so it does not match the compressed nav label ``"InternationalDomestic"``)
+    and the first occurrence of a **domestic-section anchor**
+    (``"Domestic students"`` or a CSP/HECS label).
+
+    If the domestic anchor appears *before* the international anchor, everything
+    from the international anchor onward is extracted and prepended to the
+    remaining text so Gemini reads the international fee/IELTS data first.
+
+    Returns ``text`` unchanged when:
+    - Either anchor is absent (no tab structure detected — safe no-op).
+    - International anchor already precedes the domestic anchor.
+    - The anchors are within 50 characters of each other (likely part of the
+      same nav-bar label run, not genuine section headings).
+    """
+    m_intl = _INTL_TEXT_RE.search(text)
+    m_dom = _DOM_ANCHOR_RE.search(text)
+
+    if m_intl is None or m_dom is None:
+        log.debug("gemini_primary[text_reorder]: no section markers for %s", url)
+        return text
+
+    if m_intl.start() <= m_dom.start():
+        log.debug(
+            "gemini_primary[text_reorder]: international already before domestic "
+            "(intl@%d dom@%d) for %s",
+            m_intl.start(), m_dom.start(), url,
+        )
+        return text
+
+    # Extract the international block (from its first anchor to end of text)
+    # and prepend it.  We include everything from the anchor onward so we
+    # don't risk splitting related content — the pre-anchor domestic block
+    # follows as context.
+    intl_start = m_intl.start()
+    intl_block = text[intl_start:].strip()
+    pre_intl = text[:intl_start].strip()
+
+    log.info(
+        "gemini_primary[text_reorder]: promoted international section "
+        "(was at char %d / %d) for %s",
+        intl_start, len(text), url,
+    )
+    return intl_block + "\n\n" + pre_intl
+
+
+def _extract_content_html(html: str, url: str = "") -> str:
     """Return the HTML fragment most likely to contain course-specific content.
 
     Strategy (in order of preference):
@@ -336,7 +424,9 @@ def _extract_content_html(html: str) -> str:
 
     Also calls :func:`_promote_international_panel` before content extraction
     so the international-section text always precedes the domestic-section text
-    in the string Gemini receives (fixes UTAS / ACU domestic-tab-first bug).
+    in the string Gemini receives (fixes UTAS / ACU domestic-tab-first bug when
+    tab panels use predictable id/class names).  Text-level reorder in
+    :func:`_trim_text` handles unknown DOM layouts as a fallback.
     """
     try:
         from bs4 import BeautifulSoup, Tag
@@ -351,7 +441,7 @@ def _extract_content_html(html: str) -> str:
                 pass
 
         # Promote international panel before domestic panel (UTAS / ACU fix).
-        _promote_international_panel(soup)
+        _promote_international_panel(soup, url=url)
 
         # ── Path 1: <main> ────────────────────────────────────────────────
         main = soup.find("main")
@@ -383,16 +473,24 @@ def _extract_content_html(html: str) -> str:
         return html  # never break on parse failure
 
 
-def _trim_text(html: str, *, max_chars: int = 50_000) -> str:
-    """Extract main content, convert to plain text, trim to max_chars.
+def _trim_text(html: str, *, max_chars: int = 50_000, url: str = "") -> str:
+    """Extract main content, convert to plain text, reorder sections, trim.
 
-    Uses ``_extract_content_html`` to strip nav/header/footer before running
-    ``html_to_text``, so Gemini receives course-specific content rather than
-    navigation boilerplate.  Limit raised from 8 K to 50 K chars — Gemini
-    Flash's context window is 1 M tokens and the extra input costs < $0.001.
+    Steps:
+    1. ``_extract_content_html`` strips nav/header/footer and (where DOM
+       structure permits) reorders international/domestic tab panels so the
+       international section leads (``_promote_international_panel``).
+    2. ``html_to_text`` converts to plain text.
+    3. ``_promote_international_text`` is a text-level fallback that reorders
+       the 'International students' section before 'Domestic students' when
+       step 1's DOM reorder was a no-op (e.g. Cloudflare-protected pages whose
+       tab panels use non-standard id/class names like UTAS).
+    4. Truncate to max_chars if needed.
     """
-    content_html = _extract_content_html(html)
+    content_html = _extract_content_html(html, url=url)
     text = html_to_text(content_html)
+    # Text-level section reorder (fallback for unknown DOM layouts).
+    text = _promote_international_text(text, url=url)
     if len(text) <= max_chars:
         return text
     # For very long pages: prefer the first 40 K (intro + fees section) and
@@ -536,7 +634,7 @@ async def extract_primary(
     import asyncio as _asyncio
 
     fields_block = "\n".join(f"- {k}: {hint}" for k, hint in _HARD_FIELDS.items())
-    text = _trim_text(html)
+    text = _trim_text(html, url=url)
     prompt = _PROMPT_TEMPLATE.format(fields_block=fields_block, url=url, text=text)
 
     try:
@@ -569,11 +667,13 @@ async def extract_primary(
         len(filled),
         resp.cost_usd,
     )
-    # Debug dict — returned to caller so it can emit via the SSE/Celery log path
+    # Debug dict — returned to caller so it can emit via the SSE/Celery log path.
+    # text_snippet extended to 2000 chars so operators can see whether the
+    # international-section reorder fired and where the fee/IELTS data sits.
     _dbg: dict[str, Any] = {
         "html_len": len(html) if html else 0,
         "text_len": len(text),
-        "text_snippet": text[:500],
-        "raw_response": (resp.text or "")[:400],
+        "text_snippet": text[:2000],
+        "raw_response": (resp.text or "")[:600],
     }
     return filled, resp.cost_usd, resp.input_tokens, resp.output_tokens, _dbg
