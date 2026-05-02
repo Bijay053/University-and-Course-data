@@ -1,0 +1,17 @@
+Both answers solid. Sub-gate B is exactly the missing piece — "real requirements tables always show multiple tests" is observably true across the 12 unis already scraped, so it's grounded heuristics rather than a guess. The two gates compose correctly: A fires first if regex IELTS is present, B catches the no-regex-anchor case. Good.
+
+On Q2: withdrawn. IELTS is granular at 0.5 increments, observed mismatches are 0.5 and 1.0, 0.1 is exact-match-with-floating-point. The threshold is right.
+
+One small reframing: with sub-gate B in place, the no-regex path is no longer actually permissive — it's filtered by the ≥2-test rule. Worth being explicit because the residual risk has shifted. The remaining gap is: regex found nothing AND vision reads a non-course image that happens to contain ≥2 plausible-looking test overalls. Less common than the hero-banner-one-test pattern, but possible (an info graphic on a different topic that has IELTS+TOEFL example values, etc.). Not zero risk — just much smaller.
+
+The mitigation is the post-scrape evidence panel walk — specifically including a sub-gate B test case. My five-row plan:
+
+1. Bachelor of Arts — sub-gate A case (regex IELTS=6.0). Vision should now either agree or be discarded.
+2. Bachelor of Science — sub-gate A case (was returning suspicious 50/70 values).
+3. **Bachelor of Computing and Mathematical Sciences (Honours)** — sub-gate B case (regex IELTS=None). If test scores appear on this row, the evidence panel should show them coming from an image that supplied ≥2 overalls. This is the live verification of sub-gate B.
+4. Doctor of Philosophy (PhD) in Law — yesterday's Bluesky case, confirm clean.
+5. Bachelor of Clinical Sciences/Doctor of Medicine — control case, vision agreed with regex on the previous run.
+
+Agreed on Option 4 — wait for the in-flight scrape to finish, pull + restart prod, trigger one more clean run with both gates active, walk the five panels, then promote. Final answer probably 90 minutes from now (40 min for the next scrape + 20 min for verification + 30 min buffer for any surprises).
+
+I'll be ready to do the evidence panel walk as soon as the second scrape lands. No further action from your end until then.
