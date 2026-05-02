@@ -1585,7 +1585,15 @@ async def extract_course(
             except (TypeError, ValueError):
                 _regex_ielts = None
 
+        # English overall slots used by both sub-gates below.
+        _ENGLISH_OVERALL_SLOTS: frozenset[str] = frozenset({
+            "ielts_overall", "pte_overall", "toefl_overall",
+            "cambridge_overall", "duolingo_overall",
+        })
+
         _incoherent_img_urls: set[str] = set()
+
+        # ── Sub-gate A: IELTS-anchor mismatch (regex IELTS known) ────────
         if _regex_ielts is not None:
             for _vev in vision_evidence:
                 if (
@@ -1606,6 +1614,38 @@ async def extract_course(
                             )
                     except (TypeError, ValueError):
                         pass
+
+        # ── Sub-gate B: single-test tier-1 images when no regex anchor ───
+        # When regex found no IELTS at all (_regex_ielts is None), sub-gate A
+        # cannot fire.  A real requirements table always lists ≥2 English tests
+        # (IELTS + TOEFL, or IELTS + PTE, etc.).  A hero image or AEM content
+        # fragment that merely mentions "IELTS 6.5" in a caption will provide
+        # only one overall slot.  Reject tier-1 images that provide fewer than
+        # 2 distinct English overalls — they are almost certainly not the
+        # course's requirements table.
+        else:
+            # Count distinct English overalls per tier-1 image URL.
+            from collections import Counter as _Counter
+            _t1_overall_count: dict[str, int] = _Counter(
+                _vev["source_url"]
+                for _vev in vision_evidence
+                if (
+                    _vev.get("source_tier", 1) != 0  # tier-1/2 only
+                    and _vev.get("field_key") in _ENGLISH_OVERALL_SLOTS
+                    and _vev.get("source_url")
+                )
+            )
+            for _img_url, _cnt in _t1_overall_count.items():
+                if _cnt < 2:
+                    _incoherent_img_urls.add(_img_url)
+                    log.info(
+                        "[VISION SINGLE-TEST REJECT] %s: tier-1 img %r "
+                        "supplied only %d English overall slot(s) — "
+                        "requires ≥2 to be trusted without regex IELTS anchor",
+                        url,
+                        _img_url[-80:],
+                        _cnt,
+                    )
 
         for k, v in vision_filled.items():
             _prior_method = ""
