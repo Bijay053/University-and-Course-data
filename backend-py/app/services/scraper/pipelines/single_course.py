@@ -1551,6 +1551,62 @@ async def extract_course(
         # images can FILL empty slots but must not supersede regex /
         # equivalence_table results — they may have slipped through the
         # decorative filter and be hallucinating plausible-looking scores.
+
+        # ── Tier-1 IELTS-coherence gate ───────────────────────────────────
+        # Problem: a tier-1 AEM/hero image on a Flinders page may show a
+        # *generic* English requirements table (IELTS=6.5 for the faculty)
+        # rather than this specific course's requirements (IELTS=6.0 per
+        # regex).  The image passes the decorative filter (it IS a table) but
+        # is not course-specific.  It then silently fills empty TOEFL/PTE
+        # slots with values from the wrong table.
+        #
+        # Guard: if page-text (regex/structural) already established
+        # ielts_overall=X and a tier-1 vision image returned ielts_overall=Y
+        # where |X-Y| > 0.1, that image is reading a different course's table.
+        # Discard ALL fields sourced from that image — including TOEFL/PTE
+        # that would otherwise fill empty slots unchallenged.
+        _regex_ielts: float | None = None
+        _regex_ielts_method = next(
+            (
+                ev.get("method", "")
+                for ev in reversed(evidence)
+                if ev.get("field_key") == "ielts_overall"
+                and ev.get("decision_status") != "superseded"
+            ),
+            "",
+        )
+        if (
+            _regex_ielts_method
+            and not _regex_ielts_method.startswith("per_course_vision")
+            and not _regex_ielts_method.startswith("uni_pdf")
+        ):
+            try:
+                _regex_ielts = float(payload.get("ielts_overall") or 0) or None
+            except (TypeError, ValueError):
+                _regex_ielts = None
+
+        _incoherent_img_urls: set[str] = set()
+        if _regex_ielts is not None:
+            for _vev in vision_evidence:
+                if (
+                    _vev.get("field_key") == "ielts_overall"
+                    and _vev.get("source_tier", 1) != 0
+                ):
+                    try:
+                        if abs(float(_vev["value"]) - _regex_ielts) > 0.1:
+                            _incoherent_img_urls.add(_vev.get("source_url", ""))
+                            log.info(
+                                "[VISION IELTS INCOHERENT] %s: img %r returned "
+                                "ielts_overall=%.1f but regex established %.1f — "
+                                "discarding ALL fields from this tier-1 image",
+                                url,
+                                (_vev.get("source_url") or "")[-80:],
+                                float(_vev["value"]),
+                                _regex_ielts,
+                            )
+                    except (TypeError, ValueError):
+                        pass
+
         for k, v in vision_filled.items():
             _prior_method = ""
             for _ev in reversed(evidence):
@@ -1562,6 +1618,10 @@ async def extract_course(
                 (ev for ev in vision_evidence if ev.get("field_key") == k), None
             )
             _vision_is_tier0 = _vision_ev is not None and _vision_ev.get("source_tier", 1) == 0
+
+            # Reject all fields from images flagged by the IELTS coherence gate.
+            if _vision_ev and _vision_ev.get("source_url") in _incoherent_img_urls:
+                continue
 
             # ── IELTS sub-band coherence guard (Fix: vision portrait bug) ─
             # Sub-bands from a non-requirements-section (tier-1/2) image are
