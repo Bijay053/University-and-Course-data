@@ -1,0 +1,141 @@
+Evidence Review
+Master of Business Administration
+Eligibility: review — Missing: internationalFee, academicLevel, academicScore, otherRequirement | Warnings: missing academic requirement, completeness 69% < 75%
+17 fields with evidence
+Hide suppressed
+category
+Business & Management
+✓ used
+gemini primary
+75%
+Business & Management
+gemini_primary: category=Business & Management
+https://www.flinders.edu.au/study/business/master-of-business-administration
+course_location
+Adelaide, Australia
+✓ used
+location.text block
+50%
+Adelaide, Australia
+Adelaide
+https://www.flinders.edu.au/study/business/master-of-business-administration
+course_name
+Master of Business Administration
+✓ used
+course name.h1
+90%
+Master of Business Administration
+Master of Business Administration
+https://www.flinders.edu.au/study/business/master-of-business-administration
+degree_level
+Master's
+✓ used
+degree level:name
+90%
+Master's
+Master of Business Administration
+https://www.flinders.edu.au/study/business/master-of-business-administration
+description
+Master of Business Administration at Flinders, the flagship postgraduate degree that provides you with tech-first skills in business, marketing, financial management, leadership, people management and economics, preparing you for the future of work.
+✓ used
+description.meta
+95%
+Master of Business Administration at Flinders, the flagship postgraduate degree that provides you with tech-first skills in business, marketing, financial management, leadership, people management and economics, preparing you for the future of work.
+https://www.flinders.edu.au/study/business/master-of-business-administration
+https://www.flinders.edu.au/study/business/master-of-business-administration
+duration
+4.0
+✓ used
+regex
+75%
+4.0
+Learn more PhD-MBA Program Duration: 4 years Our PhD-MBA program is the first of its kind in Australia.
+https://www.flinders.edu.au/study/business/master-of-business-administration
+duration_unit
+years
+✓ used
+ai fallback
+50%
+years
+ai_fallback: duration_unit=years
+https://www.flinders.edu.au/study/business/master-of-business-administration
+duration_value
+2.0
+✓ used
+ai fallback
+50%
+2.0
+ai_fallback: duration_value=2.0
+https://www.flinders.edu.au/study/business/master-of-business-administration
+ielts_listening
+6.5
+needs_review
+sibling cache:postgraduate
+55%
+6.5
+sibling-cache backfill from postgraduate bucket (source: https://www.flinders.edu.au/study/courses/bachelor-health-science-vision-science-master-optometry): ielts_listening=6.5
+https://www.flinders.edu.au/study/courses/bachelor-health-science-vision-science-master-optometry
+ielts_overall
+6.0
+needs_review
+sibling cache:postgraduate
+55%
+6.0
+sibling-cache backfill from postgraduate bucket (source: https://www.flinders.edu.au/study/courses/bachelor-engineering-biomedical-honours-master-engineering-biomedical): ielts_overall=6.0
+https://www.flinders.edu.au/study/courses/bachelor-engineering-biomedical-honours-master-engineering-biomedical
+ielts_reading
+6.5
+needs_review
+sibling cache:postgraduate
+55%
+6.5
+sibling-cache backfill from postgraduate bucket (source: https://www.flinders.edu.au/study/courses/bachelor-health-science-vision-science-master-optometry): ielts_reading=6.5
+https://www.flinders.edu.au/study/courses/bachelor-health-science-vision-science-master-optometry
+ielts_speaking
+6.0
+needs_review
+sibling cache:postgraduate
+55%
+6.0
+sibling-cache backfill from postgraduate bucket (source: https://www.flinders.edu.au/study/courses/bachelor-engineering-biomedical-honours-master-engineering-biomedical): ielts_speaking=6.0
+https://www.flinders.edu.au/study/courses/bachelor-engineering-biomedical-honours-master-engineering-biomedical
+ielts_writing
+6.0
+needs_review
+sibling cache:postgraduate
+55%
+6.0
+sibling-cache backfill from postgraduate bucket (source: https://www.flinders.edu.au/study/courses/bachelor-engineering-biomedical-honours-master-engineering-biomedical): ielts_writing=6.0
+https://www.flinders.edu.au/study/courses/bachelor-engineering-biomedical-honours-master-engineering-biomedical
+intake_months
+["May"]
+✓ used
+regex
+70%
+["May"]
+lete an MBA. With three study periods to choose from, you set the pace. You’ll graduate with skills that will see you embracing leadership roles in international organisations, social enterprises, governments and not-for-profits. Learn more
+https://www.flinders.edu.au/study/business/master-of-business-administration
+mode
+On Campus
+✓ used
+gemini primary
+75%
+On Campus
+gemini_primary: mode=On Campus
+https://www.flinders.edu.au/study/business/master-of-business-administration
+study_mode
+Blended
+✓ used
+study mode:rule
+70%
+Blended
+- with the choice to study at Bedford Park, in the City, or 100% online. Discover Flinders Business School &gt; Australia's first P
+https://www.flinders.edu.au/study/business/master-of-business-administration
+sub_category
+MBA
+✓ used
+category:det
+70%
+MBA
+Master of Business Administration
+https://www.flinders.edu.au/study/business/master-of-business-administration
