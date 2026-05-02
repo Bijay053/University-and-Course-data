@@ -1293,6 +1293,64 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             except Exception as _gcl_exc:
                 log.warning("gemini_call_log write failed: %s", _gcl_exc)
 
+        # ── Bug 3: within-batch name dedup ───────────────────────────────────
+        # Multiple distinct URLs can yield the same course_name (e.g. Flinders
+        # /study/bsc-computing and /study/bsc-biology both produce H1 =
+        # "Bachelor of Science"). Stage only the highest-confidence result per
+        # (course_name, degree_level) pair; mark the rest so the staging loop
+        # skips them as rejected: duplicate_name_deduplicated.
+        try:
+            from app.services.scraper.confidence import (  # noqa: PLC0415
+                score_payload as _sc_score,
+            )
+
+            _name_best: dict[tuple[str, str], dict] = {}
+            for _r in results:
+                if not isinstance(_r, dict) or _r.get("error"):
+                    continue
+                _pl = _r.get("payload") or {}
+                _cn_key = (
+                    (_pl.get("course_name") or _r.get("name") or "").strip().lower(),
+                    (_pl.get("degree_level") or "").strip().lower(),
+                )
+                if not _cn_key[0]:
+                    continue
+                if _cn_key not in _name_best:
+                    _name_best[_cn_key] = _r
+                else:
+                    _existing = _name_best[_cn_key]
+                    _existing_score = _sc_score(_existing.get("payload") or {})["score"]
+                    _new_score = _sc_score(_pl)["score"]
+                    if _new_score > _existing_score:
+                        # New result is better — demote the previous winner.
+                        _existing["error"] = "rejected: duplicate_name_deduplicated"
+                        _name_best[_cn_key] = _r
+                    else:
+                        # Existing is at least as good — demote the newcomer.
+                        _r["error"] = "rejected: duplicate_name_deduplicated"
+
+            _dedup_count = sum(
+                1 for _r in results
+                if isinstance(_r, dict)
+                and _r.get("error") == "rejected: duplicate_name_deduplicated"
+            )
+            if _dedup_count:
+                log.info(
+                    "[STAGE] dedup: suppressed %d duplicate-name result(s)",
+                    _dedup_count,
+                )
+                await emit(
+                    "status",
+                    f"[STAGE] dedup: {_dedup_count} duplicate-name course(s) suppressed "
+                    "(same course_name+degree_level from multiple URLs — "
+                    "keeping highest-confidence result per pair)",
+                    phase="stage",
+                    kind="dedup_name",
+                    count=_dedup_count,
+                )
+        except Exception as _dedup_exc:  # noqa: BLE001 — never abort on dedup failure
+            log.warning("name-dedup pass failed (continuing): %s", _dedup_exc)
+
         for r in results:
             # Accumulate Gemini PRIMARY cost (zero when Gemini was skipped/unavailable)
             if isinstance(r, dict):
