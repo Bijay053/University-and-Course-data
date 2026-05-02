@@ -1,0 +1,43 @@
+Walked the spreadsheet. The wins from the source-gating fix are real and visible at scale. Three things still need decisions before promote.
+
+**What's clean now**
+
+The hallucinated multi-test rows are gone across the PhD/Research catalog. Spot checks vs the last run:
+
+- Computing Math Sciences Honours: was IELTS=6.5 + 4 IELTS sub-scores + TOEFL=80 (all from digital-innovation-ai.jpg). Now: IELTS=6 only, no TOEFL/CAE/DET.
+- MBA parent: was IELTS=6.5 + TOEFL=80 + CAE=110 (the impossible combo). Now: IELTS=6 only.
+- Master of Forensic Science: was TOEFL=70 (impossible at IELTS=6). Now: IELTS=6 only.
+- ~30 PhD/Master-by-Research rows that previously had PTE=80, CAE=110, etc. — all now showing IELTS only.
+
+This is the fix doing what it was supposed to do.
+
+**Three things that still need decisions**
+
+**1. Bug 3/3b dedup is still broken.** Three identical Bachelor of Science rows on the spreadsheet, plus Bachelor of Business Sports Management appearing twice with identical data. URL fragment stripping didn't catch whatever's causing these. Bachelor of Medical Science (Honours) also appears twice but those look like two genuine courses (1 Year $9,537 and 4 Year $43,500).
+
+**2. Master of Business Administration parent row — fee is completely blank.** Last spreadsheet had a fee. This run has nothing in the Intl. Fee column. That's a regression on that specific row — worth investigating before promote.
+
+**3. The postgrad coursework courses are not on this spreadsheet at all.** No Master of Education, no Engineering masters, no Postgraduate Nursing, no MBA specialisations except the 3-month industry-focused ones. ~36 rows fewer than last time (109 vs 145). Is this because they were held back from staging due to missing English data? If yes, that's the right outcome — ship clean, hold the rest. If no, something else is going on. Can you confirm?
+
+**4. Suspicious low fees still there:**
+- Master of Teaching (Secondary): A$5,000/Annual (suspected domestic CSP fee leakage)
+- Bachelor of Sport, Health and Physical Activity (Honours) 1 Year: A$4,000/yr
+- Bachelor of Medical Science (Honours) 1 Year: A$9,537/Annual (likely same pattern)
+- Doctor of Medicine: A$91,200/Annual (high but plausible — needs real-world spot check)
+
+**One verification question**
+
+Nearly every PhD/Research row now shows IELTS=6 (only PhD in Business shows 6.5). Is that the real Flinders postgrad-research IELTS minimum, or is the regex capturing a generic page-wide value that's not the actual course requirement? Worth a spot check on one PhD page — if Flinders' real PhD English requirement is IELTS=6.5 (the more common postgrad standard), then we have a separate regex bug producing a confident-but-wrong value across 30+ rows.
+
+**Recommendation**
+
+Don't promote yet. The four items above need:
+- Bug 3/3b dedup investigation (the duplicates are visible to the next admin who looks at this)
+- MBA parent fee regression (one row, but a real regression)
+- Confirmation on the postgrad-coursework hold-back (intentional or accidental?)
+- Decision on the four suspicious fees (hold those rows or accept post-promote correction)
+- One PhD page spot check on IELTS=6 vs 6.5
+
+If those come back clean (or with explicit decisions), Flinders is ready for promote. The ~109 rows here are clean source-gated data, not the previous hallucinated set. That's the win.
+
+What's your read on the postgrad-coursework absence — deliberate or unexpected?
