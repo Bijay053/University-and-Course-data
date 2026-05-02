@@ -237,6 +237,17 @@ async def stage_course(
         log.info("staging_gate rejected %r: %s", name, gate_reason)
         return StageResult(False, f"rejected: {gate_reason}")
 
+    # Normalize source_url before any dedup or storage: strip trailing slash
+    # so that the same page at /course/foo and /course/foo/ is treated as
+    # one URL.  This is the most common cause of duplicate staged rows when
+    # the BFS discovers a URL from two places (sitemap + category page) with
+    # inconsistent trailing-slash convention.
+    if source_url and source_url.endswith("/") and source_url.count("/") > 3:
+        # Only strip if the URL has at least 3 slashes (i.e. has a path beyond
+        # the domain root so we don't strip the trailing slash from bare origins
+        # like "https://www.flinders.edu.au/").
+        source_url = source_url.rstrip("/")
+
     # Within-job URL deduplication: prevent the exact same source URL from
     # being staged twice in one job (can happen if a BFS bug re-queues a URL).
     # We intentionally do NOT dedup by course_name alone — universities like
