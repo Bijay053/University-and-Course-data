@@ -29,6 +29,55 @@ field_keys = (
 )
 
 
+# ---------------------------------------------------------------------------
+# Per-band floor helpers
+# ---------------------------------------------------------------------------
+# Many AU universities use the phrase "no individual band below X" (or
+# equivalent) directly after stating the overall score, e.g.:
+#   "Academic IELTS minimum overall band of 6.5 with no individual band below 6.0"
+#   "PTE Academic 58 with no communicative skill below 50"
+#   "TOEFL iBT 79 with no section below 17"
+#
+# The rich patterns (Pattern 1 / PTE Pattern 1) already capture this for
+# the most common phrasing, but they can fail when a word like "minimum"
+# appears between the test name and "overall".  The fallback broad patterns
+# (Pattern 5, PTE Pattern 3, etc.) then catch the overall but return
+# None for all four band scores, silently under-populating the DB.
+#
+# _PER_BAND_FLOOR_RE and _try_floor() are applied inside each extractor's
+# "overall-only" fallback return paths so the floor value is always
+# captured when it appears within 250 chars of the overall match.
+#
+# NOTE: per-band values written via _try_floor() land in the ExtractionResult
+# normalized dict (→ payload) but NOT in a separate evidence row, so the
+# sibling cache cannot propagate them to other courses.  This is intentional
+# until source-type gating for sibling propagation ships (Week 1 pending).
+
+_PER_BAND_FLOOR_RE = re.compile(
+    r"no\s+(?:individual\s+|sub[\s-]?score\s+|skill\s+)?"
+    r"(?:band|score|skill|section|component)\s+"
+    r"(?:less\s+than|below|lower\s+than|under)\s+"
+    r"(\d+(?:\.\d)?)",
+    re.IGNORECASE,
+)
+
+
+def _try_floor(text: str, match_end: int, lo: float, hi: float) -> float | None:
+    """Search for a per-band floor clause within 250 chars after *match_end*.
+
+    Returns the floor value when it falls within [lo, hi], else None.
+    Searches both forward (floor follows the overall) and a small window
+    before (floor precedes the overall in some table layouts).
+    """
+    window = text[max(0, match_end - 50):match_end + 250]
+    m = _PER_BAND_FLOOR_RE.search(window)
+    if m:
+        v = float(m.group(1))
+        if lo <= v <= hi:
+            return v
+    return None
+
+
 # --- IELTS (overall + subscores 4.0-9.0) -------------------------------------
 def _ielts(text: str) -> dict[str, float] | None:
     # Pattern 1: "IELTS overall 6.0 with no band below 5.5"
@@ -68,6 +117,27 @@ def _ielts(text: str) -> dict[str, float] | None:
         r"[^0-9\n]{0,50}?(?:no\s+(?:individual\s+)?(?:band|component|score)\s+(?:below|less\s+than|under)|"
         r"not\s+less\s+than|minimum\s+(?:band\s+)?(?:of\s+)?)"
         r"\s*([0-9]+(?:\.[0-9]+)?)",
+        text,
+        re.I,
+    )
+    if m:
+        ov, mn = float(m.group(1)), float(m.group(2))
+        if 4 <= ov <= 9 and 4 <= mn <= 9:
+            return {"overall": ov, "listening": mn, "reading": mn, "writing": mn, "speaking": mn}
+
+    # Pattern 1c: "IELTS minimum overall band of 6.5 with no individual band below 6.0"
+    # — extends Pattern 1 to handle 1-3 intervening words (e.g. "minimum",
+    #   "academic minimum") between the test name and the "overall" keyword.
+    #   Pattern 1 uses [^a-z0-9]{0,20} (non-alpha bridge) which stops at the
+    #   first letter of "minimum", causing the ACAP/AU common phrasing to fall
+    #   through to the broad Pattern 5 fallback which drops all band scores.
+    m = re.search(
+        r"(?:academic\s+)?ielts(?:\s+academic)?\s+"
+        r"(?:\w+\s+){0,3}"
+        r"overall\s*(?:band\s+)?(?:score\s+)?(?:of\s+)?"
+        r"([0-9]+(?:\.[0-9]+)?)"
+        r"[^a-z0-9]{0,20}(?:with\s*)?(?:no\s+(?:individual\s+)?band\s+(?:below|less\s+than)|"
+        r"minimum\s+of|no\s+score\s+less\s+than)\s*([0-9]+(?:\.[0-9]+)?)",
         text,
         re.I,
     )
@@ -164,6 +234,9 @@ def _ielts(text: str) -> dict[str, float] | None:
     if m:
         ov = float(m.group(1))
         if 4 <= ov <= 9:
+            floor = _try_floor(text, m.end(), 4.0, 9.0)
+            if floor is not None:
+                return {"overall": ov, "listening": floor, "reading": floor, "writing": floor, "speaking": floor}
             return {"overall": ov, "listening": None, "reading": None, "writing": None, "speaking": None}
 
     # Pattern 5: broad "minimum IELTS 6.0", "IELTS 6.0 or higher", "IELTS: 6.5",
@@ -182,6 +255,9 @@ def _ielts(text: str) -> dict[str, float] | None:
     if broad:
         ov = float(broad.group(1))
         if 4 <= ov <= 9:
+            floor = _try_floor(text, broad.end(), 4.0, 9.0)
+            if floor is not None:
+                return {"overall": ov, "listening": floor, "reading": floor, "writing": floor, "speaking": floor}
             return {"overall": ov, "listening": None, "reading": None, "writing": None, "speaking": None}
 
     # Pattern 6: score BEFORE the IELTS keyword — "a score of 6.5 on the IELTS
@@ -210,6 +286,9 @@ def _ielts(text: str) -> dict[str, float] | None:
     if m:
         ov = float(m.group(1))
         if 4 <= ov <= 9:
+            floor = _try_floor(text, m.end(), 4.0, 9.0)
+            if floor is not None:
+                return {"overall": ov, "listening": floor, "reading": floor, "writing": floor, "speaking": floor}
             return {"overall": ov, "listening": None, "reading": None, "writing": None, "speaking": None}
 
     return None
@@ -280,6 +359,9 @@ def _pte(text: str) -> dict[str, float] | None:
     if m:
         ov = float(m.group(1))
         if 10 <= ov <= 90:
+            floor = _try_floor(text, m.end(), 10.0, 90.0)
+            if floor is not None:
+                return {"overall": ov, "listening": floor, "reading": floor, "writing": floor, "speaking": floor}
             return {"overall": ov, "listening": None, "reading": None, "writing": None, "speaking": None}
 
     # Pattern 3 (broad): "PTE 50" / "PTE: 50" / "PTE Academic: 58" /
@@ -291,6 +373,9 @@ def _pte(text: str) -> dict[str, float] | None:
     if m:
         ov = float(m.group(1))
         if 10 <= ov <= 90:
+            floor = _try_floor(text, m.end(), 10.0, 90.0)
+            if floor is not None:
+                return {"overall": ov, "listening": floor, "reading": floor, "writing": floor, "speaking": floor}
             return {"overall": ov, "listening": None, "reading": None, "writing": None, "speaking": None}
 
     # Pattern 3b (full name): "Pearson Test of English Academic 58" /
@@ -305,6 +390,9 @@ def _pte(text: str) -> dict[str, float] | None:
     if m:
         ov = float(m.group(1))
         if 10 <= ov <= 90:
+            floor = _try_floor(text, m.end(), 10.0, 90.0)
+            if floor is not None:
+                return {"overall": ov, "listening": floor, "reading": floor, "writing": floor, "speaking": floor}
             return {"overall": ov, "listening": None, "reading": None, "writing": None, "speaking": None}
 
     # Pattern 4 (reverse-order): "50 in PTE Academic" / "a score of 50 in the
@@ -327,6 +415,9 @@ def _pte(text: str) -> dict[str, float] | None:
     if m:
         ov = float(m.group(1))
         if 10 <= ov <= 90:
+            floor = _try_floor(text, m.end(), 10.0, 90.0)
+            if floor is not None:
+                return {"overall": ov, "listening": floor, "reading": floor, "writing": floor, "speaking": floor}
             return {"overall": ov, "listening": None, "reading": None, "writing": None, "speaking": None}
 
     return None
@@ -364,6 +455,9 @@ def _toefl(text: str) -> dict[str, float] | None:
     if m:
         ov = float(m.group(1))
         if 0 <= ov <= 120:
+            floor = _try_floor(text, m.end(), 0.0, 30.0)
+            if floor is not None:
+                return {"overall": ov, "listening": floor, "reading": floor, "writing": floor, "speaking": floor}
             return {"overall": ov, "listening": None, "reading": None, "writing": None, "speaking": None}
     # Pattern 2.5 (vision-friendly overall): "TOEFL overall: 87" /
     # "TOEFL iBT overall 87" / "TOEFL iBT Overall score: 87" — Gemini
@@ -379,6 +473,9 @@ def _toefl(text: str) -> dict[str, float] | None:
     if m:
         ov = float(m.group(1))
         if 0 <= ov <= 120:
+            floor = _try_floor(text, m.end(), 0.0, 30.0)
+            if floor is not None:
+                return {"overall": ov, "listening": floor, "reading": floor, "writing": floor, "speaking": floor}
             return {"overall": ov, "listening": None, "reading": None, "writing": None, "speaking": None}
     # Loosest fallback: "TOEFL ... 60" within a short window — covers
     # PDFs that render "TOEFL iBT     60" with multiple spaces.
@@ -386,6 +483,9 @@ def _toefl(text: str) -> dict[str, float] | None:
     if m:
         ov = float(m.group(1))
         if 30 <= ov <= 120:
+            floor = _try_floor(text, m.end(), 0.0, 30.0)
+            if floor is not None:
+                return {"overall": ov, "listening": floor, "reading": floor, "writing": floor, "speaking": floor}
             return {"overall": ov, "listening": None, "reading": None, "writing": None, "speaking": None}
 
     # Pattern 4 (reverse-order): "87 in TOEFL iBT" / "87 on the TOEFL" /
@@ -404,6 +504,9 @@ def _toefl(text: str) -> dict[str, float] | None:
     if m:
         ov = float(m.group(1))
         if 30 <= ov <= 120:
+            floor = _try_floor(text, m.end(), 0.0, 30.0)
+            if floor is not None:
+                return {"overall": ov, "listening": floor, "reading": floor, "writing": floor, "speaking": floor}
             return {"overall": ov, "listening": None, "reading": None, "writing": None, "speaking": None}
 
     return None
