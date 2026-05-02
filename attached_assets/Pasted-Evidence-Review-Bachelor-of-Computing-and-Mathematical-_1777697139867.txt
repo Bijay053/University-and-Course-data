@@ -1,0 +1,203 @@
+Evidence Review
+Bachelor of Computing and Mathematical Sciences (Honours)
+Eligibility: ready - ok
+category
+selected
+selected
+/ gemini_primary
+confidence 75%
+Computer Science & IT
+gemini_primary: category=Computer Science & IT
+https://www.flinders.edu.au/study/courses/bachelor-computing-mathematical-sciences-honours
+course_location
+selected
+selected
+/ location.text_block
+confidence 50%
+Adelaide, Australia
+Adelaide
+https://www.flinders.edu.au/study/courses/bachelor-computing-mathematical-sciences-honours
+course_name
+selected
+selected
+/ course_name.h1
+confidence 90%
+Bachelor of Computing and Mathematical Sciences (Honours)
+Bachelor of Computing and Mathematical Sciences (Honours)
+https://www.flinders.edu.au/study/courses/bachelor-computing-mathematical-sciences-honours
+cricos_code
+selected
+selected
+/ regex:cricos
+confidence 95%
+118384K
+CRICOS code extracted from course page: 118384K
+https://www.flinders.edu.au/study/courses/bachelor-computing-mathematical-sciences-honours
+degree_level
+selected
+selected
+/ degree_level:name
+confidence 90%
+Bachelor's
+Bachelor of Computing and Mathematical Sciences (Honours)
+https://www.flinders.edu.au/study/courses/bachelor-computing-mathematical-sciences-honours
+description
+selected
+selected
+/ description.meta
+confidence 95%
+Take your computing and maths degree further. Build advanced technical and research skills with an Honours year at Flinders and prepare for a PhD or high-level tech career.
+https://www.flinders.edu.au/study/courses/bachelor-computing-mathematical-sciences-honours
+https://www.flinders.edu.au/study/courses/bachelor-computing-mathematical-sciences-honours
+domestic_fee
+selected
+selected
+/ gemini_primary
+confidence 75%
+7136.0
+gemini_primary: domestic_fee=7136.0
+https://www.flinders.edu.au/study/courses/bachelor-computing-mathematical-sciences-honours
+duration
+selected
+selected
+/ regex
+confidence 75%
+3.0
+Duration 3 years full-time Delivery mode In person (Tonsley, City Campus) Learn more Bachelor of Information Technology (Game Development) Learn game design and development, including graphics, AI, and user experience.
+https://www.flinders.edu.au/study/courses/bachelor-computing-mathematical-sciences-honours
+duration_unit
+selected
+selected
+/ ai_fallback
+confidence 50%
+years
+ai_fallback: duration_unit=years
+https://www.flinders.edu.au/study/courses/bachelor-computing-mathematical-sciences-honours
+duration_value
+selected
+selected
+/ ai_fallback
+confidence 50%
+1.0
+ai_fallback: duration_value=1.0
+https://www.flinders.edu.au/study/courses/bachelor-computing-mathematical-sciences-honours
+fee_currency
+selected
+selected
+/ ai_fallback
+confidence 50%
+AUD
+ai_fallback: fee_currency=AUD
+https://www.flinders.edu.au/study/courses/bachelor-computing-mathematical-sciences-honours
+fee_term
+selected
+selected
+/ gemini_primary
+confidence 75%
+Annual
+gemini_primary: fee_term=Annual
+https://www.flinders.edu.au/study/courses/bachelor-computing-mathematical-sciences-honours
+ielts_listening
+selected
+selected
+/ per_course_vision
+confidence 85%
+6.0
+https://www.flinders.edu.au/content/dam/images/flinders-online/courses/gc-digital-innovation---ai/digital-innovation-ai.jpg
+https://www.flinders.edu.au/content/dam/images/flinders-online/courses/gc-digital-innovation---ai/digital-innovation-ai.jpg
+ielts_overall
+selected
+selected
+/ per_course_vision
+confidence 85%
+6.5
+https://www.flinders.edu.au/content/dam/images/flinders-online/courses/gc-digital-innovation---ai/digital-innovation-ai.jpg
+https://www.flinders.edu.au/content/dam/images/flinders-online/courses/gc-digital-innovation---ai/digital-innovation-ai.jpg
+ielts_reading
+selected
+selected
+/ per_course_vision
+confidence 85%
+6.0
+https://www.flinders.edu.au/content/dam/images/flinders-online/courses/gc-digital-innovation---ai/digital-innovation-ai.jpg
+https://www.flinders.edu.au/content/dam/images/flinders-online/courses/gc-digital-innovation---ai/digital-innovation-ai.jpg
+ielts_speaking
+selected
+selected
+/ per_course_vision
+confidence 85%
+6.0
+https://www.flinders.edu.au/content/dam/images/flinders-online/courses/gc-digital-innovation---ai/digital-innovation-ai.jpg
+https://www.flinders.edu.au/content/dam/images/flinders-online/courses/gc-digital-innovation---ai/digital-innovation-ai.jpg
+ielts_writing
+selected
+selected
+/ per_course_vision
+confidence 85%
+6.0
+https://www.flinders.edu.au/content/dam/images/flinders-online/courses/gc-digital-innovation---ai/digital-innovation-ai.jpg
+https://www.flinders.edu.au/content/dam/images/flinders-online/courses/gc-digital-innovation---ai/digital-innovation-ai.jpg
+intake_months
+selected
+selected
+/ regex
+confidence 40%
+["May"]
+Bachelor of Computing and Mathematical Sciences (Honours) - Flinders University  Staff Students Library Study Study areas Business Computer science and information technology Creative arts and media Criminology Defence and national securit
+https://www.flinders.edu.au/study/courses/bachelor-computing-mathematical-sciences-honours
+international_eligible
+selected
+selected
+/ eligibility.positive
+confidence 85%
+True
+CRICOS Code 118384K
+https://www.flinders.edu.au/study/courses/bachelor-computing-mathematical-sciences-honours
+international_fee
+selected
+selected
+/ regex
+confidence 100%
+43500
+Annual fees $7,136 About these fees. Key information. CRICOS Code 118384K Duration 1 year full-time Delivery mode In person (Tonsley, City Campus) Annual fees $43,500 (2026) About these fees. Study Program Study Program Research Areas Care
+https://www.flinders.edu.au/study/courses/bachelor-computing-mathematical-sciences-honours
+location_text
+selected
+selected
+/ gemini_primary
+confidence 75%
+Tonsley or City Campus
+gemini_primary: location_text=Tonsley or City Campus
+https://www.flinders.edu.au/study/courses/bachelor-computing-mathematical-sciences-honours
+mode
+selected
+selected
+/ gemini_primary
+confidence 75%
+On Campus
+gemini_primary: mode=On Campus
+https://www.flinders.edu.au/study/courses/bachelor-computing-mathematical-sciences-honours
+study_mode
+selected
+selected
+/ study_mode:rule
+confidence 70%
+On Campus
+ight: auto; } } Delivery mode In person (Tonsley or City Campus) @med
+https://www.flinders.edu.au/study/courses/bachelor-computing-mathematical-sciences-honours
+sub_category
+selected
+selected
+/ gemini_primary
+confidence 75%
+Computing and Mathematical Sciences
+gemini_primary: sub_category=Computing and Mathematical Sciences
+https://www.flinders.edu.au/study/courses/bachelor-computing-mathematical-sciences-honours
+toefl_overall
+selected
+selected
+/ per_course_vision
+confidence 85%
+80.0
+https://www.flinders.edu.au/content/dam/images/flinders-online/courses/gc-digital-innovation---ai/digital-innovation-ai.jpg
+https://www.flinders.edu.au/content/dam/images/flinders-online/courses/gc-digital-innovation---ai/digital-innovation-ai.jpg

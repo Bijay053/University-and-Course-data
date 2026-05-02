@@ -1593,6 +1593,32 @@ async def extract_course(
 
         _incoherent_img_urls: set[str] = set()
 
+        # ── Per-uni tier-1 English OCR opt-out ───────────────────────────
+        # When extraction.english.trust_tier1_vision_ocr_english=false in the
+        # uni YAML, ALL tier-1 images are pre-emptively blocked from supplying
+        # English test scores.  Tier-0 (DOM-anchored requirements section)
+        # images are still trusted.  Sub-gates A/B run only if this flag is
+        # true (default).  Flinders is the canonical opt-out: regex reliably
+        # extracts IELTS from page text; tier-1 vision only hallucinated values.
+        _uc = get_uni_config()
+        _tier1_english_trusted = (
+            _uc is None
+            or _uc.extraction.english.trust_tier1_vision_ocr_english
+        )
+        if not _tier1_english_trusted:
+            for _vev in vision_evidence:
+                if _vev.get("source_tier", 1) != 0:
+                    _src = _vev.get("source_url", "")
+                    if _src:
+                        _incoherent_img_urls.add(_src)
+            if _incoherent_img_urls:
+                log.info(
+                    "[VISION TIER1 ENGLISH DISABLED] %s: %d tier-1 image(s) "
+                    "pre-blocked for English test fields (trust_tier1_vision_ocr_english=false)",
+                    url,
+                    len(_incoherent_img_urls),
+                )
+
         # ── Sub-gate A: IELTS-anchor mismatch (regex IELTS known) ────────
         if _regex_ielts is not None:
             for _vev in vision_evidence:

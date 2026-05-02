@@ -119,6 +119,18 @@ class EnglishConfig(BaseModel):
             "Disabling falls back to HTML extraction only."
         ),
     )
+    trust_tier1_vision_ocr_english: bool = Field(
+        default=True,
+        description=(
+            "Set to false to disable tier-1 (non-DOM-anchored) vision OCR "
+            "specifically for English test score fields (IELTS/PTE/TOEFL/CAE/DET). "
+            "Tier-0 images (anchored inside the Entry Requirements DOM section) "
+            "are still trusted.  Use this for universities where Gemini "
+            "hallucinates plausible-looking test scores from hero/stock imagery "
+            "but the page text (regex) reliably extracts the correct values. "
+            "Flinders is the canonical example."
+        ),
+    )
     default_ielts: Optional[float] = Field(
         default=None,
         description=(

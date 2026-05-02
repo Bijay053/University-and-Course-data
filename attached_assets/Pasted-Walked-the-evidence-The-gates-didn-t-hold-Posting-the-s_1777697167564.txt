@@ -1,0 +1,59 @@
+Walked the evidence. The gates didn't hold. Posting the smoking gun first, then the diagnosis, then a proposed fix.
+
+**Smoking gun — Bachelor of Computing and Mathematical Sciences (Honours)**
+
+Evidence panel shows IELTS overall, all four IELTS sub-scores, AND TOEFL overall, all sourced from:
+
+`https://www.flinders.edu.au/content/dam/images/flinders-online/courses/gc-digital-innovation---ai/digital-innovation-ai.jpg`
+
+Two problems:
+
+1. The image is a stock photo of students at laptops. No test scores are visible in it. None. Gemini-vision hallucinated 6 numeric values from a stock photo.
+2. The image path is `/gc-digital-innovation---ai/` — that's the Graduate Certificate in Digital Innovation and AI. It's not even from this course's page. There's image cross-contamination on top of the hallucination.
+
+Sub-gate B passed this through because the image "returned" 2+ test overalls (IELTS + TOEFL). The gate's logic works on Gemini's output — it can't distinguish hallucinated values from real ones.
+
+**This is a different failure mode than Bluesky/social-footer**
+
+Bluesky was reading-the-wrong-image. This is reading-an-image-that-doesn't-contain-data and Gemini making numbers up to fill the response. Both gates we shipped today operate on what Gemini returned. Neither can tell you whether what Gemini returned was extracted or invented. The gate design is sound; the input is unreliable in a way the gate can't detect.
+
+**Other gate failures in the same batch**
+
+- Master of Business Administration: IELTS=6.5 + TOEFL=80 + CAE=110. CAE=110 corresponds to IELTS ~5.5. Sub-gate A's threshold caught the 0.5+ IELTS deltas but said nothing about TOEFL/CAE coherence with each other.
+- Master of Forensic Science: TOEFL=70. TOEFL 70 ≈ IELTS 5.5. Regex IELTS=6.0. The mismatch is in TOEFL, not IELTS, so sub-gate A doesn't fire.
+- Data quality report itself flagged 5 cases of "english_coherence_pte" mismatch and 1 cambridge mismatch — the report knows the data is wrong, but the gates aren't using that signal to suppress.
+
+**Other Bug 3 regression**
+
+Three "Bachelor of Science" rows still on the spreadsheet, identical fee/duration/location/intake. The trailing-slash dedup fix isn't holding. Data quality report: `duplicate_course_name × 11`. So Bug 3 needs a second look.
+
+**Other anomalies worth flagging before promotion**
+
+- Bachelor of Sport, Health and Physical Activity (Honours) 1 Year: international fee = A$4,000/yr. Almost certainly the domestic CSP fee captured into the international slot.
+- Master of Teaching (Secondary): international fee = A$5,000/Annual. Same suspected pattern.
+- Doctor of Medicine: A$91,200/Annual. Plausible for MD but worth spot-check.
+
+**Recommendation**
+
+The simplest correct answer is the one we discussed three days ago: **disable tier-1 vision OCR for English test fields on Flinders**. Keep tier-0 (DOM-anchored to the actual requirements section). The structural extractors are doing the real work — every "saved" course in this batch has correct fee, duration, intake, location, and IELTS overall from regex. The only thing vision is contributing is noise and hallucinations.
+
+Concrete shape:
+
+1. Add `trust_vision_ocr_english: false` (or equivalent flag) to flinders.yaml. Tier-0 vision still allowed; tier-1 disabled for IELTS, PTE, TOEFL, CAE, DET fields specifically.
+2. Don't apply globally yet. ASAHE was the original use case for tier-1 vision; some unis genuinely need it. Per-uni opt-out is the right scope.
+3. Re-scrape Flinders one more time. ~40 min. If the staged rows show clean evidence panels for the 5 walked courses, promote.
+
+Also pending before promote:
+- Bug 3 dedup fix — the three Bachelor of Science rows shouldn't be there.
+- The two suspicious low fees (Sport Health Honours $4k, Teaching Secondary $5k) need a real-world check or the rows held back.
+
+**Honest read**
+
+We spent today building gates that operate on Gemini's output. The hallucination problem means the right unit of trust is the image *source* (anchored to requirements DOM = trust, anywhere else = don't), not the image *output*. The two days of gate work weren't wasted — sub-gate A correctly caught the IELTS=6.5 vs regex=6.0 mismatches in the original Bachelor of Arts case, and Bug 1 (Bluesky path block) is holding. But for the no-regex case, vision is fundamentally not trustworthy enough to use without DOM anchoring.
+
+Not trying to relitigate, just naming it cleanly so we can decide. Two paths:
+
+**A** — Disable tier-1 English vision for Flinders, re-scrape, promote (~1 hour to final answer)
+**B** — Try a third gate iteration on top of the existing two (uncertain it'll work, given the failure mode is hallucinated numbers)
+
+I'd take A. Want me to draft the YAML diff?
