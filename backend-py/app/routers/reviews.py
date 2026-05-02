@@ -40,14 +40,19 @@ async def list_scraped_courses(
     stmt = stmt.order_by(desc(ScrapedCourse.created_at)).offset((page - 1) * limit).limit(limit)
     rows = (await db.execute(stmt)).all()
 
+    def _row_dict(sc, uname: str) -> dict:
+        d = {c.name: getattr(sc, c.name) for c in sc.__table__.columns}
+        d["university_name"] = uname
+        # Guard against float32 precision artefacts (pre-migration REAL column).
+        if d.get("duration") is not None:
+            try:
+                d["duration"] = round(float(d["duration"]), 2)
+            except (TypeError, ValueError):
+                pass
+        return d
+
     return {
-        "data": [
-            {
-                **{c.name: getattr(sc, c.name) for c in sc.__table__.columns},
-                "university_name": uname,
-            }
-            for sc, uname in rows
-        ],
+        "data": [_row_dict(sc, uname) for sc, uname in rows],
         "total": int(total),
         "page": page,
         "limit": limit,

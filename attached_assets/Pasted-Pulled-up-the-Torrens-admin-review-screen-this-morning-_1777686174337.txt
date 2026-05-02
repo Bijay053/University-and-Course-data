@@ -1,0 +1,57 @@
+Pulled up the Torrens admin review screen this morning to verify last night's fixes. Both bugs are still visible. Sharing what I'm seeing before either of us builds on top of work that didn't actually land.
+
+**Bug 2 — float32 artifacts still showing in the review screen**
+
+Still seeing `1.7000000476837158 Year` and `0.699999988079071 Year` on multiple Torrens rows: Master of Cybersecurity, Master of Business Analytics, Master of Information Technology, Diploma of Ux and Web Design, Diploma of Photography, Advanced Diploma of Game Design and Development, Diploma of 3D Design and Animation, Bachelor of Ux and Web Design, Bachelor of Interior Design (Commercial), Diploma of Graphic Design, Advanced Diploma of Interior Design and Decoration, Graduate Certificate of Business Analytics, Graduate Certificate of Analytics. Same set as yesterday.
+
+Last night's terminal output showed `ALTER TABLE` succeeded but `UPDATE 0` on the cleanup — zero rows matched the cleanup regex. Either:
+
+(a) The ALTER did round the values in place (so they're now `1.70` in the `duration` column), but the admin screen reads a different field (a denormalised cache, a JSON value in `extraction_method`, or a separate `duration_value` column). The frontend is showing the old value from somewhere else.
+
+(b) The admin screen is showing stale cached data — hard refresh hasn't been tried.
+
+(c) Or these are new staged rows from a re-scrape after the ALTER, and the new write path still has the float32 bug somewhere.
+
+Quick check that disambiguates:
+
+```sql
+SELECT id, course_name, duration, duration::text
+FROM scraped_courses
+WHERE university_id = 3
+  AND course_name = 'Master of Cybersecurity';
+```
+
+If `duration::text` shows `1.70` — DB is clean, bug is in the frontend (caching or wrong field). If it shows `1.7000000476837158` — ALTER didn't actually persist the rounded values, and we need to find why.
+
+**Bug 1 — the cache fix worked, but the underlying problem is bigger than caching**
+
+Looked at Master of Professional Accounting evidence panel. IELTS overall = 6.5, source: `per_course_vision` (note: NOT `per_course_vision_cached`). Evidence image: `how-to-apply/how-to-apply-1-tua.jpg`. That's a generic site-wide "How to apply" marketing image, not anything specific to the Accounting course.
+
+The composite cache key fix prevented contamination between courses (good). But it didn't address that **vision is happily mining IELTS values from generic marketing imagery on every course page**. The "how-to-apply" image presumably contains generic copy like "IELTS 6.5 / PTE 62" because it's the universal application-requirements graphic, and vision treats any number it can OCR as a candidate.
+
+In the Accounting case the value (6.5) happens to match what regex also found on the page, so the row's value is correct. But the evidence chain is junk — and on courses where a generic marketing image happens to show different numbers than the actual course requirement, vision would silently produce a wrong value.
+
+This means last night's audit (`0 promoted vision_cached`) was correct for the question it asked but asked the wrong question. The real audit should also count `per_course_vision` (without `_cached`):
+
+```sql
+SELECT 
+  sc.extraction_method->>'ielts_overall' AS ielts_source,
+  COUNT(*) AS promoted_count
+FROM courses c
+JOIN scraped_courses sc ON sc.course_id = c.id
+WHERE sc.extraction_method->>'ielts_overall' IN ('per_course_vision', 'per_course_vision_cached')
+  AND sc.status = 'promoted'
+GROUP BY 1;
+```
+
+If that returns non-zero, we have an unknown number of live student-facing rows where IELTS came from generic marketing imagery rather than course-specific content.
+
+**The deeper fix** is a relevance check before vision values are accepted: does the image URL path or alt-text relate to the course (course slug match, faculty match, or at least not on a global block-list of generic marketing image paths like `/shared/how-to-apply/`, `/shared/cards/`, `/shared/career-opportunities/`)? If not, don't trust the OCR'd numbers from it.
+
+**What I'd suggest before any other work today:**
+
+1. Run the `duration::text` check above — tells us in 30 seconds whether Bug 2 is DB-side or frontend-side.
+2. Run the expanded vision audit. If non-zero promoted, we have a remediation question to think through (clean live rows + re-scrape, or just re-scrape).
+3. Decide on the vision relevance-check approach — my suggestion is a path block-list as the cheapest first pass (`/shared/`, `/cards/`, `/how-to-apply/`, `/career-opportunities/` are all common generic asset paths and would block most of the false positives), and add slug-match as a stricter follow-up.
+
+Not trying to relitigate last night's work — the cache fix and the migration are real progress. Just want us to be honest that the symptoms haven't actually disappeared, before either of us moves on to Tier 2 / 3 / 4 work today.

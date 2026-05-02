@@ -78,6 +78,16 @@ def _staged_row_to_dict(r) -> dict:
         if cc != col.name:
             d[cc] = v                    # camelCase (React modal)
 
+    # ── Normalise numeric fields that historically used REAL (float32) ────
+    # Even after the Numeric(6,2) migration, guard here so that any prod
+    # rows written before the migration (or on a still-REAL column) never
+    # emit the raw float32 representation (e.g. 1.7000000476837158).
+    if d.get("duration") is not None:
+        try:
+            d["duration"] = round(float(d["duration"]), 2)
+        except (TypeError, ValueError):
+            pass
+
     # ── Explicit overrides / extra convenience aliases ───────────────────
     d["courseName"] = r.course_name
     d["courseWebsite"] = r.course_website
