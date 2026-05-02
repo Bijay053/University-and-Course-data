@@ -1,0 +1,165 @@
+Evidence Review
+Bachelor of Psychological Science and Bachelor of Laws (93D)
+Eligibility: ready — ok
+25 fields with evidence
+Show 5 suppressed fields
+category
+Law
+✓ used
+gemini primary
+75%
+Law
+gemini_primary: category=Law
+https://www.utas.edu.au/courses/arts-soc/courses/93d-bachelor-of-psychological-science-and-bachelor-of-laws
+course_location
+Hobart Semester 1, Semester 2
+✓ used
+location.div panel
+88%
+Hobart Semester 1, Semester 2
+Hobart Semester 1, Semester 2
+https://www.utas.edu.au/courses/arts-soc/courses/93d-bachelor-of-psychological-science-and-bachelor-of-laws
+course_name
+Bachelor of Psychological Science and Bachelor of Laws (93D)
+✓ used
+course name.h1
+90%
+Bachelor of Psychological Science and Bachelor of Laws (93D)
+Bachelor of Psychological Science and Bachelor of Laws (93D)
+https://www.utas.edu.au/courses/arts-soc/courses/93d-bachelor-of-psychological-science-and-bachelor-of-laws
+degree_level
+Bachelor's
+✓ used
+degree level:name
+90%
+Bachelor's
+Bachelor of Psychological Science and Bachelor of Laws (93D)
+https://www.utas.edu.au/courses/arts-soc/courses/93d-bachelor-of-psychological-science-and-bachelor-of-laws
+description
+Minimum 5 years, up to a maximum of 11 years.
+✓ used
+description.main p
+65%
+Minimum 5 years, up to a maximum of 11 years.
+https://www.utas.edu.au/courses/arts-soc/courses/93d-bachelor-of-psychological-science-and-bachelor-of-laws
+https://www.utas.edu.au/courses/arts-soc/courses/93d-bachelor-of-psychological-science-and-bachelor-of-laws
+domestic_fee
+13152.0
+✓ used
+gemini primary
+75%
+13152.0
+gemini_primary: domestic_fee=13152.0
+https://www.utas.edu.au/courses/arts-soc/courses/93d-bachelor-of-psychological-science-and-bachelor-of-laws
+duration
+5.0
+✓ used
+regex
+75%
+5.0
+Remove content prioritisation Update Close Choose a login Student portalStaff portaleStudentMyLO Back to Arts and Society Bachelor of Psychological Science and Bachelor of Laws (93D) Home Courses and units Arts and Society 93D Bachelor of P
+https://www.utas.edu.au/courses/arts-soc/courses/93d-bachelor-of-psychological-science-and-bachelor-of-laws
+duration_text
+Minimum 5 years, up to a maximum of 11 years.
+✓ used
+gemini primary
+75%
+Minimum 5 years, up to a maximum of 11 years.
+gemini_primary: duration_text=Minimum 5 years, up to a maximum of 11 years.
+https://www.utas.edu.au/courses/arts-soc/courses/93d-bachelor-of-psychological-science-and-bachelor-of-laws
+duration_unit
+years
+✓ used
+ai fallback
+50%
+years
+ai_fallback: duration_unit=years
+https://www.utas.edu.au/courses/arts-soc/courses/93d-bachelor-of-psychological-science-and-bachelor-of-laws
+duration_value
+5.0
+✓ used
+ai fallback
+50%
+5.0
+ai_fallback: duration_value=5.0
+https://www.utas.edu.au/courses/arts-soc/courses/93d-bachelor-of-psychological-science-and-bachelor-of-laws
+fee_currency
+AUD
+✓ used
+ai fallback
+50%
+AUD
+ai_fallback: fee_currency=AUD
+https://www.utas.edu.au/courses/arts-soc/courses/93d-bachelor-of-psychological-science-and-bachelor-of-laws
+fee_term
+Annual
+✓ used
+gemini primary
+75%
+Annual
+gemini_primary: fee_term=Annual
+https://www.utas.edu.au/courses/arts-soc/courses/93d-bachelor-of-psychological-science-and-bachelor-of-laws
+intake_months
+["February", "July"]
+✓ used
+regex
+70%
+["February", "July"]
+Admission requirements Application dates Starting at the University Starting at the University Starting at the University overview Accepting and enrolling Orientation and settling in Pathways to university Scholarships, fees and costs Find
+https://www.utas.edu.au/courses/arts-soc/courses/93d-bachelor-of-psychological-science-and-bachelor-of-laws
+intake_text
+Semester 1, Semester 2
+✓ used
+gemini primary
+75%
+Semester 1, Semester 2
+gemini_primary: intake_text=Semester 1, Semester 2
+https://www.utas.edu.au/courses/arts-soc/courses/93d-bachelor-of-psychological-science-and-bachelor-of-laws
+international_eligible
+True
+✓ used
+eligibility.positive
+85%
+True
+available to international students
+https://www.utas.edu.au/courses/arts-soc/courses/93d-bachelor-of-psychological-science-and-bachelor-of-laws
+international_fee
+13152
+✓ used
+regex
+100%
+13152
+ernment. You’ll only need to pay the student contribution amount for each unit you study within the course. Commonwealth Supported Place indicative annual fee: $13,152 How is this calculated? This is an estimate. The calculation is based on
+https://www.utas.edu.au/courses/arts-soc/courses/93d-bachelor-of-psychological-science-and-bachelor-of-laws
+location_text
+Hobart
+✓ used
+gemini primary
+75%
+Hobart
+gemini_primary: location_text=Hobart
+https://www.utas.edu.au/courses/arts-soc/courses/93d-bachelor-of-psychological-science-and-bachelor-of-laws
+mode
+On Campus
+✓ used
+gemini primary
+75%
+On Campus
+gemini_primary: mode=On Campus
+https://www.utas.edu.au/courses/arts-soc/courses/93d-bachelor-of-psychological-science-and-bachelor-of-laws
+study_mode
+On Campus
+✓ used
+study mode:rule
+70%
+On Campus
+ster 2 Online Semester 2 Key: On-campus Off-Campus International stud
+https://www.utas.edu.au/courses/arts-soc/courses/93d-bachelor-of-psychological-science-and-bachelor-of-laws
+sub_category
+Psychological Science and Law
+✓ used
+gemini primary
+75%
+Psychological Science and Law
+gemini_primary: sub_category=Psychological Science and Law
+https://www.utas.edu.au/courses/arts-soc/courses/93d-bachelor-of-psychological-science-and-bachelor-of-laws
