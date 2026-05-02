@@ -391,3 +391,75 @@ def test_coherence_gate_allows_toefl_from_coherent_image() -> None:
     assert surviving == {"ielts_overall": 6.0, "toefl_overall": 79.0}, (
         "Coherent image should not be blocked; TOEFL should survive"
     )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Bug 5b — Sub-gate B: single-test tier-1 image rejected when no regex anchor
+# ─────────────────────────────────────────────────────────────────────────────
+
+_ENGLISH_OVERALL_SLOTS = frozenset({
+    "ielts_overall", "pte_overall", "toefl_overall",
+    "cambridge_overall", "duolingo_overall",
+})
+
+
+def _run_single_test_gate(vision_evidence: list[dict]) -> set[str]:
+    """Replicate sub-gate B (no regex anchor) logic from single_course.py."""
+    from collections import Counter
+    t1_overall_count: dict[str, int] = Counter(
+        ev["source_url"]
+        for ev in vision_evidence
+        if (
+            ev.get("source_tier", 1) != 0
+            and ev.get("field_key") in _ENGLISH_OVERALL_SLOTS
+            and ev.get("source_url")
+        )
+    )
+    return {url for url, cnt in t1_overall_count.items() if cnt < 2}
+
+
+def test_single_test_gate_rejects_ielts_only_image() -> None:
+    """Tier-1 image with only IELTS (no TOEFL/PTE) must be flagged when regex IELTS is None."""
+    img_url = "https://flinders.edu.au/_jcr_content/hero-ielts-caption.png"
+    evidence = [
+        {"field_key": "ielts_overall", "value": 6.5, "source_tier": 1, "source_url": img_url},
+    ]
+    flagged = _run_single_test_gate(evidence)
+    assert img_url in flagged, (
+        "Single-test tier-1 image (IELTS only) must be flagged without regex anchor"
+    )
+
+
+def test_single_test_gate_passes_multi_test_image() -> None:
+    """Tier-1 image with IELTS + TOEFL must NOT be flagged — looks like a real requirements table."""
+    img_url = "https://flinders.edu.au/_jcr_content/requirements-table.png"
+    evidence = [
+        {"field_key": "ielts_overall", "value": 6.0, "source_tier": 1, "source_url": img_url},
+        {"field_key": "toefl_overall", "value": 79.0, "source_tier": 1, "source_url": img_url},
+    ]
+    flagged = _run_single_test_gate(evidence)
+    assert not flagged, (
+        "Multi-test tier-1 image (IELTS + TOEFL) should NOT be flagged"
+    )
+
+
+def test_single_test_gate_never_flags_tier0_image() -> None:
+    """Tier-0 images must never be flagged by sub-gate B even with only one test score."""
+    img_url = "https://flinders.edu.au/_jcr_content/dom-anchored-reqs.png"
+    evidence = [
+        {"field_key": "ielts_overall", "value": 7.0, "source_tier": 0, "source_url": img_url},
+    ]
+    flagged = _run_single_test_gate(evidence)
+    assert not flagged, "Tier-0 image must never be flagged by sub-gate B"
+
+
+def test_single_test_gate_three_test_image_passes() -> None:
+    """Tier-1 image with IELTS + PTE + TOEFL passes (≥2 overalls)."""
+    img_url = "https://flinders.edu.au/_jcr_content/full-table.png"
+    evidence = [
+        {"field_key": "ielts_overall", "value": 6.0, "source_tier": 1, "source_url": img_url},
+        {"field_key": "pte_overall",   "value": 50.0, "source_tier": 1, "source_url": img_url},
+        {"field_key": "toefl_overall", "value": 79.0, "source_tier": 1, "source_url": img_url},
+    ]
+    flagged = _run_single_test_gate(evidence)
+    assert not flagged, "Three-test tier-1 image must not be flagged"
