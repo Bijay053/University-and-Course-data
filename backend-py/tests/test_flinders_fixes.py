@@ -517,3 +517,88 @@ def test_single_test_gate_three_test_image_passes() -> None:
     ]
     flagged = _run_single_test_gate(evidence)
     assert not flagged, "Three-test tier-1 image must not be flagged"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Real-world regression: karl-sammut.png hallucination
+# Bachelor of Engineering (Maritime) (Honours) — headshot photo from _jcr_content
+# Gemini returned IELTS overall=6.5 + all 4 sub-bands from a portrait photo.
+# Sub-gate A catches the 6.5 vs regex 6.0 mismatch; trust_tier1_vision_ocr_english
+# catches it even if no regex anchor exists.
+# ─────────────────────────────────────────────────────────────────────────────
+
+_KARL_SAMMUT_URL = (
+    "https://www.flinders.edu.au/study/courses/bachelor-engineering-maritime-honours"
+    "/_jcr_content/content/section_1690004324_c/par_0/section_1444220647_c"
+    "/par_0/section_copy/par_0/image_general.coreimg.png/1756445737683/karl-sammut.png"
+)
+
+
+def test_karl_sammut_blocked_by_gate_a() -> None:
+    """Portrait photo returning IELTS=6.5 must be blocked when regex established 6.0."""
+    vision_evidence = [
+        {"field_key": "ielts_overall",   "value": 6.5, "source_tier": 1, "source_url": _KARL_SAMMUT_URL},
+        {"field_key": "ielts_listening", "value": 6.0, "source_tier": 1, "source_url": _KARL_SAMMUT_URL},
+        {"field_key": "ielts_reading",   "value": 6.5, "source_tier": 1, "source_url": _KARL_SAMMUT_URL},
+        {"field_key": "ielts_speaking",  "value": 6.5, "source_tier": 1, "source_url": _KARL_SAMMUT_URL},
+        {"field_key": "ielts_writing",   "value": 6.0, "source_tier": 1, "source_url": _KARL_SAMMUT_URL},
+    ]
+    flagged = _run_coherence_gate(regex_ielts=6.0, vision_evidence=vision_evidence)
+    assert _KARL_SAMMUT_URL in flagged, (
+        "karl-sammut.png must be flagged by sub-gate A (IELTS=6.5 vs regex=6.0)"
+    )
+    vision_filled = {ev["field_key"]: ev["value"] for ev in vision_evidence}
+    surviving = {
+        k: v for k, v in vision_filled.items()
+        if next(
+            (ev for ev in vision_evidence if ev["field_key"] == k), {}
+        ).get("source_url") not in flagged
+    }
+    assert surviving == {}, (
+        f"ALL fields from karl-sammut.png must be blocked, got: {surviving}"
+    )
+
+
+def test_karl_sammut_blocked_by_tier1_opt_out() -> None:
+    """With trust_tier1_vision_ocr_english=false, ALL tier-1 images pre-blocked regardless of values."""
+    vision_evidence = [
+        {"field_key": "ielts_overall",   "value": 6.5, "source_tier": 1, "source_url": _KARL_SAMMUT_URL},
+        {"field_key": "ielts_listening", "value": 6.0, "source_tier": 1, "source_url": _KARL_SAMMUT_URL},
+        {"field_key": "ielts_reading",   "value": 6.5, "source_tier": 1, "source_url": _KARL_SAMMUT_URL},
+        {"field_key": "ielts_speaking",  "value": 6.5, "source_tier": 1, "source_url": _KARL_SAMMUT_URL},
+        {"field_key": "ielts_writing",   "value": 6.0, "source_tier": 1, "source_url": _KARL_SAMMUT_URL},
+    ]
+    # Simulate the opt-out pre-population (trust_tier1_vision_ocr_english=false)
+    incoherent: set[str] = set()
+    for vev in vision_evidence:
+        if vev.get("source_tier", 1) != 0:
+            incoherent.add(vev.get("source_url", ""))
+
+    assert _KARL_SAMMUT_URL in incoherent
+
+    vision_filled = {ev["field_key"]: ev["value"] for ev in vision_evidence}
+    surviving = {
+        k: v for k, v in vision_filled.items()
+        if next(
+            (ev for ev in vision_evidence if ev["field_key"] == k), {}
+        ).get("source_url") not in incoherent
+    }
+    assert surviving == {}, (
+        f"Tier-1 opt-out must block ALL fields from karl-sammut.png, got: {surviving}"
+    )
+
+
+def test_karl_sammut_tier0_twin_would_pass() -> None:
+    """If karl-sammut were tier-0 (DOM-anchored), it must NOT be blocked by tier-1 opt-out."""
+    tier0_evidence = [
+        {"field_key": "ielts_overall", "value": 6.5, "source_tier": 0, "source_url": _KARL_SAMMUT_URL},
+    ]
+    incoherent: set[str] = set()
+    for vev in tier0_evidence:
+        if vev.get("source_tier", 1) != 0:
+            incoherent.add(vev.get("source_url", ""))
+
+    assert _KARL_SAMMUT_URL not in incoherent, (
+        "Tier-0 version of same image must NOT be blocked by the opt-out — "
+        "tier-0 means it was found inside the English requirements DOM section"
+    )

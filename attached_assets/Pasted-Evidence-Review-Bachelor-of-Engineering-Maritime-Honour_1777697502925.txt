@@ -1,0 +1,174 @@
+Evidence Review
+Bachelor of Engineering (Maritime) (Honours)
+Eligibility: ready - ok
+Conflicts
+ielts_listening: 6.0 vs 7.0 - per_course_vision vs sibling_cache:undergraduate disagreed
+ielts_overall: 6.5 vs 6.0 - per_course_vision vs regex disagreed
+ielts_reading: 6.5 vs 7.0 - per_course_vision vs sibling_cache:undergraduate disagreed
+category
+selected
+selected
+/ category:rule
+confidence 60%
+Engineering & Technology
+Bachelor of Engineering (Maritime) (Honours)
+https://www.flinders.edu.au/study/courses/bachelor-engineering-maritime-honours
+course_location
+selected
+selected
+/ location.delivery_inperson
+confidence 85%
+Tonsley
+Tonsley
+https://www.flinders.edu.au/study/courses/bachelor-engineering-maritime-honours
+course_name
+selected
+selected
+/ course_name.h1
+confidence 90%
+Bachelor of Engineering (Maritime) (Honours)
+Bachelor of Engineering (Maritime) (Honours)
+https://www.flinders.edu.au/study/courses/bachelor-engineering-maritime-honours
+cricos_code
+selected
+selected
+/ regex:cricos
+confidence 95%
+092433B
+CRICOS code extracted from course page: 092433B
+https://www.flinders.edu.au/study/courses/bachelor-engineering-maritime-honours
+degree_level
+selected
+selected
+/ degree_level:name
+confidence 90%
+Bachelor's
+Bachelor of Engineering (Maritime) (Honours)
+https://www.flinders.edu.au/study/courses/bachelor-engineering-maritime-honours
+description
+selected
+selected
+/ description.meta
+confidence 95%
+Navigate the future of maritime engineering with a degree from Flinders University. Gain skills for marine industry careers.
+https://www.flinders.edu.au/study/courses/bachelor-engineering-maritime-honours
+https://www.flinders.edu.au/study/courses/bachelor-engineering-maritime-honours
+duration
+selected
+selected
+/ regex
+confidence 75%
+4.0
+Speak to us about alternative entry options STAT 150.0 GPA 4.5 TAFE/VET Diploma or above Pathway options Engineering (Honours) - Flexible Entry | Engineering (Honours) - General Entry | Engineering Science | Science | Diploma in Arts IELTS
+https://www.flinders.edu.au/study/courses/bachelor-engineering-maritime-honours
+duration_unit
+selected
+selected
+/ ai_fallback
+confidence 50%
+years
+ai_fallback: duration_unit=years
+https://www.flinders.edu.au/study/courses/bachelor-engineering-maritime-honours
+duration_value
+selected
+selected
+/ ai_fallback
+confidence 50%
+4.0
+ai_fallback: duration_value=4.0
+https://www.flinders.edu.au/study/courses/bachelor-engineering-maritime-honours
+fee_currency
+selected
+selected
+/ ai_fallback
+confidence 50%
+AUD
+ai_fallback: fee_currency=AUD
+https://www.flinders.edu.au/study/courses/bachelor-engineering-maritime-honours
+ielts_listening
+needs_review
+/ per_course_vision
+confidence 85%
+6.0
+https://www.flinders.edu.au/study/courses/bachelor-engineering-maritime-honours/_jcr_content/content/section_1690004324_c/par_0/section_1444220647_c/par_0/section_copy/par_0/image_general.coreimg.png/1756445737683/karl-sammut.png
+https://www.flinders.edu.au/study/courses/bachelor-engineering-maritime-honours/_jcr_content/content/section_1690004324_c/par_0/section_1444220647_c/par_0/section_copy/par_0/image_general.coreimg.png/1756445737683/karl-sammut.png
+needs_review
+/ sibling_cache:undergraduate
+confidence 55%
+7.0
+sibling-cache backfill from undergraduate bucket (source: https://www.flinders.edu.au/study/courses/bachelor-early-childhood-education-birth-5): ielts_listening=7.0
+https://www.flinders.edu.au/study/courses/bachelor-early-childhood-education-birth-5
+ielts_overall
+selected
+selected
+/ regex
+confidence 85%
+6.0
+Study the Bachelor of Engineering (Maritime) (Honours) - Flinders University  Staff Students Library Study Study areas Business Computer science and information technology Creative arts and media Cri
+https://www.flinders.edu.au/study/courses/bachelor-engineering-maritime-honours
+needs_review
+/ per_course_vision
+confidence 85%
+6.5
+https://www.flinders.edu.au/study/courses/bachelor-engineering-maritime-honours/_jcr_content/content/section_1690004324_c/par_0/section_1444220647_c/par_0/section_copy/par_0/image_general.coreimg.png/1756445737683/karl-sammut.png
+https://www.flinders.edu.au/study/courses/bachelor-engineering-maritime-honours/_jcr_content/content/section_1690004324_c/par_0/section_1444220647_c/par_0/section_copy/par_0/image_general.coreimg.png/1756445737683/karl-sammut.png
+ielts_reading
+needs_review
+/ per_course_vision
+confidence 85%
+6.5
+https://www.flinders.edu.au/study/courses/bachelor-engineering-maritime-honours/_jcr_content/content/section_1690004324_c/par_0/section_1444220647_c/par_0/section_copy/par_0/image_general.coreimg.png/1756445737683/karl-sammut.png
+https://www.flinders.edu.au/study/courses/bachelor-engineering-maritime-honours/_jcr_content/content/section_1690004324_c/par_0/section_1444220647_c/par_0/section_copy/par_0/image_general.coreimg.png/1756445737683/karl-sammut.png
+needs_review
+/ sibling_cache:undergraduate
+confidence 55%
+7.0
+sibling-cache backfill from undergraduate bucket (source: https://www.flinders.edu.au/study/courses/bachelor-early-childhood-education-birth-5): ielts_reading=7.0
+https://www.flinders.edu.au/study/courses/bachelor-early-childhood-education-birth-5
+ielts_speaking
+needs_review
+/ per_course_vision
+confidence 85%
+6.5
+https://www.flinders.edu.au/study/courses/bachelor-engineering-maritime-honours/_jcr_content/content/section_1690004324_c/par_0/section_1444220647_c/par_0/section_copy/par_0/image_general.coreimg.png/1756445737683/karl-sammut.png
+https://www.flinders.edu.au/study/courses/bachelor-engineering-maritime-honours/_jcr_content/content/section_1690004324_c/par_0/section_1444220647_c/par_0/section_copy/par_0/image_general.coreimg.png/1756445737683/karl-sammut.png
+ielts_writing
+selected
+selected
+/ per_course_vision
+confidence 85%
+6.0
+https://www.flinders.edu.au/study/courses/bachelor-engineering-maritime-honours/_jcr_content/content/section_1690004324_c/par_0/section_1444220647_c/par_0/section_copy/par_0/image_general.coreimg.png/1756445737683/karl-sammut.png
+https://www.flinders.edu.au/study/courses/bachelor-engineering-maritime-honours/_jcr_content/content/section_1690004324_c/par_0/section_1444220647_c/par_0/section_copy/par_0/image_general.coreimg.png/1756445737683/karl-sammut.png
+intake_months
+selected
+selected
+/ regex
+confidence 70%
+["March", "July"]
+valent) Deferrable: Yes Start Dates March July Start Dates March July Annual Indicative Fees Annual Indicative Fees 2026 : $9,537 (CSP) 2026 : $47,300 (FFP) Delivery mode In person (Tonsley) In person (Tonsley) Practical experience Availabl
+https://www.flinders.edu.au/study/courses/bachelor-engineering-maritime-honours
+international_eligible
+selected
+selected
+/ eligibility.positive
+confidence 85%
+True
+CRICOS 092433B
+https://www.flinders.edu.au/study/courses/bachelor-engineering-maritime-honours
+international_fee
+selected
+selected
+/ regex
+confidence 100%
+47300
+or part-time equivalent) Deferrable: Yes Start Dates March July Start Dates March July Annual Indicative Fees Annual Indicative Fees 2026 : $9,537 (CSP) 2026 : $47,300 (FFP) Delivery mode In person (Tonsley) In person (Tonsley) Practical ex
+https://www.flinders.edu.au/study/courses/bachelor-engineering-maritime-honours
+study_mode
+selected
+selected
+/ study_mode:rule
+confidence 70%
+On Campus
+: $47,300 (FFP) Delivery mode In person (Tonsley) In person (Tonsley)
+https://www.flinders.edu.au/study/courses/bachelor-engineering-maritime-honours
