@@ -557,15 +557,20 @@ def _extract_img_candidates(
         _stem = _filename.rsplit(".", 1)[0]
         if _stem in _DECORATIVE_EXACT_STEMS:
             continue
-        # Generic marketing path block: check the FULL URL (lowercased) for
-        # known site-wide image directories that never contain per-course
-        # English-requirement tables (e.g. /shared/how-to-apply/, /marketing/).
-        _src_lower = src.lower()
-        if any(block in _src_lower for block in _GENERIC_MARKETING_PATH_BLOCKS):
-            continue
+        # Resolve to absolute URL first — the path-block check MUST run on
+        # the absolute URL so that relative srcs without a leading slash
+        # (e.g. ``how-to-apply/img.jpg``) are correctly caught.  Checking
+        # the raw src attribute misses those because the block-list entries
+        # all start with "/" (e.g. "/how-to-apply").
         try:
             absolute = urljoin(base_url, src)
         except Exception:  # noqa: BLE001 — never fail the scrape on a bad src
+            continue
+        # Generic marketing path block: check the FULL absolute URL for
+        # known site-wide image directories that never contain per-course
+        # English-requirement tables (e.g. /shared/how-to-apply/, /marketing/).
+        _abs_lower = absolute.lower()
+        if any(block in _abs_lower for block in _GENERIC_MARKETING_PATH_BLOCKS):
             continue
         # Skip images already captured as tier-0 English-section candidates.
         if absolute in tier0_urls:
