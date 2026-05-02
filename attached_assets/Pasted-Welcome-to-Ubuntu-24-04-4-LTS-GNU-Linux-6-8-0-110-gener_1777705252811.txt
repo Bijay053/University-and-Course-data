@@ -1,0 +1,375 @@
+Welcome to Ubuntu 24.04.4 LTS (GNU/Linux 6.8.0-110-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/pro
+
+ System information as of Sat May  2 05:50:14 UTC 2026
+
+  System load:           1.01
+  Usage of /:            3.7% of 231.44GB
+  Memory usage:          23%
+  Swap usage:            0%
+  Processes:             205
+  Users logged in:       1
+  IPv4 address for eth0: 159.65.152.72
+  IPv4 address for eth0: 10.47.0.13
+  IPv6 address for eth0: 2400:6180:100:d0:0:1:3615:5001
+
+Expanded Security Maintenance for Applications is not enabled.
+
+17 updates can be applied immediately.
+To see these additional updates run: apt list --upgradable
+
+1 additional security update can be applied with ESM Apps.
+Learn more about enabling ESM Apps service at https://ubuntu.com/esm
+
+
+Last login: Sat May  2 04:37:10 2026 from 162.243.188.66
+root@university-and-course-data:~# cd /root/University-and-Course-data && git pull origin main && pnpm --filter @workspace/university-portal run build && systemctl restart uni-api-py.service uni-celery.service
+remote: Enumerating objects: 13, done.
+remote: Counting objects: 100% (13/13), done.
+remote: Compressing objects: 100% (7/7), done.
+remote: Total 7 (delta 6), reused 0 (delta 0), pack-reused 0 (from 0)
+Unpacking objects: 100% (7/7), 2.78 KiB | 568.00 KiB/s, done.
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+   67b948f..c433975  main       -> origin/main
+Updating 67b948f..c433975
+Fast-forward
+ artifacts/university-portal/src/pages/scraping.tsx | 218 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++---------------------------
+ 1 file changed, 164 insertions(+), 54 deletions(-)
+
+> @workspace/university-portal@0.0.0 build /root/University-and-Course-data/artifacts/university-portal
+> vite build --config vite.config.ts
+
+vite v7.3.1 building client environment for production...
+src/components/ui/tooltip.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/label.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/progress.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/dropdown-menu.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/select.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/command.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+✓ 1879 modules transformed.
+dist/public/index.html                                 0.74 kB │ gzip:   0.41 kB
+dist/public/assets/image_1776917782083-Beo3ixZx.png   10.01 kB
+dist/public/assets/index-wvunI1jQ.css                132.51 kB │ gzip:  21.89 kB
+dist/public/assets/index-BpsLQv_p.js                 871.19 kB │ gzip: 245.05 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 5.13s
+root@university-and-course-data:~/University-and-Course-data# cd /root/University-and-Course-data && git pull origin main && pnpm --filter @workspace/university-portal run build && systemctl restart uni-api-py.service uni-celery.service
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+Already up to date.
+
+> @workspace/university-portal@0.0.0 build /root/University-and-Course-data/artifacts/university-portal
+> vite build --config vite.config.ts
+
+vite v7.3.1 building client environment for production...
+src/components/ui/tooltip.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/label.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/progress.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/dropdown-menu.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/select.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/command.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+✓ 1879 modules transformed.
+dist/public/index.html                                 0.74 kB │ gzip:   0.41 kB
+dist/public/assets/image_1776917782083-Beo3ixZx.png   10.01 kB
+dist/public/assets/index-wvunI1jQ.css                132.51 kB │ gzip:  21.89 kB
+dist/public/assets/index-BpsLQv_p.js                 871.19 kB │ gzip: 245.05 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 4.96s
+root@university-and-course-data:~/University-and-Course-data# cd /root/University-and-Course-data && git pull origin main && systemctl restart uni-api-py.service uni-celery.service
+remote: Enumerating objects: 13, done.
+remote: Counting objects: 100% (13/13), done.
+remote: Compressing objects: 100% (7/7), done.
+remote: Total 7 (delta 6), reused 0 (delta 0), pack-reused 0 (from 0)
+Unpacking objects: 100% (7/7), 1.12 KiB | 573.00 KiB/s, done.
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+   c433975..33a7e83  main       -> origin/main
+Updating c433975..33a7e83
+Fast-forward
+ backend-py/app/services/scraper/stage_course.py | 18 +++++++++++++++++-
+ 1 file changed, 17 insertions(+), 1 deletion(-)
+root@university-and-course-data:~/University-and-Course-data# cd /root/University-and-Course-data && git pull origin main && systemctl restart uni-celery.service uni-api-py.service
+remote: Enumerating objects: 13, done.
+remote: Counting objects: 100% (13/13), done.
+remote: Compressing objects: 100% (7/7), done.
+remote: Total 7 (delta 6), reused 0 (delta 0), pack-reused 0 (from 0)
+Unpacking objects: 100% (7/7), 1.88 KiB | 642.00 KiB/s, done.
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+   33a7e83..f80c8ce  main       -> origin/main
+Updating 33a7e83..f80c8ce
+Fast-forward
+ backend-py/app/services/scraper/sibling_cache.py | 35 ++++++++++++++++++++++++++++++++---
+ 1 file changed, 32 insertions(+), 3 deletions(-)
+root@university-and-course-data:~/University-and-Course-data# -- Run on PROD DB
+SELECT sc.university_id, u.name,
+       sfe.field_key,
+       COUNT(*) as cnt
+FROM scraped_field_evidence sfe
+JOIN scraped_courses sc ON sfe.scraped_course_id = sc.id
+JOIN universities u ON sc.university_id = u.id
+WHERE sfe.extraction_method LIKE 'sibling_cache:%'
+  AND sfe.selected = true
+  AND sfe.field_key IN (
+      'ielts_overall','ielts_listening','ielts_reading',
+      'ielts_writing','ielts_speaking'
+  )
+  AND sc.status IN ('approved','published')
+GROUP BY sc.university_id, u.name, sfe.field_key
+ORDER BY sc.university_id, sfe.field_key;
+--: command not found
+SELECT: command not found
+sfe.field_key,: command not found
+-bash: syntax error near unexpected token `*'
+FROM: command not found
+JOIN: command not found
+JOIN: command not found
+WHERE: command not found
+AND: command not found
+-bash: syntax error near unexpected token `('
+ielts_overall,ielts_listening,ielts_reading,: command not found
+ielts_writing,ielts_speaking: command not found
+-bash: syntax error near unexpected token `)'
+-bash: syntax error near unexpected token `('
+GROUP: command not found
+ORDER: command not found
+root@university-and-course-data:~/University-and-Course-data# cd /root/University-and-Course-data && git pull origin main && systemctl restart uni-celery.service uni-api-py.service
+remote: Enumerating objects: 13, done.
+remote: Counting objects: 100% (13/13), done.
+remote: Compressing objects: 100% (7/7), done.
+remote: Total 7 (delta 6), reused 0 (delta 0), pack-reused 0 (from 0)
+Unpacking objects: 100% (7/7), 2.05 KiB | 524.00 KiB/s, done.
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+   f80c8ce..938d198  main       -> origin/main
+Updating f80c8ce..938d198
+Fast-forward
+ backend-py/app/services/scraper/orchestrator.py | 58 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 58 insertions(+)
+root@university-and-course-data:~/University-and-Course-data# psql "$DATABASE_URL" << 'SQL'
+SELECT sc.university_id, u.name,
+       sfe.field_key,
+       COUNT(*) AS cnt
+FROM scraped_field_evidence sfe
+JOIN scraped_courses sc ON sfe.scraped_course_id = sc.id
+JOIN universities u ON sc.university_id = u.id
+WHERE sfe.extraction_method LIKE 'sibling_cache:%'
+  AND sfe.selected = true
+  AND sfe.field_key IN (
+      'ielts_overall','ielts_listening','ielts_reading',
+      'ielts_writing','ielts_speaking'
+  )
+  AND sc.status IN ('approved','published')
+GROUP BY sc.university_id, u.name, sfe.field_key
+ORDER BY sc.university_id, sfe.field_key;
+SQL
+psql: error: could not translate host name "host" to address: Temporary failure in name resolution
+root@university-and-course-data:~/University-and-Course-data# # Get DATABASE_URL from the running service environment
+DB=$(systemctl show uni-api-py.service --property=Environment | grep -oP 'DATABASE_URL=\S+' | cut -d= -f2-)
+psql "$DB" << 'SQL'
+SELECT sc.university_id, u.name,
+       sfe.field_key,
+       COUNT(*) AS cnt
+FROM scraped_field_evidence sfe
+JOIN scraped_courses sc ON sfe.scraped_course_id = sc.id
+JOIN universities u ON sc.university_id = u.id
+WHERE sfe.extraction_method LIKE 'sibling_cache:%'
+  AND sfe.selected = true
+  AND sfe.field_key IN (
+      'ielts_overall','ielts_listening','ielts_reading',
+      'ielts_writing','ielts_speaking'
+  )
+  AND sc.status IN ('approved','published')
+GROUP BY sc.university_id, u.name, sfe.field_key
+ORDER BY sc.university_id, sfe.field_key;
+SQL
+psql: error: connection to server on socket "/var/run/postgresql/.s.PGSQL.5432" failed: FATAL:  role "root" does not exist
+root@university-and-course-data:~/University-and-Course-data# # Find where the env file lives
+grep -r EnvironmentFile /etc/systemd/system/uni-api-py.service
+
+# Then source it and retry (replace the path with what you see above)
+source /root/University-and-Course-data/backend-py/.env
+psql "$DATABASE_URL" << 'SQL'
+SELECT sc.university_id, u.name, sfe.field_key, COUNT(*) AS cnt
+FROM scraped_field_evidence sfe
+JOIN scraped_courses sc ON sfe.scraped_course_id = sc.id
+JOIN universities u ON sc.university_id = u.id
+WHERE sfe.extraction_method LIKE 'sibling_cache:%'
+  AND sfe.selected = true
+  AND sfe.field_key IN ('ielts_overall','ielts_listening','ielts_reading','ielts_writing','ielts_speaking')
+  AND sc.status IN ('approved','published')
+GROUP BY sc.university_id, u.name, sfe.field_key
+ORDER BY sc.university_id, sfe.field_key;
+SQL
+EnvironmentFile=/root/University-and-Course-data/backend-py/.env
+psql: error: connection to server on socket "/var/run/postgresql/.s.PGSQL.5432" failed: FATAL:  role "root" does not exist
+root@university-and-course-data:~/University-and-Course-data# # Find the DB name first
+sudo -u postgres psql -c "\l"
+
+# Then run the query (replace university_portal with the actual DB name)
+sudo -u postgres psql -d university_portal << 'SQL'
+SELECT sc.university_id, u.name, sfe.field_key, COUNT(*) AS cnt
+FROM scraped_field_evidence sfe
+JOIN scraped_courses sc ON sfe.scraped_course_id = sc.id
+JOIN universities u ON sc.university_id = u.id
+WHERE sfe.extraction_method LIKE 'sibling_cache:%'
+  AND sfe.selected = true
+  AND sfe.field_key IN ('ielts_overall','ielts_listening','ielts_reading','ielts_writing','ielts_speaking')
+  AND sc.status IN ('approved','published')
+GROUP BY sc.university_id, u.name, sfe.field_key
+ORDER BY sc.university_id, sfe.field_key;
+SQL
+                                                             List of databases
+           Name            |   Owner   | Encoding | Locale Provider | Collate |  Ctype  | ICU Locale | ICU Rules |    Access privileges    
+---------------------------+-----------+----------+-----------------+---------+---------+------------+-----------+-------------------------
+ postgres                  | postgres  | UTF8     | libc            | C.UTF-8 | C.UTF-8 |            |           | 
+ template0                 | postgres  | UTF8     | libc            | C.UTF-8 | C.UTF-8 |            |           | =c/postgres            +
+                           |           |          |                 |         |         |            |           | postgres=CTc/postgres
+ template1                 | postgres  | UTF8     | libc            | C.UTF-8 | C.UTF-8 |            |           | =c/postgres            +
+                           |           |          |                 |         |         |            |           | postgres=CTc/postgres
+ test                      | postgres  | UTF8     | libc            | C.UTF-8 | C.UTF-8 |            |           | =Tc/postgres           +
+                           |           |          |                 |         |         |            |           | postgres=CTc/postgres  +
+                           |           |          |                 |         |         |            |           | test=CTc/postgres
+ university_portal         | uniportal | UTF8     | libc            | C.UTF-8 | C.UTF-8 |            |           | =Tc/uniportal          +
+                           |           |          |                 |         |         |            |           | uniportal=CTc/uniportal
+ university_portal_staging | postgres  | UTF8     | libc            | C.UTF-8 | C.UTF-8 |            |           | 
+(6 rows)
+
+ university_id |        name         |   field_key   | cnt 
+---------------+---------------------+---------------+-----
+            12 | Flinders University | ielts_overall |  59
+            20 | aut                 | ielts_overall |   4
+(2 rows)
+
+root@university-and-course-data:~/University-and-Course-data# sudo -u postgres psql -d university_portal << 'SQL'
+-- Q1: approved vs published breakdown
+SELECT u.name, sc.status, COUNT(*) AS cnt
+FROM scraped_field_evidence sfe
+JOIN scraped_courses sc ON sfe.scraped_course_id = sc.id
+JOIN universities u ON sc.university_id = u.id
+WHERE sfe.extraction_method LIKE 'sibling_cache:%'
+  AND sfe.selected = true
+  AND sfe.field_key = 'ielts_overall'
+  AND sc.status IN ('approved','published')
+GROUP BY u.name, sc.status
+ORDER BY u.name, sc.status;
+
+-- Q2: for published ones — what are the actual course names and degree levels?
+SELECT u.name, sc.course_name, sc.degree_level, sc.status,
+       sfe.raw_value AS sibling_ielts,
+       sfe.extraction_method
+FROM scraped_field_evidence sfe
+JOIN scraped_courses sc ON sfe.scraped_course_id = sc.id
+JOIN universities u ON sc.university_id = u.id
+WHERE sfe.extraction_method LIKE 'sibling_cache:%'
+  AND sfe.selected = true
+  AND sfe.field_key = 'ielts_overall'
+  AND sc.status IN ('approved','published')
+ORDER BY u.name, sc.degree_level, sc.course_name;
+SQL
+        name         |  status  | cnt 
+---------------------+----------+-----
+ Flinders University | approved |  59
+ aut                 | approved |   4
+(2 rows)
+
+ERROR:  column sfe.raw_value does not exist
+LINE 2:        sfe.raw_value AS sibling_ielts,
+               ^
+root@university-and-course-data:~/University-and-Course-data# sudo -u postgres psql -d university_portal << 'SQL'
+SELECT u.name, sc.course_name, sc.degree_level, sc.status,
+       sfe.candidate_value AS sibling_ielts,
+       sfe.extraction_method
+FROM scraped_field_evidence sfe
+JOIN scraped_courses sc ON sfe.scraped_course_id = sc.id
+JOIN universities u ON sc.university_id = u.id
+WHERE sfe.extraction_method LIKE 'sibling_cache:%'
+  AND sfe.selected = true
+  AND sfe.field_key = 'ielts_overall'
+  AND sc.status IN ('approved','published')
+ORDER BY u.name, sc.degree_level, sc.course_name;
+SQL
+        name         |                                       course_name                                        |     degree_level     |  status  | sibling_ielts |      extraction_method      
+---------------------+------------------------------------------------------------------------------------------+----------------------+----------+---------------+-----------------------------
+ Flinders University | Bachelor of Computing and Mathematical Sciences (Honours)                                | Bachelor's           | approved | 6.0           | sibling_cache:undergraduate
+ Flinders University | Bachelor of Medical Science (Honours)                                                    | Bachelor's           | approved | 6.0           | sibling_cache:undergraduate
+ Flinders University | Bachelor of Psychological Studies (Graduate Entry)                                       | Bachelor's           | approved | 6.0           | sibling_cache:undergraduate
+ Flinders University | Bachelor of Science (Honours)                                                            | Bachelor's           | approved | 6.0           | sibling_cache:undergraduate
+ Flinders University | Bachelor of Sport, Health and Physical Activity (Honours) 1 Year                         | Bachelor's           | approved | 6.0           | sibling_cache:undergraduate
+ Flinders University | Doctor of Medicine                                                                       | Doctorate            | approved | 6.0           | sibling_cache:postgraduate
+ Flinders University | Doctor of Philosophy (Clinical Psychology)                                               | Doctorate            | approved | 6.0           | sibling_cache:postgraduate
+ Flinders University | Doctor of Philosophy (Phd) / Master of Business Administration (MBA)                     | Doctorate            | approved | 6.0           | sibling_cache:postgraduate
+ Flinders University | Doctor of Philosophy (Phd) in Biological Sciences                                        | Doctorate            | approved | 6.0           | sibling_cache:postgraduate
+ Flinders University | Doctor of Philosophy (Phd) in Business                                                   | Doctorate            | approved | 6.0           | sibling_cache:postgraduate
+ Flinders University | Doctor of Philosophy (Phd) in Chemical Or Physical Sciences                              | Doctorate            | approved | 6.0           | sibling_cache:postgraduate
+ Flinders University | Doctor of Philosophy (Phd) in Clinical                                                   | Doctorate            | approved | 6.0           | sibling_cache:postgraduate
+ Flinders University | Doctor of Philosophy (Phd) in Computing, Information Technology Or Mathematical Sciences | Doctorate            | approved | 6.0           | sibling_cache:postgraduate
+ Flinders University | Doctor of Philosophy (Phd) in Creative and Performing Arts                               | Doctorate            | approved | 6.0           | sibling_cache:postgraduate
+ Flinders University | Doctor of Philosophy (Phd) in Criminology                                                | Doctorate            | approved | 6.0           | sibling_cache:postgraduate
+ Flinders University | Doctor of Philosophy (Phd) in Disability and Community Inclusion                         | Doctorate            | approved | 6.0           | sibling_cache:postgraduate
+ Flinders University | Doctor of Philosophy (Phd) in Education                                                  | Doctorate            | approved | 6.0           | sibling_cache:postgraduate
+ Flinders University | Doctor of Philosophy (Phd) in Engineering                                                | Doctorate            | approved | 6.0           | sibling_cache:postgraduate
+ Flinders University | Doctor of Philosophy (Phd) in Environmental Sciences                                     | Doctorate            | approved | 6.0           | sibling_cache:postgraduate
+ Flinders University | Doctor of Philosophy (Phd) in Government and International Relations                     | Doctorate            | approved | 6.0           | sibling_cache:postgraduate
+ Flinders University | Doctor of Philosophy (Phd) in Health Emergencies and Health Security                     | Doctorate            | approved | 6.0           | sibling_cache:postgraduate
+ Flinders University | Doctor of Philosophy (Phd) in Health Sciences and Allied Health                          | Doctorate            | approved | 6.0           | sibling_cache:postgraduate
+ Flinders University | Doctor of Philosophy (Phd) in Healthy Ageing and Aged Care                               | Doctorate            | approved | 6.0           | sibling_cache:postgraduate
+ Flinders University | Doctor of Philosophy (Phd) in History, Archaeology, Geography and Indigenous Studies     | Doctorate            | approved | 6.0           | sibling_cache:postgraduate
+ Flinders University | Doctor of Philosophy (Phd) in Language, Literature and Culture                           | Doctorate            | approved | 6.0           | sibling_cache:postgraduate
+ Flinders University | Doctor of Philosophy (Phd) in Law                                                        | Doctorate            | approved | 6.0           | sibling_cache:postgraduate
+ Flinders University | Doctor of Philosophy (Phd) in Medical Biosciences                                        | Doctorate            | approved | 6.0           | sibling_cache:postgraduate
+ Flinders University | Doctor of Philosophy (Phd) in Nursing Or Midwifery                                       | Doctorate            | approved | 6.0           | sibling_cache:postgraduate
+ Flinders University | Doctor of Philosophy (Phd) in Palliative Care and End of Life                            | Doctorate            | approved | 6.0           | sibling_cache:postgraduate
+ Flinders University | Doctor of Philosophy (Phd) in Psychology                                                 | Doctorate            | approved | 6.0           | sibling_cache:postgraduate
+ Flinders University | Doctor of Philosophy (Phd) in Public Health and Rural and Remote Health                  | Doctorate            | approved | 6.0           | sibling_cache:postgraduate
+ Flinders University | Doctor of Philosophy (Phd) in Social Sciences                                            | Doctorate            | approved | 6.0           | sibling_cache:postgraduate
+ Flinders University | Doctor of Philosophy (Phd) in Social Work                                                | Doctorate            | approved | 6.0           | sibling_cache:postgraduate
+ Flinders University | Master of Applied Business Analytics                                                     | Master's             | approved | 6.0           | sibling_cache:postgraduate
+ Flinders University | Master of Arts by Research in Creative and Performing Arts                               | Master's             | approved | 6.0           | sibling_cache:postgraduate
+ Flinders University | Master of Arts by Research in History and Archaeology                                    | Master's             | approved | 6.0           | sibling_cache:postgraduate
+ Flinders University | Master of Arts by Research in Language, Literature and Culture                           | Master's             | approved | 6.0           | sibling_cache:postgraduate
+ Flinders University | Master of Arts by Research in Social Sciences                                            | Master's             | approved | 6.0           | sibling_cache:postgraduate
+ Flinders University | Master of Business Administration (Business Analytics)                                   | Master's             | approved | 6.0           | sibling_cache:postgraduate
+ Flinders University | Master of Business Administration (Finance)                                              | Master's             | approved | 6.0           | sibling_cache:postgraduate
+ Flinders University | Master of Business Administration (Healthcare Management)                                | Master's             | approved | 6.0           | sibling_cache:postgraduate
+ Flinders University | Master of Business Administration (Human Resource Management)                            | Master's             | approved | 6.0           | sibling_cache:postgraduate
+ Flinders University | Master of Business Administration (International Business)                               | Master's             | approved | 6.0           | sibling_cache:postgraduate
+ Flinders University | Master of Business Administration (Marketing)                                            | Master's             | approved | 6.0           | sibling_cache:postgraduate
+ Flinders University | Master of Business Administration Industry Focused                                       | Master's             | approved | 6.0           | sibling_cache:postgraduate
+ Flinders University | Master of Disability Practice and Leadership                                             | Master's             | approved | 6.0           | sibling_cache:postgraduate
+ Flinders University | Master of Disability Practice and Leadership (Developmental Education)                   | Master's             | approved | 6.0           | sibling_cache:postgraduate
+ Flinders University | Master of Education                                                                      | Master's             | approved | 6.0           | sibling_cache:postgraduate
+ Flinders University | Master of Forensic Science                                                               | Master's             | approved | 6.0           | sibling_cache:postgraduate
+ Flinders University | Master of Health and Clinical Research                                                   | Master's             | approved | 6.0           | sibling_cache:postgraduate
+ Flinders University | Master of Inclusive and Specialised Education                                            | Master's             | approved | 6.0           | sibling_cache:postgraduate
+ Flinders University | Master of Laws                                                                           | Master's             | approved | 6.0           | sibling_cache:postgraduate
+ Flinders University | Master of Professional Psychology                                                        | Master's             | approved | 6.0           | sibling_cache:postgraduate
+ Flinders University | Master of Project Management                                                             | Master's             | approved | 6.0           | sibling_cache:postgraduate
+ Flinders University | Master of Science (Biology)                                                              | Master's             | approved | 6.0           | sibling_cache:postgraduate
+ Flinders University | Master of Science (Environmental Science)                                                | Master's             | approved | 6.0           | sibling_cache:postgraduate
+ Flinders University | Master of Social Work (Graduate Entry)                                                   | Master's             | approved | 6.0           | sibling_cache:postgraduate
+ Flinders University | Master of Teaching (Birth - 5)                                                           | Master's             | approved | 6.0           | sibling_cache:postgraduate
+ Flinders University | Master of Teaching (Secondary)                                                           | Master's             | approved | 6.0           | sibling_cache:postgraduate
+ aut                 | Bachelor of Education ([Specialty] Teaching)                                             | Bachelor's           | approved | 6.0           | sibling_cache:undergraduate
+ aut                 | Graduate Diploma in Secondary Teaching                                                   | Graduate Certificate | approved | 6.5           | sibling_cache:postgraduate
+ aut                 | Master of Teaching and Learning                                                          | Master's             | approved | 6.5           | sibling_cache:postgraduate
+ aut                 | Master of Teaching and Learning                                                          | Master's             | approved | 6.5           | sibling_cache:postgraduate
+(63 rows)
+
+root@university-and-course-data:~/University-and-Course-data# cd /root/University-and-Course-data && git pull origin main && systemctl restart uni-celery.service uni-api-py.service
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+Already up to date.
+root@university-and-course-data:~/University-and-Course-data# 
