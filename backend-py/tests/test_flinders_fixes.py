@@ -1,9 +1,11 @@
-"""Tests for the four Flinders-specific bugs fixed in this session:
+"""Tests for Flinders-specific bugs fixed in this session:
 
   Bug 1 — Vision OCR: social-footer icons blocked by _SOCIAL_CHROME_PATH_RE
   Bug 2 — Duration: combined/add-on degree sentences demoted by 0.001×
   Bug 3 — Duplicates: trailing-slash URL normalization in stage_course
   Bug 4 — flinders.yaml: config file created and loads cleanly
+  Bug 5 — Vision IELTS coherence gate: tier-1 images with mismatched IELTS
+           must not silently inject TOEFL/PTE into empty slots
 """
 from __future__ import annotations
 
@@ -258,3 +260,134 @@ def test_flinders_config_slug_derivation() -> None:
 
     assert _hostname_to_slug("www.flinders.edu.au") == "flinders"
     assert _hostname_to_slug("flinders.edu.au") == "flinders"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Bug 5 — Tier-1 IELTS coherence gate in single_course pipeline
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _run_coherence_gate(
+    regex_ielts: float | None,
+    vision_evidence: list[dict],
+) -> set[str]:
+    """Replicate the incoherent-image-URL detection logic from single_course.py."""
+    incoherent: set[str] = set()
+    if regex_ielts is None:
+        return incoherent
+    for vev in vision_evidence:
+        if (
+            vev.get("field_key") == "ielts_overall"
+            and vev.get("source_tier", 1) != 0
+        ):
+            try:
+                if abs(float(vev["value"]) - regex_ielts) > 0.1:
+                    incoherent.add(vev.get("source_url", ""))
+            except (TypeError, ValueError):
+                pass
+    return incoherent
+
+
+def test_coherence_gate_flags_mismatched_tier1_image() -> None:
+    """Tier-1 image returning IELTS=6.5 when regex said 6.0 must be flagged."""
+    evidence = [
+        {
+            "field_key": "ielts_overall",
+            "value": 6.5,
+            "source_tier": 1,
+            "source_url": "https://flinders.edu.au/_jcr_content/hero.jpg",
+        }
+    ]
+    flagged = _run_coherence_gate(regex_ielts=6.0, vision_evidence=evidence)
+    assert "https://flinders.edu.au/_jcr_content/hero.jpg" in flagged, (
+        "Image with IELTS=6.5 should be flagged when regex established 6.0"
+    )
+
+
+def test_coherence_gate_passes_matching_tier1_image() -> None:
+    """Tier-1 image returning same IELTS as regex must NOT be flagged."""
+    evidence = [
+        {
+            "field_key": "ielts_overall",
+            "value": 6.0,
+            "source_tier": 1,
+            "source_url": "https://flinders.edu.au/_jcr_content/reqs.jpg",
+        }
+    ]
+    flagged = _run_coherence_gate(regex_ielts=6.0, vision_evidence=evidence)
+    assert not flagged, "Image matching regex IELTS should not be flagged"
+
+
+def test_coherence_gate_never_flags_tier0_image() -> None:
+    """Tier-0 (English-requirements DOM) image must never be flagged even if IELTS differs."""
+    evidence = [
+        {
+            "field_key": "ielts_overall",
+            "value": 7.0,
+            "source_tier": 0,
+            "source_url": "https://flinders.edu.au/_jcr_content/reqs-table.png",
+        }
+    ]
+    flagged = _run_coherence_gate(regex_ielts=6.0, vision_evidence=evidence)
+    assert not flagged, "Tier-0 images must never be flagged by the coherence gate"
+
+
+def test_coherence_gate_noop_when_no_regex_ielts() -> None:
+    """Gate must be a no-op when regex didn't find any IELTS value."""
+    evidence = [
+        {
+            "field_key": "ielts_overall",
+            "value": 6.5,
+            "source_tier": 1,
+            "source_url": "https://flinders.edu.au/_jcr_content/banner.jpg",
+        }
+    ]
+    flagged = _run_coherence_gate(regex_ielts=None, vision_evidence=evidence)
+    assert not flagged, "Gate must be a no-op when regex_ielts is None"
+
+
+def test_coherence_gate_blocks_toefl_injection() -> None:
+    """Flagged image's TOEFL/PTE must be excluded — simulates the bachelor-arts case."""
+    img_url = "https://flinders.edu.au/_jcr_content/hero.png"
+    vision_evidence = [
+        {"field_key": "ielts_overall", "value": 6.5, "source_tier": 1, "source_url": img_url},
+        {"field_key": "toefl_overall", "value": 80.0, "source_tier": 1, "source_url": img_url},
+        {"field_key": "pte_overall",   "value": 58.0, "source_tier": 1, "source_url": img_url},
+    ]
+    vision_filled = {"ielts_overall": 6.5, "toefl_overall": 80.0, "pte_overall": 58.0}
+
+    flagged = _run_coherence_gate(regex_ielts=6.0, vision_evidence=vision_evidence)
+    assert img_url in flagged
+
+    surviving = {
+        k: v for k, v in vision_filled.items()
+        if next(
+            (ev for ev in vision_evidence if ev["field_key"] == k), {}
+        ).get("source_url") not in flagged
+    }
+    assert surviving == {}, (
+        "All fields from the incoherent image must be blocked; "
+        f"surviving fields: {surviving}"
+    )
+
+
+def test_coherence_gate_allows_toefl_from_coherent_image() -> None:
+    """TOEFL from a tier-1 image that returns matching IELTS must pass through."""
+    img_url = "https://flinders.edu.au/_jcr_content/reqs.png"
+    vision_evidence = [
+        {"field_key": "ielts_overall", "value": 6.0, "source_tier": 1, "source_url": img_url},
+        {"field_key": "toefl_overall", "value": 79.0, "source_tier": 1, "source_url": img_url},
+    ]
+    vision_filled = {"ielts_overall": 6.0, "toefl_overall": 79.0}
+
+    flagged = _run_coherence_gate(regex_ielts=6.0, vision_evidence=vision_evidence)
+    assert not flagged
+
+    surviving = {
+        k: v for k, v in vision_filled.items()
+        if next(
+            (ev for ev in vision_evidence if ev["field_key"] == k), {}
+        ).get("source_url") not in flagged
+    }
+    assert surviving == {"ielts_overall": 6.0, "toefl_overall": 79.0}, (
+        "Coherent image should not be blocked; TOEFL should survive"
+    )

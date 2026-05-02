@@ -1,0 +1,75 @@
+Watching the Flinders re-scrape live at the 120/388 mark (~31% through, ~40 min remaining). Sharing what's holding well and two new concerns that are surfacing in the live logs before they get baked into the final batch.
+
+**What's working as expected**
+
+*Domestic-only filter is firing properly.* I can count at least 13 `[DOMESTIC ONLY] ... skipping` log lines so far across the first 120 courses, including some that the previous batch let through. Examples caught this run: `bachelor-allied-health-physiotherapy`, `bachelor-allied-health-speech-pathology`, `bachelor-allied-health-occupational-therapy`, `bachelor-creative-arts-dance`, `bachelor-creative-arts-interior-design`, `bachelor-creative-arts-visual-arts`, `bachelor-engineering-science`, `bachelor-engineering-technology-systems-security-bachelor-science-physics`, `bachelor-paramedicine-nt`, `bachelor-paramedicine-regional-external-program`, `bachelor-of-medical-science-laboratory-medicine-regional-external-program`, plus 4 `/online/courses/` paths. The `flinders.yaml` + central filter restoration is doing its job. Bug 4 fix is **HOLDING**.
+
+*Bachelor durations are correct now.* Spot-checking the FIELD SUMMARY lines for undergraduate degrees:
+
+- Bachelor of Accounting — 3.0 ✅ (was 5)
+- Bachelor of Archaeology — 3.0 ✅ (was 5)
+- Bachelor of Arts — 3.0 ✅
+- Bachelor of Business — 3.0 ✅ (was 5)
+- Bachelor of Business majoring in Sports Management — 3.0 ✅ (was 5)
+- Bachelor of Commerce — 3.0 ✅ (was 5)
+- Bachelor of Computer Science — 3.0 ✅
+- Bachelor of Criminology — 3.0 ✅ (was 5)
+- Bachelor of Engineering (Environmental) (Honours) — 4.0 ✅ (was 5)
+- Bachelor of International Relations and Political Science — 3.0 ✅ (was 4.5)
+- Bachelor of Science — 3.0 ✅ (was 5)
+
+Combined-degree weight demotion is working. The 5-year values now correctly belong only to genuine combined degrees (Bachelor + Master pairs) where 5 is right. Bug 2 fix is **HOLDING**.
+
+*Per-course extraction quality looks strong.* Most rows showing `[PASS 100/100]` with regex sources for fee, IELTS, duration, intake. The structural and label-based extractors are doing the work, AI fallback only firing where genuinely needed (currency, duration units).
+
+**Concern 1 — Vision OCR still pulling test scores from generic Flinders imagery**
+
+Looking at the per-course vision lines, I'm seeing IELTS/PTE/TOEFL values being extracted from images on courses where the page text already has these values. Examples:
+
+- `bachelor-arts` text had no IELTS in the FIELD SUMMARY (regex got 6.0), but vision then returned `IELTS=6.5 PTE=— TOEFL=80.0` — different values from a different image.
+- `bachelor-business-analytics` regex got IELTS 6.0, vision returned `IELTS=6.5 TOEFL=45.0` — the TOEFL=45 is suspicious (TOEFL minimums are normally 60+).
+- `bachelor-creative-arts-costume-design` regex got IELTS 6.0, vision returned `IELTS=7.0 TOEFL=100.0`.
+- `bachelor-clinical-sciences-doctor-medicine` regex got IELTS 7.0, vision returned `IELTS=7.0 PTE=65.0 TOEFL=90.0` (matches — good).
+- `bachelor-early-childhood-education-birth-8` returned `IELTS=7.5 PTE=58.0 TOEFL=100.0` from vision — IELTS=7.5 doesn't appear elsewhere on the page summary.
+- `bachelor-media-communication` vision returned `IELTS=6.0 PTE=50.0 TOEFL=70.0` — PTE=50 and TOEFL=70 are below typical Flinders minimums.
+- `bachelor-science` (main) regex got 6.0, vision returned `IELTS=6.0 PTE=50.0 TOEFL=70.0` again — same suspicious low values.
+
+The two-layer DOM-strip + URL-regex from this morning's fix is catching Bluesky-style social footer icons (no `bluesky-circle-mono.png` evidence in this run, which is genuine progress). But vision is still mining numbers from *other* images on Flinders pages — hero imagery, info graphics, possibly the `_jcr_content` AEM-generated content fragments. The block list is no longer being dodged via social paths, but vision is finding numbers somewhere else.
+
+My read: this confirms what I argued yesterday — a positive relevance check is needed, not just chrome-stripping. The values look right for some courses (Clinical Sciences) and wrong/suspicious for others (PTE=50, TOEFL=45, TOEFL=70 don't match real Flinders requirements). Whatever vision is reading on bachelor-arts and bachelor-science needs the same treatment as the social footer fix — it's a different image but the same class of bug.
+
+**Concern 2 — Gemini quota exhaustion on this scrape**
+
+Many `[VISION FAIL] ... Gemini skipped — None (likely quota exhausted)` and `503 UNAVAILABLE ... high demand` log lines throughout. This is partial vision coverage — some courses get full vision OCR, others fall through to regex-only. Two implications:
+
+- The data quality on this batch will be uneven — some courses got vision-supplemented test scores (some right, some wrong), others didn't. Hard to evaluate the batch as a coherent set.
+- We're paying for vision calls that fail mid-pass. The cost log shows ~$0.000044 per classification call across hundreds of pages — not breaking the bank, but the failed vision calls are still producing noise rather than signal.
+
+Suggestion: once this scrape finishes, check the Gemini API quota and spend for the day. If we're running into rate limits, that's worth knowing for capacity planning, especially as we onboard more universities.
+
+**Concern 3 — Two `[per-course vision img X/Y (cache hits Z)]` entries**
+
+Noticed:
+
+- `bachelor-computing-mathematical-sciences-honours` shows `img 4/6 (cache hits 2)`
+- `bachelor-criminology-honours` shows `img 2/6 (cache hits 4)`
+
+Cache is being hit, which means images shared between courses are being deduplicated correctly — the composite cache key from yesterday is working. Good. But I want to verify the cache hits are *legitimate* (same image, same source course context) rather than the old contamination pattern resurfacing. Worth checking the evidence panel on these two specific rows after the scrape completes.
+
+**What I'd suggest doing once the scrape completes**
+
+1. Wait for it to finish (~40 min from now).
+2. Open the admin review screen and walk evidence panels for 5 random rows specifically for:
+ - IELTS source on Bachelor of Arts (was vision-supplied at 6.5, regex said 6.0)
+ - IELTS/PTE/TOEFL source on Bachelor of Science (vision said 6.0/50/70 — are those from a real Flinders page or a generic image?)
+ - The two `(cache hits X)` rows (Computing Math Sciences Honours and Criminology Honours) — confirm cache is hitting course-relevant images
+ - Any Bachelor of Science duplicates (Bug 3 trailing-slash fix)
+ - One PhD in Law row (Bug 1 / Bug 2 corner case from yesterday)
+3. If walks 1-3 are clean: promote the batch.
+4. If walk 1 or 2 reveals vision is still polluting test scores from non-course imagery: don't promote yet, ship a positive-relevance-check on top of the chrome-strip + URL-regex fix.
+
+**Net read on the run so far**
+
+Three of four bugs from yesterday's batch are visibly fixed in the live logs. The vision-relevance-check question is still open and the answer matters for whether we promote tonight or push another fix. Will know definitively once I can walk the evidence panels.
+
+No action needed from your end until the scrape finishes. Just sharing the mid-run read so we both know what to look for when it lands.
