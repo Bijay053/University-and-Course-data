@@ -1,0 +1,59 @@
+Walked the evidence panel for one of the PhD rows from this batch. Found a different fabrication mechanism that bypasses the source-gating fix. This needs immediate attention before promote.
+
+**Smoking gun — Doctor of Philosophy (PhD) in Government and International Relations**
+
+Evidence panel shows all five IELTS values sourced from `sibling_cache:postgraduate` with these source URLs:
+
+- `ielts_overall=6.0` from `bachelor-engineering-biomedical-honours-master-engineering-biomedical`
+- `ielts_listening=6.5` from `bachelor-health-science-vision-science-master-optometry`
+- `ielts_reading=6.5` from `bachelor-health-science-vision-science-master-optometry`
+- `ielts_speaking=6.0` from `bachelor-engineering-biomedical-honours-master-engineering-biomedical`
+- `ielts_writing=6.0` from `bachelor-engineering-biomedical-honours-master-engineering-biomedical`
+
+The user verified the actual Flinders page — there is no English requirement section on the PhD in Government and International Relations page. The system fabricated a complete English requirement set by pulling values from two unrelated coursework courses (a Biomedical Engineering combined degree and a Vision Science/Optometry degree).
+
+The rows are labelled `needs_review` at confidence 0.55, but they still land in the staged catalog with the English fields populated. The next admin who reviews this row sees IELTS=6 with full sub-scores and probably approves.
+
+**Why this matters and how it connects to source-gating**
+
+The vision hallucination problem was: Gemini reads a stock photo, makes up numbers. We fixed that by source-gating tier-1 vision — don't trust output from non-anchored images. That fix worked: ~30 PhD/Research rows that previously had hallucinated PTE/CAE/TOEFL values are now clean.
+
+But the sibling_cache backfill is a different fabrication mechanism. It's not reading a wrong image. It's intentionally borrowing data from a different course's cache and labelling that as the PhD course's requirement. Same outcome — fabricated data presented to admin as real — different code path.
+
+This means **most or all of the IELTS=6 values on PhD/Research rows in this spreadsheet are not from those courses' actual pages.** I previously asked whether the universal IELTS=6 across 30+ PhD rows was a regex artefact. The answer is: it's sibling-cache fabrication. PhD pages at Flinders genuinely don't have English requirement sections (PhD admission is supervisor-driven, not score-driven). The correct value is empty.
+
+**The fix shape**
+
+Same shape as the vision fix: don't fabricate. The sibling_cache backfill mechanism should be either:
+
+1. **Disabled entirely** — if the page genuinely doesn't have a value, the right value is empty. Admin can flag a course as missing data and the next scrape can attempt to fill it from the actual page if Flinders updates.
+2. **Restricted to verified sibling relationships** — only backfill from courses on the same uni's same template/program family. A PhD course is not a sibling of a Biomedical Engineering combined degree just because they're both at Flinders.
+3. **Restricted to specific fields** — backfill is acceptable for things like fee_currency or fee_term (where the value is uni-wide). Not acceptable for IELTS overall and sub-scores (where the value is course-specific).
+
+My strong recommendation: option 1 (disable) for English fields, possibly option 3 for genuinely uni-wide fields like fee_currency. The needs_review flag isn't enough — the data is fabricated and should not be presented as a candidate value at all.
+
+**Affected scope**
+
+Likely all 30+ PhD/Research rows on this spreadsheet showing IELTS=6 with sub-scores. Possibly more rows on previous spreadsheets too. Worth running a query against the staged_courses table for any row where any English field has provenance starting with `sibling_cache:` and surfacing the count.
+
+Might also affect:
+- Master-by-Research rows (similar pattern — research courses without explicit English requirements)
+- Some of the postgrad coursework courses we discussed last round (the ones whose pages had "English section detected but all scores blank")
+
+**What I'd do next**
+
+Before another scrape:
+
+1. Disable sibling_cache backfill for IELTS, PTE, TOEFL, CAE, DET fields. That's a one-line change.
+2. Re-scrape Flinders. The PhD/Research rows should land with empty English fields, which is the truthful outcome.
+3. Walk the evidence panel on three PhDs and three postgrad courses to confirm no `sibling_cache` provenance remains on English fields.
+
+Bug 3 dedup, MBA parent fee blank, the suspicious low fees, and the postgrad-coursework absence question — all still pending from the previous message but second priority compared to this.
+
+**The bigger lesson**
+
+For two days we've been chasing fabrication through one code path (vision OCR) and the source-gating architecture is sound. But fabrication can come from any code path that fills blank fields without verifying the source is actually about this course. Sibling-cache backfill is one example. There may be others (AI fallback, location/intake heuristics that backfill from listing pages, etc.). Worth a code-level audit of every place a field can be populated where the source data is from a different URL than the course's own page.
+
+Not urgent for the Flinders ship, but worth a 30-min audit before handover.
+
+Thanks for catching this. Without the evidence-panel walk this would have shipped — the rows look complete and credible at the spreadsheet level.

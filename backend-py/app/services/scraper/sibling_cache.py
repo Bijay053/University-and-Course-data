@@ -73,26 +73,55 @@ _UNDERGRAD_HINTS: Final = (
     "foundation", "bridging", "honours",
 )
 _POSTGRAD_HINTS: Final = (
-    "master", "postgraduate", "doctor", "phd", "graduate certificate",
-    "graduate diploma", "doctorate",
+    "master", "postgraduate", "graduate certificate",
+    "graduate diploma",
+)
+# Research/doctoral degrees are kept in their own bucket so they never
+# inherit English requirements from taught/coursework programmes.
+#
+# At universities like Flinders, PhD admission is supervisor-driven and
+# course pages carry no English requirement section at all.  Putting PhDs
+# in the "postgraduate" bucket alongside taught Masters caused every PhD
+# row to inherit IELTS=6 from the Masters pool — fabricated data that
+# looked credible and would have been approved by admins.
+#
+# With a dedicated "research" bucket: if no PhD/research page in the run
+# yields an IELTS value, the research bucket cache is empty and nothing
+# is backfilled (correct blank).  At universities where PhD pages DO
+# publish IELTS requirements, research degrees backfill from each other
+# only — still correct.
+_RESEARCH_HINTS: Final = (
+    "doctor", "phd", "doctorate", "by research", "master of philosophy",
+    "mphil", "research degree",
 )
 
 
 def _bucket_for(payload: dict[str, Any]) -> str:
-    """Return ``"undergraduate"``, ``"postgraduate"`` or ``"unknown"``.
+    """Return ``"undergraduate"``, ``"postgraduate"``, ``"research"`` or
+    ``"unknown"``.
 
     Looks at ``degree_level`` first (cheap, set by the degree_level
     extractor) then falls back to keyword-matching the course name. The
     "unknown" bucket is its own pool — it's better to share a value
     among the unknowns than to splash a Master's score onto an
     unidentified Bachelor's.
+
+    Research/doctoral degrees are checked before postgraduate so that
+    "Doctor of Philosophy" is never merged into the taught-postgraduate
+    pool.
     """
     lvl = (payload.get("degree_level") or "").lower()
+    # Research must be checked before postgraduate — "doctor"/"phd" must
+    # not fall through into the postgraduate branch.
+    if any(h in lvl for h in _RESEARCH_HINTS):
+        return "research"
     if any(h in lvl for h in _POSTGRAD_HINTS):
         return "postgraduate"
     if any(h in lvl for h in _UNDERGRAD_HINTS):
         return "undergraduate"
     name = (payload.get("course_name") or "").lower()
+    if any(h in name for h in _RESEARCH_HINTS):
+        return "research"
     if any(h in name for h in _POSTGRAD_HINTS):
         return "postgraduate"
     if any(h in name for h in _UNDERGRAD_HINTS):

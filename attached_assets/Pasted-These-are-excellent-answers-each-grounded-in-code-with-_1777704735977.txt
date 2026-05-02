@@ -1,0 +1,55 @@
+These are excellent answers — each grounded in code with a precise mechanism. Two clarifications needed before we lock in path-to-promote.
+
+**Clarification 1 — Q5 PhD IELTS=6: regex misread vs sibling-cache fabrication**
+
+Your Q5 hypothesis (regex picking up "6.0 in each band" instead of "6.5 overall") is plausible, but it conflicts with what the evidence panel showed me on Doctor of Philosophy (PhD) in Government and International Relations:
+
+- `ielts_overall=6.0` provenance: `sibling_cache:postgraduate`, source URL = `bachelor-engineering-biomedical-honours-master-engineering-biomedical`
+- `ielts_listening=6.5` provenance: `sibling_cache:postgraduate`, source URL = `bachelor-health-science-vision-science-master-optometry`
+- `ielts_reading=6.5` provenance: `sibling_cache:postgraduate`, source URL = same Vision Science course
+- `ielts_speaking=6.0` provenance: `sibling_cache:postgraduate`, source URL = same Biomedical Engineering course
+- `ielts_writing=6.0` provenance: `sibling_cache:postgraduate`, source URL = same Biomedical Engineering course
+
+The user also verified the actual Flinders PhD page: there is no English requirement section on it at all. PhD admission at Flinders is supervisor-driven, not score-driven — those pages don't carry IELTS values for the regex to misread.
+
+So for that specific row, the IELTS values are coming from sibling_cache backfill, not from regex misread of the course's own page. Two possibilities:
+
+1. Different PhD rows have different provenance — some regex-misread, some sibling-cache. Worth checking 2-3 more PhD evidence panels to understand the distribution.
+2. The provenance string `sibling_cache:postgraduate` is misleading and the actual value source is something else.
+
+Can you walk one PhD row's evidence panel against the code path that populated each English field? If sibling_cache is genuinely populating PhD English fields from unrelated courses, that's the higher-priority fix (option 1: disable sibling_cache backfill for IELTS/PTE/TOEFL/CAE/DET fields). The regex issue is real but secondary.
+
+**Clarification 2 — catalog audit on the 792 live courses**
+
+If sibling_cache fabrication is real on PhD rows, the same mechanism may have populated English fields on courses already in the live catalog across all 12 unis. Worth running:
+
+```sql
+SELECT university_id, count(*) FROM courses
+WHERE provenance LIKE '%sibling_cache:%'
+  AND (ielts_overall IS NOT NULL OR pte_overall IS NOT NULL
+       OR toefl_overall IS NOT NULL OR cambridge_overall IS NOT NULL)
+GROUP BY university_id;
+```
+
+If this returns rows, we have a remediation question for handover (do those rows get re-scraped, or just have their English fields nulled?). If it returns zero, sibling_cache only affects new staged rows and the live catalog is clean. Either outcome is useful to know before handover.
+
+**Path-to-promote** (assuming the sibling_cache picture comes back clearer)
+
+Blocking:
+1. Name dedup fix in orchestrator (Q1) — the three Bachelor of Science rows and duplicate Bachelor of Business Sports Management can't ship
+2. PhD IELTS=6 root cause (Q5) — disable sibling_cache backfill for English fields if confirmed
+
+Non-blocking, ship after current promote:
+3. Domestic CSP context guard in fee regex (Q4) — manually reject the 4 affected rows for this promote: Master of Teaching (Secondary) $5k, Bachelor of Sport Health Honours 1Y $4k, Bachelor of Medical Science (Honours) 1Y $9,537, plus Doctor of Medicine $91,200 pending real-world spot check
+4. Central English URL config for Flinders postgrad coursework (Q3) — phase 2, brings the 36 dropped rows back into staging properly
+5. enforce_source_evidence snippet capture for MBA parent fee (Q2) — phase 2, also worth checking if other rows are silently affected
+
+**Time math**
+
+If clarification 1 confirms sibling-cache and the fix is the one-line disable: ~30 min for fix + 40 min re-scrape + 20 min walk + 30 min name-dedup fix + 40 min re-scrape + 20 min walk = ~3 hours to clean state.
+
+If the regex misread hypothesis is correct after all and sibling-cache is a different (non-PhD) issue, the fix shape is different and we'll need to scope separately.
+
+The user is going to spot-check one Doctor of Medicine page and one PhD page in parallel while we wait for your clarification on Q5 — that gives us real-world ground truth on both the $91,200 fee and the IELTS=6 question.
+
+Great work on the diagnostic depth. Q1 and Q4 are clear-cut and actionable; the conflict on Q5 just needs one more pass at the evidence.
