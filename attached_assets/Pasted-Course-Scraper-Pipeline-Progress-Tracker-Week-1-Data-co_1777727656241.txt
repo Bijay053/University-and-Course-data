@@ -1,0 +1,93 @@
+Course Scraper Pipeline — Progress Tracker
+Week 1 — Data correctness fixes
+Done:
+
+KBS Bug A duration regex slash-structure pre-check + Bug A.2 orchestrator skip rule (recovered 8 KBS courses)
+KBS fee extraction via central-page follow + column-keyed English parser
+IELTS/PTE/TOEFL per-band floor extraction (af2ae03 — Pattern 1c + _PER_BAND_FLOOR_RE + _try_floor() for ACAP-style "no individual band below" phrasing)
+Pattern 1d for IELTS split-component bands (7a64f0a — handles "IELTS 7.0 in L/R/S and 6.5 in writing" NMBA-style wording, both forward and inverse forms)
+Within-batch name dedup (938d198, df26252)
+approved_row:inherited evidence (33a7e83)
+Online_only over-rejection fix (d8fb4c5 — recovered 87 Flinders courses)
+Float32 → Numeric(6,2) duration migration (014)
+Vision cache composite key fix (cross-course leak partially fixed)
+ACAP re NameError fix
+ACAP location cruft strip (Option C)
+Per-uni YAML config architecture rebuilt (/scraper/unis/*.yaml overriding defaults.yaml)
+23-uni regression baseline established at backend-py/baselines/
+Domestic-only filter — Torrens HDR phrasing (7754b37 — "begin your application to study as a domestic student")
+Domestic-only filter — UTAS phrasing (4accb5e — "may not be available to international students")
+
+Pending:
+
+Vision OCR hallucination filter (filter decorative images by filename, validate OCR text contains test keywords, only tier-4 authority for English-section images)
+Sibling cache fix — write evidence rows with provenance, block propagation from vision/AI sources, require ≥2 sources for consensus
+AI fallback strictness — tighten prompt, block override of regex values, validate against page text
+ASAHE 17→26 + VIT 30→66 unexpected diffs from KBS sweep — shipped to prod without investigation, highest immediate priority
+Re-verify ASAHE, VIT, ACAP after fixes
+UTAS Bachelor of Nursing curl spot-check (scenario a vs b — genuine floor vs NMBA split)
+23-uni regression sweep on Pattern 1d
+Provenance verification on Torrens Bachelor of Nursing post-rescrape (confirm Pattern 1d source not coincidental Pattern 5 match)
+Code comment on Pattern 1d bridge explaining why letters allowed
+
+Week 2 — Observability + pathway handling
+Done:
+
+Pathway program detection — English for Academic Purposes correctly tagged [PATHWAY] in Torrens scrape
+Phased migration discipline (Phase 1–5 template established)
+
+Pending:
+
+Priority 5 Component 1 — scrape_run_metrics table + automatic collection
+Priority 5 Component 2 — university_field_baselines table + seed script + weekly refresh job
+Priority 5 Component 3 — alert evaluator with rules (fill-rate, method-distribution, URL-pattern)
+Priority 5 Component 4 — alert delivery (dashboard SQL views + critical email/Slack)
+Lower sanity floors
+Don't revert vision values found in page text
+Verify UniSQ UniPrep no longer gets IELTS=6.5 from central page
+
+Week 3 — Cost optimisation + CRICOS matching
+Done:
+
+CRICOS extractor for course pages (visible in L6b evidence panel — cricos_code: 040663G [regex:cricos conf=0.95])
+Gemini classification-only mode active (visible in UTAS scrape — classification_only cat='?' cost=$0.000043)
+
+Pending:
+
+Gemini Component 4 — gemini_call_log table + per-call cost recording
+Gemini Component 1 — skip Gemini when regex/CSS already has high-value fields (partially live, needs verification)
+Gemini Component 2 — quota wrapper + circuit breaker (currently hitting 503s and quota exhaustion mid-scrape)
+Gemini Component 3 — per-job cost ceiling + alert on breach
+Gemini Component 5 — confirm model is gemini-2.0-flash (switch if more expensive)
+Gemini SQL views — per-uni cost, per-call-type cost, top spenders, skip efficiency
+Priority 3 Component 2 — CRICOS extraction in PDF parser
+Priority 3 Component 3 — CRICOS-first matcher in orchestrator
+Priority 3 Component 4 — authority tier 1.5 for CRICOS-matched PDF values
+Priority 3 Component 5 — cricos_code column in scraped_courses (confirm exists; appears in evidence panel so likely live)
+Verify cost down 30–50% on UniSQ
+Verify CRICOS coverage 70%+ on AU unis
+
+Week 4 — Production scale-up (top 10 universities)
+Done:
+
+Torrens re-scrape through new pipeline (104 courses staged, 64 skipped, 0 errors)
+UTAS re-scrape through new pipeline (28 courses staged, 23 skipped, 2 fetch errors)
+
+Pending:
+
+Re-scrape remaining top 10 universities
+Manual spot-check 2–3 courses per university before approval
+Approve clean universities to production courses table
+Fix per-university extractor configs for any uni triggering data quality alerts
+Document patterns for onboarding remaining 70+ universities
+Review Gemini spend vs budget for full 80-uni operation
+
+Week 5 — Scale-up continues + next-sprint planning
+Pending:
+
+Re-scrape next 20 universities (top 11–30)
+Manual spot-check + approve
+Triage any new failure modes the larger sample reveals
+Decide next priorities — sibling cache replacement, NZQA matching for NZ unis, dashboard UI, cross-scrape caching, embedding-based fuzzy matching
+Update architecture doc with everything learned over weeks 1–4
+
