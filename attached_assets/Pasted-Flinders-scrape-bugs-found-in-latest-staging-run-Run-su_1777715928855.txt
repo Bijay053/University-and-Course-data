@@ -1,0 +1,72 @@
+Flinders scrape — bugs found in latest staging run
+Run summary: 390 discovered, 168 staged, 183 skipped, 4 fetch errors, 30m51s total. Gemini cost $0.0347 / 168 courses.
+The staged set itself looks broadly correct against the production reference — same MBA variants, double degrees, PhD list, location/duration/fee values mostly aligned. The bugs below are the things blocking promote.
+
+Bug 1 — Gemini circuit breaker tripping prematurely [SEVERE]
+Symptom. First SKIP='circuit_open' appears at the honours bachelor pages (~course 140) with no preceding error visible in the log. Once tripped, the breaker stays open for ~120 courses straight. Every Gemini call returns 0 field(s) (cost=$0.000000, in=NNNN out=0) SKIP='circuit_open' during that window.
+Examples from log:
+[GEMINI] .../honours-bachelor-archaeology → 0 field(s) (cost=$0.000000, in=1506 out=0) SKIP='circuit_open'
+[GEMINI] .../honours-bachelor-arts        → 0 field(s) (cost=$0.000000, in=1504 out=0) SKIP='circuit_open'
+[GEMINI] .../honours-bachelor-business    → 0 field(s) (cost=$0.000000, in=1505 out=0) SKIP='circuit_open'
+[GEMINI] .../honours-bachelor-commerce    → 0 field(s) (cost=$0.000000, in=1506 out=0) SKIP='circuit_open'
+... (continues for ~120 courses)
+Why it matters. The breaker recovery only happens around the postgraduate teaching pages (~course 265), so the entire honours-bachelor and most postgrad-coursework batches got regex/CSS extraction only — no AI fallback. This is the direct cause of all the [WARN 75/100] — missing: english warnings on postgrad rows. A small number of legitimate 503s later in the run (Server disconnected without sending a response, 503 UNAVAILABLE — high demand) confirm Gemini was occasionally flaky, but those don't explain why the breaker tripped 100+ courses earlier with no visible upstream error.
+Inconsistency with progress doc. The progress doc says "Quota wrapper + circuit breaker ⏳ Pending" under Week 3. But a circuit breaker IS active in the running code and IS tripping. Either it shipped without the row being updated, or there's an older breaker living somewhere that's mis-tuned. Worth grepping the codebase for circuit_open to confirm which.
+Suggested fixes (in order):
+
+Add a log line at the moment the breaker opens, with the trigger reason and the recent error count/timestamps that caused it. Right now there's no signal in the log explaining why the breaker tripped at honours-bachelor-archaeology specifically.
+Raise the breaker threshold OR shorten the cool-down window — whichever knob matches the implementation. Tripping for 120 courses on what may have been a single transient is too aggressive.
+Until the breaker is fixed, AI fallback effectively doesn't run for the back half of any large-uni scrape, which masks the real fill-rate of the regex/CSS extractors.
+
+
+Bug 2 — English scores blank on per-course pages despite English section being present [HIGH]
+Symptom. Repeated warning across postgrad coursework pages:
+[WARN] X — English section detected in HTML but all scores blank
+Affects (sample): Counselling (Behavioural Health), Data Science, Clinical Education, Clinical Exercise Physiology, Disability Practice, Doctor of Medicine, Engineering Management, Engineering Science, Environmental Health, Health Administration, Information Technology, International Relations, Maritime Archaeology, Postgraduate Nursing, Public Health, Public Policy, Speech Pathology, Sustainable Development, Master of Education, Master of Inclusive and Specialised Education, Master of Project Management, Master of Professional Psychology, Master of Social Work, Master of Teaching (Birth-5/Secondary/Primary), Mathematics, Master of Forensic Science, Master of Science (Biology/Environmental), Maritime Archaeology, Public Administration, plus most PhD-by-research pages.
+What's happening. The parser is correctly identifying the English-requirements section structurally (which is why the warning fires), but the value extractors return blank. So the structural check finds the block but the value regexes/CSS selectors against that block return nothing.
+This is NOT the sibling-cache bug. Sibling-cache propagation (Week 1 row 5/6) is about not propagating bad central-page values. Bug 2 is about a per-course page that has English values but the parser can't read them. Different code path.
+Suggested investigation.
+
+Capture the raw HTML of one offending postgrad page (e.g. postgraduate-data-science) and the structural-detector output that's flagging "English section detected".
+Compare the actual selector/regex used to pull values out of that block against what's actually in the HTML — likely a layout change on Flinders's postgrad template that diverges from the undergrad template the extractors were tuned against.
+May explain why postgrad coursework rows in the production reference table (first table in the conversation) almost all have English filled — those values came from sibling-cache backfill of the bucket leader (6.0/6.5/7.0), not from per-course extraction. So the bug has been latent and masked by the cache.
+
+
+Bug 3 — PDF brochures slipping past discovery gate [MEDIUM]
+Symptom. Several study-area-brochures/*.pdf URLs make it into extraction with no real course data:
+business.pdf, creative-arts-media.pdf, defence-national-security.pdf,
+education.pdf, engineering.pdf, environment.pdf, health.pdf,
+humanities-social-sciences.pdf, information-technology.pdf, languages-culture.pdf,
+law.pdf, medicine.pdf, psychology.pdf, science.pdf, social-work.pdf, sport.pdf,
+international-relations.pdf, criminology.pdf, adult-entry-pathways-guide.pdf
+Most get rejected at the staging filter (rejected: duplicate_name_deduplicated or category_landing_page) but two leak through as CRITICAL data-quality failures with blank course names:
+
+/content/dam/documents/study/domestic/pathways/adult-entry-pathways-guide.pdf
+/content/dam/documents/study/domestic/study-area-brochures/international-relations.pdf
+
+Each one also burns ~$0.001 per Gemini call (vs ~$0.00004 for a normal classification call) because the full PDF body gets sent.
+Suggested fix. Add a discovery-stage block for any URL matching /content/dam/documents/.*\.pdf$. These are marketing brochures, not course pages, and they never produce useful data. Cheap win — kills ~$0.02 of wasted Gemini spend per Flinders run AND removes the two CRITICAL data-quality flags blocking promote.
+
+Bug 4 — Sibling cache backfill only carries the bucket leader value for English [LOW]
+Symptom. Cache build log shows exactly one English value per bucket:
+[EXTRACT] [sibling cache ↻ build unknown]       ielts_overall=6.5
+[EXTRACT] [sibling cache ↻ build undergraduate] ielts_overall=6.0 ...
+[EXTRACT] [sibling cache ↻ build research]      ielts_overall=6.5 ...
+[EXTRACT] [sibling cache ↻ build postgraduate]  ielts_overall=6.0 ...
+[EXTRACT] [sibling cache ↻ backfill postgraduate] 228 slot(s) filled across siblings
+Why it matters. When Bug 2 is also present, every postgrad row that the per-course parser can't read English from gets backfilled to the bucket leader (6.0). Production reference table shows postgrad fees with IELTS often at 6.5, sometimes 7.0 (Occupational Therapy, Public Health, Audiology, Physiotherapy, Speech Pathology, Nutrition and Dietetics). Backfilling everything to 6.0 silently downgrades all those courses.
+This IS what Week 1 rows 5 and 6 are about — source-type gating + ≥2-source consensus would prevent the bucket leader from clobbering pages that genuinely have a higher requirement. The progress doc correctly marks both as pending. Logging this here just to flag that Bug 2 makes the impact of the missing fix worse than it would be on its own.
+
+Summary
+Two bugs to fix before promote:
+
+PDF brochure block in discovery (Bug 3) — 5 minutes, removes both CRITICAL flags.
+Circuit breaker over-tripping (Bug 1) — needs investigation; without a fix the AI fallback effectively doesn't run for postgrad rows.
+
+One bug to investigate but maybe not block on:
+3. Per-course English extraction on postgrad template (Bug 2) — known-bad but masked by sibling cache; severity depends on whether you trust 6.0 as a safe floor for postgrad pending the Week 1 sibling-cache work shipping.
+Progress-doc correction:
+
+"Quota wrapper + circuit breaker ⏳ Pending" — there IS an active breaker in code, so either update the row or find/remove the older one.
+
+Spend note: $0.0347 across 168 courses is fine, but ~$0.018 of that went to PDFs that produced nothing. Fixing Bug 3 brings per-course cost below the $0.00021 average.

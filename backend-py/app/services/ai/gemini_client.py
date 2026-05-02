@@ -11,10 +11,11 @@ input  $0.075 / 1M tokens, output $0.30 / 1M tokens. We use a coarse
 characters/4 -> tokens approximation good enough for the daily cap.
 
 Circuit breaker (Component 2):
-  After 5 quota errors (HTTP 429 / 503 / "exhausted") within 60 s, the
-  circuit opens for 5 minutes. All calls during that window return an empty
+  After 8 quota errors (HTTP 429 / 503 / "exhausted") within 60 s, the
+  circuit opens for 2 minutes. All calls during that window return an empty
   skipped GeminiResponse without hitting the API. The circuit auto-resets
-  after the cool-down.
+  after the cool-down.  Every recorded failure is logged at DEBUG so the
+  triggering errors are visible even when the circuit doesn't open.
 
 Call log accumulator (Component 4):
   Each call appends a structured entry to the per-coroutine log list held in
@@ -71,9 +72,9 @@ class GeminiQuotaTracker:
 
     def __init__(
         self,
-        failure_threshold: int = 5,
+        failure_threshold: int = 8,
         window_seconds: int = 60,
-        cool_down_seconds: int = 300,
+        cool_down_seconds: int = 120,
     ) -> None:
         self.failure_threshold = failure_threshold
         self.window_seconds = window_seconds
@@ -89,13 +90,21 @@ class GeminiQuotaTracker:
         self._recent_failures.append(now)
         window_start = now - timedelta(seconds=self.window_seconds)
         recent = [t for t in self._recent_failures if t >= window_start]
+        log.debug(
+            "[GEMINI QUOTA FAILURE] code=%s msg=%.120s — %d/%d in window",
+            error_code, error_message, len(recent), self.failure_threshold,
+        )
         if len(recent) >= self.failure_threshold:
             self._circuit_open_until = now + timedelta(seconds=self.cool_down_seconds)
             log.warning(
-                "[GEMINI CIRCUIT OPEN] %d quota errors in %ds — pausing until %s",
+                "[GEMINI CIRCUIT OPEN] %d quota errors in %ds — pausing %.0fs until %s "
+                "| last_error: code=%s msg=%.200s",
                 len(recent),
                 self.window_seconds,
+                self.cool_down_seconds,
                 self._circuit_open_until.isoformat(),
+                error_code,
+                error_message,
             )
 
     def is_circuit_open(self) -> bool:

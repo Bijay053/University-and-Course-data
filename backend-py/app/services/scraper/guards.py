@@ -603,6 +603,14 @@ _BLOCK_URL_SUBSTRINGS: tuple[tuple[str, str], ...] = (
     # /courses/index.php?id=NNN style URLs that we have NOT confirmed
     # as leaks).
     ("/study/index.php",        "category_landing_page"),
+    # AEM (Adobe Experience Manager) digital asset library — marketing
+    # brochures, PDF schedules, and image assets published at
+    # /content/dam/...  These URLs are discovered via sitemap on AEM-hosted
+    # sites (e.g. Flinders) and never contain course detail data.
+    # Blocking here removes them from all three filter points (BFS, post-
+    # discovery gate, staging gate) and also eliminates ~$0.001/URL wasted
+    # on Gemini calls that extract nothing.
+    ("/content/dam/",           "asset_library_pdf"),
 )
 
 # URL query-string substring matches.  Real course-detail pages do not
