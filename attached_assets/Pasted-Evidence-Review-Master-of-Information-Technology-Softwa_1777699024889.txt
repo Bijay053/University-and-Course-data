@@ -1,0 +1,241 @@
+Evidence Review
+Master of Information Technology (Software Application Development)
+Eligibility: ready - ok
+cambridge_overall
+needs_review
+/ uni_pdf:requirements
+confidence 70%
+169.0
+uni_pdf english: cambridge_overall=169.0
+https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/69af540baceac672ce4d06db_Student%20Admissions%20Policy%202025.2.pdf
+category
+selected
+selected
+/ gemini_primary
+confidence 75%
+Computer Science & IT
+gemini_primary: category=Computer Science & IT
+https://www.asahe.edu.au/courses/master-of-information-technology-software-application-development
+course_location
+selected
+selected
+/ location.strong
+confidence 90%
+Sydney, Australia
+Sydney, Australia
+https://www.asahe.edu.au/courses/master-of-information-technology-software-application-development
+course_name
+selected
+selected
+/ course_name.h1
+confidence 90%
+Master of Information Technology (Software Application Development)
+Master of Information Technology (Software Application Development)
+https://www.asahe.edu.au/courses/master-of-information-technology-software-application-development
+cricos_code
+selected
+selected
+/ regex:cricos
+confidence 95%
+117603A
+CRICOS code extracted from course page: 117603A
+https://www.asahe.edu.au/courses/master-of-information-technology-software-application-development
+currency
+selected
+selected
+/ uni_pdf:cricos_match:fees
+confidence 70%
+AUD
+uni_pdf fee: currency=AUD
+https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/696f704ddf123bd8c8d982b0_2026%20Fees%20Schedule%20-%20International%20Student.pdf
+degree_level
+selected
+selected
+/ degree_level:name
+confidence 90%
+Master's
+Master of Information Technology (Software Application Development)
+https://www.asahe.edu.au/courses/master-of-information-technology-software-application-development
+description
+selected
+selected
+/ description.meta
+confidence 95%
+ASA Institute of Higher Education is a Sydney-based provider offering undergraduate and postgraduate programs in IT and Business.
+https://www.asahe.edu.au/courses/master-of-information-technology-software-application-development
+https://www.asahe.edu.au/courses/master-of-information-technology-software-application-development
+duolingo_overall
+needs_review
+/ uni_pdf:requirements
+confidence 70%
+100.0
+uni_pdf english: duolingo_overall=100.0
+https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/69af540baceac672ce4d06db_Student%20Admissions%20Policy%202025.2.pdf
+duration
+selected
+selected
+/ duration.structural
+confidence 85%
+2.0
+<strong>Course Duration</strong> -> Course Duration 2 years Full Time
+https://www.asahe.edu.au/courses/master-of-information-technology-software-application-development
+duration_unit
+selected
+selected
+/ ai_fallback
+confidence 50%
+years
+ai_fallback: duration_unit=years
+https://www.asahe.edu.au/courses/master-of-information-technology-software-application-development
+duration_value
+selected
+selected
+/ ai_fallback
+confidence 50%
+2.0
+ai_fallback: duration_value=2.0
+https://www.asahe.edu.au/courses/master-of-information-technology-software-application-development
+fee_term
+selected
+selected
+/ uni_pdf:cricos_match:fees
+confidence 70%
+Full Course
+uni_pdf fee: fee_term=Full Course
+https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/696f704ddf123bd8c8d982b0_2026%20Fees%20Schedule%20-%20International%20Student.pdf
+fee_year
+selected
+selected
+/ uni_pdf:cricos_match:fees
+confidence 70%
+2026
+uni_pdf fee: fee_year=2026
+https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/696f704ddf123bd8c8d982b0_2026%20Fees%20Schedule%20-%20International%20Student.pdf
+ielts_listening
+selected
+selected
+/ per_course_vision
+confidence 85%
+6.0
+https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/696d888d52876a0edc8b3450_MaSTER.png
+https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/696d888d52876a0edc8b3450_MaSTER.png
+ielts_overall
+selected
+selected
+/ per_course_vision
+confidence 85%
+6.5
+https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/696d888d52876a0edc8b3450_MaSTER.png
+https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/696d888d52876a0edc8b3450_MaSTER.png
+ielts_reading
+selected
+selected
+/ per_course_vision
+confidence 85%
+6.0
+https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/696d888d52876a0edc8b3450_MaSTER.png
+https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/696d888d52876a0edc8b3450_MaSTER.png
+ielts_speaking
+selected
+selected
+/ per_course_vision
+confidence 85%
+6.0
+https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/696d888d52876a0edc8b3450_MaSTER.png
+https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/696d888d52876a0edc8b3450_MaSTER.png
+ielts_writing
+selected
+selected
+/ per_course_vision
+confidence 85%
+6.0
+https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/696d888d52876a0edc8b3450_MaSTER.png
+https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/696d888d52876a0edc8b3450_MaSTER.png
+intake_months
+selected
+selected
+/ regex
+confidence 70%
+["January", "April", "July", "October"]
+ation 2 years Full Time Intake Options‍ January, April, July, October See Key Dates AQF Level AQF Level 9 delivered by ASA Institute of Higher Education Download course brochure Course Overview Entry Requirements Fees and Scholarships Cours
+https://www.asahe.edu.au/courses/master-of-information-technology-software-application-development
+international_fee
+selected
+selected
+/ uni_pdf:cricos_match:fees
+confidence 70%
+52800
+uni_pdf fee: international_fee=52800
+https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/696f704ddf123bd8c8d982b0_2026%20Fees%20Schedule%20-%20International%20Student.pdf
+mode
+selected
+selected
+/ gemini_primary
+confidence 75%
+On Campus
+gemini_primary: mode=On Campus
+https://www.asahe.edu.au/courses/master-of-information-technology-software-application-development
+pte_overall
+selected
+selected
+/ per_course_vision
+confidence 85%
+58.0
+https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/696d888d52876a0edc8b3450_MaSTER.png
+https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/696d888d52876a0edc8b3450_MaSTER.png
+study_mode
+selected
+selected
+/ study_mode:rule
+confidence 70%
+On Campus
+<strong>Delivery</strong> -> Delivery Face to Face on campus
+https://www.asahe.edu.au/courses/master-of-information-technology-software-application-development
+sub_category
+selected
+selected
+/ gemini_primary
+confidence 75%
+Software Application Development
+gemini_primary: sub_category=Software Application Development
+https://www.asahe.edu.au/courses/master-of-information-technology-software-application-development
+toefl_listening
+selected
+selected
+/ per_course_vision
+confidence 85%
+20.0
+https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/696d888d52876a0edc8b3450_MaSTER.png
+https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/696d888d52876a0edc8b3450_MaSTER.png
+toefl_overall
+selected
+selected
+/ per_course_vision
+confidence 85%
+85.0
+https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/696d888d52876a0edc8b3450_MaSTER.png
+https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/696d888d52876a0edc8b3450_MaSTER.png
+toefl_reading
+selected
+selected
+/ per_course_vision
+confidence 85%
+20.0
+https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/696d888d52876a0edc8b3450_MaSTER.png
+https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/696d888d52876a0edc8b3450_MaSTER.png
+toefl_speaking
+selected
+selected
+/ per_course_vision
+confidence 85%
+20.0
+https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/696d888d52876a0edc8b3450_MaSTER.png
+https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/696d888d52876a0edc8b3450_MaSTER.png
+toefl_writing
+selected
+selected
+/ per_course_vision
+confidence 85%
+20.0
+https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/696d888d52876a0edc8b3450_MaSTER.png
+https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/696d888d52876a0edc8b3450_MaSTER.png
