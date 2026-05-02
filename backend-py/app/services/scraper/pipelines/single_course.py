@@ -1290,6 +1290,20 @@ async def extract_course(
             )
             if _gp_filled.get("location_text"):
                 _loc = str(_gp_filled["location_text"]).strip()
+                # Strip semester/trimester/period labels from Gemini's location_text
+                # before storing as course_location.  Gemini often copies the raw
+                # "Hobart Semester 1, Semester 2 Launceston Semester 1" panel text
+                # verbatim.  _strip_period_labels() normalises it to "Hobart, Launceston"
+                # regardless of which extractor ultimately wins the field.
+                try:
+                    from app.services.scraper.extractors.location import (
+                        _strip_period_labels as _spl,
+                    )
+                    _loc_clean = _spl(_loc)
+                    if _loc_clean:
+                        _loc = _loc_clean
+                except Exception:
+                    pass  # never block on import/runtime error
                 if _loc and _loc.lower() not in _STUDY_MODE_KEYWORDS:
                     _has_structural_loc = any(
                         ev.get("field_key") == "course_location"
