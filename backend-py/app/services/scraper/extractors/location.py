@@ -221,13 +221,47 @@ _PERIOD_LABEL_RE = re.compile(
     re.I,
 )
 
-# UTAS (and similar) panel divs store location as "Hobart Semester 1, Semester 2"
-# — the availability schedule is concatenated onto the campus name.  Strip these
-# trailing period/semester/trimester availability labels so only the city is kept.
-_PERIOD_SUFFIX_RE = re.compile(
-    r"(?:,?\s+(?:Semester|Trimester|Term|Quarter|S\d|T\d)\s*\d+)+\s*$",
+# UTAS (and similar) panel divs concatenate availability schedules onto campus
+# names in a single text node:
+#   "Hobart Semester 1, Semester 2 Launceston Semester 1"
+# Each matched label (with its optional leading comma+space) is replaced with
+# a § sentinel so that multi-word campus names like "Cradle Coast" survive
+# intact while the labels act as campus-name separators.
+_PERIOD_ANY_RE = re.compile(
+    r",?\s*\b(?:"
+    r"Half\s+Year\s+Period\s*\d+|"
+    r"Semester\s*\d+|"
+    r"Trimester\s*\d+|"
+    r"Term\s*\d+|"
+    r"Quarter\s*\d+|"
+    r"Study\s+Period\s*\d*"
+    r")\b",
     re.IGNORECASE,
 )
+
+
+def _strip_period_labels(text: str) -> str:
+    """Strip inline period/semester availability labels from a location string.
+
+    Returns the cleaned campus-name string, or an empty string when the entire
+    text was availability labels (e.g. "Study Period" with no campus name).
+
+    Uses a § (U+00A7) sentinel to preserve multi-word campus names while
+    turning each label into a campus-name boundary::
+
+        "Hobart Semester 1, Semester 2 Launceston Semester 1"
+        → "Hobart, Launceston"
+
+        "Cradle Coast Semester 1 Hobart Semester 1, Semester 2 Launceston"
+        → "Cradle Coast, Hobart, Launceston"
+
+        "Study Period"
+        → ""  (caller should return None)
+    """
+    replaced = _PERIOD_ANY_RE.sub("\u00a7", text)
+    parts = [p.strip().strip(",").strip() for p in replaced.split("\u00a7")]
+    parts = [p for p in parts if p]
+    return ", ".join(parts)
 
 
 _CHECKMARK_CHARS = frozenset("✓✔✅√☑")
@@ -304,6 +338,8 @@ _NON_LOCATION_PHRASES: frozenset[str] = frozenset({
     "domestic students",
     "international students",
     "domestic and international",
+    # UTAS "Study period" panel value — availability label, not a campus name.
+    "study period",
 })
 
 
@@ -344,10 +380,13 @@ def _normalise(raw: str | None) -> str | None:
     # normalised form.  Strip any trailing slash/comma/space left by the conversion.
     if " / " in cleaned:
         cleaned = re.sub(r"\s+/\s+", ", ", cleaned).strip(" ,/")
-    # Strip trailing semester/trimester availability suffixes before any other
-    # checks.  UTAS (and similar) panel divs concatenate availability schedule
-    # onto the campus name: "Hobart Semester 1, Semester 2".  We want "Hobart".
-    cleaned = _PERIOD_SUFFIX_RE.sub("", cleaned).strip().strip(",").strip()
+    # Strip inline period/semester availability labels before any other checks.
+    # UTAS panel divs concatenate schedule onto campus names:
+    #   "Hobart Semester 1, Semester 2 Launceston Semester 1" → "Hobart, Launceston"
+    #   "Study Period" (no campus at all) → "" → return None below
+    cleaned = _strip_period_labels(cleaned)
+    if not cleaned:
+        return None
     # Expand campus short-codes (e.g. "SYD | MEL | BNE" → "Sydney, Melbourne, Brisbane")
     # before any marketing / junk checks so the expanded text can be validated normally.
     cleaned = _expand_campus_codes(cleaned)
