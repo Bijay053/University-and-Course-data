@@ -1,0 +1,60 @@
+Here's a clear, copy-pasteable brief for Replit.
+
+Subject: Fix: IELTS/PTE/TOEFL per-band scores not being extracted (L/R/W/S empty across all courses)
+Problem
+Across all 12 ACAP courses just scraped (and likely all AU unis), ielts_overall is correctly populated but the four individual band scores — Listening, Reading, Writing, Speaking — are all empty. Same issue for PTE, TOEFL, Cambridge, Duolingo per-band fields.
+The data IS on the page. Example from ACAP MBA (https://www.acap.edu.au/courses/master-of-business-administration/):
+
+"Academic IELTS minimum overall band of 6.5 with no individual band below 6.0 (completed in the past two years)"
+
+Our regex captures 6.5 as overall but ignores the 6.0 per-band floor in the same sentence. Result: every Australian course goes to staging missing 4 of 5 English fields.
+Why this matters now
+
+Affects every AU university, not just ACAP (UniSQ, ASAHE, VIT, Flinders all use this phrasing)
+Blocks Week 4 "approve clean unis to production" — courses without per-band scores aren't really complete
+Small fix, big coverage win
+
+Fix — three parts
+1. Add a "per-band floor" regex that runs after the overall match
+In whatever module handles the IELTS regex extraction (likely extractors/english.py or similar — please locate and confirm before editing), after ielts_overall is found, run a second pass on a ~200-char window following the overall match:
+pythonPER_BAND_FLOOR_RE = re.compile(
+    r"no\s+(?:individual\s+)?"
+    r"(?:band|sub[\s-]?score|skill|section|component)\s+"
+    r"(?:less\s+than|below|lower\s+than|under)\s+"
+    r"(\d(?:\.\d)?)",
+    re.IGNORECASE,
+)
+If it matches, set:
+ielts_listening = ielts_reading = ielts_writing = ielts_speaking = floor_value
+with method regex.per_band_floor and confidence 0.85 (same as overall — it's the same source sentence).
+2. Add an explicit per-band regex for pages that list each skill
+Some unis list bands individually instead of using a floor clause:
+pythonPER_BAND_EXPLICIT_RE = re.compile(
+    r"(listening|reading|writing|speaking)\s*[:\-–]?\s*(\d(?:\.\d)?)",
+    re.IGNORECASE,
+)
+Run this on the IELTS section text. If it finds 2+ named bands, populate those specific fields (don't fan a single match across all four — only the floor regex does that). Confidence 0.9, method regex.per_band_explicit.
+3. Replicate for the other tests
+Same two patterns apply to:
+
+PTE Academic (overall 0–90, bands 0–90)
+TOEFL iBT (overall 0–120, bands 0–30)
+Cambridge (overall 100–230, bands 100–230)
+Duolingo doesn't have per-band scores — skip
+
+The floor regex is identical (it's about the phrasing, not the score). The explicit regex needs the test name in scope so you don't pull a TOEFL "20" into an IELTS field.
+Critical: provenance / sibling cache
+When writing these to the evidence table, tag method as regex.per_band_floor or regex.per_band_explicit. Do NOT propagate per-band values through the sibling cache yet — that fix is still pending in Week 1. Per-band floor values from one course shouldn't fan out to siblings until source-type gating is in place.
+Validation — please run before merging
+
+Re-scrape ACAP (uni 41). Expected: all 12 staged courses have IELTS L=R=W=S=6.0 (UG) or 6.0 (PG) from the floor clause.
+Spot-check 1 course manually: Master of Business Administration should show overall 6.5, all four bands 6.0.
+Re-scrape one other AU uni (UniSQ or ASAHE) to confirm the regex generalises.
+Confirm no regression on the existing ielts_overall extraction — fill rate should stay the same or improve.
+
+Where this fits in the roadmap
+Add as a new line item under Week 1 — Data correctness fixes:
+
+English per-band extraction — overall regex was capturing ielts_overall but missing the per-band floor clause ("no individual band below X"). Affects all AU unis. Fixed with two new regex passes (floor + explicit) for IELTS/PTE/TOEFL/Cambridge.
+
+Tagging it Week 1 because it's a correctness fix and gates Week 4 promotion, not a Week 2 observability item.
