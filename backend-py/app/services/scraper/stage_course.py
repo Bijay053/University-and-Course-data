@@ -382,8 +382,24 @@ async def stage_course(
             preserved: list[str] = []
             for _fld in _PRESERVE_FIELDS:
                 if payload.get(_fld) is None and getattr(_exist, _fld, None) is not None:
-                    payload[_fld] = getattr(_exist, _fld)
+                    _val = getattr(_exist, _fld)
+                    payload[_fld] = _val
                     preserved.append(_fld)
+                    # Emit a traceable evidence entry so the review panel shows
+                    # where this value came from — not silently invisible.
+                    evidence.append(
+                        {
+                            "field_key": _fld,
+                            "value": _val,
+                            "confidence": 0.5,
+                            "method": "approved_row:inherited",
+                            "snippet": (
+                                f"Carried forward from previously approved row "
+                                f"(id={_exist.id}, status={_exist.status}): {_fld}={_val}"
+                            ),
+                            "needs_review": True,
+                        }
+                    )
             if preserved:
                 log.info(
                     "stage_course: preserved %d field(s) from existing approved row for %r: %s",
