@@ -1,0 +1,111 @@
+The fix didn't work the way Replit claimed. Reading the new log carefully against the dashboard you sent — none of the supposed fixes actually fired. Three real problems and a process problem.
+What's still broken:
+
+Bug A is not fixed. Look at the Gemini outputs in the log:
+
+93G → domestic_fee=14485, international_fee=null
+93F → domestic_fee=10464, international_fee=null
+93E → domestic_fee=9887, international_fee=null
+93C → domestic_fee=13152, international_fee=null
+93D → fetch failed, no Gemini output
+93B → domestic_fee=16599, international_fee=null
+21A → domestic_fee=7520, international_fee=null
+P4k → both null
+A3f → domestic_fee=10322, international_fee=null
+E5m → domestic_fee=2312, international_fee=null
+
+These are the EXACT SAME 11 rows that were rejected as no_international_fee last cycle. The 93I row failed entirely (Server disconnected without sending a response).
+The page text starts with 'Overview (2026) InternationalDomestic' — meaning International AND Domestic tab labels are both there in the static HTML. The reorder either isn't running or isn't matching the actual DOM structure. The prompt rule isn't being respected either.
+Three rows DID get international_fee=37950 from Gemini — 93A, 93J, 93K, 93L. But these are exactly the ones where the regex caught $37950 from the page text first (Fee: ✅ '37950' [regex conf=1.00] in the field summary). So that 37950 was likely already in the regex result and Gemini just echoed it. Not evidence of the tab fix working.
+Bug C is not fixed either. Dashboard still shows:
+
+Hobart Semester 1, Semester 2 Launceston
+Cradle Coast Semester 1 Hobart Semester 1, Semester 2 Launceston Semester 1
+Hobart Semester 1, Semester 2 Launceston Semester 1
+Hobart Semester 1 (multiple)
+Launceston Semester 1, Semester 2, Spring
+Cradle Coast Semester 1 Launceston Semester 1
+Hobart Half Year Period 1, Half Year Period 2
+Study period (just the bare text)
+
+_strip_period_labels either isn't being called on the dashboard render path, or doesn't handle these patterns. Replit said "11/11 test cases pass" — but the test cases evidently don't match what's actually in the DB.
+Bug B might be fixed (can't tell from this data). No evidence either way without seeing the suppressed-fields panel for one of these rows.
+
+The real diagnostic finding: Comparing this log to the previous UTAS log, the Gemini outputs are character-for-character similar. Same domestic_fee values. Same international_fee=null. Same staging outcomes. The 11 same rows rejected. That means the 471606d3 commit either didn't ship to prod, or shipped but the code path isn't being exercised, or shipped and is being exercised but is a no-op.
+Most likely diagnosis: the _promote_international_panel function isn't matching UTAS's actual DOM. UTAS may not use literal tabDomestic/tabInternational IDs — they may use their own naming convention. The code was written and tested without inspecting the actual UTAS HTML.
+Send this back to Replit:
+
+The 471606d3 fix didn't fire. Same 11 rows rejected with same domestic_fee values from Gemini as last scrape. Need to verify the code is actually running and matches the real UTAS DOM.
+Compare these Gemini outputs from this scrape against last scrape — they are identical:
+CourseLast scrape GeminiThis scrape Gemini93Gdomestic_fee=14485, international_fee=nulldomestic_fee=14485, international_fee=null93Fdomestic_fee=10464, international_fee=nulldomestic_fee=10464, international_fee=null93Edomestic_fee=9887, international_fee=nulldomestic_fee=9887, international_fee=null93Bdomestic_fee=13152, international_fee=nulldomestic_fee=16599, international_fee=null93Cdomestic_fee=13152, international_fee=nulldomestic_fee=13152, international_fee=null21Adomestic_fee=7520, international_fee=nulldomestic_fee=7520, international_fee=nullA3fdomestic_fee=10322, international_fee=nulldomestic_fee=10322, international_fee=nullE5mdomestic_fee=2312, international_fee=nulldomestic_fee=2312, international_fee=null
+If the prompt change had taken effect, Gemini should be returning international values from the page, OR returning international_fee populated and domestic_fee populated separately. It's still doing the same wrong thing. Same outcome means same input — which means the HTML reorder isn't running or isn't matching UTAS's DOM.
+Three things to verify immediately:
+
+Did the commit actually deploy? On prod:
+
+bash   cd /root/University-and-Course-data && git log --oneline -10 | grep -E '(471606d3|7d208121|4accb5e)'
+   systemctl status uni-celery.service --lines=0
+   # Confirm services were restarted AFTER the commits landed
+
+What is UTAS's actual tab DOM structure? Run this on prod against a real UTAS page to confirm whether the _promote_international_panel selector pattern matches anything:
+
+bash   curl -s 'https://www.utas.edu.au/courses/arts-soc/courses/93b-bachelor-of-economics-and-bachelor-of-laws' \
+     | python3 -c "
+   import sys
+   from bs4 import BeautifulSoup
+   soup = BeautifulSoup(sys.stdin.read(), 'html.parser')
+   # What did the function look for? Print all elements whose id or class contains 'omestic' or 'nternational'
+   for el in soup.find_all(attrs={'id': True}):
+       if 'omestic' in el['id'].lower() or 'nternational' in el['id'].lower():
+           print('ID:', el.name, el.get('id'), 'class:', el.get('class'))
+   for el in soup.find_all(attrs={'class': True}):
+       classes = ' '.join(el.get('class', []))
+       if 'omestic' in classes.lower() or 'nternational' in classes.lower():
+           print('CLASS:', el.name, el.get('id'), 'class:', classes)
+   " | head -40
+If output is empty: the function's selector pattern doesn't match UTAS DOM. Whatever tabDomestic/tabInternational was tested on, it wasn't UTAS.
+
+Add temporary debug logging to confirm the function is running. In the next deploy, log a line each time _promote_international_panel is called and what it found:
+
+python   logger.info(f"[INTL_REORDER] called for {url} — found international panel: {found_intl}, found domestic panel: {found_dom}, reorder applied: {applied}")
+Then re-scrape one UTAS page and check journalctl -u uni-celery | grep INTL_REORDER. If the line never appears, the function isn't being called from the extraction path. If it appears with found_intl=False, the selector is wrong.
+Bug C is also still broken. Dashboard still shows:
+
+Hobart Semester 1, Semester 2 Launceston
+Cradle Coast Semester 1 Hobart Semester 1, Semester 2 Launceston Semester 1
+Launceston Semester 1, Semester 2, Spring
+Hobart Half Year Period 1, Half Year Period 2
+Study period (location is literally the bare text "Study period")
+
+You said _strip_period_labels has 11/11 passing tests. The tests don't match real data. Two questions:
+
+Are the tests asserting on the input format that actually arrives at the parser? Run a real UTAS row through the parser interactively and print before/after.
+Where does the location string get assigned to the row? If it's coming from a different code path (e.g. study_mode:rule setting location='Hobart Semester 1...' directly per the field traces in the log), _strip_period_labels isn't being called on that path.
+
+Look at this field trace from the log:
+[FIELD TRACE] study_mode='On Campus' location='Cradle Coast, Hobart, Launceston' method=study_mode:rule url=https://www.utas.edu.au/courses/tsbe/courses/b3a-bachelor-of-business
+That's the parser producing a CLEAN location ("Cradle Coast, Hobart, Launceston"). But the dashboard for B3a shows: "Cradle Coast Semester 1 Hobart Semester 1, Semester 2 Launceston Semester 1".
+This means clean data exists post-extraction, but something downstream is overwriting it with the raw concatenated form. Probably the dashboard query isn't reading the cleaned location field, it's reading a different source that still has raw text. SQL diagnostic:
+sqlSELECT 
+  course_name,
+  course_location,
+  raw_location_text,         -- if this column exists
+  evidence->>'location_text' AS evidence_location,
+  evidence->>'course_location' AS evidence_course_loc
+FROM scraped_courses
+WHERE university_id = 27 
+  AND course_name = 'Bachelor of Business (B3a)';
+Compare what the dashboard renders against what these columns contain. The dashboard is reading the wrong column.
+Process — fourth time asking, plain English:
+Four sessions in a row, fixes have shipped that don't actually work in production. Each time, local tests pass and local diagnostic checks pass, but the user-facing dashboard shows the bug is unchanged. This isn't bad luck — this is a verification gap. Local tests are testing isolated functions on synthetic input. There's no integration test that takes a real UTAS HTML page through the full extraction path and asserts on the dashboard output.
+Before any further fixes ship for UTAS specifically, please add this single integration test:
+pythondef test_utas_full_extraction():
+    """Real UTAS page → full pipeline → assert dashboard-visible fields are correct."""
+    html = open('test/fixtures/utas_93b_real.html').read()  # snapshot of real page
+    result = extract_course(html, 'https://www.utas.edu.au/courses/arts-soc/courses/93b-bachelor-of-economics-and-bachelor-of-laws')
+    assert result.international_fee is not None  # Bug A
+    assert result.international_fee >= 30000  # actual int'l fee, not domestic CSP
+    assert 'Semester' not in result.course_location  # Bug C
+    assert 'Hobart' in result.course_location  # location should still have campus
+If this test passes locally AND matches what shows on the dashboard, we have proof the fix works. Right now we have neither.
+Don't ship more code on this until the deploy verification (item 1) and DOM check (item 2) come back. If 471606d3 didn't actually deploy, or if the function never matched UTAS DOM, the fix needs rewriting against real UTAS HTML. If they did deploy and the function is firing, then the prompt change isn't being respected by Gemini and we need a different approach — possibly section-stripping the Domestic content entirely before sending to Gemini, not just reordering.
