@@ -78,6 +78,16 @@ def _staged_row_to_dict(r) -> dict:
         if cc != col.name:
             d[cc] = v                    # camelCase (React modal)
 
+    # ── Normalise numeric fields that historically used REAL (float32) ────
+    # Even after the Numeric(6,2) migration, guard here so that any prod
+    # rows written before the migration (or on a still-REAL column) never
+    # emit the raw float32 representation (e.g. 1.7000000476837158).
+    if d.get("duration") is not None:
+        try:
+            d["duration"] = round(float(d["duration"]), 2)
+        except (TypeError, ValueError):
+            pass
+
     # ── Explicit overrides / extra convenience aliases ───────────────────
     d["courseName"] = r.course_name
     d["courseWebsite"] = r.course_website
@@ -347,9 +357,12 @@ async def start_scrape(
     # Try to enqueue on Celery; if broker unreachable we still return 202 so the
     # frontend shows it queued, and the row stays in 'queued' for retry.
     try:
-        from app.tasks.scrape_tasks import scrape_university
+        from app.tasks.scrape_tasks import scrape_university, set_initial_dispatch_lock
 
         scrape_university.delay(job_id)
+        # Mark this job as "in broker" so the post-completion immediate-requeue
+        # hook does not try to re-dispatch it while it waits for a free worker.
+        set_initial_dispatch_lock(job_id)
     except Exception:
         pass
 
@@ -399,10 +412,11 @@ async def start_bulk(
     await db.commit()
 
     try:
-        from app.tasks.scrape_tasks import scrape_university
+        from app.tasks.scrape_tasks import scrape_university, set_initial_dispatch_lock
 
         for jid in job_ids:
             scrape_university.delay(jid)
+            set_initial_dispatch_lock(jid)
     except Exception:
         # Broker unavailable: rows stay 'queued' for retry by the next start call
         # or the periodic reaper.
