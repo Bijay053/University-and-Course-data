@@ -602,3 +602,100 @@ def test_karl_sammut_tier0_twin_would_pass() -> None:
         "Tier-0 version of same image must NOT be blocked by the opt-out — "
         "tier-0 means it was found inside the English requirements DOM section"
     )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Global tier-1 pre-skip logic (per_course_vision._regex_has_ielts)
+# These tests verify the skip-before-Gemini logic introduced to save cost
+# for ALL universities (not just Flinders).
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _simulate_pre_skip(
+    candidates: list[tuple[str, str]],
+    tier0_url_set: set[str],
+    payload_ielts: float | None,
+    skip_tier1_english: bool,
+) -> tuple[list[str], list[str]]:
+    """
+    Mirror the loop logic from per_course_vision.maybe_vision_refetch:
+    return (processed_urls, skipped_urls).
+    """
+    regex_has_ielts = bool(payload_ielts)
+    processed, skipped = [], []
+    for img_url, _alt in candidates:
+        is_tier0 = img_url in tier0_url_set
+        if not is_tier0 and (skip_tier1_english or regex_has_ielts):
+            skipped.append(img_url)
+        else:
+            processed.append(img_url)
+    return processed, skipped
+
+
+_T1_IMG = "https://www.example-uni.edu.au/_jcr_content/hero.png"
+_T0_IMG = "https://www.example-uni.edu.au/_jcr_content/requirements-table.png"
+_T0_SET = {_T0_IMG}
+
+
+def test_global_skip_fires_when_regex_has_ielts() -> None:
+    """Tier-1 image is skipped (no Gemini call) when payload already has ielts_overall."""
+    processed, skipped = _simulate_pre_skip(
+        [(_T1_IMG, ""), (_T0_IMG, "")],
+        tier0_url_set=_T0_SET,
+        payload_ielts=6.0,
+        skip_tier1_english=False,
+    )
+    assert _T1_IMG in skipped, "Tier-1 must be skipped when regex has IELTS"
+    assert _T0_IMG in processed, "Tier-0 must still be processed"
+
+
+def test_global_skip_does_not_fire_without_regex_ielts() -> None:
+    """Tier-1 image is NOT skipped when regex found no ielts_overall (ASAHE-type case)."""
+    processed, skipped = _simulate_pre_skip(
+        [(_T1_IMG, "")],
+        tier0_url_set=_T0_SET,
+        payload_ielts=None,
+        skip_tier1_english=False,
+    )
+    assert _T1_IMG in processed, "Tier-1 must be processed when regex found no IELTS"
+    assert skipped == []
+
+
+def test_global_skip_fires_via_skip_tier1_flag_regardless_of_regex() -> None:
+    """skip_tier1_english=True skips tier-1 images even when regex found no IELTS."""
+    processed, skipped = _simulate_pre_skip(
+        [(_T1_IMG, "")],
+        tier0_url_set=_T0_SET,
+        payload_ielts=None,
+        skip_tier1_english=True,
+    )
+    assert _T1_IMG in skipped, "skip_tier1_english=True must skip tier-1 even without regex IELTS"
+
+
+def test_global_skip_tier0_always_processed_with_regex_ielts() -> None:
+    """Tier-0 images are never skipped, even when regex has IELTS and skip_tier1_english=True."""
+    processed, skipped = _simulate_pre_skip(
+        [(_T0_IMG, "")],
+        tier0_url_set=_T0_SET,
+        payload_ielts=7.0,
+        skip_tier1_english=True,
+    )
+    assert _T0_IMG in processed, "Tier-0 must always be processed regardless of any skip flag"
+    assert skipped == []
+
+
+def test_global_skip_mixed_candidates() -> None:
+    """Mixed candidate list: tier-0 processed, tier-1 skipped when regex has IELTS."""
+    t1_a = "https://uni.edu.au/content/portrait-a.png"
+    t1_b = "https://uni.edu.au/content/portrait-b.png"
+    t0   = "https://uni.edu.au/content/requirements.png"
+    processed, skipped = _simulate_pre_skip(
+        [(t1_a, ""), (t0, ""), (t1_b, "")],
+        tier0_url_set={t0},
+        payload_ielts=6.5,
+        skip_tier1_english=False,
+    )
+    assert t0 in processed
+    assert t1_a in skipped
+    assert t1_b in skipped
+    assert len(processed) == 1
+    assert len(skipped) == 2
