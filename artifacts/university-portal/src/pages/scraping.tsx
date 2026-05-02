@@ -1478,7 +1478,18 @@ export default function Scraping() {
     try {
       const res = await fetch(`/api/scrape/staged/${id}/review`);
       if (!res.ok) {
-        toast({ title: "Could not load review", description: await getFetchErrorMessage(res), variant: "destructive" });
+        if (res.status === 404) {
+          // Course was hard-deleted by cross-job dedup when a newer scrape
+          // restaged the same URL. Remove it from the stale list so the user
+          // stops seeing it, and show a clear explanation.
+          setStagedCourses((prev) => prev.filter((c) => c.id !== id));
+          toast({
+            title: "Course superseded",
+            description: "This course was replaced by data from a newer scrape. It has been removed from the list.",
+          });
+        } else {
+          toast({ title: "Could not load review", description: await getFetchErrorMessage(res), variant: "destructive" });
+        }
         return;
       }
       const data = await readResponseJson<CourseReviewPayload>(res);
