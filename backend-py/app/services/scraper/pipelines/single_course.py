@@ -72,6 +72,15 @@ _DOMESTIC_ONLY_RE = _re.compile(
     # international student applications" — Federation and similar.
     r"|international\s+(?:student\s+)?applications?\s+(?:are\s+)?not\s+(?:accepted|available|open)"
     r"|not\s+currently\s+accepting\s+international\s+(?:student\s+)?applications?"
+    # "This course may not be available to international students" — UTAS double-
+    # degree and other UTAS course pages use the softened modal "may not be
+    # available" rather than the definite "not available".  The existing arm
+    # `not\s+available\s+to\s+international\s+students?` requires "not" to be
+    # immediately followed by "available", but UTAS inserts "be" between them
+    # ("may not BE available"), defeating the existing arm.  This arm covers both
+    # the standalone form and the "This course ..." lead-in.  Existing arms
+    # are unchanged — "may not" is a distinct modal, not a relaxation.
+    r"|(?:this\s+course\s+)?may\s+not\s+be\s+available\s+to\s+international\s+students?"
     # "your application to study as a domestic student" — Torrens HDR-specific
     # phrasing where the entire admissions section is framed for domestic
     # applicants only (e.g. Doctor of Philosophy by Prior Works).  The phrase
