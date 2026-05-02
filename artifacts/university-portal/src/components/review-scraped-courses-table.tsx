@@ -157,6 +157,8 @@ function looselyEqual(a: string | null, b: string | null): boolean {
 }
 
 function EvidencePanel({ evidence, course }: { evidence: ReviewEvidenceItem[]; course?: ReviewStagedCourse }) {
+  const [hideSupressed, setHideSuppressed] = useState(true);
+
   const grouped = useMemo(() => {
     const m = new Map<string, ReviewEvidenceItem[]>();
     for (const e of evidence) {
@@ -168,6 +170,22 @@ function EvidencePanel({ evidence, course }: { evidence: ReviewEvidenceItem[]; c
     return Array.from(m.entries()).sort(([a], [b]) => a.localeCompare(b));
   }, [evidence]);
 
+  // A field group is "suppressed" when nothing was selected AND the final value
+  // on the course record is empty — i.e. the extractor found a candidate value
+  // but negative-suppression (or coherence gates) rejected it entirely.
+  const visibleGrouped = useMemo(() => {
+    if (!hideSupressed) return grouped;
+    return grouped.filter(([fieldKey, items]) => {
+      const hasSelected = items.some((it) => it.selected);
+      if (hasSelected) return true;
+      const finalValue = course ? finalValueForField(course, fieldKey) : null;
+      const isSuppressed = finalValue == null || finalValue === "";
+      return !isSuppressed;
+    });
+  }, [grouped, hideSupressed, course]);
+
+  const suppressedCount = grouped.length - visibleGrouped.length;
+
   if (grouped.length === 0) {
     return <div className="text-xs text-gray-400 italic px-3 py-2">No evidence recorded for this course.</div>;
   }
@@ -175,10 +193,22 @@ function EvidencePanel({ evidence, course }: { evidence: ReviewEvidenceItem[]; c
   return (
     <div className="bg-slate-50 border-t border-slate-200">
       <div className="p-3 space-y-3">
-        <div className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
-          Evidence sources ({evidence.length} total across {grouped.length} field{grouped.length === 1 ? "" : "s"})
+        <div className="flex items-center justify-between gap-2">
+          <div className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
+            Evidence sources ({evidence.length} total across {grouped.length} field{grouped.length === 1 ? "" : "s"})
+          </div>
+          {suppressedCount > 0 || !hideSupressed ? (
+            <button
+              onClick={() => setHideSuppressed((v) => !v)}
+              className="text-[11px] text-slate-500 hover:text-slate-800 underline underline-offset-2 shrink-0"
+            >
+              {hideSupressed
+                ? `Show ${suppressedCount} suppressed field${suppressedCount === 1 ? "" : "s"}`
+                : "Hide suppressed"}
+            </button>
+          ) : null}
         </div>
-        {grouped.map(([fieldKey, items]) => {
+        {visibleGrouped.map(([fieldKey, items]) => {
           const finalValue = course ? finalValueForField(course, fieldKey) : null;
           const selected = items.find((it) => it.selected) ?? null;
           const selectedValue = selected?.normalizedValue ?? selected?.candidateValue ?? null;
