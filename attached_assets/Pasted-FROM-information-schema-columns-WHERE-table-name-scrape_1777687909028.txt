@@ -1,0 +1,104 @@
+FROM information_schema.columns
+WHERE table_name='scraped_courses' AND column_name='duration';
+"
+ column_name | data_type | numeric_precision | numeric_scale 
+-------------+-----------+-------------------+---------------
+ duration    | numeric   |                 6 |             2
+(1 row)
+
+root@university-and-course-data:~/University-and-Course-data# sudo -u postgres psql university_portal -c "
+SELECT id, course_name, duration::text
+FROM scraped_courses
+WHERE university_id = 5
+  AND course_name ILIKE '%Master of Cybersecurity%'
+ORDER BY created_at DESC
+LIMIT 3;
+"
+ id | course_name | duration 
+----+-------------+----------
+(0 rows)
+
+root@university-and-course-data:~/University-and-Course-data# sudo -u postgres psql university_portal -c "
+SELECT u.id, u.name FROM universities u WHERE u.name ILIKE '%torrens%';
+"
+ id |  name   
+----+---------
+  3 | torrens
+(1 row)
+
+root@university-and-course-data:~/University-and-Course-data# # Restart with the correct service name
+systemctl restart uni-api-py.service
+
+# Check status
+systemctl status uni-api-py.service --no-pager | head -5
+
+# Check prod Torrens duration values (correct uni_id=3)
+sudo -u postgres psql university_portal -c "
+SELECT id, course_name, duration::text
+FROM scraped_courses
+WHERE university_id = 3
+  AND course_name ILIKE '%Master of Cybersecurity%'
+ORDER BY created_at DESC LIMIT 3;
+"
+
+# Check for any remaining float32 strings across ALL universities
+sudo -u postgres psql university_portal -c "
+SELECT university_id, COUNT(*), MIN(duration::text), MAX(duration::text)
+FROM scraped_courses
+WHERE duration::text ~ '^[0-9]+\.[0-9]{5,}$'
+GROUP BY university_id;
+"
+● uni-api-py.service - University Portal Python API (FastAPI + Uvicorn)
+     Loaded: loaded (/etc/systemd/system/uni-api-py.service; enabled; preset: enabled)
+     Active: active (running) since Sat 2026-05-02 02:11:28 UTC; 13ms ago
+   Main PID: 1312824 (python)
+      Tasks: 1 (limit: 9483)
+  id   |            course_name             | duration 
+-------+------------------------------------+----------
+ 13464 | Master of Cybersecurity (Advanced) | 2.00
+ 13463 | Master of Cybersecurity            | 1.70
+  4926 | Master Of Cybersecurity            | 1.70
+(3 rows)
+
+ university_id | count | min | max 
+---------------+-------+-----+-----
+(0 rows)
+
+root@university-and-course-data:~/University-and-Course-data# # Correct restart command
+systemctl restart uni-api-py.service
+systemctl status uni-api-py.service --no-pager | head -6
+
+# Verify Torrens (uni_id=3 on prod) duration values are clean
+sudo -u postgres psql university_portal -c "
+SELECT id, course_name, duration::text
+FROM scraped_courses
+WHERE university_id = 3
+  AND course_name ILIKE '%Master of Cybersecurity%'
+ORDER BY created_at DESC LIMIT 3;
+"
+
+# Scan for any float32 survivors across the entire table
+sudo -u postgres psql university_portal -c "
+SELECT university_id, COUNT(*), MIN(duration::text)
+FROM scraped_courses
+WHERE duration::text ~ '^[0-9]+\.[0-9]{5,}$'
+GROUP BY university_id;
+"
+● uni-api-py.service - University Portal Python API (FastAPI + Uvicorn)
+     Loaded: loaded (/etc/systemd/system/uni-api-py.service; enabled; preset: enabled)
+     Active: active (running) since Sat 2026-05-02 02:11:37 UTC; 13ms ago
+   Main PID: 1312847 (python)
+      Tasks: 1 (limit: 9483)
+     Memory: 2.6M (peak: 2.6M)
+  id   |            course_name             | duration 
+-------+------------------------------------+----------
+ 13464 | Master of Cybersecurity (Advanced) | 2.00
+ 13463 | Master of Cybersecurity            | 1.70
+  4926 | Master Of Cybersecurity            | 1.70
+(3 rows)
+
+ university_id | count | min 
+---------------+-------+-----
+(0 rows)
+
+root@university-and-course-data:~/University-and-Course-data# 
