@@ -235,6 +235,9 @@ _PERIOD_ANY_RE = re.compile(
     r"Term\s*\d+|"
     r"Quarter\s*\d+|"
     r"Study\s+Period\s*\d*|"
+    # Research Period N — used by UTAS for HDR / postgrad research courses
+    # e.g. "Hobart Research Period 1, Research Period 2" → "Hobart"
+    r"Research\s+Period\s*\d*|"
     # Season-based study periods (UTAS uses "Spring", "Summer" etc. without
     # a number: "Launceston, Spring" → the season is a study-period label,
     # not a second campus name).  Allow an optional trailing year.
