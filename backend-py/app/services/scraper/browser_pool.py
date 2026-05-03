@@ -110,13 +110,14 @@ _INTERNATIONAL_TOGGLE_JS = r"""
     }
     if (inNav) continue;
     try { el.click(); } catch (e) { continue; }
-    // Post-click verification: if the click navigated us away from the
-    // course page, we clicked the wrong thing — return false so the
-    // Python caller doesn't treat the post-click HTML as the toggle
-    // result. (Browser hasn't reloaded yet at this point but will if
-    // the click resolved to <a href>; the location.href check catches
-    // SPA-style pushState navigations too.)
-    if (location.href !== beforeUrl) return false;
+    // Post-click verification: only reject actual cross-page navigations.
+    // Same-page hash changes (e.g. UTAS: href="#tabInternational" updates
+    // location.href from ".../course-p3o" to ".../course-p3o#tabInternational")
+    // are expected tab-switch behaviour and must NOT cause us to bail.
+    const _afterHref = location.href;
+    const _beforeBase = beforeUrl.replace(/#.*$/, '');
+    const _afterBase = _afterHref.replace(/#.*$/, '');
+    if (_afterBase !== _beforeBase) return false;
     return true;
   }
   return false;
