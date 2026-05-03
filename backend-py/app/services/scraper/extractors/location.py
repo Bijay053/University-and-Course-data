@@ -234,7 +234,14 @@ _PERIOD_ANY_RE = re.compile(
     r"Trimester\s*\d+|"
     r"Term\s*\d+|"
     r"Quarter\s*\d+|"
-    r"Study\s+Period\s*\d*"
+    r"Study\s+Period\s*\d*|"
+    # Season-based study periods (UTAS uses "Spring", "Summer" etc. without
+    # a number: "Launceston, Spring" → the season is a study-period label,
+    # not a second campus name).  Allow an optional trailing year.
+    r"Spring(?:\s+\d{4})?|"
+    r"Summer(?:\s+\d{4})?|"
+    r"Autumn(?:\s+\d{4})?|"
+    r"Winter(?:\s+\d{4})?"
     r")\b",
     re.IGNORECASE,
 )
@@ -793,8 +800,13 @@ def _from_utas_intl_panel(soup: BeautifulSoup) -> str | None:
         result = fn(panel_soup)
         if result:
             return result
-    # Last resort: text-block city scan scoped to the panel.
-    return _from_text_block(panel_soup.get_text(" ", strip=True))
+    # Do NOT fall back to text-block here.  The panel's full text contains
+    # page-chrome headings ("Key Information", "Entry requirements",
+    # "Course rules") that share the same parent section as the Location
+    # heading, causing _from_text_block's keyword window to capture those
+    # phrases instead of a campus name.  Return None and let the outer
+    # cascade continue — structural methods on the full page are safer.
+    return None
 
 
 def _from_text_block(text: str) -> str | None:
@@ -867,7 +879,13 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:  # noqa: ARG00
         if not display:
             continue
         # Append country suffix when all tokens are unambiguous AU/NZ cities.
-        display = _append_country_suffix(display)
+        # Skip for UTAS international-panel results: UTAS campus names include
+        # overseas partner institutions (Hong Kong Universal Ed, Shanghai Ocean
+        # University) that are unknown tokens, so suffix is applied
+        # inconsistently across rows.  Returning the raw campus list keeps
+        # format stable regardless of whether a course has overseas partners.
+        if method != "utas_intl_panel":
+            display = _append_country_suffix(display)
         return [
             ExtractionResult(
                 field_key="course_location",
