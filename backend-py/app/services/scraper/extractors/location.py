@@ -845,7 +845,35 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:  # noqa: ARG00
             except re.error:
                 pass  # bad pattern in YAML — skip rather than crash
 
-    cascade = (
+    # ── UTAS page detection ──────────────────────────────────────────────────
+    # Detect the hidden #tabInternational panel that UTAS injects into every
+    # course page.  Two consequences:
+    #
+    # 1. _from_text_block is SKIPPED for UTAS pages.
+    #    The full-page text contains page-chrome headings ("Key Information",
+    #    "Entry requirements", "Course rules") immediately after the "Location"
+    #    heading inside the panel.  _from_text_block's keyword window captures
+    #    those phrases and returns them verbatim when no common city is found,
+    #    producing "Key Information Entry requirements Course rules" as location.
+    #    Courses whose international panel has no structural location node are
+    #    better served by FALLBACK AI enrichment, which reads the whole page
+    #    correctly.
+    #
+    # 2. _append_country_suffix is SKIPPED for all UTAS results.
+    #    UTAS campus names include non-standard tokens ("Cradle Coast",
+    #    "Melbourne Study Centre", "Ultimo Study Centre") and overseas partner
+    #    institutions ("Hong Kong Universal Ed", "Shanghai Ocean University").
+    #    These are unknown to _AU_CITIES so suffix is applied inconsistently —
+    #    some rows get ", Australia", others don't.  Omitting it entirely keeps
+    #    format stable across all UTAS courses.
+    _has_utas_panel: bool = bool(
+        soup.find(id="tabInternational")
+        or soup.find(id="tabintl")
+        or soup.find(attrs={"id": re.compile(r"tab.?international", re.I)})
+    )
+    _is_utas_host: bool = "utas.edu.au" in (url or "").lower()
+
+    cascade_list: list[tuple[str, str | None, float]] = [
         # UTAS-specific: scope the entire cascade to the hidden
         # #tabInternational panel so the international location wins over the
         # domestic section that appears earlier in the HTML.  No-ops when the
@@ -863,9 +891,12 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:  # noqa: ARG00
         ("heading", _from_headings(soup), 0.7),
         # "In person (CampusName)" delivery-mode pattern (Flinders, etc.)
         ("delivery_inperson", _from_delivery_mode_inperson(soup), 0.85),
-        ("text_block", _from_text_block(html_to_text(html)), 0.5),
-    )
-    for method, raw, conf in cascade:
+    ]
+    # text_block runs on non-UTAS pages only — see comment above.
+    if not _has_utas_panel:
+        cascade_list.append(("text_block", _from_text_block(html_to_text(html)), 0.5))
+
+    for method, raw, conf in cascade_list:
         if not raw:
             continue
         # Apply per-uni strip_patterns before sanitise so cruft (e.g. ACAP
@@ -875,16 +906,21 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:  # noqa: ARG00
             raw = _pat.sub("", raw).strip()
         if not raw:
             continue
+        # Strip study-period labels (Semester 1, Spring, Autumn, Term 2 …)
+        # from ALL cascade results.  Some extractors (headings, text_block,
+        # utas_intl_panel) emit strings like "Launceston, Spring" when the
+        # UTAS page lists availability periods inline with campus names.
+        raw = _strip_period_labels(raw)
+        if not raw:
+            continue
         display = _sanitise_for_display(raw)
         if not display:
             continue
         # Append country suffix when all tokens are unambiguous AU/NZ cities.
-        # Skip for UTAS international-panel results: UTAS campus names include
-        # overseas partner institutions (Hong Kong Universal Ed, Shanghai Ocean
-        # University) that are unknown tokens, so suffix is applied
-        # inconsistently across rows.  Returning the raw campus list keeps
-        # format stable regardless of whether a course has overseas partners.
-        if method != "utas_intl_panel":
+        # Skip for: (a) utas_intl_panel results, and (b) any UTAS-domain page.
+        # UTAS campus names include non-standard tokens and overseas partners
+        # that make the suffix inconsistent — see comment above.
+        if method != "utas_intl_panel" and not _is_utas_host:
             display = _append_country_suffix(display)
         return [
             ExtractionResult(
