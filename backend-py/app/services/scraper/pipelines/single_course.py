@@ -72,15 +72,6 @@ _DOMESTIC_ONLY_RE = _re.compile(
     # international student applications" — Federation and similar.
     r"|international\s+(?:student\s+)?applications?\s+(?:are\s+)?not\s+(?:accepted|available|open)"
     r"|not\s+currently\s+accepting\s+international\s+(?:student\s+)?applications?"
-    # "This course may not be available to international students" — UTAS double-
-    # degree and other UTAS course pages use the softened modal "may not be
-    # available" rather than the definite "not available".  The existing arm
-    # `not\s+available\s+to\s+international\s+students?` requires "not" to be
-    # immediately followed by "available", but UTAS inserts "be" between them
-    # ("may not BE available"), defeating the existing arm.  This arm covers both
-    # the standalone form and the "This course ..." lead-in.  Existing arms
-    # are unchanged — "may not" is a distinct modal, not a relaxation.
-    r"|(?:this\s+course\s+)?may\s+not\s+be\s+available\s+to\s+international\s+students?"
     # "your application to study as a domestic student" — Torrens HDR-specific
     # phrasing where the entire admissions section is framed for domestic
     # applicants only (e.g. Doctor of Philosophy by Prior Works).  The phrase
@@ -92,17 +83,69 @@ _DOMESTIC_ONLY_RE = _re.compile(
 )
 
 
+# "This course may not be available to international students" — UTAS uses
+# this soft modal on many pages INCLUDING courses that DO accept international
+# students (it functions as a campus-specific caveat, not a hard exclusion).
+# Treating it as a hard signal produces false-positive domestic_only rejections
+# for courses that have a full international tab and international fee schedule.
+#
+# It is now separated into _DOMESTIC_ONLY_SOFT_RE and only applied when the
+# page has no structural evidence of an international section.
+_DOMESTIC_ONLY_SOFT_RE: _re.Pattern[str] = _re.compile(
+    r"(?:this\s+course\s+)?may\s+not\s+be\s+available\s+to\s+international\s+students?",
+    _re.IGNORECASE,
+)
+
+
+def _has_international_section(html: str) -> bool:
+    """True when the raw HTML has structural evidence of an international section.
+
+    Uses cheap string/regex checks on the raw HTML (not stripped text) so the
+    DOM attribute ``id="tabInternational"`` is detectable without BeautifulSoup.
+
+    Conservative: a false negative (missing a real international section) is
+    worse than a false positive (reporting a section that isn't really there),
+    so multiple independent signals are checked — any one is sufficient.
+    """
+    if not html:
+        return False
+    # UTAS: hidden `#tabInternational` panel present in DOM from page load.
+    if _re.search(r'id=["\']?tabInternational["\']?', html, _re.IGNORECASE):
+        return True
+    # CRICOS registration appears in international sections of AU course pages.
+    if _re.search(r'\bCRICOS\b', html):
+        return True
+    # Explicit international fee / entry requirements blocks.
+    if _re.search(
+        r'international.*(?:tuition|entry\s+requirements?|fee)',
+        html, _re.IGNORECASE,
+    ):
+        return True
+    return False
+
+
 def _is_domestic_only_page(html: str) -> bool:
     """Return True when the page explicitly states it is for domestic students only.
 
     Strips HTML tags before matching so tag noise doesn't break patterns.
     Only fires on unambiguous phrases to avoid false positives.
+
+    Soft signals (e.g. "may not be available to international students") are
+    only honoured when no structural international section exists on the page —
+    see ``_DOMESTIC_ONLY_SOFT_RE`` and ``_has_international_section``.
     """
     if not html:
         return False
     text = _re.sub(r"<[^>]+>", " ", html)
     text = _re.sub(r"\s+", " ", text)
-    return bool(_DOMESTIC_ONLY_RE.search(text))
+    # Hard patterns: unambiguous course-level exclusion statements.
+    if _DOMESTIC_ONLY_RE.search(text):
+        return True
+    # Soft pattern: "may not be available" — only block when there is no
+    # structural international section elsewhere on the same page.
+    if _DOMESTIC_ONLY_SOFT_RE.search(text) and not _has_international_section(html):
+        return True
+    return False
 
 
 def _domestic_only_filter_enabled() -> bool:
@@ -1368,9 +1411,18 @@ async def extract_course(
                 # that was already set by a uni_pdf extractor.  The PDF fee
                 # schedule is more authoritative than Gemini's prose reading.
                 if _gp_k == "fee_term":
+                    # Allow Gemini PRIMARY's fee_term when:
+                    #  (a) Gemini itself found a fee amount (original guard), OR
+                    #  (b) the payload already has a fee from regex / structural
+                    #      extractor — Gemini's "Annual" should still be able to
+                    #      override a regex-produced "Full Course" that arose
+                    #      because the fee context window contained "total tuition"
+                    #      text even though the captured amount was the annual rate.
                     _gp_has_fee = bool(
                         _gp_filled.get("international_fee") is not None
                         or _gp_filled.get("domestic_fee") is not None
+                        or payload.get("international_fee") is not None
+                        or payload.get("domestic_fee") is not None
                     )
                     if not _gp_has_fee:
                         continue

@@ -1,0 +1,55 @@
+Bug 3 — Domestic-only filter is over-blocking courses that DO accept international students
+Critical regression. Compared to the previous scrape, courses are now being rejected as _domestic_only that were previously rejected as _no_international_fee (or were staging). Some are correct rejections, but not all.
+Newly rejected as _domestic_only this cycle:
+
+21A (Diploma of University Studies) — UTAS has international entries for this
+P4K (Science + Engineering with Honours) — not international-restricted in general
+E5m (Graduate Cert Early Childhood) — debatable, may be domestic-only
+A3F (Outdoor and Environmental Education) — confirmed domestic-only
+93G (Arts + Business) — UTAS lists international fees for some campuses
+93I (Arts + ICT) — same
+93F (Arts + Fine Arts) — same
+93E (Arts + Science) — same
+93B (Economics + Laws) — same
+93C (Science + Laws) — same
+93D (Psychological Science + Laws) — confirmed domestic-only
+
+The 4accb5e fix added "may not be available to international students" as a domestic-only signal. The phrase appears on UTAS course chrome for MANY courses — including ones that ARE available internationally at specific campuses. The phrase functions as a soft warning ("check your campus") rather than a hard exclusion ("never available").
+The actual hard exclusion phrase on UTAS pages is: "This course may not be available to international students. Please see the list of distance courses (i.e. online and taken outside Australia) that are offered to international students" followed by a redirect link, AND no international fee section appears anywhere else on the page.
+The current filter triggers on the first sentence alone. Need a stricter check.
+Suggested fix: Make the may not be available to international students arm conditional on absence of international fee/IELTS/admission-international-section content elsewhere on the page. Pseudocode:
+pythonif MAY_NOT_BE_AVAILABLE_RE.search(page_text):
+    # Soft signal — only block if NO international section exists elsewhere
+    if not _has_international_section(page_text):
+        return DOMESTIC_ONLY
+    # Otherwise course IS available internationally despite the warning
+Where _has_international_section checks for: international fee structure, international entry requirements, international admission link, or <div id="tabInternational"> (the structural marker we know exists from the prompt fix).
+Verification once fixed: spot-check that 93B and 93C re-scrape WITHOUT being blocked by domestic-only, and stage with international_fee values from the International tab. Currently they're being blocked PRE-extraction.
+This is also a verification gap worth noting: the 4accb5e fix had 12/12 smoke tests pass. None of those tests included a UTAS course page that has BOTH the soft warning text AND an international section. Real UTAS HTML breaks the test assumption.
+
+Bug 4 — 93K (Bachelor of Business and Bachelor of Science) wrongly rejected as online_only
+[STAGE] skipped Bachelor of Business and Bachelor of Science (93K): rejected: online_only
+Previous scrape staged this row with international_fee=37950, mode=On Campus. This scrape, the FIELD SUMMARY shows StudyMode: ✅ 'Online' [study_mode:rule conf=0.70] — same root cause as Bug 2(a), the study_mode rule is reading the unit-level catalogue ("Online Semester 1" appearing for individual units) and inferring the whole course is online-only.
+Same fix as Bug 2 — read course-level study_mode from the course-level mode panel, not from the unit catalogue's per-unit availability list.
+
+Stage count regression
+CycleFoundStagedNotesPre-fix532811 rejected _no_international_fee (wrong, but rows were known)This cycle572711 rejected _domestic_only + 1 rejected _online_only (some wrong, regression)
+Net: same staging count, but the rejection mix is worse — courses that previously had wrong international fee values caught by Gemini's wrong-tab read are now being blocked entirely at the filter stage, so we can't even debug them on the dashboard.
+
+Verification before promote
+
+SQL on fee_term for all 27 staged rows (Bug 1 confirmation)
+DOM inspection of B3a and H3x course pages to identify the correct course-level location selector vs unit-level location selector (Bug 2 fix design)
+Curl 93B and 93C pages to confirm they have international sections, then narrow the domestic-only filter to require absence of international content (Bug 3 fix)
+Re-scrape after fixes and confirm:
+
+All "Full Course" labels become "Annual" where Gemini said Annual
+Locations match what the page actually lists for international students (no Hong Kong, no Shanghai, no "Summer", no "Key Information")
+93B, 93C, 93I, 93F, 93G, 93E, 21A, P4K all stage with international fees
+93K stages as On Campus, not rejected as online_only
+Stage count rises from 27 to ~33-35
+
+
+Add the integration test that's been pending three cycles — real UTAS HTML fixture, full pipeline, assert dashboard-visible fields. No more "11/11 tests pass" claims without an integration test that actually predicts dashboard output.
+
+Don't promote any of the 27 staged UTAS rows until at minimum Bug 1 (fee_term) is fixed. Showing $82k as "Full Course" instead of "Annual" is a 5x understatement of the actual cost — this is a customer-facing data quality blocker.

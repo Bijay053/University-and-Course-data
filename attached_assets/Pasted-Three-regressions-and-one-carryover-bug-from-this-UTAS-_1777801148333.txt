@@ -1,0 +1,21 @@
+Three regressions and one carryover bug from this UTAS re-scrape. Net result: fewer courses staged than last cycle, and the ones that did stage have visible data quality issues. Need to debug before promote.
+The 471606d3 fix did partially work — Gemini IS now reading the International tab (you can see international_fee=38950 and location_text=Hobart coming through cleanly on 93A, 93J, 93L). But four bugs are now breaking the result.
+
+Bug 1 — fee_term defaults to "Full Course" when set via AI fallback path
+Pattern visible across the dashboard:
+CourseSource pathDashboard shows93A, 93J, 93LGemini primary set fee_term=Annual directly"Annual" ✅L6bGemini primary set fee_term=Annual directly"Annual" ✅H3x, S4a, A3a, M3x, L3c, M3s, P3i, P3l, P3r, P3t, A3m, 13O, 13R, P3e, P7c, 53F, P3o, E7g, B3a, B3b, P3j, 43B, M3s, H7lregex got the fee, AI fallback fired for currency/duration"Full Course" ❌
+Every Gemini raw response in the log includes "fee_term": "Annual" for the courses with fees. But the dashboard shows "Full Course" for any row where the fee was caught by regex first (regex is hitting Tuition fee based on a rate of $X AUD per standard, full-time year of study and extracting just the number, not the period qualifier).
+Root cause: when regex sets international_fee directly and Gemini's response is then merged for AI fallback fields, fee_term is either not being merged, OR the row's default fee_term="Full Course" is winning over Gemini's Annual.
+Fix: In the row merge logic, when Gemini emits fee_term, that value should overwrite the default. AI fallback is not the primary issue — the primary issue is that regex extracts the fee number without setting fee_term, leaving it at default "Full Course".
+SQL diagnostic to confirm:
+sqlSELECT 
+  course_name,
+  international_fee,
+  fee_term,
+  extraction_method->>'international_fee' AS fee_source,
+  extraction_method->>'fee_term' AS fee_term_source
+FROM scraped_courses
+WHERE university_id = 27 AND status = 'pending'
+ORDER BY fee_term;
+If fee_term_source is null or "default" for every row showing "Full Course", and Gemini raw responses (visible in [GP-DEBUG] raw_response) say "fee_term": "Annual" for those same URLs, the bug is confirmed: Gemini's fee_term is being dropped on the merge.
+These fees are wrong on the user-facing dashboard right now. A Bachelor of Medical Science showing "$82,450 Full Course" implies $82k for the entire 5-year degree (≈$16k/year). The actual fee is $82,450 PER YEAR = $412k full course. Off by 5x. Same understatement applies to every other "Full Course" row.
