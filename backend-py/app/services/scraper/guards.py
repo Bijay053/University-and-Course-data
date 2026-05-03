@@ -426,14 +426,34 @@ def should_stage_course(
         )
         return (False, "online_only")
 
-    # Note: we do NOT reject study_mode="Blended" when location is absent.
+    # UTAS-specific online_only: utas.edu.au pages always declare a physical
+    # campus name in their "Location" panel when the course has any on-campus
+    # component.  The location extractor strips virtual keywords ("Online",
+    # "Distance", etc.) so a blank course_location means the panel contained
+    # only "Online" — i.e. the course is online-only for international
+    # students and cannot be studied on a student visa.
+    # This catches cases where the study_mode extractor returned "Blended" or
+    # "On Campus" by picking up the domestic-tab campus reference while the
+    # international-tab Location field said "Online" only — the general
+    # online_only guard above requires "online" in study_mode and misses these.
+    if "utas.edu.au" in (source_url or "").lower() and not _physical_location:
+        log.info(
+            "[REJECT CHECK] course=%r url=%r decision=reject "
+            "(utas_online_blank_location — Location panel was Online only)",
+            effective_name,
+            source_url,
+        )
+        return (False, "online_only")
+
+    # Note: we do NOT reject study_mode="Blended" when location is absent
+    # for non-UTAS universities.
     # "Blended" means the extractor found explicit evidence of both online
     # and campus delivery on the course page — by definition a campus
     # component exists.  Some universities (e.g. Torrens) don't embed campus
     # location details on individual course pages, so location=None is
     # expected even for courses genuinely available on campus.
     # The strict "Online → reject" rule above already handles any case where
-    # the mode is purely online.
+    # the mode is purely online.  UTAS is handled by the explicit check above.
 
     # Bug B: no international fee after all extraction is done.
     # If the university has a centralized fee page, the fee may simply not
