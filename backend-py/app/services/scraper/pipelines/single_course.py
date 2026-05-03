@@ -45,6 +45,30 @@ log = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 import re as _re
 
+# ── Location chrome-text guard ────────────────────────────────────────────────
+# UTAS course pages embed the Key Information panel headings ("Key Information",
+# "Entry requirements", "Course rules") as plain text immediately after the
+# "Location" heading in the hidden #tabInternational panel.  When AI extractors
+# (Gemini PRIMARY and FALLBACK) read the page they sometimes return these
+# verbatim as location_text / course_location.  Any value matching ≥2 of these
+# chrome phrases is treated as noise and discarded so the course gets
+# location=None → the online-only rejection filter can fire correctly.
+_LOCATION_CHROME_RE = _re.compile(
+    r"\b(?:key\s+information|entry\s+requirements?|course\s+rules?)\b",
+    _re.IGNORECASE,
+)
+
+
+def _is_location_chrome(text: str) -> bool:
+    """Return True when *text* looks like UTAS page-chrome headings.
+
+    Two or more matches of ("key information", "entry requirements",
+    "course rules") in the same string means the AI copied a panel heading
+    block verbatim rather than extracting a real campus name.
+    """
+    return bool(text) and len(_LOCATION_CHROME_RE.findall(text)) >= 2
+
+
 _DOMESTIC_ONLY_RE = _re.compile(
     # All patterns require the COURSE / PROGRAM to be the explicit subject.
     # Bare phrases like "Available to domestic students only" or
@@ -1333,20 +1357,26 @@ async def extract_course(
             )
             if _gp_filled.get("location_text"):
                 _loc = str(_gp_filled["location_text"]).strip()
+                # Discard chrome text before any further processing.
+                # UTAS pages have "Key Information Entry requirements Course rules"
+                # immediately after the Location heading; Gemini copies it verbatim.
+                if _is_location_chrome(_loc):
+                    _loc = ""
                 # Strip semester/trimester/period labels from Gemini's location_text
                 # before storing as course_location.  Gemini often copies the raw
                 # "Hobart Semester 1, Semester 2 Launceston Semester 1" panel text
                 # verbatim.  _strip_period_labels() normalises it to "Hobart, Launceston"
                 # regardless of which extractor ultimately wins the field.
-                try:
-                    from app.services.scraper.extractors.location import (
-                        _strip_period_labels as _spl,
-                    )
-                    _loc_clean = _spl(_loc)
-                    if _loc_clean:
-                        _loc = _loc_clean
-                except Exception:
-                    pass  # never block on import/runtime error
+                if _loc:
+                    try:
+                        from app.services.scraper.extractors.location import (
+                            _strip_period_labels as _spl,
+                        )
+                        _loc_clean = _spl(_loc)
+                        if _loc_clean:
+                            _loc = _loc_clean
+                    except Exception:
+                        pass  # never block on import/runtime error
                 if _loc and _loc.lower() not in _STUDY_MODE_KEYWORDS:
                     _has_structural_loc = any(
                         ev.get("field_key") == "course_location"
@@ -2291,6 +2321,13 @@ async def extract_course(
         # so AI-filled units don't silently drop on the floor. See B20.
         _apply_ai_duration_mapping(payload, ai_filled)
         for k, v in ai_filled.items():
+            # Discard chrome text returned by the FALLBACK AI for location fields.
+            # UTAS pages have "Key Information Entry requirements Course rules"
+            # immediately after the Location heading; the AI sometimes copies it
+            # verbatim.  Dropping it keeps course_location=None so the online-only
+            # rejection filter can fire correctly.
+            if k in ("location_text", "course_location") and isinstance(v, str) and _is_location_chrome(v):
+                continue
             payload.setdefault(k, v)
             evidence.append(
                 {
