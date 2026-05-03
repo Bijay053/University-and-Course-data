@@ -1,0 +1,224 @@
+Evidence Review
+Graduate Certificate in Economic Geology (K5f)
+Eligibility: review — Missing: courseLocation, academicLevel, academicScore, otherRequirement | Warnings: missing academic requirement, completeness 69% < 75%
+23 fields with evidence
+Hide suppressed
+Conflicts
+study_mode: On Campus vs Online — per_course_browser_extended vs study_mode:no_location_online_override disagreed
+category
+Science
+✓ used
+gemini primary
+75%
+Science
+gemini_primary: category=Science
+https://www.utas.edu.au/courses/sci-eng/courses/k5f-graduate-certificate-in-economic-geology
+course_name
+Graduate Certificate in Economic Geology (K5f)
+✓ used
+course name.h1
+90%
+Graduate Certificate in Economic Geology (K5f)
+Graduate Certificate in Economic Geology (K5F)
+https://www.utas.edu.au/courses/sci-eng/courses/k5f-graduate-certificate-in-economic-geology
+degree_level
+Graduate Certificate
+✓ used
+degree level:name
+90%
+Graduate Certificate
+Graduate Certificate in Economic Geology (K5f)
+https://www.utas.edu.au/courses/sci-eng/courses/k5f-graduate-certificate-in-economic-geology
+description
+Minimum 0.5 years, up to a maximum of 2 years.
+✓ used
+description.main p
+65%
+Minimum 0.5 years, up to a maximum of 2 years.
+https://www.utas.edu.au/courses/sci-eng/courses/k5f-graduate-certificate-in-economic-geology
+https://www.utas.edu.au/courses/sci-eng/courses/k5f-graduate-certificate-in-economic-geology
+domestic_fee
+4656.0
+✓ used
+gemini primary
+75%
+4656.0
+gemini_primary: domestic_fee=4656.0
+https://www.utas.edu.au/courses/sci-eng/courses/k5f-graduate-certificate-in-economic-geology
+duration
+2 sources
+0.5
+✓ used
+per course browser extended
+80%
+0.5
+Remove content prioritisation Update Close Choose a login Student portalStaff portaleStudentMyLO Back to Sciences and Engineering Graduate Certificate in Economic Geology (K5F) Home Courses and units Sciences and Engineering K5F Graduate Ce
+https://www.utas.edu.au/courses/sci-eng/courses/k5f-graduate-certificate-in-economic-geology
+needs_review
+regex
+75%
+0.5
+Remove content prioritisation Update Close Choose a login Student portalStaff portaleStudentMyLO Back to Sciences and Engineering Graduate Certificate in Economic Geology (K5F) Home Courses and units Sciences and Engineering K5F Graduate Ce
+https://www.utas.edu.au/courses/sci-eng/courses/k5f-graduate-certificate-in-economic-geology
+duration_term
+Year
+✓ used
+per course browser extended
+80%
+Year
+Remove content prioritisation Update Close Choose a login Student portalStaff portaleStudentMyLO Back to Sciences and Engineering Graduate Certificate in Economic Geology (K5F) Home Courses and units Sciences and Engineering K5F Graduate Ce
+https://www.utas.edu.au/courses/sci-eng/courses/k5f-graduate-certificate-in-economic-geology
+duration_text
+Minimum 0.5 years, up to a maximum of 2 years.
+✓ used
+gemini primary
+75%
+Minimum 0.5 years, up to a maximum of 2 years.
+gemini_primary: duration_text=Minimum 0.5 years, up to a maximum of 2 years.
+https://www.utas.edu.au/courses/sci-eng/courses/k5f-graduate-certificate-in-economic-geology
+duration_unit
+years
+✓ used
+ai fallback
+50%
+years
+ai_fallback: duration_unit=years
+https://www.utas.edu.au/courses/sci-eng/courses/k5f-graduate-certificate-in-economic-geology
+duration_value
+2.0
+✓ used
+ai fallback
+50%
+2.0
+ai_fallback: duration_value=2.0
+https://www.utas.edu.au/courses/sci-eng/courses/k5f-graduate-certificate-in-economic-geology
+fee_currency
+AUD
+✓ used
+ai fallback
+50%
+AUD
+ai_fallback: fee_currency=AUD
+https://www.utas.edu.au/courses/sci-eng/courses/k5f-graduate-certificate-in-economic-geology
+fee_term
+Annual
+✓ used
+gemini primary
+75%
+Annual
+gemini_primary: fee_term=Annual
+https://www.utas.edu.au/courses/sci-eng/courses/k5f-graduate-certificate-in-economic-geology
+ielts_listening
+6.0
+needs_review
+sibling cache:postgraduate
+55%
+6.0
+sibling-cache backfill from postgraduate bucket (source: https://www.utas.edu.au/courses/health/courses/55a-graduate-certificate-in-advanced-practice): ielts_listening=6.0
+https://www.utas.edu.au/courses/health/courses/55a-graduate-certificate-in-advanced-practice
+ielts_overall
+6.5
+needs_review
+sibling cache:postgraduate
+55%
+6.5
+sibling-cache backfill from postgraduate bucket (source: https://www.utas.edu.au/courses/health/courses/55a-graduate-certificate-in-advanced-practice): ielts_overall=6.5
+https://www.utas.edu.au/courses/health/courses/55a-graduate-certificate-in-advanced-practice
+ielts_reading
+6.0
+needs_review
+sibling cache:postgraduate
+55%
+6.0
+sibling-cache backfill from postgraduate bucket (source: https://www.utas.edu.au/courses/health/courses/55a-graduate-certificate-in-advanced-practice): ielts_reading=6.0
+https://www.utas.edu.au/courses/health/courses/55a-graduate-certificate-in-advanced-practice
+ielts_speaking
+6.0
+needs_review
+sibling cache:postgraduate
+55%
+6.0
+sibling-cache backfill from postgraduate bucket (source: https://www.utas.edu.au/courses/health/courses/55a-graduate-certificate-in-advanced-practice): ielts_speaking=6.0
+https://www.utas.edu.au/courses/health/courses/55a-graduate-certificate-in-advanced-practice
+ielts_writing
+6.0
+needs_review
+sibling cache:postgraduate
+55%
+6.0
+sibling-cache backfill from postgraduate bucket (source: https://www.utas.edu.au/courses/health/courses/55a-graduate-certificate-in-advanced-practice): ielts_writing=6.0
+https://www.utas.edu.au/courses/health/courses/55a-graduate-certificate-in-advanced-practice
+intake_months
+2 sources
+["February", "July"]
+✓ used
+per course browser extended
+75%
+["February", "July"]
+Admission requirements Application dates Starting at the University Starting at the University Starting at the University overview Accepting and enrolling Orientation and settling in Pathways to university Scholarships, fees and costs Find
+https://www.utas.edu.au/courses/sci-eng/courses/k5f-graduate-certificate-in-economic-geology
+needs_review
+regex
+70%
+["February", "July"]
+Admission requirements Application dates Starting at the University Starting at the University Starting at the University overview Accepting and enrolling Orientation and settling in Pathways to university Scholarships, fees and costs Find
+https://www.utas.edu.au/courses/sci-eng/courses/k5f-graduate-certificate-in-economic-geology
+intake_text
+Semester 1
+✓ used
+gemini primary
+75%
+Semester 1
+gemini_primary: intake_text=Semester 1
+https://www.utas.edu.au/courses/sci-eng/courses/k5f-graduate-certificate-in-economic-geology
+international_fee
+2 sources
+42250
+✓ used
+regex
+100%
+42250
+ound at Australian Government Study Assist. International students 2026 Total Tuition Fee (international students): $21,125 AUD* Tuition fee based on a rate of $42,250 AUD per standard, full-time year of study (100 credit points). * Please
+https://www.utas.edu.au/courses/sci-eng/courses/k5f-graduate-certificate-in-economic-geology
+needs_review
+per course browser extended
+100%
+42250
+ound at Australian Government Study Assist. International students 2026 Total Tuition Fee (international students): $21,125 AUD* Tuition fee based on a rate of $42,250 AUD per standard, full-time year of study (100 credit points). * Please
+https://www.utas.edu.au/courses/sci-eng/courses/k5f-graduate-certificate-in-economic-geology
+mode
+Online
+✓ used
+gemini primary
+75%
+Online
+gemini_primary: mode=Online
+https://www.utas.edu.au/courses/sci-eng/courses/k5f-graduate-certificate-in-economic-geology
+study_mode
+3 sources
+On Campus
+✓ used
+per course browser extended
+75%
+On Campus
+hrough a series of intensive “face-to-face” learning opportunities, supp
+https://www.utas.edu.au/courses/sci-eng/courses/k5f-graduate-certificate-in-economic-geology
+needs_review
+study mode:rule
+70%
+On Campus
+hrough a series of intensive “face-to-face” learning opportunities, supp
+https://www.utas.edu.au/courses/sci-eng/courses/k5f-graduate-certificate-in-economic-geology
+needs_review
+study mode:no location online override
+55%
+Online
+study_mode:rule returned 'On Campus' but course_location and location_text are both blank — sidebar contamination suspected. Downgraded to Online for online_only guard.
+https://www.utas.edu.au/courses/sci-eng/courses/k5f-graduate-certificate-in-economic-geology
+sub_category
+Economic Geology
+✓ used
+gemini primary
+75%
+Economic Geology
+gemini_primary: sub_category=Economic Geology

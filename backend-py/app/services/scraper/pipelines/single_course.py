@@ -102,6 +102,15 @@ _DOMESTIC_ONLY_RE = _re.compile(
     # is unambiguous on a course-detail page: international-eligible courses
     # have a parallel section framed for international applicants.
     r"|(?:begin\s+your|your)\s+application\s+to\s+study\s+as\s+a\s+domestic\s+student"
+    # UTAS distance-courses disclaimer — hard signal even when the page has a
+    # structural #tabInternational panel (UTAS includes that tab on every page).
+    # The phrase "please see the list of distance courses (i.e. online and
+    # taken outside Australia)" always accompanies the soft "may not be
+    # available to international students" text and appears exclusively on
+    # pages where the course is online-only / not available to student-visa
+    # holders.  Treating it as a hard pattern avoids the _has_international_
+    # section suppression that would otherwise swallow the soft signal.
+    r"|please\s+see\s+the\s+list\s+of\s+distance\s+courses"
     r")",
     _re.IGNORECASE,
 )
@@ -3150,7 +3159,17 @@ async def extract_course(
                 else 4.0 if _is_grad_short
                 else 12.0
             )
-            if _dur_years > _SUSPICIOUS_MAX or _dur_years < 0.25:
+            # UTAS bachelor-floor guard: UTAS flexible-enrolment pages show
+            # "Duration Minimum 1 Semester, up to a maximum of 4 years." for
+            # bachelor degrees where the 1-Semester (or similar short) value
+            # is the cross-institutional / exchange enrolment floor — NOT the
+            # real 3-year program duration.  Any bachelor-level course with
+            # duration < 2.0 years is almost certainly a scrape error of this
+            # type; a null is far safer to display than "1 Semester".
+            # (Australian bachelor degrees are never shorter than 2 years.)
+            _is_bachelor_only = "bachelor" in _degree_l and not _is_grad_short
+            _bachelor_floor_breach = _is_bachelor_only and 0 < _dur_years < 2.0
+            if _dur_years > _SUSPICIOUS_MAX or _dur_years < 0.25 or _bachelor_floor_breach:
                 # Nullify the value so bad data never reaches staging.
                 # A missing duration is better than a wrong one — operators
                 # can fill it via the review UI; a wrong value propagates silently.
@@ -3159,9 +3178,14 @@ async def extract_course(
                 if "suspicious_duration" not in _scrape_warnings:
                     _scrape_warnings.append("suspicious_duration")
                 if emit:
+                    _reason = (
+                        "bachelor degree floor"
+                        if _bachelor_floor_breach
+                        else "sanity limit"
+                    )
                     await emit(
                         "status",
-                        f"[NULLIFIED] {payload.get('course_name','?')[:40]} — duration {_dur_val} {_dur_term} ({_dur_years:.1f} yrs) exceeds sanity limit; cleared",
+                        f"[NULLIFIED] {payload.get('course_name','?')[:40]} — duration {_dur_val} {_dur_term} ({_dur_years:.1f} yrs) exceeds {_reason}; cleared",
                         phase="extract",
                         kind="scrape_warning",
                         warning="suspicious_duration",
