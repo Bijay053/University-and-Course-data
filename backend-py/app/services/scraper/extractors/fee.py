@@ -212,6 +212,15 @@ def _normalize_fee_term(ctx: str) -> str:
     # saying "for 120 points" is not accidentally tagged as Full Course.
     if re.search(r"\b(?:for|per)\s+\d{2,4}\s+(?:credit\s+)?points?\b", ctx, re.I):
         return "Annual"
+    # Explicit "annual" / "per year" / "per annum" label overrides any "total"
+    # that may appear later in the same context window.  UTAS pages show:
+    #   "2026 annual international student tuition fee: $42,950 AUD
+    #    Indicative total tuition fee for international students: $135,400 AUD"
+    # Both candidates share a wide context window, so without this guard the
+    # $42,950 candidate would be tagged "Full Course" because "total tuition"
+    # appears further along in its window.
+    if re.search(r"\bannual\b|\bper\s+year\b|\bper\s+annum\b", ctx, re.I):
+        return "Annual"
     if re.search(
         r"total\s*(?:course|program|tuition)|full\s*course|complete\s*(?:course|program)",
         ctx,

@@ -76,6 +76,20 @@ _HOST_EXTRA_SEEDS: dict[str, list[str]] = {
         "https://www.une.edu.au/study/postgraduate-study",
         "https://www.une.edu.au/study/find-a-course",
     ],
+    # UTAS: browser BFS starts from /courses (undergrad landing) and exhausts
+    # its page budget on undergraduate listing pages, never reaching the
+    # postgraduate A-Z listing.  Seed both levels directly so master courses
+    # are included in every scrape run.
+    "www.utas.edu.au": [
+        "https://www.utas.edu.au/courses/postgraduate",
+        "https://www.utas.edu.au/study/postgraduate",
+        "https://www.utas.edu.au/courses/honours",
+    ],
+    "utas.edu.au": [
+        "https://www.utas.edu.au/courses/postgraduate",
+        "https://www.utas.edu.au/study/postgraduate",
+        "https://www.utas.edu.au/courses/honours",
+    ],
 }
 
 _LISTING_URL_RE = re.compile(
