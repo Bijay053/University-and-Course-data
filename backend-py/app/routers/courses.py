@@ -1,6 +1,7 @@
 """Course CRUD endpoints (read-heavy; writes guarded by auth)."""
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -13,6 +14,11 @@ from app.models import Course, University
 from app.schemas.course import CourseCreate, CourseListResponse, CourseRead, CourseUpdate
 
 router = APIRouter()
+
+
+def _f(v: object) -> object:
+    """Convert Decimal → float so JSONResponse can serialize it."""
+    return float(v) if isinstance(v, Decimal) else v
 
 
 @router.get("/courses")
@@ -71,12 +77,12 @@ async def list_courses(
         """), {"ids": course_ids})).all()
         for fr in fee_rows:
             fees_map[fr.course_id] = {
-                "international_fee": fr.international_fee,
-                "internationalFee": fr.international_fee,
+                "international_fee": _f(fr.international_fee),
+                "internationalFee": _f(fr.international_fee),
                 "fee_term": fr.fee_term,
                 "feeTerm": fr.fee_term,
-                "fee_year": fr.fee_year,
-                "feeYear": fr.fee_year,
+                "fee_year": _f(fr.fee_year),
+                "feeYear": _f(fr.fee_year),
                 "currency": fr.currency,
             }
 
@@ -143,6 +149,8 @@ async def list_courses(
         for k, v in list(d.items()):
             if isinstance(v, _dt):
                 d[k] = v.isoformat()
+            elif isinstance(v, Decimal):
+                d[k] = float(v)
         for snake, camel in course_aliases.items():
             if snake in d:
                 d[camel] = d[snake]
