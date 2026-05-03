@@ -755,6 +755,48 @@ def _from_panel_divs(soup: BeautifulSoup) -> str | None:
     return None
 
 
+def _from_utas_intl_panel(soup: BeautifulSoup) -> str | None:
+    """UTAS-specific: extract location from the hidden #tabInternational panel.
+
+    UTAS course pages use a two-tab layout (Domestic / International) rendered
+    as ``<div id="tabDomestic">`` and ``<div id="tabInternational" hidden="">``.
+    The international panel is in the DOM from the start (just CSS-hidden) so
+    BeautifulSoup can read it without needing a browser tab-click.
+
+    Scoping the cascade to only the international panel ensures the Location
+    section returned reflects what international students actually see — not the
+    domestic section that appears earlier in the HTML and would otherwise win the
+    cascade first-match race.
+
+    The element ID matching is case-insensitive and also tries ``tabintl`` and
+    ``international-tab`` aliases so minor UTAS template changes don't break it.
+    """
+    intl_panel = (
+        soup.find(id="tabInternational")
+        or soup.find(id="tabintl")
+        or soup.find(attrs={"id": re.compile(r"tab.?international", re.I)})
+    )
+    if not intl_panel:
+        return None
+
+    # Run the whole cascade on the restricted panel soup so we reuse all
+    # existing normalisation / sanity-checking logic without duplicating it.
+    panel_soup = BeautifulSoup(str(intl_panel), "html.parser")
+    for fn in (
+        _from_strong_dom_walk,
+        _from_dl,
+        _from_panel_divs,
+        _from_tables,
+        _from_headings,
+        _from_delivery_mode_inperson,
+    ):
+        result = fn(panel_soup)
+        if result:
+            return result
+    # Last resort: text-block city scan scoped to the panel.
+    return _from_text_block(panel_soup.get_text(" ", strip=True))
+
+
 def _from_text_block(text: str) -> str | None:
     text = compact(text)
     if not text:
@@ -792,6 +834,11 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:  # noqa: ARG00
                 pass  # bad pattern in YAML — skip rather than crash
 
     cascade = (
+        # UTAS-specific: scope the entire cascade to the hidden
+        # #tabInternational panel so the international location wins over the
+        # domestic section that appears earlier in the HTML.  No-ops when the
+        # page has no such panel, so it is safe for all other universities.
+        ("utas_intl_panel", _from_utas_intl_panel(soup), 0.95),
         # Structural pre-pass FIRST — see _from_strong_dom_walk for the
         # rationale. Reads `<strong>Location</strong>` style values out
         # of the DOM directly, including the ASA-style adjacent-div
