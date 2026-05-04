@@ -15,7 +15,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 from pydantic import BaseModel
-from sqlalchemy import case, desc, func, or_, select, text
+from sqlalchemy import and_, case, desc, func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies import get_current_user, get_db
@@ -289,17 +289,36 @@ async def start_scrape(
     from sqlalchemy import text as _text
     await db.execute(_text("SELECT pg_advisory_xact_lock(:uid)"), {"uid": uni.id})
 
-    # Deduplication: if there is already a queued or running job for this
-    # university, return it instead of creating a duplicate. This prevents the
-    # "5 workers claimed the same job" loop seen when UEL's 403 caused every
-    # attempt to complete with 0 courses, the UI showed "completed", and the
-    # operator clicked "Re-run" multiple times in quick succession.
+    # Deduplication: prevent starting a second scrape while one is already
+    # active for the same university.
+    #
+    # Rules:
+    #   running / awaiting_approval — always block regardless of age.  Two
+    #     workers scraping the same university at the same time produce
+    #     duplicate scraped_courses rows and split log streams.
+    #
+    #   queued — only block if the job is fresh (< 2 minutes old).  A queued
+    #     job older than 2 minutes was almost certainly orphaned: either
+    #     .delay() failed silently (Redis hiccup) or all 4 Celery workers
+    #     were briefly saturated and the lock expired before a slot freed up.
+    #     Returning the stale job traps the operator in "Queued" forever;
+    #     allowing a fresh dispatch lets the new task race the orphan —
+    #     the atomic claim UPDATE ("WHERE status = 'queued'") in run_scrape
+    #     ensures only one of them wins even when both tasks arrive together.
+    from datetime import datetime as _dt, timezone as _tz, timedelta as _td
+    _fresh_cutoff = _dt.now(_tz.utc) - _td(minutes=2)
     existing_job = (
         await db.execute(
             select(ScrapeRuntimeJob)
             .where(
                 ScrapeRuntimeJob.university_id == uni.id,
-                ScrapeRuntimeJob.status.in_(["queued", "running"]),
+                or_(
+                    ScrapeRuntimeJob.status.in_(["running", "awaiting_approval"]),
+                    and_(
+                        ScrapeRuntimeJob.status == "queued",
+                        ScrapeRuntimeJob.created_at > _fresh_cutoff,
+                    ),
+                ),
             )
             .order_by(ScrapeRuntimeJob.created_at.desc())
             .limit(1)
@@ -355,7 +374,8 @@ async def start_scrape(
     await db.commit()
 
     # Try to enqueue on Celery; if broker unreachable we still return 202 so the
-    # frontend shows it queued, and the row stays in 'queued' for retry.
+    # frontend shows it queued, and the row stays in 'queued' for retry via
+    # the requeue_stale beat task or the immediate_requeue_hook.
     try:
         from app.tasks.scrape_tasks import scrape_university, set_initial_dispatch_lock
 
@@ -363,8 +383,15 @@ async def start_scrape(
         # Mark this job as "in broker" so the post-completion immediate-requeue
         # hook does not try to re-dispatch it while it waits for a free worker.
         set_initial_dispatch_lock(job_id)
-    except Exception:
-        pass
+    except Exception as _exc:
+        # Log at WARNING so the failure is visible in worker/API logs on prod.
+        # The job row stays in 'queued'; requeue_stale will retry after ~2 min.
+        import logging as _log_mod
+        _log_mod.getLogger(__name__).warning(
+            "start_scrape: broker enqueue failed for job %s (uni %s) — "
+            "job stays queued for requeue_stale recovery: %s",
+            job_id, uni.id, _exc,
+        )
 
     return ScrapeStartResponse(job_id=job_id, runtime_job_id=job_id, status="queued")
 

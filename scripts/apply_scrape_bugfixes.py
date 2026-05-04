@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 """
-Apply the scraping bug-fix changes to the local working tree.
+Apply all scraping bug-fix changes to the local working tree (idempotent).
 
 Run from the root of the repo:
     python3 scripts/apply_scrape_bugfixes.py
 
-Then commit + push:
+Then commit + push from prod:
     git add artifacts/university-portal/src/components/scrape-job-card.tsx \
-            artifacts/university-portal/src/pages/scraping.tsx
-    git commit -m "fix: stop-poll race and force-cancel-all card reset"
+            artifacts/university-portal/src/pages/scraping.tsx \
+            backend-py/app/routers/scrape.py
+    git commit -m "fix: stop-poll race, force-cancel-all reset, dedup stale-queued"
     git push origin main
 """
 import sys, pathlib, re
@@ -190,8 +191,123 @@ else:
 
 PAGE.write_text(page)
 
-print("\nDone. Now run:")
-print("  git add artifacts/university-portal/src/components/scrape-job-card.tsx \\")
+# ── 3. backend-py/app/routers/scrape.py ─────────────────────────────────────
+SCRAPE_ROUTER = ROOT / "backend-py/app/routers/scrape.py"
+router = SCRAPE_ROUTER.read_text()
+
+# 3a. Add and_ to sqlalchemy imports
+OLD_IMPORT = "from sqlalchemy import case, desc, func, or_, select, text"
+NEW_IMPORT = "from sqlalchemy import and_, case, desc, func, or_, select, text"
+if "and_," not in router:
+    if OLD_IMPORT in router:
+        router = router.replace(OLD_IMPORT, NEW_IMPORT, 1)
+        print("scrape.py: added and_ to sqlalchemy imports")
+    else:
+        print("WARNING: sqlalchemy import line not found — check manually", file=sys.stderr)
+else:
+    print("scrape.py: and_ already imported, skipping")
+
+# 3b. Fix dedup check — only block fresh queued jobs (< 2 min)
+OLD_DEDUP = (
+    "    # Deduplication: if there is already a queued or running job for this\n"
+    "    # university, return it instead of creating a duplicate. This prevents the\n"
+    "    # \"5 workers claimed the same job\" loop seen when UEL's 403 caused every\n"
+    "    # attempt to complete with 0 courses, the UI showed \"completed\", and the\n"
+    "    # operator clicked \"Re-run\" multiple times in quick succession.\n"
+    "    existing_job = (\n"
+    "        await db.execute(\n"
+    "            select(ScrapeRuntimeJob)\n"
+    "            .where(\n"
+    "                ScrapeRuntimeJob.university_id == uni.id,\n"
+    "                ScrapeRuntimeJob.status.in_([\"queued\", \"running\"]),\n"
+    "            )\n"
+    "            .order_by(ScrapeRuntimeJob.created_at.desc())\n"
+    "            .limit(1)\n"
+    "        )\n"
+    "    ).scalar_one_or_none()"
+)
+NEW_DEDUP = (
+    "    # Deduplication: prevent starting a second scrape while one is already\n"
+    "    # active for the same university.\n"
+    "    #\n"
+    "    # Rules:\n"
+    "    #   running / awaiting_approval — always block regardless of age.  Two\n"
+    "    #     workers scraping the same university at the same time produce\n"
+    "    #     duplicate scraped_courses rows and split log streams.\n"
+    "    #\n"
+    "    #   queued — only block if the job is fresh (< 2 minutes old).  A queued\n"
+    "    #     job older than 2 minutes was almost certainly orphaned: either\n"
+    "    #     .delay() failed silently (Redis hiccup) or all 4 Celery workers\n"
+    "    #     were briefly saturated and the lock expired before a slot freed up.\n"
+    "    #     Returning the stale job traps the operator in \"Queued\" forever;\n"
+    "    #     allowing a fresh dispatch lets the new task race the orphan —\n"
+    "    #     the atomic claim UPDATE (\"WHERE status = 'queued'\") in run_scrape\n"
+    "    #     ensures only one of them wins even when both tasks arrive together.\n"
+    "    from datetime import datetime as _dt, timezone as _tz, timedelta as _td\n"
+    "    _fresh_cutoff = _dt.now(_tz.utc) - _td(minutes=2)\n"
+    "    existing_job = (\n"
+    "        await db.execute(\n"
+    "            select(ScrapeRuntimeJob)\n"
+    "            .where(\n"
+    "                ScrapeRuntimeJob.university_id == uni.id,\n"
+    "                or_(\n"
+    "                    ScrapeRuntimeJob.status.in_([\"running\", \"awaiting_approval\"]),\n"
+    "                    and_(\n"
+    "                        ScrapeRuntimeJob.status == \"queued\",\n"
+    "                        ScrapeRuntimeJob.created_at > _fresh_cutoff,\n"
+    "                    ),\n"
+    "                ),\n"
+    "            )\n"
+    "            .order_by(ScrapeRuntimeJob.created_at.desc())\n"
+    "            .limit(1)\n"
+    "        )\n"
+    "    ).scalar_one_or_none()"
+)
+if "_fresh_cutoff" not in router:
+    if OLD_DEDUP in router:
+        router = router.replace(OLD_DEDUP, NEW_DEDUP, 1)
+        print("scrape.py: fixed dedup check (stale queued bypass)")
+    else:
+        print("WARNING: old dedup block not found in scrape.py — check manually", file=sys.stderr)
+else:
+    print("scrape.py: dedup fix already present, skipping")
+
+# 3c. Add warning log to silent .delay() failure
+OLD_SILENT = (
+    "    except Exception:\n"
+    "        pass"
+)
+NEW_SILENT = (
+    "    except Exception as _exc:\n"
+    "        # Log at WARNING so the failure is visible in worker/API logs on prod.\n"
+    "        # The job row stays in 'queued'; requeue_stale will retry after ~2 min.\n"
+    "        import logging as _log_mod\n"
+    "        _log_mod.getLogger(__name__).warning(\n"
+    "            \"start_scrape: broker enqueue failed for job %s (uni %s) — \"\n"
+    "            \"job stays queued for requeue_stale recovery: %s\",\n"
+    "            job_id, uni.id, _exc,\n"
+    "        )"
+)
+if "broker enqueue failed" not in router:
+    # Only replace the first occurrence (the one inside start_scrape)
+    idx = router.find(OLD_SILENT)
+    if idx != -1:
+        router = router[:idx] + NEW_SILENT + router[idx + len(OLD_SILENT):]
+        print("scrape.py: added warning log to silent .delay() failure")
+    else:
+        print("WARNING: silent except block not found in scrape.py — check manually", file=sys.stderr)
+else:
+    print("scrape.py: broker enqueue warning already present, skipping")
+
+SCRAPE_ROUTER.write_text(router)
+
+print("\nDone. Now run on prod:")
+print("  git add backend-py/app/routers/scrape.py \\")
+print("          artifacts/university-portal/src/components/scrape-job-card.tsx \\")
 print("          artifacts/university-portal/src/pages/scraping.tsx")
-print('  git commit -m "fix: stop-poll race and force-cancel-all card reset"')
+print('  git commit -m "fix: stop-poll race, force-cancel-all reset, dedup stale-queued"')
 print("  git push origin main")
+print("  # Rebuild frontend (if .tsx files changed):")
+print("  pnpm --filter @workspace/university-portal run build")
+print("  # Restart FastAPI (picks up scrape.py fix):")
+print("  pm2 restart university-portal-api  # or however FastAPI is managed on prod")
