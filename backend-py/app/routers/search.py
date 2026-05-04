@@ -13,6 +13,7 @@ import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
+from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -318,13 +319,13 @@ async def search_courses(
         "locations": [{"name": k, "count": v} for k, v in location_counter.most_common()],
         "universities": [{"name": k, "count": v} for k, v in uni_counter.most_common()],
     }
-    return JSONResponse(content={
+    return JSONResponse(content=jsonable_encoder({
         "results": out,
         "total": int(total or 0),
         "page": page,
         "limit": limit,
         "facets": facets,
-    })
+    }))
 
 
 @router.get("/compare")
@@ -463,7 +464,7 @@ async def search_compare(
             }
         )
 
-    return JSONResponse(content={"courses": courses})
+    return JSONResponse(content=jsonable_encoder({"courses": courses}))
 
 
 @router.get("/options")
@@ -528,13 +529,13 @@ async def search_options(db: Annotated[AsyncSession, Depends(get_db)]) -> Search
         log.error("search_options SQL failed: %s", exc)
         return JSONResponse(content={"countries": [], "cities": [], "universities": [], "degree_levels": [], "degreeLevels": [], "intake_months": [], "intakeMonths": []})
 
-    return JSONResponse(content={
+    return JSONResponse(content=jsonable_encoder({
         "countries": list(countries),
         "cities": list(cities),
         "universities": [dict(u) for u in unis],
         "degree_levels": list(degree_levels), "degreeLevels": list(degree_levels),
         "intake_months": intake_months, "intakeMonths": intake_months,
-    })
+    }))
 
 
 @router.get("/stats")
