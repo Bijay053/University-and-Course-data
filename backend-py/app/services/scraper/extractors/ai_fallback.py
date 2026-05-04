@@ -40,7 +40,8 @@ _FIELD_HINTS: dict[str, str] = {
         "3 for a 3-year Bachelors). DO NOT report credit-point counts, "
         "unit counts, or per-trimester subject loads. If the page says "
         "'5 units of 8 credit points across 2 years' the answer is 2 (years), "
-        "not 5."
+        "not 5. If the page gives a range (e.g. 'Minimum 2 years, up to a "
+        "maximum of 5 years'), return the MINIMUM (shortest) value — i.e. 2, not 5."
     ),
     "duration_unit": (
         'Unit for duration_value. Use "years" for programs measured in years '

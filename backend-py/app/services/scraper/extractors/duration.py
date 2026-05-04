@@ -153,6 +153,18 @@ _DURATION_RESEARCH_CAP_RE = re.compile(
 # Used in _classify_duration_value to skip digit matches embedded in these clauses.
 _EXTENSION_CTX_RE = re.compile(r"\bextension\b", re.I)
 
+# "Minimum 2 years, up to a maximum of 5 years" — always prefer the MINIMUM
+# (floor) duration when the page advertises a range.  Without this the weight
+# tournament can pick "5 years" because a duration-context word ("complete",
+# "completion", "course") happens to appear closer to the maximum number.
+# This fires in BOTH _classify_duration_value (structural DOM pre-pass) and
+# the sentence-level tournament loop in extract().
+_MINIMUM_DURATION_RE = re.compile(
+    r"\b(?:minimum|min\.?|at\s+least|from)\s+(\d+(?:\.\d+)?)\s*"
+    r"(years?|yrs?|months?|weeks?|semesters?|trimesters?)\b",
+    re.IGNORECASE,
+)
+
 # Sentences that describe a combined / add-on / double degree listed inline
 # on a course page must never win the duration tournament over the main
 # program's labeled "Duration: N years" sentence.
@@ -338,6 +350,18 @@ def _classify_duration_value(value: str) -> tuple[float, str] | None:
         if amount is not None and unit and 0 < amount <= _DURATION_CAP[unit]:
             return amount, unit
 
+    # 2b. Minimum-stated duration: "Minimum 2 years, up to a maximum of 5 years"
+    # Always return the floor value — the maximum in the same string must never win.
+    mm = _MINIMUM_DURATION_RE.search(value)
+    if mm:
+        try:
+            min_amount = float(mm.group(1))
+            min_unit = _normalise_unit(mm.group(2))
+            if min_unit and 0 < min_amount <= _DURATION_CAP[min_unit]:
+                return min_amount, min_unit
+        except (ValueError, IndexError):
+            pass
+
     # 3. Digit scan — prefer matches NOT inside an extension clause.
     # Walk all matches so we can skip "12 month" in
     # "with the possibility of a six to 12 month extension" and still
@@ -496,6 +520,27 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
         # Demote combined/add-on degree sentences so the main program's
         # "Duration: N years" label always wins (see _COMBINED_DEGREE_CONTEXT_RE).
         is_combined_degree_sentence = bool(_COMBINED_DEGREE_CONTEXT_RE.search(s))
+
+        # "Minimum N years, up to a maximum of M years" — always use the floor.
+        # Add at Pattern-0 priority (×100) and skip remaining patterns for this
+        # sentence so the larger maximum value can never beat the minimum in the
+        # weight tournament, regardless of which word has more context nearby.
+        min_m = _MINIMUM_DURATION_RE.search(s)
+        if min_m and not credit_context:
+            try:
+                min_amount = float(min_m.group(1))
+                min_unit = _normalise_unit(min_m.group(2))
+                if min_unit and 0 < min_amount <= _DURATION_CAP[min_unit]:
+                    min_weeks = min_amount * _WEEKS[min_unit]
+                    parsed.append((
+                        (min_weeks * 100 + _UNIT_RANK[min_unit]) * 100.0,
+                        min_amount,
+                        min_unit,
+                        s.strip()[:240],
+                    ))
+                    continue  # don't also score the maximum from this sentence
+            except (ValueError, IndexError):
+                pass
 
         # Bug A (KBS grad certs): slash-structured program-info cell.
         # "8 months / 4 subjects / 2 trimesters" — first token is real duration.
