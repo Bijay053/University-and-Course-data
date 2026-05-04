@@ -1,0 +1,40 @@
+root@university-and-course-data:~/University-and-Course-data# cd /root/University-and-Course-data
+
+pm2 start \
+  "/root/University-and-Course-data/backend-py/venv/bin/uvicorn" \
+  --name api-py \
+  --cwd /root/University-and-Course-data/backend-py \
+  -- app.main:app --host 0.0.0.0 --port 8080 --workers 1
+
+pm2 save
+
+pm2 logs api-py --lines 15 --nostream
+[PM2] Starting /root/University-and-Course-data/backend-py/venv/bin/uvicorn in fork_mode (1 instance)
+[PM2] Done.
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ api-py             │ fork     │ 0    │ online    │ 0%       │ 26.3mb   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+[PM2] Saving current process list...
+[PM2] Successfully saved in /root/.pm2/dump.pm2
+[TAILING] Tailing last 15 lines for [api-py] process (change the value with --lines option)
+/root/.pm2/logs/api-py-out.log last 15 lines:
+/root/.pm2/logs/api-py-error.log last 15 lines:
+0|api-py   |     at afterResolve (node:internal/modules/esm/loader:625:52)
+0|api-py   |     at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:631:12)
+0|api-py   |     at onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:650:32)
+0|api-py   |     at TracingChannel.tracePromise (node:diagnostics_channel:350:14)
+0|api-py   | SyntaxError: Unexpected identifier 'uvicorn'
+0|api-py   |     at compileSourceTextModule (node:internal/modules/esm/utils:318:16)
+0|api-py   |     at ModuleLoader.moduleStrategy (node:internal/modules/esm/translators:99:18)
+0|api-py   |     at #translate (node:internal/modules/esm/loader:473:20)
+0|api-py   |     at afterLoad (node:internal/modules/esm/loader:529:29)
+0|api-py   |     at ModuleLoader.loadAndTranslate (node:internal/modules/esm/loader:534:12)
+0|api-py   |     at #getOrCreateModuleJobAfterResolve (node:internal/modules/esm/loader:577:36)
+0|api-py   |     at afterResolve (node:internal/modules/esm/loader:625:52)
+0|api-py   |     at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:631:12)
+0|api-py   |     at onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:650:32)
+0|api-py   |     at TracingChannel.tracePromise (node:diagnostics_channel:350:14)
+
+root@university-and-course-data:~/University-and-Course-data# 
