@@ -55,3 +55,9 @@ Thumbs.db
 .env.development.local
 .env.production.local
 !.env.example
+
+# Celery / scraper runtime files
+backend-py/celerybeat-schedule
+backend-py/baselines/
+baselines/
+ielts_overall
