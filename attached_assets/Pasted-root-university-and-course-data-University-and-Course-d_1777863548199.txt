@@ -1,0 +1,76 @@
+root@university-and-course-data:~/University-and-Course-data# pm2 restart api-py
+sleep 3
+curl -s "http://localhost/api/courses?universityId=2&limit=1" | python3 -c "import json,sys; d=json.load(sys.stdin); print('total:', d['total'], '| first course:', d['data'][0]['name'] if d['data'] else 'EMPTY')"
+Use --update-env to update environment variables
+[PM2] Applying action restartProcessId on app [api-py](ids: [ 0 ])
+[PM2] [api-py](0) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ api-py             │ fork     │ 3    │ online    │ 0%       │ 3.4mb    │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+  File "/usr/lib/python3.12/json/__init__.py", line 293, in load
+    return loads(fp.read(),
+           ^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/decoder.py", line 337, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/decoder.py", line 355, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+root@university-and-course-data:~/University-and-Course-data# python3 - << 'ENDPATCH'
+import re
+
+path = "/root/University-and-Course-data/backend-py/app/routers/courses.py"
+with open(path) as f:
+    src = f.read()
+
+old = '''        # B7: surface english bands. Always emit ALL keys (with None
+        # fallback) so the UI doesn't have to guard against undefined.
+        b = eng_map.get(r.id, {})
+        i = b.get("ielts"); p = b.get("pte"); t = b.get("toefl"); o = b.get("other")
+        d["ieltsListening"] = i.listening if i else None
+        d["ieltsSpeaking"]  = i.speaking  if i else None
+        d["ieltsWriting"]   = i.writing   if i else None
+        d["ieltsReading"]   = i.reading   if i else None
+        d["ieltsOverall"]   = i.overall   if i else None
+        d["pteListening"]   = p.listening if p else None
+        d["pteSpeaking"]    = p.speaking  if p else None
+        d["pteWriting"]     = p.writing   if p else None
+        d["pteReading"]     = p.reading   if p else None
+        d["pteOverall"]     = p.overall   if p else None
+        d["toeflListening"] = t.listening if t else None
+        d["toeflSpeaking"]  = t.speaking  if t else None
+        d["toeflWriting"]   = t.writing   if t else None
+        d["toeflReading"]   = t.reading   if t else None
+        d["toeflOverall"]   = t.overall   if t else None
+        # Other-test name falls back to test_type so e.g. test_type
+        # "Cambridge" with no test_name still labels the row.
+        d["otherEnglishTestName"] = (o.test_name if o else None) or (o.test_type if o else None)
+        d["otherEnglishListening"] = o.listening if o else None
+        d["otherEnglishSpeaking"]  = o.speaking  if o else None
+        d["otherEnglishWriting"]   = o.writing   if o else None
+        d["otherEnglishReading"]   = o.reading   if o else None
+        d["otherEnglishOverall"]   = o.overall   if o else None
+        out.append(d)'''
+
+new = '''        # B7: surface english bands. Always emit ALL keys (with None
+        # fallback) so the UI doesn't have to guard against undefined.
+        # NOTE: asyncpg returns NUMERIC columns as Python Decimal objects.
+        # Wrap every band value through _f() so they become plain floats
+        # before JSONResponse tries to serialize the dict.
+        b = eng_map.get(r.id, {})
+        i = b.get("ielts"); p = b.get("pte"); t = b.get("toefl"); o = b.get("other")
+        d["ieltsListening"] = _f(i.listening) if i else None
+        d["ieltsSpeaking"]  = _f(i.speaking)  if i else None
+        d["ieltsWriting"]   = _f(i.writing)   if i else None
+        d["ieltsReading"]   = _f(i.reading)   if i else None
+        d["ieltsOverall"]   = _f(i.overall)   if i else None
+ENDPATCHt("ERROR: old block not found — check if already patched or file differs")f o else None)
+ERROR: old block not found — check if already patched or file differs
+root@university-and-course-data:~/University-and-Course-data# 
