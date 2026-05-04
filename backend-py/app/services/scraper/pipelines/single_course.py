@@ -493,15 +493,41 @@ def _apply_ai_duration_mapping(payload: dict[str, Any], ai_filled: dict[str, Any
     canonical `duration` / `duration_term` keys used by the staged-course
     schema. Mutates ``ai_filled`` in place. Only fills when the rule
     extractor hasn't already populated the canonical key, so a confident
-    regex hit always beats an AI guess. See B20 root-cause notes."""
-    if "duration" not in payload and ai_filled.get("duration_value") is not None:
+    regex hit always beats an AI guess. See B20 root-cause notes.
+
+    Safety-net override: when the regex extracted a sub-year duration
+    (months/weeks — typically from a placement/practicum sentence that
+    slipped through the extractor) AND the AI independently identifies a
+    year-level duration, the AI value is more likely correct.  We allow the
+    override so that the sanity check (bachelor-floor: <2 years → nullify)
+    doesn't drop an otherwise-good course.  The override only fires when:
+      • regex term is Month or Week (not Semester/Trimester which are valid)
+      • AI unit normalises to Year
+      • AI value is a plausible program length (1–10 years)
+    """
+    from app.services.scraper.extractors.duration import _normalise_unit
+
+    existing_term = _normalise_unit(str(payload.get("duration_term") or "")) or ""
+    ai_unit_raw = str(ai_filled.get("duration_unit") or "")
+    ai_term = _normalise_unit(ai_unit_raw) if ai_unit_raw else None
+    ai_val_raw = ai_filled.get("duration_value")
+
+    # Determine whether AI is eligible to rescue a sub-year regex result.
+    _sub_year_regex = existing_term in ("Month", "Week") and "duration" in payload
+    _ai_says_years = ai_term == "Year"
+    try:
+        _ai_plausible = ai_val_raw is not None and 1.0 <= float(ai_val_raw) <= 10.0
+    except (TypeError, ValueError):
+        _ai_plausible = False
+    _rescue = _sub_year_regex and _ai_says_years and _ai_plausible
+
+    if ("duration" not in payload or _rescue) and ai_val_raw is not None:
         try:
-            ai_filled["duration"] = float(ai_filled["duration_value"])
+            ai_filled["duration"] = float(ai_val_raw)
         except (TypeError, ValueError):
             pass
-    if "duration_term" not in payload and ai_filled.get("duration_unit"):
-        from app.services.scraper.extractors.duration import _normalise_unit
-        term = _normalise_unit(str(ai_filled["duration_unit"]))
+    if ("duration_term" not in payload or _rescue) and ai_unit_raw:
+        term = _normalise_unit(ai_unit_raw)
         if term:
             ai_filled["duration_term"] = term
 

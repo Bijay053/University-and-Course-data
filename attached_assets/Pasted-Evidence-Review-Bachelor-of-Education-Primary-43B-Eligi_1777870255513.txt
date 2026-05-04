@@ -1,0 +1,133 @@
+Evidence Review
+Bachelor of Education (Primary) (43B)
+Eligibility: review — Missing: duration, academicLevel, academicScore, otherRequirement | Warnings: missing academic requirement, completeness 69% < 75%
+16 fields with evidence
+Hide suppressed
+category
+Education & Teaching
+✓ used
+gemini primary
+75%
+Education & Teaching
+gemini_primary: category=Education & Teaching
+https://www.utas.edu.au/courses/arts-soc/courses/43b-bachelor-of-education-primary
+course_location
+Launceston
+✓ used
+location.utas intl panel
+95%
+Launceston
+Launceston
+https://www.utas.edu.au/courses/arts-soc/courses/43b-bachelor-of-education-primary
+course_name
+Bachelor of Education (Primary) (43B)
+✓ used
+course name.h1
+90%
+Bachelor of Education (Primary) (43B)
+Bachelor of Education (Primary) (43B)
+https://www.utas.edu.au/courses/arts-soc/courses/43b-bachelor-of-education-primary
+cricos_code
+070689D
+✓ used
+regex:cricos
+95%
+070689D
+CRICOS code extracted from course page: 070689D
+https://www.utas.edu.au/courses/arts-soc/courses/43b-bachelor-of-education-primary
+degree_level
+Bachelor's
+✓ used
+degree level:name
+90%
+Bachelor's
+Bachelor of Education (Primary) (43B)
+https://www.utas.edu.au/courses/arts-soc/courses/43b-bachelor-of-education-primary
+description
+Minimum 4 years, up to a maximum of 9 years.
+✓ used
+description.main p
+65%
+Minimum 4 years, up to a maximum of 9 years.
+https://www.utas.edu.au/courses/arts-soc/courses/43b-bachelor-of-education-primary
+https://www.utas.edu.au/courses/arts-soc/courses/43b-bachelor-of-education-primary
+duration
+4.0
+needs_review
+regex
+75%
+4.0
+Across the degree, you’ll complete at least 80 days (16 weeks) of full-time placement in primary education settings.
+https://www.utas.edu.au/courses/arts-soc/courses/43b-bachelor-of-education-primary
+duration_unit
+years
+✓ used
+ai fallback
+50%
+years
+ai_fallback: duration_unit=years
+https://www.utas.edu.au/courses/arts-soc/courses/43b-bachelor-of-education-primary
+duration_value
+4.0
+✓ used
+ai fallback
+50%
+4.0
+ai_fallback: duration_value=4.0
+https://www.utas.edu.au/courses/arts-soc/courses/43b-bachelor-of-education-primary
+fee_currency
+AUD
+✓ used
+ai fallback
+50%
+AUD
+ai_fallback: fee_currency=AUD
+https://www.utas.edu.au/courses/arts-soc/courses/43b-bachelor-of-education-primary
+ielts_overall
+7.5
+✓ used
+regex
+85%
+7.5
+43B Bachelor of Education (Primary) | Courses and Units Skip to content open hamburger menu Select Your Interest Login Close Home Study with us Study with us Study with us We make sure that every stud
+https://www.utas.edu.au/courses/arts-soc/courses/43b-bachelor-of-education-primary
+intake_months
+["February", "July"]
+✓ used
+regex
+70%
+["February", "July"]
+Admission requirements Application dates Starting at the University Starting at the University Starting at the University overview Accepting and enrolling Orientation and settling in Pathways to university Scholarships, fees and costs Find
+https://www.utas.edu.au/courses/arts-soc/courses/43b-bachelor-of-education-primary
+international_eligible
+True
+✓ used
+eligibility.positive
+85%
+True
+international student tuition
+https://www.utas.edu.au/courses/arts-soc/courses/43b-bachelor-of-education-primary
+international_fee
+36450
+✓ used
+regex
+100%
+36450
+t loans and a CSP eligibility checker can be found at Australian Government Study Assist. International students 2026 annual international student tuition fee: $36,450 AUD The standard year of study for this course is 100 credit points. Ind
+https://www.utas.edu.au/courses/arts-soc/courses/43b-bachelor-of-education-primary
+study_mode
+On Campus
+✓ used
+study mode:rule
+70%
+On Campus
+online across Australia, and on campus in Launceston and at Cradle C
+https://www.utas.edu.au/courses/arts-soc/courses/43b-bachelor-of-education-primary
+sub_category
+Teacher Education
+✓ used
+gemini primary
+75%
+Teacher Education
+gemini_primary: sub_category=Teacher Education
+https://www.utas.edu.au/courses/arts-soc/courses/43b-bachelor-of-education-primary

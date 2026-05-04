@@ -153,6 +153,25 @@ _DURATION_RESEARCH_CAP_RE = re.compile(
 # Used in _classify_duration_value to skip digit matches embedded in these clauses.
 _EXTENSION_CTX_RE = re.compile(r"\bextension\b", re.I)
 
+# Sentences about field placement, practicum, or professional experience
+# must NEVER contribute to the duration tournament — the time value in such
+# sentences is practice hours, not program length.
+#   e.g. "complete at least 80 days (16 weeks) of full-time placement in
+#         primary education settings."
+# Pattern-1 gates on "full-time" and would otherwise match "16 weeks" here.
+# Without this guard those 16 weeks convert to 4 months and, for a
+# bachelor-level course, the bachelor-floor sanity check (<2 years) nullifies
+# the value — dropping the duration entirely even when the AI fallback
+# correctly derived 4 years from the rest of the page.
+_PLACEMENT_CONTEXT_RE = re.compile(
+    r"\b(?:placement|practicum|prac\b|professional\s+experience|"
+    r"field\s+(?:placement|experience|work)|work\s+(?:placement|experience)|"
+    r"clinical\s+(?:placement|experience|practice)|"
+    r"teaching\s+(?:placement|practice|rounds?)|"
+    r"industry\s+placement|internship\s+(?:hours?|days?|weeks?))\b",
+    re.IGNORECASE,
+)
+
 # "Minimum 2 years, up to a maximum of 5 years" — always prefer the MINIMUM
 # (floor) duration when the page advertises a range.  Without this the weight
 # tournament can pick "5 years" because a duration-context word ("complete",
@@ -520,13 +539,18 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
         # Demote combined/add-on degree sentences so the main program's
         # "Duration: N years" label always wins (see _COMBINED_DEGREE_CONTEXT_RE).
         is_combined_degree_sentence = bool(_COMBINED_DEGREE_CONTEXT_RE.search(s))
+        # Sentences describing field placement / practicum hours must not
+        # contribute Pattern-1 or Pattern-2 matches (see _PLACEMENT_CONTEXT_RE).
+        is_placement_sentence = bool(_PLACEMENT_CONTEXT_RE.search(s))
 
         # "Minimum N years, up to a maximum of M years" — always use the floor.
         # Add at Pattern-0 priority (×100) and skip remaining patterns for this
         # sentence so the larger maximum value can never beat the minimum in the
         # weight tournament, regardless of which word has more context nearby.
+        # Gate on is_placement_sentence too: "Minimum 16 weeks of full-time
+        # placement" would otherwise extract 16 weeks as a floor duration.
         min_m = _MINIMUM_DURATION_RE.search(s)
-        if min_m and not credit_context:
+        if min_m and not credit_context and not is_placement_sentence:
             try:
                 min_amount = float(min_m.group(1))
                 min_unit = _normalise_unit(min_m.group(2))
@@ -596,6 +620,13 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
             # sentence AND no anti-context. Patterns 0 and 1 are already
             # context-bound and unaffected.
             if pat_idx == 2 and (is_cap_sentence or not duration_context or anti_duration_context):
+                continue
+            # Block Pattern-1 (full-time anchor) and Pattern-2 (loose fallback)
+            # for sentences about field placement / practicum.  Pattern-0
+            # (explicit duration label) is still allowed so that a page which
+            # writes "Duration: 4 years (includes 16 weeks full-time placement)"
+            # still extracts the labeled value correctly.
+            if is_placement_sentence and pat_idx in (1, 2):
                 continue
             try:
                 amount = float(m.group(1))
