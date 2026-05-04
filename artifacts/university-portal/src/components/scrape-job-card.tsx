@@ -19,6 +19,8 @@ export type ScrapeJobCardProps = {
   onReviewReady: (jobId: string, uniName: string) => void;
   onRemove?: () => void;
   canRemove?: boolean;
+  /** Incremented by the parent's "Cancel All" action to force-reset this card. */
+  forceResetKey?: number;
 };
 
 const MAX_LOGS = 5000;
@@ -97,7 +99,7 @@ function UniPicker({ value, onChange, universities, disabled }: {
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
-export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove, canRemove }: ScrapeJobCardProps) {
+export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove, canRemove, forceResetKey }: ScrapeJobCardProps) {
   const slotKey = `scrape_slot_${slotIndex}_jobId`;
   const startTimeKey = `scrape_slot_${slotIndex}_startTime`;
   const [selectedUni, setSelectedUni] = useState("");
@@ -333,10 +335,31 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
   const handleStop = useCallback(async () => {
     if (!activeJobId) return;
     setStopping(true);
+    // Cancel the poll FIRST so it cannot race and override the idle reset
+    // with a terminal "stopped" status (which would set phase="error").
+    if (pollRef.current) { clearTimeout(pollRef.current); pollRef.current = null; }
+    pollInFlightRef.current = false;
+    pollFailRef.current = 0;
+    logIndexRef.current = 0;
     try { await fetch(`/api/scrape/stop/${activeJobId}`, { method: "POST" }); } catch {}
     sessionStorage.removeItem(slotKey);
-    setScraping(false); setStopping(false); setActiveJobId(null); setPhase("idle");
-  }, [activeJobId, slotKey]);
+    sessionStorage.removeItem(startTimeKey);
+    setScraping(false);
+    setStopping(false);
+    setActiveJobId(null);
+    setPhase("idle");
+    setLogs([]);
+    setProgress(null);
+    setJobStatus(null);
+    setUniName("");
+    setStartTime(null);
+  }, [activeJobId, slotKey, startTimeKey]);
+
+  // Force-reset when the parent's "Cancel All" fires (forceResetKey increments)
+  useEffect(() => {
+    if (!forceResetKey) return;
+    resetToIdle();
+  }, [forceResetKey, resetToIdle]);
 
   // Auto-fill URL when university is selected
   useEffect(() => {
