@@ -1,0 +1,199 @@
+	Course Name	Score	Level	Duration	Intl. Fee	IELTS	PTE	TOEFL	CAE	DET	Intakes	Course Location	Mode
+	
+Graduate Diploma of Research Studies
+Science
+Publish: review
+Eligibility: ready
+77%	Graduate Diploma	1 Year	A$29,500/Annual	7	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane, Adelaide, Australia	Blended
+	
+Graduate Diploma of Information Technology
+Computer Science & IT
+Publish: review
+Eligibility: ready
+77%	Graduate Diploma	7 Month	A$36,000/Annual	6.5	-	-	-	-	Jun, Sep	Sydney, Brisbane, Melbourne, Adelaide, Australia	On Campus
+	
+Graduate Certificate of Information Technology
+Computer Science & IT
+Publish: review
+Eligibility: ready
+77%	Graduate Certificate	7 Month	A$18,000/Annual	6.5	-	-	-	-	Jun, Sep	Sydney, Brisbane, Melbourne, Adelaide, Australia	Blended
+	
+Diploma of Information Technology
+Computer Science & IT
+Publish: review
+Eligibility: ready
+77%	Diploma	12 Month	A$31,600/Annual	6	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane, Adelaide, Australia	Blended
+	
+Diploma of Business (International Hotel Management)
+Hospitality, Tourism & Events
+Publish: review
+Eligibility: ready
+77%	Diploma	1 Year	A$37,485/Annual	6	-	-	-	-	Jun, Sep	Blue Mountains, Sydney	On Campus
+	
+Bachelor of Business (International Hotel Management)
+Hospitality, Tourism & Events
+Publish: review
+Eligibility: ready
+77%	Bachelor's	3 Year	A$112,455/Full Course	6	-	-	-	-	Jun, Sep	Blue Mountains, Sydney	On Campus
+	
+Master of Design
+Arts & Humanities
+Publish: review
+Eligibility: review
+69%	Master's	2 Year		6.5	-	-	-	-	Jun, Sep	Sydney, Australia	Blended
+	
+Graduate Certificate of Design
+Arts & Humanities
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	6 Month		6.5	-	-	-	-	Jun, Sep	Sydney, Australia	Blended
+	
+Diploma of Ux and Web Design
+Computer Science & IT
+Publish: review
+Eligibility: review
+69%	Diploma	1.7 Year		6	-	-	-	-	Jun, Sep	Sydney, Australia	Blended
+	
+Diploma of Photography and Photo Imaging
+Arts & Humanities
+Publish: review
+Eligibility: ready
+77%	Diploma	1.7 Year	A$37,500/Full Course	6	-	-	-	-	Jun, Sep	Sydney, Australia	Blended
+	
+Diploma of Interior Design and Decoration
+Built Environment
+Publish: review
+Eligibility: ready
+77%	Diploma	1 Year	A$25,000/Annual	6	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane, Australia	Blended
+	
+Advanced Diploma of Interior Design and Decoration
+Built Environment
+Publish: review
+Eligibility: ready
+77%	Advanced Diploma	1.7 Year	A$37,500/Full Course	6	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane, Australia	Blended
+	
+Diploma of Graphic Design
+Arts & Humanities
+Publish: review
+Eligibility: ready
+77%	Diploma	1.7 Year	A$37,500/Full Course	6	-	-	-	-	Jun, Sep, Feb, May	Sydney, Melbourne, Brisbane, Australia	Blended
+	
+Diploma of Fashion Marketing and Enterprise
+Business & Management
+Publish: review
+Eligibility: ready
+77%	Diploma	1 Year	A$37,500/Annual	6	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane, Australia	Blended
+	
+Advanced Diploma of Game Programming
+Computer Science & IT
+Publish: review
+Eligibility: review
+69%	Advanced Diploma	7 Month		6	-	-	-	-	Jun, Sep, Feb, May	Sydney, Australia	Blended
+	
+Advanced Diploma of Game Design and Development
+Computer Science & IT
+Publish: review
+Eligibility: ready
+77%	Advanced Diploma	1.7 Year	A$75,000/Full Course	6	-	-	-	-	Jun, Sep, Feb, May	Sydney, Australia	Blended
+	
+Diploma of Branded Fashion Design
+Arts & Humanities
+Publish: review
+Eligibility: review
+69%	Diploma	1 Year		6	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane, Australia	Blended
+	
+Diploma of 3D Design and Animation
+Arts & Humanities
+Publish: review
+Eligibility: ready
+77%	Diploma	1.7 Year	A$37,500/Full Course	6	-	-	-	-	Jun, Sep	Sydney, Australia	Blended
+	
+Bachelor of Interior Design (Residential)
+Built Environment
+Publish: review
+Eligibility: ready
+77%	Bachelor's	3 Year	A$112,500/Full Course	6	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane, Australia	Blended
+	
+Bachelor of Interior Design (Commercial)
+Built Environment
+Publish: review
+Eligibility: ready
+77%	Bachelor's	1.7 Year	A$112,500/Full Course	6	-	-	-	-	Jun, Sep	Sydney, Australia	Blended
+	
+Bachelor of Fashion Marketing and Enterprise
+Business & Management
+Publish: review
+Eligibility: ready
+77%	Bachelor's	3 Year	A$75,000/Full Course	6	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane, Australia	Blended
+	
+Diploma of Media Production
+Arts & Humanities
+Publish: review
+Eligibility: review
+69%	Diploma	1 Year		6	-	-	-	-	Feb	Sydney, Australia	Blended
+	
+Bachelor of Media Production and Communication
+Arts & Humanities
+Publish: review
+Eligibility: review
+69%	Bachelor's	3 Year		6	-	-	-	-	Feb	Sydney, Australia	Blended
+	
+Bachelor of Communication Design
+Arts & Humanities
+Publish: review
+Eligibility: ready
+77%	Bachelor's	3 Year	A$112,500/Full Course	6	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane, Australia	Blended
+	
+Bachelor of Branded Fashion Design
+Arts & Humanities
+Publish: review
+Eligibility: ready
+77%	Bachelor's	3 Year	A$112,500/Full Course	6	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane, Australia	Blended
+	
+Bachelor of Game Programming
+Computer Science & IT
+Publish: review
+Eligibility: review
+69%	Bachelor's	1 Year		6	-	-	-	-	Jun, Sep, Feb, May	Sydney, Australia	Blended
+	
+Bachelor of Game Design and Development
+Computer Science & IT
+Publish: review
+Eligibility: ready
+77%	Bachelor's	1 Year	A$37,500/Full Course	6	-	-	-	-	Jun, Sep, Feb, May	Sydney, Australia	Blended
+	
+Bachelor of 3D Design and Animation
+Arts & Humanities
+Publish: review
+Eligibility: ready
+77%	Bachelor's	3 Year	A$112,500/Full Course	6	-	-	-	-	Jun, Sep	Sydney, Australia	Blended
+	
+Bachelor of Architectural Technology
+Built Environment
+Publish: review
+Eligibility: ready
+77%	Bachelor's	3 Year	A$112,500/Full Course	6	-	-	-	-	Jun, Sep	Sydney, Australia	Blended
+	
+Diploma of Design
+Arts & Humanities
+Publish: review
+Eligibility: review
+69%	Diploma	1 Year		6	-	-	-	-	Jun, Sep	Sydney, Melbourne, Australia	Blended
+	
+Master of Research Studies
+Education
+Publish: review
+Eligibility: ready
+77%	Master's	2 Year	A$59,000/Full Course	6.5	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane, Adelaide, Australia	Blended
+	
+Graduate Certificate of Research Studies
+Science
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	6 Month		7	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane, Adelaide, Australia	Blended
+	
+Master of Philosophy
+Arts & Humanities
+Publish: review
+Eligibility: ready
+77%	Master's	2 Year	A$59,000/Full Course	7	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane, Adelaide, Australia	Blended
