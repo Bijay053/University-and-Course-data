@@ -553,6 +553,7 @@ export default function Scraping() {
   const [scrapeTargetUrl, setScrapeTargetUrl] = useState("");
   const [stopping, setStopping] = useState(false);
   const [showForceCancelDialog, setShowForceCancelDialog] = useState(false);
+  const [forceResetKey, setForceResetKey] = useState(0);
   const [awaitingApproval, setAwaitingApproval] = useState<ApprovalSummary | null>(null);
   const [approvalLoading, setApprovalLoading] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -1117,6 +1118,14 @@ export default function Scraping() {
         variant: "destructive",
       });
     }
+    // Reset all ScrapeJobCard slots — clear their sessionStorage keys first
+    // so resetToIdle() inside each card sees no saved job on its next render.
+    for (let i = 0; i < 4; i++) {
+      sessionStorage.removeItem(`scrape_slot_${i}_jobId`);
+      sessionStorage.removeItem(`scrape_slot_${i}_startTime`);
+    }
+    setForceResetKey((k) => k + 1);
+    // Also reset legacy page-level scrape state
     setScraping(false);
     setStopping(false);
     setActiveJobId(null);
@@ -1586,7 +1595,7 @@ export default function Scraping() {
           </div>
         </div>
 
-        <div className={`grid gap-4 ${slotIds.length === 1 ? "grid-cols-1 max-w-2xl" : slotIds.length === 2 ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1 sm:grid-cols-2"}`}>
+        <div className={`grid gap-4 ${slotIds.length === 1 ? "grid-cols-1 max-w-2xl" : "grid-cols-1 sm:grid-cols-2"}`}>
           {slotIds.map((id, index) => (
             <ScrapeJobCard
               key={id}
@@ -1595,6 +1604,7 @@ export default function Scraping() {
               onReviewReady={handleReviewReady}
               onRemove={() => removeSlot(id)}
               canRemove={slotIds.length > 1}
+              forceResetKey={forceResetKey}
             />
           ))}
         </div>
