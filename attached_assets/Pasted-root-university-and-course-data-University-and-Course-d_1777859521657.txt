@@ -1,0 +1,100 @@
+root@university-and-course-data:~/University-and-Course-data# grep "_fresh_cutoff" backend-py/app/routers/scrape.py
+# should print the line that creates the 2-minute cutoff
+    _fresh_cutoff = _dt.now(_tz.utc) - _td(minutes=2)
+                        ScrapeRuntimeJob.created_at > _fresh_cutoff,
+root@university-and-course-data:~/University-and-Course-data# cd /root/University-and-Course-data
+
+# See all running processes
+pm2 list
+
+# Then restart the FastAPI one — common names are:
+pm2 restart fastapi
+# or:
+pm2 restart uvicorn
+# or:
+pm2 restart api
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ api-py             │ fork     │ 15   │ errored   │ 0%       │ 0b       │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+Use --update-env to update environment variables
+[PM2][ERROR] Process or Namespace fastapi not found
+Use --update-env to update environment variables
+[PM2][ERROR] Process or Namespace uvicorn not found
+Use --update-env to update environment variables
+[PM2][ERROR] Process or Namespace api not found
+root@university-and-course-data:~/University-and-Course-data# cd /root/University-and-Course-data
+pm2 restart api-py
+pm2 logs api-py --lines 20
+Use --update-env to update environment variables
+[PM2] Applying action restartProcessId on app [api-py](ids: [ 0 ])
+[PM2] [api-py](0) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ api-py             │ fork     │ 16   │ stopped   │ 0%       │ 0b       │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+[TAILING] Tailing last 20 lines for [api-py] process (change the value with --lines option)
+/root/.pm2/logs/api-py-out.log last 20 lines:
+/root/.pm2/logs/api-py-error.log last 20 lines:
+0|api-py   | /usr/bin/bash: line 1: uvicorn: command not found
+0|api-py   | /usr/bin/bash: line 1: uvicorn: command not found
+0|api-py   | /usr/bin/bash: line 1: uvicorn: command not found
+0|api-py   | /usr/bin/bash: line 1: uvicorn: command not found
+0|api-py   | /usr/bin/bash: line 1: uvicorn: command not found
+0|api-py   | /usr/bin/bash: line 1: uvicorn: command not found
+0|api-py   | /usr/bin/bash: line 1: uvicorn: command not found
+0|api-py   | /usr/bin/bash: line 1: uvicorn: command not found
+0|api-py   | /usr/bin/bash: line 1: uvicorn: command not found
+0|api-py   | /usr/bin/bash: line 1: uvicorn: command not found
+0|api-py   | /usr/bin/bash: line 1: uvicorn: command not found
+0|api-py   | /usr/bin/bash: line 1: uvicorn: command not found
+0|api-py   | /usr/bin/bash: line 1: uvicorn: command not found
+0|api-py   | /usr/bin/bash: line 1: uvicorn: command not found
+0|api-py   | /usr/bin/bash: line 1: uvicorn: command not found
+0|api-py   | /usr/bin/bash: line 1: uvicorn: command not found
+0|api-py   | /usr/bin/bash: line 1: uvicorn: command not found
+0|api-py   | /usr/bin/bash: line 1: uvicorn: command not found
+0|api-py   | /usr/bin/bash: line 1: uvicorn: command not found
+0|api-py   | /usr/bin/bash: line 1: uvicorn: command not found
+
+^C
+root@university-and-course-data:~/University-and-Course-data# pm2 logs api-py --lines 50 --nostream
+[TAILING] Tailing last 50 lines for [api-py] process (change the value with --lines option)
+/root/.pm2/logs/api-py-out.log last 50 lines:
+/root/.pm2/logs/api-py-error.log last 50 lines:
+0|api-py   | /usr/bin/bash: line 1: uvicorn: command not found
+0|api-py   | /usr/bin/bash: line 1: uvicorn: command not found
+0|api-py   | /usr/bin/bash: line 1: uvicorn: command not found
+0|api-py   | /usr/bin/bash: line 1: uvicorn: command not found
+0|api-py   | /usr/bin/bash: line 1: uvicorn: command not found
+0|api-py   | /usr/bin/bash: line 1: uvicorn: command not found
+0|api-py   | /usr/bin/bash: line 1: uvicorn: command not found
+0|api-py   | /usr/bin/bash: line 1: uvicorn: command not found
+0|api-py   | /usr/bin/bash: line 1: uvicorn: command not found
+0|api-py   | /usr/bin/bash: line 1: uvicorn: command not found
+0|api-py   | /usr/bin/bash: line 1: uvicorn: command not found
+0|api-py   | /usr/bin/bash: line 1: uvicorn: command not found
+0|api-py   | /usr/bin/bash: line 1: uvicorn: command not found
+0|api-py   | /usr/bin/bash: line 1: uvicorn: command not found
+0|api-py   | /usr/bin/bash: line 1: uvicorn: command not found
+0|api-py   | /usr/bin/bash: line 1: uvicorn: command not found
+0|api-py   | /usr/bin/bash: line 1: uvicorn: command not found
+0|api-py   | /usr/bin/bash: line 1: uvicorn: command not found
+0|api-py   | /usr/bin/bash: line 1: uvicorn: command not found
+0|api-py   | /usr/bin/bash: line 1: uvicorn: command not found
+0|api-py   | /usr/bin/bash: line 1: uvicorn: command not found
+0|api-py   | /usr/bin/bash: line 1: uvicorn: command not found
+0|api-py   | /usr/bin/bash: line 1: uvicorn: command not found
+0|api-py   | /usr/bin/bash: line 1: uvicorn: command not found
+0|api-py   | /usr/bin/bash: line 1: uvicorn: command not found
+0|api-py   | /usr/bin/bash: line 1: uvicorn: command not found
+0|api-py   | /usr/bin/bash: line 1: uvicorn: command not found
+0|api-py   | /usr/bin/bash: line 1: uvicorn: command not found
+0|api-py   | /usr/bin/bash: line 1: uvicorn: command not found
+0|api-py   | /usr/bin/bash: line 1: uvicorn: command not found
+0|api-py   | /usr/bin/bash: line 1: uvicorn: command not found
+0|api-py   | /usr/bin/bash: line 1: uvicorn: command not found
+
+root@university-and-course-data:~/University-and-Course-data# 
