@@ -876,28 +876,42 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:  # noqa: ARG00
     )
     _is_utas_host: bool = "utas.edu.au" in (url or "").lower()
 
-    cascade_list: list[tuple[str, str | None, float]] = [
-        # UTAS-specific: scope the entire cascade to the hidden
-        # #tabInternational panel so the international location wins over the
-        # domestic section that appears earlier in the HTML.  No-ops when the
-        # page has no such panel, so it is safe for all other universities.
-        ("utas_intl_panel", _from_utas_intl_panel(soup), 0.95),
-        # Structural pre-pass FIRST — see _from_strong_dom_walk for the
-        # rationale. Reads `<strong>Location</strong>` style values out
-        # of the DOM directly, including the ASA-style adjacent-div
-        # idiom that the heading walker misses.
-        ("strong", _from_strong_dom_walk(soup), 0.9),
-        ("dl", _from_dl(soup), 0.9),
-        # Div-label / div-value panel idiom (Torrens course-card-panel, etc.)
-        ("div_panel", _from_panel_divs(soup), 0.88),
-        ("table", _from_tables(soup), 0.85),
-        ("heading", _from_headings(soup), 0.7),
-        # "In person (CampusName)" delivery-mode pattern (Flinders, etc.)
-        ("delivery_inperson", _from_delivery_mode_inperson(soup), 0.85),
-    ]
-    # text_block runs on non-UTAS pages only — see comment above.
-    if not _has_utas_panel:
-        cascade_list.append(("text_block", _from_text_block(html_to_text(html)), 0.5))
+    # For UTAS pages that have a #tabInternational panel: scope the cascade
+    # ENTIRELY to that panel.  Do NOT run any full-page structural method as a
+    # fallback.
+    #
+    # Root cause of the leak: the full-page methods (strong, dl, div_panel,
+    # table, heading) run on the whole HTML source, which includes the
+    # *domestic* tab.  When the international panel has no physical campus
+    # (course is Online-only for international students) _from_utas_intl_panel
+    # returns None, and the cascade then finds the domestic campus (e.g.
+    # "Hobart") from the full-page strong/dl/table scan.  That non-empty
+    # course_location prevents the UTAS-specific online_only guard in
+    # guards.py from firing, so the course is incorrectly staged.
+    #
+    # Correct behaviour: if the international panel has no physical location,
+    # course_location should be blank → UTAS guard rejects the course.
+    if _has_utas_panel:
+        cascade_list: list[tuple[str, str | None, float]] = [
+            ("utas_intl_panel", _from_utas_intl_panel(soup), 0.95),
+        ]
+    else:
+        cascade_list = [
+            # Structural pre-pass FIRST — see _from_strong_dom_walk for the
+            # rationale. Reads `<strong>Location</strong>` style values out
+            # of the DOM directly, including the ASA-style adjacent-div
+            # idiom that the heading walker misses.
+            ("strong", _from_strong_dom_walk(soup), 0.9),
+            ("dl", _from_dl(soup), 0.9),
+            # Div-label / div-value panel idiom (Torrens course-card-panel, etc.)
+            ("div_panel", _from_panel_divs(soup), 0.88),
+            ("table", _from_tables(soup), 0.85),
+            ("heading", _from_headings(soup), 0.7),
+            # "In person (CampusName)" delivery-mode pattern (Flinders, etc.)
+            ("delivery_inperson", _from_delivery_mode_inperson(soup), 0.85),
+            # text_block runs on non-UTAS pages only — see comment above.
+            ("text_block", _from_text_block(html_to_text(html)), 0.5),
+        ]
 
     for method, raw, conf in cascade_list:
         if not raw:
