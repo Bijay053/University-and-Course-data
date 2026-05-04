@@ -197,6 +197,22 @@ The Replit remote is named `github` (not `origin`). Prod remote is `origin`.
 - **ait**: ~37 staged
 - **Study (weird)**: 694 staged but 0 live — investigate before touching
 
+### /api/courses 500 fix (COMPLETED)
+
+Root cause: the prod `courses.py` was an older version missing two things:
+1. `from decimal import Decimal` import
+2. `def _f(v) -> float` helper function
+
+asyncpg returns PostgreSQL `NUMERIC` columns as Python `Decimal` objects, which are
+not JSON-serializable. The fix (applied directly to prod via Python patch scripts):
+- Added `from decimal import Decimal` import
+- Added `def _f(v): return float(v) if isinstance(v, Decimal) else v`
+- Wrapped all english_requirements band scores with `_f()` (listening/speaking/writing/reading/overall for ielts/pte/toefl/other)
+- Added safety final-pass that re-checks all dict values for stray Decimals before `out.append(d)`
+
+**These changes are in the Replit dev repo (courses.py) but NOT yet on GitHub/prod via git.**
+The prod file was patched manually. Next git push will include the correct version.
+
 ### Next session housekeeping (do first, ~15 min)
 
 1. **bulk_approve.py audit**: `git log --oneline --diff-filter=D --all -- backend-py/scripts/bulk_approve.py` — check if ever deleted in git history

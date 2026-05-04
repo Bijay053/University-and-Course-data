@@ -1,0 +1,78 @@
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/decoder.py", line 337, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/decoder.py", line 355, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+root@university-and-course-data:~/University-and-Course-data# python3 - << 'EOF'
+path = "/root/University-and-Course-data/backend-py/app/routers/courses.py"
+with open(path) as f:
+    src = f.read()
+
+# Insert Decimal import + _f() function right after the JSONResponse import line
+old = 'from fastapi.responses import JSONResponse\n'
+new = ('from decimal import Decimal\n'
+       'from fastapi.responses import JSONResponse\n\n\n'
+       'def _f(v: object) -> object:\n'
+       '    """Convert Decimal -> float for JSON serialization."""\n'
+       '    return float(v) if isinstance(v, Decimal) else v\n\n\n')
+
+if 'def _f(' in src:
+    print("_f already defined — no change needed")
+elif old in src:
+    with open(path, 'w') as f:
+        f.write(src.replace(old, new, 1))
+    print("PATCHED OK — Decimal import and _f() added")
+else:
+    print("ERROR: target line not found, showing imports:")
+    for i, line in enumerate(src.split('\n')[:20], 1):
+        print(f"  {i}: {line}")
+EOF
+PATCHED OK — Decimal import and _f() added
+root@university-and-course-data:~/University-and-Course-data# pm2 restart api-py && sleep 10 && curl -s "http://localhost/api/courses?universityId=2&limit=1" | python3 -c "import json,sys; d=json.load(sys.stdin); print('OK — total:', d['total'], '| course:', d['data'][0]['name'] if d['data'] else 'EMPTY')"
+Use --update-env to update environment variables
+[PM2] Applying action restartProcessId on app [api-py](ids: [ 0 ])
+[PM2] [api-py](0) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ api-py             │ fork     │ 6    │ online    │ 0%       │ 3.4mb    │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+OK — total: 8 | course: Master of Information Technology (Artificial Intelligence)
+root@university-and-course-data:~/University-and-Course-data# python3 - << 'EOF'
+path = "/root/University-and-Course-data/backend-py/app/routers/courses.py"
+with open(path) as f:
+    src = f.read()
+
+old = 'from fastapi.responses import JSONResponse\n'
+new = ('from decimal import Decimal\n'
+       'from fastapi.responses import JSONResponse\n\n\n'
+       'def _f(v: object) -> object:\n'
+       '    """Convert Decimal -> float for JSON serialization."""\n'
+       '    return float(v) if isinstance(v, Decimal) else v\n\n\n')
+
+if 'def _f(' in src:
+    print("_f already defined — no change needed")
+elif old in src:
+    with open(path, 'w') as f:
+        f.write(src.replace(old, new, 1))
+    print("PATCHED OK — Decimal import and _f() added")
+else:
+    print("ERROR: target line not found, showing imports:")
+    for i, line in enumerate(src.split('\n')[:20], 1):
+        print(f"  {i}: {line}")
+EOF
+_f already defined — no change needed
+root@university-and-course-data:~/University-and-Course-data# pm2 restart api-py && sleep 10 && curl -s "http://localhost/api/courses?universityId=2&limit=1" | python3 -c "import json,sys; d=json.load(sys.stdin); print('OK — total:', d['total'], '| course:', d['data'][0]['name'] if d['data'] else 'EMPTY')"
+Use --update-env to update environment variables
+[PM2] Applying action restartProcessId on app [api-py](ids: [ 0 ])
+[PM2] [api-py](0) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ api-py             │ fork     │ 7    │ online    │ 0%       │ 384.0kb  │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+OK — total: 8 | course: Master of Information Technology (Artificial Intelligence)
+root@university-and-course-data:~/University-and-Course-data# 
