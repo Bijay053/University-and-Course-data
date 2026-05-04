@@ -1,0 +1,109 @@
+root@university-and-course-data:~/University-and-Course-data# sudo -u postgres psql university_portal \
+    -f /root/University-and-Course-data/backend-py/alembic/prod_migration_015.sql
+psql: error: /root/University-and-Course-data/backend-py/alembic/prod_migration_015.sql: No such file or directory
+root@university-and-course-data:~/University-and-Course-data# sudo -u postgres psql university_portal << 'ENDSQL' 
+
+-- courses table: add all missing columns
+ALTER TABLE courses ADD COLUMN IF NOT EXISTS sub_category           TEXT;
+ALTER TABLE courses ADD COLUMN IF NOT EXISTS course_structure       TEXT;
+ALTER TABLE courses ADD COLUMN IF NOT EXISTS career_outcomes        TEXT;
+ALTER TABLE courses ADD COLUMN IF NOT EXISTS course_location        TEXT;
+ALTER TABLE courses ADD COLUMN IF NOT EXISTS student_market         TEXT;
+ALTER TABLE courses ADD COLUMN IF NOT EXISTS delivery_mode          TEXT;
+ALTER TABLE courses ADD COLUMN IF NOT EXISTS international_eligible BOOLEAN;
+ALTER TABLE courses ADD COLUMN IF NOT EXISTS on_campus_available    BOOLEAN;
+ALTER TABLE courses ADD COLUMN IF NOT EXISTS eligibility_reason     TEXT;
+ALTER TABLE courses ADD COLUMN IF NOT EXISTS eligibility_confidence FLOAT;
+ALTER TABLE courses ADD COLUMN IF NOT EXISTS approval_score         FLOAT;
+ALTER TABLE courses ADD COLUMN IF NOT EXISTS approved_at            TIMESTAMPTZ;
+ALTER TABLE courses ADD COLUMN IF NOT EXISTS last_reviewed_at       TIMESTAMPTZ;
+ALTER TABLE courses ADD COLUMN IF NOT EXISTS last_edited_at         TIMESTAMPTZ;
+ALTER TABLE courses ADD COLUMN IF NOT EXISTS last_edited_by         TEXT;
+ALTER TABLE courses ADD COLUMN IF NOT EXISTS eligibility_status     TEXT NOT NULL DEFAULT 'unknown';
+ALTER TABLE courses ADD COLUMN IF NOT EXISTS approval_status        TEXT NOT NULL DEFAULT 'approved';
+
+-- universities table: add all missing columns
+ALTER TABLE universities ADD COLUMN IF NOT EXISTS scrape_config                  JSONB;
+ALTER TABLE universities ADD COLUMN IF NOT EXISTS fee_page_url                   TEXT;
+ALTER TABLE universities ADD COLUMN IF NOT EXISTS requirements_page_url          TEXT;
+ALTER TABLE universities ADD COLUMN IF NOT EXISTS scholarship_page_url           TEXT;
+ALTER TABLE universities ADD COLUMN IF NOT EXISTS academic_requirements_page_url TEXT;
+ALTER TABLE universities ADD COLUMN IF NOT EXISTS featured          BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE universities ADD COLUMN IF NOT EXISTS featured_priority INTEGER NOT NULL DEFAULT 0;
+
+-- Refresh the search view if it exists
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_matviews WHERE matviewname = 'course_search_view') THEN
+        REFRESH MATERIALIZED VIEW course_search_view;
+        RAISE NOTICE 'course_search_view refreshed';
+    END IF;
+END $$;
+
+-- Mark migration applied
+INSERT INTO alembic_version (version_num) VALUES ('015_courses_missing_columns') ON CONFLICT DO NOTHING;
+UPDATE alembic_version SET version_num = '015_courses_missing_columns' WHERE version_num != '015_courses_missing_columns';
+
+\echo 'Done — all columns added.'
+ENDSQL
+NOTICE:  column "sub_category" of relation "courses" already exists, skipping
+ALTER TABLE
+NOTICE:  column "course_structure" of relation "courses" already exists, skipping
+ALTER TABLE
+NOTICE:  column "career_outcomes" of relation "courses" already exists, skipping
+ALTER TABLE
+NOTICE:  column "course_location" of relation "courses" already exists, skipping
+ALTER TABLE
+NOTICE:  column "student_market" of relation "courses" already exists, skipping
+ALTER TABLE
+NOTICE:  column "delivery_mode" of relation "courses" already exists, skipping
+ALTER TABLE
+NOTICE:  column "international_eligible" of relation "courses" already exists, skipping
+ALTER TABLE
+NOTICE:  column "on_campus_available" of relation "courses" already exists, skipping
+ALTER TABLE
+NOTICE:  column "eligibility_reason" of relation "courses" already exists, skipping
+ALTER TABLE
+NOTICE:  column "eligibility_confidence" of relation "courses" already exists, skipping
+ALTER TABLE
+NOTICE:  column "approval_score" of relation "courses" already exists, skipping
+ALTER TABLE
+NOTICE:  column "approved_at" of relation "courses" already exists, skipping
+ALTER TABLE
+NOTICE:  column "last_reviewed_at" of relation "courses" already exists, skipping
+ALTER TABLE
+NOTICE:  column "last_edited_at" of relation "courses" already exists, skipping
+ALTER TABLE
+NOTICE:  column "last_edited_by" of relation "courses" already exists, skipping
+ALTER TABLE
+NOTICE:  column "eligibility_status" of relation "courses" already exists, skipping
+ALTER TABLE
+NOTICE:  column "approval_status" of relation "courses" already exists, skipping
+ALTER TABLE
+NOTICE:  column "scrape_config" of relation "universities" already exists, skipping
+ALTER TABLE
+NOTICE:  column "fee_page_url" of relation "universities" already exists, skipping
+ALTER TABLE
+NOTICE:  column "requirements_page_url" of relation "universities" already exists, skipping
+ALTER TABLE
+NOTICE:  column "scholarship_page_url" of relation "universities" already exists, skipping
+ALTER TABLE
+NOTICE:  column "academic_requirements_page_url" of relation "universities" already exists, skipping
+ALTER TABLE
+NOTICE:  column "featured" of relation "universities" already exists, skipping
+ALTER TABLE
+NOTICE:  column "featured_priority" of relation "universities" already exists, skipping
+ALTER TABLE
+NOTICE:  course_search_view refreshed
+DO
+INSERT 0 1
+ERROR:  duplicate key value violates unique constraint "alembic_version_pkc"
+DETAIL:  Key (version_num)=(015_courses_missing_columns) already exists.
+Done — all columns added.
+root@university-and-course-data:~/University-and-Course-data# pm2 restart uni-api-py
+
+curl -s "http://localhost/api/courses?universityId=2&limit=1"
+# Expected: {"data":[...],"total":N,"page":1,"limit":1}
+Use --update-env to update environment variables
+[PM2][ERROR] Process or Namespace uni-api-py not found
+Internal Server Errorroot@university-and-course-data:~/University-and-Course-data# 
