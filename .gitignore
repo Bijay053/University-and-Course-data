@@ -61,3 +61,4 @@ backend-py/celerybeat-schedule
 backend-py/baselines/
 baselines/
 ielts_overall
+attached_assets/
