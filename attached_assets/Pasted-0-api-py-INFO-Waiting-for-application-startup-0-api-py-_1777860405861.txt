@@ -1,0 +1,206 @@
+0|api-py   | INFO:     Waiting for application startup.
+0|api-py   | INFO:uniportal:Python backend starting up (debug=False)
+0|api-py   | INFO:     Application startup complete.
+0|api-py   | INFO:     Uvicorn running on http://0.0.0.0:8080 (Press CTRL+C to quit)
+
+root@university-and-course-data:~/University-and-Course-data# # Kill the orphan worker groups (not the systemd-managed one)
+kill 1201614 1292303 1292305 1292307 1292309
+
+# Pull the latest code (search fix + dedup fix) into the systemd worker too
+cd /root/University-and-Course-data
+git pull origin main
+
+# Restart the systemd service so it picks up the new code
+systemctl restart uni-celery.service
+systemctl status uni-celery.service --no-pager
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+Already up to date.
+● uni-celery.service - University Portal Celery Worker (scraper)
+     Loaded: loaded (/etc/systemd/system/uni-celery.service; enabled; preset: enabled)
+     Active: active (running) since Mon 2026-05-04 02:01:14 UTC; 11ms ago
+   Main PID: 1404143 (celery)
+      Tasks: 1 (limit: 9483)
+     Memory: 2.8M (peak: 2.8M)
+        CPU: 10ms
+     CGroup: /system.slice/uni-celery.service
+             └─1404143 /root/University-and-Course-data/backend-py/venv/bin/python3.12 /root/University-and-Cour…
+
+May 04 02:01:14 university-and-course-data systemd[1]: Started uni-celery.service - University Portal Cele…aper).
+Hint: Some lines were ellipsized, use -l to show in full.
+root@university-and-course-data:~/University-and-Course-data# cd /root/University-and-Course-data
+git pull origin main
+fuser -k 8080/tcp
+sleep 2 && pm2 restart api-py
+sleep 3 && pm2 logs api-py --lines 5 --nostream
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+Already up to date.
+8080/tcp:            1404041
+Use --update-env to update environment variables
+[PM2] Applying action restartProcessId on app [api-py](ids: [ 0 ])
+[PM2] [api-py](0) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ api-py             │ fork     │ 21   │ online    │ 0%       │ 5.4mb    │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+[TAILING] Tailing last 5 lines for [api-py] process (change the value with --lines option)
+/root/.pm2/logs/api-py-out.log last 5 lines:
+0|api-py   | INFO:     176.65.139.177:9498 - "GET /login HTTP/1.1" 404 Not Found
+
+/root/.pm2/logs/api-py-error.log last 5 lines:
+0|api-py   | INFO:     Started server process [1404182]
+0|api-py   | INFO:     Waiting for application startup.
+0|api-py   | INFO:uniportal:Python backend starting up (debug=False)
+0|api-py   | INFO:     Application startup complete.
+0|api-py   | INFO:     Uvicorn running on http://0.0.0.0:8080 (Press CTRL+C to quit)
+
+root@university-and-course-data:~/University-and-Course-data# cd /root/University-and-Course-data
+
+# 1. Pull all recent fixes (search 500 fix + ecosystem config)
+git pull origin main
+
+# 2. Kill whatever is on 8080
+fuser -k 8080/tcp 2>/dev/null; sleep 1
+
+# 3. Wipe the broken PM2 entry and start fresh using the ecosystem file
+pm2 delete api-py 2>/dev/null; true
+pm2 start ecosystem.config.js
+pm2 save
+
+# 4. Confirm it's up
+sleep 3 && pm2 list
+pm2 logs api-py --lines 8 --nostream
+remote: Enumerating objects: 4, done.
+remote: Counting objects: 100% (4/4), done.
+remote: Compressing objects: 100% (3/3), done.
+remote: Total 3 (delta 1), reused 0 (delta 0), pack-reused 0 (from 0)
+Unpacking objects: 100% (3/3), 539 bytes | 539.00 KiB/s, done.
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+   9334ee8..a8c2bf7  main       -> origin/main
+Updating 9334ee8..a8c2bf7
+Fast-forward
+ ecosystem.config.js | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
+ create mode 100644 ecosystem.config.js
+ 1404182[PM2] Applying action deleteProcessId on app [api-py](ids: [ 0 ])
+[PM2] [api-py](0) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+[PM2][WARN] Applications api-py not running, starting...
+[PM2] App [api-py] launched (1 instances)
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ api-py             │ fork     │ 0    │ online    │ 0%       │ 5.4mb    │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+[PM2] Saving current process list...
+[PM2] Successfully saved in /root/.pm2/dump.pm2
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ api-py             │ fork     │ 0    │ online    │ 0%       │ 88.0mb   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+[TAILING] Tailing last 8 lines for [api-py] process (change the value with --lines option)
+/root/.pm2/logs/api-py-out.log last 8 lines:
+0|api-py   | INFO:     176.65.139.177:9498 - "GET /login HTTP/1.1" 404 Not Found
+
+/root/.pm2/logs/api-py-error.log last 8 lines:
+0|api-py   | INFO:uniportal:Python backend shutting down
+0|api-py   | INFO:     Application shutdown complete.
+0|api-py   | INFO:     Finished server process [1404231]
+0|api-py   | INFO:     Started server process [1404254]
+0|api-py   | INFO:     Waiting for application startup.
+0|api-py   | INFO:uniportal:Python backend starting up (debug=False)
+0|api-py   | INFO:     Application startup complete.
+0|api-py   | INFO:     Uvicorn running on http://0.0.0.0:8080 (Press CTRL+C to quit)
+
+root@university-and-course-data:~/University-and-Course-data# # Hit FastAPI directly (bypass nginx/proxy)
+curl -s "http://localhost:8080/api/search/courses?sort=relevance&limit=3" | head -300
+
+# Then check FastAPI error log for the traceback
+pm2 logs api-py --lines 30 --nostream
+{"results":[],"total":0,"page":1,"limit":3}[TAILING] Tailing last 30 lines for [api-py] process (change the value with --lines option)
+/root/.pm2/logs/api-py-out.log last 30 lines:
+0|api-py   | INFO:     176.65.139.177:9498 - "GET /login HTTP/1.1" 404 Not Found
+0|api-py   | INFO:     127.0.0.1:59570 - "GET /api/search/courses?sort=relevance&limit=3 HTTP/1.1" 200 OK
+
+/root/.pm2/logs/api-py-error.log last 30 lines:
+0|api-py   | INFO:     Waiting for application startup.
+0|api-py   | INFO:uniportal:Python backend starting up (debug=False)
+0|api-py   | INFO:     Application startup complete.
+0|api-py   | INFO:     Uvicorn running on http://0.0.0.0:8080 (Press CTRL+C to quit)
+0|api-py   | INFO:     Shutting down
+0|api-py   | INFO:     Waiting for application shutdown.
+0|api-py   | INFO:uniportal:Python backend shutting down
+0|api-py   | INFO:     Application shutdown complete.
+0|api-py   | INFO:     Finished server process [1404167]
+0|api-py   | INFO:     Started server process [1404182]
+0|api-py   | INFO:     Waiting for application startup.
+0|api-py   | INFO:uniportal:Python backend starting up (debug=False)
+0|api-py   | INFO:     Application startup complete.
+0|api-py   | INFO:     Uvicorn running on http://0.0.0.0:8080 (Press CTRL+C to quit)
+0|api-py   | INFO:     Started server process [1404231]
+0|api-py   | INFO:     Waiting for application startup.
+0|api-py   | INFO:uniportal:Python backend starting up (debug=False)
+0|api-py   | INFO:     Application startup complete.
+0|api-py   | INFO:     Uvicorn running on http://0.0.0.0:8080 (Press CTRL+C to quit)
+0|api-py   | INFO:     Shutting down
+0|api-py   | INFO:     Waiting for application shutdown.
+0|api-py   | INFO:uniportal:Python backend shutting down
+0|api-py   | INFO:     Application shutdown complete.
+0|api-py   | INFO:     Finished server process [1404231]
+0|api-py   | INFO:     Started server process [1404254]
+0|api-py   | INFO:     Waiting for application startup.
+0|api-py   | INFO:uniportal:Python backend starting up (debug=False)
+0|api-py   | INFO:     Application startup complete.
+0|api-py   | INFO:     Uvicorn running on http://0.0.0.0:8080 (Press CTRL+C to quit)
+0|api-py   | ERROR:app.routers.search:search_courses SQL failed: [Errno -3] Temporary failure in name resolution
+
+root@university-and-course-data:~/University-and-Course-data# # What's listening on port 80?
+ss -tlnp | grep ':80 '
+
+# All PM2 processes (not just api-py)
+pm2 list
+
+# What DATABASE_URL is FastAPI using? (mask the password)
+grep -r "DATABASE_URL\|DB_URL\|database_url" /root/University-and-Course-data/backend-py/.env* 2>/dev/null | sed 's|://[^:]*:[^@]*@|://USER:PASS@|'
+
+# What does nginx proxy /api to?
+nginx -T 2>/dev/null | grep -A10 "location.*api\|proxy_pass" | head -30
+LISTEN 0      511          0.0.0.0:80        0.0.0.0:*    users:(("nginx",pid=1162585,fd=5),("nginx",pid=1162584,fd=5),("nginx",pid=1162583,fd=5),("nginx",pid=1162582,fd=5),("nginx",pid=1006237,fd=5))
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ api-py             │ fork     │ 0    │ online    │ 0%       │ 89.3mb   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+/root/University-and-Course-data/backend-py/.env:DATABASE_URL=postgresql+asyncpg://USER:PASS@127.0.0.1:5432/university_portal
+/root/University-and-Course-data/backend-py/.env.example:# use the project-wide DATABASE_URL automatically; in production this
+/root/University-and-Course-data/backend-py/.env.example:DATABASE_URL=postgresql+asyncpg://USER:PASS@localhost:5432/university_portal
+    location /api/ {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+
+    # Frontend SPA — serve index.html for all routes
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
+--
+  location /api/ {
+    proxy_pass http://localhost:8000;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_read_timeout 300s;
+    proxy_send_timeout 300s;
+    client_max_body_size 50M;
+  }
+}
+
+root@university-and-course-data:~/University-and-Course-data# 
