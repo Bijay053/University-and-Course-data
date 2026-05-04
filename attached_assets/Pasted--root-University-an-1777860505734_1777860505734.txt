@@ -1,0 +1,95 @@
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+/root/University-and-Course-data/backend-py/.env:DATABASE_URL=postgresql+asyncpg://USER:PASS@127.0.0.1:5432/university_portal
+/root/University-and-Course-data/backend-py/.env.example:# use the project-wide DATABASE_URL automatically; in production this
+/root/University-and-Course-data/backend-py/.env.example:DATABASE_URL=postgresql+asyncpg://USER:PASS@localhost:5432/university_portal
+    location /api/ {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+
+    # Frontend SPA — serve index.html for all routes
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
+--
+  location /api/ {
+    proxy_pass http://localhost:8000;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_read_timeout 300s;
+    proxy_send_timeout 300s;
+    client_max_body_size 50M;
+  }
+}
+
+root@university-and-course-data:~/University-and-Course-data# # 1. Find the nginx config file with the wrong port 
+grep -r "127.0.0.1:8000" /etc/nginx/ --include="*.conf" -l
+
+# 2. Change 8000 → 8080 in that file (replace with actual filename if different)
+sed -i 's|proxy_pass http://127.0.0.1:8000|proxy_pass http://127.0.0.1:8080|g' \
+    /etc/nginx/sites-enabled/default
+
+# 3. Test config and reload
+nginx -t && nginx -s reload
+
+# 4. Verify — should now return results (not 500)
+curl -s "http://localhost/api/search/courses?limit=3" | head -200
+sed: can't read /etc/nginx/sites-enabled/default: No such file or directory
+nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+nginx: configuration file /etc/nginx/nginx.conf test is successful
+2026/05/04 02:08:28 [notice] 1404650#1404650: signal process started
+Internal Server Errorroot@university-and-course-data:~/University-and-Course-data# # Find the config file that haroot@university-and-course-data:~/University-and-Course-data# # Find the config file that has 8000 in it
+grep -r "8000\|proxy_pass" /etc/nginx/ 2>/dev/null | head -20
+
+# Also try nginx full config dump
+nginx -T 2>/dev/null | grep -B5 -A5 "8000\|proxy_pass"
+
+# List all nginx config files
+find /etc/nginx/ -type f 2>/dev/null
+/etc/nginx/sites-enabled/uniportal:    proxy_pass http://localhost:8000;
+/etc/nginx/sites-enabled/uniadmin:        proxy_pass http://127.0.0.1:8000;
+/etc/nginx/sites-available/uniportal:    proxy_pass http://localhost:8080;
+/etc/nginx/sites-available/uniadmin:        proxy_pass http://127.0.0.1:8080;
+    root /var/www/university-portal;
+    index index.html;
+
+    # Proxy API calls to Node.js
+    location /api/ {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+
+--
+  server_name _;
+  root /opt/app/artifacts/university-portal/dist/public;
+  index index.html;
+  location / { try_files $uri $uri/ /index.html; }
+  location /api/ {
+    proxy_pass http://localhost:8000;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_read_timeout 300s;
+    proxy_send_timeout 300s;
+    client_max_body_size 50M;
+/etc/nginx/mime.types
+/etc/nginx/fastcgi.conf
+/etc/nginx/sites-enabled/uniportal
+/etc/nginx/sites-enabled/uniadmin
+/etc/nginx/snippets/fastcgi-php.conf
+/etc/nginx/snippets/snakeoil.conf
+/etc/nginx/koi-utf
+/etc/nginx/uwsgi_params
+/etc/nginx/scgi_params
+/etc/nginx/sites-available/uniportal
+/etc/nginx/sites-available/default
+/etc/nginx/sites-available/uniadmin
+/etc/nginx/nginx.conf
+/etc/nginx/proxy_params
+/etc/nginx/win-utf
+/etc/nginx/koi-win
+/etc/nginx/fastcgi_params
