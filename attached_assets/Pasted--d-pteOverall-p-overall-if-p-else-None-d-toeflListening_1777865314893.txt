@@ -1,0 +1,523 @@
+        d["pteOverall"]     = p.overall   if p else None
+        d["toeflListening"] = t.listening if t else None
+        d["toeflSpeaking"]  = t.speaking  if t else None
+        d["toeflWriting"]   = t.writing   if t else None
+        d["toeflReading"]   = t.reading   if t else None
+        d["toeflOverall"]   = t.overall   if t else None
+        # Other-test name falls back to test_type so e.g. test_type
+        # "Cambridge" with no test_name still labels the row.
+        d["otherEnglishTestName"] = (o.test_name if o else None) or (o.test_type if o else None)
+        d["otherEnglishListening"] = o.listening if o else None
+        d["otherEnglishSpeaking"]  = o.speaking  if o else None
+        d["otherEnglishWriting"]   = o.writing   if o else None
+        d["otherEnglishReading"]   = o.reading   if o else None
+        d["otherEnglishOverall"]   = o.overall   if o else None
+        out.append(d)'''
+
+new = '''        # B7: surface english bands. Always emit ALL keys (with None
+        # fallback) so the UI doesn't have to guard against undefined.
+        # NOTE: asyncpg returns NUMERIC columns as Python Decimal objects.
+        # Wrap every band value through _f() so they become plain floats
+        # before JSONResponse tries to serialize the dict.
+        b = eng_map.get(r.id, {})
+        i = b.get("ielts"); p = b.get("pte"); t = b.get("toefl"); o = b.get("other")
+        d["ieltsListening"] = _f(i.listening) if i else None
+        d["ieltsSpeaking"]  = _f(i.speaking)  if i else None
+        d["ieltsWriting"]   = _f(i.writing)   if i else None
+        d["ieltsReading"]   = _f(i.reading)   if i else None
+        d["ieltsOverall"]   = _f(i.overall)   if i else None
+ENDPATCHt("ERROR: old block not found — check if already patched or file differs")f o else None)
+ERROR: old block not found — check if already patched or file differs
+root@university-and-course-data:~/University-and-Course-data# sed -n '165,215p' /root/University-and-Course-data/backend-py/app/routers/courses.py
+        # fallback) so the UI doesn't have to guard against undefined.
+        # NOTE: asyncpg returns NUMERIC columns as Python Decimal objects.
+        # Wrap every band value through _f() so they become plain floats
+        # before JSONResponse tries to serialize the dict.
+        b = eng_map.get(r.id, {})
+        i = b.get("ielts"); p = b.get("pte"); t = b.get("toefl"); o = b.get("other")
+        d["ieltsListening"] = _f(i.listening) if i else None
+        d["ieltsSpeaking"]  = _f(i.speaking)  if i else None
+        d["ieltsWriting"]   = _f(i.writing)   if i else None
+        d["ieltsReading"]   = _f(i.reading)   if i else None
+        d["ieltsOverall"]   = _f(i.overall)   if i else None
+        d["pteListening"]   = _f(p.listening) if p else None
+        d["pteSpeaking"]    = _f(p.speaking)  if p else None
+        d["pteWriting"]     = _f(p.writing)   if p else None
+        d["pteReading"]     = _f(p.reading)   if p else None
+        d["pteOverall"]     = _f(p.overall)   if p else None
+        d["toeflListening"] = _f(t.listening) if t else None
+        d["toeflSpeaking"]  = _f(t.speaking)  if t else None
+        d["toeflWriting"]   = _f(t.writing)   if t else None
+        d["toeflReading"]   = _f(t.reading)   if t else None
+        d["toeflOverall"]   = _f(t.overall)   if t else None
+        # Other-test name falls back to test_type so e.g. test_type
+        # "Cambridge" with no test_name still labels the row.
+        d["otherEnglishTestName"] = (o.test_name if o else None) or (o.test_type if o else None)
+        d["otherEnglishListening"] = _f(o.listening) if o else None
+        d["otherEnglishSpeaking"]  = _f(o.speaking)  if o else None
+        d["otherEnglishWriting"]   = _f(o.writing)   if o else None
+        d["otherEnglishReading"]   = _f(o.reading)   if o else None
+        d["otherEnglishOverall"]   = _f(o.overall)   if o else None
+        # Safety pass: catch any remaining Decimal or datetime values
+        # that may have been introduced after the initial conversion loop.
+        from datetime import datetime as _dt2
+        for k, v in list(d.items()):
+            if isinstance(v, Decimal):
+                d[k] = float(v)
+            elif isinstance(v, _dt2):
+                d[k] = v.isoformat()
+        out.append(d)
+    return JSONResponse(content={"data": out, "total": int(total), "page": page, "limit": limit})
+
+
+@router.get("/courses/{course_id}", response_model=CourseRead)
+async def get_course(course_id: int, db: Annotated[AsyncSession, Depends(get_db)]) -> CourseRead:
+    c = await db.get(Course, course_id)
+    if not c:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+    return CourseRead.model_validate(c)
+
+
+@router.post("/courses", response_model=CourseRead, status_code=status.HTTP_201_CREATED)
+async def create_course(
+root@university-and-course-data:~/University-and-Course-data# FILE=/root/University-and-Course-data/backend-py/app/routers/courses.py
+
+# Replace bare attribute access with _f()-wrapped versions for all band scores
+sed -i \
+  -e 's/= i\.listening if i else None/= _f(i.listening) if i else None/g' \
+  -e 's/= i\.speaking  if i else None/= _f(i.speaking)  if i else None/g' \
+  -e 's/= i\.writing   if i else None/= _f(i.writing)   if i else None/g' \
+  -e 's/= i\.reading   if i else None/= _f(i.reading)   if i else None/g' \
+  -e 's/= i\.overall   if i else None/= _f(i.overall)   if i else None/g' \
+  -e 's/= p\.listening if p else None/= _f(p.listening) if p else None/g' \
+  -e 's/= p\.speaking  if p else None/= _f(p.speaking)  if p else None/g' \
+  -e 's/= p\.writing   if p else None/= _f(p.writing)   if p else None/g' \
+  -e 's/= p\.reading   if p else None/= _f(p.reading)   if p else None/g' \
+  -e 's/= p\.overall   if p else None/= _f(p.overall)   if p else None/g' \
+  -e 's/= t\.listening if t else None/= _f(t.listening) if t else None/g' \
+  -e 's/= t\.speaking  if t else None/= _f(t.speaking)  if t else None/g' \
+  -e 's/= t\.writing   if t else None/= _f(t.writing)   if t else None/g' \
+  -e 's/= t\.reading   if t else None/= _f(t.reading)   if t else None/g' \
+  -e 's/= t\.overall   if t else None/= _f(t.overall)   if t else None/g' \
+  -e 's/= o\.listening if o else None/= _f(o.listening) if o else None/g' \
+  -e 's/= o\.speaking  if o else None/= _f(o.speaking)  if o else None/g' \
+  -e 's/= o\.writing   if o else None/= _f(o.writing)   if o else None/g' \
+  -e 's/= o\.reading   if o else None/= _f(o.reading)   if o else None/g' \
+  -e 's/= o\.overall   if o else None/= _f(o.overall)   if o else None/g' \
+  "$FILE"
+
+# Verify the fix landed
+echo "=== Verification ==="
+grep -c "_f(" "$FILE" && echo "Lines with _f() found — patch applied"
+grep "ieltsListening\|pteOverall\|toeflOverall\|otherEnglishOverall" "$FILE"
+=== Verification ===
+21
+Lines with _f() found — patch applied
+        # `c.ieltsOverall || c.pteOverall || c.toeflOverall || ...`
+        d["ieltsListening"] = _f(i.listening) if i else None
+        d["pteOverall"]     = _f(p.overall)   if p else None
+        d["toeflOverall"]   = _f(t.overall)   if t else None
+        d["otherEnglishOverall"]   = _f(o.overall)   if o else None
+root@university-and-course-data:~/University-and-Course-data# pm2 restart api-py && sleep 8 && curl -s "http://localhost/api/courses?universityId=2&limit=1" | python3 -c "import json,sys; d=json.load(sys.stdin); print('OK — total:', d['total'], '| course:', d['data'][0]['name'] if d['data'] else 'EMPTY')"
+Use --update-env to update environment variables
+[PM2] Applying action restartProcessId on app [api-py](ids: [ 0 ])
+[PM2] [api-py](0) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ api-py             │ fork     │ 4    │ online    │ 0%       │ 3.4mb    │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+  File "/usr/lib/python3.12/json/__init__.py", line 293, in load
+    return loads(fp.read(),
+           ^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/decoder.py", line 337, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/decoder.py", line 355, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+root@university-and-course-data:~/University-and-Course-data# # 1. Wait for uvicorn to be fully ready, then test
+sleep 10 && curl -s "http://localhost/api/courses?universityId=2&limit=1" | python3 -c "import json,sys; d=json.load(sys.stdin); print('OK — total:', d['total'], '| course:', d['data'][0]['name'] if d['data'] else 'EMPTY')"
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+  File "/usr/lib/python3.12/json/__init__.py", line 293, in load
+    return loads(fp.read(),
+           ^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/decoder.py", line 337, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/decoder.py", line 355, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+root@university-and-course-data:~/University-and-Course-data# # 2. Get fresh error log
+pm2 logs api-py --err --lines 30 --nostream
+
+# 3. Show current prod file lines 140-215
+sed -n '140,215p' /root/University-and-Course-data/backend-py/app/routers/courses.py
+[TAILING] Tailing last 30 lines for [api-py] process (change the value with --lines option)
+/root/.pm2/logs/api-py-error.log last 30 lines:
+0|api-py   |     raise exc
+0|api-py   |   File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+0|api-py   |     await app(scope, receive, sender)
+0|api-py   |   File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/fastapi/middleware/asyncexitstack.py", line 18, in __call__
+0|api-py   |     await self.app(scope, receive, send)
+0|api-py   |   File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/starlette/routing.py", line 660, in __call__
+0|api-py   |     await self.middleware_stack(scope, receive, send)
+0|api-py   |   File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/starlette/routing.py", line 680, in app
+0|api-py   |     await route.handle(scope, receive, send)
+0|api-py   |   File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/starlette/routing.py", line 276, in handle
+0|api-py   |     await self.app(scope, receive, send)
+0|api-py   |   File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/fastapi/routing.py", line 134, in app
+0|api-py   |     await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+0|api-py   |   File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+0|api-py   |     raise exc
+0|api-py   |   File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+0|api-py   |     await app(scope, receive, sender)
+0|api-py   |   File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/fastapi/routing.py", line 120, in app
+0|api-py   |     response = await f(request)
+0|api-py   |                ^^^^^^^^^^^^^^^^
+0|api-py   |   File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/fastapi/routing.py", line 674, in app
+0|api-py   |     raw_response = await run_endpoint_function(
+0|api-py   |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+0|api-py   |   File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/fastapi/routing.py", line 328, in run_endpoint_function
+0|api-py   |     return await dependant.call(**values)
+0|api-py   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+0|api-py   |   File "/root/University-and-Course-data/backend-py/app/routers/courses.py", line 171, in list_courses
+0|api-py   |     d["ieltsListening"] = _f(i.listening) if i else None
+0|api-py   |                           ^^
+0|api-py   | NameError: name '_f' is not defined
+
+    for r in rows:
+        d = {col.name: getattr(r, col.name, None) for col in r.__table__.columns}
+        from datetime import datetime as _dt
+        for k, v in list(d.items()):
+            if isinstance(v, _dt):
+                d[k] = v.isoformat()
+        for snake, camel in course_aliases.items():
+            if snake in d:
+                d[camel] = d[snake]
+        # Add camelCase aliases for course fields
+        d["universityId"] = d.get("university_id")
+        d["degreeLevel"] = d.get("degree_level")
+        d["studyMode"] = d.get("study_mode")
+        d["courseLocation"] = d.get("course_location")
+        d["courseWebsite"] = d.get("course_website")
+        d["durationTerm"] = d.get("duration_term")
+        # Merge in fees (always include keys, even null)
+        d.update(fees_map.get(r.id, {
+            "international_fee": None, "internationalFee": None,
+            "fee_term": None, "feeTerm": None,
+            "fee_year": None, "feeYear": None,
+            "currency": None,
+        }))
+
+        # B7: surface english bands. Always emit ALL keys (with None
+        # fallback) so the UI doesn't have to guard against undefined.
+        # NOTE: asyncpg returns NUMERIC columns as Python Decimal objects.
+        # Wrap every band value through _f() so they become plain floats
+        # before JSONResponse tries to serialize the dict.
+        b = eng_map.get(r.id, {})
+        i = b.get("ielts"); p = b.get("pte"); t = b.get("toefl"); o = b.get("other")
+        d["ieltsListening"] = _f(i.listening) if i else None
+        d["ieltsSpeaking"]  = _f(i.speaking)  if i else None
+        d["ieltsWriting"]   = _f(i.writing)   if i else None
+        d["ieltsReading"]   = _f(i.reading)   if i else None
+        d["ieltsOverall"]   = _f(i.overall)   if i else None
+        d["pteListening"]   = _f(p.listening) if p else None
+        d["pteSpeaking"]    = _f(p.speaking)  if p else None
+        d["pteWriting"]     = _f(p.writing)   if p else None
+        d["pteReading"]     = _f(p.reading)   if p else None
+        d["pteOverall"]     = _f(p.overall)   if p else None
+        d["toeflListening"] = _f(t.listening) if t else None
+        d["toeflSpeaking"]  = _f(t.speaking)  if t else None
+        d["toeflWriting"]   = _f(t.writing)   if t else None
+        d["toeflReading"]   = _f(t.reading)   if t else None
+        d["toeflOverall"]   = _f(t.overall)   if t else None
+        # Other-test name falls back to test_type so e.g. test_type
+        # "Cambridge" with no test_name still labels the row.
+        d["otherEnglishTestName"] = (o.test_name if o else None) or (o.test_type if o else None)
+        d["otherEnglishListening"] = _f(o.listening) if o else None
+        d["otherEnglishSpeaking"]  = _f(o.speaking)  if o else None
+        d["otherEnglishWriting"]   = _f(o.writing)   if o else None
+        d["otherEnglishReading"]   = _f(o.reading)   if o else None
+        d["otherEnglishOverall"]   = _f(o.overall)   if o else None
+        # Safety pass: catch any remaining Decimal or datetime values
+        # that may have been introduced after the initial conversion loop.
+        from datetime import datetime as _dt2
+        for k, v in list(d.items()):
+            if isinstance(v, Decimal):
+                d[k] = float(v)
+            elif isinstance(v, _dt2):
+                d[k] = v.isoformat()
+        out.append(d)
+    return JSONResponse(content={"data": out, "total": int(total), "page": page, "limit": limit})
+
+
+@router.get("/courses/{course_id}", response_model=CourseRead)
+async def get_course(course_id: int, db: Annotated[AsyncSession, Depends(get_db)]) -> CourseRead:
+    c = await db.get(Course, course_id)
+    if not c:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+    return CourseRead.model_validate(c)
+
+
+@router.post("/courses", response_model=CourseRead, status_code=status.HTTP_201_CREATED)
+async def create_course(
+root@university-and-course-data:~/University-and-Course-data# python3 - << 'EOF'
+path = "/root/University-and-Course-data/backend-py/app/routers/courses.py"
+with open(path) as f:
+    src = f.read()
+
+if 'def _f(' in src:
+    print("_f already defined — no change needed")
+else:
+    old = 'from decimal import Decimal\n'
+    new = ('from decimal import Decimal\n\n\n'
+           'def _f(v: object) -> object:\n'
+           '    """Convert Decimal -> float for JSON serialization."""\n'
+           '    return float(v) if isinstance(v, Decimal) else v\n\n')
+    if old in src:
+        with open(path, 'w') as f:
+            f.write(src.replace(old, new, 1))
+        print("PATCHED OK — _f() function added")
+    else:
+        print("ERROR: 'from decimal import Decimal' not found")
+        # Show first 30 lines to debug
+        print('\n'.join(src.split('\n')[:30]))
+EOF
+ERROR: 'from decimal import Decimal' not found
+"""Course CRUD endpoints (read-heavy; writes guarded by auth)."""
+from __future__ import annotations
+
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import JSONResponse
+from sqlalchemy import desc, func, or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.dependencies import get_current_user, get_db
+from app.models import Course, University
+from app.schemas.course import CourseCreate, CourseListResponse, CourseRead, CourseUpdate
+
+router = APIRouter()
+
+
+@router.get("/courses")
+async def list_courses(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    # B4: the OpenAPI spec declares these params in camelCase
+    # (universityId, degreeLevel, studyMode, search, subCategory)
+    # but FastAPI by default matches function parameter names verbatim.
+    # Without the aliases below the client's ?universityId=11 was
+    # silently dropped and the endpoint returned ALL 353 courses
+    # instead of the 8 belonging to that university — that's the
+    # "fake 353" the UI was showing in the Courses tab header.
+    university_id: int | None = Query(default=None, alias="universityId"),
+    q: str | None = Query(default=None, alias="search"),
+    degree_level: str | None = Query(default=None, alias="degreeLevel"),
+root@university-and-course-data:~/University-and-Course-data# pm2 restart api-py && sleep 8 && curl -s "http://localhost/api/courses?universityId=2&limit=1" | python3 -c "import json,sys; d=json.load(sys.stdin); print('OK — total:', d['total'], '| course:', d['data'][0]['name'] if d['data'] else 'EMPTY')"
+Use --update-env to update environment variables
+[PM2] Applying action restartProcessId on app [api-py](ids: [ 0 ])
+[PM2] [api-py](0) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ api-py             │ fork     │ 5    │ online    │ 0%       │ 3.4mb    │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+  File "/usr/lib/python3.12/json/__init__.py", line 293, in load
+    return loads(fp.read(),
+           ^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/decoder.py", line 337, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/decoder.py", line 355, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+root@university-and-course-data:~/University-and-Course-data# python3 - << 'EOF'
+path = "/root/University-and-Course-data/backend-py/app/routers/courses.py"
+with open(path) as f:
+    src = f.read()
+
+# Insert Decimal import + _f() function right after the JSONResponse import line
+old = 'from fastapi.responses import JSONResponse\n'
+new = ('from decimal import Decimal\n'
+       'from fastapi.responses import JSONResponse\n\n\n'
+       'def _f(v: object) -> object:\n'
+       '    """Convert Decimal -> float for JSON serialization."""\n'
+       '    return float(v) if isinstance(v, Decimal) else v\n\n\n')
+
+if 'def _f(' in src:
+    print("_f already defined — no change needed")
+elif old in src:
+    with open(path, 'w') as f:
+        f.write(src.replace(old, new, 1))
+    print("PATCHED OK — Decimal import and _f() added")
+else:
+    print("ERROR: target line not found, showing imports:")
+    for i, line in enumerate(src.split('\n')[:20], 1):
+        print(f"  {i}: {line}")
+EOF
+PATCHED OK — Decimal import and _f() added
+root@university-and-course-data:~/University-and-Course-data# pm2 restart api-py && sleep 10 && curl -s "http://localhost/api/courses?universityId=2&limit=1" | python3 -c "import json,sys; d=json.load(sys.stdin); print('OK — total:', d['total'], '| course:', d['data'][0]['name'] if d['data'] else 'EMPTY')"
+Use --update-env to update environment variables
+[PM2] Applying action restartProcessId on app [api-py](ids: [ 0 ])
+[PM2] [api-py](0) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ api-py             │ fork     │ 6    │ online    │ 0%       │ 3.4mb    │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+OK — total: 8 | course: Master of Information Technology (Artificial Intelligence)
+root@university-and-course-data:~/University-and-Course-data# python3 - << 'EOF'
+path = "/root/University-and-Course-data/backend-py/app/routers/courses.py"
+with open(path) as f:
+    src = f.read()
+
+old = 'from fastapi.responses import JSONResponse\n'
+new = ('from decimal import Decimal\n'
+       'from fastapi.responses import JSONResponse\n\n\n'
+       'def _f(v: object) -> object:\n'
+       '    """Convert Decimal -> float for JSON serialization."""\n'
+       '    return float(v) if isinstance(v, Decimal) else v\n\n\n')
+
+if 'def _f(' in src:
+    print("_f already defined — no change needed")
+elif old in src:
+    with open(path, 'w') as f:
+        f.write(src.replace(old, new, 1))
+    print("PATCHED OK — Decimal import and _f() added")
+else:
+    print("ERROR: target line not found, showing imports:")
+    for i, line in enumerate(src.split('\n')[:20], 1):
+        print(f"  {i}: {line}")
+EOF
+_f already defined — no change needed
+root@university-and-course-data:~/University-and-Course-data# pm2 restart api-py && sleep 10 && curl -s "http://localhost/api/courses?universityId=2&limit=1" | python3 -c "import json,sys; d=json.load(sys.stdin); print('OK — total:', d['total'], '| course:', d['data'][0]['name'] if d['data'] else 'EMPTY')"
+Use --update-env to update environment variables
+[PM2] Applying action restartProcessId on app [api-py](ids: [ 0 ])
+[PM2] [api-py](0) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ api-py             │ fork     │ 7    │ online    │ 0%       │ 384.0kb  │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+OK — total: 8 | course: Master of Information Technology (Artificial Intelligence)
+root@university-and-course-data:~/University-and-Course-data# cd /root/University-and-Course-data && python3 - <<root@university-and-course-data:~/University-and-Course-data# cd /root/University-and-Course-data && python3 - << 'PYEOF'e
+import re
+path = "backend-py/app/services/scraper/discovery.py"
+path = "backend-py/app/services/scraper/discovery.py"
+with open(path) as f:
+    src = f.read()
+old = '''    if len(found) < _ALT_PROBE_THRESHOLD and origin:
+old = '''    if len(found) < _ALT_PROBE_THRESHOLD and origin:
+        for _alt_path in _ALT_LISTING_PATHS:
+            if len(found) >= max_courses:
+                break= f"{origin}{_alt_path}"
+            _alt_url = f"{origin}{_alt_path}"
+            if _alt_url in visited:
+                continueawait fetch_html(_alt_url, retries=0)'''
+            _alt_html = await fetch_html(_alt_url, retries=0)'''
+new = '''    if len(found) < _ALT_PROBE_THRESHOLD and origin:
+new = '''    if len(found) < _ALT_PROBE_THRESHOLD and origin:
+        if emit:t emit(
+            await emit(",
+                "status",ER] probing {len(_ALT_LISTING_PATHS)} alt listing path(s) "
+                f"[DISCOVER] probing {len(_ALT_LISTING_PATHS)} alt listing path(s) "
+                f"for additional candidates\\u2026",
+                phase="discover",tart",
+                kind="alt_probe_start",PATHS),
+                count=len(_ALT_LISTING_PATHS),
+            )alt_path in _ALT_LISTING_PATHS:
+        for _alt_path in _ALT_LISTING_PATHS:
+            if len(found) >= max_courses:
+                break= f"{origin}{_alt_path}"
+            _alt_url = f"{origin}{_alt_path}"
+            if _alt_url in visited:
+                continue
+            if emit:t emit(
+                await emit(",
+                    "status",ER] alt probe: {_alt_url}",
+                    f"[DISCOVER] alt probe: {_alt_url}",
+                    phase="discover",
+                    kind="alt_probe",
+                )html = await fetch_html(_alt_url, retries=0)'''
+            _alt_html = await fetch_html(_alt_url, retries=0)'''
+if old not in src:
+if old not in src:old string not found — already patched or file differs")
+    print("ERROR: old string not found — already patched or file differs")
+else:ith open(path, "w") as f:
+    with open(path, "w") as f:d, new, 1))
+        f.write(src.replace(old, new, 1))its added")
+    print("OK — discovery.py alt probe emits added")
+PYEOF
+OK — discovery.py alt probe emits added
+root@university-and-course-data:~/University-and-Course-data# cd /root/University-and-Course-data && python3 - << 'PYEOF'
+path = "backend-py/app/services/scraper/orchestrator.py"
+with open(path) as f:
+    src = f.read()
+
+old = '''                # Fire-and-forget Slack/email (sync helpers, no await needed)
+                deliver_discovery_failure_alert(
+                    uni_name=uni_name,
+                    uni_id=uni_id,
+                    scrape_url=scrape_url,
+                    candidates_found=len(links),
+                    diagnostic=_diag,
+                )'''
+
+new = '''                # Fire-and-forget Slack/email — offload to a thread so the
+                # sync urllib/smtplib calls (each up to 10s timeout) don't
+                # block the asyncio event loop and freeze the scrape UI.
+                asyncio.create_task(asyncio.to_thread(
+                    deliver_discovery_failure_alert,
+                    uni_name=uni_name,
+                    uni_id=uni_id,
+                    scrape_url=scrape_url,
+                    candidates_found=len(links),
+                    diagnostic=_diag,
+                ))'''
+
+if old not in src:
+    print("ERROR: old string not found — already patched or file differs")
+else:
+    with open(path, "w") as f:
+        f.write(src.replace(old, new, 1))
+    print("OK — orchestrator.py Tier-7 alert offloaded to thread")
+PYEOF
+OK — orchestrator.py Tier-7 alert offloaded to thread
+root@university-and-course-data:~/University-and-Course-data# cd /root/University-and-Course-data && pm2 restart api-py
+Use --update-env to update environment variables
+[PM2] Applying action restartProcessId on app [api-py](ids: [ 0 ])
+[PM2] [api-py](0) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ api-py             │ fork     │ 8    │ online    │ 0%       │ 3.4mb    │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+root@university-and-course-data:~/University-and-Course-data# cd /root/University-and-Course-data && python3 -c " 
+import ast, sys
+for f in ['backend-py/app/services/scraper/discovery.py', 'backend-py/app/services/scraper/orchestrator.py']:
+    try:
+        ast.parse(open(f).read())
+        print(f'OK syntax: {f}')
+    except SyntaxError as e:
+        print(f'SYNTAX ERROR in {f}: {e}')
+        sys.exit(1)
+"
+OK syntax: backend-py/app/services/scraper/discovery.py
+OK syntax: backend-py/app/services/scraper/orchestrator.py
+root@university-and-course-data:~/University-and-Course-data# 
