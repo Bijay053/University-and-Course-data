@@ -171,31 +171,42 @@ async def list_courses(
 
         # B7: surface english bands. Always emit ALL keys (with None
         # fallback) so the UI doesn't have to guard against undefined.
+        # NOTE: asyncpg returns NUMERIC columns as Python Decimal objects.
+        # Wrap every band value through _f() so they become plain floats
+        # before JSONResponse tries to serialize the dict.
         b = eng_map.get(r.id, {})
         i = b.get("ielts"); p = b.get("pte"); t = b.get("toefl"); o = b.get("other")
-        d["ieltsListening"] = i.listening if i else None
-        d["ieltsSpeaking"]  = i.speaking  if i else None
-        d["ieltsWriting"]   = i.writing   if i else None
-        d["ieltsReading"]   = i.reading   if i else None
-        d["ieltsOverall"]   = i.overall   if i else None
-        d["pteListening"]   = p.listening if p else None
-        d["pteSpeaking"]    = p.speaking  if p else None
-        d["pteWriting"]     = p.writing   if p else None
-        d["pteReading"]     = p.reading   if p else None
-        d["pteOverall"]     = p.overall   if p else None
-        d["toeflListening"] = t.listening if t else None
-        d["toeflSpeaking"]  = t.speaking  if t else None
-        d["toeflWriting"]   = t.writing   if t else None
-        d["toeflReading"]   = t.reading   if t else None
-        d["toeflOverall"]   = t.overall   if t else None
+        d["ieltsListening"] = _f(i.listening) if i else None
+        d["ieltsSpeaking"]  = _f(i.speaking)  if i else None
+        d["ieltsWriting"]   = _f(i.writing)   if i else None
+        d["ieltsReading"]   = _f(i.reading)   if i else None
+        d["ieltsOverall"]   = _f(i.overall)   if i else None
+        d["pteListening"]   = _f(p.listening) if p else None
+        d["pteSpeaking"]    = _f(p.speaking)  if p else None
+        d["pteWriting"]     = _f(p.writing)   if p else None
+        d["pteReading"]     = _f(p.reading)   if p else None
+        d["pteOverall"]     = _f(p.overall)   if p else None
+        d["toeflListening"] = _f(t.listening) if t else None
+        d["toeflSpeaking"]  = _f(t.speaking)  if t else None
+        d["toeflWriting"]   = _f(t.writing)   if t else None
+        d["toeflReading"]   = _f(t.reading)   if t else None
+        d["toeflOverall"]   = _f(t.overall)   if t else None
         # Other-test name falls back to test_type so e.g. test_type
         # "Cambridge" with no test_name still labels the row.
         d["otherEnglishTestName"] = (o.test_name if o else None) or (o.test_type if o else None)
-        d["otherEnglishListening"] = o.listening if o else None
-        d["otherEnglishSpeaking"]  = o.speaking  if o else None
-        d["otherEnglishWriting"]   = o.writing   if o else None
-        d["otherEnglishReading"]   = o.reading   if o else None
-        d["otherEnglishOverall"]   = o.overall   if o else None
+        d["otherEnglishListening"] = _f(o.listening) if o else None
+        d["otherEnglishSpeaking"]  = _f(o.speaking)  if o else None
+        d["otherEnglishWriting"]   = _f(o.writing)   if o else None
+        d["otherEnglishReading"]   = _f(o.reading)   if o else None
+        d["otherEnglishOverall"]   = _f(o.overall)   if o else None
+        # Safety pass: catch any remaining Decimal or datetime values
+        # that may have been introduced after the initial conversion loop.
+        from datetime import datetime as _dt2
+        for k, v in list(d.items()):
+            if isinstance(v, Decimal):
+                d[k] = float(v)
+            elif isinstance(v, _dt2):
+                d[k] = v.isoformat()
         out.append(d)
     return JSONResponse(content={"data": out, "total": int(total), "page": page, "limit": limit})
 

@@ -1,0 +1,181 @@
+NOTICE:  column "approved_at" of relation "courses" already exists, skipping
+ALTER TABLE
+NOTICE:  column "last_reviewed_at" of relation "courses" already exists, skipping
+ALTER TABLE
+NOTICE:  column "last_edited_at" of relation "courses" already exists, skipping
+ALTER TABLE
+NOTICE:  column "last_edited_by" of relation "courses" already exists, skipping
+ALTER TABLE
+NOTICE:  column "eligibility_status" of relation "courses" already exists, skipping
+ALTER TABLE
+NOTICE:  column "approval_status" of relation "courses" already exists, skipping
+ALTER TABLE
+NOTICE:  column "scrape_config" of relation "universities" already exists, skipping
+ALTER TABLE
+NOTICE:  column "fee_page_url" of relation "universities" already exists, skipping
+ALTER TABLE
+NOTICE:  column "requirements_page_url" of relation "universities" already exists, skipping
+ALTER TABLE
+NOTICE:  column "scholarship_page_url" of relation "universities" already exists, skipping
+ALTER TABLE
+NOTICE:  column "academic_requirements_page_url" of relation "universities" already exists, skipping
+ALTER TABLE
+NOTICE:  column "featured" of relation "universities" already exists, skipping
+ALTER TABLE
+NOTICE:  column "featured_priority" of relation "universities" already exists, skipping
+ALTER TABLE
+NOTICE:  course_search_view refreshed
+DO
+INSERT 0 1
+ERROR:  duplicate key value violates unique constraint "alembic_version_pkc"
+DETAIL:  Key (version_num)=(015_courses_missing_columns) already exists.
+Done — all columns added.
+root@university-and-course-data:~/University-and-Course-data# pm2 restart uni-api-py
+
+curl -s "http://localhost/api/courses?universityId=2&limit=1"
+# Expected: {"data":[...],"total":N,"page":1,"limit":1}
+Use --update-env to update environment variables
+[PM2][ERROR] Process or Namespace uni-api-py not found
+root@university-and-course-data:~/University-and-Course-data# pm2 restart api-pya# pm2 restart api-py
+sleep 3
+pm2 logs api-py --lines 60 --nostream
+Use --update-env to update environment variables
+[PM2] Applying action restartProcessId on app [api-py](ids: [ 0 ])
+[PM2] [api-py](0) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ api-py             │ fork     │ 2    │ online    │ 0%       │ 2.4mb    │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+[TAILING] Tailing last 60 lines for [api-py] process (change the value with --lines option)
+/root/.pm2/logs/api-py-out.log last 60 lines:
+0|api-py   | INFO:     127.0.0.1:57368 - "GET /api/courses?universityId=15&limit=1 HTTP/1.1" 200 OK
+0|api-py   | INFO:     127.0.0.1:57380 - "GET /api/courses?universityId=89&limit=1 HTTP/1.1" 200 OK
+0|api-py   | INFO:     127.0.0.1:57392 - "GET /api/courses?universityId=78&limit=1 HTTP/1.1" 200 OK
+0|api-py   | INFO:     127.0.0.1:57400 - "GET /api/courses?universityId=95&limit=1 HTTP/1.1" 200 OK
+0|api-py   | INFO:     127.0.0.1:57408 - "GET /api/courses?universityId=79&limit=1 HTTP/1.1" 200 OK
+0|api-py   | INFO:     127.0.0.1:57418 - "GET /api/courses?universityId=94&limit=1 HTTP/1.1" 200 OK
+0|api-py   | INFO:     127.0.0.1:57424 - "GET /api/courses?universityId=57&limit=1 HTTP/1.1" 200 OK
+0|api-py   | INFO:     127.0.0.1:57432 - "GET /api/courses?universityId=58&limit=1 HTTP/1.1" 200 OK
+0|api-py   | INFO:     127.0.0.1:57442 - "GET /api/courses?universityId=44&limit=1 HTTP/1.1" 200 OK
+0|api-py   | INFO:     127.0.0.1:57458 - "GET /api/courses?universityId=17&limit=1 HTTP/1.1" 500 Internal Server Error
+0|api-py   | INFO:     127.0.0.1:57468 - "GET /api/courses?universityId=34&limit=1 HTTP/1.1" 200 OK
+0|api-py   | INFO:     127.0.0.1:57484 - "GET /api/courses?universityId=76&limit=1 HTTP/1.1" 200 OK
+0|api-py   | INFO:     127.0.0.1:57486 - "GET /api/courses?universityId=96&limit=1 HTTP/1.1" 200 OK
+0|api-py   | INFO:     127.0.0.1:57488 - "GET /api/courses?universityId=32&limit=1 HTTP/1.1" 200 OK
+0|api-py   | INFO:     127.0.0.1:57504 - "GET /api/courses?universityId=67&limit=1 HTTP/1.1" 200 OK
+0|api-py   | INFO:     127.0.0.1:57510 - "GET /api/courses?universityId=68&limit=1 HTTP/1.1" 200 OK
+0|api-py   | INFO:     127.0.0.1:57518 - "GET /api/courses?universityId=69&limit=1 HTTP/1.1" 200 OK
+0|api-py   | INFO:     127.0.0.1:57530 - "GET /api/courses?universityId=70&limit=1 HTTP/1.1" 200 OK
+0|api-py   | INFO:     127.0.0.1:57538 - "GET /api/courses?universityId=59&limit=1 HTTP/1.1" 200 OK
+0|api-py   | INFO:     127.0.0.1:57544 - "GET /api/courses?universityId=84&limit=1 HTTP/1.1" 200 OK
+0|api-py   | INFO:     127.0.0.1:57556 - "GET /api/courses?universityId=60&limit=1 HTTP/1.1" 200 OK
+0|api-py   | INFO:     127.0.0.1:57566 - "GET /api/courses?universityId=61&limit=1 HTTP/1.1" 200 OK
+0|api-py   | INFO:     127.0.0.1:57570 - "GET /api/courses?universityId=39&limit=1 HTTP/1.1" 200 OK
+0|api-py   | INFO:     127.0.0.1:57574 - "GET /api/courses?universityId=14&limit=1 HTTP/1.1" 200 OK
+0|api-py   | INFO:     127.0.0.1:57582 - "GET /api/courses?universityId=97&limit=1 HTTP/1.1" 200 OK
+0|api-py   | INFO:     127.0.0.1:57576 - "GET /api/courses?universityId=13&limit=1 HTTP/1.1" 200 OK
+0|api-py   | INFO:     127.0.0.1:57592 - "GET /api/courses?universityId=25&limit=1 HTTP/1.1" 200 OK
+0|api-py   | INFO:     127.0.0.1:57608 - "GET /api/courses?universityId=83&limit=1 HTTP/1.1" 200 OK
+0|api-py   | INFO:     127.0.0.1:57620 - "GET /api/courses?universityId=11&limit=1 HTTP/1.1" 200 OK
+0|api-py   | INFO:     127.0.0.1:57626 - "GET /api/courses?universityId=50&limit=1 HTTP/1.1" 200 OK
+0|api-py   | INFO:     127.0.0.1:57628 - "GET /api/courses?universityId=24&limit=1 HTTP/1.1" 200 OK
+0|api-py   | INFO:     127.0.0.1:57638 - "GET /api/courses?universityId=82&limit=1 HTTP/1.1" 200 OK
+0|api-py   | INFO:     127.0.0.1:57648 - "GET /api/courses?universityId=1&limit=1 HTTP/1.1" 500 Internal Server Error
+0|api-py   | INFO:     127.0.0.1:57664 - "GET /api/courses?universityId=26&limit=1 HTTP/1.1" 200 OK
+0|api-py   | INFO:     127.0.0.1:57680 - "GET /api/courses?universityId=5&limit=1 HTTP/1.1" 500 Internal Server Error
+0|api-py   | INFO:     127.0.0.1:57692 - "GET /api/courses?universityId=27&limit=1 HTTP/1.1" 200 OK
+0|api-py   | INFO:     127.0.0.1:57694 - "GET /api/courses?universityId=62&limit=1 HTTP/1.1" 200 OK
+0|api-py   | INFO:     127.0.0.1:57708 - "GET /api/courses?universityId=85&limit=1 HTTP/1.1" 200 OK
+0|api-py   | INFO:     127.0.0.1:57712 - "GET /api/courses?universityId=38&limit=1 HTTP/1.1" 200 OK
+0|api-py   | INFO:     127.0.0.1:57724 - "GET /api/courses?universityId=28&limit=1 HTTP/1.1" 200 OK
+0|api-py   | INFO:     127.0.0.1:57736 - "GET /api/courses?universityId=81&limit=1 HTTP/1.1" 200 OK
+0|api-py   | INFO:     127.0.0.1:57742 - "GET /api/courses?universityId=42&limit=1 HTTP/1.1" 200 OK
+0|api-py   | INFO:     127.0.0.1:57752 - "GET /api/courses?universityId=80&limit=1 HTTP/1.1" 200 OK
+0|api-py   | INFO:     127.0.0.1:57746 - "GET /api/courses?universityId=16&limit=1 HTTP/1.1" 200 OK
+0|api-py   | INFO:     127.0.0.1:57760 - "GET /api/courses?universityId=20&limit=1 HTTP/1.1" 500 Internal Server Error
+0|api-py   | INFO:     127.0.0.1:57772 - "GET /api/courses?universityId=18&limit=1 HTTP/1.1" 200 OK
+0|api-py   | INFO:     127.0.0.1:57784 - "GET /api/courses?universityId=3&limit=1 HTTP/1.1" 500 Internal Server Error
+0|api-py   | INFO:     127.0.0.1:57790 - "GET /api/courses?universityId=6&limit=1 HTTP/1.1" 500 Internal Server Error
+0|api-py   | INFO:     127.0.0.1:57794 - "GET /api/scrape/active HTTP/1.1" 200 OK
+0|api-py   | INFO:     127.0.0.1:47100 - "GET /api/universities HTTP/1.1" 200 OK
+0|api-py   | INFO:     127.0.0.1:47110 - "GET /api/universities/2/scholarship-courses HTTP/1.1" 200 OK
+0|api-py   | INFO:     127.0.0.1:47136 - "GET /api/universities/2/academic-requirements HTTP/1.1" 200 OK
+0|api-py   | INFO:     127.0.0.1:47132 - "GET /api/settings/academic-levels HTTP/1.1" 200 OK
+0|api-py   | INFO:     127.0.0.1:47116 - "GET /api/universities/2 HTTP/1.1" 200 OK
+0|api-py   | INFO:     127.0.0.1:47130 - "GET /api/courses?universityId=2&page=1&limit=50 HTTP/1.1" 500 Internal Server Error
+0|api-py   | INFO:     127.0.0.1:47150 - "GET /api/courses?universityId=2&page=1&limit=50 HTTP/1.1" 500 Internal Server Error
+0|api-py   | INFO:     127.0.0.1:47166 - "GET /api/courses?universityId=2&page=1&limit=50 HTTP/1.1" 500 Internal Server Error
+0|api-py   | INFO:     127.0.0.1:36248 - "GET /api/courses?universityId=2&page=1&limit=50 HTTP/1.1" 500 Internal Server Error
+0|api-py   | INFO:     127.0.0.1:37858 - "GET /api/dashboard/stats HTTP/1.1" 200 OK
+0|api-py   | INFO:     127.0.0.1:59972 - "GET /api/vendor/phpunit/phpunit/src/Util/PHP/eval-stdin.php HTTP/1.1" 404 Not Found
+
+/root/.pm2/logs/api-py-error.log last 60 lines:
+0|api-py   |     raise exc
+0|api-py   |   File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+0|api-py   |     await app(scope, receive, sender)
+0|api-py   |   File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/fastapi/middleware/asyncexitstack.py", line 18, in __call__
+0|api-py   |     await self.app(scope, receive, send)
+0|api-py   |   File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/starlette/routing.py", line 660, in __call__
+0|api-py   |     await self.middleware_stack(scope, receive, send)
+0|api-py   |   File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/starlette/routing.py", line 680, in app
+0|api-py   |     await route.handle(scope, receive, send)
+0|api-py   |   File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/starlette/routing.py", line 276, in handle
+0|api-py   |     await self.app(scope, receive, send)
+0|api-py   |   File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/fastapi/routing.py", line 134, in app
+0|api-py   |     await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+0|api-py   |   File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+0|api-py   |     raise exc
+0|api-py   |   File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+0|api-py   |     await app(scope, receive, sender)
+0|api-py   |   File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/fastapi/routing.py", line 120, in app
+0|api-py   |     response = await f(request)
+0|api-py   |                ^^^^^^^^^^^^^^^^
+0|api-py   |   File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/fastapi/routing.py", line 674, in app
+0|api-py   |     raw_response = await run_endpoint_function(
+0|api-py   |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+0|api-py   |   File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/fastapi/routing.py", line 328, in run_endpoint_function
+0|api-py   |     return await dependant.call(**values)
+0|api-py   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+0|api-py   |   File "/root/University-and-Course-data/backend-py/app/routers/courses.py", line 192, in list_courses
+0|api-py   |     return JSONResponse(content={"data": out, "total": int(total), "page": page, "limit": limit})
+0|api-py   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+0|api-py   |   File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/starlette/responses.py", line 192, in __init__
+0|api-py   |     super().__init__(content, status_code, headers, media_type, background)
+0|api-py   |   File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/starlette/responses.py", line 45, in __init__
+0|api-py   |     self.body = self.render(content)
+0|api-py   |                 ^^^^^^^^^^^^^^^^^^^^
+0|api-py   |   File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/starlette/responses.py", line 195, in render
+0|api-py   |     return json.dumps(
+0|api-py   |            ^^^^^^^^^^^
+0|api-py   |   File "/usr/lib/python3.12/json/__init__.py", line 238, in dumps
+0|api-py   |     **kw).encode(obj)
+0|api-py   |           ^^^^^^^^^^^
+0|api-py   |   File "/usr/lib/python3.12/json/encoder.py", line 200, in encode
+0|api-py   |     chunks = self.iterencode(o, _one_shot=True)
+0|api-py   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+0|api-py   |   File "/usr/lib/python3.12/json/encoder.py", line 258, in iterencode
+0|api-py   |     return _iterencode(o, 0)
+0|api-py   |            ^^^^^^^^^^^^^^^^^
+0|api-py   |   File "/usr/lib/python3.12/json/encoder.py", line 180, in default
+0|api-py   |     raise TypeError(f'Object of type {o.__class__.__name__} '
+0|api-py   | TypeError: Object of type Decimal is not JSON serializable
+0|api-py   | WARNING:  Invalid HTTP request received.
+0|api-py   | INFO:     Shutting down
+0|api-py   | INFO:     Waiting for application shutdown.
+0|api-py   | INFO:uniportal:Python backend shutting down
+0|api-py   | INFO:     Application shutdown complete.
+0|api-py   | INFO:     Finished server process [1407374]
+0|api-py   | INFO:     Started server process [1407750]
+0|api-py   | INFO:     Waiting for application startup.
+0|api-py   | INFO:uniportal:Python backend starting up (debug=False)
+0|api-py   | INFO:     Application startup complete.
+0|api-py   | INFO:     Uvicorn running on http://0.0.0.0:8080 (Press CTRL+C to quit)
+
+root@university-and-course-data:~/University-and-Course-data# sudo -u postgres psql university_portal -c "
+SELECT 
+  (SELECT string_agg(column_name, ', ') FROM information_schema.columns WHERE table_name='fees') AS fees_cols,
+  (SELECT string_agg(column_name, ', ') FROM information_schema.columns WHERE table_name='english_requirements') AS eng_req_cols;
+"
+root@university-and-course-data:~/University-and-Course-data# curl -s "http://localhost/api/courses?universityId=2&limit=1"
+Internal Server Errorroot@university-and-course-data:~/University-and-Course-data# 
