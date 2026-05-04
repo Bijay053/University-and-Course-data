@@ -151,24 +151,17 @@ _NETWORKIDLE_HOSTS: tuple[str, ...] = (
     # UniSQ: course detail panels (fees, entry requirements, study modes) are
     # React-rendered after page load. Need networkidle to catch the XHR content.
     "unisq.edu.au",
-    # UTAS: the DOMESTIC/INTERNATIONAL tab panels are JS-rendered. Without
-    # networkidle the tab button may not have mounted when the toggle JS fires,
-    # causing the click to miss and leaving the Domestic tab active. The 3s
-    # settle after networkidle also gives the tab-switch XHR time to complete
-    # before we snap the HTML.
-    "utas.edu.au",
+    # VIT: English table and fee data are XHR-rendered after page load.
+    # networkidle with a tighter 30s / 25s budget is sufficient for SPA
+    # hydration and avoids over-waiting on vocational pages.
+    "vit.edu.au",
 )
 
 # Hosts that need domcontentloaded + a longer-than-default JS settle window.
-# VIT was previously in _NETWORKIDLE_HOSTS (30s outer) but its analytics
-# widgets (Intercom, Hotjar, GA stream) prevent networkidle from ever firing,
-# so every course hit the 30s ceiling and timed out before the International
-# toggle could be clicked.  domcontentloaded fires as soon as the HTML is
-# parsed; the 6s settle gives the Vue/React SPA enough time to mount the
-# International toggle button.  Same strategy used for Torrens in central_pages.
-_DCL_SETTLE_MS_OVERRIDES: dict[str, int] = {
-    "vit.edu.au": 6_000,
-}
+# Add hosts here when networkidle is unsuitable (e.g. long-poll analytics
+# widgets that prevent idle from firing) but a brief DCL+settle window is
+# enough to mount the feature the scraper needs to click.
+_DCL_SETTLE_MS_OVERRIDES: dict[str, int] = {}
 
 # Hosts that need the full 60s / networkidle treatment.
 # These are sites that are either genuinely slow from our DigitalOcean

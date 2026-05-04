@@ -329,28 +329,25 @@ async def stage_course(
             dropped_fields, name, university_id,
         )
 
-    # ── Confidence gate ───────────────────────────────────────────────────
-    # Courses with confidence < 60 (two or more critical fields missing) are
-    # not staged.  A missing row is better than a row with misleading data —
-    # operators cannot easily spot wrong values but will notice a missing row.
-    # Exceptions:
-    #   • has_central_fee_page=True already earns the 25 fee points, so
-    #     universities like Bond/ECU are not unfairly penalised for JS fees.
-    #   • domestic_only courses are blocked earlier; this gate never fires on them.
-    from app.services.scraper.confidence import (  # noqa: PLC0415 — local to avoid circular import
+    # ── Confidence log (informational only — does NOT gate staging) ────────
+    # Courses with a low confidence score get a scrape_warning so operators
+    # can see at a glance why a row landed in review.  We no longer hard-reject
+    # here: the staging gate is (a) degree-qualified name + (b) international_fee
+    # via should_stage_course().  Everything that passes that gate is staged;
+    # the eligibility / auto_publish_status system then decides review vs ready.
+    from app.services.scraper.confidence import (  # noqa: PLC0415
         CONFIDENCE_WARN as _CONF_GATE,
         score_payload as _score_payload,
     )
     _cg = _score_payload(payload)
     if _cg["score"] < _CONF_GATE:
         log.info(
-            "stage_course: confidence %d/100 < %d — skipping %r (missing: %s)",
-            _cg["score"], _CONF_GATE, name, ", ".join(_cg.get("missing", [])),
+            "stage_course: confidence %d/100 — staging %r with missing fields: %s",
+            _cg["score"], name, ", ".join(_cg.get("missing", [])),
         )
-        return StageResult(
-            False,
-            f"rejected: confidence_{_cg['score']}_missing_{'_'.join(_cg.get('missing', []))}",
-        )
+        payload.setdefault("scrape_warnings", [])
+        if "confidence_low" not in payload["scrape_warnings"]:
+            payload["scrape_warnings"].append("confidence_low")
 
     # ── Preserve existing valid data ──────────────────────────────────────
     # When a re-scrape cannot extract a field that was successfully captured

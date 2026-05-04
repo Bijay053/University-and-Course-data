@@ -233,7 +233,7 @@ def _normalize_fee_term(ctx: str) -> str:
 def _extract_year(ctx: str) -> int | None:
     from datetime import datetime as _dt
 
-    cur = _dt.utcnow().year
+    cur = _dt.now(tz=None).year
     for raw in _YEAR_RE.findall(ctx):
         y = int(raw)
         if cur - 1 <= y <= cur + 3:

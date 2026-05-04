@@ -58,6 +58,7 @@ async def test_stage_course_persists_completeness_and_evidence():
                 "value": "Bachelor of Computer Science",
                 "method": "course_name:h1",
                 "confidence": 0.95,
+                "source_url": "https://example.edu/cs",
                 "snippet": "<h1>Bachelor of Computer Science</h1>",
             },
             {
@@ -66,12 +67,32 @@ async def test_stage_course_persists_completeness_and_evidence():
                 "normalized": {"degree_level": "Bachelor's"},
                 "method": "degree_level:name",
                 "confidence": 0.9,
+                "source_url": "https://example.edu/cs",
+                "snippet": "Bachelor of Computer Science",
             },
             {
                 "field_key": "study_mode",
                 "value": "On Campus",
                 "method": "study_mode:rule",
                 "confidence": 0.7,
+                "source_url": "https://example.edu/cs",
+                "snippet": "Delivery: On Campus",
+            },
+            {
+                "field_key": "international_fee",
+                "value": 45000,
+                "method": "fee:table",
+                "confidence": 0.85,
+                "source_url": "https://example.edu/cs",
+                "snippet": "International tuition: A$45,000",
+            },
+            {
+                "field_key": "ielts_overall",
+                "value": 6.5,
+                "method": "english:table",
+                "confidence": 0.9,
+                "source_url": "https://example.edu/cs",
+                "snippet": "IELTS overall: 6.5",
             },
         ]
         payload = {
@@ -124,9 +145,9 @@ async def test_stage_course_persists_completeness_and_evidence():
                     )
                 )
             ).scalars().all()
-            assert len(ev_rows) == 3
+            assert len(ev_rows) == 5
             keys = {r.field_key for r in ev_rows}
-            assert keys == {"course_name", "degree_level", "study_mode"}
+            assert keys == {"course_name", "degree_level", "study_mode", "international_fee", "ielts_overall"}
             for r in ev_rows:
                 # Defaults must land for the operator-decision columns.
                 assert r.validation_status == "pending"
@@ -146,12 +167,14 @@ async def test_stage_course_persists_completeness_and_evidence():
         assert body["eligibilityStatus"] == "ready"
         assert body["autoPublishStatus"] == "ready"
         assert isinstance(body["evidence"], list)
-        assert len(body["evidence"]) == 3
+        assert len(body["evidence"]) == 5
         # Per-field grouping must include each key we wrote.
         assert set(body["evidenceByField"].keys()) == {
             "course_name",
             "degree_level",
             "study_mode",
+            "international_fee",
+            "ielts_overall",
         }
         # camelCase aliases the React UI expects.
         sample = body["evidence"][0]

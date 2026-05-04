@@ -54,6 +54,12 @@ asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "session"
 asyncio_default_test_loop_scope = "session"
 testpaths = ["tests"]
+# Skip integration tests (real Playwright/network) by default.
+# Run them explicitly with: pytest -m integration
+addopts = "-m 'not integration'"
+markers = [
+    "integration: marks tests that require real network access and a running Playwright browser (deselect with '-m not integration')",
+]
 
 [tool.setuptools.packages.find]
 include = ["app*"]

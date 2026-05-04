@@ -12,8 +12,9 @@ Five fixtures required by the task spec:
 
 Plus regression cases: other degree-level qualifiers, edge cases, blended mode.
 
-Note: Bug C (online_only rejection) has been removed — online-only courses
-are valid international offerings and should pass through to human review.
+Note: Bug C tests have been updated — online-only courses ARE rejected by the
+online_only guard (study_mode is authoritative). The pipeline upgrades
+Online→Blended before the guard fires when confirmed physical campuses exist.
 """
 from __future__ import annotations
 
@@ -135,7 +136,7 @@ _FIXTURE_DOMESTIC_ONLY = {
     "study_mode": "On Campus",
 }
 
-# Fixture 4 — Torrens online-only course (now accepted — online delivery is allowed)
+# Fixture 4 — Torrens online-only course (rejected — online_only guard is active)
 _FIXTURE_ONLINE_ONLY = {
     "course_name": "Bachelor of Applied Business Marketing",
     "international_fee": 24000,  # fee exists, but delivery is Online
@@ -196,10 +197,10 @@ class TestShouldStageCourse:
         assert accept is False
         assert reason == "no_international_fee"
 
-    # ---- Fixture 4: online-only (accepted — Bug C removed) ----------------
+    # ---- Fixture 4: online-only (rejected — online_only guard is active) -----
 
-    def test_fixture4_online_course_accepted(self) -> None:
-        """Online delivery is now accepted — the online_only filter has been removed."""
+    def test_fixture4_online_course_rejected(self) -> None:
+        """Online-only delivery is rejected — study_mode is the authoritative signal."""
         accept, reason = should_stage_course(
             "Bachelor of Applied Business Marketing",
             _FIXTURE_ONLINE_ONLY,
@@ -208,8 +209,8 @@ class TestShouldStageCourse:
                 "bachelor-of-applied-business-marketing"
             ),
         )
-        assert accept is True
-        assert reason == "accepted"
+        assert accept is False
+        assert reason == "online_only"
 
     # ---- Fixture 5: international, on-campus Master (accepted) ------------
 
@@ -289,8 +290,8 @@ class TestBugAEdgeCases:
         )
         assert accept is True
 
-    def test_online_mode_accepted(self) -> None:
-        """Online delivery is accepted (Bug C filter has been removed)."""
+    def test_online_mode_rejected(self) -> None:
+        """Online delivery is rejected — study_mode is the authoritative signal."""
         accept, reason = should_stage_course(
             "Graduate Certificate of Higher Education Leadership",
             {
@@ -299,8 +300,8 @@ class TestBugAEdgeCases:
                 "study_mode": "online",
             },
         )
-        assert accept is True
-        assert reason == "accepted"
+        assert accept is False
+        assert reason == "online_only"
 
     def test_payload_course_name_preferred_over_link_name(self) -> None:
         """payload['course_name'] (H1 source) wins over discovery link name for Bug A."""
@@ -362,12 +363,13 @@ class TestBugAEdgeCases:
                 f"Expected no_international_fee for {name!r}, got {reason!r}"
             )
 
-    def test_online_courses_now_accepted(self) -> None:
-        """Online courses are now accepted — Bug C filter has been removed.
+    def test_online_courses_rejected(self) -> None:
+        """Online-only courses are rejected — study_mode is the authoritative signal.
 
-        Previously these names triggered the online_only rejection.  With the
-        filter gone they all pass through to human review so long as a valid
-        degree-level qualifier and an international fee are present.
+        These names all have a valid degree-level qualifier and an international
+        fee, but study_mode="Online" causes the online_only guard to reject them.
+        The pipeline upgrades Online→Blended before the guard when confirmed
+        physical campuses are found; only truly online-only courses reach here.
         """
         online_names = [
             "Diploma of Marketing",
@@ -395,8 +397,11 @@ class TestBugAEdgeCases:
                     "study_mode": "Online",
                 },
             )
-            assert accept is True, (
-                f"Expected acceptance for online course {name!r}, got reason={reason!r}"
+            assert accept is False, (
+                f"Expected online_only rejection for {name!r}, got accept={accept!r} reason={reason!r}"
+            )
+            assert reason == "online_only", (
+                f"Expected reason='online_only' for {name!r}, got {reason!r}"
             )
 
     def test_all_bug_a_category_landing_names(self) -> None:

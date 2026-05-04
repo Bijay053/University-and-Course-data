@@ -695,20 +695,18 @@ async def _download(url: str) -> bytes | None:
         return None
 
 
-VisionImageCache = dict[tuple[str, str], "asyncio.Future[dict[str, Any]]"]
+VisionImageCache = dict[str, "asyncio.Future[dict[str, Any]]"]
 """Type alias for the per-scrape-run cache used by
 :func:`maybe_vision_refetch`.
 
-The cache key is a ``(img_url, course_url)`` tuple so that the same hero
-image appearing on two different courses (e.g. a shared Health faculty
-banner) never causes one course's IELTS values to be silently reused for
-another.  Within a single course the leader/waiter coalescing pattern still
-applies — the same ``(img_url, course_url)`` key deduplications concurrent
-extraction of the same image on the same page.
+The cache key is the absolute image URL (``img_url``). This allows
+concurrent coroutines for sibling courses that all embed the same image
+(e.g. the ASA Master pages sharing ``MaSTER.png``) to coalesce into a
+single Gemini call — the leader resolves the future, waiters await it.
 
 Stores ``asyncio.Future`` values (not raw parsed dicts) so that
 concurrent coroutines processing the same image URL coalesce into a
-single Gemini call — the leader resolves the future, waiters await it.
+single Gemini call.
 The orchestrator creates a fresh empty dict per scrape run; callers
 should never read from the cache themselves, only pass it through.
 Use the :func:`new_vision_image_cache` factory below to construct one
@@ -915,7 +913,7 @@ async def maybe_vision_refetch(
         normalized: dict[str, Any] | None = None
         cached_method = "per_course_vision"
         leader_future: asyncio.Future[dict[str, Any]] | None = None
-        _cache_key = (img_url, url)
+        _cache_key = img_url  # key on image URL only — sibling courses sharing the same image must coalesce
         if image_cache is not None:
             existing: asyncio.Future[dict[str, Any]] | None = image_cache.get(_cache_key)
             if existing is None:

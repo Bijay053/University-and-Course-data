@@ -1083,7 +1083,8 @@ async def export_scraped_courses(
             },
         )
 
-    # default: JSON download. Stringify dates so json.dumps doesn't choke.
+    # default: JSON download. Stringify dates/Decimals so json.dumps doesn't choke.
+    import decimal as _decimal
     import json as _json
 
     out_rows = []
@@ -1092,6 +1093,8 @@ async def export_scraped_courses(
         for k, v in list(d.items()):
             if hasattr(v, "isoformat"):
                 d[k] = v.isoformat()
+            elif isinstance(v, _decimal.Decimal):
+                d[k] = float(v)
         out_rows.append(d)
     return Response(
         content=_json.dumps(out_rows),

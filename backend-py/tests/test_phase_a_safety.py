@@ -857,7 +857,7 @@ def test_uow_intake_autumn_spring_sessions():
     <p>Annual fee: $34,560. IELTS: 6.5 overall, 6.0 each band.</p>
     </body></html>
     """
-    results = _asyncio.get_event_loop().run_until_complete(
+    results = _asyncio.run(
         _intake_extract(_uow_html, "https://www.uow.edu.au/courses/bachelor-cs/")
     )
     assert results, "UOW intake extraction must return a result"
@@ -891,7 +891,7 @@ def test_uow_intake_no_session_names_returns_empty():
     <p>Fee: $38,400 per year. Last updated January 2024.</p>
     </body></html>
     """
-    results = _asyncio.get_event_loop().run_until_complete(
+    results = _asyncio.run(
         _intake_extract(_uow_html, "https://www.uow.edu.au/courses/bachelor-nursing/")
     )
     # 'January' from "Last updated January 2024" must NOT appear —
@@ -912,7 +912,7 @@ def test_non_uow_intake_still_uses_month_scan():
     <table><tr><th>Intake</th><td>February, July</td></tr></table>
     </body></html>
     """
-    results = _asyncio.get_event_loop().run_until_complete(
+    results = _asyncio.run(
         _intake_extract(_html, "https://www.someuni.edu.au/courses/bcom/")
     )
     assert results, "Generic university intake must still be extracted"
@@ -1005,7 +1005,7 @@ def test_duration_rejects_maximum_candidature_sentence():
     <p>Maximum candidature: 8 years (or 4 years part time equivalent).</p>
     </body></html>
     """
-    results = _asyncio2.get_event_loop().run_until_complete(
+    results = _asyncio2.run(
         _dur_extract(_html, "https://www.unisq.edu.au/study/degrees/master-of-research")
     )
     assert results, "Duration must be extracted from the labeled cell"
@@ -1029,7 +1029,7 @@ def test_duration_rejects_research_period_only_page():
     <p>Thesis submission required by maximum completion time.</p>
     </body></html>
     """
-    results = _asyncio2.get_event_loop().run_until_complete(
+    results = _asyncio2.run(
         _dur_extract(_html, "https://www.unisq.edu.au/study/degrees/master-of-research")
     )
     if results:
@@ -1059,7 +1059,7 @@ def test_intake_rejects_research_candidature_months():
     </table>
     </body></html>
     """
-    results = _asyncio.get_event_loop().run_until_complete(
+    results = _asyncio.run(
         _intake_extract(
             _html,
             "https://www.unisq.edu.au/study/degrees/master-of-research",

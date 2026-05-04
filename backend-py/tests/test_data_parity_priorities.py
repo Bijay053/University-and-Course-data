@@ -197,7 +197,8 @@ def test_t208_per_course_vision_drops_decorative_images() -> None:
         '<img src="/img/social/facebook.png" alt="Facebook">'
         "</body></html>"
     )
-    candidates = _extract_img_candidates(html, "https://x/page")
+    img_list, _tier0 = _extract_img_candidates(html, "https://x/page")
+    candidates = img_list
     urls = [u for u, _ in candidates]
     assert len(candidates) == 1, urls
     assert urls[0].endswith("english-requirements-table.png"), urls

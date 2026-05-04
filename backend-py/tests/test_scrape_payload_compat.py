@@ -32,7 +32,7 @@ class _FakeSession:
             return self._uni
         return None
 
-    async def execute(self, stmt):  # noqa: ARG002
+    async def execute(self, stmt, *args, **kwargs):  # noqa: ARG002
         # bulk path doesn't hit the orm select on uni; single-uni path uses .get
         result = MagicMock()
         result.scalar_one_or_none.return_value = None

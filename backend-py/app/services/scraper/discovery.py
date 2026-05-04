@@ -400,16 +400,11 @@ def _is_category_landing(url: str) -> bool:
             return False
         last = parts[2].replace("-", " ").replace("_", " ")
         return not _COURSE_TEXT.search(last)
-    # 4-segment paths: e.g. /study/degrees-and-courses/arts-and-communication/communication
-    # (UniSQ sub-discipline pages). Same rule: first segment is a catalog root
-    # and the last segment carries no degree qualifier → it's a sub-category
-    # that should be drilled into, not treated as a course detail page.
-    # Without this, the /study/ URL hint causes sub-discipline URLs to pass
-    # _looks_like_course and end up in the extraction queue, wasting Gemini
-    # calls on pages that always return null for every field.
-    if len(parts) == 4:
-        if parts[0] not in _CATEGORY_BASE_SEGMENTS:
-            return False
+    # 4-segment paths: only applies to /study/degrees-and-courses/<area>/<sub>
+    # (UniSQ sub-discipline pages). Restricted to the 'study' prefix so that
+    # deeper /courses/<area>/<course>/<detail> paths are NOT treated as
+    # category landings — they are real course pages already drilled into.
+    if len(parts) == 4 and parts[0] == "study":
         last = parts[3].replace("-", " ").replace("_", " ")
         return not _COURSE_TEXT.search(last)
     return False
@@ -1332,51 +1327,6 @@ async def discover_course_links(
                 kind="cdu_course_filter",
                 kept=len(found),
                 dropped=_removed_cdu,
-            )
-
-    # ── AIT: drop flat /courses/<area> category pages ─────────────────────────
-    # AIT's course listing uses a BFS pattern where category hubs sit at
-    # /courses/<area> (e.g. /courses/2d-animation, /courses/3d-animation,
-    # /courses/game-design, /courses/information-technology).  These pages
-    # contain marketing copy that the page classifier mistakenly labels as
-    # "detail", so they end up in the candidate set even though they have no
-    # per-course data.  Actual course detail pages always sit at least one
-    # level deeper: /courses/<area>/<course-slug>
-    # (e.g. /courses/information-technology/vocational-diploma-of-it).
-    # Dropping 1-segment /courses/<area> paths is safe for AIT because the
-    # BFS self-candidate logic (line 775) still adds them initially so their
-    # child-link harvest (line 816) fires first and correctly finds the deeper
-    # sibling courses before we prune here.
-    _ait_hosts = frozenset({"ait.edu.au", "www.ait.edu.au"})
-    if parsed.netloc in _ait_hosts:
-        _pre_ait = len(found)
-        _ait_valid: dict[str, str] = {}
-        for _au, _an in found.items():
-            try:
-                _ap = urlparse(_au).path.lower().rstrip("/")
-                # Drop flat /courses/<one-segment> category hubs.
-                # Valid course pages are at /courses/<area>/<course-slug>
-                # (two+ segments after /courses/) or at a non-/courses/ path.
-                if _ap.startswith("/courses/"):
-                    _tail = _ap[len("/courses/"):]
-                    _segs = [s for s in _tail.split("/") if s]
-                    if len(_segs) < 2:
-                        # e.g. /courses/3d-animation → drop
-                        continue
-            except Exception:
-                pass
-            _ait_valid[_au] = _an
-        _removed_ait = _pre_ait - len(_ait_valid)
-        found = _ait_valid
-        if emit and _removed_ait:
-            await emit(
-                "status",
-                f"[DISCOVER] AIT post-filter: kept {len(found)} real-course URL(s) "
-                f"(dropped {_removed_ait} category hub URL(s))",
-                phase="discover",
-                kind="ait_course_filter",
-                kept=len(found),
-                dropped=_removed_ait,
             )
 
     raw = [{"url": u, "name": n} for u, n in list(found.items())[:max_courses]]

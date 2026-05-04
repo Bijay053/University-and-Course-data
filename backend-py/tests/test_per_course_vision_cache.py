@@ -25,6 +25,7 @@ _FAKE_GEMINI_TEXT = (
     "IELTS Academic reading: 6\n"
     "IELTS Academic writing: 6\n"
     "IELTS Academic speaking: 6\n"
+    "PTE Academic: 58\n"
 )
 
 _HTML = (
