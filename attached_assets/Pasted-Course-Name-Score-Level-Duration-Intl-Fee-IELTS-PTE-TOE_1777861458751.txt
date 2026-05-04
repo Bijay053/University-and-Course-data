@@ -1,0 +1,546 @@
+Course Name	Score	Level	Duration	Intl. Fee	IELTS	PTE	TOEFL	CAE	DET	Intakes	Course Location	Mode	Actions
+	
+Bachelor of Business and Bachelor of Laws (93L)
+Law
+Publish: review
+Eligibility: ready
+1 scrape warning
+77%	Bachelor	5 Year	A$37,950/Annual	6	-	-	-	-	Feb, Jul	Hobart	On Campus	
+
+
+
+	
+Bachelor of Business and Bachelor of Information and Communication Technology (93J)
+Business & Management
+Publish: review
+Eligibility: ready
+1 scrape warning
+77%	Bachelor	4 Year	A$37,950/Annual	6	-	-	-	-	Feb, Jul	Hobart	On Campus	
+
+
+
+	
+Bachelor of Arts and Bachelor of Laws (93A)
+Law
+Publish: review
+Eligibility: ready
+1 scrape warning
+77%	Bachelor	5 Year	A$38,950/Annual	6	-	-	-	-	Feb, Jul	Hobart	Blended	
+
+
+
+	
+Bachelor of Science (P3o)
+Science & Mathematics
+Publish: review
+Eligibility: review
+1 scrape warning
+69%	Bachelor	-	A$42,950/Annual	6	50	-	-	-	Feb, Jul	Hobart, Launceston	On Campus	
+
+
+
+	
+Bachelor of Psychological Science (53F)
+Science & Mathematics
+Publish: review
+Eligibility: ready
+77%	Bachelor	3 Year	A$39,950/Annual	6.5	58	-	-	-	Feb, Jul	Hobart, Launceston	On Campus	
+
+
+
+	
+Bachelor of Natural Environments and Conservation (P3j)
+Publish: review
+Eligibility: review
+69%	Bachelor	3 Year	A$41,450/Annual	6	50	-	-	-	Feb, Jul	Hobart	On Campus	
+
+
+
+	
+Bachelor of Music (13O)
+Arts, Humanities & Social Sciences
+Publish: review
+Eligibility: ready
+77%	Bachelor	3 Year	A$38,250/Annual	6	50	-	-	-	Feb, Jul	Hobart	On Campus	
+
+
+
+	
+Bachelor of Media and Communication (A3m)
+Media & Communications
+Publish: review
+Eligibility: ready
+77%	Bachelor	3 Year	A$38,250/Annual	6	50	-	-	-	Feb, Jul	Hobart	On Campus	
+
+
+
+	
+Bachelor of Marine and Antarctic Science (P3l)
+Science & Mathematics
+Publish: review
+Eligibility: ready
+77%	Bachelor	3 Year	A$47,450/Annual	6	50	-	-	-	Feb, Jul	Hobart	On Campus	
+
+
+
+	
+Bachelor of Laws (L3c)
+Publish: review
+Eligibility: review
+69%	Bachelor	3.5 Year	A$38,950/Annual	6.5	58	-	-	-	Feb, Jul	Hobart	On Campus	
+
+
+
+	
+Bachelor of Information and Communication Technology (P3t)
+Media & Communications
+Publish: review
+Eligibility: ready
+77%	Bachelor	3 Year	A$39,950/Annual	6	50	-	-	-	Feb, Jul	Hobart, Melbourne Study Centre, Launceston, Ultimo Study Centre	On Campus	
+
+
+
+	
+Bachelor of Global Logistics and Maritime Management (P3e)
+Business & Management
+Publish: review
+Eligibility: ready
+77%	Bachelor	3 Year	A$36,250/Annual	6	50	-	-	-	Feb, Jul	Launceston	On Campus	
+
+
+
+	
+Bachelor of Geospatial Science (P3r)
+Science & Mathematics
+Publish: review
+Eligibility: ready
+77%	Bachelor	3 Year	A$42,950/Annual	6	50	-	-	-	Feb, Jul	Hobart	On Campus	
+
+
+
+	
+Bachelor of Fine Arts (13R)
+Arts, Humanities & Social Sciences
+Publish: review
+Eligibility: ready
+77%	Bachelor	3 Year	A$38,250/Annual	6	50	-	-	-	Feb, Jul	Hobart, Launceston	On Campus	
+
+
+
+	
+Bachelor of Education (Primary) (43B)
+Education & Social Work
+Publish: review
+Eligibility: review
+1 scrape warning
+69%	Bachelor	-	A$36,450/Annual	7.5	-	-	-	-	Feb, Jul	Launceston	On Campus	
+
+
+
+	
+Bachelor of Economics (B3b)
+Business & Management
+Publish: review
+Eligibility: ready
+77%	Bachelor	3 Year	A$37,250/Annual	6	50	-	-	-	May	Hobart	On Campus	
+
+
+
+	
+Bachelor of Design (P3i)
+Architecture, Building & Design
+Publish: review
+Eligibility: ready
+77%	Bachelor	3 Year	A$36,450/Annual	6	50	-	-	-	Feb, Jul	Hobart	On Campus	
+
+
+
+	
+Bachelor of Business (B3a)
+Business & Management
+Publish: review
+Eligibility: ready
+77%	Bachelor	3 Year	A$37,950/Annual	6	50	-	-	-	Feb, Jul	Hobart, Hong Kong Universal Ed, Shanghai Ocean University Shanghai, Launceston, Melbourne Study Centre	On Campus	
+
+
+
+	
+Bachelor of Biomedicine (M3x)
+Publish: review
+Eligibility: review
+69%	Bachelor	3 Year	A$40,950/Annual	6.5	-	-	-	-	Feb, Jul	Hobart, Launceston	On Campus	
+
+
+
+	
+Bachelor of Arts (A3a)
+Arts, Humanities & Social Sciences
+Publish: review
+Eligibility: review
+1 scrape warning
+69%	Bachelor	-	A$35,950/Annual	6	50	-	-	-	Feb, Jul	Hobart	Blended	
+
+
+
+	
+Bachelor of Agricultural Science with Honours (S4a)
+Science & Mathematics
+Publish: review
+Eligibility: ready
+77%	Bachelor	4 Year	A$42,950/Annual	6	50	-	-	-	Feb, Jul	Hobart	On Campus	
+
+
+
+	
+Bachelor of Medical Science and Doctor of Medicine (H3x)
+Medicine & Health
+Publish: review
+Eligibility: ready
+77%	Doctorate	5 Year	A$82,450/Annual	7	65	100	-	-	Aug, Sep, Feb	Hobart, Launceston	On Campus	
+
+
+
+	
+Master of Teaching (E7g)
+Education & Social Work
+Publish: review
+Eligibility: ready
+77%	Master	5 Year	A$37,950/Annual	7.5	-	-	-	-	Feb, Jul	Hobart	On Campus	
+
+
+
+	
+Graduate Certificate in Sustainable Business (C5q)
+Business & Management
+Publish: review
+Eligibility: ready
+2 scrape warnings
+77%	Graduate Certificate	1 Year	A$17,225/Annual	6.5	-	-	-	-	Feb, Jul	Hobart	On Campus	
+
+
+
+	
+Master of Speech Pathology (M7g)
+Publish: review
+Eligibility: review
+69%	Master	2 Year	A$49,450/Annual	7	-	-	-	-	Jul	Launceston	On Campus	
+
+
+
+	
+Master of Social Work (Qualifying) (R7o)
+Education & Social Work
+Publish: review
+Eligibility: ready
+77%	Master	2 Year	A$37,250/Annual	7	-	-	-	-	Jun, Sep	Hobart, Launceston	On Campus	
+
+
+
+	
+Graduate Diploma of Quantitative Marine and Antarctic Science (S6v)
+Science
+Publish: review
+Eligibility: ready
+1 scrape warning
+77%	Graduate Diploma	1 Year	A$42,450/Annual	6.5	-	-	-	-	Jul	Hobart	On Campus	
+
+
+
+	
+Master of Public Health (M7w)
+Medicine & Health
+Publish: review
+Eligibility: ready
+77%	Master	2 Year	A$38,950/Annual	6.5	58	88	176	-	Feb, Jul	Hobart	On Campus	
+
+
+
+	
+Master of Psychology (Clinical) (M7l)
+Health Sciences
+Publish: review
+Eligibility: ready
+2 scrape warnings
+77%	Master	2 Year	A$45,950/Annual	6.5	-	-	-	-	Feb, Jul	Hobart, Launceston	On Campus	
+
+
+
+	
+Master of Protected Area Conservation (P7c)
+Publish: review
+Eligibility: review
+69%	Master	2 Year	A$40,250/Annual	6.5	-	-	-	-	Feb, Jul	Hobart	On Campus	
+
+
+
+	
+Master of Professional Psychology (M7q)
+Health Sciences
+Publish: review
+Eligibility: ready
+77%	Master	1 Year	A$41,950/Annual	7	-	-	-	-	May	Hobart, Launceston	On Campus	
+
+
+
+	
+Graduate Certificate in Professional Accounting (C5b)
+Accounting & Finance
+Publish: review
+Eligibility: ready
+2 scrape warnings
+77%	Graduate Certificate	0.5 Year	A$41,950/Annual	6.5	-	-	-	-	Feb, Jul	Hobart	Blended	
+
+
+
+	
+Graduate Diploma of Professional Accounting (C6b)
+Accounting & Finance
+Publish: review
+Eligibility: ready
+2 scrape warnings
+77%	Graduate Diploma	1 Year	A$42,950/Annual	6.5	-	-	-	-	Feb, Jul	Hobart	On Campus	
+
+
+
+	
+Master of Professional Accounting (C7s)
+Accounting & Finance
+Publish: review
+Eligibility: ready
+2 scrape warnings
+77%	Master	2 Year	A$38,250/Annual	6.5	-	-	-	-	Feb, Jul	Hobart	On Campus	
+
+
+
+	
+Master of Planning (K7p)
+Publish: review
+Eligibility: review
+69%	Master	2 Year	A$39,450/Annual	6.5	-	-	-	-	Feb, Jul	Hobart	On Campus	
+
+
+
+	
+Master of Physiotherapy (M7c)
+Medicine & Health
+Publish: review
+Eligibility: ready
+77%	Master	2 Year	A$49,450/Annual	7	-	-	-	-	Jul	Launceston	On Campus	
+
+
+
+	
+Graduate Diploma of Pharmaceutical Science (M6e)
+Science & Mathematics
+Publish: review
+Eligibility: ready
+77%	Graduate Diploma	1 Year	A$38,950/Annual	6.5	-	-	-	-	Feb, Jul	Hobart	On Campus	
+
+
+
+	
+Master of Pharmaceutical Science (M7e)
+Science & Mathematics
+Publish: review
+Eligibility: ready
+77%	Master	2 Year	A$38,950/Annual	6.5	-	-	-	-	Feb, Jul	Hobart	On Campus	
+
+
+
+	
+Master of Occupational Therapy (M7d)
+Medicine & Health
+Publish: review
+Eligibility: ready
+77%	Master	2 Year	A$49,450/Annual	7	-	-	-	-	Jul	Launceston	On Campus	
+
+
+
+	
+Graduate Certificate in Maritime Management (P5h)
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	0.5 Year	A$38,250/Full Course	6	-	-	-	-	Feb, Jul	Launceston	On Campus	
+
+
+
+	
+Graduate Diploma of Maritime Management (P6h)
+Publish: review
+Eligibility: review
+69%	Graduate Diploma	1 Year	A$38,250/Annual	6	-	-	-	-	Feb, Jul	Launceston	On Campus	
+
+
+
+	
+Graduate Diploma of Marine and Antarctic Science (S6z)
+Science & Mathematics
+Publish: review
+Eligibility: ready
+77%	Graduate Diploma	1 Year	A$48,450/Annual	6	-	-	-	-	Feb, Jul	Hobart	On Campus	
+
+
+
+	
+Master of Marine and Antarctic Science (S7z)
+Science & Mathematics
+Publish: review
+Eligibility: ready
+77%	Master	2 Year	A$48,450/Annual	6	-	-	-	-	Feb, Jul	Hobart	On Campus	
+
+
+
+	
+Graduate Diploma of Legal Practice (L6b)
+Law
+Publish: review
+Eligibility: ready
+2 scrape warnings
+77%	Graduate Diploma	0.5 Year	A$51,900/Annual	6.5	-	-	-	-	Feb	Hobart	On Campus	
+
+
+
+	
+Master of Laboratory Medicine (H7l)
+Medicine & Health
+Publish: review
+Eligibility: ready
+77%	Master	2 Year	A$42,950/Annual	6.5	-	-	-	-	Feb, Jul	Launceston	On Campus	
+
+
+
+	
+Master of Information Technology and Systems (K7i)
+Computer Science & IT
+Publish: review
+Eligibility: ready
+77%	Master	2 Year	A$39,950/Annual	6.5	-	-	-	-	Feb, Jul	Hobart, Melbourne Study Centre, Ultimo Study Centre	On Campus	
+
+
+
+	
+Master of Health Service Management (C7u)
+Publish: review
+Eligibility: review
+69%	Master	2 Year	A$26,588/Annual	6.5	-	-	-	-	Feb, Jul	Melbourne Study Centre, Ultimo Study Centre	On Campus	
+
+
+
+	
+Graduate Certificate in Global Logistics and Supply Chain Management (P5e)
+Business & Management
+Publish: review
+Eligibility: ready
+77%	Graduate Certificate	0.5 Year	A$37,950/Full Course	6	-	-	-	-	Feb, Jul	Launceston	On Campus	
+
+
+
+	
+Graduate Diploma of Global Logistics and Supply Chain Management (P6e)
+Business & Management
+Publish: review
+Eligibility: ready
+77%	Graduate Diploma	1 Year	A$37,950/Annual	6	-	-	-	-	Feb, Jul	Launceston	On Campus	
+
+
+
+	
+Master of Global Logistics and Supply Chain Management (P7e)
+Business & Management
+Publish: review
+Eligibility: ready
+77%	Master	2 Year	A$37,950/Annual	6	-	-	-	-	Feb, Jul	Launceston	On Campus	
+
+
+
+	
+Graduate Diploma of Environmental Planning (S6l)
+Agriculture & Environmental Science
+Publish: review
+Eligibility: ready
+77%	Graduate Diploma	1 Year	A$39,450/Annual	6.5	-	-	-	-	Feb, Jul	Hobart	On Campus	
+
+
+
+	
+Master of Environmental Geospatial Science (P7b)
+Science & Mathematics
+Publish: review
+Eligibility: ready
+77%	Master	2 Year	A$42,950/Annual	6.5	-	-	-	-	Feb, Jul	Hobart	On Campus	
+
+
+
+	
+Master of Education (E7h)
+Education
+Publish: review
+Eligibility: review
+2 scrape warnings
+69%	Master	1.5 Year	A$37,950/Annual	6.5	-	-	-	-	Feb, Jul	-	On Campus	
+
+
+
+	
+Graduate Certificate in Economic Geology (K5f)
+Science
+Publish: review
+Eligibility: ready
+2 scrape warnings
+77%	Graduate Certificate	0.5 Year	A$42,250/Annual	6.5	-	-	-	-	Feb, Jul	Hobart	On Campus	
+
+
+
+	
+Master of Economic Geology (S7w)
+Science & Mathematics
+Publish: review
+Eligibility: ready
+77%	Master	2 Year	A$42,250/Annual	6	50	-	-	-	Feb, Jul	Hobart	On Campus	
+
+
+
+	
+Master of Chemistry (P7j)
+Science & Mathematics
+Publish: review
+Eligibility: ready
+77%	Master	2 Year	A$42,950/Annual	6	-	-	-	-	Feb, Jul	Hobart	On Campus	
+
+
+
+	
+Master of Business Administration in Maritime Management (P7h)
+Business & Management
+Publish: review
+Eligibility: ready
+77%	Master	2 Year	A$38,950/Annual	6	-	-	-	-	Feb, Jul	Launceston	On Campus	
+
+
+
+	
+Master of Business Administration (Global) (37Q)
+Business & Management
+Publish: review
+Eligibility: ready
+77%	Master	2 Year	A$34,088/Annual	6.5	58	-	-	-	May	Hobart, Melbourne Study Centre, Ultimo Study Centre	On Campus	
+
+
+
+	
+Graduate Certificate in Behavioural Insights (C5v)
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	24 Month	A$19,475/Annual	6.5	58	88	-	-	Feb, Jul	Hobart	Blended	
+
+
+
+	
+Master of Architecture (D7c)
+Architecture & Design
+Publish: review
+Eligibility: ready
+77%	Master	2 Year	A$41,950/Annual	6	-	-	-	-	Feb, Jul	Launceston	On Campus	
+
+
+
