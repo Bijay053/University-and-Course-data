@@ -153,6 +153,37 @@ _DURATION_RESEARCH_CAP_RE = re.compile(
 # Used in _classify_duration_value to skip digit matches embedded in these clauses.
 _EXTENSION_CTX_RE = re.compile(r"\bextension\b", re.I)
 
+# Sentences about field placement, practicum, or professional experience
+# must NEVER contribute to the duration tournament — the time value in such
+# sentences is practice hours, not program length.
+#   e.g. "complete at least 80 days (16 weeks) of full-time placement in
+#         primary education settings."
+# Pattern-1 gates on "full-time" and would otherwise match "16 weeks" here.
+# Without this guard those 16 weeks convert to 4 months and, for a
+# bachelor-level course, the bachelor-floor sanity check (<2 years) nullifies
+# the value — dropping the duration entirely even when the AI fallback
+# correctly derived 4 years from the rest of the page.
+_PLACEMENT_CONTEXT_RE = re.compile(
+    r"\b(?:placement|practicum|prac\b|professional\s+experience|"
+    r"field\s+(?:placement|experience|work)|work\s+(?:placement|experience)|"
+    r"clinical\s+(?:placement|experience|practice)|"
+    r"teaching\s+(?:placement|practice|rounds?)|"
+    r"industry\s+placement|internship\s+(?:hours?|days?|weeks?))\b",
+    re.IGNORECASE,
+)
+
+# "Minimum 2 years, up to a maximum of 5 years" — always prefer the MINIMUM
+# (floor) duration when the page advertises a range.  Without this the weight
+# tournament can pick "5 years" because a duration-context word ("complete",
+# "completion", "course") happens to appear closer to the maximum number.
+# This fires in BOTH _classify_duration_value (structural DOM pre-pass) and
+# the sentence-level tournament loop in extract().
+_MINIMUM_DURATION_RE = re.compile(
+    r"\b(?:minimum|min\.?|at\s+least|from)\s+(\d+(?:\.\d+)?)\s*"
+    r"(years?|yrs?|months?|weeks?|semesters?|trimesters?)\b",
+    re.IGNORECASE,
+)
+
 # Sentences that describe a combined / add-on / double degree listed inline
 # on a course page must never win the duration tournament over the main
 # program's labeled "Duration: N years" sentence.
@@ -338,6 +369,18 @@ def _classify_duration_value(value: str) -> tuple[float, str] | None:
         if amount is not None and unit and 0 < amount <= _DURATION_CAP[unit]:
             return amount, unit
 
+    # 2b. Minimum-stated duration: "Minimum 2 years, up to a maximum of 5 years"
+    # Always return the floor value — the maximum in the same string must never win.
+    mm = _MINIMUM_DURATION_RE.search(value)
+    if mm:
+        try:
+            min_amount = float(mm.group(1))
+            min_unit = _normalise_unit(mm.group(2))
+            if min_unit and 0 < min_amount <= _DURATION_CAP[min_unit]:
+                return min_amount, min_unit
+        except (ValueError, IndexError):
+            pass
+
     # 3. Digit scan — prefer matches NOT inside an extension clause.
     # Walk all matches so we can skip "12 month" in
     # "with the possibility of a six to 12 month extension" and still
@@ -453,24 +496,75 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
     if structural is not None:
         amount, unit = structural
         amount, unit = _convert_weeks(amount, unit)  # Issue 4: week→year/month
-        return [
-            ExtractionResult(
-                field_key="duration",
-                value=amount,
-                normalized={"duration": amount, "duration_term": unit},
-                confidence=0.85,
-                snippet=snippet,
-                method="duration.structural",
+        struct_years = amount * _WEEKS.get(unit, 52) / 52
+
+        if struct_years >= 1.5:
+            # Year-level structural result — check the page prose for a
+            # "Minimum N years" qualifier that's *lower* than the structural
+            # value.  UTAS flex-enrolment pages put the enrollment cap (e.g.
+            # "5 years") in the Duration DOM cell, while the real program
+            # floor ("Minimum 2 years, up to a maximum of 5 years") lives in
+            # the body.  When that pattern exists and the prose minimum is ≥
+            # 1.5 years (i.e. it's a genuine program-length floor, not an
+            # enrolment-period floor), prefer the prose minimum.
+            prose_text = compact(html_to_text(html))
+            prose_min_m = _MINIMUM_DURATION_RE.search(prose_text or "")
+            if prose_min_m:
+                try:
+                    pa = float(prose_min_m.group(1))
+                    pu = _normalise_unit(prose_min_m.group(2))
+                    if pu:
+                        py = pa * _WEEKS.get(pu, 52) / 52
+                        if struct_years > py >= 1.5:
+                            amount, unit = pa, pu
+                            snippet = f"prose-minimum: {prose_min_m.group(0)}"
+                except (ValueError, IndexError):
+                    pass
+            return [
+                ExtractionResult(
+                    field_key="duration",
+                    value=amount,
+                    normalized={"duration": amount, "duration_term": unit},
+                    confidence=0.85,
+                    snippet=snippet,
+                    method="duration.structural",
+                )
+            ]
+        # else: struct_years < 1.5 — the structural value is a sub-year
+        # enrolment floor ("Minimum 1 Semester, up to a maximum of 4 years").
+        # Do NOT return early.  Add it to parsed at ×1 priority (lowest) so
+        # the sentence loop can find the real program duration from the prose
+        # (e.g. "3 years full-time") and beat it in the weight tournament.
+        struct_weeks = amount * _WEEKS.get(unit, 1)
+        parsed_sub_year: list[tuple[float, float, str, str]] = [
+            (
+                (struct_weeks * 100 + _UNIT_RANK.get(unit, 1)) * 1.0,
+                amount,
+                unit,
+                f"structural (sub-year floor): {snippet}",
             )
         ]
+    else:
+        parsed_sub_year = []
 
-    text = compact(html_to_text(html))
-    if not text:
+    # Use the raw html_to_text output (before compact) so that newlines
+    # emitted for block-level tags (dt, dd, p, div, …) survive into the
+    # sentence splitter.  compact() is applied per-sentence afterwards so
+    # each candidate is still normalised.
+    raw_text = html_to_text(html)
+    if not raw_text.strip():
         return []
+    text = compact(raw_text)  # kept for prose_text / other callers
 
     # Build candidate sentences (skip accelerated callouts entirely).
-    sentences = re.split(r"(?<=[.!?])\s+|\n", text)
-    parsed: list[tuple[float, float, str, str]] = []  # (weight, amount, unit, snippet)
+    sentences = [
+        compact(s)
+        for s in re.split(r"(?<=[.!?])\s+|\n", raw_text)
+        if s.strip()
+    ]
+    # Seed parsed with any sub-year structural candidate found above so it
+    # participates in the tournament at ×1 priority (lowest).
+    parsed: list[tuple[float, float, str, str]] = list(parsed_sub_year)
     for s in sentences:
         if _ACCELERATED.search(s):
             continue
@@ -496,6 +590,95 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
         # Demote combined/add-on degree sentences so the main program's
         # "Duration: N years" label always wins (see _COMBINED_DEGREE_CONTEXT_RE).
         is_combined_degree_sentence = bool(_COMBINED_DEGREE_CONTEXT_RE.search(s))
+        # Sentences describing field placement / practicum hours must not
+        # contribute Pattern-1 or Pattern-2 matches (see _PLACEMENT_CONTEXT_RE).
+        is_placement_sentence = bool(_PLACEMENT_CONTEXT_RE.search(s))
+
+        # "Minimum N years, up to a maximum of M years" — always use the floor.
+        # Add at Pattern-0 priority (×100) and skip remaining patterns for this
+        # sentence so the larger maximum value can never beat the minimum in the
+        # weight tournament, regardless of which word has more context nearby.
+        # Gate on is_placement_sentence too: "Minimum 16 weeks of full-time
+        # placement" would otherwise extract 16 weeks as a floor duration.
+        #
+        # Sub-1.5-year-equivalent minimums ("Minimum 1 Semester", "Minimum 1 Year")
+        # are UTAS flexible-enrolment FLOORS, not program lengths.  Skip the entire
+        # sentence when the minimum is sub-1.5-year so neither the floor value nor
+        # the "up to a maximum of N years" clause can enter the tournament — the
+        # real program duration must come from a different prose sentence.
+        min_m = _MINIMUM_DURATION_RE.search(s)
+        if min_m and not credit_context and not is_placement_sentence:
+            try:
+                min_amount = float(min_m.group(1))
+                min_unit = _normalise_unit(min_m.group(2))
+                if min_unit and 0 < min_amount <= _DURATION_CAP[min_unit]:
+                    min_years_eq = min_amount * _WEEKS[min_unit] / 52
+                    if min_years_eq >= 1.5:
+                        # Meaningful floor (≥ 1.5 years) — add at Pattern-0
+                        # priority (×100) and skip this sentence so the larger
+                        # "maximum of N years" clause cannot win the tournament.
+                        min_weeks = min_amount * _WEEKS[min_unit]
+                        parsed.append((
+                            (min_weeks * 100 + _UNIT_RANK[min_unit]) * 100.0,
+                            min_amount,
+                            min_unit,
+                            s.strip()[:240],
+                        ))
+                        continue
+                    # Sub-1.5-year minimum ("Minimum 1 Semester", "Minimum 1 Year"):
+                    # this is a UTAS flexible-enrolment FLOOR, not a program length.
+                    # Strategy:
+                    #  1. Add the minimum itself at ×0.1 — pure last-resort fallback
+                    #     (used when nothing else exists, e.g. genuine 1-semester
+                    #     grad cert with no other prose).
+                    #  2. If there is a paired "up to a maximum of X" clause, add X
+                    #     at ×0.5 — still lower than any prose pattern (Pattern-1
+                    #     ×10, Pattern-2 ×1) but higher than the minimum seed.
+                    #     This makes grad diplomas with "min 1 sem, max 1 yr" show
+                    #     1 Year when there is no separate prose sentence.
+                    #  3. Strip both clauses so the normal pattern loop below cannot
+                    #     re-match them at Pattern-2 (×1) priority, which would
+                    #     otherwise beat the maximum seed and confuse the tournament.
+                    #  Prose sentences (e.g. "3 years full-time" at Pattern-1 ×10)
+                    #  always beat both seeds — bachelor programs remain correct.
+                    min_weeks_seed = min_amount * _WEEKS[min_unit]
+                    parsed.append((
+                        (min_weeks_seed * 100 + _UNIT_RANK[min_unit]) * 0.1,
+                        min_amount,
+                        min_unit,
+                        min_m.group(0).strip()[:240],
+                    ))
+                    max_m2 = re.search(
+                        r"\bup\s+to\s+a?\s*maximum\s+of\s+(\d+(?:\.\d+)?)\s*"
+                        r"(years?|months?|weeks?|semesters?|trimesters?)\b",
+                        s,
+                        re.IGNORECASE,
+                    )
+                    if max_m2:
+                        try:
+                            _mx_a = float(max_m2.group(1))
+                            _mx_u = _normalise_unit(max_m2.group(2))
+                            if _mx_u and 0 < _mx_a <= _DURATION_CAP[_mx_u]:
+                                _mx_w = _mx_a * _WEEKS[_mx_u]
+                                parsed.append((
+                                    (_mx_w * 100 + _UNIT_RANK[_mx_u]) * 0.5,
+                                    _mx_a,
+                                    _mx_u,
+                                    max_m2.group(0).strip()[:240],
+                                ))
+                        except (ValueError, IndexError):
+                            pass
+                    s = _MINIMUM_DURATION_RE.sub("", s, count=1)
+                    s = re.sub(
+                        r"\bup\s+to\s+a?\s*maximum\s+of\s+\d+(?:\.\d+)?\s*"
+                        r"(?:years?|months?|weeks?|semesters?|trimesters?)\b",
+                        "",
+                        s,
+                        flags=re.IGNORECASE,
+                    )
+                    # Fall through with cleaned sentence.
+            except (ValueError, IndexError):
+                pass
 
         # Bug A (KBS grad certs): slash-structured program-info cell.
         # "8 months / 4 subjects / 2 trimesters" — first token is real duration.
@@ -551,6 +734,13 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
             # sentence AND no anti-context. Patterns 0 and 1 are already
             # context-bound and unaffected.
             if pat_idx == 2 and (is_cap_sentence or not duration_context or anti_duration_context):
+                continue
+            # Block Pattern-1 (full-time anchor) and Pattern-2 (loose fallback)
+            # for sentences about field placement / practicum.  Pattern-0
+            # (explicit duration label) is still allowed so that a page which
+            # writes "Duration: 4 years (includes 16 weeks full-time placement)"
+            # still extracts the labeled value correctly.
+            if is_placement_sentence and pat_idx in (1, 2):
                 continue
             try:
                 amount = float(m.group(1))
