@@ -24,13 +24,24 @@ class _Stripper(HTMLParser):
     def handle_starttag(self, tag: str, attrs) -> None:  # noqa: ANN001
         if tag in self.SKIP_TAGS:
             self._skip_depth += 1
-        elif tag in {"br", "p", "li", "tr", "div", "h1", "h2", "h3", "h4", "h5", "h6"}:
+        elif tag in {
+            "br", "p", "li", "tr", "div",
+            "h1", "h2", "h3", "h4", "h5", "h6",
+            # Definition-list terms and values: ensure "Duration" and the
+            # following value cell ("Minimum 1 Semester") are separated by a
+            # newline so the sentence splitter treats them as distinct units.
+            "dt", "dd",
+            # Table header / data cells (th/td already split via tr, but an
+            # explicit newline at the cell level is safer for nested tables).
+            "th", "td",
+        }:
             self._buf.append("\n")
 
     def handle_endtag(self, tag: str) -> None:
         if tag in self.SKIP_TAGS and self._skip_depth > 0:
             self._skip_depth -= 1
-        elif tag in {"p", "li", "tr", "div", "h1", "h2", "h3", "h4", "h5", "h6"}:
+        elif tag in {"p", "li", "tr", "div", "h1", "h2", "h3", "h4", "h5", "h6",
+                     "dt", "dd", "th", "td"}:
             self._buf.append("\n")
 
     def handle_data(self, data: str) -> None:
