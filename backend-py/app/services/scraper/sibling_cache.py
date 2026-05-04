@@ -20,6 +20,7 @@ values from siblings that did manage to extract them.
 """
 from __future__ import annotations
 
+import json
 import logging
 from collections import Counter
 from typing import Any, Awaitable, Callable, Final
@@ -189,9 +190,10 @@ def _build_bucket_cache(
         misreads).
     """
     buckets: dict[str, dict[str, Counter]] = {}
-    # Track the first course URL that contributed each (bucket, slot, value).
-    # Used to write source-traceable evidence rows during back-fill.
-    first_origin: dict[str, dict[str, dict[Any, str]]] = {}
+    # Track the first course URL + method + confidence that contributed each
+    # (bucket, slot, value).  Stored as (url, method, conf) tuples so
+    # backfill evidence rows can record full provenance for audit purposes.
+    first_origin: dict[str, dict[str, dict[Any, tuple[str, str, float]]]] = {}
 
     for r in results:
         if not isinstance(r, dict):
@@ -205,14 +207,20 @@ def _build_bucket_cache(
         bucket_origins = first_origin.setdefault(
             bucket, {k: {} for k in _SIBLING_BACKFILL_SLOTS}
         )
-        # Build a quick lookup: field_key → method that actually SET the value.
-        # first-write-wins in the pipeline means the earliest evidence entry
-        # for a key is the one that set the payload value.
+        # Build a quick lookup: field_key → (method, confidence) from the
+        # evidence that actually set the payload value. First-write-wins in
+        # the pipeline means the earliest evidence entry for a key is the
+        # authoritative one.
         evidence_method: dict[str, str] = {}
+        evidence_conf: dict[str, float] = {}
         for ev in r.get("evidence") or []:
             fk = ev.get("field_key", "")
             if fk and fk not in evidence_method:
                 evidence_method[fk] = ev.get("method", "")
+                try:
+                    evidence_conf[fk] = float(ev.get("confidence") or 0.0)
+                except (TypeError, ValueError):
+                    evidence_conf[fk] = 0.0
 
         for k in _SIBLING_BACKFILL_SLOTS:
             v = payload.get(k)
@@ -222,15 +230,26 @@ def _build_bucket_cache(
             if _is_cross_level_method(evidence_method.get(k, "")):
                 continue
             slot_counters[k][v] += 1
-            # Record the first course URL that contributed this (slot, value).
+            # Record the first course URL + source method + confidence that
+            # contributed this (slot, value) for provenance evidence rows.
             if v not in bucket_origins[k]:
-                bucket_origins[k][v] = course_url
+                bucket_origins[k][v] = (
+                    course_url,
+                    evidence_method.get(k, "unknown"),
+                    evidence_conf.get(k, 0.0),
+                )
+
+    # _ProvMeta holds everything needed to write a complete provenance row.
+    # Keys: source_url, source_method, source_conf, consensus_count.
+    _ProvMeta = dict[str, Any]
 
     cache: dict[str, dict[str, Any]] = {}
     origins: dict[str, dict[str, str]] = {}
+    prov_meta: dict[str, dict[str, _ProvMeta]] = {}
     for bucket, counters in buckets.items():
         slot_values: dict[str, Any] = {}
         slot_origins: dict[str, str] = {}
+        slot_prov: dict[str, _ProvMeta] = {}
         bucket_first = first_origin.get(bucket) or {}
         for k, counter in counters.items():
             if not counter:
@@ -242,12 +261,23 @@ def _build_bucket_cache(
             # the value is not backfilled to all 50+ siblings.
             if count < min_quorum:
                 continue
+            origin_tuple = (bucket_first.get(k) or {}).get(most_common, ("", "unknown", 0.0))
+            src_url, src_method, src_conf = (
+                origin_tuple if isinstance(origin_tuple, tuple) else (origin_tuple, "unknown", 0.0)
+            )
             slot_values[k] = most_common
-            slot_origins[k] = (bucket_first.get(k) or {}).get(most_common, "")
+            slot_origins[k] = src_url
+            slot_prov[k] = {
+                "source_url": src_url,
+                "source_method": src_method,
+                "source_conf": round(src_conf, 4),
+                "consensus_count": count,
+            }
         if slot_values:
             cache[bucket] = slot_values
             origins[bucket] = slot_origins
-    return cache, origins
+            prov_meta[bucket] = slot_prov
+    return cache, origins, prov_meta
 
 
 # Mapping from test prefix → the payload flag key that indicates whether
@@ -291,7 +321,7 @@ async def backfill_english_from_siblings(
         Defaults to 1 to preserve the original behaviour for all universities
         that didn't exhibit this false-positive; pass 2 for Bond and similar.
     """
-    cache, cache_origins = _build_bucket_cache(results, min_quorum=min_quorum)
+    cache, cache_origins, cache_prov = _build_bucket_cache(results, min_quorum=min_quorum)
     if not cache:
         return 0
 
@@ -320,7 +350,7 @@ async def backfill_english_from_siblings(
         slot_values = cache.get(bucket) or {}
         if not slot_values:
             continue
-        bucket_origins = cache_origins.get(bucket) or {}
+        bucket_prov = cache_prov.get(bucket) or {}
         # Fallback URL for evidence rows when origin tracking found no URL.
         course_url: str = r.get("url") or ""
         for k, v in slot_values.items():
@@ -335,11 +365,26 @@ async def backfill_english_from_siblings(
             if accepted_flag and payload.get(accepted_flag) is False:
                 continue
             payload[k] = v
-            # Use the origin course URL (the actual source) not the recipient
-            # URL — this makes every sibling-cache evidence row traceable
-            # back to the sibling where the value was extracted, so reviewers
-            # can verify whether the source extractor is trustworthy.
-            origin_url = bucket_origins.get(k) or course_url
+            # Pull full provenance from the cache-build phase.
+            prov = bucket_prov.get(k) or {}
+            origin_url: str = prov.get("source_url") or course_url
+            source_method: str = prov.get("source_method") or "unknown"
+            source_conf: float = prov.get("source_conf") or 0.0
+            consensus_count: int = prov.get("consensus_count") or 1
+            # Encode full provenance as a JSON object in the snippet field so
+            # it is queryable via PostgreSQL's JSONB operators:
+            #   snippet::jsonb->>'source_method'
+            #   snippet::jsonb->>'consensus_count'
+            snippet_doc = {
+                "method": "sibling_cache_backfill",
+                "field": k,
+                "value": v,
+                "bucket": bucket,
+                "source_url": origin_url or "unknown",
+                "source_method": source_method,
+                "source_conf": source_conf,
+                "consensus_count": consensus_count,
+            }
             evidence.append(
                 {
                     "field_key": k,
@@ -349,10 +394,14 @@ async def backfill_english_from_siblings(
                     # origin_url is the course that originally yielded this
                     # value; course_url is the recipient being backfilled.
                     "source_url": origin_url,
-                    "snippet": (
-                        f"sibling-cache backfill from {bucket} bucket "
-                        f"(source: {origin_url or 'unknown'}): {k}={v}"
-                    ),
+                    # Extra provenance keys — stored in snippet as JSON so
+                    # they survive into scraped_field_evidence.snippet and
+                    # are queryable without a schema migration.
+                    "source_method": source_method,
+                    "source_conf": source_conf,
+                    "bucket": bucket,
+                    "consensus_count": consensus_count,
+                    "snippet": json.dumps(snippet_doc, separators=(",", ":")),
                 }
             )
             fills_total += 1

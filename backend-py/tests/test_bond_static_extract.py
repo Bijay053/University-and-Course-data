@@ -266,7 +266,7 @@ class TestSiblingCacheMinQuorum:
             self._make_result("Bachelor of Commerce", None),
             self._make_result("Bachelor of Business", None),
         ]
-        cache = _build_bucket_cache(results, min_quorum=2)
+        cache, _origins, _prov = _build_bucket_cache(results, min_quorum=2)
         # Undergraduate bucket should be empty — only 1 source for IELTS 6.5
         ug_cache = cache.get("undergraduate", {})
         assert "ielts_overall" not in ug_cache
@@ -279,7 +279,7 @@ class TestSiblingCacheMinQuorum:
             self._make_result("Bachelor of Commerce", 6.5),
             self._make_result("Bachelor of Business", None),
         ]
-        cache = _build_bucket_cache(results, min_quorum=2)
+        cache, _origins, _prov = _build_bucket_cache(results, min_quorum=2)
         ug_cache = cache.get("undergraduate", {})
         assert ug_cache.get("ielts_overall") == 6.5
 
@@ -290,6 +290,6 @@ class TestSiblingCacheMinQuorum:
             self._make_result("Bachelor of Laws", 6.5),
             self._make_result("Bachelor of Commerce", None),
         ]
-        cache = _build_bucket_cache(results)  # min_quorum defaults to 1
+        cache, _origins, _prov = _build_bucket_cache(results)  # min_quorum defaults to 1
         ug_cache = cache.get("undergraduate", {})
         assert ug_cache.get("ielts_overall") == 6.5
