@@ -1,0 +1,38 @@
+root@university-and-course-data:~/University-and-Course-data# # Find and kill whatever is on port 8080
+fuser -k 8080/tcp
+
+# Give it a moment, then restart the PM2 process
+sleep 2 && pm2 restart api-py
+
+# Confirm it stays up
+sleep 3 && pm2 list
+pm2 logs api-py --lines 10 --nostream
+8080/tcp:            1201604 1403396
+Use --update-env to update environment variables
+[PM2] Applying action restartProcessId on app [api-py](ids: [ 0 ])
+[PM2] [api-py](0) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ api-py             │ fork     │ 17   │ online    │ 0%       │ 4.8mb    │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ api-py             │ fork     │ 17   │ online    │ 0%       │ 88.1mb   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+[TAILING] Tailing last 10 lines for [api-py] process (change the value with --lines option)
+/root/.pm2/logs/api-py-out.log last 10 lines:
+/root/.pm2/logs/api-py-error.log last 10 lines:
+0|api-py   | INFO:     Shutting down
+0|api-py   | INFO:     Waiting for application shutdown.
+0|api-py   | INFO:uniportal:Python backend shutting down
+0|api-py   | INFO:     Application shutdown complete.
+0|api-py   | INFO:     Finished server process [1403887]
+0|api-py   | INFO:     Started server process [1403904]
+0|api-py   | INFO:     Waiting for application startup.
+0|api-py   | INFO:uniportal:Python backend starting up (debug=False)
+0|api-py   | INFO:     Application startup complete.
+0|api-py   | INFO:     Uvicorn running on http://0.0.0.0:8080 (Press CTRL+C to quit)
+
+root@university-and-course-data:~/University-and-Course-data# 
