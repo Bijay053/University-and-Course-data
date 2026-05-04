@@ -1,0 +1,93 @@
+Welcome to Ubuntu 24.04.4 LTS (GNU/Linux 6.8.0-110-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/pro
+
+ System information as of Mon May  4 01:18:39 UTC 2026
+
+  System load:           0.0
+  Usage of /:            3.8% of 231.44GB
+  Memory usage:          33%
+  Swap usage:            0%
+  Processes:             242
+  Users logged in:       1
+  IPv4 address for eth0: 159.65.152.72
+  IPv4 address for eth0: 10.47.0.13
+  IPv6 address for eth0: 2400:6180:100:d0:0:1:3615:5001
+
+Expanded Security Maintenance for Applications is not enabled.
+
+17 updates can be applied immediately.
+To see these additional updates run: apt list --upgradable
+
+1 additional security update can be applied with ESM Apps.
+Learn more about enabling ESM Apps service at https://ubuntu.com/esm
+
+
+Last login: Sun May  3 13:35:05 2026 from 162.243.190.66
+root@university-and-course-data:~# cd /root/University-and-Course-data
+
+# 1. Apply the guards.py patch (if you haven't already)
+python3 - << 'PYEOF'
+path = "backend-py/app/services/scraper/guards.py"
+with open(path) as f:
+    src = f.read()
+
+old = (
+    '        return (False, "online_only")\n'
+    '\n'
+    '    # Note: we do NOT reject study_mode="Blended" when location is absent.\n'
+    '    # "Blended" means the extractor found explicit evidence of both online\n'
+    '    # and campus delivery on the course page — by definition a campus\n'
+    '    # component exists.  Some universities (e.g. Torrens) don\'t embed campus\n'
+    '    # location details on individual course pages, so location=None is\n'
+    '    # expected even for courses genuinely available on campus.\n'
+    '    # The strict "Online → reject" rule above already handles any case where\n'
+    '    # the mode is purely online.\n'
+)
+new = (
+    '        return (False, "online_only")\n'
+    '\n'
+    '    # UTAS-specific online_only: utas.edu.au pages always declare a physical\n'
+    '    # campus name in their "Location" panel when the course has any on-campus\n'
+    '    # component.  The location extractor strips virtual keywords ("Online",\n'
+    '    # "Distance", etc.) so a blank course_location means the panel contained\n'
+    '    # only "Online" — i.e. the course is online-only for international\n'
+    '    # students and cannot be studied on a student visa.\n'
+    '    # This catches cases where the study_mode extractor returned "Blended" or\n'
+    '    # "On Campus" by picking up the domestic-tab campus reference while the\n'
+    '    # international-tab Location field said "Online" only — the general\n'
+    '    # online_only guard above requires "online" in study_mode and misses these.\n'
+    '    if "utas.edu.au" in (source_url or "").lower() and not _physical_location:\n'
+    '        log.info(\n'
+    '            "[REJECT CHECK] course=%r url=%r decision=reject "\n'
+    '            "(utas_online_blank_location — Location panel was Online only)",\n'
+    '            effective_name,\n'
+    '            source_url,\n'
+    '        )\n'
+    '        return (False, "online_only")\n'
+    '\n'
+    '    # Note: we do NOT reject study_mode="Blended" when location is absent\n'
+    '    # for non-UTAS universities.\n'
+    '    # "Blended" means the extractor found explicit evidence of both online\n'
+    '    # and campus delivery on the course page — by definition a campus\n'
+    '    # component exists.  Some universities (e.g. Torrens) don\'t embed campus\n'
+    '    # location details on individual course pages, so location=None is\n'
+echo "Done"estart uni-api-py.servicene-only courses with blank location (E5n, M7x, M5x, E7h, E6j and similar)"
+Already patched or file has drifted — skipping
+Syntax OK
+On branch main
+Your branch is up to date with 'origin/main'.
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+        backend-py/baselines/
+        backend-py/celerybeat-schedule
+        baselines/
+        ielts_overall
+
+nothing added to commit but untracked files present (use "git add" to track)
+Everything up-to-date
+Done
+root@university-and-course-data:~/University-and-Course-data# 
