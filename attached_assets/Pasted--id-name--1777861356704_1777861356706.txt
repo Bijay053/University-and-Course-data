@@ -1,0 +1,385 @@
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+[PM2][WARN] Applications api-py not running, starting...
+[PM2] App [api-py] launched (1 instances)
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ api-py             │ fork     │ 0    │ online    │ 0%       │ 5.4mb    │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+[PM2] Saving current process list...
+[PM2] Successfully saved in /root/.pm2/dump.pm2
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ api-py             │ fork     │ 0    │ online    │ 0%       │ 88.0mb   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+[TAILING] Tailing last 8 lines for [api-py] process (change the value with --lines option)
+/root/.pm2/logs/api-py-out.log last 8 lines:
+0|api-py   | INFO:     176.65.139.177:9498 - "GET /login HTTP/1.1" 404 Not Found
+
+/root/.pm2/logs/api-py-error.log last 8 lines:
+0|api-py   | INFO:uniportal:Python backend shutting down
+0|api-py   | INFO:     Application shutdown complete.
+0|api-py   | INFO:     Finished server process [1404231]
+0|api-py   | INFO:     Started server process [1404254]
+0|api-py   | INFO:     Waiting for application startup.
+0|api-py   | INFO:uniportal:Python backend starting up (debug=False)
+0|api-py   | INFO:     Application startup complete.
+0|api-py   | INFO:     Uvicorn running on http://0.0.0.0:8080 (Press CTRL+C to quit)
+
+root@university-and-course-data:~/University-and-Course-data# # Hit FastAPI directly (bypass nginx/proxy)
+curl -s "http://localhost:8080/api/search/courses?sort=relevance&limit=3" | head -300
+
+# Then check FastAPI error log for the traceback
+pm2 logs api-py --lines 30 --nostream
+{"results":[],"total":0,"page":1,"limit":3}[TAILING] Tailing last 30 lines for [api-py] process (change the value with --lines option)
+/root/.pm2/logs/api-py-out.log last 30 lines:
+0|api-py   | INFO:     176.65.139.177:9498 - "GET /login HTTP/1.1" 404 Not Found
+0|api-py   | INFO:     127.0.0.1:59570 - "GET /api/search/courses?sort=relevance&limit=3 HTTP/1.1" 200 OK
+
+/root/.pm2/logs/api-py-error.log last 30 lines:
+0|api-py   | INFO:     Waiting for application startup.
+0|api-py   | INFO:uniportal:Python backend starting up (debug=False)
+0|api-py   | INFO:     Application startup complete.
+0|api-py   | INFO:     Uvicorn running on http://0.0.0.0:8080 (Press CTRL+C to quit)
+0|api-py   | INFO:     Shutting down
+0|api-py   | INFO:     Waiting for application shutdown.
+0|api-py   | INFO:uniportal:Python backend shutting down
+0|api-py   | INFO:     Application shutdown complete.
+0|api-py   | INFO:     Finished server process [1404167]
+0|api-py   | INFO:     Started server process [1404182]
+0|api-py   | INFO:     Waiting for application startup.
+0|api-py   | INFO:uniportal:Python backend starting up (debug=False)
+0|api-py   | INFO:     Application startup complete.
+0|api-py   | INFO:     Uvicorn running on http://0.0.0.0:8080 (Press CTRL+C to quit)
+0|api-py   | INFO:     Started server process [1404231]
+0|api-py   | INFO:     Waiting for application startup.
+0|api-py   | INFO:uniportal:Python backend starting up (debug=False)
+0|api-py   | INFO:     Application startup complete.
+0|api-py   | INFO:     Uvicorn running on http://0.0.0.0:8080 (Press CTRL+C to quit)
+0|api-py   | INFO:     Shutting down
+0|api-py   | INFO:     Waiting for application shutdown.
+0|api-py   | INFO:uniportal:Python backend shutting down
+0|api-py   | INFO:     Application shutdown complete.
+0|api-py   | INFO:     Finished server process [1404231]
+0|api-py   | INFO:     Started server process [1404254]
+0|api-py   | INFO:     Waiting for application startup.
+0|api-py   | INFO:uniportal:Python backend starting up (debug=False)
+0|api-py   | INFO:     Application startup complete.
+0|api-py   | INFO:     Uvicorn running on http://0.0.0.0:8080 (Press CTRL+C to quit)
+0|api-py   | ERROR:app.routers.search:search_courses SQL failed: [Errno -3] Temporary failure in name resolution
+
+root@university-and-course-data:~/University-and-Course-data# # What's listening on port 80?
+ss -tlnp | grep ':80 '
+
+# All PM2 processes (not just api-py)
+pm2 list
+
+# What DATABASE_URL is FastAPI using? (mask the password)
+grep -r "DATABASE_URL\|DB_URL\|database_url" /root/University-and-Course-data/backend-py/.env* 2>/dev/null | sed 's|://[^:]*:[^@]*@|://USER:PASS@|'
+
+# What does nginx proxy /api to?
+nginx -T 2>/dev/null | grep -A10 "location.*api\|proxy_pass" | head -30
+LISTEN 0      511          0.0.0.0:80        0.0.0.0:*    users:(("nginx",pid=1162585,fd=5),("nginx",pid=1162584,fd=5),("nginx",pid=1162583,fd=5),("nginx",pid=1162582,fd=5),("nginx",pid=1006237,fd=5))
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ api-py             │ fork     │ 0    │ online    │ 0%       │ 89.3mb   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+/root/University-and-Course-data/backend-py/.env:DATABASE_URL=postgresql+asyncpg://USER:PASS@127.0.0.1:5432/university_portal
+/root/University-and-Course-data/backend-py/.env.example:# use the project-wide DATABASE_URL automatically; in production this
+/root/University-and-Course-data/backend-py/.env.example:DATABASE_URL=postgresql+asyncpg://USER:PASS@localhost:5432/university_portal
+    location /api/ {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+
+    # Frontend SPA — serve index.html for all routes
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
+--
+  location /api/ {
+    proxy_pass http://localhost:8000;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_read_timeout 300s;
+    proxy_send_timeout 300s;
+    client_max_body_size 50M;
+  }
+}
+
+root@university-and-course-data:~/University-and-Course-data# # 1. Find the nginx config file with the wrong port 
+grep -r "127.0.0.1:8000" /etc/nginx/ --include="*.conf" -l
+
+# 2. Change 8000 → 8080 in that file (replace with actual filename if different)
+sed -i 's|proxy_pass http://127.0.0.1:8000|proxy_pass http://127.0.0.1:8080|g' \
+    /etc/nginx/sites-enabled/default
+
+# 3. Test config and reload
+nginx -t && nginx -s reload
+
+# 4. Verify — should now return results (not 500)
+curl -s "http://localhost/api/search/courses?limit=3" | head -200
+sed: can't read /etc/nginx/sites-enabled/default: No such file or directory
+nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+nginx: configuration file /etc/nginx/nginx.conf test is successful
+2026/05/04 02:08:28 [notice] 1404650#1404650: signal process started
+Internal Server Errorroot@university-and-course-data:~/University-and-Course-data# # Find the config file that haroot@university-and-course-data:~/University-and-Course-data# # Find the config file that has 8000 in it
+grep -r "8000\|proxy_pass" /etc/nginx/ 2>/dev/null | head -20
+
+# Also try nginx full config dump
+nginx -T 2>/dev/null | grep -B5 -A5 "8000\|proxy_pass"
+
+# List all nginx config files
+find /etc/nginx/ -type f 2>/dev/null
+/etc/nginx/sites-enabled/uniportal:    proxy_pass http://localhost:8000;
+/etc/nginx/sites-enabled/uniadmin:        proxy_pass http://127.0.0.1:8000;
+/etc/nginx/sites-available/uniportal:    proxy_pass http://localhost:8080;
+/etc/nginx/sites-available/uniadmin:        proxy_pass http://127.0.0.1:8080;
+    root /var/www/university-portal;
+    index index.html;
+
+    # Proxy API calls to Node.js
+    location /api/ {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+
+--
+  server_name _;
+  root /opt/app/artifacts/university-portal/dist/public;
+  index index.html;
+  location / { try_files $uri $uri/ /index.html; }
+  location /api/ {
+    proxy_pass http://localhost:8000;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_read_timeout 300s;
+    proxy_send_timeout 300s;
+    client_max_body_size 50M;
+/etc/nginx/mime.types
+/etc/nginx/fastcgi.conf
+/etc/nginx/sites-enabled/uniportal
+/etc/nginx/sites-enabled/uniadmin
+/etc/nginx/snippets/fastcgi-php.conf
+/etc/nginx/snippets/snakeoil.conf
+/etc/nginx/koi-utf
+/etc/nginx/uwsgi_params
+/etc/nginx/scgi_params
+/etc/nginx/sites-available/uniportal
+/etc/nginx/sites-available/default
+/etc/nginx/sites-available/uniadmin
+/etc/nginx/nginx.conf
+/etc/nginx/proxy_params
+/etc/nginx/win-utf
+/etc/nginx/koi-win
+/etc/nginx/fastcgi_params
+root@university-and-course-data:~/University-and-Course-data# # Fix both enabled nginx configs
+sed -i 's|proxy_pass http://localhost:8000|proxy_pass http://localhost:8080|g' /etc/nginx/sites-enabled/uniportal 
+sed -i 's|proxy_pass http://127.0.0.1:8000|proxy_pass http://127.0.0.1:8080|g' /etc/nginx/sites-enabled/uniadmin
+
+# Verify the changes
+grep "proxy_pass" /etc/nginx/sites-enabled/uniportal /etc/nginx/sites-enabled/uniadmin
+
+# Test and reload
+nginx -t && nginx -s reload
+
+# Now test through nginx (port 80)
+curl -s "http://localhost/api/search/courses?limit=3" | head -300
+/etc/nginx/sites-enabled/uniportal:    proxy_pass http://localhost:8080;
+/etc/nginx/sites-enabled/uniadmin:        proxy_pass http://127.0.0.1:8080;
+nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+nginx: configuration file /etc/nginx/nginx.conf test is successful
+2026/05/04 02:09:24 [notice] 1404753#1404753: signal process started
+Internal Server Errorroot@university-and-course-data:~/University-and-Course-data# # 1. See nginx error log for uroot@university-and-course-data:~/University-and-Course-data# # 1. See nginx error log for upstream errors
+tail -30 /var/log/nginx/error.log
+
+# 2. See which server block nginx is routing to
+nginx -T 2>/dev/null | grep -B5 -A20 "proxy_pass"
+
+# 3. Try with the server's real IP (different server_name match)
+curl -v "http://159.65.152.72/api/search/courses?limit=3" 2>&1 | grep -E "< HTTP|error|Error|upstream"
+
+# 4. Is the .env file being loaded? Check what DATABASE_URL FastAPI sees
+pm2 env 0 2>/dev/null | grep -i "database\|db_url\|PATH"
+    root /var/www/university-portal;
+    index index.html;
+
+    # Proxy API calls to Node.js
+    location /api/ {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+
+    # Frontend SPA — serve index.html for all routes
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
+
+# configuration file /etc/nginx/sites-enabled/uniportal:
+server {
+  listen 80;
+  server_name _;
+  root /opt/app/artifacts/university-portal/dist/public;
+  index index.html;
+  location / { try_files $uri $uri/ /index.html; }
+  location /api/ {
+    proxy_pass http://localhost:8080;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_read_timeout 300s;
+    proxy_send_timeout 300s;
+    client_max_body_size 50M;
+  }
+}
+
+< HTTP/1.1 200 OK
+DATABASE_URL: postgres://user:password@host:5432/dbname
+PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin
+DBUS_SESSION_BUS_ADDRESS: unix:path=/run/user/0/bus
+BASE_PATH: /
+PYTHONPATH: /root/University-and-Course-data/backend-py
+root@university-and-course-data:~/University-and-Course-data# # Show env vars that the running FastAPI process actually has
+cat /proc/$(pm2 pid api-py 2>/dev/null)/environ 2>/dev/null | tr '\0' '\n' | grep -i "database\|pg\|postgres" | head -5
+LS_COLORS=rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:mi=00:su=37;41:sg=30;43:ca=00:tw=30;42:ow=34;42:st=37;44:ex=01;32:*.tar=01;31:*.tgz=01;31:*.arc=01;31:*.arj=01;31:*.taz=01;31:*.lha=01;31:*.lz4=01;31:*.lzh=01;31:*.lzma=01;31:*.tlz=01;31:*.txz=01;31:*.tzo=01;31:*.t7z=01;31:*.zip=01;31:*.z=01;31:*.dz=01;31:*.gz=01;31:*.lrz=01;31:*.lz=01;31:*.lzo=01;31:*.xz=01;31:*.zst=01;31:*.tzst=01;31:*.bz2=01;31:*.bz=01;31:*.tbz=01;31:*.tbz2=01;31:*.tz=01;31:*.deb=01;31:*.rpm=01;31:*.jar=01;31:*.war=01;31:*.ear=01;31:*.sar=01;31:*.rar=01;31:*.alz=01;31:*.ace=01;31:*.zoo=01;31:*.cpio=01;31:*.7z=01;31:*.rz=01;31:*.cab=01;31:*.wim=01;31:*.swm=01;31:*.dwm=01;31:*.esd=01;31:*.avif=01;35:*.jpg=01;35:*.jpeg=01;35:*.mjpg=01;35:*.mjpeg=01;35:*.gif=01;35:*.bmp=01;35:*.pbm=01;35:*.pgm=01;35:*.ppm=01;35:*.tga=01;35:*.xbm=01;35:*.xpm=01;35:*.tif=01;35:*.tiff=01;35:*.png=01;35:*.svg=01;35:*.svgz=01;35:*.mng=01;35:*.pcx=01;35:*.mov=01;35:*.mpg=01;35:*.mpeg=01;35:*.m2v=01;35:*.mkv=01;35:*.webm=01;35:*.webp=01;35:*.ogm=01;35:*.mp4=01;35:*.m4v=01;35:*.mp4v=01;35:*.vob=01;35:*.qt=01;35:*.nuv=01;35:*.wmv=01;35:*.asf=01;35:*.rm=01;35:*.rmvb=01;35:*.flc=01;35:*.avi=01;35:*.fli=01;35:*.flv=01;35:*.gl=01;35:*.dl=01;35:*.xcf=01;35:*.xwd=01;35:*.yuv=01;35:*.cgm=01;35:*.emf=01;35:*.ogv=01;35:*.ogx=01;35:*.aac=00;36:*.au=00;36:*.flac=00;36:*.m4a=00;36:*.mid=00;36:*.midi=00;36:*.mka=00;36:*.mp3=00;36:*.mpc=00;36:*.ogg=00;36:*.ra=00;36:*.wav=00;36:*.oga=00;36:*.opus=00;36:*.spx=00;36:*.xspf=00;36:*~=00;90:*#=00;90:*.bak=00;90:*.crdownload=00;90:*.dpkg-dist=00;90:*.dpkg-new=00;90:*.dpkg-old=00;90:*.dpkg-tmp=00;90:*.old=00;90:*.orig=00;90:*.part=00;90:*.rej=00;90:*.rpmnew=00;90:*.rpmorig=00;90:*.rpmsave=00;90:*.swp=00;90:*.tmp=00;90:*.ucf-dist=00;90:*.ucf-new=00;90:*.ucf-old=00;90:
+DATABASE_URL=postgres://user:password@host:5432/dbname
+root@university-and-course-data:~/University-and-Course-data# # 1. Create the startup wrapper script
+cat > /root/University-and-Course-data/backend-py/start.sh << # 1. Create the startup wrapper script
+cat > /root/University-and-Course-data/backend-py/start.sh << 'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ENV_FILE="$SCRIPT_DIR/.env"
+# Unset placeholder values that the system env may carry
+# Unset placeholder values that the system env may carryET CELERY_BROKER_URL 2>/dev/null || true
+unset DATABASE_URL REDIS_URL GEMINI_API_KEY SESSION_SECRET CELERY_BROKER_URL 2>/dev/null || true
+# Source .env so real production values override system env
+# Source .env so real production values override system env
+if [ -f "$ENV_FILE" ]; then
+  set -a "$ENV_FILE"
+  source "$ENV_FILE"
+  set +a
+fi
+exec "$SCRIPT_DIR/venv/bin/uvicorn" app.main:app --host 0.0.0.0 --port 8080 --workers 1
+exec "$SCRIPT_DIR/venv/bin/uvicorn" app.main:app --host 0.0.0.0 --port 8080 --workers 1
+EOFod +x /root/University-and-Course-data/backend-py/start.sh
+chmod +x /root/University-and-Course-data/backend-py/start.sh
+# 2. Update ecosystem.config.js to use the startup script
+# 2. Update ecosystem.config.js to use the startup scripts << 'EOF'
+cat > /root/University-and-Course-data/ecosystem.config.js << 'EOF'
+module.exports = {
+  apps: [
+    { name: "api-py",
+      name: "api-py",University-and-Course-data/backend-py/start.sh",
+      script: "/root/University-and-Course-data/backend-py/start.sh",
+      cwd: "/root/University-and-Course-data/backend-py",
+      interpreter: "bash",
+      autorestart: true,
+      watch: false,
+      env: {ONPATH: "/root/University-and-Course-data/backend-py"
+        PYTHONPATH: "/root/University-and-Course-data/backend-py"
+      }
+    }
+  ]
+};F
+EOF
+# 3. Restart PM2 with the new config
+# 3. Restart PM2 with the new confige
+pm2 delete api-py 2>/dev/null || true-data/ecosystem.config.js
+pm2 start /root/University-and-Course-data/ecosystem.config.js
+pm2 save
+# 4. Wait a moment then verify DB connection works
+# 4. Wait a moment then verify DB connection works
+sleep 3 "http://localhost:8080/api/universities?limit=5" | head -200
+curl -s "http://localhost:8080/api/universities?limit=5" | head -200
+[PM2] Applying action deleteProcessId on app [api-py](ids: [ 0 ])
+[PM2] [api-py](0) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+[PM2][WARN] Applications api-py not running, starting...
+[PM2] App [api-py] launched (1 instances)
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ api-py             │ fork     │ 0    │ online    │ 0%       │ 3.4mb    │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+[PM2] Saving current process list...
+[PM2] Successfully saved in /root/.pm2/dump.pm2
+{"data":[{"id":2,"name":"asa","country":"Australia","city":"Sydney","website":"https://www.asahe.edu.au/","description":null,"logo_url":null,"scrape_url":"https://www.asahe.edu.au/","fee_page_url":null,"requirements_page_url":null,"scholarship_page_url":null,"academic_requirements_page_url":null,"scrape_config":{"uniPages":{"feePage":"http://asahe.edu.au/fees-and-charges","feesPdf":"https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/696f704ddf123bd8c8d982b0_2026%20Fees%20Schedule%20-%20International%20Student.pdf","requirementsPdf":"https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/69af540baceac672ce4d06db_Student%20Admissions%20Policy%202025.2.pdf","requirementsPage":"http://asahe.edu.au/policies-and-forms"},"courseLinks":[{"url":"https://www.asahe.edu.au/courses/bachelor-of-business-international-business","name":"Bachelor of Business International Business"},{"url":"https://www.asahe.edu.au/courses/bachelor-of-business-hospitality-management","name":"Bachelor of Business Hospitality Management"},{"url":"https://www.asahe.edu.au/courses/bachelor-of-business-technology-management","name":"Bachelor of Business Technology Management"},{"url":"https://www.asahe.edu.au/courses/bachelor-of-business","name":"Bachelor of Business"},{"url":"https://www.asahe.edu.au/courses/bachelor-of-professional-accounting","name":"Bachelor of Professional Accounting"},{"url":"https://www.asahe.edu.au/courses/master-of-project-management","name":"Master of Project Management"},{"url":"https://www.asahe.edu.au/courses/master-of-information-technology-cyber-security","name":"Master of Information Technology (Cyber Security)"},{"url":"https://www.asahe.edu.au/courses/master-of-information-technology-artificial-intelligence","name":"Master of Information Technology (Artificial Intelligence)"},{"url":"https://www.asahe.edu.au/courses/master-of-information-technology-software-application-development","name":"Master of Information Technology (Software Application Development)"}],"resolvedUrl":"https://www.asahe.edu.au/our-courses/courses-grid-view","lastScrapedAt":"2026-04-22T12:13:33.819Z","central_english_pg_skip":true},"featured":true,"featured_priority":100,"created_at":"2026-04-17T06:31:53.274075+00:00","updated_at":"2026-04-24T02:56:41.647131+00:00","course_count":8,"scrapeUrl":"https://www.asahe.edu.au/","feePageUrl":null,"requirementsPageUrl":null,"academicRequirementsPageUrl":null,"scholarshipPageUrl":null,"logoUrl":null,"courseCount":8,"featuredPriority":100,"createdAt":"2026-04-17T06:31:53.274075+00:00","updatedAt":"2026-04-24T02:56:41.647131+00:00"},{"id":41,"name":"ACAP University College","country":"Australia","city":"Sydney","website":"https://acap.edu.au/","description":null,"logo_url":null,"scrape_url":"https://acap.edu.au/courses","fee_page_url":null,"requirements_page_url":null,"scholarship_page_url":null,"academic_requirements_page_url":null,"scrape_config":null,"featured":false,"featured_priority":0,"created_at":"2026-04-28T03:16:55.545456+00:00","updated_at":"2026-04-28T03:16:55.545456+00:00","course_count":0,"scrapeUrl":"https://acap.edu.au/courses","feePageUrl":null,"requirementsPageUrl":null,"academicRequirementsPageUrl":null,"scholarshipPageUrl":null,"logoUrl":null,"courseCount":0,"featuredPriority":0,"createdAt":"2026-04-28T03:16:55.545456+00:00","updatedAt":"2026-04-28T03:16:55.545456+00:00"},{"id":47,"name":"AIBI","country":"Australia","city":"Sydney","website":"https://aibi.edu.au/","description":null,"logo_url":null,"scrape_url":"https://aibi.edu.au/courses","fee_page_url":null,"requirements_page_url":null,"scholarship_page_url":null,"academic_requirements_page_url":null,"scrape_config":null,"featured":false,"featured_priority":0,"created_at":"2026-04-28T03:16:55.545456+00:00","updated_at":"2026-04-28T03:16:55.545456+00:00","course_count":0,"scrapeUrl":"https://aibi.edu.au/courses","feePageUrl":null,"requirementsPageUrl":null,"academicRequirementsPageUrl":null,"scholarshipPageUrl":null,"logoUrl":null,"courseCount":0,"featuredPriority":0,"createdAt":"2026-04-28T03:16:55.545456+00:00","updatedAt":"2026-04-28T03:16:55.545456+00:00"},{"id":37,"name":"AIT Academy of Interactive Technology","country":"Australia","city":"Sydney","website":"https://ait.edu.au/","description":null,"logo_url":null,"scrape_url":"https://ait.edu.au/courses","fee_page_url":null,"requirements_page_url":null,"scholarship_page_url":null,"academic_requirements_page_url":null,"scrape_config":null,"featured":false,"featured_priority":0,"created_at":"2026-04-28T03:16:55.545456+00:00","updated_at":"2026-04-28T03:16:55.545456+00:00","course_count":0,"scrapeUrl":"https://ait.edu.au/courses","feePageUrl":null,"requirementsPageUrl":null,"academicRequirementsPageUrl":null,"scholarshipPageUrl":null,"logoUrl":null,"courseCount":0,"featuredPriority":0,"createdAt":"2026-04-28T03:16:55.545456+00:00","updatedAt":"2026-04-28T03:16:55.545456+00:00"},{"id":30,"name":"APIC College","country":"Australia","city":"Sydney","website":"https://apicollege.edu.au/","description":null,"logo_url":null,"scrape_url":"https://apicollege.edu.au/courses","fee_page_url":null,"requirements_page_url":null,"scholarship_page_url":null,"academic_requirements_page_url":null,"scrape_config":null,"featured":false,"featured_priority":0,"created_at":"2026-04-28T03:16:55.545456+00:00","updated_at":"2026-04-28T03:16:55.545456+00:00","course_count":0,"scrapeUrl":"https://apicollege.edu.au/courses","feePageUrl":null,"requirementsPageUrl":null,"academicRequirementsPageUrl":null,"scholarshipPageUrl":null,"logoUrl":null,"courseCount":0,"featuredPriority":0,"createdAt":"2026-04-28T03:16:55.545456+00:00","updatedAt":"2026-04-28T03:16:55.545456+00:00"}],"total":96,"page":1,"limit":5}root@university-and-course-data:~/University-and-Course-data# # 1. Create the startup wrapper script
+cat > /root/University-and-Course-data/backend-py/start.sh << # 1. Create the startup wrapper script
+cat > /root/University-and-Course-data/backend-py/start.sh << 'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ENV_FILE="$SCRIPT_DIR/.env"
+# Unset placeholder values that the system env may carry
+# Unset placeholder values that the system env may carryET CELERY_BROKER_URL 2>/dev/null || true
+unset DATABASE_URL REDIS_URL GEMINI_API_KEY SESSION_SECRET CELERY_BROKER_URL 2>/dev/null || true
+# Source .env so real production values override system env
+# Source .env so real production values override system env
+if [ -f "$ENV_FILE" ]; then
+  set -a "$ENV_FILE"
+  source "$ENV_FILE"
+  set +a
+fi
+exec "$SCRIPT_DIR/venv/bin/uvicorn" app.main:app --host 0.0.0.0 --port 8080 --workers 1
+exec "$SCRIPT_DIR/venv/bin/uvicorn" app.main:app --host 0.0.0.0 --port 8080 --workers 1
+EOFod +x /root/University-and-Course-data/backend-py/start.sh
+chmod +x /root/University-and-Course-data/backend-py/start.sh
+# 2. Update ecosystem.config.js to use the startup script
+# 2. Update ecosystem.config.js to use the startup scripts << 'EOF'
+cat > /root/University-and-Course-data/ecosystem.config.js << 'EOF'
+module.exports = {
+  apps: [
+    { name: "api-py",
+      name: "api-py",University-and-Course-data/backend-py/start.sh",
+      script: "/root/University-and-Course-data/backend-py/start.sh",
+      cwd: "/root/University-and-Course-data/backend-py",
+      interpreter: "bash",
+      autorestart: true,
+      watch: false,
+      env: {ONPATH: "/root/University-and-Course-data/backend-py"
+        PYTHONPATH: "/root/University-and-Course-data/backend-py"
+      }
+    }
+  ]
+};F
+EOF
+# 3. Restart PM2 with the new config
+# 3. Restart PM2 with the new confige
+pm2 delete api-py 2>/dev/null || true-data/ecosystem.config.js
+pm2 start /root/University-and-Course-data/ecosystem.config.js
+pm2 save
+# 4. Wait a moment then verify DB connection works
+# 4. Wait a moment then verify DB connection works
+sleep 3 "http://localhost:8080/api/universities?limit=5" | head -200
+curl -s "http://localhost:8080/api/universities?limit=5" | head -200
+[PM2] Applying action deleteProcessId on app [api-py](ids: [ 0 ])
+[PM2] [api-py](0) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+[PM2][WARN] Applications api-py not running, starting...
+[PM2] App [api-py] launched (1 instances)
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ api-py             │ fork     │ 0    │ online    │ 0%       │ 3.4mb    │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+[PM2] Saving current process list...
+[PM2] Successfully saved in /root/.pm2/dump.pm2
+{"data":[{"id":2,"name":"asa","country":"Australia","city":"Sydney","website":"https://www.asahe.edu.au/","description":null,"logo_url":null,"scrape_url":"https://www.asahe.edu.au/","fee_page_url":null,"requirements_page_url":null,"scholarship_page_url":null,"academic_requirements_page_url":null,"scrape_config":{"uniPages":{"feePage":"http://asahe.edu.au/fees-and-charges","feesPdf":"https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/696f704ddf123bd8c8d982b0_2026%20Fees%20Schedule%20-%20International%20Student.pdf","requirementsPdf":"https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/69af540baceac672ce4d06db_Student%20Admissions%20Policy%202025.2.pdf","requirementsPage":"http://asahe.edu.au/policies-and-forms"},"courseLinks":[{"url":"https://www.asahe.edu.au/courses/bachelor-of-business-international-business","name":"Bachelor of Business International Business"},{"url":"https://www.asahe.edu.au/courses/bachelor-of-business-hospitality-management","name":"Bachelor of Business Hospitality Management"},{"url":"https://www.asahe.edu.au/courses/bachelor-of-business-technology-management","name":"Bachelor of Business Technology Management"},{"url":"https://www.asahe.edu.au/courses/bachelor-of-business","name":"Bachelor of Business"},{"url":"https://www.asahe.edu.au/courses/bachelor-of-professional-accounting","name":"Bachelor of Professional Accounting"},{"url":"https://www.asahe.edu.au/courses/master-of-project-management","name":"Master of Project Management"},{"url":"https://www.asahe.edu.au/courses/master-of-information-technology-cyber-security","name":"Master of Information Technology (Cyber Security)"},{"url":"https://www.asahe.edu.au/courses/master-of-information-technology-artificial-intelligence","name":"Master of Information Technology (Artificial Intelligence)"},{"url":"https://www.asahe.edu.au/courses/master-of-information-technology-software-application-development","name":"Master of Information Technology (Software Application Development)"}],"resolvedUrl":"https://www.asahe.edu.au/our-courses/courses-grid-view","lastScrapedAt":"2026-04-22T12:13:33.819Z","central_english_pg_skip":true},"featured":true,"featured_priority":100,"created_at":"2026-04-17T06:31:53.274075+00:00","updated_at":"2026-04-24T02:56:41.647131+00:00","course_count":8,"scrapeUrl":"https://www.asahe.edu.au/","feePageUrl":null,"requirementsPageUrl":null,"academicRequirementsPageUrl":null,"scholarshipPageUrl":null,"logoUrl":null,"courseCount":8,"featuredPriority":100,"createdAt":"2026-04-17T06:31:53.274075+00:00","updatedAt":"2026-04-24T02:56:41.647131+00:00"},{"id":41,"name":"ACAP University College","country":"Australia","city":"Sydney","website":"https://acap.edu.au/","description":null,"logo_url":null,"scrape_url":"https://acap.edu.au/courses","fee_page_url":null,"requirements_page_url":null,"scholarship_page_url":null,"academic_requirements_page_url":null,"scrape_config":null,"featured":false,"featured_priority":0,"created_at":"2026-04-28T03:16:55.545456+00:00","updated_at":"2026-04-28T03:16:55.545456+00:00","course_count":0,"scrapeUrl":"https://acap.edu.au/courses","feePageUrl":null,"requirementsPageUrl":null,"academicRequirementsPageUrl":null,"scholarshipPageUrl":null,"logoUrl":null,"courseCount":0,"featuredPriority":0,"createdAt":"2026-04-28T03:16:55.545456+00:00","updatedAt":"2026-04-28T03:16:55.545456+00:00"},{"id":47,"name":"AIBI","country":"Australia","city":"Sydney","website":"https://aibi.edu.au/","description":null,"logo_url":null,"scrape_url":"https://aibi.edu.au/courses","fee_page_url":null,"requirements_page_url":null,"scholarship_page_url":null,"academic_requirements_page_url":null,"scrape_config":null,"featured":false,"featured_priority":0,"created_at":"2026-04-28T03:16:55.545456+00:00","updated_at":"2026-04-28T03:16:55.545456+00:00","course_count":0,"scrapeUrl":"https://aibi.edu.au/courses","feePageUrl":null,"requirementsPageUrl":null,"academicRequirementsPageUrl":null,"scholarshipPageUrl":null,"logoUrl":null,"courseCount":0,"featuredPriority":0,"createdAt":"2026-04-28T03:16:55.545456+00:00","updatedAt":"2026-04-28T03:16:55.545456+00:00"},{"id":37,"name":"AIT Academy of Interactive Technology","country":"Australia","city":"Sydney","website":"https://ait.edu.au/","description":null,"logo_url":null,"scrape_url":"https://ait.edu.au/courses","fee_page_url":null,"requirements_page_url":null,"scholarship_page_url":null,"academic_requirements_page_url":null,"scrape_config":null,"featured":false,"featured_priority":0,"created_at":"2026-04-28T03:16:55.545456+00:00","updated_at":"2026-04-28T03:16:55.545456+00:00","course_count":0,"scrapeUrl":"https://ait.edu.au/courses","feePageUrl":null,"requirementsPageUrl":null,"academicRequirementsPageUrl":null,"scholarshipPageUrl":null,"logoUrl":null,"courseCount":0,"featuredPriority":0,"createdAt":"2026-04-28T03:16:55.545456+00:00","updatedAt":"2026-04-28T03:16:55.545456+00:00"},{"id":30,"name":"APIC College","country":"Australia","city":"Sydney","website":"https://apicollege.edu.au/","description":null,"logo_url":null,"scrape_url":"https://apicollege.edu.au/courses","fee_page_url":null,"requirements_page_url":null,"scholarship_page_url":null,"academic_requirements_page_url":null,"scrape_config":null,"featured":false,"featured_priority":0,"created_at":"2026-04-28T03:16:55.545456+00:00","updated_at":"2026-04-28T03:16:55.545456+00:00","course_count":0,"scrapeUrl":"https://apicollege.edu.au/courses","feePageUrl":null,"requirementsPageUrl":null,"academicRequirementsPageUrl":null,"scholarshipPageUrl":null,"logoUrl":null,"courseCount":0,"featuredPriority":0,"createdAt":"2026-04-28T03:16:55.545456+00:00","updatedAt":"2026-04-28T03:16:55.545456+00:00"}],"total":96,"page":1,"limit":5}root@university-and-course-data:~/University-and-Course-data# 
