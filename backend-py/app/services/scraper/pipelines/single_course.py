@@ -2355,6 +2355,16 @@ async def extract_course(
         # `duration_term` (Year/Month/Week/...). Translate before merging
         # so AI-filled units don't silently drop on the floor. See B20.
         _apply_ai_duration_mapping(payload, ai_filled)
+        # Build a lookup of which fields already have evidence from a
+        # non-ai_fallback method so the guard below can log drop attempts.
+        # First-write-wins: the earliest non-ai_fallback entry for each field
+        # is the authoritative source method for that field.
+        _prior_method: dict[str, str] = {}
+        for _ev in evidence:
+            _fk = _ev.get("field_key", "")
+            _m = _ev.get("method", "")
+            if _fk and _m and _m not in ("ai_fallback",) and _fk not in _prior_method:
+                _prior_method[_fk] = _m
         for k, v in ai_filled.items():
             # Discard chrome text returned by the FALLBACK AI for location fields.
             # UTAS pages have "Key Information Entry requirements Course rules"
@@ -2362,6 +2372,17 @@ async def extract_course(
             # verbatim.  Dropping it keeps course_location=None so the online-only
             # rejection filter can fire correctly.
             if k in ("location_text", "course_location") and isinstance(v, str) and _is_location_chrome(v):
+                continue
+            # Belt-and-braces override block: AI fallback can only fill fields
+            # that have no prior evidence from a higher-authority method.
+            # payload.setdefault() already prevents payload overwrite, but this
+            # guard also logs the attempt so it is auditable in the Celery log.
+            existing_method = _prior_method.get(k)
+            if existing_method and existing_method not in ("ai_fallback", None):
+                log.info(
+                    "[AI_FALLBACK] dropping %s=%r — already set by %s on %s",
+                    k, v, existing_method, url,
+                )
                 continue
             payload.setdefault(k, v)
             evidence.append(
