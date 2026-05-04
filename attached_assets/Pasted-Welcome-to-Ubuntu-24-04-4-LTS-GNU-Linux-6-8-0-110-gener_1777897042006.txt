@@ -1,0 +1,573 @@
+Welcome to Ubuntu 24.04.4 LTS (GNU/Linux 6.8.0-110-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/pro
+
+ System information as of Mon May  4 10:23:13 UTC 2026
+
+  System load:           0.0
+  Usage of /:            3.8% of 231.44GB
+  Memory usage:          16%
+  Swap usage:            0%
+  Processes:             200
+  Users logged in:       1
+  IPv4 address for eth0: 159.65.152.72
+  IPv4 address for eth0: 10.47.0.13
+  IPv6 address for eth0: 2400:6180:100:d0:0:1:3615:5001
+
+Expanded Security Maintenance for Applications is not enabled.
+
+17 updates can be applied immediately.
+To see these additional updates run: apt list --upgradable
+
+1 additional security update can be applied with ESM Apps.
+Learn more about enabling ESM Apps service at https://ubuntu.com/esm
+
+
+Last login: Mon May  4 08:48:17 2026 from 198.211.111.194
+root@university-and-course-data:~# python3 << 'PYEOF'
+import re, json, sys
+
+BASE = "/opt/uni-portal/backend-py/app/services/scraper"
+
+def _r(p):
+    with open(p) as f: return f.read()
+
+def _w(p, s):
+    with open(p, "w") as f: f.write(s)
+
+R = []
+
+# ══════════════════════════════════════════════════════
+# 1.  _text.py — dt/dd/th/td block-tag newlines
+# ══════════════════════════════════════════════════════
+src = _r(BASE + "/extractors/_text.py")
+if '"dt", "dd"' in src:
+    R.append("SKIP  _text.py")
+else:
+    OLD = (
+        '            "h1", "h2", "h3", "h4", "h5", "h6",\n'
+        '        }:\n'
+        '            self._buf.append("\\n")\n\n'
+        '    def handle_endtag(self, tag: str) -> None:\n'
+        '        if tag in self.SKIP_TAGS and self._skip_depth > 0:\n'
+        '            self._skip_depth -= 1\n'
+        '        elif tag in {"p", "li", "tr", "div", "h1", "h2", "h3", "h4", "h5", "h6"}:\n'
+        '            self._buf.append("\\n")'
+    )
+    NEW = (
+        '            "h1", "h2", "h3", "h4", "h5", "h6",\n'
+        '            "dt", "dd",\n'
+        '            "th", "td",\n'
+        '        }:\n'
+        '            self._buf.append("\\n")\n\n'
+        '    def handle_endtag(self, tag: str) -> None:\n'
+        '        if tag in self.SKIP_TAGS and self._skip_depth > 0:\n'
+        '            self._skip_depth -= 1\n'
+        '        elif tag in {"p", "li", "tr", "div", "h1", "h2", "h3", "h4", "h5", "h6",\n'
+        '                     "dt", "dd", "th", "td"}:\n'
+        '            self._buf.append("\\n")'
+    )
+    if OLD in src:
+        _w(BASE + "/extractors/_text.py", src.replace(OLD, NEW, 1))
+PYEOFrint("  pm2 restart api-py && systemctl restart uni-celery.service")ators=(",", ":")),\n'"unknown\", 0.0)\n"
+Traceback (most recent call last):
+  File "<stdin>", line 16, in <module>
+  File "<stdin>", line 6, in _r
+FileNotFoundError: [Errno 2] No such file or directory: '/opt/uni-portal/backend-py/app/services/scraper/extractors/_text.py'
+root@university-and-course-data:~# find / -name "_text.py" -path "*/scraper/*" 2>/dev/null | head -5
+/root/University-and-Course-data/backend-py/app/services/scraper/extractors/_text.py
+root@university-and-course-data:~# python3 << 'PYEOF'
+import re, json, sys
+
+BASE = "/root/University-and-Course-data/backend-py/app/services/scraper"
+
+def _r(p):
+    with open(p) as f: return f.read()
+
+def _w(p, s):
+    with open(p, "w") as f: f.write(s)
+
+R = []
+
+# ══ 1. _text.py — dt/dd/th/td newlines ══════════════════════════════════════
+src = _r(BASE + "/extractors/_text.py")
+if '"dt", "dd"' in src:
+    R.append("SKIP  _text.py")
+else:
+    OLD = (
+        '            "h1", "h2", "h3", "h4", "h5", "h6",\n'
+        '        }:\n'
+        '            self._buf.append("\\n")\n\n'
+        '    def handle_endtag(self, tag: str) -> None:\n'
+        '        if tag in self.SKIP_TAGS and self._skip_depth > 0:\n'
+        '            self._skip_depth -= 1\n'
+        '        elif tag in {"p", "li", "tr", "div", "h1", "h2", "h3", "h4", "h5", "h6"}:\n'
+        '            self._buf.append("\\n")'
+    )
+    NEW = (
+        '            "h1", "h2", "h3", "h4", "h5", "h6",\n'
+        '            "dt", "dd",\n'
+        '            "th", "td",\n'
+        '        }:\n'
+        '            self._buf.append("\\n")\n\n'
+        '    def handle_endtag(self, tag: str) -> None:\n'
+        '        if tag in self.SKIP_TAGS and self._skip_depth > 0:\n'
+        '            self._skip_depth -= 1\n'
+        '        elif tag in {"p", "li", "tr", "div", "h1", "h2", "h3", "h4", "h5", "h6",\n'
+        '                     "dt", "dd", "th", "td"}:\n'
+        '            self._buf.append("\\n")'
+    )
+    if OLD in src:
+        _w(BASE + "/extractors/_text.py", src.replace(OLD, NEW, 1))
+        R.append("OK    _text.py")
+    else:
+PYEOFrint("  pm2 restart api-py && systemctl restart uni-celery.service")══════(",", ":")),\n'"unknown\", 0.0)\n"
+
+========================================================
+  SKIP  _text.py
+  OK    duration.py
+  SKIP  single_course.py
+  OK    sibling_cache.py
+========================================================
+
+  All patches applied. Restart with:
+  pm2 restart api-py && systemctl restart uni-celery.service
+root@university-and-course-data:~# pm2 restart api-py && systemctl restart uni-celery.service
+Use --update-env to update environment variables
+[PM2] Applying action restartProcessId on app [api-py](ids: [ 0 ])
+[PM2] [api-py](0) ✓
+┌────┬───────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
+│ id │ name      │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
+├────┼───────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
+│ 0  │ api-py    │ default     │ 0.0.0   │ fork    │ 1422286  │ 0s     │ 14   │ online    │ 0%       │ 0b       │ root     │ disabled │
+└────┴───────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
+root@university-and-course-data:~# python3 << 'PYEOF'
+BASE = "/root/University-and-Course-data/backend-py/app/services/scraper"
+
+with open(BASE + "/extractors/location.py") as f:
+    src = f.read()
+
+MARKER = "if _has_utas_panel:\n        cascade_list"
+if MARKER in src:
+    print("SKIP  location.py — already patched")
+else:
+    OLD = '''    cascade_list: list[tuple[str, str | None, float]] = [
+        # UTAS-specific: scope the entire cascade to the hidden
+        # #tabInternational panel so the international location wins over the
+        # domestic section that appears earlier in the HTML.  No-ops when the
+        # page has no such panel, so it is safe for all other universities.
+        ("utas_intl_panel", _from_utas_intl_panel(soup), 0.95),
+        # Structural pre-pass FIRST — see _from_strong_dom_walk for the
+        # rationale. Reads `<strong>Location</strong>` style values out
+        # of the DOM directly, including the ASA-style adjacent-div
+        # idiom that the heading walker misses.
+        ("strong", _from_strong_dom_walk(soup), 0.9),
+        ("dl", _from_dl(soup), 0.9),
+        # Div-label / div-value panel idiom (Torrens course-card-panel, etc.)
+        ("div_panel", _from_panel_divs(soup), 0.88),
+        ("table", _from_tables(soup), 0.85),
+        ("heading", _from_headings(soup), 0.7),
+        # "In person (CampusName)" delivery-mode pattern (Flinders, etc.)
+        ("delivery_inperson", _from_delivery_mode_inperson(soup), 0.85),
+    ]
+    # text_block runs on non-UTAS pages only — see comment above.
+    if not _has_utas_panel:
+        cascade_list.append(("text_block", _from_text_block(html_to_text(html)), 0.5))'''
+
+    NEW = '''    # For UTAS pages with #tabInternational: scope cascade ENTIRELY to that
+    # panel. Do NOT fall back to full-page structural methods.
+    #
+    # Bug: full-page methods (strong, dl, table, heading) read the whole HTML
+    # including the *domestic* tab. When the international panel is Online-only
+    # _from_utas_intl_panel returns None, then the cascade finds the domestic
+    # campus (e.g. "Hobart") from the full-page scan. That non-empty
+    # course_location prevents the UTAS online_only guard in guards.py from
+    # firing, so online-only-for-international courses are incorrectly staged.
+    #
+    # Fix: if the international panel has no physical location, course_location
+    # stays blank and the UTAS guard correctly rejects the course.
+PYEOF   print("WARN  location.py — anchor not found, check prod version manually")
+OK    location.py
+root@university-and-course-data:~# python3 << 'PYEOF'
+BASE = "/root/University-and-Course-data/backend-py/app/services/scraper"
+
+with open(BASE + "/extractors/location.py") as f:
+    src = f.read()
+
+MARKER = "if _has_utas_panel:\n        cascade_list"
+if MARKER in src:
+    print("SKIP  location.py — already patched")
+else:
+    OLD = '''    cascade_list: list[tuple[str, str | None, float]] = [
+        # UTAS-specific: scope the entire cascade to the hidden
+        # #tabInternational panel so the international location wins over the
+        # domestic section that appears earlier in the HTML.  No-ops when the
+        # page has no such panel, so it is safe for all other universities.
+        ("utas_intl_panel", _from_utas_intl_panel(soup), 0.95),
+        # Structural pre-pass FIRST — see _from_strong_dom_walk for the
+        # rationale. Reads `<strong>Location</strong>` style values out
+        # of the DOM directly, including the ASA-style adjacent-div
+        # idiom that the heading walker misses.
+        ("strong", _from_strong_dom_walk(soup), 0.9),
+        ("dl", _from_dl(soup), 0.9),
+        # Div-label / div-value panel idiom (Torrens course-card-panel, etc.)
+        ("div_panel", _from_panel_divs(soup), 0.88),
+        ("table", _from_tables(soup), 0.85),
+        ("heading", _from_headings(soup), 0.7),
+        # "In person (CampusName)" delivery-mode pattern (Flinders, etc.)
+        ("delivery_inperson", _from_delivery_mode_inperson(soup), 0.85),
+    ]
+    # text_block runs on non-UTAS pages only — see comment above.
+    if not _has_utas_panel:
+        cascade_list.append(("text_block", _from_text_block(html_to_text(html)), 0.5))'''
+
+    NEW = '''    # For UTAS pages with #tabInternational: scope cascade ENTIRELY to that
+    # panel. Do NOT fall back to full-page structural methods.
+    #
+    # Bug: full-page methods (strong, dl, table, heading) read the whole HTML
+    # including the *domestic* tab. When the international panel is Online-only
+    # _from_utas_intl_panel returns None, then the cascade finds the domestic
+    # campus (e.g. "Hobart") from the full-page scan. That non-empty
+    # course_location prevents the UTAS online_only guard in guards.py from
+    # firing, so online-only-for-international courses are incorrectly staged.
+    #
+    # Fix: if the international panel has no physical location, course_location
+    # stays blank and the UTAS guard correctly rejects the course.
+PYEOF   print("WARN  location.py — anchor not found, check prod version manually")
+SKIP  location.py — already patched
+root@university-and-course-data:~# pm2 restart api-py && systemctl restart uni-celery.service
+Use --update-env to update environment variables
+[PM2] Applying action restartProcessId on app [api-py](ids: [ 0 ])
+[PM2] [api-py](0) ✓
+┌────┬───────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
+│ id │ name      │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
+├────┼───────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
+│ 0  │ api-py    │ default     │ 0.0.0   │ fork    │ 1425115  │ 0s     │ 15   │ online    │ 0%       │ 3.4mb    │ root     │ disabled │
+└────┴───────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
+root@university-and-course-data:~# -- On prod psql: check what would be removed
+SELECT c.id, c.name, c.study_mode, c.course_location, c.created_at::date
+FROM courses c
+JOIN universities u ON u.id = c.university_id
+WHERE u.name ILIKE '%tasmania%' OR u.name ILIKE '%utas%'
+ORDER BY c.name;
+--: command not found
+SELECT: command not found
+FROM: command not found
+JOIN: command not found
+WHERE: command not found
+ORDER: command not found
+root@university-and-course-data:~# psql "$DATABASE_URL" -c "SELECT c.id, c.name, c.study_mode, c.course_location, c.created_at::date FROM courses c JOIN universities u ON u.id = c.university_id WHERE u.name ILIKE '%tasmania%' OR u.name ILIKE '%utas%' ORDER BY c.name;"
+psql: error: could not translate host name "host" to address: Temporary failure in name resolution
+root@university-and-course-data:~# grep -r "DATABASE_URL\|postgres\|pg_host\|DB_HOST" /root/University-and-Course-data/.env /root/University-and-Course-data/backend-py/.env /etc/environment 2>/dev/null | head -20
+/root/University-and-Course-data/backend-py/.env:DATABASE_URL=postgresql+asyncpg://uniportal:Bij%40y12345@127.0.0.1:5432/university_portal
+/etc/environment:DATABASE_URL=postgres://user:password@host:5432/dbname
+root@university-and-course-data:~# cat /root/University-and-Course-data/backend-py/.env 2>/dev/null || cat /root/University-and-Course-data/.env 2>/dev/null
+DATABASE_URL=postgresql+asyncpg://uniportal:Bij%40y12345@127.0.0.1:5432/university_portal
+GEMINI_API_KEY=AIzaSyA7Bv1NsejhMVVb113-G0KcPrYJKO85W4U
+SHADOW_MODE_UNI_IDS=41
+SHADOW_MODE_UNI_IDS=41
+root@university-and-course-data:~# PGPASSWORD='Bij@y12345' psql -h 127.0.0.1 -p 5432 -U uniportal -d university_portal -c "SELECT c.id, c.name, c.study_mode, c.course_location, c.created_at::date FROM courses c JOIN universities u ON u.id = c.university_id WHERE u.name ILIKE '%tasmania%' OR u.name ILIKE '%utas%' ORDER BY c.name;"
+ id  |                   name                   | study_mode | course_location | created_at 
+-----+------------------------------------------+------------+-----------------+------------
+ 532 | Master of Social Work (Qualifying) (R7o) | On Campus  | Study period    | 2026-05-01
+(1 row)
+
+root@university-and-course-data:~# PGPASSWORD='Bij@y12345' psql -h 127.0.0.1 -p 5432 -U uniportal -d university_portal -c "SELECT sc.id, sc.course_name, sc.study_mode, sc.course_location, sc.status FROM scraped_courses sc JOIN universities u ON u.id = sc.university_id WHERE (u.name ILIKE '%tasmania%' OR u.name ILIKE '%utas%') AND (sc.course_location IS NULL OR sc.course_location = '' OR sc.study_mode ILIKE '%online%') ORDER BY sc.course_name;"
+ id | course_name | study_mode | course_location | status 
+----+-------------+------------+-----------------+--------
+(0 rows)
+
+root@university-and-course-data:~# PGPASSWORD='Bij@y12345' psql -h 127.0.0.1 -p 5432 -U uniportal -d university_portal -c "
+DELETE FROM courses WHERE id = 532;
+"
+DELETE 1
+root@university-and-course-data:~# python3 << 'PYEOF'
+BASE = "/root/University-and-Course-data/backend-py/app/services/scraper"
+with open(BASE + "/extractors/location.py") as f:
+    src = f.read()
+
+MARKER = "if _has_utas_panel:\n        cascade_list"
+if MARKER in src:
+    print("SKIP  location.py — already patched")
+else:
+    OLD = '''    cascade_list: list[tuple[str, str | None, float]] = [
+        # UTAS-specific: scope the entire cascade to the hidden
+        # #tabInternational panel so the international location wins over the
+        # domestic section that appears earlier in the HTML.  No-ops when the
+        # page has no such panel, so it is safe for all other universities.
+        ("utas_intl_panel", _from_utas_intl_panel(soup), 0.95),
+        # Structural pre-pass FIRST — see _from_strong_dom_walk for the
+        # rationale. Reads `<strong>Location</strong>` style values out
+        # of the DOM directly, including the ASA-style adjacent-div
+        # idiom that the heading walker misses.
+        ("strong", _from_strong_dom_walk(soup), 0.9),
+        ("dl", _from_dl(soup), 0.9),
+        # Div-label / div-value panel idiom (Torrens course-card-panel, etc.)
+        ("div_panel", _from_panel_divs(soup), 0.88),
+        ("table", _from_tables(soup), 0.85),
+        ("heading", _from_headings(soup), 0.7),
+        # "In person (CampusName)" delivery-mode pattern (Flinders, etc.)
+        ("delivery_inperson", _from_delivery_mode_inperson(soup), 0.85),
+    ]
+    # text_block runs on non-UTAS pages only — see comment above.
+    if not _has_utas_panel:
+        cascade_list.append(("text_block", _from_text_block(html_to_text(html)), 0.5))'''
+
+    NEW = '''    # For UTAS pages with #tabInternational: scope cascade ENTIRELY to that
+    # panel. Do NOT fall back to full-page structural methods.
+    # Bug: full-page methods read the whole HTML including the domestic tab.
+    # When the international panel is Online-only _from_utas_intl_panel
+    # returns None, then the cascade finds the domestic campus from the
+    # full-page scan — that non-empty course_location prevents the UTAS
+    # online_only guard in guards.py from firing.
+    if _has_utas_panel:
+        cascade_list: list[tuple[str, str | None, float]] = [
+            ("utas_intl_panel", _from_utas_intl_panel(soup), 0.95),
+        ]
+    else:
+        cascade_list = [
+PYEOF   print("WARN  location.py — anchor not found")w") as f:), 0.5),0.85),
+SKIP  location.py — already patched
+root@university-and-course-data:~# pm2 restart api-py && systemctl restart uni-celery.service
+Use --update-env to update environment variables
+[PM2] Applying action restartProcessId on app [api-py](ids: [ 0 ])
+[PM2] [api-py](0) ✓
+┌────┬───────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
+│ id │ name      │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
+├────┼───────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
+│ 0  │ api-py    │ default     │ 0.0.0   │ fork    │ 1427725  │ 0s     │ 16   │ online    │ 0%       │ 0b       │ root     │ disabled │
+└────┴───────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
+root@university-and-course-data:~# SELECT
+    sfe.extraction_method                   AS method,
+    sfe.snippet::jsonb->>'source_method'    AS source_method,
+    sfe.snippet::jsonb->>'consensus_count'  AS consensus,
+    COUNT(*)
+FROM scraped_field_evidence sfe
+JOIN scraped_courses sc ON sc.id = sfe.scraped_course_id
+JOIN universities u     ON u.id  = sc.university_id
+WHERE u.slug = 'torrens'
+  AND sfe.field_key = 'ielts_overall'
+  AND sfe.extraction_method ILIKE 'sibling_cache%'
+GROUP BY 1, 2, 3
+ORDER BY 1, 2;
+SELECT: command not found
+sfe.extraction_method: command not found
+sfe.snippet::jsonb-: command not found
+sfe.snippet::jsonb-: command not found
+-bash: syntax error near unexpected token `*'
+FROM: command not found
+JOIN: command not found
+JOIN: command not found
+WHERE: command not found
+AND: command not found
+AND: command not found
+GROUP: command not found
+ORDER: command not found
+root@university-and-course-data:~# PGPASSWORD='Bij@y12345' psql -h 127.0.0.1 -p 5432 -U uniportal -d university_portal -c "
+SELECT
+    sfe.extraction_method                   AS method,
+    sfe.snippet::jsonb->>'source_method'    AS source_method,
+    sfe.snippet::jsonb->>'consensus_count'  AS consensus,
+    COUNT(*)
+FROM scraped_field_evidence sfe
+JOIN scraped_courses sc ON sc.id = sfe.scraped_course_id
+JOIN universities u     ON u.id  = sc.university_id
+WHERE u.slug = 'torrens'
+  AND sfe.field_key = 'ielts_overall'
+  AND sfe.extraction_method ILIKE 'sibling_cache%'
+GROUP BY 1, 2, 3
+ORDER BY 1, 2;
+"
+ERROR:  column u.slug does not exist
+LINE 10: WHERE u.slug = 'torrens'
+               ^
+root@university-and-course-data:~# PGPASSWORD='Bij@y12345' psql -h 127.0.0.1 -p 5432 -U uniportal -d university_portal -c "
+SELECT
+    sfe.extraction_method                   AS method,
+    sfe.snippet::jsonb->>'source_method'    AS source_method,
+    sfe.snippet::jsonb->>'consensus_count'  AS consensus,
+    COUNT(*)
+FROM scraped_field_evidence sfe
+JOIN scraped_courses sc ON sc.id = sfe.scraped_course_id
+JOIN universities u     ON u.id  = sc.university_id
+WHERE u.name ILIKE '%torrens%'
+  AND sfe.field_key = 'ielts_overall'
+  AND sfe.extraction_method ILIKE 'sibling_cache%'
+GROUP BY 1, 2, 3
+ORDER BY 1, 2;
+"
+ERROR:  invalid input syntax for type json
+DETAIL:  Token "sibling" is invalid.
+CONTEXT:  JSON data, line 1: sibling...
+root@university-and-course-data:~# PGPASSWORD='Bij@y12345' psql -h 127.0.0.1 -p 5432 -U uniportal -d university_portal -c "
+SELECT
+    sfe.extraction_method                   AS method,
+    sfe.snippet::jsonb->>'source_method'    AS source_method,
+    sfe.snippet::jsonb->>'consensus_count'  AS consensus,
+    COUNT(*)
+FROM scraped_field_evidence sfe
+JOIN scraped_courses sc ON sc.id = sfe.scraped_course_id
+JOIN universities u     ON u.id  = sc.university_id
+WHERE u.name ILIKE '%torrens%'
+  AND sfe.field_key = 'ielts_overall'
+  AND sfe.extraction_method ILIKE 'sibling_cache%'
+  AND sfe.snippet IS NOT NULL
+  AND sfe.snippet LIKE '{%'
+GROUP BY 1, 2, 3
+ORDER BY 1, 2;
+"
+ method | source_method | consensus | count 
+--------+---------------+-----------+-------
+(0 rows)
+
+root@university-and-course-data:~# # Check services are running with the new code
+pm2 status
+systemctl status uni-celery.service --no-pager | head -5
+┌────┬───────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
+│ id │ name      │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
+├────┼───────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
+│ 0  │ api-py    │ default     │ 0.0.0   │ fork    │ 1427725  │ 13m    │ 16   │ online    │ 0%       │ 126.2mb  │ root     │ disabled │
+└────┴───────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
+● uni-celery.service - University Portal Celery Worker (scraper)
+     Loaded: loaded (/etc/systemd/system/uni-celery.service; enabled; preset: enabled)
+     Active: active (running) since Mon 2026-05-04 11:48:51 UTC; 13min ago
+   Main PID: 1427739 (celery)
+      Tasks: 75 (limit: 9483)
+root@university-and-course-data:~# python3 << 'PYEOF'
+import re, shutil, pathlib
+
+BASE = "/root/University-and-Course-data/backend-py/app/services/scraper"
+f = pathlib.Path(BASE + "/extractors/location.py")
+src = f.read_text()
+
+# Check if already patched
+if "if _has_utas_panel:" in src and "cascade_list: list" not in src.split("if _has_utas_panel:")[0].split("cascade_list")[-1]:
+    print("SKIP  location.py — already patched")
+else:
+    # Backup first
+    shutil.copy(f, str(f) + ".bak")
+    
+    # Find the cascade_list block and replace it
+    OLD = '''    cascade_list: list[tuple[str, str | None, float]] = ['''
+    
+    if OLD not in src:
+        print("WARN  anchor not found — printing first 50 chars of cascade_list context:")
+        idx = src.find("cascade_list")
+        print(repr(src[idx:idx+120]))
+    else:
+        print("OK    anchor found — patch ready")
+        print("Lines around anchor:")
+        for i, line in enumerate(src.splitlines()):
+            if "cascade_list" in line:
+                print(f"  {i+1}: {line}")
+PYEOF
+SKIP  location.py — already patched
+root@university-and-course-data:~# PGPASSWORD='Bij@y12345' psql -h 127.0.0.1 -p 5432 -U uniportal -d university_portal -c "
+SELECT c.id, c.name, c.study_mode, c.course_location 
+FROM courses c 
+JOIN universities u ON u.id = c.university_id 
+WHERE (u.name ILIKE '%tasmania%' OR u.name ILIKE '%utas%');
+"
+ id | name | study_mode | course_location 
+----+------+------------+-----------------
+(0 rows)
+
+root@university-and-course-data:~# PGPASSWORD='Bij@y12345' psql -h 127.0.0.1 -p 5432 -U uniportal -d university_portal -c "
+SELECT sc.id, sc.course_name, sc.study_mode, sc.course_location, sc.status 
+FROM scraped_courses sc 
+JOIN universities u ON u.id = sc.university_id 
+WHERE (u.name ILIKE '%tasmania%' OR u.name ILIKE '%utas%') 
+ORDER BY sc.status, sc.course_name;
+"
+root@university-and-course-data:~# PGPASSWORD='Bij@y12345' psql -h 127.0.0.1 -p 5432 -U uniportal -d university_portal -c "
+SELECT sc.id, sc.course_name, sc.course_location, sc.status
+FROM scraped_courses sc
+JOIN universities u ON u.id = sc.university_id
+WHERE (u.name ILIKE '%tasmania%' OR u.name ILIKE '%utas%')
+  AND (
+    sc.course_location ILIKE '%study period%'
+    OR sc.course_location = ''
+    OR sc.course_location IS NULL
+    OR sc.study_mode ILIKE '%online%'
+  )
+ORDER BY sc.course_name;
+"
+  id  |                     course_name                      | course_location |  status  
+------+------------------------------------------------------+-----------------+----------
+ 8542 | Bachelor of Philosophy (X3p)                         | Study period    | pending
+ 8543 | Bachelor of Psychological Science (53F)              | Study period    | pending
+ 8548 | Bachelor of Psychological Science with Honours (M4y) | Study period    | pending
+ 8546 | Bachelor of Social Work with Honours (A4s)           | Study period    | pending
+ 8537 | Diploma of University Studies (21A)                  | Study period    | pending
+ 8538 | Graduate Certificate in Behavioural Insights (C5v)   | Study period    | pending
+ 8541 | Graduate Certificate in Sustainable Business (C5q)   | Study period    | pending
+ 8536 | Graduate Certificate in Sustainable Business (C5q)   | Study period    | pending
+ 8545 | Graduate Certificate of Counselling (M5i)            | Study period    | pending
+ 8544 | Graduate Diploma in Counselling (M6i)                | Study period    | pending
+ 8540 | Graduate Diploma in Counselling (M6i)                | Study period    | pending
+ 8547 | Master of Social Work (Qualifying) (R7o)             | Study period    | approved
+ 8539 | Master of Teaching (E7g)                             | Study period    | pending
+(13 rows)
+
+root@university-and-course-data:~# PGPASSWORD='Bij@y12345' psql -h 127.0.0.1 -p 5432 -U uniportal -d university_portal -c "
+UPDATE scraped_courses sc
+SET status = 'rejected',
+    reject_reason = 'bad_location_data'
+FROM universities u
+WHERE sc.university_id = u.id
+  AND (u.name ILIKE '%tasmania%' OR u.name ILIKE '%utas%')
+  AND (
+    sc.course_location ILIKE '%study period%'
+    OR sc.course_location = ''
+    OR sc.course_location IS NULL
+    OR sc.study_mode ILIKE '%online%'
+  )
+  AND sc.status IN ('pending', 'staged', 'approved');
+"
+ERROR:  column "reject_reason" of relation "scraped_courses" does not exist
+LINE 4:     reject_reason = 'bad_location_data'
+            ^
+root@university-and-course-data:~# PGPASSWORD='Bij@y12345' psql -h 127.0.0.1 -p 5432 -U uniportal -d university_portal -c "
+UPDATE scraped_courses sc
+SET status = 'rejected'
+FROM universities u
+WHERE sc.university_id = u.id
+  AND (u.name ILIKE '%tasmania%' OR u.name ILIKE '%utas%')
+  AND (
+    sc.course_location ILIKE '%study period%'
+    OR sc.course_location = ''
+    OR sc.course_location IS NULL
+    OR sc.study_mode ILIKE '%online%'
+  )
+  AND sc.status IN ('pending', 'staged', 'approved');
+"
+UPDATE 13
+root@university-and-course-data:~# PGPASSWORD='Bij@y12345' psql -h 127.0.0.1 -p 5432 -U uniportal -d university_portal -c "
+UPDATE scraped_courses sc
+SET status = 'rejected'
+FROM universities u
+WHERE sc.university_id = u.id
+  AND (u.name ILIKE '%tasmania%' OR u.name ILIKE '%utas%')
+  AND (
+    sc.course_location ILIKE '%study period%'
+    OR sc.course_location = ''
+    OR sc.course_location IS NULL
+    OR sc.study_mode ILIKE '%online%'
+  )
+  AND sc.status IN ('pending', 'staged', 'approved');
+"
+UPDATE 0
+root@university-and-course-data:~# PGPASSWORD='Bij@y12345' psql -h 127.0.0.1 -p 5432 -U uniportal -d university_portal -c "
+SELECT
+  (SELECT COUNT(*) FROM courses c JOIN universities u ON u.id=c.university_id WHERE u.name ILIKE '%tasmania%') AS live_utas_courses,
+  (SELECT COUNT(*) FROM scraped_courses sc JOIN universities u ON u.id=sc.university_id WHERE u.name ILIKE '%tasmania%' AND sc.status NOT IN ('rejected')) AS staged_utas_courses,
+  (SELECT COUNT(*) FROM scraped_courses sc JOIN universities u ON u.id=sc.university_id WHERE u.name ILIKE '%tasmania%' AND sc.status = 'rejected') AS rejected_utas_courses;
+"
+ live_utas_courses | staged_utas_courses | rejected_utas_courses 
+-------------------+---------------------+-----------------------
+                 0 |                  58 |                    13
+(1 row)
+
+root@university-and-course-data:~# 
