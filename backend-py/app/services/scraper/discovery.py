@@ -1013,12 +1013,28 @@ async def discover_course_links(
         "/study/all",
     )
     if len(found) < _ALT_PROBE_THRESHOLD and origin:
+        if emit:
+            await emit(
+                "status",
+                f"[DISCOVER] probing {len(_ALT_LISTING_PATHS)} alt listing path(s) "
+                f"for additional candidates…",
+                phase="discover",
+                kind="alt_probe_start",
+                count=len(_ALT_LISTING_PATHS),
+            )
         for _alt_path in _ALT_LISTING_PATHS:
             if len(found) >= max_courses:
                 break
             _alt_url = f"{origin}{_alt_path}"
             if _alt_url in visited:
                 continue
+            if emit:
+                await emit(
+                    "status",
+                    f"[DISCOVER] alt probe: {_alt_url}",
+                    phase="discover",
+                    kind="alt_probe",
+                )
             _alt_html = await fetch_html(_alt_url, retries=0)
             if not _alt_html:
                 continue

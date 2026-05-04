@@ -805,14 +805,17 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     "(candidates=%d, job=%s)",
                     uni_name, len(links), job.id,
                 )
-                # Fire-and-forget Slack/email (sync helpers, no await needed)
-                deliver_discovery_failure_alert(
+                # Fire-and-forget Slack/email — offload to a thread so the
+                # sync urllib/smtplib calls (each up to 10s timeout) don't
+                # block the asyncio event loop and freeze the scrape UI.
+                asyncio.create_task(asyncio.to_thread(
+                    deliver_discovery_failure_alert,
                     uni_name=uni_name,
                     uni_id=uni_id,
                     scrape_url=scrape_url,
                     candidates_found=len(links),
                     diagnostic=_diag,
-                )
+                ))
             except Exception as _t7_exc:  # noqa: BLE001
                 log.error("[TIER7] Failed to persist/deliver discovery alert: %s", _t7_exc)
 
