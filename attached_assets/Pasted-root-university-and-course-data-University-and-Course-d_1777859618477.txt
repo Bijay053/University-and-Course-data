@@ -1,0 +1,42 @@
+root@university-and-course-data:~/University-and-Course-data# pm2 delete api-py
+
+pm2 start bash \
+  --name api-py \
+  -- -c "cd /root/University-and-Course-data/backend-py && exec ./venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8080 --workers 1"
+
+pm2 save
+
+# Wait 3 seconds then check
+sleep 3 && pm2 logs api-py --lines 15 --nostream
+[PM2] Applying action deleteProcessId on app [api-py](ids: [ 0 ])
+[PM2] [api-py](0) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+[PM2] Starting /usr/bin/bash in fork_mode (1 instance)
+[PM2] Done.
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ api-py             │ fork     │ 0    │ online    │ 0%       │ 4.9mb    │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+[PM2] Saving current process list...
+[PM2] Successfully saved in /root/.pm2/dump.pm2
+[TAILING] Tailing last 15 lines for [api-py] process (change the value with --lines option)
+/root/.pm2/logs/api-py-out.log last 15 lines:
+/root/.pm2/logs/api-py-error.log last 15 lines:
+0|api-py   | INFO:     Waiting for application startup.
+0|api-py   | INFO:uniportal:Python backend starting up (debug=False)
+0|api-py   | INFO:     Application startup complete.
+0|api-py   | ERROR:    [Errno 98] error while attempting to bind on address ('0.0.0.0', 8080): address already in use
+0|api-py   | INFO:     Waiting for application shutdown.
+0|api-py   | INFO:uniportal:Python backend shutting down
+0|api-py   | INFO:     Application shutdown complete.
+0|api-py   | INFO:     Started server process [1403783]
+0|api-py   | INFO:     Waiting for application startup.
+0|api-py   | INFO:uniportal:Python backend starting up (debug=False)
+0|api-py   | INFO:     Application startup complete.
+0|api-py   | ERROR:    [Errno 98] error while attempting to bind on address ('0.0.0.0', 8080): address already in use
+0|api-py   | INFO:     Waiting for application shutdown.
+0|api-py   | INFO:uniportal:Python backend shutting down
+0|api-py   | INFO:     Application shutdown complete.
