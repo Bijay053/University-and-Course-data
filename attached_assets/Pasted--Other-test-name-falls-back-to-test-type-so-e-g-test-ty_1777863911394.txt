@@ -1,0 +1,222 @@
+        # Other-test name falls back to test_type so e.g. test_type
+        # "Cambridge" with no test_name still labels the row.
+        d["otherEnglishTestName"] = (o.test_name if o else None) or (o.test_type if o else None)
+        d["otherEnglishListening"] = _f(o.listening) if o else None
+        d["otherEnglishSpeaking"]  = _f(o.speaking)  if o else None
+        d["otherEnglishWriting"]   = _f(o.writing)   if o else None
+        d["otherEnglishReading"]   = _f(o.reading)   if o else None
+        d["otherEnglishOverall"]   = _f(o.overall)   if o else None
+        # Safety pass: catch any remaining Decimal or datetime values
+        # that may have been introduced after the initial conversion loop.
+        from datetime import datetime as _dt2
+        for k, v in list(d.items()):
+            if isinstance(v, Decimal):
+                d[k] = float(v)
+            elif isinstance(v, _dt2):
+                d[k] = v.isoformat()
+        out.append(d)
+    return JSONResponse(content={"data": out, "total": int(total), "page": page, "limit": limit})
+
+
+@router.get("/courses/{course_id}", response_model=CourseRead)
+async def get_course(course_id: int, db: Annotated[AsyncSession, Depends(get_db)]) -> CourseRead:
+    c = await db.get(Course, course_id)
+    if not c:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+    return CourseRead.model_validate(c)
+
+
+@router.post("/courses", response_model=CourseRead, status_code=status.HTTP_201_CREATED)
+async def create_course(
+root@university-and-course-data:~/University-and-Course-data# FILE=/root/University-and-Course-data/backend-py/app/routers/courses.py
+
+# Replace bare attribute access with _f()-wrapped versions for all band scores
+sed -i \
+  -e 's/= i\.listening if i else None/= _f(i.listening) if i else None/g' \
+  -e 's/= i\.speaking  if i else None/= _f(i.speaking)  if i else None/g' \
+  -e 's/= i\.writing   if i else None/= _f(i.writing)   if i else None/g' \
+  -e 's/= i\.reading   if i else None/= _f(i.reading)   if i else None/g' \
+  -e 's/= i\.overall   if i else None/= _f(i.overall)   if i else None/g' \
+  -e 's/= p\.listening if p else None/= _f(p.listening) if p else None/g' \
+  -e 's/= p\.speaking  if p else None/= _f(p.speaking)  if p else None/g' \
+  -e 's/= p\.writing   if p else None/= _f(p.writing)   if p else None/g' \
+  -e 's/= p\.reading   if p else None/= _f(p.reading)   if p else None/g' \
+  -e 's/= p\.overall   if p else None/= _f(p.overall)   if p else None/g' \
+  -e 's/= t\.listening if t else None/= _f(t.listening) if t else None/g' \
+  -e 's/= t\.speaking  if t else None/= _f(t.speaking)  if t else None/g' \
+  -e 's/= t\.writing   if t else None/= _f(t.writing)   if t else None/g' \
+  -e 's/= t\.reading   if t else None/= _f(t.reading)   if t else None/g' \
+  -e 's/= t\.overall   if t else None/= _f(t.overall)   if t else None/g' \
+  -e 's/= o\.listening if o else None/= _f(o.listening) if o else None/g' \
+  -e 's/= o\.speaking  if o else None/= _f(o.speaking)  if o else None/g' \
+  -e 's/= o\.writing   if o else None/= _f(o.writing)   if o else None/g' \
+  -e 's/= o\.reading   if o else None/= _f(o.reading)   if o else None/g' \
+  -e 's/= o\.overall   if o else None/= _f(o.overall)   if o else None/g' \
+  "$FILE"
+
+# Verify the fix landed
+echo "=== Verification ==="
+grep -c "_f(" "$FILE" && echo "Lines with _f() found — patch applied"
+grep "ieltsListening\|pteOverall\|toeflOverall\|otherEnglishOverall" "$FILE"
+=== Verification ===
+21
+Lines with _f() found — patch applied
+        # `c.ieltsOverall || c.pteOverall || c.toeflOverall || ...`
+        d["ieltsListening"] = _f(i.listening) if i else None
+        d["pteOverall"]     = _f(p.overall)   if p else None
+        d["toeflOverall"]   = _f(t.overall)   if t else None
+        d["otherEnglishOverall"]   = _f(o.overall)   if o else None
+root@university-and-course-data:~/University-and-Course-data# pm2 restart api-py && sleep 8 && curl -s "http://localhost/api/courses?universityId=2&limit=1" | python3 -c "import json,sys; d=json.load(sys.stdin); print('OK — total:', d['total'], '| course:', d['data'][0]['name'] if d['data'] else 'EMPTY')"
+Use --update-env to update environment variables
+[PM2] Applying action restartProcessId on app [api-py](ids: [ 0 ])
+[PM2] [api-py](0) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ api-py             │ fork     │ 4    │ online    │ 0%       │ 3.4mb    │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+  File "/usr/lib/python3.12/json/__init__.py", line 293, in load
+    return loads(fp.read(),
+           ^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/decoder.py", line 337, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/decoder.py", line 355, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+root@university-and-course-data:~/University-and-Course-data# # 1. Wait for uvicorn to be fully ready, then test
+sleep 10 && curl -s "http://localhost/api/courses?universityId=2&limit=1" | python3 -c "import json,sys; d=json.load(sys.stdin); print('OK — total:', d['total'], '| course:', d['data'][0]['name'] if d['data'] else 'EMPTY')"
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+  File "/usr/lib/python3.12/json/__init__.py", line 293, in load
+    return loads(fp.read(),
+           ^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/decoder.py", line 337, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/decoder.py", line 355, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+root@university-and-course-data:~/University-and-Course-data# # 2. Get fresh error log
+pm2 logs api-py --err --lines 30 --nostream
+
+# 3. Show current prod file lines 140-215
+sed -n '140,215p' /root/University-and-Course-data/backend-py/app/routers/courses.py
+[TAILING] Tailing last 30 lines for [api-py] process (change the value with --lines option)
+/root/.pm2/logs/api-py-error.log last 30 lines:
+0|api-py   |     raise exc
+0|api-py   |   File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+0|api-py   |     await app(scope, receive, sender)
+0|api-py   |   File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/fastapi/middleware/asyncexitstack.py", line 18, in __call__
+0|api-py   |     await self.app(scope, receive, send)
+0|api-py   |   File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/starlette/routing.py", line 660, in __call__
+0|api-py   |     await self.middleware_stack(scope, receive, send)
+0|api-py   |   File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/starlette/routing.py", line 680, in app
+0|api-py   |     await route.handle(scope, receive, send)
+0|api-py   |   File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/starlette/routing.py", line 276, in handle
+0|api-py   |     await self.app(scope, receive, send)
+0|api-py   |   File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/fastapi/routing.py", line 134, in app
+0|api-py   |     await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+0|api-py   |   File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+0|api-py   |     raise exc
+0|api-py   |   File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+0|api-py   |     await app(scope, receive, sender)
+0|api-py   |   File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/fastapi/routing.py", line 120, in app
+0|api-py   |     response = await f(request)
+0|api-py   |                ^^^^^^^^^^^^^^^^
+0|api-py   |   File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/fastapi/routing.py", line 674, in app
+0|api-py   |     raw_response = await run_endpoint_function(
+0|api-py   |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+0|api-py   |   File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/fastapi/routing.py", line 328, in run_endpoint_function
+0|api-py   |     return await dependant.call(**values)
+0|api-py   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+0|api-py   |   File "/root/University-and-Course-data/backend-py/app/routers/courses.py", line 171, in list_courses
+0|api-py   |     d["ieltsListening"] = _f(i.listening) if i else None
+0|api-py   |                           ^^
+0|api-py   | NameError: name '_f' is not defined
+
+    for r in rows:
+        d = {col.name: getattr(r, col.name, None) for col in r.__table__.columns}
+        from datetime import datetime as _dt
+        for k, v in list(d.items()):
+            if isinstance(v, _dt):
+                d[k] = v.isoformat()
+        for snake, camel in course_aliases.items():
+            if snake in d:
+                d[camel] = d[snake]
+        # Add camelCase aliases for course fields
+        d["universityId"] = d.get("university_id")
+        d["degreeLevel"] = d.get("degree_level")
+        d["studyMode"] = d.get("study_mode")
+        d["courseLocation"] = d.get("course_location")
+        d["courseWebsite"] = d.get("course_website")
+        d["durationTerm"] = d.get("duration_term")
+        # Merge in fees (always include keys, even null)
+        d.update(fees_map.get(r.id, {
+            "international_fee": None, "internationalFee": None,
+            "fee_term": None, "feeTerm": None,
+            "fee_year": None, "feeYear": None,
+            "currency": None,
+        }))
+
+        # B7: surface english bands. Always emit ALL keys (with None
+        # fallback) so the UI doesn't have to guard against undefined.
+        # NOTE: asyncpg returns NUMERIC columns as Python Decimal objects.
+        # Wrap every band value through _f() so they become plain floats
+        # before JSONResponse tries to serialize the dict.
+        b = eng_map.get(r.id, {})
+        i = b.get("ielts"); p = b.get("pte"); t = b.get("toefl"); o = b.get("other")
+        d["ieltsListening"] = _f(i.listening) if i else None
+        d["ieltsSpeaking"]  = _f(i.speaking)  if i else None
+        d["ieltsWriting"]   = _f(i.writing)   if i else None
+        d["ieltsReading"]   = _f(i.reading)   if i else None
+        d["ieltsOverall"]   = _f(i.overall)   if i else None
+        d["pteListening"]   = _f(p.listening) if p else None
+        d["pteSpeaking"]    = _f(p.speaking)  if p else None
+        d["pteWriting"]     = _f(p.writing)   if p else None
+        d["pteReading"]     = _f(p.reading)   if p else None
+        d["pteOverall"]     = _f(p.overall)   if p else None
+        d["toeflListening"] = _f(t.listening) if t else None
+        d["toeflSpeaking"]  = _f(t.speaking)  if t else None
+        d["toeflWriting"]   = _f(t.writing)   if t else None
+        d["toeflReading"]   = _f(t.reading)   if t else None
+        d["toeflOverall"]   = _f(t.overall)   if t else None
+        # Other-test name falls back to test_type so e.g. test_type
+        # "Cambridge" with no test_name still labels the row.
+        d["otherEnglishTestName"] = (o.test_name if o else None) or (o.test_type if o else None)
+        d["otherEnglishListening"] = _f(o.listening) if o else None
+        d["otherEnglishSpeaking"]  = _f(o.speaking)  if o else None
+        d["otherEnglishWriting"]   = _f(o.writing)   if o else None
+        d["otherEnglishReading"]   = _f(o.reading)   if o else None
+        d["otherEnglishOverall"]   = _f(o.overall)   if o else None
+        # Safety pass: catch any remaining Decimal or datetime values
+        # that may have been introduced after the initial conversion loop.
+        from datetime import datetime as _dt2
+        for k, v in list(d.items()):
+            if isinstance(v, Decimal):
+                d[k] = float(v)
+            elif isinstance(v, _dt2):
+                d[k] = v.isoformat()
+        out.append(d)
+    return JSONResponse(content={"data": out, "total": int(total), "page": page, "limit": limit})
+
+
+@router.get("/courses/{course_id}", response_model=CourseRead)
+async def get_course(course_id: int, db: Annotated[AsyncSession, Depends(get_db)]) -> CourseRead:
+    c = await db.get(Course, course_id)
+    if not c:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+    return CourseRead.model_validate(c)
+
+
+@router.post("/courses", response_model=CourseRead, status_code=status.HTTP_201_CREATED)
+async def create_course(
+root@university-and-course-data:~/University-and-Course-data# 
