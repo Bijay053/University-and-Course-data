@@ -122,6 +122,107 @@ def _get_html(url: str) -> str | None:
 
 
 # ---------------------------------------------------------------------------
+# Static HTML: fee extraction (fallback when API ids are absent)
+# ---------------------------------------------------------------------------
+
+_STATIC_FEE_PATTERNS: list[re.Pattern[str]] = [
+    # "International students: A$28,320" / "International student A$28,320"
+    re.compile(
+        r"(?:international|overseas)\s+student[s]?[^$\n]{0,40}(?:A\$|\$)\s*([\d,]+)",
+        re.IGNORECASE,
+    ),
+    # "Annual tuition fee: $32,600 AUD" / "Annual tuition fee $32,600"
+    re.compile(
+        r"(?:annual|yearly|total)\s+(?:tuition\s+)?fee[s]?[:\s]*(?:A\$|\$)\s*([\d,]+)",
+        re.IGNORECASE,
+    ),
+    # Generic "tuition fee: A$XX,XXX"
+    re.compile(
+        r"tuition\s+fee[s]?[:\s]*(?:A\$|\$)\s*([\d,]+)",
+        re.IGNORECASE,
+    ),
+]
+
+_FEE_TERM_MAP: list[tuple[re.Pattern[str], str]] = [
+    (re.compile(r"\bper\s+semester\b", re.IGNORECASE), "semester"),
+    (re.compile(r"\bper\s+trimester\b", re.IGNORECASE), "trimester"),
+    (re.compile(r"\bper\s+(?:year|annum)\b|annually\b|annual\b", re.IGNORECASE), "year"),
+]
+
+_FEE_MIN = 1_000
+_FEE_MAX = 200_000
+
+# ---------------------------------------------------------------------------
+# Static HTML: intake month extraction (fallback when API ids are absent)
+# ---------------------------------------------------------------------------
+
+_MONTH_NAMES: list[str] = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December",
+]
+_MONTH_NAME_RE = re.compile(
+    r"\b(" + "|".join(_MONTH_NAMES) + r")\b",
+    re.IGNORECASE,
+)
+_INTAKE_CONTEXT_RE = re.compile(
+    r"(?:intake[s]?|start[s]?|commenc|semester\s+start|enrollment|enrolment)"
+    r".{0,120}",
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+def _extract_intake_from_static_html(plain_text: str) -> list[str]:
+    """Extract unique intake month names from plain text near intake keywords.
+
+    Returns an ordered, deduplicated list of month names (title-case) when
+    an intake-context phrase is found, otherwise ``[]``.
+    """
+    context_match = _INTAKE_CONTEXT_RE.search(plain_text)
+    if not context_match:
+        return []
+    context = context_match.group(0)
+    seen: set[str] = set()
+    months: list[str] = []
+    for m in _MONTH_NAME_RE.finditer(context):
+        name = m.group(1).title()
+        if name not in seen:
+            seen.add(name)
+            months.append(name)
+    return months
+
+
+def _extract_fee_from_static_html(plain_text: str) -> dict[str, Any]:
+    """Try to extract international fee from stripped plain text.
+
+    Returns a dict with ``international_fee`` and ``fee_term`` when a
+    plausible amount (1,000–200,000 AUD) is found, otherwise ``{}``.
+    """
+    for pattern in _STATIC_FEE_PATTERNS:
+        m = pattern.search(plain_text)
+        if not m:
+            continue
+        try:
+            amount = float(m.group(1).replace(",", ""))
+        except ValueError:
+            continue
+        if not (_FEE_MIN <= amount <= _FEE_MAX):
+            continue
+        result: dict[str, Any] = {"international_fee": amount}
+        # Determine fee term from surrounding context (±200 chars)
+        start = max(0, m.start() - 50)
+        end = min(len(plain_text), m.end() + 150)
+        context = plain_text[start:end]
+        fee_term = "year"  # default
+        for term_re, term_name in _FEE_TERM_MAP:
+            if term_re.search(context):
+                fee_term = term_name
+                break
+        result["fee_term"] = fee_term
+        return result
+    return {}
+
+
+# ---------------------------------------------------------------------------
 # Static HTML: data-* attribute parsing
 # ---------------------------------------------------------------------------
 
@@ -409,6 +510,21 @@ def apply_bond_extraction(url: str, html: str) -> dict[str, Any]:
     ielts = _enrich_from_entry_requirements(url)
     for k, v in ielts.items():
         result.setdefault(k, v)
+
+    # ── Static HTML intake fallback (when API ids absent or API returned no months) ─
+    if "intake_months" not in result:
+        static_months = _extract_intake_from_static_html(plain_text)
+        if static_months:
+            result["intake_months"] = static_months
+            log.info("[BOND] %s — intake_months extracted from static HTML: %s", url, static_months)
+
+    # ── Static HTML fee fallback (when API ids absent or API returned no fee) ─
+    if "international_fee" not in result:
+        static_fee = _extract_fee_from_static_html(plain_text)
+        for k, v in static_fee.items():
+            result.setdefault(k, v)
+        if static_fee:
+            log.info("[BOND] %s — fee extracted from static HTML: %.0f", url, static_fee["international_fee"])
 
     # ── Fee warning when still missing ─────────────────────────────────────
     if "international_fee" not in result:
