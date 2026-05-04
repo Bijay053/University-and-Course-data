@@ -55,3 +55,7 @@ Thumbs.db
 .env.development.local
 .env.production.local
 !.env.example
+backend-py/celerybeat-schedule
+backend-py/baselines/
+baselines/
+ielts_overall
