@@ -627,11 +627,47 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
                         continue
                     # Sub-1.5-year minimum ("Minimum 1 Semester", "Minimum 1 Year"):
                     # this is a UTAS flexible-enrolment FLOOR, not a program length.
-                    # Strip the enrollment-floor clause (and the paired "maximum of N
-                    # [unit]" clause) from the sentence so the pattern loop can still
-                    # find the real program duration that may appear later in the same
-                    # text block (e.g. html_to_text merges the <dd> content and the
-                    # following <p> into one long string without a period between them).
+                    # Strategy:
+                    #  1. Add the minimum itself at ×0.1 — pure last-resort fallback
+                    #     (used when nothing else exists, e.g. genuine 1-semester
+                    #     grad cert with no other prose).
+                    #  2. If there is a paired "up to a maximum of X" clause, add X
+                    #     at ×0.5 — still lower than any prose pattern (Pattern-1
+                    #     ×10, Pattern-2 ×1) but higher than the minimum seed.
+                    #     This makes grad diplomas with "min 1 sem, max 1 yr" show
+                    #     1 Year when there is no separate prose sentence.
+                    #  3. Strip both clauses so the normal pattern loop below cannot
+                    #     re-match them at Pattern-2 (×1) priority, which would
+                    #     otherwise beat the maximum seed and confuse the tournament.
+                    #  Prose sentences (e.g. "3 years full-time" at Pattern-1 ×10)
+                    #  always beat both seeds — bachelor programs remain correct.
+                    min_weeks_seed = min_amount * _WEEKS[min_unit]
+                    parsed.append((
+                        (min_weeks_seed * 100 + _UNIT_RANK[min_unit]) * 0.1,
+                        min_amount,
+                        min_unit,
+                        min_m.group(0).strip()[:240],
+                    ))
+                    max_m2 = re.search(
+                        r"\bup\s+to\s+a?\s*maximum\s+of\s+(\d+(?:\.\d+)?)\s*"
+                        r"(years?|months?|weeks?|semesters?|trimesters?)\b",
+                        s,
+                        re.IGNORECASE,
+                    )
+                    if max_m2:
+                        try:
+                            _mx_a = float(max_m2.group(1))
+                            _mx_u = _normalise_unit(max_m2.group(2))
+                            if _mx_u and 0 < _mx_a <= _DURATION_CAP[_mx_u]:
+                                _mx_w = _mx_a * _WEEKS[_mx_u]
+                                parsed.append((
+                                    (_mx_w * 100 + _UNIT_RANK[_mx_u]) * 0.5,
+                                    _mx_a,
+                                    _mx_u,
+                                    max_m2.group(0).strip()[:240],
+                                ))
+                        except (ValueError, IndexError):
+                            pass
                     s = _MINIMUM_DURATION_RE.sub("", s, count=1)
                     s = re.sub(
                         r"\bup\s+to\s+a?\s*maximum\s+of\s+\d+(?:\.\d+)?\s*"
@@ -640,7 +676,7 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
                         s,
                         flags=re.IGNORECASE,
                     )
-                    # Fall through to the pattern loop with the cleaned sentence.
+                    # Fall through with cleaned sentence.
             except (ValueError, IndexError):
                 pass
 
