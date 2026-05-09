@@ -12,6 +12,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Plus, Search, Globe, ArrowRight, Building2, Trash2, Pencil, MoreHorizontal, ExternalLink, BookOpen, Star, Upload } from "lucide-react";
+import { Can, useCan } from "@/components/can";
 import { useToast } from "@/hooks/use-toast";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -37,6 +38,9 @@ const COUNTRY_FLAGS: Record<string, string> = {
 export default function Universities() {
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
+  const { can } = useCan();
+  const canEdit = can("universities.edit");
+  const canDelete = can("universities.delete");
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [deleteName, setDeleteName] = useState("");
   const [deleteLoading, setDeleteLoading] = useState(false);
@@ -143,11 +147,14 @@ export default function Universities() {
           <p className="text-sm text-gray-500 mt-0.5">Manage partner universities and institutions.</p>
         </div>
         <div className="flex gap-2">
-          <Link href="/universities/bulk-import">
-            <Button variant="outline" className="gap-1.5">
-              <Upload className="h-4 w-4" /> Bulk Import (CSV)
-            </Button>
-          </Link>
+          <Can permission="bulk.import">
+            <Link href="/universities/bulk-import">
+              <Button variant="outline" className="gap-1.5">
+                <Upload className="h-4 w-4" /> Bulk Import (CSV)
+              </Button>
+            </Link>
+          </Can>
+          <Can permission="universities.create">
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <Button className="gap-1.5">
@@ -181,6 +188,7 @@ export default function Universities() {
             </Form>
           </DialogContent>
         </Dialog>
+          </Can>
         </div>
       </div>
 
@@ -338,19 +346,25 @@ export default function Universities() {
                               </a>
                             </DropdownMenuItem>
                           )}
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem onClick={() => openEdit(uni)} className="gap-2 cursor-pointer">
-                            <Pencil className="w-3.5 h-3.5 text-amber-500" />
-                            Edit Details
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            onClick={() => { setDeleteId(uni.id); setDeleteName(uni.name); }}
-                            className="gap-2 cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                            Delete
-                          </DropdownMenuItem>
+                          {(canEdit || canDelete) && <DropdownMenuSeparator />}
+                          {canEdit && (
+                            <DropdownMenuItem onClick={() => openEdit(uni)} className="gap-2 cursor-pointer">
+                              <Pencil className="w-3.5 h-3.5 text-amber-500" />
+                              Edit Details
+                            </DropdownMenuItem>
+                          )}
+                          {canDelete && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                onClick={() => { setDeleteId(uni.id); setDeleteName(uni.name); }}
+                                className="gap-2 cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                                Delete
+                              </DropdownMenuItem>
+                            </>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>

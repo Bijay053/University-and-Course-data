@@ -31,6 +31,7 @@ from app.models.scraping_change import ScrapingChange
 from app.models.scraping_job import ScrapingJob
 from app.models.university import University
 from app.models.university_field_baseline import UniversityFieldBaseline
+from app.models.user import PasswordResetToken, User, UserPermission
 
 __all__ = [
     "AcademicLevelOption",

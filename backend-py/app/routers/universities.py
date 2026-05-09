@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies import get_current_user, get_db
 from app.models import Course, University
+from app.permissions import require_permission
 from app.schemas.course import CourseListResponse, CourseRead
 from app.schemas.university import (
     UniversityCreate,
@@ -140,6 +141,7 @@ async def get_university_courses(
 async def create_university(
     body: UniversityCreate,
     db: Annotated[AsyncSession, Depends(get_db)],
+    _u: Annotated[dict, Depends(require_permission("universities.create"))],
 ) -> UniversityRead:
     # Bug #1: case-insensitive name match -- prevents "Monash" / "monash" duplicates.
     existing_stmt = select(University).where(func.lower(University.name) == body.name.lower())
@@ -197,7 +199,7 @@ async def update_university(
     uni_id: int,
     body: UniversityUpdate,
     db: Annotated[AsyncSession, Depends(get_db)],
-    _user: Annotated[dict, Depends(get_current_user)],
+    _user: Annotated[dict, Depends(require_permission("universities.edit"))],
 ) -> UniversityRead:
     u = await db.get(University, uni_id)
     if not u:
@@ -221,6 +223,7 @@ async def update_university_featured(
     uni_id: int,
     db: Annotated[AsyncSession, Depends(get_db)],
     body: Annotated[dict, Body(...)],
+    _u: Annotated[dict, Depends(require_permission("universities.edit"))],
 ) -> dict:
     """Toggle the featured flag (and optional priority) used by the public
     Course Search ranking. Mirrors Node ``router.patch
@@ -244,7 +247,7 @@ async def update_university_featured(
 @router.post("/universities/bulk-import", status_code=status.HTTP_200_OK)
 async def bulk_import_universities(
     db: Annotated[AsyncSession, Depends(get_db)],
-    _user: Annotated[dict, Depends(get_current_user)],
+    _user: Annotated[dict, Depends(require_permission("bulk.import"))],
     file: UploadFile = File(...),
 ) -> dict[str, Any]:
     """Bug #6 fix: CSV bulk import for universities.
@@ -340,7 +343,7 @@ async def bulk_import_universities(
 async def delete_university(
     uni_id: int,
     db: Annotated[AsyncSession, Depends(get_db)],
-    _user: Annotated[dict, Depends(get_current_user)],
+    _user: Annotated[dict, Depends(require_permission("universities.delete"))],
 ) -> None:
     u = await db.get(University, uni_id)
     if not u:

@@ -12,6 +12,7 @@ import {
   FileJson, FileText, CheckCheck, WifiOff, RotateCcw, Search, ChevronsUpDown,
 } from "lucide-react";
 import { readResponseJson } from "@/lib/readResponseJson";
+import { Can } from "@/components/can";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type ImportResult = {
@@ -962,6 +963,14 @@ export default function Bulk() {
             </div>
           )}
 
+          <Can
+            permission="bulk.import"
+            fallback={
+              <p className="text-sm text-muted-foreground bg-muted/40 rounded-md px-3 py-2 text-center">
+                You don't have permission to import data.
+              </p>
+            }
+          >
           <Button className="w-full" size="lg" onClick={handleImport} disabled={importLoading || !file}>
             {importLoading ? (
               <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Importing...</>
@@ -969,6 +978,7 @@ export default function Bulk() {
               <><Upload className="w-4 h-4 mr-2" />Import Excel File</>
             )}
           </Button>
+          </Can>
 
           <div className="rounded-xl border bg-gray-50 p-5 text-sm text-gray-600 space-y-2">
             <p className="font-medium text-gray-700">Expected Column Format</p>
