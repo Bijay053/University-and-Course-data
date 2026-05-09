@@ -951,10 +951,10 @@ export default function Bulk() {
                   <div className="text-xs text-gray-500 mt-0.5">Skipped</div>
                 </div>
               </div>
-              {importResult.errors.length > 0 && (
+              {(importResult.errors?.length ?? 0) > 0 && (
                 <div className="space-y-1">
-                  <p className="text-sm font-medium text-red-600">Errors ({importResult.errors.length}):</p>
-                  {importResult.errors.map((e, i) => (
+                  <p className="text-sm font-medium text-red-600">Errors ({importResult.errors!.length}):</p>
+                  {importResult.errors!.map((e, i) => (
                     <p key={i} className="text-xs text-red-500 bg-white rounded p-1 border border-red-100">{e}</p>
                   ))}
                 </div>
