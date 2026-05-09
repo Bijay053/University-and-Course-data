@@ -1,0 +1,9 @@
+# Federation University Australia — stub created for Week 5 scale-up.
+# Hostname: federation.edu.au  (course catalogue under /study)
+# Pathway-heavy — confirms Week 2 Prompt 5 (skip central English) and
+# Prompt 6 (lower sanity floors for pathway programs) work as advertised.
+discovery: {}
+extraction:
+  filters:
+    domestic_only:
+      enabled: false

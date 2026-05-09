@@ -1,0 +1,10 @@
+# Curtin University — stub created for Week 5 scale-up.
+# Hostname: www.curtin.edu.au  (course catalogue at study.curtin.edu.au)
+# Multi-campus: Bentley, Perth City, Singapore, Malaysia, Mauritius.
+discovery:
+  fallback_subdomains:
+    - "study.{domain}"
+extraction:
+  filters:
+    domestic_only:
+      enabled: false

@@ -36,7 +36,7 @@ _NAME_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"\b(doctor(ate)?|ph\.?d|d\.?phil)\b", re.IGNORECASE), "Doctorate"),
     (re.compile(r"\bgraduate\s+diploma\b", re.IGNORECASE), "Graduate Diploma"),
     (re.compile(r"\bgraduate\s+certificate\b", re.IGNORECASE), "Graduate Certificate"),
-    (re.compile(r"\bpostgraduate\s+diploma\b", re.IGNORECASE), "Graduate Diploma"),
+    (re.compile(r"\bpostgraduate\s+diploma\b", re.IGNORECASE), "Graduate Certificate"),
     (re.compile(r"\bpostgraduate\s+certificate\b", re.IGNORECASE), "Graduate Certificate"),
     (re.compile(r"\b(master('?s)?|mba|m\.?sc|m\.?eng|m\.?ed|m\.?phil)\b", re.IGNORECASE), "Master's"),
     (re.compile(r"\b(bachelor('?s)?|b\.?sc|b\.?eng|b\.?ed|b\.?a|b\.?bus)\b", re.IGNORECASE), "Bachelor's"),

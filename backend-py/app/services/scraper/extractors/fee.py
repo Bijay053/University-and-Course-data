@@ -299,8 +299,17 @@ def _classify_fee_value(value: str) -> tuple[int, str] | None:
         amount = int(float(raw.replace(",", "")))
     except ValueError:
         return None
-    if amount < 5_000 or amount > 200_000:
+    # Week 2 P6 — log-and-accept low values; only the upper bound rejects.
+    # Pathway-program / TAFE / short-course fees can fall below the historic
+    # 5_000 floor; the module-level _MIN_INTL_FEE_FLOOR (1_000) defines the
+    # new floor.  Above 200_000 still rejects (those are CRICOS errors).
+    if amount > 200_000:
         return None
+    if amount < 1_000:
+        return None
+    if amount < 5_000:
+        from app.services.scraper.sanity_floors import sanity_check
+        sanity_check("international_fee", amount)
     return amount, value
 
 
@@ -411,9 +420,20 @@ def _candidates(text: str) -> Iterable[tuple[int, str, str]]:
         start = max(0, m.start() - 160)
         end = min(len(text), m.end() + 160)
         ctx = text[start:end]
-        floor = 1_500 if _PER_UNIT_HINT_RE.search(ctx) else 5_000
-        if amount < floor or amount > 200_000:
+        # Week 2 P6 — log-and-accept low values.  The historic floor of
+        # 5_000 silently dropped pathway / TAFE / micro-credential courses;
+        # we now reject only below 1_000 (clearly noise) or above 200_000
+        # (clearly a CRICOS-code mis-parse), and emit a SANITY log line
+        # for the 1_000–4_999 grey zone so reviewers can audit if needed.
+        # The per-unit floor (1_500) is kept as the *upper* limit for
+        # per-unit context — it gates whether the rollup branch should
+        # multiply the value, not whether to reject it outright.
+        if amount < 1_000 or amount > 200_000:
             continue
+        per_unit = bool(_PER_UNIT_HINT_RE.search(ctx))
+        if (per_unit and amount < 1_500) or (not per_unit and amount < 5_000):
+            from app.services.scraper.sanity_floors import sanity_check
+            sanity_check("international_fee", amount)
         # Salary filter: reject only when the *nearest* salary cue is closer
         # to the amount than the nearest tuition/fee/international cue.
         anchor = m.start() - start  # offset of the amount inside ctx

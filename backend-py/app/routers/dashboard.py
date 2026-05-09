@@ -10,6 +10,8 @@ Mirrors the Node API surface (artifacts/api-server/src/routes/dashboard.ts):
 """
 from __future__ import annotations
 
+import logging
+import traceback
 from datetime import datetime, timezone
 from typing import Annotated
 
@@ -73,41 +75,48 @@ async def stats(db: Annotated[AsyncSession, Depends(get_db)]) -> dict:
     to these exact camelCase keys via the generated client; missing the
     endpoint flooded the browser console with 404s on every page load.
     """
-    # Fire counts in a single round-trip via UNION ALL — keeps p99 cheap on
-    # the dashboard which is hit on every navigation.
-    uni_count = (await db.execute(select(func.count(University.id)))).scalar_one() or 0
-    course_count = (await db.execute(select(func.count(Course.id)))).scalar_one() or 0
-    scholarship_count = (
-        await db.execute(select(func.count(Scholarship.id)))
-    ).scalar_one() or 0
-    pending_count = (
-        await db.execute(
-            select(func.count(ScrapingChange.id)).where(ScrapingChange.status == "pending")
-        )
-    ).scalar_one() or 0
-    active_job_count = (
-        await db.execute(
-            select(func.count(ScrapeRuntimeJob.runtime_job_id)).where(
-                ScrapeRuntimeJob.status.in_(["queued", "running"])
+    try:
+        uni_count = (await db.execute(select(func.count(University.id)))).scalar_one() or 0
+        course_count = (await db.execute(select(func.count(Course.id)))).scalar_one() or 0
+        scholarship_count = (
+            await db.execute(select(func.count(Scholarship.id)))
+        ).scalar_one() or 0
+        pending_count = (
+            await db.execute(
+                select(func.count(ScrapingChange.id)).where(ScrapingChange.status == "pending")
             )
-        )
-    ).scalar_one() or 0
-    # Courses created in current calendar month
-    now = datetime.now(timezone.utc)
-    month_start = datetime(now.year, now.month, 1, tzinfo=timezone.utc)
-    courses_this_month = (
-        await db.execute(
-            select(func.count(Course.id)).where(Course.created_at >= month_start)
-        )
-    ).scalar_one() or 0
-    return {
-        "totalUniversities": int(uni_count),
-        "totalCourses": int(course_count),
-        "totalScholarships": int(scholarship_count),
-        "pendingChanges": int(pending_count),
-        "activeScrapingJobs": int(active_job_count),
-        "coursesThisMonth": int(courses_this_month),
-    }
+        ).scalar_one() or 0
+        active_job_count = (
+            await db.execute(
+                select(func.count(ScrapeRuntimeJob.runtime_job_id)).where(
+                    ScrapeRuntimeJob.status.in_(["queued", "running"])
+                )
+            )
+        ).scalar_one() or 0
+        now = datetime.now(timezone.utc)
+        month_start = datetime(now.year, now.month, 1, tzinfo=timezone.utc)
+        courses_this_month = (
+            await db.execute(
+                select(func.count(Course.id)).where(Course.created_at >= month_start)
+            )
+        ).scalar_one() or 0
+        return {
+            "totalUniversities": int(uni_count),
+            "totalCourses": int(course_count),
+            "totalScholarships": int(scholarship_count),
+            "pendingChanges": int(pending_count),
+            "activeScrapingJobs": int(active_job_count),
+            "coursesThisMonth": int(courses_this_month),
+        }
+    except Exception as exc:
+        tb = traceback.format_exc()
+        _log.error("dashboard/stats failed: %s", tb)
+        try:
+            with open("/tmp/dashboard_stats_error.log", "w") as fh:
+                fh.write(tb)
+        except Exception:
+            pass
+        raise
 
 
 @router.get("/recent-changes")

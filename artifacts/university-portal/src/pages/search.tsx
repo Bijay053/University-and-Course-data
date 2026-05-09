@@ -101,7 +101,9 @@ function formatFee(
 function formatDuration(d: number | null, term: string | null) {
   if (d == null) return null;
   const unit = term || "Year";
-  return `${d} ${unit}${d !== 1 && !unit.endsWith("s") ? "s" : ""}`;
+  const r = Math.round(d * 10) / 10;
+  const display = r % 1 === 0 ? String(Math.round(r)) : String(r);
+  return `${display} ${unit}${r !== 1 && !unit.endsWith("s") ? "s" : ""}`;
 }
 
 export default function SearchPage() {

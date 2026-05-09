@@ -271,14 +271,37 @@ class TestShouldStageCourseOnlineOnly:
         assert ok is False
         assert reason == "online_only"
 
-    def test_acap_mba_online_with_physical_campus_stages(self) -> None:
-        """ACAP MBA fix: study_mode='Online' must NOT reject when course_location
-        contains real physical campus cities. The location extractor strips virtual
-        keywords, so a non-empty course_location = confirmed physical campus → Blended.
+    def test_acap_mba_blended_with_physical_campus_stages(self) -> None:
+        """ACAP MBA: after pipeline upgrades Online→Blended the guard must accept.
+
+        The scraping pipeline (single_course.py) upgrades study_mode from
+        'Online' to 'Blended' when the location extractor finds confirmed
+        physical campuses — so by the time should_stage_course is called the
+        payload carries 'Blended', not 'Online'.  The guard treats study_mode
+        as authoritative: 'Online' with no campus keyword always rejects;
+        'Blended' (which contains no "online"-only signal) passes.
 
         Real case: https://www.acap.edu.au/courses/master-of-business-administration/
-        The study_mode extractor returns 'Online' but the page shows delivery in
-        Sydney, Melbourne, Brisbane, Adelaide, and Perth — clearly not online-only.
+        """
+        payload = {
+            "course_name": "Master of Business Administration",
+            "international_fee": 35000,
+            "study_mode": "Blended",
+            "course_location": "Sydney, Melbourne, Brisbane, Adelaide, Perth",
+        }
+        ok, reason = should_stage_course("Master of Business Administration", payload)
+        assert ok is True, (
+            f"ACAP MBA with Blended study_mode should stage, got reason={reason!r}"
+        )
+
+    def test_acap_mba_raw_online_with_campus_rejects_at_guard(self) -> None:
+        """Guard rejects study_mode='Online' even with physical campus.
+
+        If somehow a payload with study_mode='Online' AND a non-empty
+        course_location reaches the guard (i.e. the pipeline's Online→Blended
+        upgrade did not fire), the guard still rejects it.  This is intentional:
+        study_mode is the authoritative signal.  Many universities (e.g. ACAP)
+        list their physical campuses for purely-online courses.
         """
         payload = {
             "course_name": "Master of Business Administration",
@@ -287,12 +310,29 @@ class TestShouldStageCourseOnlineOnly:
             "course_location": "Sydney, Melbourne, Brisbane, Adelaide, Perth",
         }
         ok, reason = should_stage_course("Master of Business Administration", payload)
+        assert ok is False
+        assert reason == "online_only"
+
+    def test_blended_with_location_text_stages(self) -> None:
+        """Blended mode with location_text stages correctly."""
+        payload = {
+            "course_name": "Graduate Diploma of Business Administration",
+            "international_fee": 28000,
+            "study_mode": "Blended",
+            "location_text": "Sydney, Melbourne",
+        }
+        ok, reason = should_stage_course("Graduate Diploma of Business Administration", payload)
         assert ok is True, (
-            f"ACAP MBA with physical campus cities should stage, got reason={reason!r}"
+            f"Blended with location_text='Sydney, Melbourne' should stage, got reason={reason!r}"
         )
 
-    def test_online_with_location_text_stages(self) -> None:
-        """location_text (alias for course_location in some payloads) also overrides."""
+    def test_online_with_location_text_rejects(self) -> None:
+        """study_mode='Online' is rejected even when location_text has campus names.
+
+        study_mode is authoritative.  The pipeline upgrades Online→Blended
+        before the guard, so this scenario only arises if the pipeline's
+        upgrade logic did not fire (e.g. low-confidence location).
+        """
         payload = {
             "course_name": "Graduate Diploma of Business Administration",
             "international_fee": 28000,
@@ -300,9 +340,8 @@ class TestShouldStageCourseOnlineOnly:
             "location_text": "Sydney, Melbourne",
         }
         ok, reason = should_stage_course("Graduate Diploma of Business Administration", payload)
-        assert ok is True, (
-            f"Online with location_text='Sydney, Melbourne' should stage, got reason={reason!r}"
-        )
+        assert ok is False
+        assert reason == "online_only"
 
     def test_online_no_location_still_rejects(self) -> None:
         """Courses genuinely online-only (no course_location, no location_text) still rejected."""
@@ -316,6 +355,104 @@ class TestShouldStageCourseOnlineOnly:
         ok, reason = should_stage_course("Master of Data Science", payload)
         assert ok is False
         assert reason == "online_only"
+
+
+class TestUtasOnlineBlankLocation:
+    """UTAS-specific guard: blank course_location must reject even when
+    location_text contains 'Online'.
+
+    Root cause of the bug: _physical_location was computed as
+        (course_location or location_text or "")
+    For UTAS courses whose Location panel says "Online", the location
+    extractor correctly strips it from course_location (leaving it empty)
+    but location_text still holds the raw "Online" string.  The fallback
+    to location_text made _physical_location = "Online" (truthy), so the
+    UTAS guard never fired and the course slipped through.
+
+    Fix: the UTAS guard now uses course_location exclusively (already
+    de-virtualised), ignoring location_text.
+    """
+
+    _UTAS_URL = "https://www.utas.edu.au/courses/arts-soc/courses/e7h-master-of-education"
+
+    def test_utas_online_location_text_not_treated_as_physical(self) -> None:
+        """BUG: location_text='Online' must NOT count as a physical campus for UTAS.
+
+        Before the fix, this payload would pass the UTAS guard because
+        _physical_location fell back to location_text='Online' (truthy).
+        """
+        payload = {
+            "course_name": "Master of Education",
+            "international_fee": 37950,
+            "study_mode": "On Campus",
+            "course_location": "",       # stripped by location extractor
+            "location_text": "Online",   # raw value from UTAS Location panel
+        }
+        ok, reason = should_stage_course(
+            "Master of Education", payload, source_url=self._UTAS_URL
+        )
+        assert ok is False, (
+            "UTAS course with course_location='' and location_text='Online' "
+            f"must be rejected as online_only, got reason={reason!r}"
+        )
+        assert reason == "online_only"
+
+    def test_utas_blank_both_locations_rejects(self) -> None:
+        """UTAS course with no location evidence at all is also rejected."""
+        payload = {
+            "course_name": "Master of Education",
+            "international_fee": 37950,
+            "study_mode": "On Campus",
+            "course_location": None,
+            "location_text": None,
+        }
+        ok, reason = should_stage_course(
+            "Master of Education", payload, source_url=self._UTAS_URL
+        )
+        assert ok is False
+        assert reason == "online_only"
+
+    def test_utas_real_campus_stages(self) -> None:
+        """UTAS course with a confirmed physical campus in course_location passes."""
+        payload = {
+            "course_name": "Master of Architecture",
+            "international_fee": 41950,
+            "study_mode": "On Campus",
+            "course_location": "Launceston",
+            "location_text": "Launceston",
+        }
+        ok, reason = should_stage_course(
+            "Master of Architecture",
+            payload,
+            source_url="https://www.utas.edu.au/courses/sci-eng/courses/d7c-master-of-architecture",
+        )
+        assert ok is True, (
+            f"UTAS course with course_location='Launceston' should stage, got reason={reason!r}"
+        )
+
+    def test_non_utas_location_text_online_still_stages(self) -> None:
+        """For non-UTAS universities the UTAS guard must NOT fire.
+
+        A non-UTAS course with study_mode='On Campus' and location_text='Online'
+        should still pass (the general online_only guard only fires when
+        study_mode itself contains 'online').
+        """
+        payload = {
+            "course_name": "Master of Business Administration",
+            "international_fee": 35000,
+            "study_mode": "On Campus",
+            "course_location": "",
+            "location_text": "Online",
+        }
+        ok, reason = should_stage_course(
+            "Master of Business Administration",
+            payload,
+            source_url="https://www.example-university.edu.au/courses/mba",
+        )
+        assert ok is True, (
+            "Non-UTAS course with study_mode='On Campus' must not be rejected "
+            f"by the UTAS guard, got reason={reason!r}"
+        )
 
 
 class TestQualificationCodePrefix:

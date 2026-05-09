@@ -805,14 +805,17 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     "(candidates=%d, job=%s)",
                     uni_name, len(links), job.id,
                 )
-                # Fire-and-forget Slack/email (sync helpers, no await needed)
-                deliver_discovery_failure_alert(
+                # Fire-and-forget Slack/email — offload to a thread so the
+                # sync urllib/smtplib calls (each up to 10s timeout) don't
+                # block the asyncio event loop and freeze the scrape UI.
+                asyncio.create_task(asyncio.to_thread(
+                    deliver_discovery_failure_alert,
                     uni_name=uni_name,
                     uni_id=uni_id,
                     scrape_url=scrape_url,
                     candidates_found=len(links),
                     diagnostic=_diag,
-                )
+                ))
             except Exception as _t7_exc:  # noqa: BLE001
                 log.error("[TIER7] Failed to persist/deliver discovery alert: %s", _t7_exc)
 
@@ -965,17 +968,33 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 if not discovered:
                     course_sample = [lk["url"] for lk in links[:5] if lk.get("url")]
                     base_domain = (uni.website or uni.scrape_url or "").rstrip("/")
-                    try:
-                        discovered = await asyncio.wait_for(
-                            discover_fee_url_from_course_pages(course_sample, base_domain),
-                            timeout=120,
-                        )
-                    except asyncio.TimeoutError:
+                    if not base_domain and course_sample:
+                        from urllib.parse import urlparse as _urlparse
+                        _p = _urlparse(course_sample[0])
+                        if _p.scheme and _p.netloc:
+                            base_domain = f"{_p.scheme}://{_p.netloc}"
+                            log.warning(
+                                "uni %s has empty website/scrape_url; derived base_domain=%s from first course link",
+                                uni.id, base_domain,
+                            )
+                    if not base_domain:
                         log.warning(
-                            "discover_fee_url_from_course_pages timed out after 120s for %s — skipping",
-                            base_domain,
+                            "skipping fee-page auto-discovery for uni %s: no base_domain available",
+                            uni.id,
                         )
                         discovered = None
+                    else:
+                        try:
+                            discovered = await asyncio.wait_for(
+                                discover_fee_url_from_course_pages(course_sample, base_domain),
+                                timeout=120,
+                            )
+                        except asyncio.TimeoutError:
+                            log.warning(
+                                "discover_fee_url_from_course_pages timed out after 120s for %s — skipping",
+                                base_domain,
+                            )
+                            discovered = None
                     if discovered:
                         await emit(
                             "status",
@@ -1202,11 +1221,17 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             #   CDU:  category overview pages contain an English-requirement
             #         image that vision OCR extracts; without quorum=2 the
             #         extracted IELTS score backfills every course in the run.
+            # Week 1 Prompt 6 — global minimum is now 2 (set as the
+            # ``backfill_english_from_siblings`` default).  Bond / CDU
+            # entries are kept here for documentation: they were the
+            # original drivers for the higher quorum and remain in the
+            # set so a future raise to 3+ can target them explicitly
+            # without rediscovery.
             _high_quorum_hosts = frozenset({
                 "bond.edu.au", "www.bond.edu.au",
                 "cdu.edu.au", "www.cdu.edu.au",
             })
-            _sibling_quorum = 2 if _scrape_host in _high_quorum_hosts else 1
+            _sibling_quorum = max(2, 2 if _scrape_host in _high_quorum_hosts else 2)
             fills = await backfill_english_from_siblings(
                 sibling_dicts, emit=emit, min_quorum=_sibling_quorum
             )
@@ -1732,6 +1757,18 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 await compute_run_metrics(db, runtime_job_id, uni_id)
             except Exception as _metrics_exc:  # noqa: BLE001
                 log.warning("[METRICS] failed for run %s: %s", runtime_job_id, _metrics_exc)
+
+            # Week 2 P1 — wide one-row-per-run summary for the dashboard
+            # and alerting layer. Independent of compute_run_metrics; safe
+            # to fail without affecting the job result.
+            try:
+                from app.services.scraper.run_summary import compute_run_summary
+                await compute_run_summary(
+                    db, runtime_job_id, uni_id,
+                    summary=summary, skip_reasons=skip_reasons,
+                )
+            except Exception as _summary_exc:  # noqa: BLE001
+                log.warning("[RUN_SUMMARY] failed for run %s: %s", runtime_job_id, _summary_exc)
 
             try:
                 from app.services.scraper.alerts import evaluate_run_alerts

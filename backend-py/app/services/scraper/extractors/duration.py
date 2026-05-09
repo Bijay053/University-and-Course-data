@@ -498,15 +498,21 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
         amount, unit = _convert_weeks(amount, unit)  # Issue 4: week→year/month
         struct_years = amount * _WEEKS.get(unit, 52) / 52
 
-        if struct_years >= 1.5:
-            # Year-level structural result — check the page prose for a
-            # "Minimum N years" qualifier that's *lower* than the structural
-            # value.  UTAS flex-enrolment pages put the enrollment cap (e.g.
-            # "5 years") in the Duration DOM cell, while the real program
-            # floor ("Minimum 2 years, up to a maximum of 5 years") lives in
-            # the body.  When that pattern exists and the prose minimum is ≥
-            # 1.5 years (i.e. it's a genuine program-length floor, not an
-            # enrolment-period floor), prefer the prose minimum.
+        if struct_years >= 0.5:
+            # Structural result ≥ 6 months — treat as a real program duration.
+            # Check the page prose for a "Minimum N years" qualifier that's
+            # *lower* than the structural value.  UTAS flex-enrolment pages
+            # put the enrollment cap (e.g. "5 years") in the Duration DOM
+            # cell, while the real program floor ("Minimum 2 years, up to a
+            # maximum of 5 years") lives in the body.  When that pattern
+            # exists and the prose minimum is ≥ 0.5 years (i.e. it's a
+            # genuine program-length floor, not an enrolment-period floor),
+            # prefer the prose minimum.
+            # NOTE: threshold was 1.5 years — Graduate Certificates (8 months,
+            # 0.615 years) were incorrectly falling into the sub-year floor
+            # path and losing the structural method tag.  0.5 years (6 months)
+            # is the right floor; anything below that is an enrollment-period
+            # minimum ("1 semester"), not a program length.
             prose_text = compact(html_to_text(html))
             prose_min_m = _MINIMUM_DURATION_RE.search(prose_text or "")
             if prose_min_m:
@@ -515,7 +521,7 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
                     pu = _normalise_unit(prose_min_m.group(2))
                     if pu:
                         py = pa * _WEEKS.get(pu, 52) / 52
-                        if struct_years > py >= 1.5:
+                        if struct_years > py >= 0.5:
                             amount, unit = pa, pu
                             snippet = f"prose-minimum: {prose_min_m.group(0)}"
                 except (ValueError, IndexError):
@@ -530,7 +536,7 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
                     method="duration.structural",
                 )
             ]
-        # else: struct_years < 1.5 — the structural value is a sub-year
+        # else: struct_years < 0.5 — the structural value is a sub-year
         # enrolment floor ("Minimum 1 Semester, up to a maximum of 4 years").
         # Do NOT return early.  Add it to parsed at ×1 priority (lowest) so
         # the sentence loop can find the real program duration from the prose

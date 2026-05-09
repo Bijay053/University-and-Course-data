@@ -14,7 +14,26 @@ from __future__ import annotations
 
 import pytest
 
+from app.services.scraper.config import set_uni_config
+from app.services.scraper.config.schema import UniConfig
 from app.services.scraper.pipelines import single_course, university_pdfs
+
+_BARE_CFG = UniConfig.model_validate(
+    {"slug": "test-uni", "name": "Test University", "base_url": "https://uni.example.com", "scrape_url": "https://uni.example.com"}
+)
+
+
+@pytest.fixture(autouse=True)
+def _uni_config(monkeypatch):
+    set_uni_config(_BARE_CFG)
+
+    async def _noop_browser(url, payload, *, emit=True, force=False):
+        return {}, [], None, False
+
+    monkeypatch.setattr(
+        "app.services.scraper.per_course_browser.maybe_browser_refetch",
+        _noop_browser,
+    )
 
 
 _FEE_PDF_TEXT = """\

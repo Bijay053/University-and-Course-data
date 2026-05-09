@@ -436,7 +436,15 @@ def should_stage_course(
     # "On Campus" by picking up the domestic-tab campus reference while the
     # international-tab Location field said "Online" only — the general
     # online_only guard above requires "online" in study_mode and misses these.
-    if "utas.edu.au" in (source_url or "").lower() and not _physical_location:
+    #
+    # IMPORTANT: use course_location exclusively here, NOT location_text.
+    # course_location has already had virtual keywords ("Online", "Distance",
+    # "Internet", etc.) stripped by the location extractor, so it contains
+    # only confirmed physical campuses.  location_text is the raw value from
+    # the page and may be "Online" — using it here would make the guard treat
+    # "Online" as a physical campus and silently let the course through.
+    _utas_physical_location = (payload.get("course_location") or "").strip()
+    if "utas.edu.au" in (source_url or "").lower() and not _utas_physical_location:
         log.info(
             "[REJECT CHECK] course=%r url=%r decision=reject "
             "(utas_online_blank_location — Location panel was Online only)",

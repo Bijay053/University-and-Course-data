@@ -68,7 +68,7 @@ async def test_listing_page_still_follows_nav_links(monkeypatch):
     """
     fetched: list[str] = []
 
-    async def fake_fetch_html(url):
+    async def fake_fetch_html(url, **kwargs):
         fetched.append(url)
         if url == "https://example.edu/":
             return _LISTING_HTML
@@ -119,7 +119,7 @@ async def test_sitemap_fallback_threshold_boundary(monkeypatch):
     )
     html = f"<html><body><h1>Programs</h1><ul>{links}</ul></body></html>"
 
-    async def fake_fetch_html(url):
+    async def fake_fetch_html(url, **kwargs):
         if url == "https://example.edu/":
             return html
         return ""
@@ -221,7 +221,7 @@ async def test_ait_detail_pages_added_as_self_candidates(monkeypatch):
         "https://ait.edu.au/courses/information-technology/vocational-diploma-of-it": _AIT_CHILD_HTML,
     }
 
-    async def fake_fetch(url):
+    async def fake_fetch(url, **kwargs):
         return _pages.get(url, "")
 
     async def fake_sitemap(origin, *, emit=None):

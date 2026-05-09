@@ -28,6 +28,16 @@ if TYPE_CHECKING:
 
 log = logging.getLogger(__name__)
 
+# Week 2 P4: explicit master switch so notifications can be muted during
+# development / shadow runs without removing the env vars themselves.
+# Set ``ALERTS_NOTIFICATION_ENABLED=false`` to suppress Slack + email
+# delivery while still persisting alerts to the DB.  Default is true so
+# production keeps the existing behaviour.
+def _notifications_enabled() -> bool:
+    val = os.environ.get("ALERTS_NOTIFICATION_ENABLED", "true").strip().lower()
+    return val not in {"false", "0", "no", "off"}
+
+
 SLACK_WEBHOOK_URL: str | None = os.environ.get("SLACK_WEBHOOK_URL")
 ALERT_EMAIL_TO: str | None = os.environ.get("ALERT_EMAIL_TO")
 SMTP_HOST: str = os.environ.get("SMTP_HOST", "")
@@ -41,7 +51,7 @@ def format_alert_digest(scrape_run_id: str, alerts: list[ScrapeRunAlert]) -> str
     lines = [f"Scrape run {scrape_run_id} — {len(alerts)} critical alert(s):\n"]
     for a in alerts:
         lines.append(f"  • [{a.rule_id}] {a.message}")
-    lines.append(f"\nReview: check v_university_run_health or scrape_run_alerts where scrape_run_id='{scrape_run_id}'")
+    lines.append(f"\nReview: check v_active_alerts / v_university_health, or scrape_run_alerts where scrape_run_id='{scrape_run_id}'")
     return "\n".join(lines)
 
 
@@ -49,6 +59,13 @@ async def deliver_alerts(alerts: list[ScrapeRunAlert]) -> None:
     """Send critical alerts to Slack / email.  Warnings stay on dashboard only."""
     critical = [a for a in alerts if a.severity == "critical"]
     if not critical:
+        return
+    if not _notifications_enabled():
+        log.info(
+            "[ALERT DELIVERY] ALERTS_NOTIFICATION_ENABLED=false — "
+            "muting %d critical alert(s) (still persisted to DB)",
+            len(critical),
+        )
         return
 
     # Group by run ID (normally all from one run, but handle multiple)
@@ -126,6 +143,10 @@ def deliver_discovery_failure_alert(
     )
     body = "\n".join(lines)
 
+    if not _notifications_enabled():
+        log.info("[ALERT DELIVERY] ALERTS_NOTIFICATION_ENABLED=false — muting discovery-failure alert")
+        return
+
     if SLACK_WEBHOOK_URL:
         _send_slack_raw(SLACK_WEBHOOK_URL, subject, body)
 
@@ -186,6 +207,10 @@ def deliver_drift_alert(
         "Review: compare baselines/nightly/<before_date>/ vs baselines/nightly/<after_date>/"
     )
     body = "\n".join(lines)
+
+    if not _notifications_enabled():
+        log.info("[ALERT DELIVERY] ALERTS_NOTIFICATION_ENABLED=false — muting drift alert")
+        return
 
     if SLACK_WEBHOOK_URL:
         _send_slack_raw(SLACK_WEBHOOK_URL, subject, body)

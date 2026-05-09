@@ -1,0 +1,8 @@
+# University of Newcastle (Australia) — stub created for Week 5 scale-up.
+# Hostname: www.newcastle.edu.au  (course catalogue at /study)
+# Already partially scraped pre-Week 5; check existing data before re-running.
+discovery: {}
+extraction:
+  filters:
+    domestic_only:
+      enabled: false

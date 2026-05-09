@@ -2,7 +2,7 @@
 
 Shadow mode runs both the old and new extraction code paths in parallel during
 a single scrape job, diffs their outputs, and writes a structured report.
-Only the old path result is staged to scraped_courses â shadow mode is
+Only the old path result is staged to scraped_courses — shadow mode is
 verification only, not deployment.
 
 Enable per env var:

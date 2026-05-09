@@ -1,25 +1,28 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Building2, HardDrive, UploadCloud, Menu, X, Shield, Settings, Search as SearchIcon, LogOut } from "lucide-react";
+import { LayoutDashboard, Building2, HardDrive, UploadCloud, Menu, X, Shield, Settings, Search as SearchIcon, LogOut, Users as UsersIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import brandLogo from "@assets/image_1776917782083.png";
 import { useAuth } from "@/context/auth";
 
-const navigation = [
-  { name: "Dashboard", href: "/", icon: LayoutDashboard },
-  { name: "Course Search", href: "/search", icon: SearchIcon },
-  { name: "Universities", href: "/universities", icon: Building2 },
-  { name: "Scraping", href: "/scraping", icon: HardDrive },
-  { name: "Bulk Upload", href: "/bulk", icon: UploadCloud },
-  { name: "Data Backup", href: "/backup", icon: Shield },
-  { name: "Settings", href: "/settings/academic-levels", icon: Settings },
+const navigation: { name: string; href: string; icon: typeof LayoutDashboard; permission?: string }[] = [
+  { name: "Dashboard", href: "/", icon: LayoutDashboard, permission: "dashboard.view" },
+  { name: "Course Search", href: "/search", icon: SearchIcon, permission: "search.view" },
+  { name: "Universities", href: "/universities", icon: Building2, permission: "universities.view" },
+  { name: "Scraping", href: "/scraping", icon: HardDrive, permission: "scraping.view" },
+  { name: "Bulk Upload", href: "/bulk", icon: UploadCloud, permission: "bulk.view" },
+  { name: "Data Backup", href: "/backup", icon: Shield, permission: "backup.view" },
+  { name: "Settings", href: "/settings/academic-levels", icon: Settings, permission: "settings.view" },
+  { name: "Users & Permissions", href: "/users", icon: UsersIcon, permission: "users.manage" },
 ];
 
 function NavLinks({ onNav }: { onNav?: () => void }) {
   const [location] = useLocation();
+  const { can } = useAuth();
+  const visible = navigation.filter((item) => !item.permission || can(item.permission));
   return (
     <nav className="space-y-1 px-2">
-      {navigation.map((item) => {
+      {visible.map((item) => {
         const isActive = location === item.href || (item.href !== "/" && location.startsWith(item.href));
         return (
           <Link
@@ -68,7 +71,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <NavLinks />
         </div>
         {user && (
-          <div className="border-t border-sidebar-border px-3 py-3 flex items-center gap-2">
+          <div className="border-t border-sidebar-border px-3 py-3 flex items-center gap-2 group">
             <div className="w-7 h-7 bg-primary rounded-full flex items-center justify-center text-primary-foreground font-semibold text-xs flex-shrink-0">
               {initials}
             </div>
@@ -79,7 +82,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <button
               onClick={logout}
               title="Sign out"
-              className="p-1 rounded text-sidebar-foreground/50 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 transition-colors"
+              className="p-1 rounded text-sidebar-foreground/50 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 transition-all duration-150 opacity-0 group-hover:opacity-100"
             >
               <LogOut className="h-4 w-4" />
             </button>
@@ -118,7 +121,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <NavLinks onNav={() => setMobileOpen(false)} />
         </div>
         {user && (
-          <div className="border-t border-sidebar-border px-3 py-3 flex items-center gap-2">
+          <div className="border-t border-sidebar-border px-3 py-3 flex items-center gap-2 group">
             <div className="w-7 h-7 bg-primary rounded-full flex items-center justify-center text-primary-foreground font-semibold text-xs flex-shrink-0">
               {initials}
             </div>
@@ -128,7 +131,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <button
               onClick={logout}
               title="Sign out"
-              className="p-1 rounded text-sidebar-foreground/50 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 transition-colors"
+              className="p-1 rounded text-sidebar-foreground/50 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 transition-all duration-150 opacity-0 group-hover:opacity-100"
             >
               <LogOut className="h-4 w-4" />
             </button>

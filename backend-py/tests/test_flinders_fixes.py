@@ -276,12 +276,15 @@ def test_flinders_config_tier1_english_disabled() -> None:
     )
 
 
-def test_schema_tier1_english_flag_default_is_true() -> None:
-    """Default value for trust_tier1_vision_ocr_english must be True (opt-in)."""
+def test_schema_tier1_english_flag_default_is_false() -> None:
+    """Week 1 Prompt 7 Part B flipped the default to False so tier-1
+    vision OCR for English fields is suppressed unless a per-uni YAML
+    explicitly opts in (``trust_tier1_vision_ocr_english: true``)."""
     from app.services.scraper.config.schema import EnglishConfig
 
-    assert EnglishConfig().trust_tier1_vision_ocr_english is True, (
-        "trust_tier1_vision_ocr_english must default to True — opt-in, not opt-out"
+    assert EnglishConfig().trust_tier1_vision_ocr_english is False, (
+        "trust_tier1_vision_ocr_english must default to False — "
+        "opt-out, per Week 1 Prompt 7 Part B"
     )
 
 

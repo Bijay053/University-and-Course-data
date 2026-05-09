@@ -35,7 +35,18 @@ async def approve_scraped_course(
     db: AsyncSession, sc: ScrapedCourse, *, actor: str = "system"
 ) -> dict:
     """Idempotent: if a course with the same (university_id, name CI) exists,
-    the row is updated rather than duplicated."""
+    the row is updated rather than duplicated.
+
+    Raises ``ValueError`` if ``sc.course_name`` is None or empty — historically
+    this crashed at the case-insensitive lookup with a confusing AttributeError
+    on ``None.lower()``, which then poisoned the SQLAlchemy session and made
+    every subsequent row in a batch fail (Week 5: Charles Sturt promotion gap).
+    """
+    if not sc.course_name or not sc.course_name.strip():
+        raise ValueError(
+            f"scraped_course id={sc.id} has empty course_name; cannot promote"
+        )
+
     existing = (
         await db.execute(
             select(Course).where(

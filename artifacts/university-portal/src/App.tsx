@@ -20,6 +20,9 @@ import SearchPage from "@/pages/search";
 import ComparePage from "@/pages/compare";
 import CourseDetail from "@/pages/course-detail";
 import Login from "@/pages/login";
+import ForgotPassword from "@/pages/forgot-password";
+import ResetPassword from "@/pages/reset-password";
+import UsersPage from "@/pages/users";
 
 const queryClient = new QueryClient();
 
@@ -52,6 +55,8 @@ function Router() {
   return (
     <Switch>
       <Route path="/login" component={Login} />
+      <Route path="/forgot-password" component={ForgotPassword} />
+      <Route path="/reset-password" component={ResetPassword} />
       <Route>
         <AuthGuard>
           <Layout>
@@ -68,6 +73,7 @@ function Router() {
               <Route path="/search" component={SearchPage} />
               <Route path="/compare" component={ComparePage} />
               <Route path="/courses/:id" component={CourseDetail} />
+              <Route path="/users" component={UsersPage} />
               <Route component={NotFound} />
             </Switch>
           </Layout>

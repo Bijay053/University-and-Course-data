@@ -1083,7 +1083,8 @@ async def export_scraped_courses(
             },
         )
 
-    # default: JSON download. Stringify dates so json.dumps doesn't choke.
+    # default: JSON download. Stringify dates/Decimals so json.dumps doesn't choke.
+    import decimal as _decimal
     import json as _json
 
     out_rows = []
@@ -1092,6 +1093,8 @@ async def export_scraped_courses(
         for k, v in list(d.items()):
             if hasattr(v, "isoformat"):
                 d[k] = v.isoformat()
+            elif isinstance(v, _decimal.Decimal):
+                d[k] = float(v)
         out_rows.append(d)
     return Response(
         content=_json.dumps(out_rows),
@@ -1162,7 +1165,7 @@ async def staged_list(
         stmt = stmt.where(ScrapedCourse.scrape_job_id == job_id)
     if university_id:
         stmt = stmt.where(ScrapedCourse.university_id == university_id)
-    if status_f:
+    if status_f and status_f.lower() != "all":
         stmt = stmt.where(ScrapedCourse.status == status_f)
     total = (await db.execute(select(func.count()).select_from(stmt.subquery()))).scalar_one()
     stmt = stmt.order_by(desc(ScrapedCourse.created_at)).offset((page - 1) * limit).limit(limit)

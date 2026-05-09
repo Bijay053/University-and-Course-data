@@ -163,7 +163,7 @@ class DiffReport:
     @property
     def summary(self) -> str:
         if self.is_clean:
-            return f"CLEAN â {self.matched} courses matched exactly"
+            return f"CLEAN — {self.matched} courses matched exactly"
         parts = []
         if self.old_only:
             parts.append(f"{len(self.old_only)} old-only drops")
@@ -174,7 +174,7 @@ class DiffReport:
         if self.field_regressions:
             n_fields = sum(len(c.field_diffs) for c in self.field_regressions)
             parts.append(f"{len(self.field_regressions)} courses with {n_fields} field diffs")
-        return "DIFF â " + ", ".join(parts)
+        return "DIFF — " + ", ".join(parts)
 
     def as_dict(self) -> dict:
         return {
@@ -250,7 +250,7 @@ def diff_staged_runs(
             )
             continue
 
-        # Both errored â compare error codes only (not full messages)
+        # Both errored — compare error codes only (not full messages)
         if old.error and new.error:
             old_code = (old.error or "").split(":")[0]
             new_code = (new.error or "").split(":")[0]

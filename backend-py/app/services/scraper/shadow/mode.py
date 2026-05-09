@@ -19,9 +19,9 @@ def _parse_uni_ids(env_var: str) -> frozenset[int] | None:
     """Parse comma-separated uni IDs.
 
     Returns:
-        None      â env var not set â feature disabled
-        frozenset() â wildcard '*' â all unis
-        frozenset({41, 20}) â explicit list
+        None      — env var not set → feature disabled
+        frozenset() — wildcard '*' → all unis
+        frozenset({41, 20}) — explicit list
     """
     raw = os.environ.get(env_var, "").strip()
     if not raw:

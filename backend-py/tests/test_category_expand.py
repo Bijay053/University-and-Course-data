@@ -17,7 +17,7 @@ from app.services.scraper import home_page_redirect
 
 
 def _run(coro):  # noqa: ANN001 — tiny test helper
-    return asyncio.get_event_loop().run_until_complete(coro)
+    return asyncio.run(coro)
 
 
 class _FakeResponse:

@@ -120,15 +120,17 @@ class EnglishConfig(BaseModel):
         ),
     )
     trust_tier1_vision_ocr_english: bool = Field(
-        default=True,
+        default=False,
         description=(
-            "Set to false to disable tier-1 (non-DOM-anchored) vision OCR "
-            "specifically for English test score fields (IELTS/PTE/TOEFL/CAE/DET). "
-            "Tier-0 images (anchored inside the Entry Requirements DOM section) "
-            "are still trusted.  Use this for universities where Gemini "
-            "hallucinates plausible-looking test scores from hero/stock imagery "
-            "but the page text (regex) reliably extracts the correct values. "
-            "Flinders is the canonical example."
+            "Week 1 Prompt 7 Part B — default is now FALSE globally.  Tier-1 "
+            "vision OCR (images NOT anchored inside an English / Entry "
+            "Requirements DOM section) is treated as 'tier 5' evidence: the "
+            "OCR still runs and is logged, but extracted values do not "
+            "contribute to row finalisation.  Only tier-0 images (DOM-anchored) "
+            "are promoted to tier-4 evidence and may write to the payload.  "
+            "Set to true on a per-uni basis only for universities whose "
+            "requirements live exclusively inside images that the DOM-section "
+            "detector misses (e.g. ASAHE), and only after manual spot-check."
         ),
     )
     default_ielts: Optional[float] = Field(

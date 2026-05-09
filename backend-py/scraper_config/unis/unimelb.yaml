@@ -1,0 +1,9 @@
+# University of Melbourne — stub created for Week 4 scale-up.
+# Hostname: study.unimelb.edu.au  (course catalogue at /find-a-course)
+#
+# Bug history: none yet — fill in after first scrape.
+discovery: {}
+extraction:
+  filters:
+    domestic_only:
+      enabled: false

@@ -1,0 +1,10 @@
+# Monash University — stub created for Week 4 scale-up.
+# Hostname: www.monash.edu  (course catalogue under /study/courses)
+#
+# Bug history: none yet — fill in after first scrape.
+# Likely platform: Adobe Experience Manager.
+discovery: {}
+extraction:
+  filters:
+    domestic_only:
+      enabled: false

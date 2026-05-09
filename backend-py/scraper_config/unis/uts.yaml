@@ -1,0 +1,9 @@
+# University of Technology Sydney — stub created for Week 4 scale-up.
+# Hostname: www.uts.edu.au  (course catalogue under /study)
+#
+# Bug history: none yet — fill in after first scrape.
+discovery: {}
+extraction:
+  filters:
+    domestic_only:
+      enabled: false

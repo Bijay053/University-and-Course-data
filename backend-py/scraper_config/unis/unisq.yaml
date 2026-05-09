@@ -1,0 +1,8 @@
+# University of Southern Queensland (UniSQ) — stub created for Week 5 scale-up.
+# Hostname: www.unisq.edu.au  (formerly USQ; rebranded 2022-09)
+# Was the Week 3 cost-optimisation test bed; should be a low-risk scrape.
+discovery: {}
+extraction:
+  filters:
+    domestic_only:
+      enabled: false

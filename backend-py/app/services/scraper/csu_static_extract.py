@@ -749,11 +749,10 @@ def apply_csu_static_extraction(url: str, html: str) -> dict[str, Any]:
                 result["intake_months"] = _intakes(course, sess_data)
 
     # After the main meta block: when ocb_metadata fails to parse (or the
-    # course sub-object is absent), location/mode remain at their pre-seeded
-    # None values.  CSU is a distance-education provider, so "Online" is the
-    # correct last-resort default for both fields.
-    if result.get("course_location") is None:
-        result["course_location"] = "Online"
+    # course sub-object is absent), study_mode defaults to "Online" for CSU
+    # (predominantly distance-education).  course_location is intentionally
+    # left as None for online-only offerings — callers treat None as "no
+    # physical campus", which is the correct interpretation.
     if result.get("study_mode") is None:
         result["study_mode"] = "Online"
 

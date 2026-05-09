@@ -11,7 +11,7 @@ The run_number and clean_streak are derived from existing files in the
 shadow_reports/ directory so callers don't need to track state manually.
 
 Cutover criterion: 5 consecutive clean runs (each from a fresh scrape
-scheduled â¥ 1 hour apart).  The streak counter resets on any dirty run.
+scheduled ≥ 1 hour apart).  The streak counter resets on any dirty run.
 """
 
 from __future__ import annotations
@@ -119,7 +119,7 @@ def write_shadow_report(
 
     streak_msg = (
         f"streak={new_streak}/{CUTOVER_STREAK_NEEDED}"
-        + (" â READY FOR CUTOVER" if report_data["cutover_ready"] else "")
+        + (" — READY FOR CUTOVER" if report_data["cutover_ready"] else "")
     )
     log.info(
         "shadow[%s/%d] run=%d %s | %s",

@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { Link } from "wouter";
 import { getFetchErrorMessage, readResponseJson } from "@/lib/readResponseJson";
+import { Can, useCan } from "@/components/can";
 import {
   ReviewScrapedCoursesTable,
   type ReviewStagedCourse,
@@ -1550,12 +1551,14 @@ export default function Scraping() {
           <h1 className="text-2xl font-bold tracking-tight">Scraping & Import</h1>
           <p className="text-muted-foreground">Scrape university websites with AI or import from Excel files.</p>
         </div>
-        <Link href="/bulk">
-          <Button variant="outline">
-            <FileSpreadsheet className="w-4 h-4 mr-2" />
-            Upload Excel File
-          </Button>
-        </Link>
+        <Can permission="bulk.import">
+          <Link href="/bulk">
+            <Button variant="outline">
+              <FileSpreadsheet className="w-4 h-4 mr-2" />
+              Upload Excel File
+            </Button>
+          </Link>
+        </Can>
       </div>
 
       {/* ── Multi-Slot Scraper Panel ─────────────────────────────────────── */}
@@ -1571,27 +1574,31 @@ export default function Scraping() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {slotIds.length < 4 && (
+            <Can permission="scraping.run">
+              {slotIds.length < 4 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={addSlot}
+                  className="h-8 text-blue-600 border-blue-200 hover:bg-blue-50"
+                >
+                  <PlusCircle className="w-3.5 h-3.5 mr-1.5" />
+                  Add Slot
+                </Button>
+              )}
+            </Can>
+            <Can permission="scraping.cancel">
               <Button
                 variant="outline"
                 size="sm"
-                onClick={addSlot}
-                className="h-8 text-blue-600 border-blue-200 hover:bg-blue-50"
+                onClick={forceCancelAll}
+                className="h-8 border-red-200 text-red-600 hover:bg-red-50"
+                title="Force cancel all running scrapes"
               >
-                <PlusCircle className="w-3.5 h-3.5 mr-1.5" />
-                Add Slot
+                <StopCircle className="w-3.5 h-3.5 mr-1.5" />
+                Cancel All
               </Button>
-            )}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={forceCancelAll}
-              className="h-8 border-red-200 text-red-600 hover:bg-red-50"
-              title="Force cancel all running scrapes"
-            >
-              <StopCircle className="w-3.5 h-3.5 mr-1.5" />
-              Cancel All
-            </Button>
+            </Can>
           </div>
         </div>
 

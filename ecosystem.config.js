@@ -2,10 +2,9 @@ module.exports = {
   apps: [
     {
       name: "api-py",
-      script: "/root/University-and-Course-data/backend-py/venv/bin/uvicorn",
-      args: "app.main:app --host 0.0.0.0 --port 8080 --workers 1",
+      script: "/root/University-and-Course-data/backend-py/start.sh",
       cwd: "/root/University-and-Course-data/backend-py",
-      interpreter: "none",
+      interpreter: "bash",
       autorestart: true,
       watch: false,
       env: {

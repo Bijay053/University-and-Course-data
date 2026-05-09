@@ -28,6 +28,7 @@ from app.routers import (
     scrape_health,
     search,
     universities,
+    users,
 )
 
 logging.basicConfig(level=getattr(logging, settings.log_level.upper(), logging.INFO))
@@ -37,6 +38,12 @@ log = logging.getLogger("uniportal")
 @asynccontextmanager
 async def lifespan(app: FastAPI):  # noqa: ARG001
     log.info("Python backend starting up (debug=%s)", settings.debug)
+    try:
+        from app.routers.auth import ensure_admin_user
+
+        await ensure_admin_user()
+    except Exception:  # noqa: BLE001 -- startup must never crash the API
+        log.exception("ensure_admin_user failed (skipping)")
     yield
     log.info("Python backend shutting down")
 
@@ -73,3 +80,4 @@ app.include_router(acronyms.router, prefix="/api/settings", tags=["settings"])
 app.include_router(_import_routes.router, prefix="/api")
 app.include_router(_backup.router, prefix="/api", tags=["backup"])
 app.include_router(assessment_notes.router, prefix="/api", tags=["assessment-notes"])
+app.include_router(users.router, prefix="/api", tags=["users"])

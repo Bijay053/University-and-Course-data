@@ -1,0 +1,12 @@
+# RMIT — stub created for Week 4 scale-up.
+# Hostname: www.rmit.edu.au  (course catalogue under /study-with-us)
+#
+# Bug history: none yet — fill in after first scrape.
+# Note: RMIT is heavily JS-rendered; expect to need browser_timeout adjustments
+# and possibly skip_static_fetch:true if Cloudflare blocks the static fetch.
+discovery:
+  always_sitemap_supplement: true
+extraction:
+  filters:
+    domestic_only:
+      enabled: false

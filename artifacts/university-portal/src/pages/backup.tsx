@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Shield, RefreshCw, CheckCircle2, AlertTriangle, Clock, Database, CalendarCheck, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { Can } from "@/components/can";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -122,10 +123,12 @@ export default function BackupPage() {
             Each backup snapshot is stored inside the database and can be reused to map scraped records.
           </p>
         </div>
-        <Button onClick={triggerBackup} disabled={running || loading} className="shrink-0 cursor-pointer">
-          {running ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <Database className="w-4 h-4 mr-2" />}
-          {running ? "Backing up…" : "Create Manual Backup"}
-        </Button>
+        <Can permission="backup.create">
+          <Button onClick={triggerBackup} disabled={running || loading} className="shrink-0 cursor-pointer">
+            {running ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <Database className="w-4 h-4 mr-2" />}
+            {running ? "Backing up…" : "Create Manual Backup"}
+          </Button>
+        </Can>
       </div>
 
       {/* Auto-schedule status card */}

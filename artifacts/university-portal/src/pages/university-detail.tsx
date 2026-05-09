@@ -2545,8 +2545,26 @@ export default function UniversityDetail() {
           ) : filteredRaw.length === 0 ? (
             <div className="border rounded-xl py-16 text-center text-muted-foreground">
               <Database className="w-10 h-10 mx-auto mb-3 opacity-20" />
-              <p>No scraped courses found{rawStatus !== "all" ? ` with status "${rawStatus}"` : ""}.</p>
-              <p className="text-xs mt-1">Run a scrape job for this university to populate raw data.</p>
+              {rawData.length === 0 ? (
+                <>
+                  <p>No raw scrape data for this university.</p>
+                  <p className="text-xs mt-1">
+                    Live courses (if any) were imported via Excel or an older path that doesn&apos;t
+                    keep a staged copy. Run a scrape job to populate raw data.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p>
+                    No raw rows match the current filter
+                    {rawStatus !== "all" ? ` (status: "${rawStatus}")` : ""}.
+                  </p>
+                  <p className="text-xs mt-1">
+                    Try the &ldquo;All&rdquo; tab — this university has {rawData.length} staged row
+                    {rawData.length === 1 ? "" : "s"} in other states.
+                  </p>
+                </>
+              )}
             </div>
           ) : (
             <div ref={tableScrollRef} className="border rounded-xl overflow-auto" style={{ maxHeight: "70vh" }}>

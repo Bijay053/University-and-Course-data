@@ -186,6 +186,23 @@ _GENERIC_MARKETING_PATH_BLOCKS: Final = (
     "/shared/callout",
     "/global/",
     "/marketing/",
+    # Week 1 Prompt 3 — additional Torrens / Laureate marketing chrome paths
+    # observed during 2026-04 audits.  /shared/how-to-apply/ is already
+    # matched by the broader "/how-to-apply" entry above; the rest are
+    # site-wide template directories that never carry per-course English
+    # requirement tables.  Keeping them as a discrete block makes the
+    # provenance for this Prompt explicit in code review.
+    "/shared/cards/",
+    "/shared/career-opportunities/",
+    "/shared/people/",
+    "/shared/video/",
+    "/shared/short-content/",
+    "/shared/course-hero/",
+    "/shared/content-old/",
+    "/shared/video-old/",
+    "/laureate/shared/",
+    "/cards/billy",
+    "/cards/brand",
 )
 
 # Regex applied to the FULL absolute URL (lower-cased) to catch social media
@@ -647,6 +664,12 @@ def _extract_img_candidates(
         # English-requirement tables (e.g. /shared/how-to-apply/, /marketing/).
         _abs_lower = absolute.lower()
         if any(block in _abs_lower for block in _GENERIC_MARKETING_PATH_BLOCKS):
+            # Week 1 Prompt 3 — log block-list matches so the verification
+            # `journalctl ... | grep 'VISION SKIP'` query has data.  Logged at
+            # info level so it survives the production Celery `--loglevel=info`
+            # filter (deploy/uni-celery.service).  Volume is bounded — most
+            # course pages carry < 5 chrome images and the log is grep-friendly.
+            log.info("[VISION SKIP] blocked-list match: %s", absolute)
             continue
         # Social-chrome path regex: university-agnostic catch for social media
         # icons and chrome components regardless of their hosting path.  Works
@@ -695,20 +718,18 @@ async def _download(url: str) -> bytes | None:
         return None
 
 
-VisionImageCache = dict[tuple[str, str], "asyncio.Future[dict[str, Any]]"]
+VisionImageCache = dict[str, "asyncio.Future[dict[str, Any]]"]
 """Type alias for the per-scrape-run cache used by
 :func:`maybe_vision_refetch`.
 
-The cache key is a ``(img_url, course_url)`` tuple so that the same hero
-image appearing on two different courses (e.g. a shared Health faculty
-banner) never causes one course's IELTS values to be silently reused for
-another.  Within a single course the leader/waiter coalescing pattern still
-applies — the same ``(img_url, course_url)`` key deduplications concurrent
-extraction of the same image on the same page.
+The cache key is the absolute image URL (``img_url``). This allows
+concurrent coroutines for sibling courses that all embed the same image
+(e.g. the ASA Master pages sharing ``MaSTER.png``) to coalesce into a
+single Gemini call — the leader resolves the future, waiters await it.
 
 Stores ``asyncio.Future`` values (not raw parsed dicts) so that
 concurrent coroutines processing the same image URL coalesce into a
-single Gemini call — the leader resolves the future, waiters await it.
+single Gemini call.
 The orchestrator creates a fresh empty dict per scrape run; callers
 should never read from the cache themselves, only pass it through.
 Use the :func:`new_vision_image_cache` factory below to construct one
@@ -915,7 +936,7 @@ async def maybe_vision_refetch(
         normalized: dict[str, Any] | None = None
         cached_method = "per_course_vision"
         leader_future: asyncio.Future[dict[str, Any]] | None = None
-        _cache_key = (img_url, url)
+        _cache_key = img_url  # key on image URL only — sibling courses sharing the same image must coalesce
         if image_cache is not None:
             existing: asyncio.Future[dict[str, Any]] | None = image_cache.get(_cache_key)
             if existing is None:

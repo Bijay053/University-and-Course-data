@@ -1,13 +1,13 @@
 """Scraper data-quality validation module.
 
 Runs AFTER the staging loop and BEFORE the DONE event is emitted.  Inspects
-every staged course payload to surface data-quality issues early â before they
+every staged course payload to surface data-quality issues early — before they
 reach operators or the publish queue.
 
 Each issue is classified by severity:
-    "critical"  â data is almost certainly wrong or missing; blocks publish.
-    "warning"   â data may be wrong or incomplete; flags for review.
-    "info"      â observation worth noting; does not block anything.
+    "critical"  — data is almost certainly wrong or missing; blocks publish.
+    "warning"   — data may be wrong or incomplete; flags for review.
+    "info"      — observation worth noting; does not block anything.
 
 The module is intentionally read-only: it never mutates payloads or the DB.
 It writes issue summaries to the live log via the ``emit`` callback and
@@ -114,12 +114,12 @@ def _check_english_coherence(payload: Payload, url: str, name: str) -> list[Qual
     different page or cache entry.
 
     Thresholds are deliberately permissive: we only flag combinations that are
-    separated by â¥ 1 full IELTS band-width from any plausible equivalence.
+    separated by ≥ 1 full IELTS band-width from any plausible equivalence.
     This means TOEFL 80 for an IELTS 5.5 course (above ETS official but used
     by many Australian universities) is NOT flagged, but TOEFL 95 for an
     IELTS 6.0 course (which corresponds to IELTS 7.0-7.5) IS flagged.
 
-    All issues are "warning" severity â they flag for human review without
+    All issues are "warning" severity — they flag for human review without
     blocking staging, because unusual-but-valid equivalences exist.
     """
     issues: list[QualityIssue] = []
@@ -135,7 +135,7 @@ def _check_english_coherence(payload: Payload, url: str, name: str) -> list[Qual
 
     ielts = _num("ielts_overall")
     if ielts is None:
-        return issues  # no anchor â nothing to cross-check against
+        return issues  # no anchor — nothing to cross-check against
 
     toefl = _num("toefl_overall")
     pte = _num("pte_overall")
@@ -145,81 +145,81 @@ def _check_english_coherence(payload: Payload, url: str, name: str) -> list[Qual
     def _add(code: str, msg: str) -> None:
         issues.append(QualityIssue("warning", code, msg, url=url, course_name=name))
 
-    # ââ IELTS vs TOEFL ââââââââââââââââââââââââââââââââââââââââââââââââââ
-    # TOEFL 85+ â IELTS 6.5+; IELTS â¤ 6.0 + TOEFL â¥ 85 is a mismatch.
-    # TOEFL 75- â IELTS â¤ 5.5; IELTS â¥ 7.0 + TOEFL â¤ 75 is a mismatch.
+    # ── IELTS vs TOEFL ──────────────────────────────────────────────────
+    # TOEFL 85+ ≈ IELTS 6.5+; IELTS ≤ 6.0 + TOEFL ≥ 85 is a mismatch.
+    # TOEFL 75- ≈ IELTS ≤ 5.5; IELTS ≥ 7.0 + TOEFL ≤ 75 is a mismatch.
     if toefl is not None:
         if ielts <= 6.0 and toefl >= 85:
             _add(
                 "english_coherence_toefl",
                 f"IELTS {ielts} + TOEFL {toefl} is inconsistent: "
-                f"TOEFL {toefl:.0f} corresponds to IELTS â¥ 6.5. "
+                f"TOEFL {toefl:.0f} corresponds to IELTS ≥ 6.5. "
                 f"One value is likely sourced from a different level or hallucinated.",
             )
         elif ielts >= 7.0 and toefl <= 75:
             _add(
                 "english_coherence_toefl",
                 f"IELTS {ielts} + TOEFL {toefl} is inconsistent: "
-                f"TOEFL {toefl:.0f} corresponds to IELTS â¤ 5.5. "
+                f"TOEFL {toefl:.0f} corresponds to IELTS ≤ 5.5. "
                 f"One value is likely sourced from a different level or hallucinated.",
             )
 
-    # ââ IELTS vs PTE ââââââââââââââââââââââââââââââââââââââââââââââââââââ
-    # PTE 65+ â IELTS 7.0+; IELTS â¤ 6.0 + PTE â¥ 65 is a mismatch.
-    # PTE 45- â IELTS â¤ 5.5; IELTS â¥ 7.0 + PTE â¤ 45 is a mismatch.
+    # ── IELTS vs PTE ────────────────────────────────────────────────────
+    # PTE 65+ ≈ IELTS 7.0+; IELTS ≤ 6.0 + PTE ≥ 65 is a mismatch.
+    # PTE 45- ≈ IELTS ≤ 5.5; IELTS ≥ 7.0 + PTE ≤ 45 is a mismatch.
     if pte is not None:
         if ielts <= 6.0 and pte >= 65:
             _add(
                 "english_coherence_pte",
                 f"IELTS {ielts} + PTE {pte} is inconsistent: "
-                f"PTE {pte:.0f} corresponds to IELTS â¥ 7.0. "
+                f"PTE {pte:.0f} corresponds to IELTS ≥ 7.0. "
                 f"One value is likely sourced from a different level or hallucinated.",
             )
         elif ielts >= 7.0 and pte <= 45:
             _add(
                 "english_coherence_pte",
                 f"IELTS {ielts} + PTE {pte} is inconsistent: "
-                f"PTE {pte:.0f} corresponds to IELTS â¤ 5.0. "
+                f"PTE {pte:.0f} corresponds to IELTS ≤ 5.0. "
                 f"One value is likely sourced from a different level or hallucinated.",
             )
 
-    # ââ IELTS vs Duolingo âââââââââââââââââââââââââââââââââââââââââââââââ
-    # Duolingo 115+ â IELTS 7.0+; IELTS â¤ 6.0 + DET â¥ 115 is a mismatch.
-    # Duolingo 95-  â IELTS â¤ 5.5; IELTS â¥ 7.5 + DET â¤ 95 is a mismatch.
+    # ── IELTS vs Duolingo ───────────────────────────────────────────────
+    # Duolingo 115+ ≈ IELTS 7.0+; IELTS ≤ 6.0 + DET ≥ 115 is a mismatch.
+    # Duolingo 95-  ≈ IELTS ≤ 5.5; IELTS ≥ 7.5 + DET ≤ 95 is a mismatch.
     if duolingo is not None:
         if ielts <= 6.0 and duolingo >= 115:
             _add(
                 "english_coherence_duolingo",
                 f"IELTS {ielts} + Duolingo {duolingo} is inconsistent: "
-                f"Duolingo {duolingo:.0f} corresponds to IELTS â¥ 7.0. "
+                f"Duolingo {duolingo:.0f} corresponds to IELTS ≥ 7.0. "
                 f"Duolingo value may be hallucinated or from wrong level cache.",
             )
         elif ielts >= 7.5 and duolingo <= 95:
             _add(
                 "english_coherence_duolingo",
                 f"IELTS {ielts} + Duolingo {duolingo} is inconsistent: "
-                f"Duolingo {duolingo:.0f} corresponds to IELTS â¤ 5.5. "
+                f"Duolingo {duolingo:.0f} corresponds to IELTS ≤ 5.5. "
                 f"Duolingo value may be hallucinated or from wrong level cache.",
             )
 
-    # ââ IELTS vs Cambridge (CAE) âââââââââââââââââââââââââââââââââââââââââ
-    # Cambridge 176+ â IELTS 7.0+; IELTS â¤ 6.0 + CAE â¥ 176 is a mismatch.
-    # Cambridge 162- â IELTS â¤ 5.5; IELTS â¥ 7.0 + CAE â¤ 162 is a mismatch.
-    # Note: VIT shows CAE 176 on vocational courses with IELTS 5.5 â this fires
+    # ── IELTS vs Cambridge (CAE) ─────────────────────────────────────────
+    # Cambridge 176+ ≈ IELTS 7.0+; IELTS ≤ 6.0 + CAE ≥ 176 is a mismatch.
+    # Cambridge 162- ≈ IELTS ≤ 5.5; IELTS ≥ 7.0 + CAE ≤ 162 is a mismatch.
+    # Note: VIT shows CAE 176 on vocational courses with IELTS 5.5 — this fires
     # on those rows intentionally, since 176 is the C1 Advanced threshold (IELTS 7.0).
     if cambridge is not None:
         if ielts <= 6.0 and cambridge >= 176:
             _add(
                 "english_coherence_cambridge",
                 f"IELTS {ielts} + Cambridge {cambridge} is inconsistent: "
-                f"CAE {cambridge:.0f} corresponds to IELTS â¥ 7.0 (C1 Advanced threshold). "
+                f"CAE {cambridge:.0f} corresponds to IELTS ≥ 7.0 (C1 Advanced threshold). "
                 f"Cambridge value may be a university-wide default that doesn't apply to this level.",
             )
         elif ielts >= 7.0 and cambridge <= 162:
             _add(
                 "english_coherence_cambridge",
                 f"IELTS {ielts} + Cambridge {cambridge} is inconsistent: "
-                f"CAE {cambridge:.0f} corresponds to IELTS â¤ 5.5. "
+                f"CAE {cambridge:.0f} corresponds to IELTS ≤ 5.5. "
                 f"One value is likely sourced from a different level.",
             )
 
@@ -234,7 +234,7 @@ def _check_course(payload: Payload, url: str) -> list[QualityIssue]:
     def add(severity: str, code: str, msg: str) -> None:
         issues.append(QualityIssue(severity, code, msg, url=url, course_name=name))
 
-    # ââ 1. Course title âââââââââââââââââââââââââââââââââââââââââââââââââââ
+    # ── 1. Course title ───────────────────────────────────────────────────
     if not name or name == "?":
         add("critical", "missing_course_name", "Course name is blank.")
     elif _GENERIC_TITLE_RE.match(name):
@@ -244,7 +244,7 @@ def _check_course(payload: Payload, url: str) -> list[QualityIssue]:
         add("warning", "suspiciously_short_title",
             f"Course title is very short ({len(name)} chars): {name!r}")
 
-    # ââ 2. Fee âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+    # ── 2. Fee ───────────────────────────────────────────────────────────
     intl_fee = payload.get("international_fee")
     has_central_fee = payload.get("has_central_fee_page")
     if intl_fee is None:
@@ -253,7 +253,7 @@ def _check_course(payload: Payload, url: str) -> list[QualityIssue]:
                 "No international fee found and no central fee page flag set.")
         else:
             add("warning", "missing_international_fee_central_page",
-                "International fee absent â marked for central fee page review.")
+                "International fee absent — marked for central fee page review.")
     else:
         try:
             fee_val = float(intl_fee)
@@ -269,7 +269,7 @@ def _check_course(payload: Payload, url: str) -> list[QualityIssue]:
             add("warning", "non_numeric_fee",
                 f"International fee value is not numeric: {intl_fee!r}")
 
-    # ââ 3. IELTS / English requirement âââââââââââââââââââââââââââââââââââ
+    # ── 3. IELTS / English requirement ───────────────────────────────────
     has_any_english = any(
         payload.get(k) is not None
         for k in (
@@ -282,10 +282,10 @@ def _check_course(payload: Payload, url: str) -> list[QualityIssue]:
         add("warning", "missing_english_requirement",
             "No English language test score found (IELTS / PTE / TOEFL / CAE).")
 
-    # ââ 3a. Test-accepted flag violations ââââââââââââââââââââââââââââââââ
+    # ── 3a. Test-accepted flag violations ────────────────────────────────
     # If a university explicitly does not accept a test (*_accepted=False)
     # but the pipeline wrote a score for it anyway (from vision, sibling cache,
-    # etc.), that is a definite pipeline error â the score cannot be correct.
+    # etc.), that is a definite pipeline error — the score cannot be correct.
     for _test_prefix, _flag_key, _score_key in (
         ("Duolingo",  "duolingo_accepted",  "duolingo_overall"),
         ("Cambridge", "cambridge_accepted", "cambridge_overall"),
@@ -297,12 +297,12 @@ def _check_course(payload: Payload, url: str) -> list[QualityIssue]:
                 "warning",
                 f"test_not_accepted_but_scored_{_test_prefix.lower()}",
                 f"{_test_prefix} score ({payload[_score_key]}) found but "
-                f"{_flag_key}=False â university does not accept this test. "
+                f"{_flag_key}=False — university does not accept this test. "
                 f"Score is likely hallucinated (vision or sibling cache). Discard it.",
             )
 
-    # ââ 3b. Cross-field English coherence ââââââââââââââââââââââââââââââââ
-    # Each test score should be broadly consistent with the others â if
+    # ── 3b. Cross-field English coherence ────────────────────────────────
+    # Each test score should be broadly consistent with the others — if
     # the extractor wrote each field from a different source (regex, vision,
     # sibling cache) without cross-checking, impossible combinations can
     # appear (e.g. IELTS 6.0 + TOEFL 95 = two different admission levels).
@@ -311,10 +311,10 @@ def _check_course(payload: Payload, url: str) -> list[QualityIssue]:
     # because Australian universities sometimes set their own stricter tables
     # (e.g. TOEFL 80 for IELTS 5.5 courses, which is above the ETS equivalent
     # of 72 but still within a defensible margin). We only flag combinations
-    # that are clearly impossible â separated by â¥ 1 IELTS band-width.
+    # that are clearly impossible — separated by ≥ 1 IELTS band-width.
     issues.extend(_check_english_coherence(payload, url, name))
 
-    # ââ 4. Duration âââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+    # ── 4. Duration ───────────────────────────────────────────────────────
     duration = payload.get("duration")
     duration_term = (payload.get("duration_term") or "").lower()
     if duration is None:
@@ -326,22 +326,22 @@ def _check_course(payload: Payload, url: str) -> list[QualityIssue]:
                 if dur_val <= 0 or dur_val > _DURATION_YEAR_MAX:
                     add("warning", "suspicious_duration",
                         f"Duration {dur_val} year(s) is outside the expected range "
-                        f"(0 < duration â¤ {_DURATION_YEAR_MAX}).")
+                        f"(0 < duration ≤ {_DURATION_YEAR_MAX}).")
             elif duration_term in ("month", "months"):
                 if dur_val <= 0 or dur_val > _DURATION_MONTH_MAX:
                     add("warning", "suspicious_duration",
                         f"Duration {dur_val} month(s) is outside the expected range "
-                        f"(0 < duration â¤ {_DURATION_MONTH_MAX}).")
+                        f"(0 < duration ≤ {_DURATION_MONTH_MAX}).")
             elif duration_term in ("week", "weeks"):
                 if dur_val <= 0 or dur_val > _DURATION_WEEK_MAX:
                     add("warning", "suspicious_duration",
                         f"Duration {dur_val} week(s) is outside the expected range "
-                        f"(0 < duration â¤ {_DURATION_WEEK_MAX}).")
+                        f"(0 < duration ≤ {_DURATION_WEEK_MAX}).")
         except (TypeError, ValueError):
             add("warning", "non_numeric_duration",
                 f"Duration value is not numeric: {duration!r}")
 
-    # ââ 5. Intake months âââââââââââââââââââââââââââââââââââââââââââââââââ
+    # ── 5. Intake months ─────────────────────────────────────────────────
     intake_months = payload.get("intake_months")
     if not intake_months:
         add("info", "missing_intake_months",
@@ -353,9 +353,9 @@ def _check_course(payload: Payload, url: str) -> list[QualityIssue]:
                 f"Unrecognised intake month value(s): {invalid}")
         if len(intake_months) > 12:
             add("warning", "too_many_intake_months",
-                f"intake_months has {len(intake_months)} entries â likely extraction noise.")
+                f"intake_months has {len(intake_months)} entries — likely extraction noise.")
 
-    # ââ 6. Location âââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+    # ── 6. Location ───────────────────────────────────────────────────────
     location = payload.get("course_location") or ""
     if not location.strip():
         add("info", "missing_location",
@@ -364,13 +364,13 @@ def _check_course(payload: Payload, url: str) -> list[QualityIssue]:
         add("warning", "suspicious_location",
             f"Location looks like footer/admin text rather than a campus name: {location!r}")
 
-    # ââ 7. Study mode ââââââââââââââââââââââââââââââââââââââââââââââââââââ
+    # ── 7. Study mode ────────────────────────────────────────────────────
     study_mode = payload.get("study_mode") or ""
     if not study_mode.strip():
         add("info", "missing_study_mode",
-            "Study mode not extracted â will show blank in Review UI.")
+            "Study mode not extracted — will show blank in Review UI.")
 
-    # ââ 8. Degree level âââââââââââââââââââââââââââââââââââââââââââââââââââ
+    # ── 8. Degree level ───────────────────────────────────────────────────
     if not payload.get("degree_level"):
         add("warning", "missing_degree_level", "Degree level not extracted.")
 
@@ -398,7 +398,7 @@ def _check_duplicates(payloads_with_urls: list[tuple[Payload, str]]) -> list[Qua
                     message=(
                         f"Course name {name!r} appears {len(urls)} times in this batch. "
                         f"URLs: {', '.join(urls[:3])}"
-                        + (" (â¦)" if len(urls) > 3 else "")
+                        + (" (…)" if len(urls) > 3 else "")
                     ),
                 )
             )
@@ -406,11 +406,11 @@ def _check_duplicates(payloads_with_urls: list[tuple[Payload, str]]) -> list[Qua
 
 
 def _check_duplicate_fees(payloads_with_urls: list[tuple[Payload, str]]) -> list[QualityIssue]:
-    """Detect repeated fee values across courses â a strong indicator of a
+    """Detect repeated fee values across courses — a strong indicator of a
     selector-scope reuse bug (the same DOM element being scraped for every
     course page). Fires when:
-      â¢ At least 5 courses have a fee, AND
-      â¢ â¥ 75% of fee-bearing courses share the same single fee value.
+      • At least 5 courses have a fee, AND
+      • ≥ 75% of fee-bearing courses share the same single fee value.
     """
     issues: list[QualityIssue] = []
     fee_to_courses: dict[float, list[str]] = defaultdict(list)
@@ -434,14 +434,14 @@ def _check_duplicate_fees(payloads_with_urls: list[tuple[Payload, str]]) -> list
         count = len(course_names)
         pct = count / max(total_with_fee, 1)
         if pct >= 0.75:
-            sample = ", ".join(course_names[:4]) + (" â¦" if len(course_names) > 4 else "")
+            sample = ", ".join(course_names[:4]) + (" …" if len(course_names) > 4 else "")
             issues.append(
                 QualityIssue(
                     severity="critical",
                     code="duplicate_fee_detected",
                     message=(
                         f"Fee ${fee_val:,.0f} appears on {count}/{total_with_fee} "
-                        f"courses ({pct:.0%}) â likely a selector-scope bug. "
+                        f"courses ({pct:.0%}) — likely a selector-scope bug. "
                         f"Affected: {sample}"
                     ),
                 )
@@ -474,12 +474,12 @@ async def run_quality_checks(
     Returns
     -------
     dict with keys:
-        total_courses  â number of courses checked
-        total_issues   â total issue count
-        critical       â count of critical issues
-        warnings       â count of warning issues
-        info           â count of info issues
-        issues         â list of issue dicts (sorted severity â code â url)
+        total_courses  — number of courses checked
+        total_issues   — total issue count
+        critical       — count of critical issues
+        warnings       — count of warning issues
+        info           — count of info issues
+        issues         — list of issue dicts (sorted severity → code → url)
     """
     all_issues: list[QualityIssue] = []
     payloads_with_urls: list[tuple[Payload, str]] = []
@@ -524,7 +524,7 @@ async def run_quality_checks(
         await _emit_report(all_issues, counts, len(payloads_with_urls), emit)
 
     log.info(
-        "[DATA QUALITY] %d course(s) checked â %d critical / %d warning / %d info",
+        "[DATA QUALITY] %d course(s) checked — %d critical / %d warning / %d info",
         len(payloads_with_urls),
         counts.get("critical", 0),
         counts.get("warning", 0),
@@ -547,7 +547,7 @@ async def _emit_report(
     header_level = "error" if n_critical else ("warn" if n_warning else "info")
     await emit(
         "status",
-        f"[DATA QUALITY] {total_courses} course(s) checked â "
+        f"[DATA QUALITY] {total_courses} course(s) checked — "
         f"{n_critical} critical / {n_warning} warning / {n_info} info",
         phase="complete",
         kind="data_quality_summary",
@@ -586,7 +586,7 @@ async def _emit_report(
         sample = group[0]
         await emit(
             "status",
-            f"[DATA QUALITY][WARN] {code} Ã {count}: {sample.message}"
+            f"[DATA QUALITY][WARN] {code} × {count}: {sample.message}"
             + (f" (and {count - 1} more)" if count > 1 else ""),
             phase="complete",
             kind="data_quality_issue",

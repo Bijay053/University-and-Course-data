@@ -19,7 +19,7 @@ async def test_location_from_definition_list() -> None:
     </body></html>
     """
     out = await location.extract(html, "https://x.test")
-    assert out and out[0].value == "Sydney, Melbourne"
+    assert out and out[0].value == "Sydney, Melbourne, Australia"
     assert out[0].method == "location.dl"
 
 
@@ -27,7 +27,7 @@ async def test_location_from_definition_list() -> None:
 async def test_location_strips_online_virtual() -> None:
     html = '<dl><dt>Location</dt><dd>Online, Brisbane, Virtual</dd></dl>'
     out = await location.extract(html, "")
-    assert out[0].value == "Brisbane"
+    assert out[0].value == "Brisbane, Australia"
 
 
 @pytest.mark.asyncio

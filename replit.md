@@ -56,6 +56,31 @@ The admin portal now requires login. The auth flow:
   - *Per-job cost columns*: `scrape_runtime_jobs.total_gemini_cost_usd` and `cost_ceiling_hit` written at job completion.
   - *SQL reporting views*: `v_gemini_cost_by_university`, `v_gemini_cost_by_call_type`, `v_gemini_top_spenders_30d`, `v_gemini_skip_efficiency` for cost dashboards.
   - *Model*: `gemini-2.5-flash-lite` confirmed cost-optimal (Component 5 check script at `backend-py/scripts/check_gemini_model.py`).
+- **Week 3 — Cost optimisation + CRICOS matching (closeout 2026-05-09)**:
+  - **Track A — Gemini cost** (P1A–P5A): all five prompts already shipped via the Priority-6 system documented above (`gemini_call_log` table, `gemini_gate.py` skip rule, `gemini_client.py` circuit breaker, `cost_ceiling.py`, four SQL views, `check_gemini_model.py` audit). No new code required for Track A — it pre-dates the spec.
+  - **Track B — CRICOS matching** (P1B–P5B): extractor (`extractors/cricos_code.py`), PDF pipeline integration (`pipelines/university_pdfs.py` returns `"cricos_match"` suffix), authority tier `2.5` for `uni_pdf:cricos_match:fees` / `uni_pdf:cricos_match:requirements`, and existing tests are all in place (`test_cricos_extraction.py`, `test_university_pdfs.py`, `test_gemini_gate.py` — 75 pass). The spec calls for a separate `pdf_course_extracts` staging table; the existing implementation writes provenance directly into `scraped_field_evidence` rows with the `cricos_match` method, which is functionally equivalent and avoids data duplication.
+  - **P5B verification**: migration 018 adds `v_cricos_coverage_au` view (per-AU-uni: total_staged, has_cricos, cricos_coverage_pct, enriched_via_pdf). Apply on prod: `cd /root/University-and-Course-data && PYTHONPATH=backend-py python3 backend-py/scripts/apply_migration_018.py`.
+  - **Live coverage gap (open issue, not a code gap)**: as of 2026-05-09, dev `v_cricos_coverage_au` shows 0% for CSU / UOW / VIT (3 AU unis with recently-staged courses). The extractor is wired and tested; the issue is that those universities' course pages don't expose CRICOS in the patterns the regex matches (or the courses scraped lack CRICOS at the source). Diagnostic script: `backend-py/scripts/cricos_coverage_diagnostic.py [--uni-id N]` — counts pages where the literal token "CRICOS" appears vs pages where the extractor matches it. Backlog item for Week 5 production scale-up.
+- **Week 4 — Production scale-up prep (top 10 AU unis, prep shipped 2026-05-09)**: Week 4 is operational, not engineering — the actual scrapes / spot-checks / approvals run on the prod droplet. This commit ships the prep pack so the on-prod work has zero engineering friction:
+  - **Pre-flight gate runner**: `backend-py/scripts/week4_preflight.sh` — runs the 4 gates from Prompt 1 with column names corrected to match this codebase (`scrape_run_alerts.rule_id`/`created_at`, not `rule_type`/`fired_at`; `scrape_runtime_jobs.imported`/`total_found`/`total_gemini_cost_usd`, not `staged`/`discovered`/per-row `avg_cost_per_course`). Also lists which top-10 YAMLs exist. Run on prod: `cd /root/University-and-Course-data && bash backend-py/scripts/week4_preflight.sh`.
+  - **Per-uni protocol queries**: `backend-py/scripts/week4_per_uni_protocol.sql` — Step-2 (alerts), Step-3 (job stats), Step-4 (random spot-check picker). Bind via `psql -v run_id="'<id>'" -v uni_id=42 -f ...`.
+  - **Cost projection**: `backend-py/scripts/week4_cost_projection.sql` — Prompt 6 cost queries (per-uni cost, 80-uni projection, outliers, suspiciously low unis). Run after each scrape day.
+  - **Scale-up log**: `backend-py/docs/week4_scale_up_log.md` — top-10 status table + per-uni run template (alerts / spot-checks / decision / YAML changes).
+  - **Patterns doc**: `backend-py/docs/uni_onboarding_patterns.md` — empty skeleton with sections for site platforms, common gotchas, reusable YAML templates, and per-uni status. Update after every 2 unis processed (Prompt 5).
+  - **Stub per-uni YAMLs**: `monash.yaml`, `unimelb.yaml`, `usyd.yaml`, `unsw.yaml`, `uq.yaml`, `rmit.yaml`, `deakin.yaml`, `uts.yaml`, `anu.yaml`, `uwa.yaml` — minimal `discovery: {} / extraction.filters.domestic_only.enabled: false` with hostname comments and a small number of educated initial overrides (`always_sitemap_supplement: true` for UNSW/RMIT/Deakin which are JS-heavy, `fallback_subdomains: ['handbook.{domain}']` for UWA, `fallback_subdomains: ['programsandcourses.{domain}']` for ANU). All overrides are conservative and intended to be tightened after the first scrape's spot-check results.
+  - **Suggested order**: Group A (low risk, server-rendered HTML) — ANU, UWA, UQ, USyd. Group B (medium, custom CMS / Cloudflare) — Monash, Melbourne, UNSW, UTS. Group C (heavy JS) — RMIT, Deakin. Final order is set after one-page browser spot-check per uni at start of Week 4.
+  - **What this prep does NOT do**: trigger any scrape, change any extractor, or push anything to prod. Triggering scrapes, manual browser spot-checks, and approval-to-prod are operator tasks per spec.
+- **Week 5 — Scale-up engineering pack (next-20 prep + promotion-gap fix, shipped 2026-05-09)**: Week 5 has two parts in spec — operational scale-up (Prompts 3-5, run on prod) and engineering deliverables (Prompts 1, 5-fix, 6, 7). This commit ships the engineering portion; the operational scale-up runs on the prod droplet.
+  - **Promotion-gap root-cause fix (Prompt 5)**: investigated the spec's "Charles Sturt 92-course promotion gap". Two contributing bugs found and fixed:
+    - `app/services/scraper/approve_course.py`: `func.lower(Course.name) == sc.course_name.lower()` crashed with `AttributeError: 'NoneType' object has no attribute 'lower'` when course_name was NULL — *after* opening the SQLAlchemy transaction but *before* commit, leaving the session poisoned. Now raises a clear `ValueError` before opening the transaction.
+    - `scripts/bulk_approve.py`: per-row exception handler did NOT call `db.rollback()`. So one bad row poisoned the session and made every subsequent row in the batch fail with "transaction has been rolled back" — exactly matching the "92 missing rows" pattern. Now rolls back per-row.
+  - **CSU promotion diagnostic** (`scripts/csu_promotion_diagnostic.py`): identifies `scraped_courses` rows with `status='approved'` but `course_id IS NULL`. Run on prod: `cd /root/University-and-Course-data && PYTHONPATH=backend-py python3 backend-py/scripts/csu_promotion_diagnostic.py [--university-id 4]`.
+  - **Pre-flight gate runner** (`scripts/week5_preflight.sh`): 4 gates from Prompt 1 with corrected schema (alert table is `scrape_run_alerts` not `scrape_alerts`; uses `acknowledged` not `resolved_at`; YAMLs live under `scraper_config/unis/` not `scraper/unis/`; universities has no `slug` column).
+  - **Fleet diagnostics SQL** (`scripts/week5_fleet_diagnostics.sql`): Prompt 6 four diagnostics — fill-rate distribution, method distribution shift, AI-fallback overuse red-flag (>20% of fleet), cost outliers (>5x median), sibling-cache health. Spec assumed a denormalised wide-row `scrape_run_metrics` (`fill_rate_international_fee` etc); rewritten against the actual per-(uni, field, method) tall ledger.
+  - **Architecture doc** (`docs/architecture.md`): captures Sprint 1 deliverables grouped by layer (data correctness, observability, cost optimisation, CRICOS, per-uni YAML, promotion safety) plus 7 architecture invariants.
+  - **Sprint 2 backlog** (`docs/sprint2_backlog.md`): 9 candidate items with effort + impact + decision criteria, plus retrospective process changes (mandatory verification SQL in PR, mandatory regression sweep on shared-code changes, mandatory architecture-doc updates per feature).
+  - **Stub per-uni YAMLs (next 20)**: 11 new stubs added — macquarie, curtin (with `study.{domain}` fallback), griffith, qut, westernsydney, adelaide, newcastle, murdoch, unisq, federation, scu. The other 9 (latrobe, flinders, jcu, ecu, cdu, acu, csu, bond, uow) already existed.
+  - **What this commit does NOT do**: trigger any prod scrape, change any extractor, or cherry-pick rows for re-promotion. The bug fixes in approve_course.py and bulk_approve.py are defensive but the actual prod re-promotion (re-running bulk_approve.py for CSU after pulling the fix) is operator-driven.
 - **Per-host URL rewriting**: UNE appends `?international=true`; UOW appends `?students=international&year=<year>` before fetching each course page so the international-student fee, IELTS, intake, and campus data is visible.
 - **UOW discovery**: BFS page budget raised to 80 (non-fast mode) and all 70 pagination pages pre-seeded so the full ~300 course catalogue is discovered.
 - **Session → intake mapping (Pass 4)**: "Autumn Session" → March, "Spring Session" → July, "Summer Session" → November fallback for Australian universities (UOW-style).
@@ -114,7 +139,8 @@ The database schema includes tables for `universities`, `courses`, `intakes`, `f
 
 - **Production Server**: DigitalOcean droplet at `159.65.152.72`, Ubuntu 24.04.
 - **Process Management**: systemd. Services: `uni-api-py.service` (FastAPI/uvicorn, port 8000) and `uni-celery.service` (Celery worker). Nginx proxies `/api` → `127.0.0.1:8000`.
-- **Git repo on server**: `/root/University-and-Course-data`. Deploy = `git pull origin main` + `systemctl restart uni-api-py uni-celery`.
+- **Git repo on server**: `/root/University-and-Course-data`. Deploy = `git pull origin main` + `systemctl restart uni-api-py.service uni-celery.service`.
+- **IMPORTANT — university_id values differ between prod and dev**: Torrens = `id=3` on prod, `id=5` in dev. Always check `SELECT id, name FROM universities WHERE name ILIKE '%torrens%'` on prod before running university-specific SQL. Do NOT assume dev IDs match prod.
 - **Database**: Local PostgreSQL. Database: `university_portal`, owner: `uniportal`. Access via `sudo -u postgres psql -d university_portal`. Schema changes via direct psql (alembic cannot be used on production — asyncpg fails to connect via TCP to `localhost` due to SSL hostname DNS issue).
 - **CRITICAL — DB URL**: Must use `127.0.0.1` not `localhost` in the asyncpg connection string. asyncpg attempts SSL hostname verification using `getaddrinfo("localhost")` which fails on this server (`[Errno -3] Temporary failure in name resolution`). Using the IP literal bypasses the DNS lookup.  Hardcoded default in `backend-py/app/config.py` is already set to `127.0.0.1`.
 - **alembic**: Do NOT run `alembic upgrade head` on production — it will fail with the same DNS error. Apply all schema changes via `sudo -u postgres psql -d university_portal -c "ALTER TABLE ..."` directly.
@@ -195,6 +221,22 @@ The Replit remote is named `github` (not `origin`). Prod remote is `origin`.
 - **apicollege**: ~30 staged
 - **ait**: ~37 staged
 - **Study (weird)**: 694 staged but 0 live — investigate before touching
+
+### /api/courses 500 fix (COMPLETED)
+
+Root cause: the prod `courses.py` was an older version missing two things:
+1. `from decimal import Decimal` import
+2. `def _f(v) -> float` helper function
+
+asyncpg returns PostgreSQL `NUMERIC` columns as Python `Decimal` objects, which are
+not JSON-serializable. The fix (applied directly to prod via Python patch scripts):
+- Added `from decimal import Decimal` import
+- Added `def _f(v): return float(v) if isinstance(v, Decimal) else v`
+- Wrapped all english_requirements band scores with `_f()` (listening/speaking/writing/reading/overall for ielts/pte/toefl/other)
+- Added safety final-pass that re-checks all dict values for stray Decimals before `out.append(d)`
+
+**These changes are in the Replit dev repo (courses.py) but NOT yet on GitHub/prod via git.**
+The prod file was patched manually. Next git push will include the correct version.
 
 ### Next session housekeeping (do first, ~15 min)
 

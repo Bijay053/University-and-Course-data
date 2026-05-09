@@ -1,8 +1,9 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 interface User {
+  id?: number;
   email: string;
   name: string;
   role: string;
@@ -11,28 +12,50 @@ interface User {
 interface AuthState {
   user: User | null;
   loading: boolean;
+  isSuperAdmin: boolean;
+  permissions: Set<string>;
+  can: (key: string) => boolean;
+  canAny: (keys: string[]) => boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  refresh: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthState>({
   user: null,
   loading: true,
+  isSuperAdmin: false,
+  permissions: new Set(),
+  can: () => false,
+  canAny: () => false,
   login: async () => {},
   logout: async () => {},
+  refresh: async () => {},
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [permissions, setPermissions] = useState<Set<string>>(new Set());
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetch(`${BASE}/api/auth/me`, { credentials: "include" })
-      .then((r) => r.json())
-      .then((data) => setUser(data.user ?? null))
-      .catch(() => setUser(null))
-      .finally(() => setLoading(false));
+  const refresh = useCallback(async () => {
+    try {
+      const res = await fetch(`${BASE}/api/auth/me`, { credentials: "include" });
+      const data = await res.json();
+      setUser(data.user ?? null);
+      setPermissions(new Set<string>(Array.isArray(data.permissions) ? data.permissions : []));
+      setIsSuperAdmin(Boolean(data.is_super_admin));
+    } catch {
+      setUser(null);
+      setPermissions(new Set());
+      setIsSuperAdmin(false);
+    }
   }, []);
+
+  useEffect(() => {
+    refresh().finally(() => setLoading(false));
+  }, [refresh]);
 
   async function login(email: string, password: string) {
     const res = await fetch(`${BASE}/api/auth/login`, {
@@ -53,15 +76,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error(message);
     }
     setUser(data.user);
+    setPermissions(new Set<string>(Array.isArray(data.permissions) ? data.permissions : []));
+    setIsSuperAdmin(Boolean(data.is_super_admin));
   }
 
   async function logout() {
     await fetch(`${BASE}/api/auth/logout`, { method: "POST", credentials: "include" });
     setUser(null);
+    setPermissions(new Set());
+    setIsSuperAdmin(false);
   }
 
+  const can = useCallback(
+    (key: string) => isSuperAdmin || permissions.has(key),
+    [isSuperAdmin, permissions],
+  );
+  const canAny = useCallback(
+    (keys: string[]) => isSuperAdmin || keys.some((k) => permissions.has(k)),
+    [isSuperAdmin, permissions],
+  );
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
+    <AuthContext.Provider
+      value={{ user, loading, isSuperAdmin, permissions, can, canAny, login, logout, refresh }}
+    >
       {children}
     </AuthContext.Provider>
   );
