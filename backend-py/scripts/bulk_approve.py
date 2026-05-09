@@ -95,6 +95,11 @@ async def run(
                     sc.id, result["course_id"], sc.course_name,
                 )
             except Exception as exc:  # noqa: BLE001
+                # Roll back the poisoned session before continuing — without
+                # this, ONE bad row makes every subsequent row fail with
+                # "transaction has been rolled back" (Week 5: this is the
+                # root cause of the Charles Sturt 92-course promotion gap).
+                await db.rollback()
                 failed.append((sc.id, str(exc)))
                 log.warning("  FAILED sc_id=%s: %s", sc.id, exc)
 

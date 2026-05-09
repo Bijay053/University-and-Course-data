@@ -1,0 +1,7 @@
+# Macquarie University — stub created for Week 5 scale-up.
+# Hostname: www.mq.edu.au  (course catalogue under /study)
+discovery: {}
+extraction:
+  filters:
+    domestic_only:
+      enabled: false

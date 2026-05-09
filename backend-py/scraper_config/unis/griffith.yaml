@@ -1,0 +1,8 @@
+# Griffith University — stub created for Week 5 scale-up.
+# Hostname: www.griffith.edu.au  (course catalogue under /study)
+# Multi-campus: Nathan, Mount Gravatt, Logan, Gold Coast, South Bank.
+discovery: {}
+extraction:
+  filters:
+    domestic_only:
+      enabled: false
