@@ -15,6 +15,7 @@ google-genai>=1.0.0
 celery[redis]>=5.4.0
 redis>=5.0.0
 python-multipart>=0.0.9
+openpyxl>=3.1.0
 python-jose[cryptography]>=3.3.0
 passlib[bcrypt]>=1.7.4
 rapidfuzz>=3.9.0
