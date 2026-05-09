@@ -112,14 +112,28 @@ async def logout(response: Response) -> dict:
 
 
 @router.get("/me", response_model=MeResponse)
-async def me(user: dict | None = Depends(get_optional_user)) -> MeResponse:
+async def me(
+    user: dict | None = Depends(get_optional_user),
+    db: AsyncSession = Depends(get_db),
+) -> MeResponse:
     if not user:
         return MeResponse(user=None)
-    safe = {k: v for k, v in user.items() if k not in {"exp", "iat", "permissions", "is_super_admin"}}
+    # Re-read from DB so is_super_admin / permissions are always up-to-date,
+    # even if the browser still holds an old JWT cookie.
+    db_user = await _load_user_by_email(db, user.get("email", ""))
+    if not db_user or not db_user.is_active:
+        return MeResponse(user=None)
+    perms = _perm_keys(db_user)
+    safe = {
+        "id": db_user.id,
+        "email": db_user.email,
+        "name": db_user.full_name,
+        "role": "admin" if db_user.is_super_admin else "user",
+    }
     return MeResponse(
         user=safe,
-        permissions=user.get("permissions") or [],
-        is_super_admin=bool(user.get("is_super_admin")),
+        permissions=perms,
+        is_super_admin=db_user.is_super_admin,
     )
 
 
