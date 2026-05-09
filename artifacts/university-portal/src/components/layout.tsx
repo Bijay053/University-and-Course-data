@@ -71,7 +71,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <NavLinks />
         </div>
         {user && (
-          <div className="border-t border-sidebar-border px-3 py-3 flex items-center gap-2">
+          <div className="border-t border-sidebar-border px-3 py-3 flex items-center gap-2 group">
             <div className="w-7 h-7 bg-primary rounded-full flex items-center justify-center text-primary-foreground font-semibold text-xs flex-shrink-0">
               {initials}
             </div>
@@ -82,7 +82,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <button
               onClick={logout}
               title="Sign out"
-              className="p-1 rounded text-sidebar-foreground/50 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 transition-colors"
+              className="p-1 rounded text-sidebar-foreground/50 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 transition-all duration-150 opacity-0 group-hover:opacity-100"
             >
               <LogOut className="h-4 w-4" />
             </button>
@@ -121,7 +121,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <NavLinks onNav={() => setMobileOpen(false)} />
         </div>
         {user && (
-          <div className="border-t border-sidebar-border px-3 py-3 flex items-center gap-2">
+          <div className="border-t border-sidebar-border px-3 py-3 flex items-center gap-2 group">
             <div className="w-7 h-7 bg-primary rounded-full flex items-center justify-center text-primary-foreground font-semibold text-xs flex-shrink-0">
               {initials}
             </div>
@@ -131,7 +131,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <button
               onClick={logout}
               title="Sign out"
-              className="p-1 rounded text-sidebar-foreground/50 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 transition-colors"
+              className="p-1 rounded text-sidebar-foreground/50 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 transition-all duration-150 opacity-0 group-hover:opacity-100"
             >
               <LogOut className="h-4 w-4" />
             </button>
