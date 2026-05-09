@@ -21,9 +21,12 @@ _ENV_FILE = Path(__file__).parent.parent / ".env"
 def _normalise_db_url(raw: str) -> str:
     """Normalise a Postgres URL for asyncpg.
 
-    Two transforms:
+    Three transforms:
     1. Force the ``postgresql+asyncpg://`` driver prefix.
-    2. Strip query parameters that libpq accepts but asyncpg does not
+    2. Replace ``localhost`` host with ``127.0.0.1`` — asyncpg on this server
+       cannot resolve the hostname ``localhost`` via DNS (``[Errno -3]``); the
+       IP literal bypasses the DNS lookup entirely.
+    3. Strip query parameters that libpq accepts but asyncpg does not
        (``sslmode``, ``channel_binding``). Replit's DATABASE_URL ships with
        ``?sslmode=require`` which would crash asyncpg; we drop it (asyncpg
        negotiates SSL on its own with hosted Postgres providers).
@@ -37,9 +40,21 @@ def _normalise_db_url(raw: str) -> str:
         url = "postgresql+asyncpg://" + url[len("postgresql://") :]
 
     parts = urlsplit(url)
+
+    # Replace localhost → 127.0.0.1 so asyncpg never attempts a DNS lookup.
+    # urlsplit puts "host:port" in netloc; we only touch the hostname portion.
+    netloc = parts.netloc
+    # netloc is  [user:pass@]host[:port]  — replace only the host segment.
+    at = netloc.rfind("@")
+    host_port = netloc[at + 1 :]  # e.g. "localhost:5432" or "localhost"
+    host_part, _, port_part = host_port.partition(":")
+    if host_part.lower() == "localhost":
+        host_port = "127.0.0.1" + (":" + port_part if port_part else "")
+        netloc = (netloc[: at + 1] if at >= 0 else "") + host_port
+
     drop = {"sslmode", "channel_binding"}
     kept = [(k, v) for k, v in parse_qsl(parts.query, keep_blank_values=True) if k not in drop]
-    return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(kept), parts.fragment))
+    return urlunsplit((parts.scheme, netloc, parts.path, urlencode(kept), parts.fragment))
 
 
 class Settings(BaseSettings):
