@@ -968,17 +968,33 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 if not discovered:
                     course_sample = [lk["url"] for lk in links[:5] if lk.get("url")]
                     base_domain = (uni.website or uni.scrape_url or "").rstrip("/")
-                    try:
-                        discovered = await asyncio.wait_for(
-                            discover_fee_url_from_course_pages(course_sample, base_domain),
-                            timeout=120,
-                        )
-                    except asyncio.TimeoutError:
+                    if not base_domain and course_sample:
+                        from urllib.parse import urlparse as _urlparse
+                        _p = _urlparse(course_sample[0])
+                        if _p.scheme and _p.netloc:
+                            base_domain = f"{_p.scheme}://{_p.netloc}"
+                            log.warning(
+                                "uni %s has empty website/scrape_url; derived base_domain=%s from first course link",
+                                uni.id, base_domain,
+                            )
+                    if not base_domain:
                         log.warning(
-                            "discover_fee_url_from_course_pages timed out after 120s for %s — skipping",
-                            base_domain,
+                            "skipping fee-page auto-discovery for uni %s: no base_domain available",
+                            uni.id,
                         )
                         discovered = None
+                    else:
+                        try:
+                            discovered = await asyncio.wait_for(
+                                discover_fee_url_from_course_pages(course_sample, base_domain),
+                                timeout=120,
+                            )
+                        except asyncio.TimeoutError:
+                            log.warning(
+                                "discover_fee_url_from_course_pages timed out after 120s for %s — skipping",
+                                base_domain,
+                            )
+                            discovered = None
                     if discovered:
                         await emit(
                             "status",
