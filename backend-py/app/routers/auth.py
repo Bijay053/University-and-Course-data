@@ -194,7 +194,11 @@ async def reset_password(
 # admin always exists. Idempotent.
 # ---------------------------------------------------------------------------
 async def ensure_admin_user() -> None:
+    from sqlalchemy import select as _select
+
     from app.database import AsyncSessionLocal
+    from app.models.user import UserPermission
+    from app.permissions import ALL_KEYS
 
     admin_email = os.environ.get("ADMIN_EMAIL", "admin@university-portal.local")
     admin_password = os.environ.get("ADMIN_PASSWORD", "Bijay@12345")
@@ -208,14 +212,36 @@ async def ensure_admin_user() -> None:
                 existing.is_active = True
                 existing.updated_at = datetime.now(timezone.utc)
                 await db.commit()
-            return
-        admin = User(
-            email=admin_email,
-            full_name=admin_name,
-            password_hash=hash_password(admin_password),
-            is_active=True,
-            is_super_admin=True,
-        )
-        db.add(admin)
-        await db.commit()
-        log.info("Bootstrapped initial admin user %s", admin_email)
+            admin_id = existing.id
+        else:
+            admin = User(
+                email=admin_email,
+                full_name=admin_name,
+                password_hash=hash_password(admin_password),
+                is_active=True,
+                is_super_admin=True,
+            )
+            db.add(admin)
+            await db.commit()
+            await db.refresh(admin)
+            admin_id = admin.id
+            log.info("Bootstrapped initial admin user %s", admin_email)
+
+        # Grant every registered permission key explicitly. Super-admin already
+        # bypasses checks, but this keeps the Permissions UI showing all boxes
+        # ticked and protects any future code path that reads the granted set
+        # directly instead of using `user_has_permission`.
+        rows = (
+            await db.execute(
+                _select(UserPermission.permission_key).where(
+                    UserPermission.user_id == admin_id
+                )
+            )
+        ).scalars().all()
+        already_granted = set(rows)
+        missing = ALL_KEYS - already_granted
+        for key in missing:
+            db.add(UserPermission(user_id=admin_id, permission_key=key))
+        if missing:
+            await db.commit()
+            log.info("Granted %d new permission(s) to admin user", len(missing))
