@@ -23,7 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.dependencies import get_db, get_optional_user
-from app.models.user import PasswordResetToken, User, UserPermission
+from app.models.user import PasswordResetToken, User
 from app.schemas.auth import (
     ForgotPasswordBody,
     GenericOk,
@@ -70,7 +70,9 @@ async def _load_user_by_email(db: AsyncSession, email: str) -> User | None:
 
 
 def _perm_keys(user: User) -> list[str]:
-    return sorted(p.permission_key for p in user.permissions)
+    role_perms = {p.permission_key for p in user.role.permissions} if user.role else set()
+    user_perms = {p.permission_key for p in user.permissions}
+    return sorted(role_perms | user_perms)
 
 
 @router.post("/login", response_model=LoginResponse)

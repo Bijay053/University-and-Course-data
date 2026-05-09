@@ -4,10 +4,6 @@ import re
 
 from pydantic import BaseModel, Field, field_validator
 
-# Use a permissive regex (not Pydantic's EmailStr) because the default admin
-# uses `admin@university-portal.local` and EmailStr rejects reserved TLDs
-# like `.local`. We only need a sanity check here — actual delivery is
-# the operator's responsibility once SMTP is configured.
 _EMAIL_RE = re.compile(r"^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$")
 
 
@@ -49,10 +45,35 @@ class ResetPasswordBody(BaseModel):
 class GenericOk(BaseModel):
     ok: bool = True
     message: str | None = None
-    # Dev-only: surfaced when SMTP is not configured so the operator can
-    # still complete the reset flow during local dev.
     debug_reset_url: str | None = None
 
+
+# ---------------------------------------------------------------------------
+# Role schemas
+# ---------------------------------------------------------------------------
+
+class RoleOut(BaseModel):
+    id: int
+    name: str
+    description: str
+    permissions: list[str]
+
+
+class RoleCreateBody(BaseModel):
+    name: str = Field(..., min_length=1, max_length=80)
+    description: str = Field("", max_length=200)
+    permissions: list[str] = []
+
+
+class RoleUpdateBody(BaseModel):
+    name: str | None = Field(None, min_length=1, max_length=80)
+    description: str | None = Field(None, max_length=200)
+    permissions: list[str] | None = None
+
+
+# ---------------------------------------------------------------------------
+# User schemas
+# ---------------------------------------------------------------------------
 
 class UserOut(BaseModel):
     id: int
@@ -60,6 +81,8 @@ class UserOut(BaseModel):
     full_name: str
     is_active: bool
     is_super_admin: bool
+    role_id: int | None = None
+    role_name: str | None = None
 
 
 class UserCreateBody(BaseModel):
@@ -67,6 +90,7 @@ class UserCreateBody(BaseModel):
     full_name: str = Field("", max_length=120)
     password: str = Field(..., min_length=8, max_length=128)
     is_super_admin: bool = False
+    role_id: int | None = None
     permissions: list[str] = []
 
     _v_email = field_validator("email")(_validate_email)
@@ -76,6 +100,7 @@ class UserUpdateBody(BaseModel):
     full_name: str | None = Field(None, max_length=120)
     is_active: bool | None = None
     is_super_admin: bool | None = None
+    role_id: int | None = None
     new_password: str | None = Field(None, min_length=8, max_length=128)
 
 
