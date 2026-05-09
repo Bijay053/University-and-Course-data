@@ -1,0 +1,11 @@
+# Deakin University — stub created for Week 4 scale-up.
+# Hostname: www.deakin.edu.au  (course catalogue at /course)
+#
+# Bug history: none yet — fill in after first scrape.
+# Note: Deakin uses Sitecore + heavy JS; expect browser timeout tuning.
+discovery:
+  always_sitemap_supplement: true
+extraction:
+  filters:
+    domestic_only:
+      enabled: false

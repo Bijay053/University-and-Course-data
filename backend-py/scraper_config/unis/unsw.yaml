@@ -1,0 +1,11 @@
+# UNSW Sydney — stub created for Week 4 scale-up.
+# Hostname: www.unsw.edu.au  (course catalogue under /study/find-a-degree)
+#
+# Bug history: none yet — fill in after first scrape.
+# Note: UNSW historically uses heavy JS rendering on the find-a-degree filter UI.
+discovery:
+  always_sitemap_supplement: true
+extraction:
+  filters:
+    domestic_only:
+      enabled: false

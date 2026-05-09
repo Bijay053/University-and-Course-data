@@ -1,0 +1,13 @@
+# Australian National University — stub created for Week 4 scale-up.
+# Hostname: www.anu.edu.au  (course catalogue at programsandcourses.anu.edu.au)
+#
+# Bug history: none yet — fill in after first scrape.
+# Note: ANU uses a separate subdomain for its course catalogue — may need
+# fallback_subdomains entry once the primary discovery is verified.
+discovery:
+  fallback_subdomains:
+    - "programsandcourses.{domain}"
+extraction:
+  filters:
+    domestic_only:
+      enabled: false

@@ -1,0 +1,12 @@
+# University of Western Australia — stub created for Week 4 scale-up.
+# Hostname: www.uwa.edu.au  (course catalogue under /study)
+#
+# Bug history: none yet — fill in after first scrape.
+# Note: UWA uses handbook.uwa.edu.au for the authoritative course handbook.
+discovery:
+  fallback_subdomains:
+    - "handbook.{domain}"
+extraction:
+  filters:
+    domestic_only:
+      enabled: false
