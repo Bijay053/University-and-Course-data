@@ -130,6 +130,95 @@ def _bucket_for(payload: dict[str, Any]) -> str:
     return "unknown"
 
 
+# Week 1 Prompt 4 — sibling cache source-type gating.
+#
+# Only values produced by high-precision extractors are allowed to seed the
+# bucket cache.  Lower-precision sources (vision OCR, AI fallback, central-
+# page tables, prior sibling-cache rounds) frequently misread context — a
+# single hallucination would otherwise propagate to every sibling course.
+#
+# The check runs at CACHE-WRITE time inside :func:`_build_bucket_cache`, so
+# excluded values neither vote nor become the modal value.  Read-path /
+# backfill behaviour is unchanged.
+#
+# Coupled with ``_MIN_CACHE_CONFIDENCE`` below: even a permitted source
+# method must report confidence ≥ 0.7 to seed the cache.
+# Methods explicitly disallowed from seeding the cache: low-precision /
+# self-referential / cross-level extractors that have a known history of
+# propagating bad values.  Anything matching this set is rejected.
+_DISALLOWED_CACHE_SOURCES: Final[frozenset[str]] = frozenset({
+    "ai_fallback",            # AI text generation — Prompt 8 caller-side guarded
+    "vision_ocr",             # generic vision OCR — global tier-1 suppression P7B
+    "vision_ocr:tier1",       # explicit tier-1 vision (non-DOM-anchored)
+    "approved_row:inherited", # value carried over from a prior approved row
+    "sibling_cache_backfill", # circular — would feed the cache from itself
+})
+
+# Method-name PREFIXES that are explicitly disallowed.  Captures all
+# vision_ocr:* and sibling_cache:* variants regardless of the suffix.
+_DISALLOWED_CACHE_PREFIXES: Final[tuple[str, ...]] = (
+    "vision_ocr",      # vision_ocr, vision_ocr:tier1, vision_ocr:gemini ...
+    "sibling_cache",   # any prior sibling_cache:* round
+    "ai_fallback",     # ai_fallback:* (defensive — none today)
+)
+
+# Methods explicitly allowed (after the prefix-blocklist above is applied):
+# methods/prefixes from extractors known to read static page data with
+# high precision.  Anything not on this allowlist also fails the gate —
+# better to silently skip seeding than to propagate an unknown source.
+#
+# Audit source: rg '"method":' app/services/scraper/ (2026-05-09).
+_ALLOWED_CACHE_PREFIXES: Final[tuple[str, ...]] = (
+    "regex",                    # regex:cricos, regex:* — deterministic
+    "css_selector",             # CSS-selector-based extractors
+    "gemini_primary",           # Gemini structured extraction (high-conf)
+    "bond_static",              # Bond JSON-API static extractor
+    "csu_static",               # CSU static-page extractor
+    "ecu_static",               # ECU static-page extractor
+    "vit_static_fallback",      # VIT static fallback (deterministic)
+    "per_course_browser",       # Playwright-rendered per-course extraction
+    "per_course_modal",         # Playwright modal extraction
+    "central_page:english_level",  # per-degree-level central English table
+    "uni_pdf:requirements",     # PDF-parsed requirements (anchored)
+    "program_level_table",      # program-level structured table
+    "equivalence_table",        # equivalence-table extractor
+    "study_mode",               # study_mode:* deterministic derivations
+    "category",                 # category:* (rule + det)
+)
+_MIN_CACHE_CONFIDENCE: Final[float] = 0.7
+
+
+def _can_seed_cache(method: str, conf: float) -> bool:
+    """Return True iff this evidence record may seed the sibling cache.
+
+    Two-stage gate:
+
+    1. Reject anything whose method is on the disallow list (or starts
+       with a disallow-prefix).  This keeps tier-1 vision OCR,
+       AI fallback, and sibling-cache-derived values out of the cache
+       regardless of confidence.
+    2. Accept only methods that match an entry in
+       :data:`_ALLOWED_CACHE_PREFIXES` AND whose ``conf`` clears the
+       :data:`_MIN_CACHE_CONFIDENCE` threshold.
+
+    Returning False is non-fatal: the evidence row still appears in the
+    payload, it simply doesn't vote when the bucket cache is built.
+    """
+    if not method:
+        return False
+    if conf < _MIN_CACHE_CONFIDENCE:
+        return False
+    if method in _DISALLOWED_CACHE_SOURCES:
+        return False
+    for bad in _DISALLOWED_CACHE_PREFIXES:
+        if method == bad or method.startswith(bad + ":"):
+            return False
+    for ok in _ALLOWED_CACHE_PREFIXES:
+        if method == ok or method.startswith(ok + ":"):
+            return True
+    return False
+
+
 _CROSS_LEVEL_METHODS: Final = (
     # central_page:english fills every course in the scrape with the same
     # university-level requirement — it may reflect only one degree-level's
@@ -154,7 +243,7 @@ def _is_cross_level_method(method: str) -> bool:
 def _build_bucket_cache(
     results: list[dict[str, Any]],
     *,
-    min_quorum: int = 1,
+    min_quorum: int = 2,
 ) -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, str]]]:
     """Build ``{bucket: {slot: most_common_value}}`` and the matching origin URLs.
 
@@ -226,8 +315,23 @@ def _build_bucket_cache(
             v = payload.get(k)
             if v in (None, "", 0):
                 continue
+            _method = evidence_method.get(k, "")
+            _conf = evidence_conf.get(k, 0.0)
             # Skip values that came from cross-level fallbacks.
-            if _is_cross_level_method(evidence_method.get(k, "")):
+            if _is_cross_level_method(_method):
+                continue
+            # Week 1 Prompt 4 — source-type gate.  Only regex / css_selector /
+            # gemini_primary at conf ≥ 0.7 may seed the cache; vision OCR,
+            # AI fallback and other low-precision methods would otherwise
+            # propagate hallucinated values to every sibling course.
+            if not _can_seed_cache(_method, _conf):
+                log.debug(
+                    "[SIBLING CACHE GATE] dropping seed candidate %s=%r — "
+                    "method=%s conf=%.2f (allowlist=%s, conf>=%.2f) url=%s",
+                    k, v, _method or "unknown", _conf,
+                    list(_ALLOWED_CACHE_PREFIXES), _MIN_CACHE_CONFIDENCE,
+                    course_url,
+                )
                 continue
             slot_counters[k][v] += 1
             # Record the first course URL + source method + confidence that
@@ -301,7 +405,7 @@ async def backfill_english_from_siblings(
     results: list[dict[str, Any]],
     *,
     emit: Callable[..., Awaitable[None]] | None = None,
-    min_quorum: int = 1,
+    min_quorum: int = 2,
 ) -> int:
     """Mutate ``results`` in place, filling empty english slots from
     same-bucket siblings.
@@ -318,8 +422,12 @@ async def backfill_english_from_siblings(
         Passed through to :func:`_build_bucket_cache`. A value of 2 prevents
         a single page (e.g. a marketing page that mentions "IELTS 6.5" in
         text) from seeding the cache and backfilling every sibling in the run.
-        Defaults to 1 to preserve the original behaviour for all universities
-        that didn't exhibit this false-positive; pass 2 for Bond and similar.
+
+        Week 1 Prompt 6 — default raised from 1 → 2 globally.  Trades
+        coverage for correctness: any field whose only source is a single
+        sibling is now left null rather than propagated to every sibling
+        in the bucket.  The orchestrator may pass a higher value for
+        universities with known false-positive sources.
     """
     cache, cache_origins, cache_prov = _build_bucket_cache(results, min_quorum=min_quorum)
     if not cache:

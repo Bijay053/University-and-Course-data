@@ -91,8 +91,14 @@ async def test_fill_missing_only_requests_missing_fields():
     with patch.object(ai_fallback.gemini_client, "generate", side_effect=_fake_gen):
         out = await ai_fallback.fill_missing(payload, html=HTML_SAMPLE, url="x")
 
-    assert "international_fee" not in captured["prompt"]
-    assert "ielts_overall" in captured["prompt"]
+    # The Week 1 Prompt 5 CRITICAL RULES block now mentions
+    # ``international_fee`` in the prompt body (priority order example),
+    # so check the per-field hint section instead — that's where the
+    # caller decides which fields to actually request.
+    _fields_block_start = captured["prompt"].index("Fields to extract:")
+    _fields_block = captured["prompt"][_fields_block_start:]
+    assert "international_fee" not in _fields_block
+    assert "ielts_overall" in _fields_block
     assert out == {
         "ielts_overall": 6.0,
         "intake_months": ["February"],  # int 2 → month name

@@ -50,7 +50,49 @@ _FIELD_HINTS: dict[str, str] = {
     ),
 }
 
+# Week 1 Prompt 5 — non-negotiable rules block prepended to the AI fallback
+# prompt.  Tightens priority/refusal/guess-prevention so the model:
+#   * never copies Domestic-section values into international_fee
+#   * never overrides values another extractor already produced
+#   * returns null instead of inferring from typical Australian pricing /
+#     band thresholds
+#   * never treats page-chrome headings ("Key Information", "Course Rules")
+#     as location/intake/category values
+# Verification: re-scrape Torrens / UTAS / VIT and check ai_fallback row count
+# drops materially — see prompt notes.
+_CRITICAL_RULES_BLOCK = """CRITICAL RULES:
+
+1. PRIORITY ORDER for missing fields:
+   a. If the page has separate Domestic and International sections,
+      extract international_fee, ielts_overall, etc. from the
+      International section ONLY.
+   b. Use Domestic section only for domestic_fee.
+   c. Never put a Domestic section value into international_fee.
+   d. Never put a CSP / Commonwealth Supported Place value into international_fee.
+
+2. NEVER OVERRIDE existing extraction:
+   - You are filling gaps left by other extractors.
+   - If a field already has a value when you receive this request,
+     your job is to find OTHER missing fields, not correct that one.
+
+3. NEVER GUESS:
+   - If the page text does not explicitly contain a value for a field,
+     return null for that field.
+   - Do not infer fees from typical Australian university pricing.
+   - Do not infer IELTS bands from typical course requirements.
+   - Do not extract values from page chrome (headers, navigation, footers).
+   - Returning null is correct when the value is not present.
+
+4. SECTION HEADERS are NOT values:
+   - "Key Information", "Entry Requirements", "Course Rules"
+     are page chrome, not location/intake/category values.
+
+These rules are non-negotiable.
+"""
+
+
 _PROMPT_TEMPLATE = """You are a strict data extractor for a university course page.
+""" + _CRITICAL_RULES_BLOCK + """
 Return ONLY a JSON object with the requested fields. Use null when the page does
 not state the value explicitly. Do NOT invent values.
 
@@ -156,6 +198,86 @@ def _coerce(field_key: str, value: Any) -> Any | None:
     if field_key in {"fee_currency", "duration_unit", "course_location"}:
         return str(value).strip() or None
     return value
+
+
+# Week 1 Prompt 8 — AI-fallback hallucination filter.
+#
+# Before any AI-fallback value is merged into ``payload``, the caller must
+# verify the value (or a close variant) appears verbatim in the rendered
+# course-page text.  This catches the residual hallucinations that even a
+# tightened prompt (Prompt 5) cannot eliminate — e.g. Gemini quoting the
+# "typical Australian Masters fee" of $38,950 when the page only says
+# "fees vary by major".
+#
+# The validator returns ``True`` (= keep the value) for ``None``/empty
+# values so the caller's loop short-circuits cheaply.  Caller is expected
+# to log ``[AI_FALLBACK REJECT] ...`` when it discards a value.
+def validate_ai_fallback_value(field: str, value: Any, page_text: str) -> bool:
+    """Return ``True`` iff ``value`` plausibly appears in ``page_text``.
+
+    Field-specific rules:
+
+    * ``international_fee`` / ``domestic_fee`` — accept if the integer
+      digits ("38950") OR the comma-grouped form ("38,950") appear.
+    * ``ielts_overall`` / ``pte_overall`` / ``toefl_overall`` — accept
+      when the score string is present.  IELTS scores like ``6.5`` and
+      ``7`` are normalised to handle trailing-zero variants.
+    * Categorical fields (``intake_text``, ``category``, ``sub_category``,
+      ``mode``, ``location_text``, ``course_location``, ``intake_months``)
+      — accept when every comma-separated token appears in the text
+      (case-insensitive, whitespace-trimmed).
+    * Any other field — pass-through (returns ``True``); the validator
+      only knows how to police the fields the AI fallback actually fills.
+    """
+    if value is None or value == "" or value == []:
+        return True
+
+    page_text_norm = (page_text or "").lower()
+    if not page_text_norm:
+        # No page text to validate against — be conservative and accept
+        # so we don't drop everything when extractor returned empty html.
+        return True
+
+    if field in ("international_fee", "domestic_fee"):
+        try:
+            n = int(float(value))
+        except (TypeError, ValueError):
+            return False
+        if n <= 0:
+            return False
+        digits = str(n)
+        digits_with_comma = f"{n:,}"
+        return digits in page_text_norm or digits_with_comma.lower() in page_text_norm
+
+    if field in ("ielts_overall", "pte_overall", "toefl_overall",
+                 "cambridge_overall", "duolingo_overall"):
+        try:
+            score = float(value)
+        except (TypeError, ValueError):
+            return False
+        # Both "6.5" and "6" trailing-zero variants must be considered.
+        candidates = {str(value), str(score)}
+        if score == int(score):
+            candidates.add(str(int(score)))
+            candidates.add(f"{int(score)}.0")
+        return any(c.lower() in page_text_norm for c in candidates)
+
+    if field == "intake_months":
+        # ``intake_months`` is a list of month names — every name must
+        # appear at least once on the page (case-insensitive).
+        if not isinstance(value, list):
+            return True
+        return all(
+            isinstance(m, str) and m.strip().lower() in page_text_norm
+            for m in value
+        )
+
+    if field in ("intake_text", "category", "sub_category", "mode",
+                 "location_text", "course_location"):
+        tokens = [t.strip().lower() for t in str(value).split(",")]
+        return all(token in page_text_norm for token in tokens if token)
+
+    return True
 
 
 async def fill_missing(

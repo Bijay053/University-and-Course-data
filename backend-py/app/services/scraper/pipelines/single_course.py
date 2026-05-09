@@ -2365,6 +2365,19 @@ async def extract_course(
             _m = _ev.get("method", "")
             if _fk and _m and _m not in ("ai_fallback",) and _fk not in _prior_method:
                 _prior_method[_fk] = _m
+        # Week 1 Prompt 8 — page-text snapshot used to validate every
+        # AI fallback value below.  Computed once per course rather than
+        # per field.  Falls back to the raw HTML lower-cased when the
+        # html_to_text helper is unavailable (defensive — should never
+        # happen in production but keeps unit tests cheap).
+        try:
+            from app.services.scraper.extractors._text import html_to_text as _html_to_text
+            _ai_page_text = _html_to_text(html or "")
+        except Exception:  # noqa: BLE001
+            _ai_page_text = (html or "")
+        from app.services.scraper.extractors.ai_fallback import (
+            validate_ai_fallback_value as _validate_ai_fallback_value,
+        )
         for k, v in ai_filled.items():
             # Discard chrome text returned by the FALLBACK AI for location fields.
             # UTAS pages have "Key Information Entry requirements Course rules"
@@ -2382,6 +2395,16 @@ async def extract_course(
                 log.info(
                     "[AI_FALLBACK] dropping %s=%r — already set by %s on %s",
                     k, v, existing_method, url,
+                )
+                continue
+            # Week 1 Prompt 8 — verbatim page-text validation.  Drop any
+            # AI fallback value whose digits/score/tokens cannot be located
+            # in the rendered page text.  Catches model hallucinations the
+            # Prompt-5 rules block would otherwise let through.
+            if not _validate_ai_fallback_value(k, v, _ai_page_text):
+                log.info(
+                    "[AI_FALLBACK REJECT] %s=%r — not found in page text: %s",
+                    k, v, url,
                 )
                 continue
             payload.setdefault(k, v)

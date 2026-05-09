@@ -1205,11 +1205,17 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             #   CDU:  category overview pages contain an English-requirement
             #         image that vision OCR extracts; without quorum=2 the
             #         extracted IELTS score backfills every course in the run.
+            # Week 1 Prompt 6 — global minimum is now 2 (set as the
+            # ``backfill_english_from_siblings`` default).  Bond / CDU
+            # entries are kept here for documentation: they were the
+            # original drivers for the higher quorum and remain in the
+            # set so a future raise to 3+ can target them explicitly
+            # without rediscovery.
             _high_quorum_hosts = frozenset({
                 "bond.edu.au", "www.bond.edu.au",
                 "cdu.edu.au", "www.cdu.edu.au",
             })
-            _sibling_quorum = 2 if _scrape_host in _high_quorum_hosts else 1
+            _sibling_quorum = max(2, 2 if _scrape_host in _high_quorum_hosts else 2)
             fills = await backfill_english_from_siblings(
                 sibling_dicts, emit=emit, min_quorum=_sibling_quorum
             )

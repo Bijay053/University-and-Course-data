@@ -249,10 +249,12 @@ class TestSiblingCacheMinQuorum:
         evidence: list = []
         if ielts is not None:
             payload["ielts_overall"] = ielts
+            # Week 1 Prompt 4 — only "regex" / "css_selector" /
+            # "gemini_primary" methods at conf >= 0.7 may seed the cache.
             evidence.append({
                 "field_key": "ielts_overall",
                 "value": ielts,
-                "method": "english_test:pattern",
+                "method": "regex",
                 "confidence": 0.9,
                 "source_url": "https://bond.edu.au/program/bachelor-of-laws",
             })
@@ -283,13 +285,19 @@ class TestSiblingCacheMinQuorum:
         ug_cache = cache.get("undergraduate", {})
         assert ug_cache.get("ielts_overall") == 6.5
 
-    def test_default_quorum_1_preserves_original_behaviour(self) -> None:
-        """Default min_quorum=1 should still backfill from a single source."""
+    def test_default_quorum_is_two_after_prompt_6(self) -> None:
+        """Week 1 Prompt 6 raised the default ``min_quorum`` from 1 → 2.
+        A single source no longer seeds the cache by default — the
+        caller must explicitly pass ``min_quorum=1`` to opt back into
+        the legacy behaviour."""
         from app.services.scraper.sibling_cache import _build_bucket_cache
         results = [
             self._make_result("Bachelor of Laws", 6.5),
             self._make_result("Bachelor of Commerce", None),
         ]
-        cache, _origins, _prov = _build_bucket_cache(results)  # min_quorum defaults to 1
-        ug_cache = cache.get("undergraduate", {})
-        assert ug_cache.get("ielts_overall") == 6.5
+        # Default = 2 → single source is suppressed.
+        cache_default, _o, _p = _build_bucket_cache(results)
+        assert cache_default.get("undergraduate", {}).get("ielts_overall") is None
+        # Explicit opt-in to legacy quorum=1 still works.
+        cache_legacy, _o, _p = _build_bucket_cache(results, min_quorum=1)
+        assert cache_legacy.get("undergraduate", {}).get("ielts_overall") == 6.5

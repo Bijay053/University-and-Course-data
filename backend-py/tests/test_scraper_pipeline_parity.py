@@ -223,18 +223,34 @@ def test_t205_no_blockers_no_warnings_yields_ready_status_and_ok_reason():
 
 # ─── T206: sibling-cache english-test backfill ──────────────────────────
 def test_t206_backfill_fills_empty_slot_from_same_degree_bucket():
-    """One Master's sibling extracted PTE=58; another Master's row that
-    extracted no English fields should be back-filled to PTE=58.
-    Bachelor's siblings are in a different bucket and must not be
-    polluted by the Master's value.
+    """Two Master's siblings agree on IELTS=6.5 (Week 1 Prompt 6 requires
+    consensus ≥ 2); a third Master's row with no English fields should
+    be back-filled. Bachelor's siblings are in a different bucket and
+    must not be polluted by the Master's value.
+
+    Each seed evidence row uses ``method="regex"`` so the Week 1 Prompt
+    4 source-type gate accepts it.
     """
+    _seed_ev = [{
+        "field_key": "ielts_overall",
+        "value": 6.5,
+        "method": "regex",
+        "confidence": 0.9,
+    }]
     results: list[dict] = [
         {
             "name": "Master of A",
             "url": "https://x/a",
             "payload": {"course_name": "Master of A", "degree_level": "Master",
                         "pte_overall": 58, "ielts_overall": 6.5},
-            "evidence": [],
+            "evidence": list(_seed_ev),
+        },
+        {
+            "name": "Master of D",
+            "url": "https://x/d",
+            "payload": {"course_name": "Master of D", "degree_level": "Master",
+                        "ielts_overall": 6.5},
+            "evidence": list(_seed_ev),
         },
         {
             "name": "Master of B",
@@ -251,17 +267,18 @@ def test_t206_backfill_fills_empty_slot_from_same_degree_bucket():
     ]
     n_filled = asyncio.run(backfill_english_from_siblings(results))
     assert n_filled >= 1
-    # Master sibling B got back-filled for IELTS from Master sibling A.
+    # Master sibling B (results[2]) got back-filled for IELTS from
+    # Masters A + D (results[0] + results[1]).
     # NOTE: PTE is intentionally excluded from _SIBLING_BACKFILL_SLOTS to
     # prevent cross-level contamination (only IELTS is backfilled globally).
-    assert results[1]["payload"]["ielts_overall"] == 6.5
-    assert "pte_overall" not in results[1]["payload"]
-    # Bachelor row was NOT touched (no Bachelor sibling has any data).
+    assert results[2]["payload"]["ielts_overall"] == 6.5
     assert "pte_overall" not in results[2]["payload"]
-    assert "ielts_overall" not in results[2]["payload"]
+    # Bachelor row (results[3]) was NOT touched.
+    assert "pte_overall" not in results[3]["payload"]
+    assert "ielts_overall" not in results[3]["payload"]
     # Evidence rows annotated as sibling_cache:* so the review modal
     # can show provenance. Provenance fields must be present.
-    sc_evidence = [e for e in results[1]["evidence"] if e.get("field_key") == "ielts_overall"]
+    sc_evidence = [e for e in results[2]["evidence"] if e.get("field_key") == "ielts_overall"]
     assert sc_evidence, "Backfilled course must have an ielts_overall evidence row"
     ev = sc_evidence[0]
     assert ev["method"].startswith("sibling_cache:"), f"Bad method: {ev['method']}"

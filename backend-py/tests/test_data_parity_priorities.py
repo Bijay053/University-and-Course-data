@@ -127,11 +127,21 @@ def test_t205_eligibility_reason_includes_publish_blocked_prefix() -> None:
 
 # --- T206 — Sibling cache back-fill -----------------------------------------
 def test_t206_sibling_cache_backfills_empty_postgrad_english_slot() -> None:
-    """One Master's course extracted IELTS=6.5; another Master's course
-    on the same scrape extracted nothing. The cache should fill the
-    second one from the first within the postgraduate bucket — and
-    NOT bleed across into the undergraduate bucket.
+    """Two Master's courses extracted IELTS=6.5 (consensus required by
+    Week 1 Prompt 6: default min_quorum=2); a third Master's course on
+    the same scrape extracted nothing. The cache should fill the third
+    from the first two within the postgraduate bucket — and NOT bleed
+    across into the undergraduate bucket.
+
+    Both seed evidence rows use ``method="regex"`` at conf=0.9 to satisfy
+    the Week 1 Prompt 4 source-type gate.
     """
+    _seed_ev = [{
+        "field_key": "ielts_overall",
+        "value": 6.5,
+        "method": "regex",
+        "confidence": 0.9,
+    }]
     results = [
         {
             "name": "Master of Data Science",
@@ -141,7 +151,17 @@ def test_t206_sibling_cache_backfills_empty_postgrad_english_slot() -> None:
                 "degree_level": "Postgraduate",
                 "ielts_overall": 6.5,
             },
-            "evidence": [],
+            "evidence": list(_seed_ev),
+        },
+        {
+            "name": "Master of Computing",
+            "url": "https://x/d",
+            "payload": {
+                "course_name": "Master of Computing",
+                "degree_level": "Postgraduate",
+                "ielts_overall": 6.5,
+            },
+            "evidence": list(_seed_ev),
         },
         {
             "name": "Master of Information Technology",
@@ -164,10 +184,11 @@ def test_t206_sibling_cache_backfills_empty_postgrad_english_slot() -> None:
     ]
     fills = _run(sibling_cache.backfill_english_from_siblings(results))
     assert fills == 1, fills
-    assert results[1]["payload"]["ielts_overall"] == 6.5
+    # results[2] is the empty postgrad row; results[3] is the undergrad row.
+    assert results[2]["payload"]["ielts_overall"] == 6.5
     # Undergraduate bucket has no donor — must remain empty, never inherit
     # from the Postgraduate bucket.
-    assert "ielts_overall" not in results[2]["payload"]
+    assert "ielts_overall" not in results[3]["payload"]
 
 
 # --- T207 — Per-course browser fallback (decision gate) ---------------------
