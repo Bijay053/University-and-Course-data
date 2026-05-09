@@ -1742,6 +1742,18 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             except Exception as _metrics_exc:  # noqa: BLE001
                 log.warning("[METRICS] failed for run %s: %s", runtime_job_id, _metrics_exc)
 
+            # Week 2 P1 — wide one-row-per-run summary for the dashboard
+            # and alerting layer. Independent of compute_run_metrics; safe
+            # to fail without affecting the job result.
+            try:
+                from app.services.scraper.run_summary import compute_run_summary
+                await compute_run_summary(
+                    db, runtime_job_id, uni_id,
+                    summary=summary, skip_reasons=skip_reasons,
+                )
+            except Exception as _summary_exc:  # noqa: BLE001
+                log.warning("[RUN_SUMMARY] failed for run %s: %s", runtime_job_id, _summary_exc)
+
             try:
                 from app.services.scraper.alerts import evaluate_run_alerts
                 from app.services.scraper.alert_delivery import deliver_alerts
