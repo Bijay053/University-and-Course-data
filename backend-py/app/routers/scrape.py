@@ -1165,7 +1165,7 @@ async def staged_list(
         stmt = stmt.where(ScrapedCourse.scrape_job_id == job_id)
     if university_id:
         stmt = stmt.where(ScrapedCourse.university_id == university_id)
-    if status_f:
+    if status_f and status_f.lower() != "all":
         stmt = stmt.where(ScrapedCourse.status == status_f)
     total = (await db.execute(select(func.count()).select_from(stmt.subquery()))).scalar_one()
     stmt = stmt.order_by(desc(ScrapedCourse.created_at)).offset((page - 1) * limit).limit(limit)
