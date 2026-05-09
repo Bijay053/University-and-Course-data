@@ -186,6 +186,23 @@ _GENERIC_MARKETING_PATH_BLOCKS: Final = (
     "/shared/callout",
     "/global/",
     "/marketing/",
+    # Week 1 Prompt 3 — additional Torrens / Laureate marketing chrome paths
+    # observed during 2026-04 audits.  /shared/how-to-apply/ is already
+    # matched by the broader "/how-to-apply" entry above; the rest are
+    # site-wide template directories that never carry per-course English
+    # requirement tables.  Keeping them as a discrete block makes the
+    # provenance for this Prompt explicit in code review.
+    "/shared/cards/",
+    "/shared/career-opportunities/",
+    "/shared/people/",
+    "/shared/video/",
+    "/shared/short-content/",
+    "/shared/course-hero/",
+    "/shared/content-old/",
+    "/shared/video-old/",
+    "/laureate/shared/",
+    "/cards/billy",
+    "/cards/brand",
 )
 
 # Regex applied to the FULL absolute URL (lower-cased) to catch social media
@@ -647,6 +664,12 @@ def _extract_img_candidates(
         # English-requirement tables (e.g. /shared/how-to-apply/, /marketing/).
         _abs_lower = absolute.lower()
         if any(block in _abs_lower for block in _GENERIC_MARKETING_PATH_BLOCKS):
+            # Week 1 Prompt 3 — log block-list matches so the verification
+            # `journalctl ... | grep 'VISION SKIP'` query has data.  Logged at
+            # info level so it survives the production Celery `--loglevel=info`
+            # filter (deploy/uni-celery.service).  Volume is bounded — most
+            # course pages carry < 5 chrome images and the log is grep-friendly.
+            log.info("[VISION SKIP] blocked-list match: %s", absolute)
             continue
         # Social-chrome path regex: university-agnostic catch for social media
         # icons and chrome components regardless of their hosting path.  Works
