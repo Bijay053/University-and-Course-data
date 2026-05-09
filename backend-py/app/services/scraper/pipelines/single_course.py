@@ -231,6 +231,30 @@ _CENTRAL_ENGLISH_PG_LEVELS: frozenset[str] = frozenset({
     "Doctorate",
 })
 
+
+# ── Week 2 P5: SKIP_CENTRAL_ENGLISH_PROPAGATION toggle ─────────────────────
+# When enabled, the central-page English values (UG-only IELTS/PTE/TOEFL
+# extracted from the university-wide /english-language-requirements/ page)
+# are NOT written to per-course evidence rows.  The central-page extraction
+# still runs for diagnostic purposes (cost tracking, log emission), but
+# course rows that lack their own English signal stay NULL rather than
+# inheriting potentially-wrong defaults.
+#
+# Default: False — preserves the existing pathway/PG-aware Path 1 + Path 2
+# logic that has been carefully tuned per university.  Operators can flip
+# the toggle on after a 23-uni regression sweep confirms no regressions:
+#
+#     export SKIP_CENTRAL_ENGLISH_PROPAGATION=true
+#
+# Bug class addressed: pathway programs (UniSQ UniPrep, ELICOS bridges)
+# wrongly inheriting the central UG IELTS=6.5 because their own pages do
+# not state an English requirement.  NULL is recoverable; a silently-
+# wrong propagated value is not.
+def _skip_central_english_propagation() -> bool:
+    import os
+    val = os.environ.get("SKIP_CENTRAL_ENGLISH_PROPAGATION", "false").strip().lower()
+    return val in {"true", "1", "yes", "on"}
+
 # ── Extraction-method authority model ────────────────────────────────────────
 # Every extraction method is assigned a numeric authority level.  Higher
 # authority wins when two methods disagree about the same field, and the PG
@@ -1940,6 +1964,23 @@ async def extract_course(
                             pass
 
             if payload.get(k) in (None, "", 0):
+                # Week 2 P7 audit: log when vision fills a null slot AND the
+                # value is corroborated by static page text.  This is the
+                # spec's "preserve vision when other extractor returned null
+                # and value appears in page text" path — we always preserve
+                # (existing behaviour) but now leave a trail so reviewers
+                # can distinguish "vision rescued a real value" from
+                # "vision hallucinated into an empty slot".
+                try:
+                    _pt = (rendered_html or html or "").lower()
+                    if _pt and v is not None and str(v).lower() in _pt:
+                        log.info(
+                            "[VISION CORROBORATED] %s: %s=%s filled by vision "
+                            "and confirmed verbatim in page text",
+                            url, k, v,
+                        )
+                except Exception:  # noqa: BLE001
+                    pass
                 payload[k] = v  # fill null slot — always safe regardless of tier
             elif _vision_is_tier0 and can_override(_prior_method, "per_course_vision"):
                 # Tier-0 image (from English requirements DOM section) beats
@@ -2834,6 +2875,28 @@ async def extract_course(
             _CENTRAL_ENGLISH_OVERRIDABLE: frozenset[str] = frozenset(
                 {"", "ai_fallback", "gemini_primary"}
             )
+
+            # ── Week 2 P5: SKIP_CENTRAL_ENGLISH_PROPAGATION ──────────────
+            # Operators can disable propagation entirely while keeping the
+            # diagnostic extraction.  When enabled, neither Path 1 nor Path 2
+            # writes evidence; we emit a single status line so the dashboard
+            # can show that the central page WAS fetched (cost tracking)
+            # but its values were intentionally not propagated.
+            if _skip_central_english_propagation() and (_level_english or _central_english):
+                if emit:
+                    await emit(
+                        "status",
+                        f"[CENTRAL —] {payload.get('course_name', url)[:40]} — "
+                        f"propagation disabled (SKIP_CENTRAL_ENGLISH_PROPAGATION=true)",
+                        phase="fallback",
+                        kind="central_english_propagation_skipped",
+                        url=url,
+                        had_level_data=bool(_level_english),
+                        had_flat_data=bool(_central_english),
+                    )
+                # Skip both Path 1 and Path 2 — drop into safety-net block below.
+                _level_english = {}
+                _central_english = {}
 
             # Path 1: level-specific values available — use them unconditionally.
             if _level_english and not _is_pathway_course:

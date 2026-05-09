@@ -109,6 +109,18 @@ METHOD_QUALITY_RULES: list[dict[str, Any]] = [
 
 _TREND_DROP_THRESHOLD = 0.15  # 15 percentage-point drop vs trailing mean fires a warning
 
+# Week 2 P3 Rule 3 — URL-pattern anomaly thresholds.
+# A URL prefix that has never appeared in the trailing N scrapes for this
+# uni AND now contributes > _URL_PATTERN_MIN_STAGED stagings in this run
+# is flagged as ``info`` so a human can confirm the new section is real
+# (handbook archive, partner site) and not a discovery regression.
+_URL_PATTERN_LOOKBACK_RUNS = 4
+_URL_PATTERN_MIN_STAGED = 5
+# Keep the prefix coarse so legitimate per-course URLs (which differ by
+# slug) all collapse to the same prefix.  We use scheme://host/path[0:2]
+# i.e. "https://uni.edu.au/courses/<category>" → "https://uni.edu.au/courses".
+_URL_PATTERN_PATH_DEPTH = 2
+
 
 # ---------------------------------------------------------------------------
 # Internal helpers
@@ -269,6 +281,26 @@ async def evaluate_run_alerts(
                 actual=v.actual,
             ))
 
+    # ── Check 2.5: URL-pattern anomaly (Week 2 P3 Rule 3) ─────────────────
+    try:
+        url_anomalies = await _detect_url_pattern_anomalies(db, scrape_run_id, uni_id)
+        for prefix, staged_count in url_anomalies:
+            alerts.append(ScrapeRunAlert(
+                scrape_run_id=scrape_run_id,
+                rule_id=f"url_pattern_anomaly:{prefix}",
+                severity="info",
+                message=(
+                    f"new URL prefix {prefix!r} produced {staged_count} stagings "
+                    f"this run but appeared 0 times in the last "
+                    f"{_URL_PATTERN_LOOKBACK_RUNS} runs — confirm new section is "
+                    f"intentional (handbook, partner site, blog)"
+                ),
+                expected=0,
+                actual=staged_count,
+            ))
+    except Exception as exc:  # noqa: BLE001 — never block alert delivery on URL check
+        log.warning("[ALERTS] url_pattern_anomaly check failed for run %s: %s", scrape_run_id, exc)
+
     # ── Check 3: trend detection vs last 5 runs ────────────────────────────
     recent_metrics = await _get_recent_run_metrics(db, uni_id, exclude_run=scrape_run_id, n=5)
     if len(recent_metrics) >= 3:
@@ -349,6 +381,87 @@ async def _count_bad_url_evidence(
         if _ICON_URL_RE.search(row.source_url or ""):
             counts[row.field_key] = counts.get(row.field_key, 0) + 1
     return counts
+
+
+def _url_prefix(url: str, depth: int = _URL_PATTERN_PATH_DEPTH) -> str | None:
+    """Coarse URL prefix: scheme://host/path[0:depth].  Returns None if unparseable."""
+    if not url:
+        return None
+    from urllib.parse import urlparse
+    try:
+        p = urlparse(url)
+    except Exception:  # noqa: BLE001
+        return None
+    if not p.scheme or not p.netloc:
+        return None
+    parts = [seg for seg in (p.path or "").split("/") if seg]
+    if not parts:
+        return f"{p.scheme}://{p.netloc}"
+    return f"{p.scheme}://{p.netloc}/" + "/".join(parts[:depth])
+
+
+async def _detect_url_pattern_anomalies(
+    db: AsyncSession,
+    scrape_run_id: str,
+    university_id: int,
+) -> list[tuple[str, int]]:
+    """Return (prefix, staged_count) for URL prefixes new to this run.
+
+    "New" = appeared zero times across this uni's last
+    ``_URL_PATTERN_LOOKBACK_RUNS`` completed runs (excluding the current
+    one) AND staged > ``_URL_PATTERN_MIN_STAGED`` rows in this run.
+    """
+    from app.models.scraped_course import ScrapedCourse
+    from app.models.scrape_runtime import ScrapeRuntimeJob
+
+    # Current-run staged URLs
+    current_rows = await db.execute(
+        select(ScrapedCourse.source_url)
+        .where(ScrapedCourse.scrape_job_id == scrape_run_id)
+        .where(ScrapedCourse.source_url.isnot(None))
+    )
+    current_counts: dict[str, int] = {}
+    for (src_url,) in current_rows.all():
+        pref = _url_prefix(src_url or "")
+        if pref:
+            current_counts[pref] = current_counts.get(pref, 0) + 1
+
+    # Universe of "new" candidates by min-staged threshold
+    candidates = {p for p, c in current_counts.items() if c > _URL_PATTERN_MIN_STAGED}
+    if not candidates:
+        return []
+
+    # Trailing N completed runs for this uni (excluding current)
+    job_ids_result = await db.execute(
+        select(ScrapeRuntimeJob.runtime_job_id)
+        .where(ScrapeRuntimeJob.university_id == university_id)
+        .where(ScrapeRuntimeJob.status == "completed")
+        .where(ScrapeRuntimeJob.runtime_job_id != scrape_run_id)
+        .order_by(ScrapeRuntimeJob.completed_at.desc())
+        .limit(_URL_PATTERN_LOOKBACK_RUNS)
+    )
+    historical_job_ids = [row[0] for row in job_ids_result.all()]
+    if not historical_job_ids:
+        # No history → suppress (every prefix would be "new" on first scrape)
+        return []
+
+    # Historical staged URLs
+    hist_rows = await db.execute(
+        select(ScrapedCourse.source_url)
+        .where(ScrapedCourse.scrape_job_id.in_(historical_job_ids))
+        .where(ScrapedCourse.source_url.isnot(None))
+    )
+    hist_prefixes: set[str] = set()
+    for (src_url,) in hist_rows.all():
+        pref = _url_prefix(src_url or "")
+        if pref:
+            hist_prefixes.add(pref)
+
+    return sorted(
+        ((p, current_counts[p]) for p in candidates if p not in hist_prefixes),
+        key=lambda t: t[1],
+        reverse=True,
+    )
 
 
 async def _get_recent_run_metrics(
