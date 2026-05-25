@@ -1,0 +1,755 @@
+"""Browser-based discovery for Macquarie University's find-a-course catalogue.
+
+Macquarie's catalogue at https://www.mq.edu.au/study/find-a-course is a
+Svelte-based SPA served behind Cloudflare. Two compounding problems break
+the default discovery path:
+
+1. **Cloudflare 403 on plain HTTP** — ``curl https://www.mq.edu.au/`` returns
+   HTTP 403 with ``cf-mitigated: challenge``. The BFS HTTP crawler therefore
+   yields zero candidates. (mq.yaml sets ``always_browser_discover: true`` to
+   bypass.)
+
+2. **URL shape mismatch** — every other Australian university we scrape
+   exposes course detail pages at ``/courses/<slug>``, ``/course/<slug>``,
+   ``/degrees/<slug>`` or ``/programs/<slug>``. Macquarie does NOT: real
+   course URLs live at::
+
+       /study/find-a-course/undergraduate/<slug>
+       /study/find-a-course/postgraduate/<slug>
+       /study/find-a-course/undergraduate/<faculty>/<slug>  (combined / co-op)
+
+   ``browser_discover_generic._NAV_LINK_SELECTOR`` and ``_looks_like_course``
+   require ``/courses/`` or sibling tokens to be present in the path — so the
+   generic browser pass harvests only the 6 nav links from the homepage and
+   stages them as junk courses (the user-reported "Undergraduate", "Browse
+   all degrees" etc. that the guards now block).
+
+This module is a Macquarie-specific browser sweep modelled on
+``csu_browser_discover.py``:
+
+* Visits the three catalogue seed pages
+  (find-a-course, /undergraduate, /postgraduate).
+* For each page: waits for the Svelte course grid to hydrate, scrolls to the
+  bottom in small steps to trigger any lazy-load, and harvests every anchor
+  whose path matches the MQ course-URL regex.
+* Dedupes by URL, drops listing roots and major / specialisation sub-pages.
+* Returns ``[{"url": str, "name": str}, ...]`` or ``[]`` on failure (caller
+  falls back to ``browser_discover_generic`` then Wayback CDX).
+
+Discovery floor / defence-in-depth
+----------------------------------
+A successful sweep should return at least ~150 course URLs (Macquarie's
+catalogue is ~300 UG+PG). When the count falls below
+``_DISCOVERY_FLOOR``, this module emits a loud ``[DISCOVER] MQ: WARNING``
+status so the operator notices the regression in the live job log — but it
+still returns whatever it found so partial discovery is better than zero.
+
+Live verification
+-----------------
+The module cannot be exercised from the Replit dev sandbox because the
+Cloudflare layer challenges headless Chromium with our outbound IP range.
+Set ``MQ_LIVE_TEST=1`` and run the smoke test from a network that MQ
+accepts (the user's local machine, the prod droplet, etc.)::
+
+    cd /root/University-and-Course-data && \\
+        cd backend-py && PYTHONPATH=. MQ_LIVE_TEST=1 \\
+        python -m pytest tests/test_mq_browser_discover.py -k live -v -s
+"""
+from __future__ import annotations
+
+import asyncio
+import logging
+import re
+from urllib.parse import urlparse
+
+log = logging.getLogger(__name__)
+
+# Faculty subpages — the 4 MQ faculties each publish a per-faculty course
+# index.  Tried FIRST because they render course anchors in plain HTML
+# without needing filter UI interaction (the catalogue landing pages are
+# pure-SPA search shells that show filters + faculty cards only, no
+# course links until the user clicks something).
+_FACULTY_SEED_URLS: tuple[str, ...] = (
+    "https://www.mq.edu.au/study/find-a-course/arts",
+    "https://www.mq.edu.au/study/find-a-course/business",
+    "https://www.mq.edu.au/study/find-a-course/medicine-and-health-sciences",
+    "https://www.mq.edu.au/study/find-a-course/science-and-engineering",
+)
+
+# Catalogue landing seeds — visited AFTER the faculty pages.  These are
+# the SPA search shells; they require filter UI interaction to populate
+# course anchors (see ``_interactive_filter_harvest``).  Mirrors the
+# entries in ``_HOST_EXTRA_SEEDS`` so the two discovery paths agree on
+# which roots to enumerate.
+_CATALOGUE_SEED_URLS: tuple[str, ...] = (
+    "https://www.mq.edu.au/study/find-a-course",
+    "https://www.mq.edu.au/study/find-a-course/undergraduate",
+    "https://www.mq.edu.au/study/find-a-course/postgraduate",
+)
+
+_SEED_URLS: tuple[str, ...] = _FACULTY_SEED_URLS + _CATALOGUE_SEED_URLS
+
+_MQ_ORIGIN = "https://www.mq.edu.au"
+
+# Course-detail URL regex.  Allows one OPTIONAL faculty segment between the
+# UG/PG token and the course slug to cover MQ's combined-degree and co-op
+# listings (e.g. ``/undergraduate/combined-bachelor-master-degrees/
+# bachelor-of-laws-master-of-laws`` and ``/undergraduate/employability-
+# initiatives/cooperative-education-program-in-actuarial-studies``).
+#
+# Listing roots — ``/undergraduate``, ``/postgraduate``,
+# ``/undergraduate/combined-bachelor-master-degrees`` (path ends here) —
+# deliberately do NOT match because they have no trailing slug segment.
+_COURSE_PATH_RE = re.compile(
+    r"^/study/find-a-course/(?:undergraduate|postgraduate)"
+    r"(?:/[^/]+){1,2}/?$"
+)
+
+# Last-segment slugs that look like a course URL but are category /
+# wizard / builder pages.  Belt-and-suspenders alongside ``mq.yaml``'s
+# ``block_url_patterns`` and ``guards.is_blocked_page``.
+_LISTING_LAST_SEGMENTS: frozenset[str] = frozenset({
+    "combined-bachelor-master-degrees",
+    "double-degree-builder",
+    "browse-all-degrees",
+    "view-degrees",
+    "view-all-degrees",
+})
+
+# Path substrings that always indicate a sub-degree page (a major or
+# specialisation), not a real course.
+_BLOCKED_PATH_SUBSTRINGS: tuple[str, ...] = (
+    "/find-a-course/courses/major/",
+    "/find-a-course/courses/specialisation/",
+    "/find-a-course/courses/specialization/",
+)
+
+# Selector that waits for the catalogue/faculty page to hydrate.  Faculty
+# subpages render plain ``/study/find-a-course/<slug>`` anchors, while the
+# catalogue landing pages only show course-shape anchors AFTER filter
+# interaction (handled by ``_interactive_filter_harvest``).  Match the
+# broadest catalogue-relative shape so faculty pages don't time out
+# waiting for the narrower UG/PG-anchored variant that never appears
+# there.
+_HYDRATE_WAIT_SELECTOR = "a[href*='/study/find-a-course/']"
+_HYDRATE_WAIT_MS = 12_000
+
+# Filter buttons / chips we try on catalogue landing pages to coax the
+# SPA into rendering course results.  Tried in order; the FIRST one that
+# resolves to a visible, clickable element fires.  Defensive — every
+# click is wrapped in try/except so a missing selector never aborts the
+# sweep.  Sourced from common SPA patterns; the live MQ filter UI uses
+# accessible labels so role+name selectors are the most resilient.
+_FILTER_CLICK_SELECTORS: tuple[str, ...] = (
+    "button:has-text('Undergraduate')",
+    "button:has-text('Postgraduate')",
+    "label:has-text('Undergraduate')",
+    "label:has-text('Postgraduate')",
+    "a:has-text('All courses')",
+    "a:has-text('View all')",
+    "button:has-text('Search')",
+    "button:has-text('Apply filters')",
+)
+
+# Scroll loop bounds
+_MAX_SCROLL_ITERS = 25
+_SCROLL_SETTLE_S = 1.5
+_INITIAL_SETTLE_S = 4.0
+
+# Discovery floor: when total deduped URLs across all seeds falls below
+# this we emit a [DISCOVER] MQ: WARNING.  Macquarie publishes ~300 UG+PG
+# courses in 2026; 150 is a generous half-catalogue cushion.
+_DISCOVERY_FLOOR = 150
+
+# Hard cap mirrors the CSU module — guard against runaway harvests if MQ
+# ever exposes a duplicated link grid.  Capped well above _DISCOVERY_FLOOR
+# so the warning fires before the cap.
+_HARD_MAX_LINKS = 1_500
+
+# Extract every ``<a href>`` from the DOM and resolve it against the page
+# origin.  Returns ``[{href, text}, ...]`` so the Python caller can apply
+# the canonical URL filter.
+_EXTRACT_ANCHORS_JS = r"""
+() => {
+  const ORIGIN = 'https://www.mq.edu.au';
+  const out = [];
+  document.querySelectorAll('a[href]').forEach(a => {
+    const raw = (a.getAttribute('href') || '').trim();
+    if (!raw || raw.startsWith('mailto:') || raw.startsWith('tel:')
+        || raw.startsWith('#') || raw.startsWith('javascript:')) {
+      return;
+    }
+    let url;
+    try { url = new URL(raw, ORIGIN).href; } catch (_) { return; }
+    const text = (a.innerText || a.textContent || '')
+      .replace(/\s+/g, ' ').trim();
+    out.push({ href: url, text });
+  });
+  return out;
+}
+"""
+
+
+# ── Coursehandbook sitemap discovery ──────────────────────────────────────
+# The real, complete MQ course catalogue lives at
+# ``coursehandbook.mq.edu.au`` (a Squiz-fronted handbook host, NOT the
+# Svelte SPA at ``www.mq.edu.au/study/find-a-course``).  Its sitemap
+# index at ``/sitemap.xml`` lists 14 child sitemaps containing ~28K URLs
+# across years 2020-2027 in three shapes:
+#
+#     /YYYY/courses/CXXXXXX       — actual course detail pages (the target)
+#     /YYYY/units/<UNITCODE>      — individual subjects (NOT courses)
+#     /YYYY/aos/NXXXXXX           — areas-of-study / majors (NOT courses)
+#     /YYYY/doubledegree/DXXXXXX  — combined degrees (NOT individual courses)
+#
+# We harvest ONLY ``/YYYY/courses/CXXXXXX`` for the current year + next
+# year (the user-facing UI defaults to the current academic year and
+# offers the next year as a tab; older years are still served but
+# represent expired offerings we do not want to stage).
+#
+# Probed 2026-05-25 from Replit sandbox via stealth: the index returns
+# 200 + 14 child sitemap URLs, child sitemap-1 contains
+# ``/2026/courses/C000001`` -> "Bachelor of Biodiversity and Conservation",
+# which proves the host is reachable and the URLs render real course HTML.
+_COURSEHANDBOOK_SITEMAP_INDEX = (
+    "https://coursehandbook.mq.edu.au/sitemap.xml"
+)
+_COURSEHANDBOOK_COURSE_RE = re.compile(
+    r"^https://coursehandbook\.mq\.edu\.au/(\d{4})/courses/C\d+/?$"
+)
+_COURSEHANDBOOK_SITEMAP_TIMEOUT_S = 30.0
+# Restrict to current academic year + next-year previews.  The handbook
+# keeps prior-year offerings live (2020+) which would explode the harvest
+# to ~2K stale URLs; only the most recent two years are real catalogue.
+import datetime as _dt
+_THIS_YEAR = _dt.date.today().year
+_COURSEHANDBOOK_YEARS: frozenset[str] = frozenset({
+    str(_THIS_YEAR), str(_THIS_YEAR + 1),
+})
+
+
+async def _discover_from_coursehandbook_sitemap(
+    emit_fn,
+    *,
+    max_courses: int,
+) -> list[dict]:
+    """Harvest MQ course URLs from coursehandbook.mq.edu.au sitemaps.
+
+    Uses the stealth context (patchright + xvfb) to bypass the
+    Cloudflare challenge that fronts the handbook host.  Returns
+    ``[{"url": str, "name": ""}, ...]`` deduped, capped at *max_courses*,
+    or ``[]`` on any failure (caller falls back to the widget sweep).
+
+    The empty ``name`` is filled later by the single-course extractor
+    from the page ``<title>`` (verified shape: "Bachelor of Biodiversity
+    and Conservation").
+    """
+    try:
+        from app.services.scraper.stealth_browser import stealth_context
+    except Exception as exc:  # noqa: BLE001
+        log.warning(
+            "mq_browser_discover: stealth_browser unavailable for "
+            "coursehandbook sitemap — %s", exc,
+        )
+        return []
+
+    await emit_fn(
+        f"[DISCOVER] MQ: trying coursehandbook sitemap "
+        f"(years={sorted(_COURSEHANDBOOK_YEARS)})"
+    )
+
+    course_urls: set[str] = set()
+    try:
+        async with stealth_context() as ctx:
+            page = await ctx.new_page()
+
+            # Step 1: fetch the sitemap index → list of child sitemap URLs
+            try:
+                await page.goto(
+                    _COURSEHANDBOOK_SITEMAP_INDEX,
+                    wait_until="domcontentloaded",
+                    timeout=int(_COURSEHANDBOOK_SITEMAP_TIMEOUT_S * 1000),
+                )
+                index_body = await page.content()
+            except Exception as exc:  # noqa: BLE001
+                await emit_fn(
+                    f"[DISCOVER] MQ: coursehandbook index unreachable "
+                    f"({exc!r}); falling back to widget sweep"
+                )
+                return []
+
+            child_sitemaps = re.findall(
+                r"<loc>([^<]+\.xml)</loc>", index_body
+            )
+            if not child_sitemaps:
+                await emit_fn(
+                    "[DISCOVER] MQ: coursehandbook index returned no "
+                    "child sitemaps; falling back to widget sweep"
+                )
+                return []
+
+            await emit_fn(
+                f"[DISCOVER] MQ: coursehandbook index → "
+                f"{len(child_sitemaps)} child sitemap(s)"
+            )
+
+            # Step 2: walk each child sitemap, filter to current-year
+            # /courses/CXXXX URLs.  Sitemap-1 + sitemap-3 each hold ~10K
+            # URLs (units + aos + doubledegree dominate), so we keep the
+            # filter strict and exit early on max_courses.
+            for child in child_sitemaps:
+                if len(course_urls) >= max_courses:
+                    break
+                try:
+                    await page.goto(
+                        child,
+                        wait_until="domcontentloaded",
+                        timeout=int(_COURSEHANDBOOK_SITEMAP_TIMEOUT_S * 1000),
+                    )
+                    body = await page.content()
+                except Exception as exc:  # noqa: BLE001
+                    log.warning(
+                        "mq_browser_discover: child sitemap %s failed: %s",
+                        child, exc,
+                    )
+                    continue
+
+                for loc in re.findall(r"<loc>([^<]+)</loc>", body):
+                    m = _COURSEHANDBOOK_COURSE_RE.match(loc)
+                    if m and m.group(1) in _COURSEHANDBOOK_YEARS:
+                        course_urls.add(loc.rstrip("/"))
+                        if len(course_urls) >= max_courses:
+                            break
+    except Exception as exc:  # noqa: BLE001
+        log.warning(
+            "mq_browser_discover: coursehandbook sitemap pass failed: %s",
+            exc,
+        )
+        return []
+
+    out = [{"url": u, "name": ""} for u in sorted(course_urls)]
+    await emit_fn(
+        f"[DISCOVER] MQ: coursehandbook sitemap harvested "
+        f"{len(out)} course URL(s)"
+    )
+    return out
+
+
+def _is_mq_course_url(url: str) -> bool:
+    """Return True when *url* is a Macquarie course detail page.
+
+    Pure-Python mirror of the path filter applied to the JS-harvested
+    anchors; exposed so the unit tests can assert behaviour without
+    spinning up a browser.
+    """
+    if not url:
+        return False
+    try:
+        parsed = urlparse(url)
+    except Exception:
+        return False
+
+    host = (parsed.hostname or "").lower()
+    if host != "www.mq.edu.au" and host != "mq.edu.au":
+        return False
+
+    path = parsed.path or ""
+    # Strip query string + fragment for matching.
+    if not _COURSE_PATH_RE.match(path):
+        return False
+
+    # Block sub-degree pages (majors / specialisations).
+    lowered = path.lower()
+    if any(sub in lowered for sub in _BLOCKED_PATH_SUBSTRINGS):
+        return False
+
+    # Block listing-root last segments (combined-bachelor-master-degrees etc.).
+    last = path.rstrip("/").rsplit("/", 1)[-1]
+    if last in _LISTING_LAST_SEGMENTS:
+        return False
+
+    return True
+
+
+def filter_mq_course_anchors(
+    anchors: list[dict[str, str]],
+) -> list[dict[str, str]]:
+    """Apply ``_is_mq_course_url`` + dedup to a list of ``{href, text}``.
+
+    Exposed for the unit tests so the URL filter can be exercised against
+    real captured anchor fixtures without a live browser.
+    """
+    seen: set[str] = set()
+    out: list[dict[str, str]] = []
+    for entry in anchors:
+        raw = (entry.get("href") or "").strip()
+        if not raw:
+            continue
+        # Resolve same-origin relative paths (the in-browser JS does this via
+        # `new URL(href, origin)`; mirror it here so the helper can be unit
+        # tested against raw anchor dicts).
+        if raw.startswith("/") and not raw.startswith("//"):
+            raw = _MQ_ORIGIN + raw
+        url = raw.split("#")[0].split("?")[0]
+        if not _is_mq_course_url(url):
+            continue
+        if url in seen:
+            continue
+        seen.add(url)
+        out.append({
+            "url": url,
+            "name": (entry.get("text") or "").strip(),
+        })
+    return out
+
+
+async def _interactive_filter_harvest(
+    *,
+    page,
+    seed: str,
+    merged: dict[str, dict],
+    emit,
+) -> int:
+    """Try to coax SPA catalogue pages into rendering course anchors.
+
+    Defensive: every selector is wrapped in try/except so a missing
+    button never aborts the sweep.  Returns the number of NEW course
+    URLs added to ``merged`` (zero if nothing rendered).
+
+    Strategy:
+      1. For each selector in ``_FILTER_CLICK_SELECTORS``, click the
+         first visible match (best-effort).
+      2. After each click, settle + re-extract anchors.
+      3. Stop early as soon as any click yields >= 5 new course URLs
+         (heuristic — a populated result list will overshoot this on
+         the first click; a still-empty SPA will yield 0 every time).
+    """
+    added_total = 0
+    for selector in _FILTER_CLICK_SELECTORS:
+        try:
+            locator = page.locator(selector).first
+            if await locator.count() == 0:
+                continue
+            if not await locator.is_visible():
+                continue
+        except Exception:  # noqa: BLE001
+            continue
+
+        try:
+            await locator.click(timeout=3_000)
+        except Exception:  # noqa: BLE001
+            continue
+
+        try:
+            await emit(
+                f"[DISCOVER] MQ: interactive click on {seed} → {selector!r}"
+            )
+        except Exception:  # noqa: BLE001
+            pass
+
+        await asyncio.sleep(_SCROLL_SETTLE_S)
+        # Trigger a scroll to provoke lazy load after the filter populates.
+        try:
+            await page.evaluate(
+                "window.scrollTo(0, document.body.scrollHeight)"
+            )
+        except Exception:  # noqa: BLE001
+            pass
+        await asyncio.sleep(_SCROLL_SETTLE_S)
+
+        try:
+            anchors = await page.evaluate(_EXTRACT_ANCHORS_JS)
+        except Exception:  # noqa: BLE001
+            anchors = []
+
+        kept = filter_mq_course_anchors(anchors or [])
+        added_this_click = 0
+        for item in kept:
+            if item["url"] not in merged:
+                merged[item["url"]] = item
+                added_this_click += 1
+            if len(merged) >= _HARD_MAX_LINKS:
+                break
+
+        added_total += added_this_click
+        if added_this_click >= 5:
+            # Filter populated the result grid — no need to try more
+            # selectors on this seed.
+            break
+
+    return added_total
+
+
+async def browser_discover_mq(
+    emit=None,
+    *,
+    max_courses: int = 300,
+) -> list[dict]:
+    """Discover Macquarie course URLs via Playwright across all catalogue seeds.
+
+    Returns a list of ``{"url": str, "name": str}`` dicts (one per
+    discovered MQ course URL).  Returns ``[]`` only when the browser
+    pool is unavailable OR every seed fails to harvest a single link
+    (so the caller can fall back to BFS / generic browser / Wayback).
+
+    Partial harvests below ``_DISCOVERY_FLOOR`` (150) are **returned as
+    is** rather than discarded — on Cloudflare-walled MQ the downstream
+    BFS (403) and generic browser (URL-shape miss) tiers would only
+    drop the partial result and stage zero courses.  Operators are
+    notified of below-floor harvests via the
+    ``discovery_failure_alerts`` row that ``orchestrator.py`` persists
+    immediately after this function returns.
+
+    The function is intentionally tolerant: if seed N fails or returns
+    nothing, seeds N+1..K are still attempted.  All successful harvests
+    are merged and deduped.
+    """
+
+    async def _emit(msg: str, **kw) -> None:
+        if emit is None:
+            return
+        try:
+            await emit(
+                "status", msg, phase="discover",
+                kind="mq_browser_discover", **kw,
+            )
+        except Exception:  # noqa: BLE001
+            pass
+
+    try:
+        from app.services.scraper.browser_pool import pool as _pool
+        from playwright.async_api import TimeoutError as _PwTimeout
+    except Exception as exc:  # noqa: BLE001
+        log.warning("mq_browser_discover: browser pool unavailable — %s", exc)
+        return []
+
+    # ── Tier 1: coursehandbook sitemap (real catalogue host) ────────
+    # Try the structured handbook sitemap FIRST.  The www.mq.edu.au SPA
+    # widget sweep below is fragile (Svelte mount, filter UI selectors,
+    # CF challenges) and only yields anchors on a small subset of pages.
+    # The handbook sitemap is a static XML index that returns the full
+    # current-year course list deterministically when reachable.
+    try:
+        ch_links = await _discover_from_coursehandbook_sitemap(
+            _emit, max_courses=max_courses,
+        )
+    except Exception as _ch_exc:  # noqa: BLE001
+        log.warning(
+            "mq_browser_discover: coursehandbook sitemap raised: %s",
+            _ch_exc,
+        )
+        ch_links = []
+    # Floor of 20 is conservative — even a partial sitemap fetch giving
+    # us 20+ valid course URLs is dramatically better than the widget
+    # sweep's typical 0-6 nav junk.  Empty result → fall through.
+    if len(ch_links) >= 20:
+        return ch_links[:max_courses]
+
+    await _emit(
+        f"[DISCOVER] MQ: starting browser sweep across {len(_SEED_URLS)} "
+        f"catalogue seed(s)"
+    )
+
+    merged: dict[str, dict] = {}
+
+    try:
+        async with _pool.page() as page:
+            await page.set_extra_http_headers(
+                {"Referer": "https://www.google.com/"}
+            )
+
+            for seed in _SEED_URLS:
+                await _emit(f"[DISCOVER] MQ: seed → {seed}")
+                # ── Navigate ────────────────────────────────────────────
+                try:
+                    await page.goto(seed, wait_until="networkidle",
+                                    timeout=60_000)
+                except _PwTimeout:
+                    log.warning(
+                        "mq_browser_discover: goto networkidle timed out on %s "
+                        "— continuing with partial DOM", seed,
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    log.warning(
+                        "mq_browser_discover: goto failed on %s — %s",
+                        seed, exc,
+                    )
+                    await _emit(
+                        f"[DISCOVER] MQ: seed {seed} navigation failed ({exc})"
+                    )
+                    continue
+
+                # Error-page sniff (Chromium interstitials).
+                try:
+                    partial = await asyncio.wait_for(
+                        page.content(), timeout=5.0,
+                    )
+                    lowered = (partial or "")[:4096].lower()
+                    if (
+                        "neterror" in lowered
+                        or "chrome-error://" in lowered
+                        or "err_name_not_resolved" in lowered
+                        or "err_connection_" in lowered
+                        or "err_cert_" in lowered
+                    ):
+                        log.warning(
+                            "mq_browser_discover: Chromium error page on %s",
+                            seed,
+                        )
+                        await _emit(
+                            f"[DISCOVER] MQ: Chromium error page on {seed}"
+                        )
+                        continue
+                except Exception:  # noqa: BLE001
+                    pass
+
+                # ── Wait for hydration (course-anchor selector) ─────────
+                try:
+                    await page.wait_for_selector(
+                        _HYDRATE_WAIT_SELECTOR,
+                        timeout=_HYDRATE_WAIT_MS,
+                    )
+                except _PwTimeout:
+                    log.info(
+                        "mq_browser_discover: hydration selector not seen on "
+                        "%s within %dms — extracting whatever is in the DOM",
+                        seed, _HYDRATE_WAIT_MS,
+                    )
+                except Exception:  # noqa: BLE001
+                    pass
+
+                await asyncio.sleep(_INITIAL_SETTLE_S)
+
+                # ── Scroll loop to trigger lazy load ────────────────────
+                prev_count = -1
+                stall_streak = 0
+                for it in range(_MAX_SCROLL_ITERS):
+                    try:
+                        await page.evaluate(
+                            "window.scrollTo(0, document.body.scrollHeight)"
+                        )
+                    except Exception:  # noqa: BLE001
+                        break
+                    await asyncio.sleep(_SCROLL_SETTLE_S)
+                    try:
+                        anchors = await page.evaluate(_EXTRACT_ANCHORS_JS)
+                    except Exception:  # noqa: BLE001
+                        anchors = []
+                    current = len(filter_mq_course_anchors(anchors or []))
+                    if current == prev_count:
+                        stall_streak += 1
+                        if stall_streak >= 2:
+                            break
+                    else:
+                        stall_streak = 0
+                        if it == 0 or current - prev_count >= 10:
+                            await _emit(
+                                f"[DISCOVER] MQ: {seed} scroll iter "
+                                f"{it + 1} → {current} course link(s)"
+                            )
+                    prev_count = current
+                    if current >= _HARD_MAX_LINKS:
+                        break
+
+                # ── Final extract for this seed ─────────────────────────
+                try:
+                    anchors = await page.evaluate(_EXTRACT_ANCHORS_JS)
+                except Exception as exc:  # noqa: BLE001
+                    log.warning(
+                        "mq_browser_discover: final extract failed on %s — %s",
+                        seed, exc,
+                    )
+                    anchors = []
+
+                kept = filter_mq_course_anchors(anchors or [])
+                added = 0
+                for item in kept:
+                    if item["url"] not in merged:
+                        merged[item["url"]] = item
+                        added += 1
+                    if len(merged) >= _HARD_MAX_LINKS:
+                        break
+                await _emit(
+                    f"[DISCOVER] MQ: seed {seed} contributed +{added} "
+                    f"new course(s) (total now {len(merged)})"
+                )
+
+                # ── 0-anchor diagnostics ────────────────────────────────
+                # If a seed returned 0 course-shape anchors, dump page
+                # title + raw-anchor count so the operator can tell whether
+                # the page is a Cloudflare shell, a pre-hydration SPA, or
+                # a genuinely empty catalogue page (so the next debug
+                # iteration knows what to fix instead of guessing).
+                if added == 0:
+                    try:
+                        title = await page.title()
+                    except Exception:  # noqa: BLE001
+                        title = "?"
+                    raw_count = len(anchors or [])
+                    await _emit(
+                        f"[DISCOVER] MQ: seed {seed} yielded 0 course "
+                        f"anchors — page title={title!r}, total <a> "
+                        f"tags on DOM={raw_count}"
+                    )
+
+                # ── Interactive filter fallback for catalogue seeds ─────
+                # Catalogue landing pages (/study/find-a-course[/level])
+                # are SPA search shells.  If we got 0 anchors after the
+                # passive scroll loop, try clicking the known filter
+                # buttons to coax the SPA into rendering results.  Skip
+                # for faculty pages which are plain HTML and either work
+                # or genuinely have no courses.
+                if added == 0 and seed in _CATALOGUE_SEED_URLS:
+                    interactive_added = await _interactive_filter_harvest(
+                        page=page, seed=seed, merged=merged, emit=_emit,
+                    )
+                    if interactive_added:
+                        await _emit(
+                            f"[DISCOVER] MQ: interactive filter rescue on "
+                            f"{seed} → +{interactive_added} course(s) "
+                            f"(total now {len(merged)})"
+                        )
+                if len(merged) >= _HARD_MAX_LINKS:
+                    break
+
+    except Exception as exc:  # noqa: BLE001
+        log.warning("mq_browser_discover: unexpected error — %s", exc)
+        await _emit(f"[DISCOVER] MQ: browser discovery error — {exc}")
+        return list(merged.values())[:max_courses]
+
+    out = list(merged.values())
+
+    # ── Discovery floor warning ────────────────────────────────────────
+    if len(out) < _DISCOVERY_FLOOR:
+        log.warning(
+            "mq_browser_discover: only %d course URL(s) discovered (floor=%d) "
+            "— Cloudflare challenge or catalogue regression",
+            len(out), _DISCOVERY_FLOOR,
+        )
+        await _emit(
+            f"[DISCOVER] MQ: WARNING — only {len(out)} course URL(s) found "
+            f"(expected ≥{_DISCOVERY_FLOOR}); possible Cloudflare challenge "
+            "or catalogue regression",
+        )
+
+    # Don't return [] for partial harvests (1-2 links): on Macquarie the
+    # downstream fallbacks (BFS → 403, generic browser → URL-shape miss)
+    # would BOTH discard the partial result and stage zero courses.  Better
+    # to return what we have and let the downstream alert layer flag the
+    # low count (handled by the `discovery_failure_alerts` table when the
+    # final candidate stream is < 3).
+    if not out:
+        log.warning(
+            "mq_browser_discover: harvested 0 links — caller will fall "
+            "back to generic browser / Wayback",
+        )
+        return []
+
+    log.info(
+        "mq_browser_discover: discovered %d course URL(s) across %d seed(s)",
+        len(out), len(_SEED_URLS),
+    )
+    await _emit(
+        f"[DISCOVER] MQ: total {len(out)} unique course URL(s) discovered"
+    )
+    return out[:max_courses]
