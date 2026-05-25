@@ -24,6 +24,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
+from contextlib import asynccontextmanager
 from urllib.parse import urlparse
 
 log = logging.getLogger(__name__)
@@ -186,8 +187,63 @@ async def browser_discover_generic(
             elif _is_nav_url(url) and not _is_known_non_course_url(url):
                 nav_queue.append(url)
 
-    try:
+    # Stealth opt-in (Macquarie etc.): swap the regular browser pool for
+    # patchright + Xvfb when the active uni config sets
+    # discovery.use_stealth_browser=true.  The yielded `page` has the same
+    # Playwright Page surface so the rest of this function is unchanged.
+    from app.services.scraper.stealth_browser import (
+        stealth_context,
+        stealth_required,
+    )
+
+    @asynccontextmanager
+    async def _open_page():
+        # Stealth (patchright + Xvfb) when the uni opts in; fall back to the
+        # regular headless pool if the stealth context can't start (Xvfb
+        # missing, patchright import error, etc.) so discovery still
+        # attempts a fetch instead of silently aborting.
+        #
+        # IMPORTANT: only fall back on INIT failure (before first yield).
+        # Exceptions raised after yield (caller's page.goto, page.evaluate,
+        # etc.) must propagate to the caller — wrapping yield in
+        # try/except would silently retry whole-page errors against the
+        # regular pool and mask real bugs.  Per code-review 2026-05-25.
+        if stealth_required():
+            log.info("browser_discover_generic: using stealth (patchright+xvfb) for %s", host)
+            stealth_cm = stealth_context()
+            page = None
+            try:
+                ctx = await stealth_cm.__aenter__()
+                page = await ctx.new_page()
+            except Exception as exc:
+                log.warning(
+                    "browser_discover_generic: stealth init failed for %s (%s) — "
+                    "falling back to regular pool",
+                    host, exc,
+                )
+                try:
+                    await stealth_cm.__aexit__(None, None, None)
+                except Exception:
+                    pass
+            else:
+                try:
+                    yield page
+                finally:
+                    try:
+                        if page is not None:
+                            await page.close()
+                    except Exception:
+                        pass
+                    try:
+                        await stealth_cm.__aexit__(None, None, None)
+                    except Exception:
+                        pass
+                return
         async with _pool.page() as page:
+            yield page
+
+    try:
+        async with _open_page() as page:
             await page.set_extra_http_headers({
                 "Referer": "https://www.google.com/",
                 "Accept-Language": "en-US,en;q=0.9",

@@ -1,5 +1,6 @@
 {pkgs}: {
   deps = [
+    pkgs.xorg.xvfb
     pkgs.xorg.libXcursor
     pkgs.xorg.libXi
     pkgs.xorg.libXtst

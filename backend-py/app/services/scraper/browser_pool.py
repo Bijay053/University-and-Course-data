@@ -217,6 +217,59 @@ class BrowserPool:
         completes (PR-1.5 prod regression: VIT MBA pages returned empty
         from the browser fallback because the table hadn't hydrated yet).
         """
+        # Stealth opt-in (Macquarie etc.): when the active uni config sets
+        # discovery.use_stealth_browser=true, route per-course HTML fetches
+        # through patchright + Xvfb instead of the headless playwright pool.
+        # Cloudflare on www.mq.edu.au returns 403 to the regular pool but
+        # passes the patchright headed-via-Xvfb stack.  Adds ~2-4s per page.
+        try:
+            from app.services.scraper.stealth_browser import (
+                stealth_fetch_html,
+                stealth_required,
+            )
+            if stealth_required():
+                stealth_result = await stealth_fetch_html(
+                    url, wait_until=wait_until, timeout_ms=timeout,
+                    settle_ms=max(settle_ms, 4000),
+                )
+                # Fallback semantics: only return on actual success.  When
+                # stealth returns None (Xvfb missing, CF not solved, patchright
+                # crashed) FALL THROUGH to the regular headless pool so we at
+                # least get an error response we can detect/log rather than
+                # silently losing the page.
+                if stealth_result is not None:
+                    return stealth_result
+                log.warning(
+                    "stealth fetch returned None for %s — falling back to regular pool",
+                    url,
+                )
+        except Exception as _stealth_exc:  # noqa: BLE001
+            log.warning("stealth fetch wrapper failed for %s: %s — falling back to regular pool", url, _stealth_exc)
+
+        # Per-host concurrency cap (e.g. UTAS=3) — acquired BEFORE the global
+        # semaphore inside self.page() so capped hosts never starve the global
+        # pool.  None for hosts without a cap (default behaviour preserved).
+        host_sem = self._host_sem_for(url)
+        if host_sem is not None:
+            async with host_sem:
+                return await self._fetch_html_inner(
+                    url, wait_until=wait_until, timeout=timeout,
+                    settle_ms=settle_ms, click_international=click_international,
+                )
+        return await self._fetch_html_inner(
+            url, wait_until=wait_until, timeout=timeout,
+            settle_ms=settle_ms, click_international=click_international,
+        )
+
+    async def _fetch_html_inner(
+        self,
+        url: str,
+        *,
+        wait_until: str,
+        timeout: int,
+        settle_ms: int,
+        click_international: bool,
+    ) -> str | None:
         try:
             async with self.page() as page:
                 # Set referer to look like coming from Google

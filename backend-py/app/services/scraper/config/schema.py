@@ -75,6 +75,65 @@ class DiscoveryConfig(BaseModel):
             "Raise for sites with many listing pages (e.g. UOW ~62 pages)."
         ),
     )
+    max_candidates: Optional[int] = Field(
+        default=None,
+        description=(
+            "Override the default candidate cap (20 fast / 200 full).  Raise "
+            "when a sitemap publishes more allow_url_patterns-matching URLs "
+            "than the default cap can hold — without this, late-listed "
+            "courses get truncated (e.g. CQU sitemap has 199 unique HE "
+            "courses but BFS already filled 54 slots, so 53 of the late "
+            "alphabet — including cv82 master-of-engineering at index 168 "
+            "of the allow-filtered sitemap — were dropped at the 200 cap)."
+        ),
+    )
+    always_browser_discover: bool = Field(
+        default=False,
+        description=(
+            "Run Playwright browser-based discovery in ADDITION to BFS (merging "
+            "results) rather than only as a zero-result fallback.  Enable for "
+            "Cloudflare-protected sites where BFS succeeds on HTTP-accessible "
+            "faculties but silently misses faculties that return 403 for plain "
+            "HTTP (e.g. UTAS arts-soc which returns 403 for curl but loads fine "
+            "in a real browser).  Host-specific seed URLs in "
+            "_HOST_EXTRA_SEEDS (browser_discover_generic.py) are consumed "
+            "during this pass to sweep the full faculty A-Z catalogue."
+        ),
+    )
+    extra_course_urls: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Explicit course page URLs injected directly into the discovered "
+            "link set after all discovery tiers complete.  Bypasses BFS, "
+            "sitemap, browser-discover, and Wayback entirely.  Use as a "
+            "surgical fallback for known-CRICOS courses that all discovery "
+            "tiers consistently miss (e.g. a single URL that lives behind "
+            "Cloudflare and is not reachable by any crawler)."
+        ),
+    )
+    use_stealth_browser: bool = Field(
+        default=False,
+        description=(
+            "Route browser discovery AND per-course HTML fetches through the "
+            "patchright + Xvfb stealth stack (see stealth_browser.py).  Enable "
+            "ONLY for hosts where regular headless Playwright fails the "
+            "Cloudflare challenge with HTTP 403 / 'Just a moment...' (verified "
+            "for Macquarie/www.mq.edu.au on 2026-05-25).  Stealth adds ~2-4s "
+            "per page (Xvfb display + persistent-context launch) so do NOT "
+            "enable fleet-wide.  Requires the `patchright` python package and "
+            "the `xorg.xvfb` system dependency."
+        ),
+    )
+    must_contain: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Substring whitelist (case-insensitive) applied AFTER block_url_patterns. "
+            "If non-empty, any candidate URL that does not contain at least one of "
+            "these substrings is dropped. Simpler than allow_url_patterns (no regex) "
+            "for the common case where you just want '/courses/' or '/study/' in "
+            "the path. Empty list (default) = no-op. Per-uni opt-in via YAML."
+        ),
+    )
 
 
 # ── Extraction sub-configs ───────────────────────────────────────────────────

@@ -1058,6 +1058,25 @@ bcrypt = [
 ]
 
 [[package]]
+name = "patchright"
+version = "1.60.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "greenlet" },
+    { name = "pyee" },
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/66/7c/8ae675e3a55bfb3f71aff58ccfa808322cd193f87dfe4a452601063b96d7/patchright-1.60.0-py3-none-macosx_10_13_x86_64.whl", hash = "sha256:c33dadd9b046142d41cf0b2791de709552b434968b0c6e40e843f803c685fde0", size = 43458121, upload-time = "2026-05-21T08:12:47.125Z" },
+    { url = "https://files.pythonhosted.org/packages/1a/af/0b92c6674b10be0c97eb37b79424d2681228f2f9dddadecdffae894853f5/patchright-1.60.0-py3-none-macosx_11_0_arm64.whl", hash = "sha256:4380d7af8c14a0cf43527d3e24bdb66d1f9f68bf6d2bcd80109acf1028721b44", size = 42244813, upload-time = "2026-05-21T08:12:51.011Z" },
+    { url = "https://files.pythonhosted.org/packages/28/90/8bde3f3177928a440730e522ccc7120cd022bb458be51b23032aa83b0619/patchright-1.60.0-py3-none-macosx_11_0_universal2.whl", hash = "sha256:9896a180d5126b0ee89253d11d0bed3c8fba7e605fac8669e8a06173d55a2984", size = 43458119, upload-time = "2026-05-21T08:12:54.824Z" },
+    { url = "https://files.pythonhosted.org/packages/dc/0e/37b7dd4b0e7db24148fb3fcc73ccb36d9c82a3f5c7c8300c45ed8a76b7f4/patchright-1.60.0-py3-none-manylinux1_x86_64.whl", hash = "sha256:7a5bbb2ced890a92e05af6eea69d01ad58602050b491276d3137d1f1290ffbe1", size = 47450705, upload-time = "2026-05-21T08:12:59.108Z" },
+    { url = "https://files.pythonhosted.org/packages/a2/2b/b4783fbdd607eb346efa5c4fff8abc8a55d22bce83ada0c15f894374ef9d/patchright-1.60.0-py3-none-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:e37301a8b960f3200087ba57b9b56921262d6c573e95f2b8b64e0ecf0fb0547c", size = 47138338, upload-time = "2026-05-21T08:13:02.763Z" },
+    { url = "https://files.pythonhosted.org/packages/67/ed/f13179bc28ac1c74e19d4041982a8eaacecb8e4fb3bcbd7135af18a45ea6/patchright-1.60.0-py3-none-win32.whl", hash = "sha256:536f4ef4d6f2bb5e48d61493559b34aaac83d82beaad2185b69eb7088f4948bd", size = 37885645, upload-time = "2026-05-21T08:13:07.603Z" },
+    { url = "https://files.pythonhosted.org/packages/55/86/a626155b45559538dfa99af4c8405706acceb8981d4fb953525160df044b/patchright-1.60.0-py3-none-win_amd64.whl", hash = "sha256:d2b68c09269d6d96817a211e93df047361ccb159826cda2595a9a028d337d2ea", size = 37885651, upload-time = "2026-05-21T08:13:11.281Z" },
+    { url = "https://files.pythonhosted.org/packages/6c/8c/633aa6a9a3938c70105e8c5e80e1278a4796a8ebdb4774762e0491856289/patchright-1.60.0-py3-none-win_arm64.whl", hash = "sha256:80912aa39d1870887fada712c3e355d18862148d184bcbbbed82eb7bc6d51fcf", size = 34021469, upload-time = "2026-05-21T08:13:14.701Z" },
+]
+
+[[package]]
 name = "prompt-toolkit"
 version = "3.0.52"
 source = { registry = "https://pypi.org/simple" }
@@ -1227,6 +1246,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/42/98/c8345dccdc31de4228c039a98f6467a941e39558da41c1744fbe29fa5666/pydantic_settings-2.14.0.tar.gz", hash = "sha256:24285fd4b0e0c06507dd9fdfd331ee23794305352aaec8fc4eb92d4047aeb67d", size = 235709, upload-time = "2026-04-20T13:37:40.293Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/01/dd/bebff3040138f00ae8a102d426b27349b9a49acc310fcae7f92112d867e3/pydantic_settings-2.14.0-py3-none-any.whl", hash = "sha256:fc8d5d692eb7092e43c8647c1c35a3ecd00e040fcf02ed86f4cb5458ca62182e", size = 60940, upload-time = "2026-04-20T13:37:38.586Z" },
+]
+
+[[package]]
+name = "pyee"
+version = "13.0.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/8b/04/e7c1fe4dc78a6fdbfd6c337b1c3732ff543b8a397683ab38378447baa331/pyee-13.0.1.tar.gz", hash = "sha256:0b931f7c14535667ed4c7e0d531716368715e860b988770fc7eb8578d1f67fc8", size = 31655, upload-time = "2026-02-14T21:12:28.044Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a0/c4/b4d4827c93ef43c01f599ef31453ccc1c132b353284fc6c87d535c233129/pyee-13.0.1-py3-none-any.whl", hash = "sha256:af2f8fede4171ef667dfded53f96e2ed0d6e6bd7ee3bb46437f77e3b57689228", size = 15659, upload-time = "2026-02-14T21:12:26.263Z" },
 ]
 
 [[package]]
@@ -1430,6 +1461,7 @@ dependencies = [
     { name = "httpx" },
     { name = "lxml" },
     { name = "passlib", extra = ["bcrypt"] },
+    { name = "patchright" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
     { name = "pypdf" },
@@ -1455,6 +1487,7 @@ requires-dist = [
     { name = "httpx", specifier = ">=0.27.0" },
     { name = "lxml", specifier = ">=5.2.0" },
     { name = "passlib", extras = ["bcrypt"], specifier = ">=1.7.4" },
+    { name = "patchright", specifier = ">=1.60.0" },
     { name = "pydantic", specifier = ">=2.7.0" },
     { name = "pydantic-settings", specifier = ">=2.3.0" },
     { name = "pypdf", specifier = ">=4.2.0" },

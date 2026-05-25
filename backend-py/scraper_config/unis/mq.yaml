@@ -1,0 +1,55 @@
+# Macquarie University (uni 277, slug "mq")
+# Hostname: www.mq.edu.au
+# Course catalogue: https://www.mq.edu.au/study/find-a-course
+#
+# 2026-05-18 — Replaced the auto-generated ACAP clone (which had ACAP-only
+# domestic_only filter, trust_vision_ocr override, and ^^ footnote strip
+# patterns that have zero relevance to Macquarie).  This file is the
+# canonical MQ config; macquarie.yaml has been deleted because the
+# slug computation in orchestrator.py (`uni_name.lower().replace(" ","")`)
+# resolves to "mq" for the DB row `id=277, name="mq"`.
+#
+# Bug history / rationale:
+#   - Cloudflare blocks plain-HTTP fetches of www.mq.edu.au with a 403
+#     `cf-mitigated: challenge` response (verified 2026-05-18 via curl).
+#     BFS therefore yields 0 candidates and the browser fallback wanders
+#     6 nav links instead of the catalogue.  Forcing
+#     always_browser_discover: true bypasses the dead HTTP path and lets
+#     Playwright's TLS fingerprint pass Cloudflare's bot check.
+#   - The real catalogue lives under /study/find-a-course (A-Z), with
+#     /study/find-a-course/undergraduate and /postgraduate as the two
+#     primary listing roots.  Browser seeds are configured in
+#     _HOST_EXTRA_SEEDS (browser_discover_generic.py).
+#   - URL block patterns drop MQ's /courses/major/ and /courses/
+#     specialisation/ pages (those are sub-degree majors, not full
+#     course detail pages — they have no fee/intake/IELTS data).
+#   - URL block patterns also drop the bare /undergraduate and
+#     /postgraduate listing-root URLs (path ends exactly there).
+
+discovery:
+  always_browser_discover: true
+  # 2026-05-25 — Cloudflare on www.mq.edu.au returns HTTP 403 + "Just a
+  # moment..." challenge to BOTH plain HTTP AND the regular headless
+  # playwright pool (verified end-to-end against /study/find-a-course).
+  # Routing browser discovery + per-course fetches through the patchright
+  # + Xvfb stealth stack passes the challenge cleanly (200 OK, 189 anchors
+  # on the catalogue root).  Stealth-mode is opt-in per uni; see
+  # backend-py/app/services/scraper/stealth_browser.py for the lifecycle.
+  use_stealth_browser: true
+  block_url_patterns:
+    # MQ majors / specialisations: sub-degree pages, never full courses.
+    - '/find-a-course/courses/major/'
+    - '/find-a-course/courses/specialisation/'
+    - '/find-a-course/courses/specialization/'
+    # MQ category-landing roots (the path ends here, no course slug follows).
+    - '/study/find-a-course/?$'
+    - '/study/find-a-course/undergraduate/?$'
+    - '/study/find-a-course/postgraduate/?$'
+    - '/study/find-a-course/research/?$'
+    - '/study/find-a-course/combined-bachelor-master-degrees/?$'
+    - '/study/find-a-course/double-degree-builder/?$'
+
+extraction:
+  filters:
+    domestic_only:
+      enabled: false
