@@ -215,6 +215,35 @@ _FORCE_BROWSER_HOSTS: tuple[str, ...] = (
     # rendered international values replace any domestic figures picked up
     # during the static pass.
     "utas.edu.au",
+    # University of Newcastle: Cloudflare-protected. Static HTML shows
+    # the domestic student-type panel by default (domestic indicative
+    # fee + domestic nominal duration for programs that differ between
+    # student types). The browser must ALWAYS run and click the
+    # International toggle to expose the international fee and the
+    # correct nominal duration.  Without this, fee + duration stay at
+    # the domestic values fleet-wide (real bug 2026-05-15: Bachelor of
+    # Physiotherapy Honours staged with 5 Year / A$43,250 instead of
+    # the correct 4 years / AUD 46,380 on the international panel).
+    "newcastle.edu.au",
+    # Macquarie University (uni 277): the admissions pages at
+    # www.mq.edu.au/study/find-a-course/courses/<slug> are CF-protected
+    # Svelte SPAs. Static HTML is a 200KB+ shell with text_len≈77 (just
+    # site-nav icon labels — "open_in_new eStudent" etc.); fee, IELTS,
+    # session intake, campus and study mode are all hydrated client-side.
+    # mq.yaml sets discovery.use_stealth_browser=true so browser_pool
+    # routes fetches through patchright + Xvfb, but without forcing the
+    # browser pass + extended extractor here, only english_test runs
+    # against the rendered HTML and every other field stays NULL. With
+    # this entry, the sparse-static rescue at single_course.py:2766
+    # forces a full browser refetch, _is_extended below runs the full
+    # extractor suite against the rendered DOM (fee + IELTS + intake +
+    # duration + location + study_mode), and the override flag lets
+    # rendered values overwrite any junk static values.
+    # NOTE: coursehandbook.mq.edu.au URLs are now rewritten to
+    # www.mq.edu.au admissions URLs during discovery (see
+    # mq_browser_discover._resolve_to_study_urls), so this single host
+    # entry covers the entire MQ catalogue.
+    "mq.edu.au",
 )
 
 _NETWORKIDLE_SETTLE_MS = 3000
@@ -324,6 +353,53 @@ _EXTENDED_EXTRACT_HOSTS: frozenset[str] = frozenset({
     # the browser-rendered International view rather than the static Domestic HTML.
     "utas.edu.au",
     "www.utas.edu.au",
+    # La Trobe: per-course pages are JS-rendered SPAs. Static HTML returns 130KB+
+    # of JS shell with text_len=0 (the static-text gate strips all script tags),
+    # so Gemini-primary sees nothing. The per-course browser pass DOES render
+    # the page successfully (no timeout, returns 100KB+ of rendered HTML), but
+    # the standard path below only re-runs english_test against the rendered
+    # HTML — fees, durations, intakes, locations and study_mode in the rendered
+    # DOM are silently dropped. Symptom: every La Trobe course staged with
+    # fee=NULL fleet-wide despite the browser pass running cleanly.
+    # Including www.* to match the actual hostname seen on every La Trobe URL.
+    "latrobe.edu.au",
+    "www.latrobe.edu.au",
+    # Macquarie University (uni 277): admissions pages at
+    # www.mq.edu.au/study/find-a-course/courses/<slug> are CF-protected
+    # Svelte SPAs. Static HTML returns only the page chrome (text_len≈77),
+    # so without extended extraction the per-course browser pass would
+    # only run english_test against rendered HTML and every other field
+    # (fee, intake session, campus, study mode, duration) would stay
+    # NULL fleet-wide — symptom verified live 2026-05-25 against the
+    # post-coursehandbook-sitemap scrape (200 URLs discovered, every
+    # course staged with fee/IELTS/duration/intake BLANK and a
+    # `[per-course browser ✓] … filled=[]` log line for every URL).
+    # Pair with mq.edu.au entry in _FORCE_BROWSER_HOSTS above.
+    "mq.edu.au",
+    "www.mq.edu.au",
+    # University of Newcastle: after clicking the International toggle, the
+    # rendered HTML shows the international indicative fee, the international
+    # nominal Duration (FT) value, the international IELTS requirement and the
+    # international intake dates.  Re-running the full extractor suite on the
+    # rendered DOM (rather than only english_test) is what overwrites the
+    # static-pass domestic values with the correct international ones.  Pair
+    # with _FORCE_BROWSER_HOSTS + _INTERNATIONAL_TOGGLE_HOSTS + _NETWORKIDLE_HOSTS
+    # entries above; all four are required for the toggle to take effect.
+    "newcastle.edu.au",
+    "www.newcastle.edu.au",
+    # Victoria University (VU): course pages are React/SPA shells where the
+    # static HTML occasionally returns only the page chrome — fee, duration,
+    # intake, IELTS and the real campus list are all hydrated client-side.
+    # When that happens, Gemini-primary fills the slots with generic defaults
+    # (intake="May", location="Melbourne", IELTS=6) and the browser refetch
+    # gate at line 573 sees english slots populated → skips the browser pass
+    # entirely → fee/duration stay blank fleet-wide. Including VU here lets
+    # the sparse-static rescue path in single_course.py force a full browser
+    # extraction that overrides the bogus Gemini fallback values with the
+    # real JS-rendered data. Verified live on Bachelor of Dermal Sciences,
+    # Diploma of Education Studies, Master of Education, etc.
+    "vu.edu.au",
+    "www.vu.edu.au",
 })
 
 # Field slots that each extended extractor fills — used to guard against

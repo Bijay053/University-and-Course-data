@@ -218,6 +218,37 @@ _COURSEHANDBOOK_COURSE_RE = re.compile(
     r"^https://coursehandbook\.mq\.edu\.au/(\d{4})/courses/C\d+/?$"
 )
 _COURSEHANDBOOK_SITEMAP_TIMEOUT_S = 30.0
+
+# After harvesting coursehandbook URLs (which point at the academic catalogue —
+# descriptions, learning outcomes, credit points, but NO fees / IELTS /
+# session / campus data), we resolve each to its equivalent admissions page
+# at www.mq.edu.au/study/find-a-course/courses/<slug>. The admissions pages
+# DO have fee, IELTS, session, campus, study-mode data (verified live
+# 2026-05-25 on bachelor-of-arts, bachelor-of-biodiversity-and-conservation,
+# bachelor-of-environment, bachelor-of-chiropractic-science, master-of-
+# business-administration — 9/10 sample courses returned 200 with
+# "Estimated annual fee AUD $XX,XXX", "Session 1 (23 February 2026)",
+# "North Ryde", "International student" toggle). Coursehandbook is the
+# academic-staff handbook, not the prospective-student admissions site.
+_STUDY_URL_BASE = "https://www.mq.edu.au/study/find-a-course/courses/"
+# Parallel batch size for the resolver pass — each stealth goto takes
+# ~2-3s, so 6 parallel keeps a 350-course resolve under ~3 minutes.
+_RESOLVE_PARALLEL = 6
+# Per-page timeout for the title-only resolve goto (no body wait required;
+# <title> is in the SPA shell static HTML).
+_RESOLVE_GOTO_TIMEOUT_MS = 15_000
+# Strip the "| Macquarie University" or " - Macquarie University" suffix
+# that some coursehandbook titles carry. The bare course name is what
+# slugifies to the admissions URL.
+_TITLE_SUFFIX_RE = re.compile(
+    r"\s*(?:\||\-|–|—)\s*Macquarie\s+University\s*$", re.I,
+)
+# Slug character whitelist: lowercase letters, digits, hyphen. Anything
+# else (parens, slashes, ampersands, apostrophes, commas) is replaced by
+# a hyphen, and runs of hyphens are collapsed. Matches the canonical
+# www.mq.edu.au URL shape (e.g. "Bachelor of Game Design and Development"
+# → "bachelor-of-game-design-and-development").
+_SLUG_NON_WORD_RE = re.compile(r"[^a-z0-9]+")
 # Restrict to current academic year + next-year previews.  The handbook
 # keeps prior-year offerings live (2020+) which would explode the harvest
 # to ~2K stale URLs; only the most recent two years are real catalogue.
@@ -327,12 +358,150 @@ async def _discover_from_coursehandbook_sitemap(
         )
         return []
 
-    out = [{"url": u, "name": ""} for u in sorted(course_urls)]
+    handbook_urls = sorted(course_urls)
     await emit_fn(
         f"[DISCOVER] MQ: coursehandbook sitemap harvested "
-        f"{len(out)} course URL(s)"
+        f"{len(handbook_urls)} course URL(s); resolving to admissions URLs…"
     )
-    return out
+
+    # ── Resolve coursehandbook URLs → www.mq.edu.au admissions URLs ─────
+    # Coursehandbook is the ACADEMIC catalogue (descriptions, learning
+    # outcomes, credit points) and contains NO fee / IELTS / session /
+    # campus data. The admissions pages at
+    # www.mq.edu.au/study/find-a-course/courses/<slug> are where all the
+    # student-facing data lives. We render each coursehandbook URL just
+    # long enough to read its <title> tag (present in the SPA shell
+    # static HTML — no body wait needed), slugify the name, and emit
+    # the equivalent admissions URL. Verified live 2026-05-25.
+    study_courses = await _resolve_to_study_urls(handbook_urls, emit_fn)
+    await emit_fn(
+        f"[DISCOVER] MQ: resolved {len(study_courses)}/{len(handbook_urls)} "
+        f"coursehandbook URLs to admissions URLs"
+    )
+    return study_courses[:max_courses]
+
+
+def _slugify_course_name(name: str) -> str:
+    """Convert a course name to its www.mq.edu.au URL slug.
+
+    Examples (verified against live admissions URLs):
+      "Bachelor of Arts" → "bachelor-of-arts"
+      "Bachelor of Game Design and Development"
+        → "bachelor-of-game-design-and-development"
+      "Master of Business Administration"
+        → "master-of-business-administration"
+
+    Strips the "| Macquarie University" page-title suffix first when
+    present (some pages carry it, others don't), lowercases, replaces
+    any non-alphanumeric run with a single hyphen, and trims leading/
+    trailing hyphens.
+    """
+    if not name:
+        return ""
+    cleaned = _TITLE_SUFFIX_RE.sub("", name.strip())
+    slug = _SLUG_NON_WORD_RE.sub("-", cleaned.lower()).strip("-")
+    return slug
+
+
+async def _resolve_to_study_urls(
+    handbook_urls: list[str],
+    emit_fn,
+) -> list[dict]:
+    """For each coursehandbook URL, extract the course name from <title>
+    and construct the equivalent www.mq.edu.au admissions URL.
+
+    Runs in parallel batches of :data:`_RESOLVE_PARALLEL` using a single
+    stealth_context (which keeps the patchright + xvfb session alive
+    across all gotos — far cheaper than spinning up one context per
+    URL). Returns ``[{"url": admissions_url, "name": title}, ...]``
+    deduped on admissions URL.
+
+    URLs whose <title> can't be parsed (empty / "Handbook" site nav /
+    fetch error) are skipped with a warning rather than emitted with a
+    bad slug.
+    """
+    if not handbook_urls:
+        return []
+    try:
+        from app.services.scraper.stealth_browser import stealth_context
+    except Exception as exc:  # noqa: BLE001
+        log.warning("mq_browser_discover: stealth_browser unavailable for resolver — %s", exc)
+        return []
+
+    out_by_url: dict[str, dict] = {}
+    skipped = 0
+
+    async def _resolve_one(page, handbook_url: str) -> tuple[str, str] | None:
+        try:
+            await page.goto(
+                handbook_url,
+                wait_until="domcontentloaded",
+                timeout=_RESOLVE_GOTO_TIMEOUT_MS,
+            )
+            body = await page.content()
+        except Exception as exc:  # noqa: BLE001
+            log.warning("mq resolver: goto %s failed: %s", handbook_url, exc)
+            return None
+        m = re.search(r"<title>([^<]+)</title>", body, re.I)
+        if not m:
+            return None
+        raw_title = m.group(1).strip()
+        # "Handbook" is the literal site-nav title when the SPA shell
+        # didn't get the per-course override; skip rather than emit
+        # /courses/handbook as a garbage admissions URL.
+        if not raw_title or raw_title.lower() in ("handbook", "macquarie university handbook"):
+            return None
+        slug = _slugify_course_name(raw_title)
+        if not slug or len(slug) < 3:
+            return None
+        admissions_url = f"{_STUDY_URL_BASE}{slug}"
+        return (admissions_url, raw_title)
+
+    async def _worker(queue: asyncio.Queue, ctx) -> None:
+        nonlocal skipped
+        page = await ctx.new_page()
+        try:
+            while True:
+                try:
+                    handbook_url = queue.get_nowait()
+                except asyncio.QueueEmpty:
+                    return
+                try:
+                    result = await _resolve_one(page, handbook_url)
+                    if result is None:
+                        skipped += 1
+                    else:
+                        admissions_url, name = result
+                        if admissions_url not in out_by_url:
+                            out_by_url[admissions_url] = {"url": admissions_url, "name": name}
+                finally:
+                    queue.task_done()
+        finally:
+            try:
+                await page.close()
+            except Exception:  # noqa: BLE001
+                pass
+
+    queue: asyncio.Queue = asyncio.Queue()
+    for u in handbook_urls:
+        queue.put_nowait(u)
+
+    try:
+        async with stealth_context() as ctx:
+            workers = [
+                asyncio.create_task(_worker(queue, ctx))
+                for _ in range(min(_RESOLVE_PARALLEL, len(handbook_urls)))
+            ]
+            await asyncio.gather(*workers, return_exceptions=True)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("mq_browser_discover: resolver pass raised: %s", exc)
+
+    if skipped:
+        await emit_fn(
+            f"[DISCOVER] MQ: resolver skipped {skipped} URL(s) with "
+            f"unparseable <title>"
+        )
+    return sorted(out_by_url.values(), key=lambda d: d["url"])
 
 
 def _is_mq_course_url(url: str) -> bool:
