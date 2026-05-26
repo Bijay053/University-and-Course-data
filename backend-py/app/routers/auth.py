@@ -92,11 +92,9 @@ async def login(
         value=token,
         httponly=True,
         samesite="lax",
-        # Cookie must be HTTPS-only in production. Local dev (Replit preview
-        # proxy or `http://127.0.0.1`) should set COOKIE_SECURE=0 (or leave
-        # APP_ENV unset). Anything other than the dev override defaults to
-        # secure=True so we can't accidentally ship insecure cookies.
-        secure=os.environ.get("COOKIE_SECURE", "1" if os.environ.get("APP_ENV", "").lower() == "production" else "0") == "1",
+        # HTTP-only server (plain IP, no TLS). Keep secure=False so browsers
+        # do not silently drop the cookie. Re-enable when HTTPS is configured.
+        secure=False,
         max_age=SESSION_DAYS * 24 * 3600,
         path="/",
     )
