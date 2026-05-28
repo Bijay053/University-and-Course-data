@@ -442,6 +442,7 @@ interface HistoryPanelProps {
 
 function HistoryPanel({ history, loading, savedYaml, onRestore, restoringId }: HistoryPanelProps) {
   const [selected, setSelected] = useState<HistoryEntry | null>(null);
+  const [compareEntry, setCompareEntry] = useState<HistoryEntry | null>(null);
   const [search, setSearch] = useState("");
   const [keyFilter, setKeyFilter] = useState("");
 
@@ -532,6 +533,14 @@ function HistoryPanel({ history, loading, savedYaml, onRestore, restoringId }: H
           )}
         </div>
 
+        {/* Shift-click hint */}
+        <div className="px-3 py-1.5 border-b bg-muted/20 flex-shrink-0">
+          <p className="text-[10px] text-muted-foreground leading-tight">
+            Click to compare vs. current.{" "}
+            <span className="font-medium">Shift-click</span> a second entry to compare two versions.
+          </p>
+        </div>
+
         {/* Entry list */}
         <div className="flex-1 overflow-y-auto">
           {filtered.length === 0 ? (
@@ -541,25 +550,61 @@ function HistoryPanel({ history, loading, savedYaml, onRestore, restoringId }: H
           ) : (
             filtered.map((entry) => {
               const isSelected = selected?.id === entry.id;
+              const isCompare = compareEntry?.id === entry.id;
               const isCurrent = entry.id === history[0]?.id;
+              const isHighlighted = isSelected || isCompare;
               return (
                 <button
                   key={entry.id}
-                  onClick={() => setSelected(isSelected ? null : entry)}
+                  onClick={(e) => {
+                    if (e.shiftKey) {
+                      if (isCompare) {
+                        setCompareEntry(null);
+                      } else if (isSelected) {
+                        setSelected(null);
+                        setCompareEntry(null);
+                      } else if (selected) {
+                        setCompareEntry(entry);
+                      } else {
+                        setSelected(entry);
+                      }
+                    } else {
+                      if (isSelected && !compareEntry) {
+                        setSelected(null);
+                      } else {
+                        setSelected(entry);
+                        setCompareEntry(null);
+                      }
+                    }
+                  }}
                   className={cn(
                     "w-full text-left px-3 py-2.5 border-b last:border-b-0 transition-colors",
-                    isSelected ? "bg-primary/10" : "hover:bg-muted/50",
+                    isSelected ? "bg-blue-50 dark:bg-blue-950/30" :
+                    isCompare ? "bg-purple-50 dark:bg-purple-950/30" :
+                    "hover:bg-muted/50",
                   )}
                 >
                   <div className="flex items-center justify-between gap-1">
                     <span className="text-xs font-medium truncate" title={formatAbsoluteTime(entry.saved_at)}>
                       {formatRelativeTime(entry.saved_at)}
                     </span>
-                    {isCurrent && (
-                      <span className="text-[10px] px-1 py-0.5 rounded bg-green-100 text-green-700 flex-shrink-0">
-                        latest
-                      </span>
-                    )}
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      {isSelected && (
+                        <span className="text-[10px] px-1 py-0.5 rounded bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 font-medium">
+                          A
+                        </span>
+                      )}
+                      {isCompare && (
+                        <span className="text-[10px] px-1 py-0.5 rounded bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300 font-medium">
+                          B
+                        </span>
+                      )}
+                      {isCurrent && !isHighlighted && (
+                        <span className="text-[10px] px-1 py-0.5 rounded bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">
+                          latest
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <div className="text-[11px] text-muted-foreground truncate mt-0.5">
                     {formatSavedBy(entry.saved_by)}
@@ -576,12 +621,66 @@ function HistoryPanel({ history, loading, savedYaml, onRestore, restoringId }: H
 
       {/* Right: diff or prompt */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {selected ? (
+        {selected && compareEntry ? (() => {
+          const aDate = selected.saved_at ? new Date(selected.saved_at).getTime() : 0;
+          const bDate = compareEntry.saved_at ? new Date(compareEntry.saved_at).getTime() : 0;
+          const oldEntry = aDate <= bDate ? selected : compareEntry;
+          const newEntry = aDate <= bDate ? compareEntry : selected;
+          return (
+            <>
+              <div className="px-3 py-2 border-b flex items-center justify-between bg-muted/30 gap-2 flex-wrap">
+                <div className="text-xs text-muted-foreground flex items-center gap-1.5">
+                  <span className="inline-flex items-center gap-1">
+                    <span className="px-1 py-0.5 rounded bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 font-medium text-[10px]">A</span>
+                    <span className="font-medium" title={formatAbsoluteTime(oldEntry.saved_at)}>{formatRelativeTime(oldEntry.saved_at)}</span>
+                  </span>
+                  <span className="text-muted-foreground/50">→</span>
+                  <span className="inline-flex items-center gap-1">
+                    <span className="px-1 py-0.5 rounded bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300 font-medium text-[10px]">B</span>
+                    <span className="font-medium" title={formatAbsoluteTime(newEntry.saved_at)}>{formatRelativeTime(newEntry.saved_at)}</span>
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 text-[11px] gap-1 text-muted-foreground"
+                    onClick={() => setCompareEntry(null)}
+                  >
+                    <X className="w-3 h-3" />
+                    Clear B
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-6 text-[11px] gap-1"
+                    onClick={() => onRestore(newEntry)}
+                    disabled={restoringId === newEntry.id}
+                  >
+                    {restoringId === newEntry.id
+                      ? <Loader2 className="w-3 h-3 animate-spin" />
+                      : <RotateCcw className="w-3 h-3" />}
+                    {restoringId === newEntry.id ? "Restoring…" : "Restore B"}
+                  </Button>
+                </div>
+              </div>
+              <DiffViewer
+                oldYaml={oldEntry.yaml_content}
+                newYaml={newEntry.yaml_content}
+                oldLabel={`${formatRelativeTime(oldEntry.saved_at)} (older)`}
+                newLabel={`${formatRelativeTime(newEntry.saved_at)} (newer)`}
+              />
+            </>
+          );
+        })() : selected ? (
           <>
             <div className="px-3 py-2 border-b flex items-center justify-between bg-muted/30">
               <div className="text-xs text-muted-foreground">
-                <span className="font-medium" title={formatAbsoluteTime(selected.saved_at)}>
-                  {formatRelativeTime(selected.saved_at)}
+                <span className="inline-flex items-center gap-1">
+                  <span className="px-1 py-0.5 rounded bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 font-medium text-[10px]">A</span>
+                  <span className="font-medium" title={formatAbsoluteTime(selected.saved_at)}>
+                    {formatRelativeTime(selected.saved_at)}
+                  </span>
                 </span>
                 {" · "}
                 {formatSavedBy(selected.saved_by)}
