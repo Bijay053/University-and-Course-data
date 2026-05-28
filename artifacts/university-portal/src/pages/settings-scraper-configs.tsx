@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -383,6 +383,29 @@ interface HistoryPanelProps {
 
 function HistoryPanel({ history, loading, savedYaml, onRestore, restoringId }: HistoryPanelProps) {
   const [selected, setSelected] = useState<HistoryEntry | null>(null);
+  const [search, setSearch] = useState("");
+  const [keyFilter, setKeyFilter] = useState("");
+
+  const filtered = useMemo(() => {
+    let entries = history;
+    const q = search.trim().toLowerCase();
+    if (q) {
+      entries = entries.filter(e => {
+        const byUser = (e.saved_by ?? "").toLowerCase().includes(q);
+        const byDate =
+          formatAbsoluteTime(e.saved_at).toLowerCase().includes(q) ||
+          formatRelativeTime(e.saved_at).toLowerCase().includes(q);
+        return byUser || byDate;
+      });
+    }
+    const k = keyFilter.trim();
+    if (k) {
+      entries = entries.filter(e => e.yaml_content.includes(k));
+    }
+    return entries;
+  }, [history, search, keyFilter]);
+
+  const isFiltered = search.trim() !== "" || keyFilter.trim() !== "";
 
   if (loading) {
     return (
@@ -404,38 +427,92 @@ function HistoryPanel({ history, loading, savedYaml, onRestore, restoringId }: H
   return (
     <div className="flex-1 flex overflow-hidden">
       {/* Left: history list */}
-      <div className="w-64 flex-shrink-0 border-r overflow-y-auto">
-        {history.map((entry, idx) => {
-          const isSelected = selected?.id === entry.id;
-          const isCurrent = idx === 0;
-          return (
-            <button
-              key={entry.id}
-              onClick={() => setSelected(isSelected ? null : entry)}
-              className={cn(
-                "w-full text-left px-3 py-2.5 border-b last:border-b-0 transition-colors",
-                isSelected ? "bg-primary/10" : "hover:bg-muted/50",
-              )}
-            >
-              <div className="flex items-center justify-between gap-1">
-                <span className="text-xs font-medium truncate" title={formatAbsoluteTime(entry.saved_at)}>
-                  {formatRelativeTime(entry.saved_at)}
-                </span>
-                {isCurrent && (
-                  <span className="text-[10px] px-1 py-0.5 rounded bg-green-100 text-green-700 flex-shrink-0">
-                    latest
-                  </span>
-                )}
-              </div>
-              <div className="text-[11px] text-muted-foreground truncate mt-0.5">
-                {formatSavedBy(entry.saved_by)}
-              </div>
-              <div className="text-[10px] text-muted-foreground/70 mt-0.5">
-                {entry.yaml_content.split("\n").length} lines
-              </div>
-            </button>
-          );
-        })}
+      <div className="w-64 flex-shrink-0 border-r flex flex-col">
+        {/* Search / filter bar */}
+        <div className="p-2 border-b space-y-1.5 flex-shrink-0">
+          <div className="relative">
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+            <Input
+              className="h-7 pl-7 pr-7 text-xs"
+              placeholder="Filter by user or date…"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
+            {search && (
+              <button
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                onClick={() => setSearch("")}
+                aria-label="Clear search"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+          <div className="relative">
+            <Code className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+            <Input
+              className="h-7 pl-7 pr-7 text-xs"
+              placeholder="YAML key (e.g. default_ielts)…"
+              value={keyFilter}
+              onChange={e => setKeyFilter(e.target.value)}
+            />
+            {keyFilter && (
+              <button
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                onClick={() => setKeyFilter("")}
+                aria-label="Clear key filter"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+          {isFiltered && (
+            <p className="text-[10px] text-muted-foreground text-center">
+              {filtered.length} of {history.length} {history.length === 1 ? "entry" : "entries"}
+            </p>
+          )}
+        </div>
+
+        {/* Entry list */}
+        <div className="flex-1 overflow-y-auto">
+          {filtered.length === 0 ? (
+            <div className="px-3 py-6 text-center text-xs text-muted-foreground">
+              No entries match your filter.
+            </div>
+          ) : (
+            filtered.map((entry) => {
+              const isSelected = selected?.id === entry.id;
+              const isCurrent = entry.id === history[0]?.id;
+              return (
+                <button
+                  key={entry.id}
+                  onClick={() => setSelected(isSelected ? null : entry)}
+                  className={cn(
+                    "w-full text-left px-3 py-2.5 border-b last:border-b-0 transition-colors",
+                    isSelected ? "bg-primary/10" : "hover:bg-muted/50",
+                  )}
+                >
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="text-xs font-medium truncate" title={formatAbsoluteTime(entry.saved_at)}>
+                      {formatRelativeTime(entry.saved_at)}
+                    </span>
+                    {isCurrent && (
+                      <span className="text-[10px] px-1 py-0.5 rounded bg-green-100 text-green-700 flex-shrink-0">
+                        latest
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-[11px] text-muted-foreground truncate mt-0.5">
+                    {formatSavedBy(entry.saved_by)}
+                  </div>
+                  <div className="text-[10px] text-muted-foreground/70 mt-0.5">
+                    {entry.yaml_content.split("\n").length} lines
+                  </div>
+                </button>
+              );
+            })
+          )}
+        </div>
       </div>
 
       {/* Right: diff or prompt */}
