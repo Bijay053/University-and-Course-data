@@ -1,5 +1,5 @@
 # University of East London (UK partnership / Australian pathway)
-# Hostname: check DB — likely www.uel.edu.au or similar AU delivery partner
+# Hostname: www.uel.ac.uk
 #
 # Bug history / rationale:
 #   - Cloudflare protection: site returns 403 to the scraper user-agent.

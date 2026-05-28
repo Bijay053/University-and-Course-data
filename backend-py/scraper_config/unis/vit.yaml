@@ -1,5 +1,5 @@
 # Victorian Institute of Technology
-# Hostname: check DB — likely www.vit.edu.au
+# Hostname: vit.edu.au
 #
 # Bug history / rationale:
 #   - Static fallback: VIT's course detail pages appear to require JavaScript
