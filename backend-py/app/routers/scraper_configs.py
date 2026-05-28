@@ -2,11 +2,12 @@
 
 Endpoints
 ---------
-GET  /api/settings/scraper-configs           → list all slugs + raw YAML
-GET  /api/settings/scraper-configs/{slug}    → get one config's YAML
-PUT  /api/settings/scraper-configs/{slug}    → save / create a config
-DELETE /api/settings/scraper-configs/{slug}  → delete a config
-POST /api/settings/scraper-configs/generate  → Gemini-generated YAML for a new university
+GET  /api/settings/scraper-configs                → list all slugs + raw YAML (+ university_id)
+GET  /api/settings/scraper-configs/{slug}         → get one config's YAML
+PUT  /api/settings/scraper-configs/{slug}         → save / create a config
+DELETE /api/settings/scraper-configs/{slug}       → delete a config
+POST /api/settings/scraper-configs/generate       → Gemini-generated YAML for a new university
+POST /api/settings/scraper-configs/{slug}/trigger → start a scrape job for this config's university
 """
 from __future__ import annotations
 
@@ -20,8 +21,10 @@ import yaml
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+from sqlalchemy import or_, select, text
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.dependencies import get_current_user
+from app.dependencies import get_current_user, get_db
 from app.permissions import require_permission
 
 log = logging.getLogger(__name__)
@@ -58,21 +61,158 @@ def _parse_yaml_safe(text: str) -> dict[str, Any]:
         return {}
 
 
+# ── Hostname helpers ──────────────────────────────────────────────────────────
+
+_HOSTNAME_IN_PARENS_RE = re.compile(r"\(([a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?(?:\.[a-z0-9]{2,})+)\)", re.IGNORECASE)
+_HOSTNAME_LABEL_RE = re.compile(r"#\s*[Hh]ostname[:\s]+([a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?(?:\.[a-z0-9]{2,})+)", re.IGNORECASE)
+
+
+def _extract_hostname_from_yaml(raw: str) -> str | None:
+    """Try to pull a hostname from the YAML comment block.
+
+    Matches patterns like:
+      # University Name (some.hostname.edu.au)
+      # Hostname: some.hostname.edu.au
+    Returns the bare hostname (e.g. ``federation.edu.au``) or None.
+    """
+    for line in raw.splitlines():
+        if not line.startswith("#"):
+            break
+        m = _HOSTNAME_LABEL_RE.search(line) or _HOSTNAME_IN_PARENS_RE.search(line)
+        if m:
+            return m.group(1).lower()
+    return None
+
+
 # ── List ──────────────────────────────────────────────────────────────────────
 
 @router.get("/scraper-configs")
 async def list_scraper_configs(
     _user: Annotated[dict, Depends(require_permission("settings.view"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
 ) -> JSONResponse:
+    # Build config list from YAML files
     configs = []
+    hostnames: list[str] = []
     for f in sorted(_UNIS_DIR.glob("*.yaml")):
         slug = f.stem
         raw = _read_yaml_raw(f)
         data = _parse_yaml_safe(raw)
         comment_lines = [ln.lstrip("# ").strip() for ln in raw.splitlines() if ln.startswith("#") and ln.strip() != "#"]
         title = comment_lines[0] if comment_lines else slug.replace("-", " ").replace("_", " ").title()
-        configs.append({"slug": slug, "title": title, "yaml": raw, "parsed": data})
+        hostname = _extract_hostname_from_yaml(raw)
+        configs.append({"slug": slug, "title": title, "yaml": raw, "parsed": data,
+                        "hostname": hostname, "university_id": None, "university_name": None})
+        if hostname:
+            hostnames.append(hostname)
+
+    # Batch-resolve university_id for each config by matching hostname
+    if hostnames:
+        rows = (await db.execute(
+            text("""
+                SELECT id, name,
+                       LOWER(REGEXP_REPLACE(
+                           COALESCE(scrape_url, website, ''),
+                           '^https?://(www\\.)?', ''
+                       )) AS bare_url
+                FROM universities
+                WHERE COALESCE(scrape_url, website, '') != ''
+            """)
+        )).all()
+        # Match: config hostname appears at the start of the bare URL (after stripping www.)
+        for cfg in configs:
+            if not cfg["hostname"]:
+                continue
+            h = cfg["hostname"].lower()
+            # strip www. from the config hostname too for comparison
+            h_bare = re.sub(r"^www\.", "", h)
+            for uni_id, uni_name, bare_url in rows:
+                if bare_url and (bare_url.startswith(h_bare + "/") or bare_url.startswith(h_bare + ":")):
+                    cfg["university_id"] = uni_id
+                    cfg["university_name"] = uni_name
+                    break
+
+    # Drop internal fields not needed by the client
+    for cfg in configs:
+        cfg.pop("parsed", None)
+        cfg.pop("hostname", None)
+
     return JSONResponse(content={"configs": configs})
+
+
+# ── Trigger scrape ────────────────────────────────────────────────────────────
+
+@router.post("/scraper-configs/{slug}/trigger")
+async def trigger_scrape_for_config(
+    slug: str,
+    _user: Annotated[dict, Depends(require_permission("scraping.start"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> JSONResponse:
+    """Find the university for this YAML config and start a scrape job.
+
+    Looks up the university by matching the hostname embedded in the YAML
+    comment block against ``scrape_url``/``website`` in the DB.  Returns
+    ``{"jobId": ..., "runtimeJobId": ..., "status": "queued", "universityId": N}``
+    on success, or 404/503 on failure.
+    """
+    from app.models.university import University
+    from app.routers.scrape import start_scrape
+    from app.schemas.scrape import StartScrapeBody
+
+    _validate_slug(slug)
+    path = _slug_path(slug)
+    if not path.exists():
+        raise HTTPException(status_code=404, detail=f"No config for slug '{slug}'")
+
+    raw = _read_yaml_raw(path)
+    hostname = _extract_hostname_from_yaml(raw)
+    uni = None
+
+    if hostname:
+        h_bare = re.sub(r"^www\.", "", hostname.lower())
+        result = await db.execute(
+            select(University).where(
+                or_(
+                    University.scrape_url.op("~*")(rf"://(?:www\.)?{re.escape(h_bare)}[/:]"),
+                    University.website.op("~*")(rf"://(?:www\.)?{re.escape(h_bare)}[/:]"),
+                )
+            ).limit(1)
+        )
+        uni = result.scalar_one_or_none()
+
+    if not uni:
+        # Fallback: partial name match on the slug
+        name_guess = slug.replace("-", " ").replace("_", " ")
+        result = await db.execute(
+            select(University).where(
+                University.name.ilike(f"%{name_guess}%")
+            ).limit(1)
+        )
+        uni = result.scalar_one_or_none()
+
+    if not uni:
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                f"No university matched config slug '{slug}'"
+                + (f" (hostname={hostname})" if hostname else " (no hostname in YAML comment)")
+                + ". Add '# Hostname: your.domain.edu.au' to the YAML comment block."
+            ),
+        )
+
+    body = StartScrapeBody(university_id=uni.id)
+    resp = await start_scrape(body, db)
+    return JSONResponse(
+        status_code=202,
+        content={
+            "jobId": resp.runtime_job_id,
+            "runtimeJobId": resp.runtime_job_id,
+            "status": resp.status,
+            "ok": resp.ok,
+            "universityId": uni.id,
+            "universityName": uni.name,
+        },
+    )
 
 
 # ── Get one ───────────────────────────────────────────────────────────────────
