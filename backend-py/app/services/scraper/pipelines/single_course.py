@@ -545,28 +545,58 @@ def _federation_domestic_only_signal(rendered_html: str, url: str) -> str | None
         return None
 
     # Signal 2: disabled International tab.  Check both attribute orderings
-    # (disabled-before-label and label-before-disabled) with a tight window
-    # so we only match the actual tab element, not unrelated copy.
+    # (disabled-before-label and label-before-disabled).
+    #
+    # NOTE 2026-05-28: the original `_label_then_disabled` matcher looked
+    # back 300 chars from `International</button>` and flagged disabled if
+    # ANY `disabled` keyword appeared in the window.  That gave false
+    # positives whenever an unrelated disabled UI element (nav buttons,
+    # a disabled "Apply now" CTA, etc.) sat within 300 chars BEFORE the
+    # International tab — verified live on Federation Nursing /
+    # Physiotherapy / IT Cybersecurity pages, which all wrongly got
+    # flagged.  The fix: scan back from `International</...>` to the
+    # nearest opening `<button` or `<a` tag and check ONLY THAT TAG's
+    # own attributes for a disabled marker.  This is the same scope
+    # `_disabled_before` already uses (a single element's opening tag),
+    # just applied to the label-after ordering too.
     _disabled_before = _re.search(
         r"<(?:button|a)\b[^>]*(?:\bdisabled\b|aria-disabled\s*=\s*[\"']?true"
         r"|class\s*=\s*[\"'][^\"']*(?:is-)?disabled)[^>]*>\s*International\s*<",
         rendered_html, _re.IGNORECASE,
     )
-    _label_then_disabled = _re.search(
-        r"International\s*</(?:button|a)>",
-        rendered_html, _re.IGNORECASE,
-    )
     if _disabled_before:
         return "federation_intl_tab_disabled"
-    if _label_then_disabled:
-        # Confirm the matched tab actually carries a disabled marker within
-        # the same element (look back a bounded window for the opening tag).
-        _start = max(0, _label_then_disabled.start() - 300)
-        _seg = rendered_html[_start:_label_then_disabled.end()]
+    # Find every `International</button>` / `International</a>` close-tag
+    # and, for each, locate the matching opening tag (the nearest preceding
+    # `<button` or `<a`, no other intervening tag of the same kind).  Then
+    # check only that opening tag's attributes.
+    for _m in _re.finditer(
+        r"International\s*</(?P<tag>button|a)>",
+        rendered_html, _re.IGNORECASE,
+    ):
+        _tag = _m.group("tag").lower()
+        # Scan back from this close-tag for the matching opening tag.
+        # `rfind` finds the LAST occurrence in the slice before the
+        # close-tag, which is the immediately-enclosing element provided
+        # no other tag of the same kind opened in between — good enough
+        # for the well-formed React markup Federation produces.
+        _prefix = rendered_html[: _m.start()]
+        _open_pos = _prefix.rfind(f"<{_tag}")
+        if _open_pos == -1:
+            # Try uppercase variant (rare but defensive)
+            _open_pos = _prefix.rfind(f"<{_tag.upper()}")
+        if _open_pos == -1:
+            continue
+        # Take only up to the end of the opening tag (the first `>` after
+        # the opening tag start).  This is the attribute window.
+        _open_tag_end = rendered_html.find(">", _open_pos)
+        if _open_tag_end == -1 or _open_tag_end >= _m.start():
+            continue
+        _attrs = rendered_html[_open_pos:_open_tag_end + 1]
         if _re.search(
             r"\bdisabled\b|aria-disabled\s*=\s*[\"']?true"
             r"|class\s*=\s*[\"'][^\"']*(?:is-)?disabled",
-            _seg, _re.IGNORECASE,
+            _attrs, _re.IGNORECASE,
         ):
             return "federation_intl_tab_disabled"
 
@@ -3000,6 +3030,26 @@ async def extract_course(
         # row for a course the live page does not offer to international
         # students.  Host-gated, so no effect on other universities.
         _fed_signal = _federation_domestic_only_signal(rendered_html, url)
+        # PDF-fee override (2026-05-28): Federation's HE international fee
+        # schedule PDF, by definition, only contains courses offered to
+        # international students.  If the per-course PDF matcher populated
+        # `payload["international_fee"]`, then this course IS offered to
+        # internationals — so a `federation_intl_tab_disabled` verdict on
+        # the rendered DOM (which can be empty, broken, or contain
+        # unrelated disabled UI elements that fool the tab-state matcher)
+        # must be wrong.  Drop the federation tab-disabled signal in that
+        # case.  The `federation_csp_domestic_only` signal is NOT
+        # overridden because it already requires no international dollar
+        # amount on the page and is therefore self-protecting.
+        if _fed_signal == "federation_intl_tab_disabled" and payload.get(
+            "international_fee"
+        ):
+            log.info(
+                "[FED OVERRIDE] %s — ignoring federation_intl_tab_disabled "
+                "because per-course PDF supplied international_fee=%s",
+                url, payload.get("international_fee"),
+            )
+            _fed_signal = None
         if _fed_signal:
             _hard_marker_hit = True
         if _hard_marker_hit or (
