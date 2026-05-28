@@ -421,15 +421,26 @@ async def _git_sync_config(slug: str) -> dict:
             return {"ok": True, "message": "no changes — already up-to-date"}
         return {"ok": False, "error": f"git commit failed: {combined[:200]}"}
 
-    # Discover the GitHub HTTPS remote URL
-    rc, remotes_out, _ = await _run("git", "--no-optional-locks", "remote", "-v")
-    push_url: str | None = None
-    for line in remotes_out.splitlines():
-        if "github.com" in line and "(push)" in line:
-            parts = line.split()
-            if len(parts) >= 2:
-                push_url = parts[1]
-                break
+    # Discover the GitHub HTTPS remote URL.
+    # GITHUB_PUSH_URL env var takes priority — set it to override which repo
+    # the portal pushes to (e.g. when the `github` remote still points at an
+    # old fork that the PAT can't write to).  Falls back to auto-discovery
+    # from `git remote -v` when not set.
+    push_url: str | None = os.environ.get("GITHUB_PUSH_URL", "").strip() or None
+    if not push_url:
+        rc, remotes_out, _ = await _run("git", "--no-optional-locks", "remote", "-v")
+        for line in remotes_out.splitlines():
+            if "github.com" in line and "(push)" in line:
+                parts = line.split()
+                if len(parts) >= 2:
+                    # Prefer remotes whose URL contains the PAT account name so
+                    # we don't accidentally pick an old fork the PAT can't push to.
+                    candidate = parts[1]
+                    if push_url is None:
+                        push_url = candidate
+                    elif "studyinfocentre" in candidate.lower():
+                        push_url = candidate
+                        break
 
     if not push_url:
         # No github.com remote found — undo the commit so we don't leave a dangling local commit

@@ -105,3 +105,8 @@ externalPort = 4200
 [nix]
 channel = "stable-25_05"
 packages = ["libxcrypt", "postgresql", "rapidfuzz-cpp", "taskflow", "xcodebuild", "zlib"]
+
+[userenv]
+
+[userenv.shared]
+GITHUB_PUSH_URL = "https://github.com/Studyinfocentre/University-and-course-managment.git"
