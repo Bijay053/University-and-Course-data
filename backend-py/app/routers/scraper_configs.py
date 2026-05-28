@@ -128,7 +128,11 @@ async def list_scraper_configs(
             # strip www. from the config hostname too for comparison
             h_bare = re.sub(r"^www\.", "", h)
             for uni_id, uni_name, bare_url in rows:
-                if bare_url and (bare_url.startswith(h_bare + "/") or bare_url.startswith(h_bare + ":")):
+                if bare_url and (
+                    bare_url == h_bare
+                    or bare_url.startswith(h_bare + "/")
+                    or bare_url.startswith(h_bare + ":")
+                ):
                     cfg["university_id"] = uni_id
                     cfg["university_name"] = uni_name
                     break
