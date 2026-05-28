@@ -4,10 +4,69 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { SettingsTabs } from "@/components/settings-tabs";
-import { Plus, Save, Trash2, Sparkles, Search, RefreshCw, X, Play, Loader2, CheckCircle2, AlertCircle, Clock, GitCompare, Code, History, RotateCcw } from "lucide-react";
+import { Plus, Save, Trash2, Sparkles, Search, RefreshCw, X, Play, Loader2, CheckCircle2, AlertCircle, Clock, GitCompare, Code, History, RotateCcw, Download } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+
+const SAMPLE_YAML = `# University Full Name
+# Hostname: www.example.edu.au
+#
+# Bug history / rationale:
+#   (add notes here as you discover site-specific quirks)
+
+discovery:
+  # Uncomment if BFS alone misses many courses (JS-heavy SPAs like Torrens/CDU):
+  # always_sitemap_supplement: true
+
+  # Uncomment to probe extra subdomains when BFS finds very few candidates:
+  # fallback_subdomains:
+  #   - handbook.{domain}
+  #   - study.{domain}
+
+  # Uncomment to block noisy non-course URLs from being crawled:
+  # block_url_patterns:
+  #   - /news/
+  #   - /events/
+  #   - /staff/
+
+  # Uncomment if the sitemap is at a non-standard path:
+  # sitemap_url: https://www.example.edu.au/custom-sitemap.xml
+
+extraction:
+  fees:
+    default_currency: "AUD"   # change to NZD for New Zealand universities
+
+    # Uncomment if fees are on a single central page (not per-course):
+    # central_page: https://www.example.edu.au/fees
+
+  english:
+    # Uncomment if Gemini hallucinates IELTS scores from decorative images:
+    # trust_vision_ocr: false
+
+    # Uncomment to set a university-wide English default (last resort):
+    # default_ielts: 6.5
+    # default_pte: 58
+
+  filters:
+    domestic_only:
+      # Enable if the site lists domestic courses without clearly marking them:
+      enabled: false
+
+    online_only:
+      # Disable for distance-education universities (e.g. CSU):
+      enabled: true
+`;
+
+function downloadSampleYaml() {
+  const blob = new Blob([SAMPLE_YAML], { type: "text/yaml" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "sample-scraper-config.yaml";
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 interface ConfigEntry {
   slug: string;
@@ -984,7 +1043,7 @@ export default function SettingsScraperConfigs() {
             )}
           </div>
 
-          <div className="p-2 border-t">
+          <div className="p-2 border-t flex flex-col gap-1.5">
             <Button
               size="sm"
               className="w-full h-8 text-xs"
@@ -995,6 +1054,15 @@ export default function SettingsScraperConfigs() {
             >
               <Plus className="h-3.5 w-3.5 mr-1" />
               New Config
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="w-full h-8 text-xs"
+              onClick={downloadSampleYaml}
+            >
+              <Download className="h-3.5 w-3.5 mr-1" />
+              Download Sample YAML
             </Button>
           </div>
         </div>
