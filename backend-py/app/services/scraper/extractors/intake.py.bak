@@ -498,48 +498,11 @@ def _nz_semester_supplement(months: list[str], text: str) -> list[str]:
     return [mo for mo in _MONTHS if mo in set(supplemented)]
 
 
-def _select_intake_candidate(
-    candidates: list[ExtractionResult],
-) -> list[ExtractionResult]:
-    """Pick the winning intake candidate from all content-gated passes.
-
-    Selection rule mirrors the system-wide arbitration in
-    ``_finalize_evidence_selection``: highest confidence wins, ties broken
-    by first-write (insertion order is preserved by ``sorted``'s stability).
-
-    This replaces the previous behaviour where each content-gated pass did
-    an early ``return``. With early returns, a pass added or loosened to fix
-    one university could intercept another university's page upstream and
-    silently change its result. By accumulating candidates and selecting on
-    confidence, a lower-confidence pass can no longer pre-empt a
-    higher-confidence one just because it appears earlier in the function.
-    """
-    if not candidates:
-        return []
-    # sorted() is stable, so equal-confidence candidates keep insertion
-    # order — i.e. first-write-wins at equal confidence, matching the
-    # documented arbitration rule.
-    best = sorted(candidates, key=lambda r: r.confidence, reverse=True)[0]
-    return [best]
-
-
 async def _extract_raw(html: str, url: str) -> list[ExtractionResult]:
     from urllib.parse import urlparse as _up
     _host = (_up(url).netloc or "").lower()
     _is_uow = _host in _UOW_HOSTS
     _is_ecu = _host in _ECU_HOSTS
-
-    # ── Candidate accumulator (regression fix 2026-05-28) ────────────────
-    # Previously each content-gated pass below (campus-pivot, structural,
-    # summary-start) did an early `return` the moment it matched. Because
-    # these passes fire on PAGE CONTENT (not host), a pass added/loosened to
-    # fix university B would intercept university A's page upstream of the
-    # generic Pass 1-4 that produced A's correct months — silently breaking
-    # A. The fix: content-gated passes now APPEND to `candidates` instead of
-    # returning, and the highest-confidence candidate is selected at the end.
-    # The HOST-gated blocks (UOW / ECU) keep their early returns — they are
-    # netloc-scoped and must win for their own host, and cannot bleed.
-    candidates: list[ExtractionResult] = []
 
     # Campus-pivot pass: handles UNE "Start dates and campus" table where
     # months appear in column headers (e.g. "Trimester 1 – February 2026")
@@ -547,7 +510,7 @@ async def _extract_raw(html: str, url: str) -> list[ExtractionResult]:
     # physical (non-Online) campus rows contribute months.
     pivot_months = _extract_campus_table_intake(html)
     if pivot_months:
-        candidates.append(
+        return [
             ExtractionResult(
                 field_key="intake_months",
                 value=pivot_months,
@@ -556,7 +519,7 @@ async def _extract_raw(html: str, url: str) -> list[ExtractionResult]:
                 snippet="campus-pivot-table",
                 method="intake.campus_pivot",
             )
-        )
+        ]
 
     # Structural pre-pass FIRST — see _extract_strong_label_value for
     # the rationale. When the page publishes intake months as a
@@ -567,7 +530,7 @@ async def _extract_raw(html: str, url: str) -> list[ExtractionResult]:
     structural, snippet = _extract_strong_label_value(html)
     if structural is not None:
         months, day = structural
-        candidates.append(
+        return [
             ExtractionResult(
                 field_key="intake_months",
                 value=months,
@@ -579,13 +542,11 @@ async def _extract_raw(html: str, url: str) -> list[ExtractionResult]:
                 snippet=snippet,
                 method="intake.structural",
             )
-        )
+        ]
 
     text = compact(html_to_text(html))
     if not text:
-        # No page text to run the remaining passes against, but a structural
-        # or campus-pivot candidate may already have been found above.
-        return _select_intake_candidate(candidates)
+        return []
 
     # Strip "Recently viewed" sidebar before ANY keyword or month scan.
     # Sites like UniSQ embed sibling-course names + Start dates in this
@@ -613,7 +574,7 @@ async def _extract_raw(html: str, url: str) -> list[ExtractionResult]:
         raw_months = [_normalise_month(r) for r in _MONTH_RE.findall(_summary_hit.group(1))]
         _summary_months = [m for m in _MONTHS if m in set(filter(None, raw_months))]
         if _summary_months:
-            candidates.append(
+            return [
                 ExtractionResult(
                     field_key="intake_months",
                     value=_summary_months,
@@ -622,7 +583,7 @@ async def _extract_raw(html: str, url: str) -> list[ExtractionResult]:
                     snippet=f"summary-start: {_summary_hit.group(0)[:60]}",
                     method="intake.summary_start",
                 )
-            )
+            ]
 
     # ── ECU-specific: Semester N → month mapping takes priority ──────────
     # See _ECU_SEMESTER_ANCHOR_RE doc above.  ECU course pages do NOT carry
@@ -765,19 +726,18 @@ async def _extract_raw(html: str, url: str) -> list[ExtractionResult]:
             if mapped and mapped not in months:
                 months.append(mapped)
 
-    if months:
-        candidates.append(
-            ExtractionResult(
-                field_key="intake_months",
-                value=months,
-                normalized={"intake_months": months, "intake_days": days[0] if days else None},
-                confidence=0.7 if chunks else 0.4,
-                snippet=search[:240],
-                method="regex",
-            )
+    if not months:
+        return []
+    return [
+        ExtractionResult(
+            field_key="intake_months",
+            value=months,
+            normalized={"intake_months": months, "intake_days": days[0] if days else None},
+            confidence=0.7 if chunks else 0.4,
+            snippet=search[:240],
+            method="regex",
         )
-
-    return _select_intake_candidate(candidates)
+    ]
 
 
 # ── QUT structural reader (qut.edu.au) ─────────────────────────────────────
