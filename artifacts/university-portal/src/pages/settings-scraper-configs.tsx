@@ -435,12 +435,15 @@ function formatSavedBy(savedBy: string | null): string {
 interface HistoryPanelProps {
   history: HistoryEntry[];
   loading: boolean;
+  hasMore: boolean;
+  loadingMore: boolean;
   savedYaml: string;
   onRestore: (entry: HistoryEntry) => void;
+  onLoadMore: () => void;
   restoringId: number | null;
 }
 
-function HistoryPanel({ history, loading, savedYaml, onRestore, restoringId }: HistoryPanelProps) {
+function HistoryPanel({ history, loading, hasMore, loadingMore, savedYaml, onRestore, onLoadMore, restoringId }: HistoryPanelProps) {
   const [selected, setSelected] = useState<HistoryEntry | null>(null);
   const [compareEntry, setCompareEntry] = useState<HistoryEntry | null>(null);
   const [search, setSearch] = useState("");
@@ -617,6 +620,23 @@ function HistoryPanel({ history, loading, savedYaml, onRestore, restoringId }: H
             })
           )}
         </div>
+
+        {/* Load more */}
+        {hasMore && (
+          <div className="p-2 border-t flex-shrink-0">
+            <Button
+              size="sm"
+              variant="outline"
+              className="w-full h-7 text-xs"
+              onClick={onLoadMore}
+              disabled={loadingMore}
+            >
+              {loadingMore
+                ? <><Loader2 className="h-3 w-3 mr-1 animate-spin" />Loading…</>
+                : "Load more"}
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Right: diff or prompt */}
@@ -747,6 +767,8 @@ export default function SettingsScraperConfigs() {
   // ── History state ─────────────────────────────────────────────────────────
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyHasMore, setHistoryHasMore] = useState(false);
+  const [historyLoadingMore, setHistoryLoadingMore] = useState(false);
   const [restoringId, setRestoringId] = useState<number | null>(null);
 
   // ── Per-slug scrape job tracking ─────────────────────────────────────────
@@ -768,18 +790,30 @@ export default function SettingsScraperConfigs() {
     }
   }, [toast]);
 
-  const fetchHistory = useCallback(async (slug: string) => {
-    setHistoryLoading(true);
-    setHistory([]);
+  const fetchHistory = useCallback(async (slug: string, opts?: { beforeId?: number; append?: boolean }) => {
+    const isAppend = opts?.append ?? false;
+    if (isAppend) {
+      setHistoryLoadingMore(true);
+    } else {
+      setHistoryLoading(true);
+      setHistory([]);
+      setHistoryHasMore(false);
+    }
     try {
-      const res = await fetch(`${BASE}/api/settings/scraper-configs/${slug}/history`, { credentials: "include" });
+      const params = new URLSearchParams();
+      if (opts?.beforeId != null) params.set("before_id", String(opts.beforeId));
+      const url = `${BASE}/api/settings/scraper-configs/${slug}/history${params.size ? `?${params}` : ""}`;
+      const res = await fetch(url, { credentials: "include" });
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
-      setHistory(data.history ?? []);
+      const newEntries: HistoryEntry[] = data.history ?? [];
+      setHistory(prev => isAppend ? [...prev, ...newEntries] : newEntries);
+      setHistoryHasMore(data.has_more ?? false);
     } catch (err) {
       toast({ title: "Failed to load history", description: (err as Error).message, variant: "destructive" });
     } finally {
       setHistoryLoading(false);
+      setHistoryLoadingMore(false);
     }
   }, [toast]);
 
@@ -1340,8 +1374,15 @@ export default function SettingsScraperConfigs() {
                 <HistoryPanel
                   history={history}
                   loading={historyLoading}
+                  hasMore={historyHasMore}
+                  loadingMore={historyLoadingMore}
                   savedYaml={savedYaml}
                   onRestore={handleRestore}
+                  onLoadMore={() => {
+                    if (!selected || historyLoadingMore) return;
+                    const minId = history.length > 0 ? Math.min(...history.map(e => e.id)) : undefined;
+                    void fetchHistory(selected, { beforeId: minId, append: true });
+                  }}
                   restoringId={restoringId}
                 />
               ) : view === "diff" ? (

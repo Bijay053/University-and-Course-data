@@ -18,10 +18,10 @@ import logging
 import os
 import re
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated, Any, Optional
 
 import yaml
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy import or_, select, text
@@ -252,18 +252,27 @@ async def get_scraper_config_history(
     slug: str,
     _user: Annotated[dict, Depends(require_permission("settings.view"))],
     db: Annotated[AsyncSession, Depends(get_db)],
+    limit: int = Query(default=50, ge=1, le=200),
+    before_id: Optional[int] = Query(default=None),
 ) -> JSONResponse:
-    """Return recent save history for one slug (newest first, max 50 entries)."""
+    """Return paginated save history for one slug (newest first).
+
+    Use *before_id* as a cursor: pass the smallest id returned by the
+    previous page to get the next page of older entries.
+    """
     _validate_slug(slug)
+
+    cursor_clause = "AND id < :before_id" if before_id is not None else ""
     rows = (await db.execute(
-        text("""
+        text(f"""
             SELECT id, slug, yaml_content, saved_by, saved_at
             FROM scraper_config_history
             WHERE slug = :slug
+            {cursor_clause}
             ORDER BY saved_at DESC
-            LIMIT 50
+            LIMIT :limit
         """),
-        {"slug": slug},
+        {"slug": slug, "before_id": before_id, "limit": limit},
     )).all()
 
     entries = [
@@ -276,7 +285,8 @@ async def get_scraper_config_history(
         }
         for r in rows
     ]
-    return JSONResponse(content={"slug": slug, "history": entries})
+    has_more = len(rows) == limit
+    return JSONResponse(content={"slug": slug, "history": entries, "has_more": has_more})
 
 
 # ── Restore from history ──────────────────────────────────────────────────────
