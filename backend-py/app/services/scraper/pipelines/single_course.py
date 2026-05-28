@@ -4708,8 +4708,28 @@ async def extract_course(
         # page.  Even if this specific course wasn't listed in the table, the
         # course may still be open to international students — the staging gate
         # should stage it for human review rather than auto-rejecting it.
-        if central_data.get("fee_page_url"):
+        #
+        # IMPORTANT: the flag is only set when the central page actually PARSED
+        # fee records.  Previously this was set whenever a fee page URL was
+        # merely *discovered*, even if the page yielded zero records.  At
+        # Federation, auto-discovery picked /apply/ as the "fee page" and parsed
+        # it to 0 program records — but the flag still flipped True, so the
+        # no_international_fee staging gate (guards.py:531) was bypassed for
+        # EVERY blank-fee course, flooding the review queue with domestic-only
+        # courses (Cert/Diploma/Health/Education programs not offered to
+        # international students).  A discovered-but-empty fee page is no
+        # evidence that international fees exist elsewhere, so it must NOT grant
+        # the escape hatch.
+        _central_fee_records = central_data.get("fees") or []
+        if central_data.get("fee_page_url") and _central_fee_records:
             payload["has_central_fee_page"] = True
+        elif central_data.get("fee_page_url"):
+            log.info(
+                "[CENTRAL FEE] fee page %s discovered but parsed 0 records — "
+                "NOT setting has_central_fee_page (no escape hatch) for %r",
+                central_data.get("fee_page_url"),
+                payload.get("course_name") or url,
+            )
 
     # ── Institutional English defaults (last-resort fallback) ─────────────────
     # When a university publishes a single institutional minimum English score
