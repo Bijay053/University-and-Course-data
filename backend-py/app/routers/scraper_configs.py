@@ -14,12 +14,15 @@ import logging
 import os
 import re
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 
 import yaml
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+
+from app.dependencies import get_current_user
+from app.permissions import require_permission
 
 log = logging.getLogger(__name__)
 
@@ -58,7 +61,9 @@ def _parse_yaml_safe(text: str) -> dict[str, Any]:
 # ── List ──────────────────────────────────────────────────────────────────────
 
 @router.get("/scraper-configs")
-async def list_scraper_configs() -> JSONResponse:
+async def list_scraper_configs(
+    _user: Annotated[dict, Depends(require_permission("settings.view"))],
+) -> JSONResponse:
     configs = []
     for f in sorted(_UNIS_DIR.glob("*.yaml")):
         slug = f.stem
@@ -73,7 +78,10 @@ async def list_scraper_configs() -> JSONResponse:
 # ── Get one ───────────────────────────────────────────────────────────────────
 
 @router.get("/scraper-configs/{slug}")
-async def get_scraper_config(slug: str) -> JSONResponse:
+async def get_scraper_config(
+    slug: str,
+    _user: Annotated[dict, Depends(require_permission("settings.view"))],
+) -> JSONResponse:
     _validate_slug(slug)
     path = _slug_path(slug)
     if not path.exists():
@@ -88,12 +96,16 @@ class SaveConfigBody(BaseModel):
 
 
 @router.put("/scraper-configs/{slug}")
-async def save_scraper_config(slug: str, body: SaveConfigBody) -> JSONResponse:
+async def save_scraper_config(
+    slug: str,
+    body: SaveConfigBody,
+    _user: Annotated[dict, Depends(require_permission("settings.edit"))],
+) -> JSONResponse:
     _validate_slug(slug)
     try:
         parsed = yaml.safe_load(body.yaml_content)
         if parsed is not None and not isinstance(parsed, dict):
-            raise ValueError("YAML must be a mapping")
+            raise HTTPException(status_code=422, detail="Invalid YAML: root must be a mapping, not a scalar or list")
     except yaml.YAMLError as exc:
         raise HTTPException(status_code=422, detail=f"Invalid YAML: {exc}") from exc
 
@@ -106,7 +118,10 @@ async def save_scraper_config(slug: str, body: SaveConfigBody) -> JSONResponse:
 # ── Delete ────────────────────────────────────────────────────────────────────
 
 @router.delete("/scraper-configs/{slug}")
-async def delete_scraper_config(slug: str) -> JSONResponse:
+async def delete_scraper_config(
+    slug: str,
+    _user: Annotated[dict, Depends(require_permission("settings.edit"))],
+) -> JSONResponse:
     _validate_slug(slug)
     path = _slug_path(slug)
     if not path.exists():
@@ -154,7 +169,10 @@ extraction:
 
 
 @router.post("/scraper-configs/generate")
-async def generate_scraper_config(body: GenerateConfigBody) -> JSONResponse:
+async def generate_scraper_config(
+    body: GenerateConfigBody,
+    _user: Annotated[dict, Depends(require_permission("settings.edit"))],
+) -> JSONResponse:
     api_key = os.environ.get("GEMINI_API_KEY", "")
     if not api_key:
         raise HTTPException(status_code=503, detail="GEMINI_API_KEY not configured")
