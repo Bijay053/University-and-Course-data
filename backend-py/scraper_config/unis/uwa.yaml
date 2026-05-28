@@ -19,6 +19,10 @@
 discovery:
   sitemap_url: "https://www.uwa.edu.au/study/sitemap.xml"
   always_sitemap_supplement: true
+  # UWA sitemap has ~430 /home/courses/ URLs. Default 200-course cap means
+  # only ~95 courses stage per run. Raise to 500 to cover the full catalogue
+  # in a single pass (430 after block filters ≈ 402 processed).
+  max_candidates: 500
   # Keep ONLY real course-detail pages (drop nav, CELT, HDR, etc.).
   # Two patterns needed:
   #   /home/courses/  — matches Sitecore paths in the sitemap (pre-redirect)
