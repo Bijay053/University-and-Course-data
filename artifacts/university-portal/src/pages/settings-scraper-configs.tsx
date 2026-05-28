@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { SettingsTabs } from "@/components/settings-tabs";
-import { Plus, Save, Trash2, Sparkles, Search, RefreshCw, X, Play, Loader2, CheckCircle2, AlertCircle, Clock, GitCompare, Code, History, RotateCcw, Download } from "lucide-react";
+import { Plus, Save, Trash2, Sparkles, Search, RefreshCw, X, Play, Loader2, CheckCircle2, AlertCircle, Clock, GitCompare, Code, History, RotateCcw, Download, Clipboard, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -631,6 +631,7 @@ export default function SettingsScraperConfigs() {
   const [deleting, setDeleting] = useState(false);
   const [filter, setFilter] = useState("");
   const [showNewModal, setShowNewModal] = useState(false);
+  const [copiedSample, setCopiedSample] = useState(false);
   const [pendingSlug, setPendingSlug] = useState<string | null>(null);
   const [draftBanner, setDraftBanner] = useState<{ slug: string; lineCount: number } | null>(null);
   const [generating, setGenerating] = useState(false);
@@ -1055,15 +1056,35 @@ export default function SettingsScraperConfigs() {
               <Plus className="h-3.5 w-3.5 mr-1" />
               New Config
             </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              className="w-full h-8 text-xs"
-              onClick={downloadSampleYaml}
-            >
-              <Download className="h-3.5 w-3.5 mr-1" />
-              Download Sample YAML
-            </Button>
+            <div className="flex gap-1.5">
+              <Button
+                size="sm"
+                variant="outline"
+                className="flex-1 h-8 text-xs"
+                onClick={downloadSampleYaml}
+                title="Download sample YAML file"
+              >
+                <Download className="h-3.5 w-3.5 mr-1" />
+                Sample YAML
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="flex-1 h-8 text-xs"
+                title="Copy sample YAML to clipboard"
+                onClick={() => {
+                  navigator.clipboard.writeText(SAMPLE_YAML).then(() => {
+                    setCopiedSample(true);
+                    setTimeout(() => setCopiedSample(false), 2000);
+                  });
+                }}
+              >
+                {copiedSample
+                  ? <><Check className="h-3.5 w-3.5 mr-1 text-green-600" /><span className="text-green-600">Copied!</span></>
+                  : <><Clipboard className="h-3.5 w-3.5 mr-1" />Copy</>
+                }
+              </Button>
+            </div>
           </div>
         </div>
 
