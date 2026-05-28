@@ -402,6 +402,127 @@ function pruneOldDrafts(): void {
   } catch { /* ignore */ }
 }
 
+// ── YAML key diff helpers ─────────────────────────────────────────────────────
+
+function extractYamlKeys(yaml: string): Record<string, string> {
+  const result: Record<string, string> = {};
+  const lines = yaml.split("\n");
+  const stack: { indent: number; path: string }[] = [];
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#") || trimmed.startsWith("-")) continue;
+
+    const indent = line.length - line.trimStart().length;
+    const match = trimmed.match(/^([a-zA-Z_][a-zA-Z0-9_-]*):\s*(.*?)(?:\s*#.*)?$/);
+    if (!match) continue;
+
+    const key = match[1];
+    let value = match[2].trim();
+
+    while (stack.length > 0 && stack[stack.length - 1].indent >= indent) {
+      stack.pop();
+    }
+
+    const path = stack.length > 0 ? `${stack[stack.length - 1].path}.${key}` : key;
+
+    if (path.split(".").length <= 3) {
+      if (value.startsWith('"') && value.endsWith('"')) value = value.slice(1, -1);
+      if (value.startsWith("'") && value.endsWith("'")) value = value.slice(1, -1);
+      if (value && value !== "|" && value !== ">" && !value.startsWith("&")) {
+        result[path] = value;
+      }
+      stack.push({ indent, path });
+    }
+  }
+
+  return result;
+}
+
+interface KeyChange {
+  path: string;
+  changeType: "added" | "removed" | "modified";
+  oldValue?: string;
+  newValue?: string;
+}
+
+function computeKeyChanges(oldYaml: string, newYaml: string): KeyChange[] {
+  const oldKeys = extractYamlKeys(oldYaml);
+  const newKeys = extractYamlKeys(newYaml);
+  const changes: KeyChange[] = [];
+  const allPaths = new Set([...Object.keys(oldKeys), ...Object.keys(newKeys)]);
+
+  for (const path of allPaths) {
+    const inOld = path in oldKeys;
+    const inNew = path in newKeys;
+    if (!inOld) {
+      changes.push({ path, changeType: "added", newValue: newKeys[path] });
+    } else if (!inNew) {
+      changes.push({ path, changeType: "removed", oldValue: oldKeys[path] });
+    } else if (oldKeys[path] !== newKeys[path]) {
+      changes.push({ path, changeType: "modified", oldValue: oldKeys[path], newValue: newKeys[path] });
+    }
+  }
+
+  const order = { modified: 0, added: 1, removed: 2 };
+  changes.sort((a, b) => {
+    const diff = order[a.changeType] - order[b.changeType];
+    return diff !== 0 ? diff : a.path.localeCompare(b.path);
+  });
+
+  return changes;
+}
+
+function ChangedKeysPanel({ oldYaml, newYaml }: { oldYaml: string; newYaml: string }) {
+  const changes = useMemo(() => computeKeyChanges(oldYaml, newYaml), [oldYaml, newYaml]);
+
+  if (changes.length === 0) return null;
+
+  return (
+    <div className="border-b bg-muted/20 flex-shrink-0">
+      <div className="px-4 py-2 flex items-center gap-2 border-b bg-muted/30">
+        <GitCompare className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+        <span className="text-xs font-medium text-muted-foreground">
+          Changed keys
+        </span>
+        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 font-medium ml-auto">
+          {changes.length} {changes.length === 1 ? "key" : "keys"}
+        </span>
+      </div>
+      <div className="max-h-40 overflow-y-auto px-4 py-2 flex flex-col gap-1">
+        {changes.map((c) => (
+          <div key={c.path} className="flex items-baseline gap-2 text-xs font-mono leading-relaxed">
+            <span
+              className={cn(
+                "flex-shrink-0 w-4 text-center font-bold",
+                c.changeType === "added" ? "text-green-600 dark:text-green-400" :
+                c.changeType === "removed" ? "text-red-600 dark:text-red-400" :
+                "text-amber-600 dark:text-amber-400"
+              )}
+            >
+              {c.changeType === "added" ? "+" : c.changeType === "removed" ? "−" : "~"}
+            </span>
+            <span className="text-foreground/80 font-medium">{c.path}</span>
+            {c.changeType === "modified" && c.oldValue !== undefined && c.newValue !== undefined && (
+              <span className="flex items-center gap-1 text-muted-foreground">
+                <span className="text-red-600 dark:text-red-400 line-through">{c.oldValue}</span>
+                <span>→</span>
+                <span className="text-green-600 dark:text-green-400">{c.newValue}</span>
+              </span>
+            )}
+            {c.changeType === "added" && c.newValue !== undefined && (
+              <span className="text-green-600 dark:text-green-400">{c.newValue}</span>
+            )}
+            {c.changeType === "removed" && c.oldValue !== undefined && (
+              <span className="text-red-600 dark:text-red-400 line-through">{c.oldValue}</span>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── History panel ─────────────────────────────────────────────────────────────
 
 function formatRelativeTime(iso: string | null): string {
@@ -699,6 +820,7 @@ function HistoryPanel({ history, loading, hasMore, loadingMore, savedYaml, selec
                   </Button>
                 </div>
               </div>
+              <ChangedKeysPanel oldYaml={oldEntry.yaml_content} newYaml={newEntry.yaml_content} />
               <DiffViewer
                 oldYaml={oldEntry.yaml_content}
                 newYaml={newEntry.yaml_content}
@@ -733,6 +855,7 @@ function HistoryPanel({ history, loading, hasMore, loadingMore, savedYaml, selec
                 {restoringId === selected.id ? "Restoring…" : "Restore this version"}
               </Button>
             </div>
+            <ChangedKeysPanel oldYaml={selected.yaml_content} newYaml={savedYaml} />
             <DiffViewer
               oldYaml={selected.yaml_content}
               newYaml={savedYaml}
