@@ -79,12 +79,18 @@ async def search_courses(
     where: list[str] = []
     params: dict = {}
     if q:
-        # search_tsv is a precomputed tsvector on the MV; fall back to ILIKE on course_name.
+        # Three-tier matching:
+        # 1. Full-text search (exact stems — fastest, highest precision)
+        # 2. ILIKE substring (catches partial/prefix matches)
+        # 3. pg_trgm word_similarity (typo-tolerant fuzzy matching)
         where.append(
-            "(c.search_tsv @@ plainto_tsquery('english', :q) OR lower(c.course_name) ILIKE :ql)"
+            "(c.search_tsv @@ plainto_tsquery('english', :q) "
+            "OR lower(c.course_name) ILIKE :ql "
+            "OR word_similarity(:q_trgm, lower(c.course_name)) > 0.25)"
         )
         params["q"] = q
         params["ql"] = f"%{q.lower()}%"
+        params["q_trgm"] = q.lower()
     if country:
         where.append("lower(c.university_country) = lower(:country)")
         params["country"] = country
@@ -112,9 +118,13 @@ async def search_courses(
     # so OR them with case-insensitive ILIKE on both columns.
     if location and location.strip():
         where.append(
-            "(lower(c.university_city) ILIKE :loc OR lower(c.course_location) ILIKE :loc)"
+            "(lower(c.university_city) ILIKE :loc "
+            "OR lower(c.course_location) ILIKE :loc "
+            "OR word_similarity(:loc_trgm, lower(c.university_city)) > 0.3 "
+            "OR word_similarity(:loc_trgm, lower(c.course_location)) > 0.3)"
         )
         params["loc"] = f"%{location.strip().lower()}%"
+        params["loc_trgm"] = location.strip().lower()
 
     # B5: intakes CSV → array overlap. Empty tokens after split are
     # ignored so "?intakes=" is a no-op rather than a "match nothing" bug.
@@ -191,7 +201,11 @@ async def search_courses(
         # else fall through to relevance/alpha default
 
     rank_select = (
-        "ts_rank(c.search_tsv, plainto_tsquery('english', :q)) AS rank" if q else "NULL AS rank"
+        "GREATEST("
+        "  ts_rank(c.search_tsv, plainto_tsquery('english', :q)),"
+        "  word_similarity(:q_trgm, lower(c.course_name))"
+        ") AS rank"
+        if q else "NULL AS rank"
     )
 
     base_sql = f"""

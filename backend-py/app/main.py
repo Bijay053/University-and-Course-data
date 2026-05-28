@@ -44,6 +44,16 @@ async def lifespan(app: FastAPI):  # noqa: ARG001
         await ensure_admin_user()
     except Exception:  # noqa: BLE001 -- startup must never crash the API
         log.exception("ensure_admin_user failed (skipping)")
+    try:
+        from app.database import AsyncSessionLocal
+        from sqlalchemy import text as _text
+
+        async with AsyncSessionLocal() as _s:
+            await _s.execute(_text("CREATE EXTENSION IF NOT EXISTS pg_trgm"))
+            await _s.commit()
+        log.info("pg_trgm extension ensured")
+    except Exception:  # noqa: BLE001
+        log.exception("pg_trgm setup failed (fuzzy search unavailable)")
     yield
     log.info("Python backend shutting down")
 
