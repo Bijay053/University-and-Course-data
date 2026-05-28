@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { SettingsTabs } from "@/components/settings-tabs";
-import { Plus, Save, Trash2, Sparkles, Search, RefreshCw, X, Play, Loader2, CheckCircle2, AlertCircle, Clock, GitCompare, Code } from "lucide-react";
+import { Plus, Save, Trash2, Sparkles, Search, RefreshCw, X, Play, Loader2, CheckCircle2, AlertCircle, Clock, GitCompare, Code, History, RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -36,10 +36,20 @@ interface TriggerState {
   totalFound?: number;
 }
 
+interface HistoryEntry {
+  id: number;
+  slug: string;
+  yaml_content: string;
+  saved_by: string | null;
+  saved_at: string | null;
+}
+
+type EditorView = "editor" | "diff" | "history";
+
 const TERMINAL_STATUSES: JobStatus[] = ["done", "awaiting_approval", "failed", "cancelled"];
 
 function JobStatusBadge({ state, compact = false }: { state: TriggerState; compact?: boolean }) {
-  const { status, imported, totalFound, error, universityName } = state;
+  const { status, imported, totalFound, error } = state;
   if (status === "queued") {
     return (
       <span className={cn("inline-flex items-center gap-1 text-amber-600", compact ? "text-[10px]" : "text-xs")}>
@@ -174,14 +184,14 @@ function collapseDiff(lines: DiffLine[]): Array<DiffLine | { type: "hunk"; count
 
 // ── Diff viewer component ─────────────────────────────────────────────────────
 
-function DiffViewer({ oldYaml, newYaml }: { oldYaml: string; newYaml: string }) {
+function DiffViewer({ oldYaml, newYaml, oldLabel = "saved", newLabel = "current edit" }: { oldYaml: string; newYaml: string; oldLabel?: string; newLabel?: string }) {
   const diffLines = computeDiff(oldYaml, newYaml);
   const hasChanges = diffLines.some(l => l.op !== "equal");
 
   if (!hasChanges) {
     return (
       <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
-        No changes — editor matches the saved version.
+        No changes — {oldLabel} matches {newLabel}.
       </div>
     );
   }
@@ -194,6 +204,7 @@ function DiffViewer({ oldYaml, newYaml }: { oldYaml: string; newYaml: string }) 
   return (
     <div className="flex-1 overflow-auto font-mono text-xs">
       <div className="sticky top-0 bg-muted/80 border-b px-4 py-1.5 text-xs flex gap-3 z-10 backdrop-blur-sm">
+        <span className="text-muted-foreground mr-1">{oldLabel} → {newLabel}</span>
         <span className="text-green-600 dark:text-green-400">+{added} added</span>
         <span className="text-red-600 dark:text-red-400">−{removed} removed</span>
       </div>
@@ -332,6 +343,143 @@ function pruneOldDrafts(): void {
   } catch { /* ignore */ }
 }
 
+// ── History panel ─────────────────────────────────────────────────────────────
+
+function formatRelativeTime(iso: string | null): string {
+  if (!iso) return "unknown";
+  const date = new Date(iso);
+  const now = Date.now();
+  const diffMs = now - date.getTime();
+  const diffSec = Math.floor(diffMs / 1000);
+  if (diffSec < 60) return "just now";
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) return `${diffHr}h ago`;
+  const diffDay = Math.floor(diffHr / 24);
+  if (diffDay < 30) return `${diffDay}d ago`;
+  return date.toLocaleDateString();
+}
+
+function formatAbsoluteTime(iso: string | null): string {
+  if (!iso) return "";
+  const date = new Date(iso);
+  return date.toLocaleString();
+}
+
+function formatSavedBy(savedBy: string | null): string {
+  if (!savedBy) return "unknown";
+  if (savedBy.startsWith("restore:")) return `↩ restored by ${savedBy.slice(8)}`;
+  return savedBy;
+}
+
+interface HistoryPanelProps {
+  history: HistoryEntry[];
+  loading: boolean;
+  savedYaml: string;
+  onRestore: (entry: HistoryEntry) => void;
+  restoringId: number | null;
+}
+
+function HistoryPanel({ history, loading, savedYaml, onRestore, restoringId }: HistoryPanelProps) {
+  const [selected, setSelected] = useState<HistoryEntry | null>(null);
+
+  if (loading) {
+    return (
+      <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
+        <Loader2 className="w-4 h-4 animate-spin mr-2" />
+        Loading history…
+      </div>
+    );
+  }
+
+  if (history.length === 0) {
+    return (
+      <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
+        No save history yet — history is recorded each time you save.
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex-1 flex overflow-hidden">
+      {/* Left: history list */}
+      <div className="w-64 flex-shrink-0 border-r overflow-y-auto">
+        {history.map((entry, idx) => {
+          const isSelected = selected?.id === entry.id;
+          const isCurrent = idx === 0;
+          return (
+            <button
+              key={entry.id}
+              onClick={() => setSelected(isSelected ? null : entry)}
+              className={cn(
+                "w-full text-left px-3 py-2.5 border-b last:border-b-0 transition-colors",
+                isSelected ? "bg-primary/10" : "hover:bg-muted/50",
+              )}
+            >
+              <div className="flex items-center justify-between gap-1">
+                <span className="text-xs font-medium truncate" title={formatAbsoluteTime(entry.saved_at)}>
+                  {formatRelativeTime(entry.saved_at)}
+                </span>
+                {isCurrent && (
+                  <span className="text-[10px] px-1 py-0.5 rounded bg-green-100 text-green-700 flex-shrink-0">
+                    latest
+                  </span>
+                )}
+              </div>
+              <div className="text-[11px] text-muted-foreground truncate mt-0.5">
+                {formatSavedBy(entry.saved_by)}
+              </div>
+              <div className="text-[10px] text-muted-foreground/70 mt-0.5">
+                {entry.yaml_content.split("\n").length} lines
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Right: diff or prompt */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {selected ? (
+          <>
+            <div className="px-3 py-2 border-b flex items-center justify-between bg-muted/30">
+              <div className="text-xs text-muted-foreground">
+                <span className="font-medium" title={formatAbsoluteTime(selected.saved_at)}>
+                  {formatRelativeTime(selected.saved_at)}
+                </span>
+                {" · "}
+                {formatSavedBy(selected.saved_by)}
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-6 text-[11px] gap-1"
+                onClick={() => onRestore(selected)}
+                disabled={restoringId === selected.id}
+              >
+                {restoringId === selected.id
+                  ? <Loader2 className="w-3 h-3 animate-spin" />
+                  : <RotateCcw className="w-3 h-3" />}
+                {restoringId === selected.id ? "Restoring…" : "Restore this version"}
+              </Button>
+            </div>
+            <DiffViewer
+              oldYaml={selected.yaml_content}
+              newYaml={savedYaml}
+              oldLabel={formatRelativeTime(selected.saved_at)}
+              newLabel="current saved"
+            />
+          </>
+        ) : (
+          <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm px-6 text-center">
+            Select a history entry to compare it against the current saved version
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 
@@ -350,7 +498,7 @@ export default function SettingsScraperConfigs() {
   const [pendingSlug, setPendingSlug] = useState<string | null>(null);
   const [draftBanner, setDraftBanner] = useState<{ slug: string; lineCount: number } | null>(null);
   const [generating, setGenerating] = useState(false);
-  const [showDiff, setShowDiff] = useState(false);
+  const [view, setView] = useState<EditorView>("editor");
   const [genForm, setGenForm] = useState<GenerateForm>({
     university_name: "",
     website_url: "",
@@ -359,6 +507,11 @@ export default function SettingsScraperConfigs() {
   });
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const draftTimerRef = useRef<number | null>(null);
+
+  // ── History state ─────────────────────────────────────────────────────────
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [restoringId, setRestoringId] = useState<number | null>(null);
 
   // ── Per-slug scrape job tracking ─────────────────────────────────────────
   const [triggerJobs, setTriggerJobs] = useState<Record<string, TriggerState>>({});
@@ -379,6 +532,21 @@ export default function SettingsScraperConfigs() {
     }
   }, [toast]);
 
+  const fetchHistory = useCallback(async (slug: string) => {
+    setHistoryLoading(true);
+    setHistory([]);
+    try {
+      const res = await fetch(`${BASE}/api/settings/scraper-configs/${slug}/history`, { credentials: "include" });
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      setHistory(data.history ?? []);
+    } catch (err) {
+      toast({ title: "Failed to load history", description: (err as Error).message, variant: "destructive" });
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, [toast]);
+
   useEffect(() => { void fetchConfigs(); }, [fetchConfigs]);
 
   // Prune stale drafts once on mount
@@ -396,6 +564,13 @@ export default function SettingsScraperConfigs() {
       if (draftTimerRef.current) { clearTimeout(draftTimerRef.current); draftTimerRef.current = null; }
     };
   }, [editorYaml, editorSlug, savedYaml]);
+
+  // Fetch history when user switches to history view
+  useEffect(() => {
+    if (view === "history" && selected) {
+      void fetchHistory(selected);
+    }
+  }, [view, selected, fetchHistory]);
 
   // Poll all in-progress jobs
   useEffect(() => {
@@ -475,7 +650,8 @@ export default function SettingsScraperConfigs() {
     setSelected(slug);
     setEditorSlug(slug);
     setSavedYaml(cfg.yaml);
-    setShowDiff(false);
+    setView("editor");
+    setHistory([]);
     if (draft !== null && draft !== cfg.yaml) {
       setEditorYaml(draft);
       setDraftBanner({ slug, lineCount: draft.split("\n").length });
@@ -521,7 +697,7 @@ export default function SettingsScraperConfigs() {
       const data = await res.json();
       toast({ title: "Saved", description: `Config for '${editorSlug}' saved` });
       setSavedYaml(editorYaml);
-      setShowDiff(false);
+      setView("editor");
       setDraftBanner(null);
       removeDraft(editorSlug.trim());
 
@@ -559,7 +735,9 @@ export default function SettingsScraperConfigs() {
       setEditorYaml("");
       setSavedYaml("");
       setEditorSlug("");
-      setShowDiff(false);
+      setView("editor");
+      setHistory([]);
+      setDraftBanner(null);
       await fetchConfigs();
     } catch (err) {
       toast({ title: "Delete failed", description: (err as Error).message, variant: "destructive" });
@@ -587,7 +765,9 @@ export default function SettingsScraperConfigs() {
       setSavedYaml("");
       setEditorSlug(data.slug ?? "");
       setSelected(null);
-      setShowDiff(false);
+      setView("editor");
+      setHistory([]);
+      setDraftBanner(null);
       setShowNewModal(false);
       toast({ title: "Generated!", description: "Review and edit the config below, then save." });
       setTimeout(() => textareaRef.current?.focus(), 100);
@@ -595,6 +775,30 @@ export default function SettingsScraperConfigs() {
       toast({ title: "AI generation failed", description: (err as Error).message, variant: "destructive" });
     } finally {
       setGenerating(false);
+    }
+  };
+
+  const handleRestore = async (entry: HistoryEntry) => {
+    if (!selected) return;
+    if (!confirm(`Restore this version saved ${formatRelativeTime(entry.saved_at)}? The current saved YAML will be replaced.`)) return;
+    setRestoringId(entry.id);
+    try {
+      const res = await fetch(`${BASE}/api/settings/scraper-configs/${selected}/restore/${entry.id}`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!res.ok) { const d = await res.json(); throw new Error(d.detail ?? "Restore failed"); }
+      toast({ title: "Restored", description: `Config for '${selected}' reverted to version from ${formatRelativeTime(entry.saved_at)}` });
+      setSavedYaml(entry.yaml_content);
+      setEditorYaml(entry.yaml_content);
+      removeDraft(selected);
+      setDraftBanner(null);
+      await fetchConfigs();
+      await fetchHistory(selected);
+    } catch (err) {
+      toast({ title: "Restore failed", description: (err as Error).message, variant: "destructive" });
+    } finally {
+      setRestoringId(null);
     }
   };
 
@@ -718,7 +922,7 @@ export default function SettingsScraperConfigs() {
           </div>
         </div>
 
-        {/* Right — editor / diff */}
+        {/* Right — editor / diff / history */}
         <div className="flex-1 border rounded-lg overflow-hidden flex flex-col bg-background">
           {!selected && !editorYaml ? (
             <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
@@ -778,25 +982,55 @@ export default function SettingsScraperConfigs() {
                     </div>
                   )}
 
-                  {/* Preview changes toggle — only shown when there are unsaved edits */}
-                  {(isDirty || showDiff) && (
-                    <Button
-                      size="sm"
-                      variant={showDiff ? "secondary" : "outline"}
+                  {/* View toggle buttons */}
+                  <div className="flex items-center border rounded-md overflow-hidden">
+                    <button
+                      onClick={() => setView("editor")}
                       className={cn(
-                        "h-7 text-xs",
-                        !showDiff && isDirty && "border-amber-400 text-amber-600 hover:text-amber-700 dark:text-amber-400"
+                        "flex items-center gap-1 px-2.5 py-1 text-xs transition-colors",
+                        view === "editor" ? "bg-primary text-primary-foreground" : "hover:bg-muted/50"
                       )}
-                      onClick={() => setShowDiff(d => !d)}
-                      title={showDiff ? "Back to editor" : "Preview changes vs saved version"}
+                      title="Edit YAML"
                     >
-                      {showDiff ? (
-                        <><Code className="h-3.5 w-3.5 mr-1" />Editor</>
-                      ) : (
-                        <><GitCompare className="h-3.5 w-3.5 mr-1" />Preview changes</>
+                      <Code className="h-3.5 w-3.5" />
+                      Editor
+                      {isDirty && view !== "editor" && (
+                        <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-400" />
                       )}
-                    </Button>
-                  )}
+                    </button>
+                    <button
+                      onClick={() => setView("diff")}
+                      className={cn(
+                        "flex items-center gap-1 px-2.5 py-1 text-xs border-l transition-colors",
+                        view === "diff" ? "bg-primary text-primary-foreground" : "hover:bg-muted/50",
+                        isDirty && view !== "diff" && "text-amber-600 dark:text-amber-400"
+                      )}
+                      title="Preview changes vs saved version"
+                    >
+                      <GitCompare className="h-3.5 w-3.5" />
+                      Changes
+                      {isDirty && (
+                        <span className={cn(
+                          "inline-block w-1.5 h-1.5 rounded-full",
+                          view === "diff" ? "bg-amber-200" : "bg-amber-400"
+                        )} />
+                      )}
+                    </button>
+                    {selected && (
+                      <button
+                        onClick={() => setView("history")}
+                        className={cn(
+                          "flex items-center gap-1 px-2.5 py-1 text-xs border-l transition-colors",
+                          view === "history" ? "bg-primary text-primary-foreground" : "hover:bg-muted/50"
+                        )}
+                        title="View save history"
+                      >
+                        <History className="h-3.5 w-3.5" />
+                        History
+                      </button>
+                    )}
+                  </div>
+
                   {selected && (
                     <Button
                       size="sm"
@@ -837,7 +1071,15 @@ export default function SettingsScraperConfigs() {
                 </div>
               )}
 
-              {showDiff ? (
+              {view === "history" ? (
+                <HistoryPanel
+                  history={history}
+                  loading={historyLoading}
+                  savedYaml={savedYaml}
+                  onRestore={handleRestore}
+                  restoringId={restoringId}
+                />
+              ) : view === "diff" ? (
                 <DiffViewer oldYaml={savedYaml} newYaml={editorYaml} />
               ) : (
                 <textarea
@@ -851,7 +1093,9 @@ export default function SettingsScraperConfigs() {
               )}
 
               <div className="px-4 py-1.5 border-t bg-muted/30 text-xs text-muted-foreground flex items-center gap-4">
-                {showDiff ? (
+                {view === "history" ? (
+                  <span>{history.length} saved version{history.length !== 1 ? "s" : ""}</span>
+                ) : view === "diff" ? (
                   <>
                     <span>Diff: saved → current edit</span>
                     {isDirty ? (

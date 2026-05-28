@@ -2,12 +2,14 @@
 
 Endpoints
 ---------
-GET  /api/settings/scraper-configs                → list all slugs + raw YAML (+ university_id)
-GET  /api/settings/scraper-configs/{slug}         → get one config's YAML
-PUT  /api/settings/scraper-configs/{slug}         → save / create a config
-DELETE /api/settings/scraper-configs/{slug}       → delete a config
-POST /api/settings/scraper-configs/generate       → Gemini-generated YAML for a new university
-POST /api/settings/scraper-configs/{slug}/trigger → start a scrape job for this config's university
+GET  /api/settings/scraper-configs                           → list all slugs + raw YAML (+ university_id)
+GET  /api/settings/scraper-configs/{slug}                   → get one config's YAML
+PUT  /api/settings/scraper-configs/{slug}                   → save / create a config (appends history)
+DELETE /api/settings/scraper-configs/{slug}                 → delete a config
+POST /api/settings/scraper-configs/generate                 → Gemini-generated YAML for a new university
+POST /api/settings/scraper-configs/{slug}/trigger           → start a scrape job for this config's university
+GET  /api/settings/scraper-configs/{slug}/history           → list recent history entries for a slug
+POST /api/settings/scraper-configs/{slug}/restore/{hid}     → restore YAML from a history snapshot
 """
 from __future__ import annotations
 
@@ -36,6 +38,8 @@ _UNIS_DIR = Path(__file__).parent.parent.parent / "scraper_config" / "unis"
 _DEFAULTS_FILE = Path(__file__).parent.parent.parent / "scraper_config" / "defaults.yaml"
 
 _SLUG_RE = re.compile(r"^[a-z0-9_-]{1,64}$")
+
+_HISTORY_KEEP = 100  # rows per slug retained (older rows pruned on save)
 
 
 def _slug_path(slug: str) -> Path:
@@ -241,6 +245,107 @@ async def get_scraper_config(
     return JSONResponse(content={"slug": slug, "yaml": _read_yaml_raw(path)})
 
 
+# ── History ───────────────────────────────────────────────────────────────────
+
+@router.get("/scraper-configs/{slug}/history")
+async def get_scraper_config_history(
+    slug: str,
+    _user: Annotated[dict, Depends(require_permission("settings.view"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> JSONResponse:
+    """Return recent save history for one slug (newest first, max 50 entries)."""
+    _validate_slug(slug)
+    rows = (await db.execute(
+        text("""
+            SELECT id, slug, yaml_content, saved_by, saved_at
+            FROM scraper_config_history
+            WHERE slug = :slug
+            ORDER BY saved_at DESC
+            LIMIT 50
+        """),
+        {"slug": slug},
+    )).all()
+
+    entries = [
+        {
+            "id": r.id,
+            "slug": r.slug,
+            "yaml_content": r.yaml_content,
+            "saved_by": r.saved_by,
+            "saved_at": r.saved_at.isoformat() if r.saved_at else None,
+        }
+        for r in rows
+    ]
+    return JSONResponse(content={"slug": slug, "history": entries})
+
+
+# ── Restore from history ──────────────────────────────────────────────────────
+
+@router.post("/scraper-configs/{slug}/restore/{hid}")
+async def restore_scraper_config(
+    slug: str,
+    hid: int,
+    user: Annotated[dict, Depends(require_permission("settings.edit"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> JSONResponse:
+    """Restore the YAML file to a specific historical snapshot.
+
+    This writes the historical YAML to disk (same as a normal save) and
+    records a new history entry so the restore itself is auditable.
+    """
+    _validate_slug(slug)
+
+    row = (await db.execute(
+        text("SELECT yaml_content FROM scraper_config_history WHERE id = :hid AND slug = :slug"),
+        {"hid": hid, "slug": slug},
+    )).one_or_none()
+
+    if row is None:
+        raise HTTPException(status_code=404, detail=f"History entry {hid} not found for slug '{slug}'")
+
+    yaml_content: str = row.yaml_content
+
+    # Validate the historical YAML is still parseable
+    try:
+        parsed = yaml.safe_load(yaml_content)
+        if parsed is not None and not isinstance(parsed, dict):
+            raise HTTPException(status_code=422, detail="Stored YAML is not a valid mapping")
+    except yaml.YAMLError as exc:
+        raise HTTPException(status_code=422, detail=f"Stored YAML parse error: {exc}") from exc
+
+    _UNIS_DIR.mkdir(parents=True, exist_ok=True)
+    _slug_path(slug).write_text(yaml_content, encoding="utf-8")
+
+    saved_by = user.get("sub") or user.get("email") or "unknown"
+    await db.execute(
+        text("""
+            INSERT INTO scraper_config_history (slug, yaml_content, saved_by)
+            VALUES (:slug, :yaml_content, :saved_by)
+        """),
+        {"slug": slug, "yaml_content": yaml_content, "saved_by": f"restore:{saved_by}"},
+    )
+    await _prune_history(db, slug)
+    await db.commit()
+
+    log.info("Restored scraper config for slug=%r from history id=%d", slug, hid)
+
+    git_result: dict = {}
+    try:
+        git_result = await _git_sync_config(slug)
+    except Exception:
+        log.exception("Unexpected error in _git_sync_config after restore for slug=%r", slug)
+        git_result = {"ok": False, "error": "unexpected git sync error"}
+
+    return JSONResponse(content={
+        "ok": True,
+        "slug": slug,
+        "restored_from": hid,
+        "git_pushed": git_result.get("ok", False),
+        "git_message": git_result.get("message") or git_result.get("error", ""),
+        "git_skipped": git_result.get("skipped", False),
+    })
+
+
 # ── Git sync helper ───────────────────────────────────────────────────────────
 
 # Repo root: backend-py/app/routers/scraper_configs.py → up 4 levels
@@ -336,6 +441,37 @@ async def _git_sync_config(slug: str) -> dict:
     return {"ok": True, "message": f"committed and pushed {rel_path} to GitHub"}
 
 
+# ── History helpers ───────────────────────────────────────────────────────────
+
+async def _append_history(db: AsyncSession, slug: str, yaml_content: str, saved_by: str) -> None:
+    """Insert one history row, then prune old rows beyond _HISTORY_KEEP."""
+    await db.execute(
+        text("""
+            INSERT INTO scraper_config_history (slug, yaml_content, saved_by)
+            VALUES (:slug, :yaml_content, :saved_by)
+        """),
+        {"slug": slug, "yaml_content": yaml_content, "saved_by": saved_by},
+    )
+    await _prune_history(db, slug)
+
+
+async def _prune_history(db: AsyncSession, slug: str) -> None:
+    """Keep only the newest _HISTORY_KEEP rows for this slug."""
+    await db.execute(
+        text("""
+            DELETE FROM scraper_config_history
+            WHERE slug = :slug
+              AND id NOT IN (
+                  SELECT id FROM scraper_config_history
+                  WHERE slug = :slug
+                  ORDER BY saved_at DESC
+                  LIMIT :keep
+              )
+        """),
+        {"slug": slug, "keep": _HISTORY_KEEP},
+    )
+
+
 # ── Save / create ─────────────────────────────────────────────────────────────
 
 class SaveConfigBody(BaseModel):
@@ -346,7 +482,8 @@ class SaveConfigBody(BaseModel):
 async def save_scraper_config(
     slug: str,
     body: SaveConfigBody,
-    _user: Annotated[dict, Depends(require_permission("settings.edit"))],
+    user: Annotated[dict, Depends(require_permission("settings.edit"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
 ) -> JSONResponse:
     _validate_slug(slug)
     try:
@@ -359,6 +496,15 @@ async def save_scraper_config(
     _UNIS_DIR.mkdir(parents=True, exist_ok=True)
     _slug_path(slug).write_text(body.yaml_content, encoding="utf-8")
     log.info("Saved scraper config for slug=%r", slug)
+
+    # Record edit history
+    saved_by = user.get("sub") or user.get("email") or "unknown"
+    try:
+        await _append_history(db, slug, body.yaml_content, saved_by)
+        await db.commit()
+    except Exception:
+        log.exception("Failed to write scraper config history for slug=%r", slug)
+        # Non-fatal — the file was already saved to disk
 
     # Best-effort git commit + push — never blocks the save response
     git_result: dict = {}
