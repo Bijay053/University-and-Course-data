@@ -26,6 +26,7 @@ from app.routers import (
     reviews,
     scrape,
     scrape_health,
+    scraper_configs,
     search,
     universities,
     users,
@@ -87,6 +88,7 @@ app.include_router(scrape_health.router, prefix="/api/scrape", tags=["scrape-hea
 app.include_router(per_course_resources.router, prefix="/api", tags=["per-course"])
 app.include_router(dashboard.router, prefix="/api/dashboard", tags=["dashboard"])
 app.include_router(acronyms.router, prefix="/api/settings", tags=["settings"])
+app.include_router(scraper_configs.router, prefix="/api/settings", tags=["settings"])
 app.include_router(_import_routes.router, prefix="/api")
 app.include_router(_backup.router, prefix="/api", tags=["backup"])
 app.include_router(assessment_notes.router, prefix="/api", tags=["assessment-notes"])

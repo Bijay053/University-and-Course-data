@@ -16,6 +16,7 @@ import Bulk from "@/pages/bulk";
 import Backup from "@/pages/backup";
 import SettingsAcademicLevels from "@/pages/settings-academic-levels";
 import SettingsAcronyms from "@/pages/settings-acronyms";
+import SettingsScraperConfigs from "@/pages/settings-scraper-configs";
 import SearchPage from "@/pages/search";
 import ComparePage from "@/pages/compare";
 import CourseDetail from "@/pages/course-detail";
@@ -70,6 +71,7 @@ function Router() {
               <Route path="/backup" component={Backup} />
               <Route path="/settings/academic-levels" component={SettingsAcademicLevels} />
               <Route path="/settings/acronyms" component={SettingsAcronyms} />
+              <Route path="/settings/scraper-configs" component={SettingsScraperConfigs} />
               <Route path="/search" component={SearchPage} />
               <Route path="/compare" component={ComparePage} />
               <Route path="/courses/:id" component={CourseDetail} />
