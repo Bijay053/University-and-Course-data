@@ -1388,7 +1388,7 @@ export default function SettingsScraperConfigs() {
                   />
                   <span className="text-xs text-muted-foreground">→ scraper_config/unis/{editorSlug || "…"}.yaml</span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-shrink-0">
                   {/* Trigger scrape button + status in editor header */}
                   {selected && (
                     <div className="flex items-center gap-2">
@@ -1478,6 +1478,10 @@ export default function SettingsScraperConfigs() {
                     )}
                   </div>
 
+                  <Button size="sm" className="h-7 text-xs" onClick={handleSave} disabled={saving}>
+                    <Save className="h-3.5 w-3.5 mr-1" />
+                    {saving ? "Saving…" : "Save"}
+                  </Button>
                   {selected && (
                     <Button
                       size="sm"
@@ -1490,10 +1494,6 @@ export default function SettingsScraperConfigs() {
                       {deleting ? "Deleting…" : "Delete"}
                     </Button>
                   )}
-                  <Button size="sm" className="h-7 text-xs" onClick={handleSave} disabled={saving}>
-                    <Save className="h-3.5 w-3.5 mr-1" />
-                    {saving ? "Saving…" : "Save"}
-                  </Button>
                 </div>
               </div>
 

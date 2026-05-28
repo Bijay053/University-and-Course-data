@@ -1,38 +1,40 @@
-# University of Western Australia — www.uwa.edu.au
-# Course catalogue lives at /study/courses/<name> on www.uwa.edu.au.
-# handbook.uwa.edu.au is the authoritative handbook subdomain and is
-# probed as a fallback if BFS + sitemap yield < 5 candidates.
+# University of Western Australia
+# Hostname: www.uwa.edu.au
 #
-# Discovery fix (2026-05-28):
-#   BFS from /study was landing on SPA nav pages (discover-uwa,
-#   higher-degree-by-research, japanese-garden, robert-street-prize)
-#   which all return rendered=0B / "Loading component..." in static
-#   HTML.  Real course pages at /study/courses/* have full static
-#   content (text_len=17000-25000, Gemini extracts 15 fields, 75%).
-#   Fix: always_sitemap_supplement enumerates the full catalogue;
-#   must_contain drops everything that isn't a /study/courses/ page.
-#
-# Fee fix (2026-05-28):
-#   UWA does not publish flat international fees — it uses a fee
-#   calculator.  force_central_fee_stage: true sets has_central_fee_page
-#   on every payload so the no_international_fee staging gate passes
-#   courses to the human review queue instead of auto-rejecting them.
-#   Reviewers can fill in indicative fees manually or point at a fee
-#   schedule once one is located.
-
+# Bug history / rationale:
+#   - First scrape (uni 1091): 19 found, 0 staged. Two failures:
+#     1. Discovery harvested /study/ nav pages (discover-uwa,
+#        higher-degree-by-research, robert-street-prize, japanese-garden)
+#        instead of the real catalogue. Real courses live at /study/courses/<name>.
+#     2. Real courses (Master of Architecture, Public Health, Landscape Arch,
+#        Translation) extracted fine but were rejected no_international_fee —
+#        UWA publishes fees via a per-credit-point CALCULATOR, not a flat number.
+#   - SPA render issue: /study/ pages return rendered=0B ("Loading component...").
+#     Course /study/courses/ pages embed enough STATIC handbook text to extract.
 discovery:
+  # /study/ BFS fills up on nav pages before reaching the catalogue, so force
+  # the sitemap to run regardless of BFS yield.
   always_sitemap_supplement: true
-  must_contain:
-    - "/study/courses/"
+  # Authoritative course data lives on the handbook subdomain.
   fallback_subdomains:
-    - "handbook.{domain}"
-
+    - handbook.{domain}
+  # Block the nav/info/research-admin pages the /study/ crawl surfaces.
+  block_url_patterns:
+    - /study/discover-uwa
+    - /study/explore-courses/higher-degree-by-research
+    - /study/explore-courses/postgraduate/employer-assistance
+    - /study/login
+    - /facilities/
 extraction:
   fees:
-    # UWA uses a fee calculator — no per-course flat fee is published.
-    # Stage courses for human review rather than auto-rejecting on
-    # missing international_fee.
-    force_central_fee_stage: true
+    default_currency: "AUD"
+    # UWA has no flat per-course fee (per-credit-point calculator). If UWA
+    # publishes an indicative international fee schedule page, point here so
+    # the central-pages prefetcher can join fees and the no_international_fee
+    # gate stops rejecting real courses:
+    # central_page: https://www.uwa.edu.au/<indicative-fee-schedule-url>
   filters:
     domestic_only:
       enabled: false
+    online_only:
+      enabled: true
