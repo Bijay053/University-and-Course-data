@@ -438,14 +438,17 @@ interface HistoryPanelProps {
   hasMore: boolean;
   loadingMore: boolean;
   savedYaml: string;
+  selectedEntry: HistoryEntry | null;
+  compareEntry: HistoryEntry | null;
+  onSelectEntry: (entry: HistoryEntry | null) => void;
+  onSetCompareEntry: (entry: HistoryEntry | null) => void;
   onRestore: (entry: HistoryEntry) => void;
   onLoadMore: () => void;
   restoringId: number | null;
 }
 
-function HistoryPanel({ history, loading, hasMore, loadingMore, savedYaml, onRestore, onLoadMore, restoringId }: HistoryPanelProps) {
-  const [selected, setSelected] = useState<HistoryEntry | null>(null);
-  const [compareEntry, setCompareEntry] = useState<HistoryEntry | null>(null);
+function HistoryPanel({ history, loading, hasMore, loadingMore, savedYaml, selectedEntry, compareEntry, onSelectEntry, onSetCompareEntry, onRestore, onLoadMore, restoringId }: HistoryPanelProps) {
+  const selected = selectedEntry;
   const [search, setSearch] = useState("");
   const [keyFilter, setKeyFilter] = useState("");
 
@@ -562,21 +565,21 @@ function HistoryPanel({ history, loading, hasMore, loadingMore, savedYaml, onRes
                   onClick={(e) => {
                     if (e.shiftKey) {
                       if (isCompare) {
-                        setCompareEntry(null);
+                        onSetCompareEntry(null);
                       } else if (isSelected) {
-                        setSelected(null);
-                        setCompareEntry(null);
+                        onSelectEntry(null);
+                        onSetCompareEntry(null);
                       } else if (selected) {
-                        setCompareEntry(entry);
+                        onSetCompareEntry(entry);
                       } else {
-                        setSelected(entry);
+                        onSelectEntry(entry);
                       }
                     } else {
                       if (isSelected && !compareEntry) {
-                        setSelected(null);
+                        onSelectEntry(null);
                       } else {
-                        setSelected(entry);
-                        setCompareEntry(null);
+                        onSelectEntry(entry);
+                        onSetCompareEntry(null);
                       }
                     }
                   }}
@@ -665,7 +668,7 @@ function HistoryPanel({ history, loading, hasMore, loadingMore, savedYaml, onRes
                     size="sm"
                     variant="ghost"
                     className="h-6 text-[11px] gap-1 text-muted-foreground"
-                    onClick={() => setCompareEntry(null)}
+                    onClick={() => onSetCompareEntry(null)}
                   >
                     <X className="w-3 h-3" />
                     Clear B
@@ -769,6 +772,8 @@ export default function SettingsScraperConfigs() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyHasMore, setHistoryHasMore] = useState(false);
   const [historyLoadingMore, setHistoryLoadingMore] = useState(false);
+  const [historySelectedEntry, setHistorySelectedEntry] = useState<HistoryEntry | null>(null);
+  const [historyCompareEntry, setHistoryCompareEntry] = useState<HistoryEntry | null>(null);
   const [restoringId, setRestoringId] = useState<number | null>(null);
 
   // ── Per-slug scrape job tracking ─────────────────────────────────────────
@@ -841,6 +846,12 @@ export default function SettingsScraperConfigs() {
       void fetchHistory(selected);
     }
   }, [view, selected, fetchHistory]);
+
+  // Clear history entry selection whenever the active config slug changes
+  useEffect(() => {
+    setHistorySelectedEntry(null);
+    setHistoryCompareEntry(null);
+  }, [selected]);
 
   // Poll all in-progress jobs
   useEffect(() => {
@@ -1377,6 +1388,10 @@ export default function SettingsScraperConfigs() {
                   hasMore={historyHasMore}
                   loadingMore={historyLoadingMore}
                   savedYaml={savedYaml}
+                  selectedEntry={historySelectedEntry}
+                  compareEntry={historyCompareEntry}
+                  onSelectEntry={setHistorySelectedEntry}
+                  onSetCompareEntry={setHistoryCompareEntry}
                   onRestore={handleRestore}
                   onLoadMore={() => {
                     if (!selected || historyLoadingMore) return;
