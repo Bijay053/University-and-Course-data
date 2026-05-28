@@ -206,9 +206,21 @@ export default function SettingsScraperConfigs() {
         body: JSON.stringify({ yaml_content: editorYaml }),
       });
       if (!res.ok) { const d = await res.json(); throw new Error(d.detail ?? "Save failed"); }
-      toast({ title: "Saved", description: `Config for '${editorSlug}' saved` });
+      const data = await res.json();
       await fetchConfigs();
       setSelected(editorSlug.trim());
+
+      if (data.git_pushed && data.git_message && !data.git_message.includes("up-to-date")) {
+        toast({ title: "Saved & synced to GitHub", description: data.git_message });
+      } else if (!data.git_skipped && !data.git_pushed && data.git_message) {
+        toast({
+          title: "Saved locally — GitHub sync failed",
+          description: data.git_message,
+          variant: "destructive",
+        });
+      } else {
+        toast({ title: "Saved", description: `Config for '${editorSlug}' saved` });
+      }
     } catch (err) {
       toast({ title: "Save failed", description: (err as Error).message, variant: "destructive" });
     } finally {

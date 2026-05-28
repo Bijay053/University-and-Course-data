@@ -11,6 +11,7 @@ POST /api/settings/scraper-configs/{slug}/trigger → start a scrape job for thi
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import re
@@ -229,6 +230,101 @@ async def get_scraper_config(
     return JSONResponse(content={"slug": slug, "yaml": _read_yaml_raw(path)})
 
 
+# ── Git sync helper ───────────────────────────────────────────────────────────
+
+# Repo root: backend-py/app/routers/scraper_configs.py → up 4 levels
+_REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
+
+
+async def _git_sync_config(slug: str) -> dict:
+    """Commit the YAML file and push to the GitHub remote.
+
+    Returns ``{"ok": True, "message": ...}`` on success, or
+    ``{"ok": False, "error": ..., "skipped": True}`` if PAT is missing, or
+    ``{"ok": False, "error": ...}`` on git failure.
+
+    Never raises — callers should treat git failures as non-fatal warnings.
+    """
+    pat = os.environ.get("STUDYINFO_GITHUB_PAT", "").strip()
+    if not pat:
+        log.debug("git sync skipped — STUDYINFO_GITHUB_PAT not set")
+        return {"ok": False, "skipped": True, "error": "STUDYINFO_GITHUB_PAT not configured"}
+
+    rel_path = f"backend-py/scraper_config/unis/{slug}.yaml"
+    timeout = 30
+
+    async def _run(*args: str, cwd: str = str(_REPO_ROOT)) -> tuple[int, str, str]:
+        proc = await asyncio.create_subprocess_exec(
+            *args,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            cwd=cwd,
+        )
+        try:
+            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
+        except asyncio.TimeoutError:
+            proc.kill()
+            return -1, "", f"timeout after {timeout}s"
+        return proc.returncode, stdout.decode(errors="replace"), stderr.decode(errors="replace")
+
+    # Check if the file is dirty (new or modified)
+    rc, status_out, _ = await _run("git", "--no-optional-locks", "status", "--porcelain", rel_path)
+    if rc != 0:
+        return {"ok": False, "error": "git status failed — is this a git repo?"}
+    if not status_out.strip():
+        log.debug("git sync: %s is unchanged, nothing to commit", rel_path)
+        return {"ok": True, "message": "no changes — already up-to-date"}
+
+    # Stage the file
+    rc, _, err = await _run("git", "add", rel_path)
+    if rc != 0:
+        return {"ok": False, "error": f"git add failed: {err.strip()[:200]}"}
+
+    # Commit with a bot identity so it never fails on unconfigured user.name
+    rc, commit_out, commit_err = await _run(
+        "git",
+        "-c", "user.name=University Portal Bot",
+        "-c", "user.email=portal-bot@university.local",
+        "commit",
+        "-m", f"chore(scraper): update {slug}.yaml via portal [skip ci]",
+    )
+    if rc != 0:
+        # git writes "nothing to commit" to stdout, not stderr
+        combined = (commit_out + commit_err).strip()
+        if "nothing to commit" in combined or "nothing added to commit" in combined:
+            return {"ok": True, "message": "no changes — already up-to-date"}
+        return {"ok": False, "error": f"git commit failed: {combined[:200]}"}
+
+    # Discover the GitHub HTTPS remote URL
+    rc, remotes_out, _ = await _run("git", "--no-optional-locks", "remote", "-v")
+    push_url: str | None = None
+    for line in remotes_out.splitlines():
+        if "github.com" in line and "(push)" in line:
+            parts = line.split()
+            if len(parts) >= 2:
+                push_url = parts[1]
+                break
+
+    if not push_url:
+        # No github.com remote found — undo the commit so we don't leave a dangling local commit
+        await _run("git", "reset", "--soft", "HEAD~1")
+        return {"ok": False, "error": "No github.com remote found — configure one and retry"}
+
+    # Inject PAT: https://github.com/... → https://PAT@github.com/...
+    auth_url = re.sub(r"^https://", f"https://{pat}@", push_url)
+
+    rc, _, err = await _run("git", "push", auth_url, "HEAD:main")
+    if rc != 0:
+        # Undo the local commit to keep the repo consistent
+        await _run("git", "reset", "--soft", "HEAD~1")
+        err_clean = re.sub(pat, "***", err.strip())  # scrub PAT from log
+        log.warning("git push failed for %s: %s", slug, err_clean[:300])
+        return {"ok": False, "error": f"git push failed: {err_clean[:200]}"}
+
+    log.info("git sync: pushed %s to GitHub (%s)", rel_path, push_url)
+    return {"ok": True, "message": f"committed and pushed {rel_path} to GitHub"}
+
+
 # ── Save / create ─────────────────────────────────────────────────────────────
 
 class SaveConfigBody(BaseModel):
@@ -252,7 +348,22 @@ async def save_scraper_config(
     _UNIS_DIR.mkdir(parents=True, exist_ok=True)
     _slug_path(slug).write_text(body.yaml_content, encoding="utf-8")
     log.info("Saved scraper config for slug=%r", slug)
-    return JSONResponse(content={"ok": True, "slug": slug})
+
+    # Best-effort git commit + push — never blocks the save response
+    git_result: dict = {}
+    try:
+        git_result = await _git_sync_config(slug)
+    except Exception:
+        log.exception("Unexpected error in _git_sync_config for slug=%r", slug)
+        git_result = {"ok": False, "error": "unexpected git sync error"}
+
+    return JSONResponse(content={
+        "ok": True,
+        "slug": slug,
+        "git_pushed": git_result.get("ok", False),
+        "git_message": git_result.get("message") or git_result.get("error", ""),
+        "git_skipped": git_result.get("skipped", False),
+    })
 
 
 # ── Delete ────────────────────────────────────────────────────────────────────
