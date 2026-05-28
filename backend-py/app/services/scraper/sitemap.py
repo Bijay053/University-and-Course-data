@@ -190,7 +190,12 @@ def _same_registrable_host(host_a: str, host_b: str) -> bool:
     return a_parts[-2:] == b_parts[-2:]
 
 
-async def discover_from_sitemap(origin: str, *, emit=None) -> list[dict]:
+async def discover_from_sitemap(
+    origin: str,
+    *,
+    emit=None,
+    sitemap_url: str | None = None,
+) -> list[dict]:
     """Probe sitemap.xml + robots.txt at ``origin`` and return course candidates.
 
     ``origin`` is the scheme+host (e.g. ``https://www.asahe.edu.au``) — no
@@ -199,6 +204,13 @@ async def discover_from_sitemap(origin: str, *, emit=None) -> list[dict]:
 
     ``emit`` is the same async callable shape used by ``discovery.py`` so
     progress shows up in the UI live-log panel.
+
+    ``sitemap_url`` — when set (from ``discovery.sitemap_url`` in the per-uni
+    YAML), this explicit URL is prepended to the candidate list so it is
+    probed *before* any auto-detected sitemaps from robots.txt.  This lets
+    per-uni YAMLs point directly at, e.g., ``/study/sitemap.xml`` instead of
+    relying on the auto-discovery heuristic picking the right one from 20+
+    robots.txt entries.
 
     All candidate URLs are constrained to the same registrable host as
     ``origin`` (see :func:`_same_registrable_host`). A misconfigured or
@@ -210,6 +222,13 @@ async def discover_from_sitemap(origin: str, *, emit=None) -> list[dict]:
     base_host = urlparse(base).netloc
 
     candidates: list[str] = list(f"{base}{p}" for p in _SITEMAP_INDEX_PATHS)
+
+    # Explicit per-uni sitemap URL takes priority — insert at front so it is
+    # probed first and its URLs are added to `found` before any auto-detected
+    # sitemaps (which may contain noise pages that fill the dedup set first).
+    if sitemap_url and sitemap_url not in candidates:
+        candidates.insert(0, sitemap_url)
+
     # robots.txt may publish non-standard sitemap locations — very common
     # on large university sites that split by faculty.
     robots = await _fetch_text(f"{base}/robots.txt")

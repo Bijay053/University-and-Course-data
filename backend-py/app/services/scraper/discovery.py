@@ -1017,7 +1017,14 @@ async def discover_course_links(
                 crawl_total=len(found),
             )
         try:
-            sitemap_courses = await discover_from_sitemap(origin, emit=emit)
+            _explicit_sm = (
+                discovery_config.sitemap_url
+                if discovery_config is not None
+                else None
+            )
+            sitemap_courses = await discover_from_sitemap(
+                origin, emit=emit, sitemap_url=_explicit_sm
+            )
         except Exception as exc:
             log.warning("sitemap fallback failed for %s: %s", origin, exc)
             sitemap_courses = []
@@ -1221,7 +1228,14 @@ async def discover_course_links(
                 kind="sitemap_supplement",
             )
         try:
-            _supp_courses = await discover_from_sitemap(origin, emit=emit)
+            _explicit_sm2 = (
+                discovery_config.sitemap_url
+                if discovery_config is not None
+                else None
+            )
+            _supp_courses = await discover_from_sitemap(
+                origin, emit=emit, sitemap_url=_explicit_sm2
+            )
         except Exception as _supp_exc:
             log.warning("sitemap supplement failed for %s: %s", origin, _supp_exc)
             _supp_courses = []
