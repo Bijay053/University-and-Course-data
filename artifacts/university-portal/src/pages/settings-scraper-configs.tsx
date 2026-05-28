@@ -277,6 +277,7 @@ export default function SettingsScraperConfigs() {
   const [filter, setFilter] = useState("");
   const [showNewModal, setShowNewModal] = useState(false);
   const [pendingSlug, setPendingSlug] = useState<string | null>(null);
+  const [draftBanner, setDraftBanner] = useState<{ slug: string; lineCount: number } | null>(null);
   const [generating, setGenerating] = useState(false);
   const [showDiff, setShowDiff] = useState(false);
   const [genForm, setGenForm] = useState<GenerateForm>({
@@ -286,6 +287,7 @@ export default function SettingsScraperConfigs() {
     notes: "",
   });
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const draftTimerRef = useRef<number | null>(null);
 
   // ── Per-slug scrape job tracking ─────────────────────────────────────────
   const [triggerJobs, setTriggerJobs] = useState<Record<string, TriggerState>>({});
@@ -307,6 +309,19 @@ export default function SettingsScraperConfigs() {
   }, [toast]);
 
   useEffect(() => { void fetchConfigs(); }, [fetchConfigs]);
+
+  // Debounced draft persistence to localStorage
+  useEffect(() => {
+    if (!editorSlug || editorYaml === savedYaml) return;
+    if (draftTimerRef.current) clearTimeout(draftTimerRef.current);
+    draftTimerRef.current = window.setTimeout(() => {
+      try { localStorage.setItem(`scraper-draft:${editorSlug}`, editorYaml); } catch { /* quota */ }
+      draftTimerRef.current = null;
+    }, 600);
+    return () => {
+      if (draftTimerRef.current) { clearTimeout(draftTimerRef.current); draftTimerRef.current = null; }
+    };
+  }, [editorYaml, editorSlug, savedYaml]);
 
   // Poll all in-progress jobs
   useEffect(() => {
@@ -382,11 +397,19 @@ export default function SettingsScraperConfigs() {
   const selectConfig = (slug: string) => {
     const cfg = configs.find(c => c.slug === slug);
     if (!cfg) return;
+    let draft: string | null = null;
+    try { draft = localStorage.getItem(`scraper-draft:${slug}`); } catch { /* storage unavailable */ }
     setSelected(slug);
     setEditorSlug(slug);
-    setEditorYaml(cfg.yaml);
     setSavedYaml(cfg.yaml);
     setShowDiff(false);
+    if (draft !== null && draft !== cfg.yaml) {
+      setEditorYaml(draft);
+      setDraftBanner({ slug, lineCount: draft.split("\n").length });
+    } else {
+      setEditorYaml(cfg.yaml);
+      setDraftBanner(null);
+    }
   };
 
   const handleSelectConfig = (slug: string) => {
@@ -405,6 +428,12 @@ export default function SettingsScraperConfigs() {
     }
   };
 
+  const discardDraft = () => {
+    try { localStorage.removeItem(`scraper-draft:${editorSlug}`); } catch { /* ignore */ }
+    setEditorYaml(savedYaml);
+    setDraftBanner(null);
+  };
+
   const handleSave = async () => {
     if (!editorSlug.trim()) { toast({ title: "Slug required", variant: "destructive" }); return; }
     setSaving(true);
@@ -420,6 +449,8 @@ export default function SettingsScraperConfigs() {
       toast({ title: "Saved", description: `Config for '${editorSlug}' saved` });
       setSavedYaml(editorYaml);
       setShowDiff(false);
+      setDraftBanner(null);
+      try { localStorage.removeItem(`scraper-draft:${editorSlug.trim()}`); } catch { /* ignore */ }
 
       if (data.git_pushed && data.git_message && !data.git_message.includes("up-to-date")) {
         toast({ title: "Saved & synced to GitHub", description: data.git_message });
@@ -711,6 +742,27 @@ export default function SettingsScraperConfigs() {
                 </div>
               </div>
 
+              {/* Draft-restored banner */}
+              {draftBanner && draftBanner.slug === (selected ?? editorSlug) && (
+                <div className="flex items-center gap-3 px-4 py-2 bg-amber-50 dark:bg-amber-950/40 border-b border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 text-xs">
+                  <span className="flex-1">
+                    Draft restored — <strong>{draftBanner.lineCount} lines</strong> of unsaved edits recovered from a previous session.
+                  </span>
+                  <button
+                    className="underline underline-offset-2 hover:no-underline font-medium"
+                    onClick={() => setDraftBanner(null)}
+                  >
+                    Keep draft
+                  </button>
+                  <button
+                    className="underline underline-offset-2 hover:no-underline font-medium text-red-600 dark:text-red-400"
+                    onClick={discardDraft}
+                  >
+                    Discard
+                  </button>
+                </div>
+              )}
+
               {showDiff ? (
                 <DiffViewer oldYaml={savedYaml} newYaml={editorYaml} />
               ) : (
@@ -842,7 +894,7 @@ export default function SettingsScraperConfigs() {
             <div>
               <h2 className="font-semibold text-base">Unsaved changes</h2>
               <p className="text-sm text-muted-foreground mt-1">
-                You have unsaved edits to <span className="font-mono font-medium">{selected}</span>.
+                You have unsaved edits to <span className="font-mono font-medium">{selected ?? "current draft"}</span>.
                 Switching to <span className="font-mono font-medium">{pendingSlug}</span> will discard them.
               </p>
             </div>
