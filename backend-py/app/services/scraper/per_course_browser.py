@@ -169,6 +169,18 @@ _NETWORKIDLE_HOSTS: tuple[str, ...] = (
     # networkidle with a tighter 30s / 25s budget is sufficient for SPA
     # hydration and avoids over-waiting on vocational pages.
     "vit.edu.au",
+    # UWA (University of Western Australia): Sitecore SXA SPA identical in
+    # structure to Newcastle.  Graduate Cert/Dip pages embed Schema.org
+    # JSON-LD with IELTS in static HTML; Bachelor/Master pages do NOT —
+    # requirements are hydrated client-side after page load.  Static HTML
+    # for a Bachelor page returns "3 Year" (duration) so the sparse-static
+    # rescue (fee=None AND duration=None) never fires, and the browser was
+    # never invoked.  networkidle + 3s settle (same budget as Newcastle)
+    # gives the Sitecore hydration time to mount the requirements panel.
+    # UWA pages appear to show international content by default (no
+    # Domestic/International toggle observed); add to _INTERNATIONAL_TOGGLE_HOSTS
+    # only if a first scrape confirms a toggle exists.
+    "uwa.edu.au",
 )
 
 # Hosts that need domcontentloaded + a longer-than-default JS settle window.
@@ -302,6 +314,16 @@ _FORCE_BROWSER_HOSTS: tuple[str, ...] = (
     # mq_browser_discover._resolve_to_study_urls), so this single host
     # entry covers the entire MQ catalogue.
     "mq.edu.au",
+    # UWA (University of Western Australia): Sitecore SXA SPA.  Bachelor
+    # and Master pages do NOT embed IELTS/requirements in static HTML —
+    # they hydrate client-side.  The static fetch succeeds (~134KB) and
+    # returns "3 Year" duration, so the sparse-static rescue
+    # (fee=None AND duration=None) never fires and the browser is never
+    # invoked.  Forcing the browser ensures networkidle + 3s settle runs
+    # for every UWA page so the rendered requirements panel is scraped.
+    # Graduate Cert/Dip pages already have IELTS in static JSON-LD; the
+    # override flag is harmless for them (rendered values agree).
+    "uwa.edu.au",
 )
 
 _NETWORKIDLE_SETTLE_MS = 3000
