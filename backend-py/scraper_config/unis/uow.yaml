@@ -14,6 +14,19 @@
 
 discovery:
   bfs_page_budget: 70    # UOW ~62 listing pages; add buffer for navigation overhead
+  # UOW catalogue is alphabetical (Bachelor pages 1-29, Certificate III pages 30-31,
+  # Diploma 32-34, Doctor 35, Graduate Certificate 38-44, then Master of … pages
+  # 44-60+, then loops back). Default cap (_MAX_COURSES_PER_JOB = 200) used to hit
+  # at page 15 — all-Bachelor — dropping every Master course. The 500 cap shipped
+  # 2026-05-17 still exhausted at page 40 (Graduate Certificate range), BEFORE the
+  # M-prefix pages, leaving 0 Master / 0 Doctor / 0 Diploma courses staged.
+  # Verified live 2026-05-18: page 45 starts master-of-business-*, page 50 has
+  # master-of-laws/marketing, page 60 has master-of-research-*; the full Master
+  # range spans pages 44-60. Raise to 1000 so discovery reaches the end of the
+  # alphabetical catalogue before the cap fires. The dedup step downstream
+  # collapses the inevitable duplicates (same course appearing on multiple
+  # major-filter pages), so the staged-row count remains ~300.
+  max_candidates: 1000
 
 extraction:
   english:

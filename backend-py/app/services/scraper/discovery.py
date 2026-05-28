@@ -195,6 +195,30 @@ _NON_COURSE_URL_PATTERNS: tuple[str, ...] = (
     # (regulatory / disclaimer content, not course catalogues).
     "/important-information/",
     "/key-information/",
+    # UTAS CMS binary asset paths — PDF course guides / brochures
+    # published at /__data/assets/pdf_file/... — not HTML pages.
+    "/__data/assets/",
+    # PDF URLs — any URL containing ".pdf" is a document file, never a
+    # real course detail page.  Early rejection prevents the BFS from
+    # enqueuing PDF links found on faculty listing pages.
+    ".pdf",
+    # UTAS undergraduate discipline hub pages — category listings, not
+    # individual CRICOS course detail pages.  Match with and without
+    # trailing slash (/study/undergraduate and /study/undergraduate/).
+    "/study/undergraduate",
+    # UTAS certificate study-type category hub.
+    "/study/certificates",
+    # UTAS study-info/lifestyle pages — never CRICOS course detail pages.
+    # Real UTAS course pages always use /courses/<faculty>/courses/<slug>.
+    "/study/learning-abroad",
+    "/study/interstate",
+    "/study/areas/",
+    "/study/international",
+    "/study/online",
+    "/study/sustainability",
+    "/study/parents-and-carers",
+    "/study/starting-at-the-university",
+    "/study/postgraduate",
 )
 
 # Last-segment junk suffix regex (Node routes/scrape.ts:5540) — even
@@ -539,6 +563,21 @@ _ALWAYS_SITEMAP_SUPPLEMENT_HOSTS: frozenset[str] = frozenset({
     # of handbook-prefixed sitemap URLs → live /course/<slug> URLs.
     "www.acu.edu.au",
     "acu.edu.au",
+    # CQU: BFS from / (or /courses) burns its budget on /study/* info pages
+    # (apprenticeships landing, why-cqu, tafe-certificates-diplomas, …) and
+    # only stumbles into the ~25 TAFE Certificate URLs visible from those
+    # listings — none of which have international fee/IELTS data. The sitemap
+    # publishes 508 unique /courses/<code>/<slug> URLs including bachelors
+    # and masters whose pages embed an `IFTF` JSON blob ("International
+    # Indicative First Term Fee") plus IELTS scores. Per-uni YAML
+    # (scraper_config/unis/cqu.yaml) restricts the merged set to HE-style
+    # codes only with allow_url_patterns: ['/courses/c[a-z][0-9]{2,3}(/|$)']
+    # (199 of 508 codes — bachelors / masters / grad-cert / grad-dip) and
+    # block_url_patterns: ['/courses/pdc'] (210 PDC micro-credentials). The
+    # remaining 296 TAFE NTP-style codes are domestic-only with no intl fee
+    # or IELTS, so they're correctly excluded. 2026-05-11.
+    "www.cqu.edu.au",
+    "cqu.edu.au",
 })
 
 
@@ -1155,7 +1194,17 @@ async def discover_course_links(
     # HTTP pass can only find courses that appear in static HTML (e.g. featured
     # picks or courses linked from nav).  The sitemap exposes the full
     # catalogue; merge it here so we don't silently miss entire disciplines.
-    if parsed.netloc in _ALWAYS_SITEMAP_SUPPLEMENT_HOSTS and origin:
+    # Per-uni YAML knob (`discovery.always_sitemap_supplement`) — honour
+    # alongside the hardcoded host frozenset so newly-onboarded unis can
+    # opt in via YAML without a code change. La Trobe regression
+    # 2026-05-12: YAML knob was set but never read here, so the 392-URL
+    # sitemap never merged and BFS only surfaced ~29 candidates (mostly
+    # category landing pages).
+    _yaml_always_sitemap = bool(
+        discovery_config is not None
+        and getattr(discovery_config, "always_sitemap_supplement", False)
+    )
+    if (parsed.netloc in _ALWAYS_SITEMAP_SUPPLEMENT_HOSTS or _yaml_always_sitemap) and origin:
         if emit:
             await emit(
                 "status",
@@ -1169,11 +1218,34 @@ async def discover_course_links(
         except Exception as _supp_exc:
             log.warning("sitemap supplement failed for %s: %s", origin, _supp_exc)
             _supp_courses = []
+        # Per-uni allow_url_patterns pre-filter (CQU regression 2026-05-11):
+        # CQU's sitemap returns 726 URLs in raw order — /study/* category
+        # landings appear at indices 0..30 and the first HE-style /courses/c<x>NN
+        # URL doesn't appear until index 364.  Without this pre-filter the
+        # supplement loop fills the 200-slot cap with /study/* + alphabetic
+        # PDC/TAFE codes long before any HE degree URL is seen, and the
+        # orchestrator's Phase A.5b allow filter then drops 100% of survivors
+        # → 0 staged.  Applying the per-uni allow_url_patterns here means
+        # non-matching URLs simply don't consume cap slots, so the 194 HE
+        # URLs CQU publishes all get a chance to be added.
+        _supp_allow_pats: list[re.Pattern[str]] = []
+        if discovery_config is not None:
+            _ap_raw = list(getattr(discovery_config, "allow_url_patterns", None) or [])
+            for _ap_str in _ap_raw:
+                try:
+                    _supp_allow_pats.append(re.compile(_ap_str, re.IGNORECASE))
+                except re.error:
+                    log.warning(
+                        "discovery.allow_url_patterns: invalid regex skipped (sitemap supplement): %s",
+                        _ap_str,
+                    )
         _supp_added = 0
         for _sc in _supp_courses:
             _su = _sc.get("url")
             _sn = _sc.get("name") or ""
             if not _su or _su in found:
+                continue
+            if _supp_allow_pats and not any(_p.search(_su) for _p in _supp_allow_pats):
                 continue
             found[_su] = _sn
             _supp_added += 1
@@ -1327,6 +1399,78 @@ async def discover_course_links(
                 kind="cdu_course_filter",
                 kept=len(found),
                 dropped=_removed_cdu,
+            )
+
+    # ── Per-uni block_url_patterns (opt-in via YAML) ────────────────────────
+    # discovery.block_url_patterns is a list of regexes. Any candidate whose
+    # URL matches at least one pattern is dropped here, AFTER the BFS +
+    # sitemap + subdomain probes have all run. This is a single chokepoint
+    # so per-uni YAML can suppress info / pathway / general pages that the
+    # generic page-type classifier accepts as "course-like" but the
+    # university actually publishes outside the course catalogue (e.g.
+    # Federation's /study/intakes/, /study/information/, /study/skills).
+    #
+    # Empty list (default) = no-op. Per-uni opt-in only. Matches are case
+    # insensitive against the full URL.
+    _block_patterns_raw: list[str] = (
+        list(discovery_config.block_url_patterns)
+        if discovery_config is not None and getattr(discovery_config, "block_url_patterns", None)
+        else []
+    )
+    _compiled_block: list[re.Pattern[str]] = []
+    for _pat_str in _block_patterns_raw:
+        try:
+            _compiled_block.append(re.compile(_pat_str, re.IGNORECASE))
+        except re.error:
+            log.warning("discovery.block_url_patterns: invalid regex skipped: %s", _pat_str)
+    if _compiled_block:
+        _pre_block = len(found)
+        found = {
+            _u: _n
+            for _u, _n in found.items()
+            if not any(_p.search(_u) for _p in _compiled_block)
+        }
+        _dropped = _pre_block - len(found)
+        if emit and _dropped:
+            await emit(
+                "status",
+                f"[DISCOVER] block_url_patterns: dropped {_dropped} URL(s) "
+                f"matching {len(_compiled_block)} per-uni pattern(s)",
+                phase="discover",
+                kind="block_url_filter",
+                dropped=_dropped,
+                kept=len(found),
+            )
+
+    # ── Per-uni discovery.must_contain (opt-in via YAML) ────────────────────
+    # Substring whitelist (case-insensitive) applied AFTER block_url_patterns.
+    # When non-empty, a candidate URL is kept only if it contains at least one
+    # of the listed substrings. Simpler than allow_url_patterns for the common
+    # case where the operator just wants "/courses/" or "/study/" in the path.
+    # Empty list (default) = no-op.
+    _must_contain_raw: list[str] = (
+        list(discovery_config.must_contain)
+        if discovery_config is not None and getattr(discovery_config, "must_contain", None)
+        else []
+    )
+    _must_contain = [s.strip().lower() for s in _must_contain_raw if s and s.strip()]
+    if _must_contain:
+        _pre = len(found)
+        found = {
+            _u: _n
+            for _u, _n in found.items()
+            if any(_sub in _u.lower() for _sub in _must_contain)
+        }
+        _dropped_mc = _pre - len(found)
+        if emit and _dropped_mc:
+            await emit(
+                "status",
+                f"[DISCOVER] must_contain: dropped {_dropped_mc} URL(s) "
+                f"missing all of {_must_contain}",
+                phase="discover",
+                kind="must_contain_filter",
+                dropped=_dropped_mc,
+                kept=len(found),
             )
 
     raw = [{"url": u, "name": n} for u, n in list(found.items())[:max_courses]]

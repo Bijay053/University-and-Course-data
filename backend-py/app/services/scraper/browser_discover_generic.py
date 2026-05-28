@@ -31,7 +31,30 @@ log = logging.getLogger(__name__)
 
 _SETTLE_S = 3.0
 _NAV_SETTLE_S = 2.0
-_MAX_NAV_PAGES = 30   # total nav pages to visit across all BFS levels
+# Raised 30 → 50 (2026-05-17) so per-discipline seed sets (e.g. QUT's 15
+# /study/<area> pages + ~20 homepage-nav candidates from the start page)
+# can all be visited within a single discovery pass.  Previously the 30
+# cap let homepage-nav candidates evict ~5-7 of the per-discipline seeds
+# (design-and-architecture, health, justice-and-law, science-and-
+# mathematics, social-work-and-human-services, communication), yielding
+# only 76 candidates from a ~200-course international catalogue.
+_MAX_NAV_PAGES = 50   # total nav pages to visit across all BFS levels
+# After page.goto on a nav page, wait this long for at least one
+# course-shaped link selector to appear before extracting links.
+# JS-rendered SPA discipline pages (QUT, Newcastle, UTAS, ECU) hydrate
+# the course grid asynchronously after domcontentloaded; without this
+# wait the 2-second _NAV_SETTLE_S sleep often races the hydration and
+# the link harvest returns 0.  Caught-timeout fallback keeps the
+# existing "sleep + extract" behaviour for sites that don't need it.
+# Narrow course-anchored selectors only — generic header/footer nav links
+# (e.g. `<a href="/study/">Study</a>`) are present on every page before
+# JS hydration, so they would let the wait return early even though the
+# actual course grid hasn't populated yet.  These patterns target the
+# per-course URL shape (`/courses/<slug>`, `/course/<slug>`,
+# `/degrees/<slug>`, `/programs/<slug>`) which only appears once the
+# JS-rendered listing has hydrated.
+_NAV_LINK_SELECTOR = "a[href*='/courses/'], a[href*='/course/'], a[href*='/degrees/'], a[href*='/programs/']"
+_NAV_LINK_WAIT_MS = 8_000
 
 _EXTRACT_LINKS_JS = r"""
 (origin) => {
@@ -59,6 +82,22 @@ _NAV_URL_HINTS = (
 )
 
 _HOST_EXTRA_SEEDS: dict[str, list[str]] = {
+    # Macquarie University: www.mq.edu.au returns a Cloudflare 403 challenge
+    # to plain HTTP, so BFS yields zero candidates.  Browser-based discovery
+    # bypasses Cloudflare but starts from the homepage with only 14 nav
+    # links, none of which reach the catalogue.  Seed the two listing
+    # roots so the browser pass enumerates the full undergraduate and
+    # postgraduate A-Z indexes (~300 courses total).
+    "www.mq.edu.au": [
+        "https://www.mq.edu.au/study/find-a-course",
+        "https://www.mq.edu.au/study/find-a-course/undergraduate",
+        "https://www.mq.edu.au/study/find-a-course/postgraduate",
+    ],
+    "mq.edu.au": [
+        "https://www.mq.edu.au/study/find-a-course",
+        "https://www.mq.edu.au/study/find-a-course/undergraduate",
+        "https://www.mq.edu.au/study/find-a-course/postgraduate",
+    ],
     "www.ecu.edu.au": [
         "https://www.ecu.edu.au/degrees/courses/all",
         "https://www.ecu.edu.au/degrees/postgraduate",
@@ -79,24 +118,140 @@ _HOST_EXTRA_SEEDS: dict[str, list[str]] = {
     ],
     # UTAS: browser BFS starts from /courses (undergrad landing) and exhausts
     # its page budget on undergraduate listing pages, never reaching the
-    # postgraduate A-Z listing.  Seed both levels directly so master courses
-    # are included in every scrape run.
+    # postgraduate A-Z listing OR the per-faculty A-Z listings where the
+    # ~219-course CRICOS catalogue actually lives.  Seed:
+    #   - postgraduate / honours hub pages (existing)
+    #   - 7 faculty A-Z index pages (/courses/<faculty>/courses) which each
+    #     enumerate ~30-50 individual course URLs.
+    # Empirically the previous seed set yielded only 123 candidates from a
+    # 219-course catalogue (Master of Teaching e7g and ~80 others missed
+    # entirely); the faculty seeds bring discovery up to the full catalogue.
+    # IMPORTANT: /study/postgraduate was removed (2026-05-11) — that page
+    # contains discipline navigation links that include /study/undergraduate/*
+    # faculty listing pages, which are NOT individual CRICOS course pages.
+    # Using only /courses/* URLs keeps discovery scoped to the structured
+    # per-faculty course listings that contain individual course page links.
+    # NOTE (2026-05-12): /courses/undergraduate was MISSING from the seeds
+    # despite being the canonical UTAS undergraduate A-Z catalogue. Symptom:
+    # a UTAS scrape staged ~50 postgraduate courses (Master / Graduate
+    # Certificate / Graduate Diploma) and ZERO Bachelor's degrees, even
+    # though UTAS lists ~140 international courses overall. /courses/postgraduate
+    # was the only level-listing seed; honours hub yields a handful; the
+    # faculty A-Z pages (/courses/<faculty>/courses) are JS-heavy and the
+    # Playwright pass typically gets 0 links from them. Adding the matching
+    # /courses/undergraduate seed mirrors the postgraduate path and brings
+    # the Bachelor's catalogue back into discovery.
     "www.utas.edu.au": [
+        "https://www.utas.edu.au/courses/undergraduate",
         "https://www.utas.edu.au/courses/postgraduate",
-        "https://www.utas.edu.au/study/postgraduate",
         "https://www.utas.edu.au/courses/honours",
+        "https://www.utas.edu.au/courses/arts-soc/courses",
+        "https://www.utas.edu.au/courses/health/courses",
+        "https://www.utas.edu.au/courses/sci-eng/courses",
+        "https://www.utas.edu.au/courses/tsbe/courses",
+        "https://www.utas.edu.au/courses/acad/courses",
+        "https://www.utas.edu.au/courses/dvc-research/courses",
+        "https://www.utas.edu.au/courses/uc/courses",
     ],
     "utas.edu.au": [
+        "https://www.utas.edu.au/courses/undergraduate",
         "https://www.utas.edu.au/courses/postgraduate",
-        "https://www.utas.edu.au/study/postgraduate",
         "https://www.utas.edu.au/courses/honours",
+        "https://www.utas.edu.au/courses/arts-soc/courses",
+        "https://www.utas.edu.au/courses/health/courses",
+        "https://www.utas.edu.au/courses/sci-eng/courses",
+        "https://www.utas.edu.au/courses/tsbe/courses",
+        "https://www.utas.edu.au/courses/acad/courses",
+        "https://www.utas.edu.au/courses/dvc-research/courses",
+        "https://www.utas.edu.au/courses/uc/courses",
+    ],
+    # University of Newcastle (Australia) — uni_id 17.
+    # Cloudflare-protected, plain HTTP returns 403 for every /study/* path
+    # so BFS finds 0 candidates. The catalogue lives at /degrees/<slug>.
+    # Seed the A-Z degree finder + the level-listing pages so the
+    # Playwright pass can harvest the ~280-course international catalogue.
+    # Paired with discovery.always_browser_discover=true and
+    # must_contain=["/degrees/"] in scraper_config/unis/newcastle.yaml.
+    "www.newcastle.edu.au": [
+        "https://www.newcastle.edu.au/degrees",
+        "https://www.newcastle.edu.au/degrees/undergraduate",
+        "https://www.newcastle.edu.au/degrees/postgraduate",
+        "https://www.newcastle.edu.au/degrees/research",
+    ],
+    "newcastle.edu.au": [
+        "https://www.newcastle.edu.au/degrees",
+        "https://www.newcastle.edu.au/degrees/undergraduate",
+        "https://www.newcastle.edu.au/degrees/postgraduate",
+        "https://www.newcastle.edu.au/degrees/research",
+    ],
+    # Queensland University of Technology (QUT) — uni_id 1011.
+    # Cloudflare-walled (HTTP 403 for plain BFS) + JS-rendered SPA shells +
+    # no sitemap.xml.  Without seeds, the browser-discover homepage-nav
+    # walk only reaches /study/qut-college, /study/options/double-degrees,
+    # /study/combined-diploma-degrees, and a handful of short-course hubs
+    # — yielding 56 candidates from a ~200-course international catalogue.
+    # The full Bachelor / Master catalogue lives one click deeper under
+    # the per-discipline /study/<area> pages (e.g. /study/business,
+    # /study/engineering, /study/health, /study/law), which homepage nav
+    # does NOT link to directly.  Symptom of the missing seeds: the
+    # 2026-05-17 user-reported QUT scrape staged only ~33 rows (mostly
+    # Diplomas + Graduate Certificates + a handful of double-degree
+    # bachelors) with virtually every single-degree Bachelor (Business,
+    # Engineering, IT, Nursing, Law) and most Masters absent.
+    # Pairs with always_browser_discover=true and must_contain=["/courses/"]
+    # in scraper_config/unis/qut.yaml (Wayback CDX is enabled but
+    # archive.org has been throwing transient 503s for QUT — seeds give
+    # us a deterministic discovery path that doesn't depend on Wayback).
+    "www.qut.edu.au": [
+        "https://www.qut.edu.au/study",
+        "https://www.qut.edu.au/study/business",
+        "https://www.qut.edu.au/study/creative-industries",
+        "https://www.qut.edu.au/study/design-and-architecture",
+        "https://www.qut.edu.au/study/education",
+        "https://www.qut.edu.au/study/engineering",
+        "https://www.qut.edu.au/study/health",
+        "https://www.qut.edu.au/study/information-technology",
+        "https://www.qut.edu.au/study/justice-and-law",
+        "https://www.qut.edu.au/study/science-and-mathematics",
+        "https://www.qut.edu.au/study/social-work-and-human-services",
+        "https://www.qut.edu.au/study/communication",
+        "https://www.qut.edu.au/study/options/double-degrees",
+        "https://www.qut.edu.au/study/combined-diploma-degrees",
+        "https://www.qut.edu.au/study/qut-college/international",
+    ],
+    "qut.edu.au": [
+        "https://www.qut.edu.au/study",
+        "https://www.qut.edu.au/study/business",
+        "https://www.qut.edu.au/study/creative-industries",
+        "https://www.qut.edu.au/study/design-and-architecture",
+        "https://www.qut.edu.au/study/education",
+        "https://www.qut.edu.au/study/engineering",
+        "https://www.qut.edu.au/study/health",
+        "https://www.qut.edu.au/study/information-technology",
+        "https://www.qut.edu.au/study/justice-and-law",
+        "https://www.qut.edu.au/study/science-and-mathematics",
+        "https://www.qut.edu.au/study/social-work-and-human-services",
+        "https://www.qut.edu.au/study/communication",
+        "https://www.qut.edu.au/study/options/double-degrees",
+        "https://www.qut.edu.au/study/combined-diploma-degrees",
+        "https://www.qut.edu.au/study/qut-college/international",
     ],
 }
 
 _LISTING_URL_RE = re.compile(
     r"/(?:degrees|study|courses?|programs?)"
     r"(?:/courses?)?"
-    r"/(?:all|search|list|find(?:-a-course)?|postgrad(?:uate)?(?:-study)?|undergrad(?:uate)?)",
+    r"/(?:all|search|list|find(?:-a-course)?|postgrad(?:uate)?(?:-study)?|undergrad(?:uate)?"
+    # 2026-05-17 — match per-discipline listing slugs (QUT /study/business,
+    # /study/health, /study/justice-and-law, /study/science-and-mathematics,
+    # /study/social-work-and-human-services, /study/communication; UTAS
+    # /courses/<faculty>; Newcastle /degrees/<area>).  Any single-segment
+    # slug after the catalogue prefix is treated as a listing candidate
+    # so scroll-to-load fires and lazy-loaded course grids hydrate before
+    # the link harvest.  Individual course URLs are filtered out earlier
+    # via _looks_like_course in _process_links, so this broadening
+    # cannot accidentally re-queue course pages as nav targets.
+    r"|[a-z][a-z0-9\-]{2,})",
     re.I,
 )
 
@@ -313,6 +468,25 @@ async def browser_discover_generic(
                     await page.goto(
                         nav_url, wait_until="domcontentloaded", timeout=30_000
                     )
+                    # Wait for at least one course-shaped link selector to
+                    # appear before harvesting.  JS-rendered SPA discipline
+                    # pages (QUT /study/<area>, Newcastle /degrees/<area>,
+                    # UTAS /courses/<faculty>) hydrate the course grid
+                    # asynchronously after domcontentloaded; without this
+                    # wait the link extractor races the hydration and
+                    # returns 0 candidates.  Caught-timeout fallback keeps
+                    # the existing sleep-then-extract behaviour for sites
+                    # that don't need the wait.
+                    try:
+                        await page.wait_for_selector(
+                            _NAV_LINK_SELECTOR,
+                            state="attached",
+                            timeout=_NAV_LINK_WAIT_MS,
+                        )
+                    except _PwTimeout:
+                        pass
+                    except Exception:
+                        pass
                     await asyncio.sleep(_NAV_SETTLE_S)
                     raw2 = await page.evaluate(_EXTRACT_LINKS_JS, origin_str)
                     before = len(results)

@@ -1,3 +1,24 @@
+# ─── AUTO-GENERATED YAML for mit ───────────────────
+# Source:    csu.yaml
+# Generated: 2026-05-13 06:50 UTC
+# Generator: yaml_cascade.run_cascade_for_university()
+#
+# This file was cloned from the highest-scoring existing per-uni
+# YAML based on CMS-family + region + URL-shape signals. It is a
+# starting stub, NOT a finished tuning. After the next scrape:
+#   1. Compare staged completeness vs the source uni.
+#   2. Refine fee/intake/IELTS extractors per the per-uni-fix
+#      convention documented in replit.md.
+#   3. Delete this header once the file is hand-reviewed.
+#
+# target_university_id=11
+# target_university_name=MIT
+# target_url=https://www.mit.edu.au/study-with-us/international-students/entry-requirements
+# target_families=['drupal']
+# target_region=au
+# chosen_candidate=csu (score=9.73)
+# ─────────────────────────────────────────────────────────────
+
 # Charles Sturt University
 # Hostname: www.csu.edu.au  (now possibly www.charlesturt.edu.au post-rebrand)
 #

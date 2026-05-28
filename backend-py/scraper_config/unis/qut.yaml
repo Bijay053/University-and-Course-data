@@ -1,7 +1,73 @@
-# Queensland University of Technology — stub created for Week 5 scale-up.
-# Hostname: www.qut.edu.au  (course catalogue under /study)
-discovery: {}
+# Queensland University of Technology — uni_id 1011.
+#
+# Hostname: www.qut.edu.au  (course catalogue under /courses/<slug>)
+#
+# Discovery problem (2026-05-15): the live site is fully Cloudflare-walled
+# (HTTP 403 for plain BFS), sitemap.xml does not exist, and the /study +
+# /courses listing pages are JS-rendered SPA shells whose DOM contains
+# zero anchor-based course links.  Playwright-based discovery via the
+# homepage nav only finds ~56 courses out of the full ~150-200 catalogue.
+#
+# Fix: enable the Wayback Machine CDX fallback and let it always run
+# (use_wayback=true) — the orchestrator merges its results with whatever
+# BFS+browser produced.  must_contain restricts kept URLs to /courses/<slug>
+# so non-course archive cruft (/courses/admission/, /courses/adult.jsp, …)
+# is filtered out before extraction.
+discovery:
+  use_wayback: true
+  must_contain:
+    - "/courses/"
+  # 2026-05-17 — Bachelor & Master courses missing from QUT scrapes
+  # ----------------------------------------------------------------
+  # User report: only ~33 rows staged from QUT, with virtually every
+  # single-degree Bachelor (Business, Engineering, IT, Nursing, Law) and
+  # most Masters absent.  Root cause:
+  #
+  #   1. detect_course_listing_page() picked /study/online/undergraduate-courses
+  #      from the homepage redirect — that's the ONLINE-ONLY filter, which
+  #      catalogues only diplomas / grad certs / short courses, NOT the full
+  #      on-campus Bachelor / Master catalogue.
+  #   2. BFS yielded 0 candidates from that landing page (it's a JS-rendered
+  #      category index with no static anchor links).
+  #   3. Browser-based discovery fell back to homepage-nav walking and found
+  #      only 56 candidates from a ~200-course international catalogue,
+  #      because homepage nav doesn't link directly to the per-discipline
+  #      /study/<area> pages where the Bachelor/Master listings live.
+  #   4. Wayback CDX has been returning HTTP 503 transiently for QUT.
+  #
+  # Fix: switch to the proven Newcastle / UTAS pattern — enable
+  # always_browser_discover so the Playwright pass becomes the primary
+  # discovery mechanism, and seed it with the per-discipline /study/<area>
+  # pages via _HOST_EXTRA_SEEDS[qut.edu.au] in
+  # backend-py/app/services/scraper/browser_discover_generic.py.  That seed
+  # set drives the catalogue from ~56 candidates back up to the full
+  # ~150-200 international catalogue with deterministic, Wayback-free
+  # discovery.
+  always_browser_discover: true
+
 extraction:
   filters:
+    # 2026-05-18 — enabled. QUT course pages render a hard banner on
+    # domestic-only courses: "This course is only available for
+    # Australian and New Zealand students." (verified live against
+    # /courses/graduate-certificate-in-business-public-sector-management).
+    # International-eligible pages instead carry a two-icon audience
+    # toggle whose default-tab banner reads "You are viewing Australian
+    # and New Zealand students' course information." — that phrasing
+    # deliberately does NOT match _DOMESTIC_ONLY_RE (the pattern requires
+    # "this course is only available for australian|domestic" with the
+    # course as the explicit subject, not "you are viewing …").
+    #
+    # The filter was originally disabled when the YAML was first added
+    # (commit 309c2a4) because the bare "available to Australian and New
+    # Zealand" phrasing was not yet covered by _DOMESTIC_ONLY_RE; the
+    # QUT-specific "only available for australian|domestic" alternative
+    # was added in commit 1892941 (replit.md line ~121-131) but the YAML
+    # gate was never flipped. Flipping now wires the existing pattern to
+    # the QUT pipeline so domestic-only courses (Graduate Certificate in
+    # Business (Public Sector Management), Diploma in Architectural
+    # Studies/Bachelor of Architectural Design, etc.) skip cleanly
+    # instead of staging with the regex Fee pattern's chrome hit (e.g.
+    # fee "2027" — a year, not a dollar amount).
     domestic_only:
-      enabled: false
+      enabled: true

@@ -1,10 +1,494 @@
-# Curtin University — stub created for Week 5 scale-up.
-# Hostname: www.curtin.edu.au  (course catalogue at study.curtin.edu.au)
-# Multi-campus: Bentley, Perth City, Singapore, Malaysia, Mauritius.
+# ─────────────────────────────────────────────────────────────────────────────
+# CURTIN UNIVERSITY
+# File: backend-py/scraper_config/unis/curtin.yaml
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# Discoveries from this debugging session (2026-05-12):
+#
+# 1. Course pages live at /study/offering/course-ug-<slug>--<code>/
+#    NOT at /study/courses/<slug>/ as I previously assumed. The earlier
+#    allow_url_patterns whitelist used the wrong path and dropped 121 of 137
+#    candidates. Removing whitelist altogether let the discoverer find 130
+#    courses on the next run; 83 staged successfully.
+#
+# 2. The international-fee toggle on Curtin pages is the query string
+#    ?regionToggle=1. With that param, the page renders International fees
+#    (e.g. Bachelor of Biomedical Sciences Honours: $42,834/yr 2026 intake).
+#    Without it, the page renders domestic CSP fees, which is why almost
+#    every staged course shows a fee that is far below the true international
+#    rate.
+#
+# 3. The "JS shell" diagnosis from the earlier session was partly wrong.
+#    Most /study/offering/ pages DO server-render content in static HTML
+#    (text_len 12-22KB), and 83 of 130 courses staged with valid fee/IELTS/
+#    duration data. The previous-run failures concentrated on
+#    /study/courses/<slug>/ URLs — which are course landing/marketing pages
+#    that legitimately render almost no content server-side. Those should be
+#    blocked at discovery, not retried with a browser.
+#
+# 4. Curtin does NOT publish intake months on most course pages — many show
+#    "For start dates, please view the academic calendar." The current
+#    parser sometimes treats that whole sentence as the location string
+#    (see "Bachelor of Science (Nutrition), Bachelor of Innovation" in the
+#    last run: location = 'For start dates, please view the academic
+#    calendar .'). This is a backend parser bug, but we can also mask the
+#    sentence here via text_cleaning.location.strip_patterns.
+#
+# Outstanding limitations after this YAML:
+# - Fees will only become international-correct IF the backend honors the
+#   regionToggle=1 query in fetched URLs. This file relies on
+#   extraction.url_rewrites, which IS NOT documented in defaults.yaml. If
+#   the backend doesn't read that key, this section is a no-op and fees
+#   will remain domestic-CSP values. Verification step is in the
+#   "Expected next-run outcome" section below.
+# - IELTS appears blank on many course pages because Curtin publishes a
+#   per-course IELTS only for clinical/health programs; for others, the
+#   institutional minimum lives on the central English page. Backend has
+#   to fall back to central_page when per-course is blank.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+
 discovery:
-  fallback_subdomains:
-    - "study.{domain}"
+  # Default budget is enough — previous run hit 137 candidates within budget.
+  # Not raising.
+
+  # WHITELIST course-offering URLs. This is the path Curtin actually uses
+  # for course detail pages. The previous /study/courses/ pattern was wrong.
+  #
+  # Pattern matches:
+  #   /study/offering/course-ug-bachelor-of-science-...--bh-biomed/
+  #   /study/offering/course-pg-master-of-architecture--mc-arch/
+  # Does NOT match the /study/courses/<slug>/ landing pages, which last run
+  # showed extract as empty shells and waste budget.
+  allow_url_patterns:
+    - "/study/offering/course-"
+
+  # Block budget-burners that BFS otherwise picks up.
+  block_url_patterns:
+    - "/news/"
+    - "/research/"
+    - "/about/"
+    - "/events/"
+    - "/study/scholarships/"
+    - "/study/applying/"
+    # /study/courses/<slug>/ pages are marketing landing pages that render
+    # near-empty static HTML. Last run extracted them with text_len 23-66
+    # chars. Blocking saves both budget AND the bad rows they generated.
+    - "/study/courses/"
+
+  # Curtin's full course catalogue — sourced from the SPA's own tRPC API at
+  # https://search.curtin.edu.au/api/trpc/search?batch=1&input=<json>
+  # where <json> is URL-encoded {"0":{"region":"international","searchTerms":"",
+  # "facet":"courses","page":N,"availability":{"year":<YYYY>}}}.  pageSize=10,
+  # walk page=1..ceil(resultCount/10) to enumerate all offerings.  As of
+  # 2026-05-12 this returned 268 international courses for year=2026
+  # (87 UG + 93 PG + 88 research doctorates).  We seed all of them here
+  # because BFS from /study/courses/ only finds ~75 UG offerings (Curtin's
+  # /study/courses/ archive page is JS-rendered with 0 course-pg-/course-
+  # research- strings in static HTML, and the on-page faceted search lazy-
+  # loads via the tRPC API which our http_fetcher tier doesn't trigger).
+  # First scrape with 16 PG seeds (2026-05-12) staged 75 Bach + 11 Master +
+  # 4 Grad Cert + 2 Grad Diploma = 92.  This expanded list lifts coverage to
+  # the full 268-course catalogue including PhDs/professional doctorates.
+  # International-fee unlock is handled by the user_region=int cookie set
+  # in extractors/curtin_session.py (see archive#curtin-htmx) for both
+  # http_fetcher and browser_pool, so URLs intentionally have no query
+  # string.  REGENERATION: re-run the tRPC API call above when Curtin's
+  # catalogue rotates (~yearly).  Dead URLs surface as 404s in scrape logs
+  # and can be pruned in-place; allow_url_patterns + block_url_patterns
+  # already cover the URL shapes correctly.
+  extra_course_urls:
+      - "https://www.curtin.edu.au/study/offering/course-pg-doctor-of-physiotherapy--mx-phyth/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-graduate-certificate-in-arts--gc-arts/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-graduate-certificate-in-business--gc-busi/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-graduate-certificate-in-business-fundamentals--gc-busfu/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-graduate-certificate-in-computing--gc-comp/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-graduate-certificate-in-continence-and-pelvic-health-physiotherapy--gc-cnpvh/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-graduate-certificate-in-design--gc-design/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-graduate-certificate-in-development-planning--gc-devpln/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-graduate-certificate-in-education--gc-educ/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-graduate-certificate-in-environment-and-climate-emergency--gc-envclm/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-graduate-certificate-in-food-science-and-technology--gc-foodst/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-graduate-certificate-in-geospatial-intelligence--gc-geospi/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-graduate-certificate-in-global-engagement--gc-globl/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-graduate-certificate-in-human-rights--gc-hright/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-graduate-certificate-in-indigenous-australian-cultural-studies--gc-indauc/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-graduate-certificate-in-minerals-and-energy-economics--gc-mnerec/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-graduate-certificate-in-multimedia-journalism--gc-mmjrn/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-graduate-certificate-in-predictive-analytics--gc-predan/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-graduate-certificate-in-professional-accounting--gc-prfacc/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-graduate-certificate-in-project-management--gc-projm/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-graduate-certificate-in-public-health--gc-pubhl/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-graduate-diploma-in-arts--gd-arts/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-graduate-diploma-in-business--gd-busi/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-graduate-diploma-in-computing--gd-comp/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-graduate-diploma-in-design--gd-design/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-graduate-diploma-in-environment-and-climate-emergency--gd-envclm/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-graduate-diploma-in-food-science-and-technology--gd-foodst/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-graduate-diploma-in-geospatial-intelligence--gd-geospi/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-graduate-diploma-in-health-administration--gd-hladmn/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-graduate-diploma-in-international-security--gd-intsec/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-graduate-diploma-in-legal-practice--gd-lawlp/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-graduate-diploma-in-metallurgy--gd-metalg/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-graduate-diploma-in-mining--gd-mining/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-graduate-diploma-in-predictive-analytics--gd-predan/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-graduate-diploma-in-professional-engineering--gd-proeng/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-graduate-diploma-in-project-management--gd-projm/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-graduate-diploma-in-public-health--gd-pubhl/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-graduate-diploma-in-sexology--gd-sxlgy/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-master-of-advanced-practice--mc-advprc/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-master-of-architecture--mc-arch/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-master-of-artificial-intelligence--mc-aintl/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-master-of-arts--mc-arts/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-master-of-arts-applied-linguistics--mc-apling/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-master-of-business-administration--mc-busadm/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-master-of-business-administration-advanced--mc-mbaadv/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-master-of-clinical-exercise-physiology--mc-cexphy/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-master-of-clinical-physiotherapy--mc-phyth/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-master-of-clinical-psychology--mc-clips/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-master-of-commerce--mc-comm/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-master-of-computing--mc-comp/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-master-of-cyber-security--mc-cybse/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-master-of-design--mc-design/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-master-of-dietetics--mg-diets/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-master-of-education--mc-educ/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-master-of-engineering-management--mc-engrmg/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-master-of-environment-and-climate-emergency--mc-envclm/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-master-of-geoscience--mc-geosci/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-master-of-geospatial-intelligence--mc-geospi/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-master-of-health-administration--mc-hladmn/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-master-of-human-rights--mc-hright/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-master-of-human-rights-and-global-engagement--mc-hriglo/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-master-of-indigenous-australian-cultural-studies--mc-indcs/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-master-of-information-systems-and-technology--mc-mist/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-master-of-innovation-and-entrepreneurship--mc-innent/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-master-of-international-relations--mc-intrel/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-master-of-international-security--mc-intsec/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-master-of-midwifery--mg-midw/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-master-of-multimedia-journalism--mc-mmjrn/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-master-of-multimedia-journalism-global--mc-mmjrg/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-master-of-nursing-practice--mg-nurspr/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-master-of-occupational-therapy--mg-occt/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-master-of-predictive-analytics--mc-predan/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-master-of-professional-accounting--mc-prfacc/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-master-of-professional-engineering--mc-proeng/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-master-of-project-management--mc-projm2/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-master-of-psychology-professional--mc-psychp/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-master-of-public-health--mc-pubhl/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-master-of-public-health-practice--mc-pubhp/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-master-of-science-actuarial-and-financial-science--mc-actfns/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-master-of-science-agriculture-and-food-security--mc-agfood/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-master-of-science-food-science-and-technology--mc-foodst/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-master-of-science-industrial-engineering--mc-indeng/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-master-of-science-mathematical-sciences--mc-mathsc/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-master-of-science-minerals-and-energy-economics--mc-mergec/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-master-of-science-minerals-and-energy-economics-master-of-business-administration--mm-mecbad/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-master-of-science-project-management--mc-projm/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-master-of-sexology-professional--mc-sxlpr/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-master-of-social-work-qualifying--mg-scwk/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-master-of-speech-pathology--mg-sppath/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-master-of-taxation--mc-taxat/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-master-of-teaching--mc-teach/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-master-of-tesol--mc-tesol/"
+      - "https://www.curtin.edu.au/study/offering/course-pg-master-of-urban-and-regional-planning--mg-urplan2/"
+      - "https://www.curtin.edu.au/study/offering/course-research-doctor-of-business-administration--dr-busadm/"
+      - "https://www.curtin.edu.au/study/offering/course-research-doctor-of-philosophy---accounting--dr-acctg/"
+      - "https://www.curtin.edu.au/study/offering/course-research-doctor-of-philosophy---applied-geology--dr-geol/"
+      - "https://www.curtin.edu.au/study/offering/course-research-doctor-of-philosophy---architecture-and-interior-architecture--dr-archia/"
+      - "https://www.curtin.edu.au/study/offering/course-research-doctor-of-philosophy---biomedical-science--dr-biomed/"
+      - "https://www.curtin.edu.au/study/offering/course-research-doctor-of-philosophy---chemical-engineering--dr-chengr/"
+      - "https://www.curtin.edu.au/study/offering/course-research-doctor-of-philosophy---chemistry--dr-chem/"
+      - "https://www.curtin.edu.au/study/offering/course-research-doctor-of-philosophy---civil-engineering--dr-cvengr/"
+      - "https://www.curtin.edu.au/study/offering/course-research-doctor-of-philosophy---computing--dr-comptg/"
+      - "https://www.curtin.edu.au/study/offering/course-research-doctor-of-philosophy---construction-management--dr-conm/"
+      - "https://www.curtin.edu.au/study/offering/course-research-doctor-of-philosophy---design--dr-design/"
+      - "https://www.curtin.edu.au/study/offering/course-research-doctor-of-philosophy---education--dr-educ/"
+      - "https://www.curtin.edu.au/study/offering/course-research-doctor-of-philosophy---electrical-and-computer-engineering--dr-elecen/"
+      - "https://www.curtin.edu.au/study/offering/course-research-doctor-of-philosophy---engineering--dr-engr/"
+      - "https://www.curtin.edu.au/study/offering/course-research-doctor-of-philosophy---exercise-sport-and-rehabilitation-science--dr-exsprh/"
+      - "https://www.curtin.edu.au/study/offering/course-research-doctor-of-philosophy---health-sciences--dr-hlthsc/"
+      - "https://www.curtin.edu.au/study/offering/course-research-doctor-of-philosophy---human-communication-science--dr-hcomsc/"
+      - "https://www.curtin.edu.au/study/offering/course-research-doctor-of-philosophy---humanities--dr-humt/"
+      - "https://www.curtin.edu.au/study/offering/course-research-doctor-of-philosophy---information-systems--dr-isys/"
+      - "https://www.curtin.edu.au/study/offering/course-research-doctor-of-philosophy---law--dr-phlaw/"
+      - "https://www.curtin.edu.au/study/offering/course-research-doctor-of-philosophy---marketing--dr-mktg/"
+      - "https://www.curtin.edu.au/study/offering/course-research-doctor-of-philosophy---mechanical-engineering--dr-mcengr/"
+      - "https://www.curtin.edu.au/study/offering/course-research-doctor-of-philosophy---media-culture-and-creative-arts--dr-mcarts/"
+      - "https://www.curtin.edu.au/study/offering/course-research-doctor-of-philosophy---mining-and-metallurgical-engineering--dr-mmengr/"
+      - "https://www.curtin.edu.au/study/offering/course-research-doctor-of-philosophy---national-drug-research-institute--dr-ndri/"
+      - "https://www.curtin.edu.au/study/offering/course-research-doctor-of-philosophy---nursing-and-midwifery--dr-nurmdw/"
+      - "https://www.curtin.edu.au/study/offering/course-research-doctor-of-philosophy---occupational-therapy--dr-occt/"
+      - "https://www.curtin.edu.au/study/offering/course-research-doctor-of-philosophy---petroleum-engineering--dr-peteng/"
+      - "https://www.curtin.edu.au/study/offering/course-research-doctor-of-philosophy---pharmacy--dr-pharm/"
+      - "https://www.curtin.edu.au/study/offering/course-research-doctor-of-philosophy---physics--dr-phys/"
+      - "https://www.curtin.edu.au/study/offering/course-research-doctor-of-philosophy---physiotherapy--dr-phyth/"
+      - "https://www.curtin.edu.au/study/offering/course-research-doctor-of-philosophy---psychology--dr-psych/"
+      - "https://www.curtin.edu.au/study/offering/course-research-doctor-of-philosophy---public-health--dr-pubhl/"
+      - "https://www.curtin.edu.au/study/offering/course-research-doctor-of-philosophy---public-policy--dr-pubpol/"
+      - "https://www.curtin.edu.au/study/offering/course-research-doctor-of-philosophy---social-sciences--dr-socsci/"
+      - "https://www.curtin.edu.au/study/offering/course-research-doctor-of-philosophy---social-work-and-social-policy--dr-scwksp/"
+      - "https://www.curtin.edu.au/study/offering/course-research-doctor-of-philosophy---spatial-sciences--dr-spatsc/"
+      - "https://www.curtin.edu.au/study/offering/course-research-doctor-of-philosophy---urban-and-regional-planning--dr-urplan/"
+      - "https://www.curtin.edu.au/study/offering/course-research-master-of-philosophy-accounting--mr-acctg/"
+      - "https://www.curtin.edu.au/study/offering/course-research-master-of-philosophy-chemical-engineering--mr-chengr/"
+      - "https://www.curtin.edu.au/study/offering/course-research-master-of-philosophy-chemistry--mr-chem/"
+      - "https://www.curtin.edu.au/study/offering/course-research-master-of-philosophy-civil-engineering--mr-cvengr/"
+      - "https://www.curtin.edu.au/study/offering/course-research-master-of-philosophy-corporate-sustainability--mr-corpsu/"
+      - "https://www.curtin.edu.au/study/offering/course-research-master-of-philosophy-education--mr-educ/"
+      - "https://www.curtin.edu.au/study/offering/course-research-master-of-philosophy-electrical-and-computer-engineering--mr-elceng/"
+      - "https://www.curtin.edu.au/study/offering/course-research-master-of-philosophy-geographic-information-science--mr-gisc/"
+      - "https://www.curtin.edu.au/study/offering/course-research-master-of-philosophy-geology--mr-geol/"
+      - "https://www.curtin.edu.au/study/offering/course-research-master-of-philosophy-humanities--mr-human/"
+      - "https://www.curtin.edu.au/study/offering/course-research-master-of-philosophy-information-systems--mr-isys/"
+      - "https://www.curtin.edu.au/study/offering/course-research-master-of-philosophy-law--mr-philaw/"
+      - "https://www.curtin.edu.au/study/offering/course-research-master-of-philosophy-marketing--mr-mktg/"
+      - "https://www.curtin.edu.au/study/offering/course-research-master-of-philosophy-mechanical-engineering--mr-mcengr/"
+      - "https://www.curtin.edu.au/study/offering/course-research-master-of-philosophy-media-culture-and-creative-arts--mr-medcca/"
+      - "https://www.curtin.edu.au/study/offering/course-research-master-of-philosophy-mining-and-metallurgical-engineering--mr-mnmete/"
+      - "https://www.curtin.edu.au/study/offering/course-research-master-of-philosophy-petroleum-engineering--mr-peteng/"
+      - "https://www.curtin.edu.au/study/offering/course-research-master-of-philosophy-physics--mr-physc/"
+      - "https://www.curtin.edu.au/study/offering/course-research-master-of-philosophy-public-policy--mr-pubpol/"
+      - "https://www.curtin.edu.au/study/offering/course-research-master-of-philosophy-surveying-and-mapping--mr-surv/"
+      - "https://www.curtin.edu.au/study/offering/course-rs-doctor-of-education--dr-educp/"
+      - "https://www.curtin.edu.au/study/offering/course-rs-doctor-of-philosophy---agriculture-and-food-science--dr-arfod/"
+      - "https://www.curtin.edu.au/study/offering/course-rs-doctor-of-philosophy---business-and-management--dr-bmgt/"
+      - "https://www.curtin.edu.au/study/offering/course-rs-doctor-of-philosophy---economics-finance-and-property--dr-ecfnpr/"
+      - "https://www.curtin.edu.au/study/offering/course-rs-doctor-of-philosophy---environmental-science--dr-entsc/"
+      - "https://www.curtin.edu.au/study/offering/course-rs-doctor-of-philosophy---exploration-geophysics--dr-geophy/"
+      - "https://www.curtin.edu.au/study/offering/course-rs-doctor-of-philosophy---mathematical-sciences--dr-mathsc/"
+      - "https://www.curtin.edu.au/study/offering/course-rs-doctor-of-philosophy---medical-radiation-science--dr-mdimsc/"
+      - "https://www.curtin.edu.au/study/offering/course-rs-doctor-of-philosophy---medicine--dr-gmed/"
+      - "https://www.curtin.edu.au/study/offering/course-rs-doctor-of-sustainable-development--dr-susdev/"
+      - "https://www.curtin.edu.au/study/offering/course-rs-master-of-philosophy-business-and-management--mr-bmgt/"
+      - "https://www.curtin.edu.au/study/offering/course-rs-master-of-philosophy-computing--mr-comptg/"
+      - "https://www.curtin.edu.au/study/offering/course-rs-master-of-philosophy-design-and-built-environment--mr-desbe/"
+      - "https://www.curtin.edu.au/study/offering/course-rs-master-of-philosophy-economics-finance-and-property--mr-ecfnpr/"
+      - "https://www.curtin.edu.au/study/offering/course-rs-master-of-philosophy-environmental-science--mr-entsc/"
+      - "https://www.curtin.edu.au/study/offering/course-rs-master-of-philosophy-geophysics--mr-geophy/"
+      - "https://www.curtin.edu.au/study/offering/course-rs-master-of-philosophy-health-science--mr-hlthsc1/"
+      - "https://www.curtin.edu.au/study/offering/course-rs-master-of-philosophy-health-studies--mr-hlthst/"
+      - "https://www.curtin.edu.au/study/offering/course-rs-master-of-philosophy-mathematical-sciences--mr-mathsc/"
+      - "https://www.curtin.edu.au/study/offering/course-rs-master-of-philosophy-medical-radiation-science--mr-mdimsc/"
+      - "https://www.curtin.edu.au/study/offering/course-rs-master-of-research-agriculture--mr-agric/"
+      - "https://www.curtin.edu.au/study/offering/course-rs-master-of-research-biomedical-science--mr-biosc/"
+      - "https://www.curtin.edu.au/study/offering/course-rs-master-of-research-chemistry--mr-chems/"
+      - "https://www.curtin.edu.au/study/offering/course-rs-master-of-research-earth-and-planetary-sciences--mr-epsci/"
+      - "https://www.curtin.edu.au/study/offering/course-rs-master-of-research-economics-and-finance--mr-econfn/"
+      - "https://www.curtin.edu.au/study/offering/course-rs-master-of-research-environmental-science--mr-envsc/"
+      - "https://www.curtin.edu.au/study/offering/course-rs-master-of-research-fine-arts--mr-finart/"
+      - "https://www.curtin.edu.au/study/offering/course-rs-master-of-research-marketing--mr-mrkt/"
+      - "https://www.curtin.edu.au/study/offering/course-rs-master-of-research-physics--mr-physs/"
+      - "https://www.curtin.edu.au/study/offering/course-rs-master-of-research-psychology--mr-psycr/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-advanced-biomedical-sciences-honours--bh-advbsc/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-advanced-commerce-honours--bh-advcom/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-advanced-science-honours--bh-advsci/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-agribusiness--b-agrbu/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-applied-geology--b-apgeol/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-applied-geology-bachelor-of-commerce-finance--bb-glyfin/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-applied-geology-bachelor-of-science-environmental-biology--bb-glybio/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-applied-science-architectural-science--b-arch/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-applied-science-construction-management--b-conm/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-applied-science-interior-architecture-honours--bh-inarch/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-arts--b-arts/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-arts-bachelor-of-commerce--bb-artcom/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-arts-bachelor-of-innovation--bb-artinn/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-arts-honours--bh-arts/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-biomedical-sciences--b-biomed/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-business-administration--b-busadm/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-commerce--b-comrce/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-commerce-honours--bh-comm/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-communications--b-mascoms/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-computing--b-comp/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-creative-arts--b-crarts/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-design--b-design/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-digital-creative-industries--b-digci/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-education-early-childhood-education--b-edec/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-education-primary-education--b-edpr/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-education-secondary-education--b-edsc/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-educational-studies--b-educ/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-engineering-chemical-engineering-honours-bachelor-of-science-chemistry--bb-cenchm/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-engineering-chemical-engineering-honours-bachelor-of-science-extractive-metallurgy--bb-cenexm/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-engineering-civil-and-construction-engineering-honours-bachelor-of-science-mining--bb-ccemn/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-engineering-honours--bh-engr/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-engineering-honours-bachelor-of-commerce--bb-engcom/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-engineering-honours-bachelor-of-innovation--bb-eninno/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-engineering-honours-bachelor-of-science--bb-engsci/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-information-technology--b-inftec/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-innovation--b-innov/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-laws--b-laws/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-laws-bachelor-of-arts--bb-lawart/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-laws-bachelor-of-commerce--bb-lawcom/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-laws-bachelor-of-innovation--bb-lawinn/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-laws-bachelor-of-science-psychology--bb-lawpsy/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-laws-bachelor-of-science-science--bb-lawsci/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-laws-honours--bh-laws/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-medical-sciences-honours--bh-medsci/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-medicine-bachelor-of-surgery--b-mbbs/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-mine-and-engineering-surveying--b-mesur/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-multidisciplinary-science--b-mtdsc/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-pharmacy-honours--bh-pharm/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-psychology--b-psych/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-science-actuarial-science--b-actuar/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-science-actuarial-science-honours--bh-actuar/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-science-advanced-nursing--b-advnurs/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-science-bachelor-of-arts--bb-sciart/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-science-bachelor-of-commerce--bb-scicom/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-science-bachelor-of-innovation--bb-scinno/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-science-biomedical-science-honours--bh-biomed/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-science-exercise-and-sport-science--b-exsprhb/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-science-health-promotion--b-hlprom/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-science-health-promotion-bachelor-of-science-health-and-safety--bb-hprhsf/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-science-health-safety-and-environment--b-hlsfenv/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-science-health-sciences--b-hlthsc/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-science-health-sciences-bachelor-of-innovation--bb-hlsinn/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-science-health-sciences-honours--bh-hlthsc/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-science-industrial-optimisation--b-inoptn/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-science-laboratory-medicine--b-labmed/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-science-medical-radiation-science--b-scimrs/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-science-midwifery--b-midwife/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-science-nursing--b-nurs/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-science-nutrition--b-nutri/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-science-nutrition-bachelor-of-innovation--bb-nutinn/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-science-nutrition-bachelor-of-science-health-promotion--bb-hprntr/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-science-occupational-therapy-honours--bh-occt1/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-science-oral-health-therapy--b-oralht/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-science-paramedicine--b-paramed/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-science-physiotherapy-honours--bh-phyth/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-science-psychology-and-human-resource-management--b-psychrm/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-science-psychology-bachelor-of-commerce-human-resource-management-and-industrial-relations--bb-psyhrm/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-science-psychology-bachelor-of-commerce-marketing--bb-psymkt/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-science-science--b-scnce/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-science-science-honours--bh-scnce/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-science-speech-pathology-honours--bh-speech/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-social-work--b-scwk/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-surveying-honours--bh-survy/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-technology-computer-systems-and-networking--b-csysnt/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-technology-computer-systems-and-networking-bachelor-of-information-technology--bb-csnbit/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-bachelor-of-urban-and-regional-planning--b-urplan2/"
+      - "https://www.curtin.edu.au/study/offering/course-ug-public-health-honours-major-bsc-health-hons--mjrh-phlth/"
+
 extraction:
   filters:
     domestic_only:
-      enabled: false
+      # 2026-05-12 fix: Curtin DOES publish domestic-only courses on the
+      # International toggle (e.g. Bachelor of Science (Computer Systems
+      # and Networking) [B-SCCSNT], Bachelor of Applied Science
+      # (Indigenous Australian Research) (Honours) [BH-INDAUS]). Their
+      # Key Information panel reads exactly "This course is not available
+      # to international students studying on an Australian student visa."
+      # — which the global hard-pattern detector matches at confidence 1.0
+      # ("not available to international students" anchor at line ~94 of
+      # single_course.py). Without this filter enabled, the page is still
+      # extracted and Curtin's CSP placeholder ($12,500/Annual) gets
+      # written as the "international fee" — staging garbage courses that
+      # cannot accept international student visas. Enabling the filter
+      # short-circuits these pages at single_course.py line ~956 before
+      # any Gemini call fires.
+      enabled: true
+
+  fees:
+    # Per-course pages publish their own international fee under
+    # "International student indicative fees", visible at
+    #   /study/offering/course-ug-...--<code>/?regionToggle=1
+    # The query param is the entire reason the previous run captured
+    # domestic-CSP fees ($4,800 for Education Primary, $7,200 for Nursing
+    # etc) instead of the real international rates ($21k-47k+).
+    central_page: ""
+    fees_pdf_url: ""
+
+    # 2026-05-12 fix: Curtin per-course pages publish BOTH labels:
+    #   "Indicative year 1 fee     $47,116*"
+    #   "Total indicative course fee  $141,348*"
+    # for multi-year degrees (e.g. 3-year Bachelor of Biomedical Sciences,
+    # 2-year Master of Commerce).  The default page-regex extractor
+    # prefers the larger total and labels it "Annual" — so the catalogue
+    # showed $141,348/Annual instead of the operator-expected
+    # $47,116/Annual.  This knob inverts the preference: the year-1
+    # label wins via proximity scoring AND fee_term is forced to
+    # "Annual".  1-year programs (Master of Cyber Security, MBA) are
+    # unaffected because they only publish a single amount.
+    prefer_year_one_over_total: true
+
+  intake:
+    # 2026-05-12 fix: Curtin PhD and Master of Philosophy pages (URL
+    # prefix /course-rd-) are research degrees with continuous enrolment.
+    # The page literally states "Enrolment shall be continuous" — there
+    # are no fixed intake months. Without this fallback the intake
+    # column is blank for every research degree (Doctor of Philosophy -
+    # Accounting, Doctor of Philosophy - Applied Geology, Master of
+    # Philosophy (Geographic Information Science), Master of Philosophy
+    # (Information Systems), and ~80 others). Operators read the blank
+    # as a scrape bug rather than as accurate "no fixed intake".
+    # Surfacing "Rolling" makes the rolling-intake intent explicit.
+    rolling_enrollment_label: "Rolling"
+    rolling_enrollment_markers:
+      - "enrolment shall be continuous"
+      - "enrollment shall be continuous"
+      - "enrolment is continuous"
+      - "enrollment is continuous"
+      - "may enrol at any time"
+      - "may enroll at any time"
+
+  english:
+    # Per-course pages don't publish per-course IELTS for most courses;
+    # central page lists "IELTS Academic 6.5 / no bands below 6.0" for most
+    # postgrad and "6.0 / no bands below 5.5" for most undergrad.
+    central_page: "https://www.curtin.edu.au/study/applying/english-language-requirements/"
+    requirements_pdf_url: ""
+
+  text_cleaning:
+    location:
+      # When a Curtin page has no campus listed under "Location", the
+      # parser sometimes grabs the academic-calendar sentinel sentence
+      # instead. Strip it so the field stays blank rather than holding
+      # a sentence.
+      strip_patterns:
+        - "^For start dates, please view the academic calendar.*$"
+
+  # ── url_rewrites: speculative — verify before relying on ──────────────────
+  # Not documented in defaults.yaml. Including in case the backend reads
+  # this key; harmless if it doesn't (just ignored). The intent is to
+  # append ?regionToggle=1 to every fetched Curtin URL so each course
+  # renders the international view server-side.
+  #
+  # If on next run fees are STILL domestic-CSP values (e.g. Nursing $7,200),
+  # then this key is being ignored and the fix has to move into backend
+  # Python code (intercept the URL request and append the query before fetch).
+  url_rewrites:
+    - host: "www.curtin.edu.au"
+      append_query: "regionToggle=1"
+
+# ── Expected next-run outcome ────────────────────────────────────────────────
+#
+# DISCOVERY
+#   ~130 candidates, ~80-90 surviving the new allow_url_patterns whitelist.
+#   /study/courses/<slug>/ pages now blocked (saves budget, removes empty rows).
+#
+# EXTRACTION — VALIDATION CHECKPOINTS
+#
+#   Validation #1 — international fee toggle (the critical test):
+#   Look up "Bachelor of Science (Biomedical Science) (Honours)" in the
+#   staged courses. Expected international fee: ~$42,834/year (per the
+#   official page at ?regionToggle=1). If the staged row STILL shows the
+#   $9,600 domestic-CSP fee, then url_rewrites is not being honored by the
+#   backend. In that case the fix has to be code-level: somewhere in the
+#   per-course fetcher, before the HTTP GET, append regionToggle=1 to the
+#   query string for any www.curtin.edu.au URL.
+#
+#   Validation #2 — Bachelor of Education (Primary). Last run staged $4,800,
+#   which is the CSP rate. Expected international rate: roughly $30k-35k/yr.
+#
+#   Validation #3 — Bachelor of Medicine, Bachelor of Surgery. Last run
+#   staged $13,600. Expected international rate is well above $70k/yr.
+#
+# IELTS COVERAGE
+#   Per-course IELTS will stay blank for most non-health courses (Curtin
+#   site genuinely doesn't publish per-course IELTS for those). Backend
+#   needs to fall back to the central English page when per-course is
+#   null. This is parser behavior, not YAML.
+#
+# LOCATIONS
+#   Should improve. The strip_patterns rule prevents the
+#   "academic calendar" sentinel from being captured as a location.
+#   Courses with a real campus listed should keep showing Perth /
+#   Kalgoorlie / Albany correctly.

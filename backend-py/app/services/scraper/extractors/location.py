@@ -47,6 +47,22 @@ _REMOVE_VIRTUAL = re.compile(
     r"\b(?:online|virtual|remote|distance(?:\s*learning)?|off[-\s]?campus|external)\b",
     re.I,
 )
+# Country names that sometimes appear as standalone comma-split parts in a
+# location string (e.g. "Sydney, Melbourne, Brisbane, Australia").  They are
+# not campus names and must be stripped from the parts list in
+# _sanitise_for_display.  _append_country_suffix may add a country suffix later
+# when appropriate — but only when the raw string did NOT already carry one
+# (see cascade guard using _COUNTRY_WORD_IN_RAW_RE below).
+_COUNTRY_NAME_PARTS_LC: frozenset[str] = frozenset({
+    "australia", "new zealand", "nz",
+    "uk", "united kingdom",
+    "usa", "united states", "united states of america",
+    "canada", "india", "china", "malaysia", "singapore",
+})
+_COUNTRY_WORD_IN_RAW_RE = re.compile(
+    r"\b(?:australia|new\s+zealand|united\s+kingdom|united\s+states)\b",
+    re.I,
+)
 _LOCATION_WINDOW = re.compile(
     r"\b(?:(?:campus\s+)?locations?|available\s+at)\s*[:\-]?\s*([^\n]{0,220}?)"
     r"(?=\b(?:intakes?|duration|fees?|student\s*type|learning\s*mode|study\s*modes?|delivery|attendance)\b|$)",
@@ -350,6 +366,17 @@ _NON_LOCATION_PHRASES: frozenset[str] = frozenset({
     "domestic and international",
     # UTAS "Study period" panel value — availability label, not a campus name.
     "study period",
+    # Newcastle (and similar) sidebar headings that the DOM-walk pass would
+    # otherwise capture as a location when no real campus label is present.
+    # The "Admission info" panel header sits next to selection rank / fees /
+    # start dates and was being staged as course_location="Admission info"
+    # or "Admission info Selection rank" on every Newcastle course where the
+    # rule pass found no campus chip (2026-05-15 fleet-wide bug — Master of
+    # Nurse Practitioner, Master of Midwifery, Diploma in Information
+    # Technology, Diploma in Media and Visual Communication, etc.).
+    "admission info",
+    "admission info selection rank",
+    "selection rank",
 })
 
 
@@ -424,7 +451,12 @@ def _normalise(raw: str | None) -> str | None:
 def _sanitise_for_display(raw: str | None) -> str | None:
     if not raw:
         return None
-    parts = [p.strip() for p in raw.split(",") if p.strip() and not _REMOVE_VIRTUAL.search(p)]
+    parts = [
+        p.strip() for p in raw.split(",")
+        if p.strip()
+        and not _REMOVE_VIRTUAL.search(p)
+        and p.strip().lower() not in _COUNTRY_NAME_PARTS_LC
+    ]
     if parts:
         # de-dup preserving order
         seen: set[str] = set()
@@ -437,7 +469,9 @@ def _sanitise_for_display(raw: str | None) -> str | None:
         return ", ".join(out)
     cleaned = _REMOVE_VIRTUAL.sub("", raw)
     cleaned = re.sub(r"\s+", " ", cleaned).strip(", ").strip()
-    return cleaned or None
+    if not cleaned or cleaned.lower() in _COUNTRY_NAME_PARTS_LC:
+        return None
+    return cleaned
 
 
 # Mirrors `study_mode._extract_strong_label_value`: a structural
@@ -512,7 +546,7 @@ def _from_strong_dom_walk(soup: BeautifulSoup) -> str | None:
     order until the next labelled boundary, mirroring
     `study_mode._extract_strong_label_value`."""
     try:
-        from bs4.element import NavigableString, Tag
+        from bs4.element import Comment, NavigableString, Tag
     except ImportError:  # pragma: no cover - bs4 is a hard dep
         return None
     for label_tag in soup.find_all(("strong", "b")):
@@ -540,6 +574,19 @@ def _from_strong_dom_walk(soup: BeautifulSoup) -> str | None:
                 continue
             if isinstance(node, NavigableString):
                 if id(node) in descendant_ids:
+                    continue
+                # Skip HTML comments — they're a NavigableString subclass so
+                # the previous isinstance(NavigableString) check accepted
+                # them.  London Metropolitan University (uni 6, 2026-05-13)
+                # placed an author comment between the <strong>Location</strong>
+                # label and the value div:
+                #   <strong>Location</strong>
+                #   <!-- display after selection, but leave  t4 content here for SEO -->
+                #   <div class="variable-data-item"><a>London Metropolitan University</a></div>
+                # which leaked the SEO note into the location value as
+                # "display after selection, but leave t4 content here for SEO
+                # London Metropolitan University".
+                if isinstance(node, Comment):
                     continue
                 text = str(node).strip()
                 if not text:
@@ -697,6 +744,313 @@ def _from_delivery_mode_inperson(soup: BeautifulSoup) -> str | None:
                 parts = [p for p in parts if not _REMOVE_VIRTUAL.search(p)]
                 if parts:
                     return _normalise(", ".join(parts))
+    return None
+
+
+def _from_newcastle_toggles(soup: BeautifulSoup) -> str | None:
+    """Newcastle (newcastle.edu.au) ``Study location`` radio toggle group.
+
+    Newcastle's per-degree page has no labelled "Location:" / "Campus:" cell.
+    Instead the campus list is rendered as an HTML radio-button group::
+
+        <h6>Study location</h6>
+        <div class="uon-option-toggles" id="degree-location-toggles">
+          <div class="uon-option-toggle">
+            <input type="radio" id="degree-location-online"
+                   data-display-label="Online">
+            <label for="degree-location-online">Online</label>
+          </div>
+          <div class="uon-option-toggle">
+            <input type="radio" id="degree-location-newcastle"
+                   data-display-label="Newcastle">
+            <label for="degree-location-newcastle">Newcastle</label>
+          </div>
+        </div>
+
+    Without a structural reader for this idiom, the location extractor
+    cascade returned None for every Newcastle Master / Diploma course
+    that did not happen to expose a campus name elsewhere in the DOM
+    (observed 2026-05-15: Master of Nursing, Master of Mental Health
+    Nursing, etc. all staged with course_location blank).
+
+    We prefer the ``data-display-label`` attribute on each radio input
+    (the canonical, locale-stable label) and fall back to the visible
+    ``<label>`` text if the attribute is missing.
+
+    Pure "Online" entries are KEPT in the comma-joined raw value here —
+    downstream ``_sanitise_for_display`` strips them via
+    ``_REMOVE_VIRTUAL`` so courses with both Online + a physical campus
+    correctly stage just the physical campus, while online-only courses
+    return None (campus-less) so the ``online_only`` guard in
+    ``guards.py`` can evaluate them.
+
+    Returns ``None`` when the ``#degree-location-toggles`` div is absent
+    or has no toggle labels.
+    """
+    container = soup.find(id="degree-location-toggles")
+    if container is None:
+        # Newcastle sometimes wraps the toggles in a different parent;
+        # fall back to a class-based search for the toggle items directly.
+        toggles = soup.select(".uon-option-toggles .uon-option-toggle")
+        if not toggles:
+            return None
+    else:
+        toggles = container.select(".uon-option-toggle")
+        if not toggles:
+            # The container exists but uses a flat layout; treat the
+            # container's direct radio inputs as the toggle list.
+            toggles = container.find_all("input", attrs={"type": "radio"})
+    items: list[str] = []
+    for tog in toggles:
+        # Prefer the radio input's data-display-label attribute.
+        label = None
+        if tog.name == "input":
+            label = tog.get("data-display-label")
+        else:
+            inp = tog.find("input")
+            if inp is not None:
+                label = inp.get("data-display-label")
+            if not label:
+                lab_el = tog.find("label")
+                if lab_el is not None:
+                    label = lab_el.get_text(" ", strip=True)
+        if not label or not isinstance(label, str):
+            continue
+        label = compact(label)
+        if not label:
+            continue
+        items.append(label)
+    if not items:
+        return None
+    # De-dup while preserving order (Newcastle pages occasionally repeat
+    # the same label across hidden + visible toggles).
+    seen: set[str] = set()
+    out: list[str] = []
+    for it in items:
+        k = it.lower()
+        if k not in seen:
+            seen.add(k)
+            out.append(it)
+    return _normalise(", ".join(out))
+
+
+def _from_qut_quickbox(soup: BeautifulSoup) -> str | None:
+    """QUT-specific structural extractor for the rendered ``Explore this course``
+    quick-box sidebar.
+
+    QUT (qut.edu.au) is fully Cloudflare-walled and JS-rendered; the rendered
+    DOM contains a sidebar block of the shape::
+
+        <b>Delivery</b>
+        <ul data-course-map-key="quickBoxDeliveryINT">
+          <li>Gardens Point</li>
+          <li>Kelvin Grove</li>
+        </ul>
+
+    There are *two* such ULs per course: ``quickBoxDeliveryDOM`` (domestic
+    students) and ``quickBoxDeliveryINT`` (international students).  Their
+    contents differ on cross-jurisdictional courses (e.g. EMBA delivers in
+    Brisbane to domestic students but in additional cities to international
+    students), so we prefer ``...INT`` when present and fall back to
+    ``...DOM`` only if INT is missing or empty.
+
+    Without this structural read, QUT pages have NO recognisable
+    ``<strong>Location</strong>`` / ``<dl>`` / ``<table>`` location node, the
+    full-page text-block fallback hits page chrome (footer city lists), and
+    the orchestrator marks ``location_text`` as missing — at which point the
+    AI fallback is invoked and Gemini hallucinates plausible-but-wrong
+    multi-city values like ``Brisbane, Canberra`` and
+    ``Brisbane, Canberra, Gold Coast`` (QUT only operates in Brisbane).
+
+    Returns ``None`` when no quickBoxDelivery* UL is present or when the
+    selected UL has no non-blank list items.
+    """
+    selected = None
+    for ul in soup.find_all("ul"):
+        key = ul.get("data-course-map-key") or ""
+        if not isinstance(key, str):
+            continue
+        if "quickBoxDeliveryINT" in key:
+            selected = ul
+            break
+    if selected is None:
+        for ul in soup.find_all("ul"):
+            key = ul.get("data-course-map-key") or ""
+            if isinstance(key, str) and "quickBoxDeliveryDOM" in key:
+                selected = ul
+                break
+    if selected is None:
+        return None
+    items: list[str] = []
+    for li in selected.find_all("li"):
+        text = compact(li.get_text(" ", strip=True))
+        if not text:
+            continue
+        # Drop pure online / virtual mentions — those are study_mode signals,
+        # not physical campuses.  A combined "Online, Gardens Point" entry
+        # from a single LI is still kept (it carries a real campus name);
+        # _normalise / _sanitise_for_display will scrub the ``Online`` token.
+        if _REMOVE_VIRTUAL.fullmatch(text):
+            continue
+        items.append(text)
+    if not items:
+        return None
+    return _normalise(", ".join(items))
+
+
+def _from_unisq_quickfacts(soup: BeautifulSoup) -> str | None:
+    """UniSQ (unisq.edu.au) per-degree quick-facts panel.
+
+    UniSQ renders the quick-facts strip directly under the page hero as a
+    horizontal flex panel with six icon-labelled columns::
+
+        Entry requirements  Duration  Location   Start         Fees      CRICOS
+        View full details   2 years   Ipswich    Feb, Jun, Sep AUD …     078596M
+                                      Toowoomba  View dates    (Indic…)
+                                      External
+                                      Online
+
+    Each column header (``Location``, ``Duration``, ``Start`` …) is a plain
+    text node inside a small container; the values are stacked beneath as
+    sibling text nodes / `<p>` / `<div>` elements.  The generic
+    `_from_strong_dom_walk`, `_from_dl`, `_from_panel_divs`, `_from_tables`
+    and `_from_headings` walkers all miss this idiom because:
+
+      * The label is not a `<strong>` / `<dt>` / `<th>` / `<h*>`
+      * There is no labelled "Location:" pair — just a label followed by
+        a stack of sibling text nodes
+      * `_from_panel_divs` only reads a single next-sibling value (it would
+        return ``"Ipswich"`` and drop Toowoomba)
+
+    Without this reader, the cascade falls through to `_from_text_block`
+    which scans the *whole page text* and false-matches the homepage-footer
+    quick-links column ("Accommodation UniSQ Events Contributing to our
+    communities") — observed fleet-wide on every UniSQ course staged
+    2026-05-17.
+
+    We anchor on an element whose own (label-only) text is exactly
+    ``"Location"`` (case-insensitive, optional trailing colon) and then
+    collect adjacent / sibling text nodes within the same small container
+    until we hit another quick-fact label.  Pure "Online" / "External" /
+    "Distance" entries are KEPT in the comma-joined raw value here —
+    downstream `_sanitise_for_display` strips them via `_REMOVE_VIRTUAL`
+    so courses with both Online + a physical campus stage just the
+    physical campus, while online-only courses return None (campus-less)
+    so the `online_only` guard in `guards.py` can fire downstream.
+
+    Returns ``None`` when no exact "Location" label is found or the
+    harvested value set has no recognisable campus tokens.
+    """
+    from bs4.element import NavigableString, Tag
+
+    _LABEL_RE = re.compile(r"^\s*location\s*:?\s*$", re.I)
+    # Sibling text matching any of these patterns means we've crossed
+    # into the next quick-fact column — stop harvesting.
+    _NEXT_LABEL_RE = re.compile(
+        r"^\s*(?:entry\s+requirements?|view\s+full\s+details|duration"
+        r"|start|view\s+dates|fees?|cricos|note|how\s+to\s+apply"
+        r"|domestic\s+student|international\s+student|compare)\b",
+        re.I,
+    )
+    # Hard sanity bound: a single quick-fact column never carries more
+    # than ~8 stacked entries (UniSQ has 3 physical campuses + 3 modes
+    # at most).  Caps runaway harvesting on unusual DOM shapes.
+    _MAX_VALUES = 12
+
+    label_els: list[Tag] = []
+    for el in soup.find_all(["p", "div", "span", "strong", "b", "h5", "h6", "dt"]):
+        own_text = el.get_text(" ", strip=True)
+        if not own_text or not _LABEL_RE.match(own_text):
+            continue
+        # Must be a leaf-ish label: no block children carrying the label
+        # text (otherwise we'd match e.g. a paragraph that opens with
+        # "Location: ..." which we want the strong/dl walkers to handle).
+        if el.find(["div", "table", "ul", "ol", "p"]):
+            continue
+        label_els.append(el)
+
+    for label_el in label_els:
+        values: list[str] = []
+        # Strategy A: same-parent text harvest — collect sibling content
+        # AFTER the label until the next quick-fact label is hit.
+        parent = label_el.parent
+        if parent is not None:
+            after_label = False
+            for child in parent.children:
+                if isinstance(child, Tag) and child is label_el:
+                    after_label = True
+                    continue
+                if not after_label:
+                    continue
+                if isinstance(child, NavigableString):
+                    txt = str(child).strip()
+                else:
+                    txt = child.get_text(" ", strip=True)
+                if not txt:
+                    continue
+                if _NEXT_LABEL_RE.search(txt):
+                    break
+                # Split inline-text harvests on newlines so a single
+                # `<p>Ipswich\nToowoomba\nExternal\nOnline</p>` yields
+                # four parts.
+                for part in re.split(r"[\r\n]+|\s*,\s*", txt):
+                    part = part.strip(" \t-•·|")
+                    if not part:
+                        continue
+                    if _NEXT_LABEL_RE.search(part):
+                        break
+                    values.append(part)
+                    if len(values) >= _MAX_VALUES:
+                        break
+                if len(values) >= _MAX_VALUES:
+                    break
+        # Strategy B: if same-parent harvest yielded nothing, walk the
+        # label's next siblings at the parent level (icon-label idiom
+        # where label and values are siblings of the icon container).
+        if not values:
+            for sib in label_el.find_next_siblings():
+                txt = sib.get_text(" ", strip=True) if hasattr(sib, "get_text") else str(sib).strip()
+                if not txt:
+                    continue
+                if _NEXT_LABEL_RE.search(txt):
+                    break
+                for part in re.split(r"[\r\n]+|\s*,\s*", txt):
+                    part = part.strip(" \t-•·|")
+                    if not part:
+                        continue
+                    if _NEXT_LABEL_RE.search(part):
+                        break
+                    values.append(part)
+                    if len(values) >= _MAX_VALUES:
+                        break
+                if len(values) >= _MAX_VALUES:
+                    break
+        if not values:
+            continue
+        # De-dup while preserving order.
+        seen: set[str] = set()
+        out: list[str] = []
+        for v in values:
+            k = v.lower()
+            if k in seen:
+                continue
+            seen.add(k)
+            out.append(v)
+        if not out:
+            continue
+        # Require at least one token to be a recognised AU city (the three
+        # UniSQ campuses are Toowoomba, Springfield, Ipswich — all in
+        # _COMMON_CITIES).  This guards against the label appearing in
+        # some unrelated panel further down the page that happens to
+        # carry the literal word "Location".
+        common_lc = {c.lower() for c in _COMMON_CITIES}
+        if not any(v.lower() in common_lc for v in out):
+            # Allow pure-virtual results to pass through too — the
+            # downstream _sanitise_for_display strip will return None
+            # and the online_only guard takes over.
+            if not any(_REMOVE_VIRTUAL.fullmatch(v) for v in out):
+                continue
+        return _normalise(", ".join(out))
     return None
 
 
@@ -874,7 +1228,15 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:  # noqa: ARG00
         or soup.find(id="tabintl")
         or soup.find(attrs={"id": re.compile(r"tab.?international", re.I)})
     )
-    _is_utas_host: bool = "utas.edu.au" in (url or "").lower()
+    # Parsed-hostname check — a naive substring (`"utas.edu.au" in url`)
+    # also matches `notutas.edu.au` and `utas.edu.au.evil.com`, which would
+    # mis-route those hosts into the UTAS-only cascade.  Use urlparse +
+    # exact host / .suffix match instead.
+    from urllib.parse import urlparse as _urlparse
+    _parsed_host: str = (_urlparse(url or "").hostname or "").lower()
+    _is_utas_host: bool = (
+        _parsed_host == "utas.edu.au" or _parsed_host.endswith(".utas.edu.au")
+    )
 
     # For UTAS pages that have a #tabInternational panel: scope the cascade
     # ENTIRELY to that panel.  Do NOT run any full-page structural method as a
@@ -891,9 +1253,83 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:  # noqa: ARG00
     #
     # Correct behaviour: if the international panel has no physical location,
     # course_location should be blank → UTAS guard rejects the course.
-    if _has_utas_panel:
+    _is_qut_host: bool = "qut.edu.au" in (url or "").lower()
+
+    # IMPORTANT — the UTAS-panel branch MUST be gated on the UTAS host.
+    # Without the host guard, the `tab.?international` regex (where `.` is
+    # a wildcard, not a literal) false-matches non-UTAS pages that happen
+    # to ship a `<div id="tab-international">` marketing widget — most
+    # notably Newcastle (newcastle.edu.au) per-degree pages, whose footer
+    # carries exactly such a div.  When that happens the cascade collapses
+    # to `[_from_utas_intl_panel]` only, which returns None on Newcastle
+    # pages, and `course_location` stages blank fleet-wide.  Verified
+    # 2026-05-17 on Master of Nursing, Master of Leadership and Management
+    # in Education, and Master of Health Management and Policy (Global).
+    if _has_utas_panel and _is_utas_host:
         cascade_list: list[tuple[str, str | None, float]] = [
             ("utas_intl_panel", _from_utas_intl_panel(soup), 0.95),
+        ]
+    elif "newcastle.edu.au" in (url or "").lower():
+        # Newcastle (newcastle.edu.au): the per-degree page renders the
+        # campus list as a radio-toggle group under <h6>Study location</h6>.
+        # The structural reader for this idiom (_from_newcastle_toggles)
+        # runs FIRST at confidence 0.95 — it reads the canonical
+        # data-display-label attributes and is more reliable than any of
+        # the generic strong/dl/heading walkers, which all miss the
+        # toggle-button DOM shape.
+        cascade_list: list[tuple[str, str | None, float]] = [
+            ("newcastle_toggles", _from_newcastle_toggles(soup), 0.95),
+            ("strong", _from_strong_dom_walk(soup), 0.9),
+            ("dl", _from_dl(soup), 0.9),
+            ("div_panel", _from_panel_divs(soup), 0.88),
+            ("table", _from_tables(soup), 0.85),
+            ("heading", _from_headings(soup), 0.7),
+            ("delivery_inperson", _from_delivery_mode_inperson(soup), 0.85),
+            ("text_block", _from_text_block(html_to_text(html)), 0.5),
+        ]
+    elif "unisq.edu.au" in (url or "").lower():
+        # UniSQ (unisq.edu.au): the per-degree page renders the campus list
+        # as a stacked text column inside a horizontal icon-labelled
+        # quick-facts panel under <… >Location</…>.  The structural reader
+        # for this idiom (_from_unisq_quickfacts) runs FIRST at confidence
+        # 0.95 — without it the cascade falls through to _from_text_block
+        # and reads homepage-footer quick-links ("Accommodation UniSQ
+        # Events Contributing to our communities") as the "location".
+        # Observed 2026-05-17 on every staged UniSQ course
+        # (Master of Science, Bachelor of Nursing, Master of Information
+        # Technology, etc.) — fleet-wide blank/wrong course_location.
+        cascade_list: list[tuple[str, str | None, float]] = [
+            ("unisq_quickfacts", _from_unisq_quickfacts(soup), 0.95),
+            ("strong", _from_strong_dom_walk(soup), 0.9),
+            ("dl", _from_dl(soup), 0.9),
+            ("div_panel", _from_panel_divs(soup), 0.88),
+            ("table", _from_tables(soup), 0.85),
+            ("heading", _from_headings(soup), 0.7),
+            ("delivery_inperson", _from_delivery_mode_inperson(soup), 0.85),
+            # Critically, NO text_block fallback for UniSQ — the page
+            # chrome (footer quick-links: "Accommodation UniSQ Events
+            # Contributing to our communities") seeds the exact junk
+            # that caused this bug.  If the structural readers all miss,
+            # leave course_location blank so the AI fallback / review
+            # queue can flag it instead of staging garbage.
+        ]
+    elif _is_qut_host:
+        # QUT cascade: scope to the structural quickBoxDelivery* sidebar.
+        # Falls through to the generic strong/dl/etc. cascade only when the
+        # quick-box ULs are absent (very rare — present on every per-course
+        # page in the rendered DOM).  Critically, we do NOT run
+        # ``_from_text_block`` for QUT: the page chrome (footer "Our
+        # campuses" mega-menu, partner-city links) seeds false positives
+        # like "Brisbane, Sydney, Melbourne" / "Brisbane, Canberra" that
+        # have no relationship to the course's actual delivery campus.
+        cascade_list = [
+            ("qut_quickbox", _from_qut_quickbox(soup), 0.95),
+            ("strong", _from_strong_dom_walk(soup), 0.9),
+            ("dl", _from_dl(soup), 0.9),
+            ("div_panel", _from_panel_divs(soup), 0.88),
+            ("table", _from_tables(soup), 0.85),
+            ("heading", _from_headings(soup), 0.7),
+            ("delivery_inperson", _from_delivery_mode_inperson(soup), 0.85),
         ]
     else:
         cascade_list = [
@@ -933,12 +1369,46 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:  # noqa: ARG00
         display = _sanitise_for_display(raw)
         if not display:
             continue
+        # 2026-05-22 — Site-chrome chokepoint (post-mortem on UniSQ uni 562).
+        # Every cascade method (strong/dl/div_panel/table/heading/
+        # delivery_inperson/text_block/utas_intl_panel/newcastle_toggles/
+        # unisq_quickfacts/qut_quickbox) passes through this loop. Any of
+        # them can read a site-footer link block as a "Location:" value
+        # when the page emits a labelled list-like DOM shape inside the
+        # footer (UniSQ's `<dl>`/`<strong>` footer quick-links column
+        # "Accommodation UniSQ Events Contributing to our communities"
+        # matched method=strong/method=dl on ~25 staged courses 2026-05-22).
+        # The pipeline-side `_is_location_chrome` guards (single_course.py
+        # lines 2434/2584/3711) only protect the Gemini PRIMARY / FALLBACK
+        # writes — the structural cascade had no equivalent gate, so the
+        # chrome value entered `payload[course_location]` with method=
+        # `location.<method>` and propagated unchecked.  This is the
+        # single chokepoint that catches every structural source.
+        try:
+            from app.services.scraper.pipelines.single_course import (
+                _is_location_chrome as _loc_chrome_guard,
+            )
+            if _loc_chrome_guard(display):
+                continue  # site-chrome string — try the next cascade method
+        except Exception:  # noqa: BLE001 — never abort extraction on import error
+            pass
         # Append country suffix when all tokens are unambiguous AU/NZ cities.
-        # Skip for: (a) utas_intl_panel results, and (b) any UTAS-domain page.
-        # UTAS campus names include non-standard tokens and overseas partners
-        # that make the suffix inconsistent — see comment above.
-        if method != "utas_intl_panel" and not _is_utas_host:
-            display = _append_country_suffix(display)
+        # Skip for: (a) utas_intl_panel results, (b) any UTAS-domain page,
+        # and (c) when the raw string already contained a country word — in
+        # that case _sanitise_for_display already stripped the bare country
+        # token and we must not re-add it as a suffix (e.g. a page that lists
+        # "Sydney, Melbourne, Brisbane, Australia" should yield
+        # "Sydney, Melbourne, Brisbane", not "Sydney, Melbourne, Brisbane,
+        # Australia" again).
+        # 2026-05-13: country-suffix appending disabled per user preference.
+        # The dashboard previously displayed locations like
+        # "Sydney, Melbourne, Brisbane, Adelaide, Australia" — the trailing
+        # ", Australia" is noise (every Australian uni page is implicitly AU).
+        # The strip path (_sanitise_for_display) still removes country tokens
+        # that appear in the raw HTML; we just no longer re-add a suffix.
+        # _append_country_suffix is kept for any caller that may still want
+        # to opt in explicitly, but the structural cascade no longer calls it.
+        _raw_had_country = bool(_COUNTRY_WORD_IN_RAW_RE.search(raw))  # noqa: F841 — kept for future per-uni opt-in
         return [
             ExtractionResult(
                 field_key="course_location",

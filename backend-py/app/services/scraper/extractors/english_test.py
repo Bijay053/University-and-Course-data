@@ -1119,4 +1119,29 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
 
     # Last-resort: equivalence-table lookup for tests not captured by prose.
     results.extend(_equivalence_fallback(html, results))
+
+    # ── Per-uni english.test_blocklist (opt-in via YAML) ────────────────────
+    # Drop any extracted result whose field_key starts with a blocklisted
+    # test prefix (e.g. blocklist=["kite", "duolingo"] drops kite_overall and
+    # duolingo_overall). Empty list (default) = no-op.
+    try:
+        from app.services.scraper.config.context import get_uni_config
+        cfg = get_uni_config()
+        if cfg is not None:
+            blocklist_raw = cfg.extraction.english.test_blocklist or []
+            if blocklist_raw:
+                blocklist = {b.strip().lower() for b in blocklist_raw if b and b.strip()}
+                before = len(results)
+                results = [
+                    r for r in results
+                    if r.field_key.split("_", 1)[0].lower() not in blocklist
+                ]
+                if len(results) != before:
+                    log.info(
+                        "english_test.blocklist: dropped %d result(s) matching %s",
+                        before - len(results), sorted(blocklist),
+                    )
+    except Exception as exc:  # noqa: BLE001
+        log.debug("english_test.blocklist failed (ignored): %s", exc)
+
     return results

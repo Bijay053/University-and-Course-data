@@ -417,14 +417,57 @@ def should_stage_course(
     ).strip()
 
     if "online" in _study_mode and not _has_campus_component:
+        # Per-uni opt-out: distance-education-heavy universities (e.g. CSU,
+        # Open Universities Australia) legitimately publish many bachelors
+        # and masters as 100% online for international students.  When the
+        # uni's YAML sets ``extraction.filters.online_only.enabled: false``
+        # (the global default) we keep the row.  When set to true (the
+        # historical hard-coded behaviour) we reject as before.
+        try:
+            from app.services.scraper.config.context import (  # noqa: PLC0415
+                get_uni_config,
+            )
+            _uni_cfg = get_uni_config()
+            # Fail-safe: any missing layer (no context, no extraction block,
+            # no filters block, no online_only block) keeps the historical
+            # hard-coded reject.  Only an explicit ``enabled: false`` in the
+            # uni's loaded YAML can opt out — partial / hand-built UniConfig
+            # objects (e.g. test code, future migrations) cannot accidentally
+            # disable the gate.
+            if (
+                _uni_cfg is None
+                or _uni_cfg.extraction is None
+                or _uni_cfg.extraction.filters is None
+                or _uni_cfg.extraction.filters.online_only is None
+            ):
+                _online_filter_enabled = True
+            else:
+                _online_filter_enabled = bool(
+                    _uni_cfg.extraction.filters.online_only.enabled
+                )
+        except Exception:  # noqa: BLE001 — never crash on config lookup
+            log.warning(
+                "online_only YAML lookup raised; falling back to historical "
+                "reject behaviour",
+                exc_info=True,
+            )
+            _online_filter_enabled = True  # fail safe: keep historical behaviour
+
+        if _online_filter_enabled:
+            log.info(
+                "[REJECT CHECK] course=%r detected_modes=[%s] detected_locations=[%s] "
+                "decision=reject (online_only — study_mode is authoritative)",
+                effective_name,
+                payload.get("study_mode", "Online"),
+                _physical_location or "none",
+            )
+            return (False, "online_only")
         log.info(
-            "[REJECT CHECK] course=%r detected_modes=[%s] detected_locations=[%s] "
-            "decision=reject (online_only — study_mode is authoritative)",
+            "[ONLINE-OK] course=%r study_mode=%r — accepted (per-uni "
+            "online_only filter disabled)",
             effective_name,
             payload.get("study_mode", "Online"),
-            _physical_location or "none",
         )
-        return (False, "online_only")
 
     # UTAS-specific online_only: utas.edu.au pages always declare a physical
     # campus name in their "Location" panel when the course has any on-campus
@@ -443,13 +486,30 @@ def should_stage_course(
     # only confirmed physical campuses.  location_text is the raw value from
     # the page and may be "Online" — using it here would make the guard treat
     # "Online" as a physical campus and silently let the course through.
+    # UTAS rejection fires on EITHER of two signals:
+    #   (a) `course_location` is blank — the historical signal; the location
+    #       extractor stripped virtual keywords ("Online", "Distance", ...) so
+    #       blank means the panel contained ONLY a virtual value.
+    #   (b) `payload["online_only_utas"]` is True — set by single_course.py
+    #       when Gemini's `mode` field returned exactly "Online" for a UTAS
+    #       page. Needed because utas.yaml's `default_course_location: "Hobart"`
+    #       fallback fills course_location with "Hobart" on partial-HTML
+    #       fetches, masking signal (a) for real online-only pages like the
+    #       Graduate Certificate in Dementia (M5x, 2026-05-17 report).
     _utas_physical_location = (payload.get("course_location") or "").strip()
-    if "utas.edu.au" in (source_url or "").lower() and not _utas_physical_location:
+    _is_utas = "utas.edu.au" in (source_url or "").lower()
+    _utas_online_via_gemini = bool(payload.get("online_only_utas"))
+    if _is_utas and (not _utas_physical_location or _utas_online_via_gemini):
+        _reason = (
+            "utas_online_gemini_mode — Gemini detected Location: Online"
+            if _utas_online_via_gemini
+            else "utas_online_blank_location — Location panel was Online only"
+        )
         log.info(
-            "[REJECT CHECK] course=%r url=%r decision=reject "
-            "(utas_online_blank_location — Location panel was Online only)",
+            "[REJECT CHECK] course=%r url=%r decision=reject (%s)",
             effective_name,
             source_url,
+            _reason,
         )
         return (False, "online_only")
 
@@ -551,7 +611,21 @@ _BLOCK_URL_SUBSTRINGS: tuple[tuple[str, str], ...] = (
     # programme but are themselves not a single course.
     ("/study-at-",              "marketing_page"),  # /study-at-uow, /study-at-une-online
     ("/study-online/",          "category_landing_page"),
-    ("/study-with-us",          "marketing_page"),
+    # NOTE: bare "/study-with-us" is INTENTIONALLY narrowed.  MIT
+    # (Melbourne Institute of Technology) — and any future university
+    # that uses Drupal-style brand-subsite URL hierarchy — publishes
+    # real course pages at /study-with-us/programs/<slug> and
+    # /study-with-us/our-courses/<slug>.  A bare "/study-with-us"
+    # substring rule killed all 27 of MIT's real courses (Bachelor of
+    # Business, Master of Networking, etc.) at the staging gate
+    # (2026-05-13).  Only block the well-known audience-landing
+    # sub-paths; rely on /why-, /scholarships, /how-to-apply, /open-day,
+    # /info-night, /webinar etc. (already in this list) to catch every
+    # other marketing variant.
+    ("/study-with-us/international-students/", "marketing_page"),
+    ("/study-with-us/domestic-students/",      "marketing_page"),
+    ("/study-with-us/student-support",         "marketing_page"),
+    ("/study-with-us/student-life",            "campus_page"),
     # Pathway / preparation hub URLs (these are college pages, not real
     # university degree pages).
     ("/pathways-to-uni",        "pathway_page"),
@@ -639,6 +713,43 @@ _BLOCK_URL_SUBSTRINGS: tuple[tuple[str, str], ...] = (
     # discovery gate, staging gate) and also eliminates ~$0.001/URL wasted
     # on Gemini calls that extract nothing.
     ("/content/dam/",           "asset_library_pdf"),
+    # UTAS CMS asset path — PDF course guides / brochures published at
+    # /__data/assets/pdf_file/...  Discovered via faculty listing page nav
+    # links (e.g. "Download the 2027 Course Guide") but are binary files,
+    # not HTML course detail pages.  Triggers 429 + 600 s cooldown when
+    # the browser attempts to render them.
+    ("/__data/assets/",         "asset_library_pdf"),
+    # Generic PDF URL guard — any URL whose path contains ".pdf" is a
+    # document file, never a real course detail page.  PDF links appear
+    # on many university faculty pages (brochures, handbooks, fee schedules)
+    # and should be filtered before they consume a browser slot + cooldown.
+    # ".pdf" as a substring safely covers both bare ".pdf" (path ends here)
+    # and ".pdf?" query strings; it cannot accidentally match a real course
+    # slug since those never contain a dot-extension sequence.
+    (".pdf",                    "asset_library_pdf"),
+    # UTAS undergraduate category listing pages.  The main /courses page
+    # has nav links to /study/undergraduate/* discipline hubs which are
+    # category listings, not individual CRICOS course detail pages.
+    # Match with AND without trailing slash to catch both /study/undergraduate
+    # and /study/undergraduate/ as seen in different browser nav exports.
+    ("/study/undergraduate",    "category_landing_page"),
+    # UTAS /study/certificates — the certificate study-type category hub.
+    # Not a CRICOS course page; real certificate courses appear under
+    # /courses/<faculty>/courses/<slug>.  The trailing slash anchors
+    # to the hub URL (/study/certificates and /study/certificates/).
+    ("/study/certificates",     "category_landing_page"),
+    # UTAS study-info pages that are NOT course detail pages.  These pages
+    # appear in BFS because /courses links to them in the site navigation.
+    # All real UTAS CRICOS courses live under /courses/<faculty>/courses/<slug>.
+    ("/study/learning-abroad",  "category_landing_page"),
+    ("/study/interstate",       "category_landing_page"),
+    ("/study/areas/",           "category_landing_page"),
+    ("/study/international",    "category_landing_page"),
+    ("/study/online",           "category_landing_page"),
+    ("/study/sustainability",   "category_landing_page"),
+    ("/study/parents-and-carers", "category_landing_page"),
+    ("/study/starting-at-the-university", "category_landing_page"),
+    ("/study/postgraduate",     "category_landing_page"),
 )
 
 # URL query-string substring matches.  Real course-detail pages do not
@@ -664,6 +775,27 @@ _BLOCK_URL_QUERY_SUBSTRINGS: tuple[tuple[str, str], ...] = (
 _BLOCK_URL_LAST_SEGMENTS: dict[str, str] = {
     "undergraduate-study":      "category_landing_page",
     "postgraduate-study":       "category_landing_page",
+    # Bare nav-root last-segments — when /…/undergraduate (or /…/postgraduate)
+    # ends the URL with NO course slug after it, the page is the listing
+    # root, not a course.  Real course URLs always have the degree-name
+    # slug as the last segment (e.g.
+    # /find-a-course/undergraduate/employability-initiatives/cooperative-
+    # education-program-in-actuarial-studies → last segment is the long
+    # course slug, never the bare word "undergraduate").  Safe globally:
+    # no university publishes a real course detail page at a URL whose
+    # last segment is literally "undergraduate" or "postgraduate".
+    "undergraduate":            "category_landing_page",
+    "postgraduate":             "category_landing_page",
+    # Macquarie nav-driven landing pages discovered via browser BFS when
+    # the catalogue seeds short-circuit on Cloudflare (2026-05-18 leak).
+    "combined-bachelor-master-degrees": "category_landing_page",
+    "double-degree-builder":    "category_landing_page",
+    "browse-all-degrees":       "category_landing_page",
+    "view-degrees":             "category_landing_page",
+    "view-all-degrees":         "category_landing_page",
+    "all-degrees":              "category_landing_page",
+    "all-courses":              "category_landing_page",
+    "find-a-course":            "category_landing_page",
     "study-online":             "category_landing_page",
     "online-study":             "category_landing_page",
     "online-courses":           "category_landing_page",
@@ -808,6 +940,21 @@ _BLOCK_TITLE_EXACT: frozenset[str] = frozenset({
     "programs",
     "programmes",
     "degrees",
+    # 2026-05-18 — Macquarie nav-label leaks: anchor-text-derived course
+    # names harvested by browser BFS from MQ's mega-menu.  Real degree
+    # titles always start with a qualification word (Bachelor, Master,
+    # Diploma, Certificate, Doctor, MBA, ...).  None of these can match
+    # a real course title.
+    "browse all degrees",
+    "view degrees",
+    "view all degrees",
+    "view all courses",
+    "all degrees",
+    "all courses",
+    "combined bachelor master degrees",
+    "combined bachelor/master degrees",
+    "double degree builder",
+    "find a course",
 })
 
 

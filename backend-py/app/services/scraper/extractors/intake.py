@@ -158,7 +158,17 @@ _INTAKE_LABEL_RE = re.compile(
     r"course\s+(?:start\s+dates?|commencement|starts?)|"
     r"study\s+(?:periods?|start)|class\s+starts?|"
     r"applications?\s+(?:open|close|closing|opening\s+date)|"
-    r"entry\s+points?)",
+    r"entry\s+points?)"
+    # Optional trailing campus parenthetical, e.g. "Start dates (Newcastle)",
+    # "Start dates (Central Coast)", "Start dates (Sydney)".  Without this,
+    # the fullmatch in `_extract_strong_label_value` rejects the label and
+    # the extractor falls through to greedy text passes that pick up
+    # cross-campus dates from the international-toggle expanded view —
+    # the 2026-05-15 Newcastle bug where Bachelor of Physiotherapy staged
+    # intake_months=["January","February"] instead of the correct ["January"]
+    # (the only displayed start date is "Semester 1 — 27 Jan 2026 (Newcastle)").
+    # Bounded to 40 chars so a value mis-tagged as <strong> can't slip through.
+    r"(?:\s*\([^)]{1,40}\))?",
     re.IGNORECASE,
 )
 _STRONG_VALUE_CHAR_CAP = 300
@@ -429,6 +439,34 @@ def _strip_recently_viewed(text: str) -> str:
 
 _UOW_HOSTS: frozenset[str] = frozenset({"www.uow.edu.au", "uow.edu.au"})
 
+# ECU (Edith Cowan University) — every coursework programme page publishes
+# its intake calendar as a "Semester availability" / "Availability & Campus
+# Location" pivot whose column headers are literally "Semester 1" and
+# "Semester 2" (and occasionally "Semester 3").  No explicit month names
+# appear in those sections, so the regex passes below fall through to the
+# rest of the page text and pick up:
+#   - "may" (lowercase) from sentences like "Applicants may apply…"
+#   - "August / September" from the "Information Sessions" events sidebar
+#     ("Tue 11 Aug Tuesday, 11 August South West Teacher Education
+#     Information Session…  Mon 07 Sep Monday, 07 September …")
+# Net effect on the 2026-05-11 ECU scrape (job_2c8b501ed7d3): ~80% of
+# bachelor courses were staged with intake_months=["May"] and the research
+# masters / cyber-security cert were staged with ["August","September"] —
+# every one of them should be Feb+Jul.  The fix mirrors the UOW pattern:
+# detect the ECU semester anchors and map directly to the AU academic
+# calendar (Semester 1 → Feb, Semester 2 → Jul, Semester 3 → Oct), short-
+# circuiting the noisy Pass-1/2 raw-month scan.
+_ECU_HOSTS: frozenset[str] = frozenset({"www.ecu.edu.au", "ecu.edu.au"})
+
+# Anchors that confirm we are looking at ECU's canonical course-page
+# semester pivot, not an incidental "Semester 1" mention elsewhere on the
+# site.  Either anchor is sufficient — both appear on every ECU coursework
+# page sampled (Bachelor / Master / Graduate Certificate / research masters).
+_ECU_SEMESTER_ANCHOR_RE = re.compile(
+    r"(?:Semester\s+availability|Availability\s*(?:&amp;|&)\s*Campus)",
+    re.IGNORECASE,
+)
+
 # Labels that indicate a nearby month is a real intake/session, not a
 # deadline or key-date.  Used by the UOW-specific session guard below.
 _SESSION_LABEL_RE = re.compile(
@@ -464,6 +502,7 @@ async def _extract_raw(html: str, url: str) -> list[ExtractionResult]:
     from urllib.parse import urlparse as _up
     _host = (_up(url).netloc or "").lower()
     _is_uow = _host in _UOW_HOSTS
+    _is_ecu = _host in _ECU_HOSTS
 
     # Campus-pivot pass: handles UNE "Start dates and campus" table where
     # months appear in column headers (e.g. "Trimester 1 – February 2026")
@@ -543,6 +582,55 @@ async def _extract_raw(html: str, url: str) -> list[ExtractionResult]:
                     confidence=0.82,
                     snippet=f"summary-start: {_summary_hit.group(0)[:60]}",
                     method="intake.summary_start",
+                )
+            ]
+
+    # ── ECU-specific: Semester N → month mapping takes priority ──────────
+    # See _ECU_SEMESTER_ANCHOR_RE doc above.  ECU course pages do NOT carry
+    # explicit month names in their intake widget — only "Semester 1" /
+    # "Semester 2" column headers — so the raw Pass-1/2 month scan locks
+    # onto incidental tokens (lowercase "may" inside body sentences, "Aug"
+    # / "Sep" from the Information-Sessions events sidebar) and produces
+    # uniformly wrong intake months across the catalogue.  We run the
+    # Semester-N scan FIRST when an ECU semester anchor is present and
+    # return immediately, skipping the noisy passes entirely.  Conservative:
+    # if neither anchor is present (unusual ECU pages: doctorates, study-
+    # abroad blurbs, news articles) we fall through to the default chain.
+    if _is_ecu:
+        # Scope the Semester-N scan to a tight window around each anchor
+        # match.  Without this, curriculum tables that mention "Year 1
+        # Semester 3" (or unit guides referencing Sem 3) inflate the intake
+        # list with months not actually offered as intakes.  ±400 chars is
+        # enough to cover the entire "Semester availability" / "Availability
+        # & Campus Location" pivot block on every ECU page sampled while
+        # excluding curriculum, FAQ, and footer mentions far from the
+        # anchor.
+        _ecu_anchor_hits = list(_ECU_SEMESTER_ANCHOR_RE.finditer(text))
+    else:
+        _ecu_anchor_hits = []
+    if _is_ecu and _ecu_anchor_hits:
+        _ECU_WIN = 400
+        scope_chunks: list[str] = []
+        for am in _ecu_anchor_hits:
+            lo = max(0, am.start() - _ECU_WIN)
+            hi = min(len(text), am.end() + _ECU_WIN)
+            scope_chunks.append(text[lo:hi])
+        scope_text = "\n".join(scope_chunks)
+        ecu_months: list[str] = []
+        for m in _SEMESTER_RE.finditer(scope_text):
+            mapped = _SEMESTER_MONTH_MAP.get(m.group(1))
+            if mapped and mapped not in ecu_months:
+                ecu_months.append(mapped)
+        if ecu_months:
+            ordered = [mo for mo in _MONTHS if mo in set(ecu_months)]
+            return [
+                ExtractionResult(
+                    field_key="intake_months",
+                    value=ordered,
+                    normalized={"intake_months": ordered, "intake_days": None},
+                    confidence=0.85,
+                    snippet=f"ECU semester: {', '.join(ordered)}",
+                    method="intake.ecu_semester",
                 )
             ]
 
@@ -652,6 +740,64 @@ async def _extract_raw(html: str, url: str) -> list[ExtractionResult]:
     ]
 
 
+# ── QUT structural reader (qut.edu.au) ─────────────────────────────────────
+# QUT's per-course pages publish the canonical intake months for international
+# applicants inside a sidebar UL of the shape::
+#
+#     <b>Entry</b>
+#     <ul data-course-map-key="quickBoxCourseStartsINT">
+#       <li>January</li>
+#       <li>July</li>
+#     </ul>
+#
+# The generic regex cascade reads the full course prose and pulls in
+# unrelated month tokens from "applications open", testimonial copy, and
+# scholarship windows, producing 5–6 month lists that don't match the
+# canonical 2-month intake the live page actually shows.  This structural
+# reader is host-gated to qut.edu.au and runs BEFORE _extract_raw so the
+# canonical INT entry always wins.
+# Verified 2026-05-17 on Graduate Diploma in Legal Practice
+# (university_id QUT, course id 22761; stored ["January","March","May",
+# "July","August","October"] vs page-canonical ["January","July"]).
+def _from_qut_quickbox(html: str, url: str) -> list[str] | None:
+    from urllib.parse import urlparse as _urlparse
+    host = (_urlparse(url or "").hostname or "").lower()
+    if not (host == "qut.edu.au" or host.endswith(".qut.edu.au")):
+        return None
+    from bs4 import BeautifulSoup
+    soup = BeautifulSoup(html, "html.parser")
+    # Preference: INT (canonical international value) → DOM (fallback).
+    for preferred in ("quickBoxCourseStartsINT", "quickBoxCourseStartsDOM"):
+        for el in soup.find_all(attrs={"data-course-map-key": True}):
+            key = el.get("data-course-map-key") or ""
+            # Exact-match (not substring) — matches the duration reader's
+            # tightened key-precedence guard.  Prevents future variant
+            # keys (e.g. a hypothetical `quickBoxCourseStartsINTAlt`) from
+            # accidentally satisfying the INT precedence pass.
+            if not isinstance(key, str) or key.strip() != preferred:
+                continue
+            raw_items: list[str] = []
+            lis = el.find_all("li") if el.name in ("ul", "ol") else []
+            if lis:
+                for li in lis:
+                    t = compact(li.get_text(" ", strip=True))
+                    if t:
+                        raw_items.append(t)
+            else:
+                t = compact(el.get_text(" ", strip=True))
+                if t:
+                    raw_items.append(t)
+            months: list[str] = []
+            for item in raw_items:
+                for tok in _MONTH_RE.findall(item):
+                    mo = _normalise_month(tok)
+                    if mo and mo not in months:
+                        months.append(mo)
+            if months:
+                return [mo for mo in _MONTHS if mo in set(months)]
+    return None
+
+
 async def extract(html: str, url: str) -> list[ExtractionResult]:
     """Public entry point. Runs all extraction passes via ``_extract_raw``,
     then applies the NZ-semester supplement (Bug 11) for ``.ac.nz`` hosts.
@@ -660,6 +806,23 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
     course listings for BOTH Semester 1 AND Semester 2, ensuring that
     programmes with mid-year intake are not reported as February-only.
     """
+    # QUT structural pre-pass — see _from_qut_quickbox above.  Runs BEFORE
+    # _extract_raw because the canonical `quickBoxCourseStartsINT` UL is the
+    # authoritative source for QUT intake months; the generic regex cascade
+    # otherwise pulls in extra months from unrelated page chrome.
+    _qut_months = _from_qut_quickbox(html, url)
+    if _qut_months:
+        return [
+            ExtractionResult(
+                field_key="intake_months",
+                value=_qut_months,
+                normalized={"intake_months": _qut_months, "intake_days": None},
+                confidence=0.95,
+                snippet=f"qut.quickbox: {', '.join(_qut_months)}",
+                method="intake.qut_quickbox",
+            )
+        ]
+
     results = await _extract_raw(html, url)
     from urllib.parse import urlparse as _up
 

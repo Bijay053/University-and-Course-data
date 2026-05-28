@@ -33,11 +33,15 @@ _ACRONYMS = {
     "XIII", "XIV", "XV",
     # "V", "I", "X" are skipped — too likely to be the letter, not a numeral.
 }
-_TITLE_SUFFIX = re.compile(
-    # Named-institution suffix: "- Charles Sturt University", "| RMIT"
-    r"\s*[\|\-–—:•]\s*(?:"
-    # Full institutional name ending in a recognisable institution keyword
-    r"[A-Z][A-Za-z& ]{1,40}\s+(?:University|College|Institute|Academy|School)|"
+# Institution suffix tail: matches "Charles Sturt University" / "RMIT" /
+# "Federation Uni" / "ACU Online Courses" etc.  Used by both the
+# pipe/dash/colon branch and the comma branch of _TITLE_SUFFIX below.
+_INSTITUTION_TAIL = (
+    # Full institutional name ending in a recognisable institution keyword.
+    # Order matters inside the keyword group: longer words ("University")
+    # must come before shorter prefixes ("Uni") so the regex engine consumes
+    # them first and never strips just the "Uni" prefix from "University".
+    r"[A-Z][A-Za-z& ]{1,40}\s+(?:University|Uni|College|Institute|Academy|School)\b|"
     # Explicit acronym/short-name list. Case-insensitive match handles
     # "Aibi" (title-case) and "AIBI" (all-caps) uniformly.
     # Orchestrator._strip_provider_name_from_title() is the second layer that
@@ -49,6 +53,50 @@ _TITLE_SUFFIX = re.compile(
     # Pattern: optional institution short-name (1-6 uppercase letters) followed
     # by "Online Courses" (singular or plural, with or without institution prefix).
     r"(?:[A-Z]{1,6}\s+)?Online\s+Courses?"
+)
+_TITLE_SUFFIX = re.compile(
+    # Two separator branches:
+    #   (a) pipe/dash/colon/bullet — single institution token after separator
+    #   (b) comma — optional breadcrumb segments may sit between the course
+    #       name and the trailing institution.  La Trobe (2026-05-13) emits
+    #       "Master of Teaching Nexus (Secondary), Courses and degrees,
+    #       La Trobe University" — the breadcrumb "Courses and degrees"
+    #       must be consumed in the same .sub() pass as the institution
+    #       suffix, otherwise the iterative loop in _clean strips only
+    #       ", La Trobe University" and leaves ", Courses and degrees"
+    #       behind (which doesn't end in an institution keyword and
+    #       therefore can't be matched on the next iteration).
+    #
+    # Comma is safe to add as a separator because both branches REQUIRE
+    # the tail to end with a recognised institution keyword — ordinary
+    # commas in a course name (e.g. "Bachelor of Business, Commerce and
+    # Economics") never end with "University" / "College" / "Institute"
+    # so they cannot accidentally trigger truncation.
+    r"\s*(?:"
+    # (a) pipe / dash / colon / bullet
+    r"[\|\-–—:•]\s*(?:" + _INSTITUTION_TAIL + r")"
+    r"|"
+    # (b) comma + optional breadcrumb segments + institution.
+    # The breadcrumb capture `(?:[^,|\-–—:•\n]+,\s*)*` eats "<text>, "
+    # tokens that contain no other separator, then the institution
+    # tail closes out at end-of-string.
+    r",\s*(?:[^,|\-–—:•\n]+,\s*)*(?:" + _INSTITUTION_TAIL + r")"
+    r")\s*$",
+    re.IGNORECASE,
+)
+# No-dash variant: same as _TITLE_SUFFIX but the leading separator class
+# excludes dashes (-, –, —). Used when the title already contains a
+# primary pipe/colon separator. In that case, any trailing "- <text
+# ending in University/Institute/...>" is almost certainly part of the
+# course's major / specialisation name (e.g. Curtin "Doctor of Philosophy
+# - National Drug Research Institute | Curtin University") rather than a
+# second institution suffix, so the dash branch must NOT fire and eat
+# the major. The 2026-05-18 fix; see replit.md.
+_TITLE_SUFFIX_NO_DASH = re.compile(
+    r"\s*(?:"
+    r"[\|:•]\s*(?:" + _INSTITUTION_TAIL + r")"
+    r"|"
+    r",\s*(?:[^,|\-–—:•\n]+,\s*)*(?:" + _INSTITUTION_TAIL + r")"
     r")\s*$",
     re.IGNORECASE,
 )
@@ -145,7 +193,29 @@ def _clean(raw: str) -> str | None:
     # other processing so _smart_case never sees the raw code token.
     txt = _AQF_PREFIX_RE.sub("", txt).strip()
     txt = _NON_COURSE_PREFIX.sub("", txt)
-    txt = _TITLE_SUFFIX.sub("", txt).strip(" -|·•")
+    # Apply suffix strip iteratively. Some universities (Federation) emit
+    # browser <title> tags with the institution name DUPLICATED, e.g.
+    # "Bachelor of IT (Business Analysis) | Federation University | Federation University".
+    # _TITLE_SUFFIX is anchored at end-of-string so a single .sub() removes only
+    # the trailing copy and leaves the inner one behind. Loop until stable
+    # (capped at 5 iterations as a safety belt — real titles never carry more
+    # than 2-3 stacked suffixes) so duplicated provider tags are fully cleaned.
+    #
+    # Regex choice: when the original title contains a primary pipe / colon
+    # separator (the canonical page-title separator), suppress the dash branch
+    # of the suffix regex. Otherwise titles like Curtin's "Doctor of Philosophy
+    # - National Drug Research Institute | Curtin University" lose the major
+    # on the second iteration ("- National Drug Research Institute" matches
+    # the dash + institution-tail pattern even though Institute here is part
+    # of the course's major name, not a second provider suffix). When no
+    # pipe/colon is present, the dash branch is still needed for tails like
+    # "Bachelor of Business - AIBI" / "- Charles Sturt University".
+    pattern = _TITLE_SUFFIX_NO_DASH if any(c in txt for c in "|:•") else _TITLE_SUFFIX
+    for _ in range(5):
+        new = pattern.sub("", txt).strip(" -|·•")
+        if new == txt:
+            break
+        txt = new
     if not txt or len(txt) < 3 or len(txt) > 200:
         return None
     # Slug like "bachelor-of-business" → "Bachelor of Business". Done before

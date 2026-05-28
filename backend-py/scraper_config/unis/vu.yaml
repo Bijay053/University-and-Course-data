@@ -1,0 +1,37 @@
+# Victoria University (vu.edu.au)
+#
+# 2026-05-13: Hand-tuned over the auto-generated CSU clone.  VU is NOT a
+# distance-education-heavy uni like CSU — it's a Melbourne campus uni
+# with three Sydney CBD outposts (VU Sydney/Brisbane).  Two key fixes:
+#
+#   1. online_only filter MUST stay enabled.  CSU disabled it because
+#      ~70% of CSU's catalogue is legitimately online-distance.  VU has
+#      no such offering — every "Online"-tagged page is a
+#      misclassification (Gemini reading "study online" links in nav
+#      bars, mode-rule keyword leakage, etc.).
+#
+#   2. International tab is at /courses/<slug>/international (PATH
+#      suffix, not query).  The hardcoded VU block in
+#      single_course.py rewrites the URL before fetch so extractors
+#      always see the international fee, IELTS, intake months, and full
+#      campus list.  Without this the prominent domestic VET fees
+#      (e.g. $1,337/year Cert IV in Tertiary Prep) leak into
+#      international_fee.
+
+discovery:
+  always_sitemap_supplement: true   # VU is JS-heavy; sitemap supplement catches the full ~600-course catalogue.
+  # The default 200-candidate cap clipped legit courses (e.g. Master of
+  # Enterprise Resource Planning at /courses/master-of-enterprise-
+  # resource-planning-bmen) because VU's sitemap returns ~445 entries
+  # and the BFS-+-supplement merge filled the slot with sub-pages /
+  # study-area landing pages first.  Raise to 500 so the entire VU
+  # catalogue fits with headroom.
+  max_candidates: 500
+
+extraction:
+  filters:
+    domestic_only:
+      enabled: true   # Standard: filter pages flagged as domestic-only away.
+
+    online_only:
+      enabled: true   # VU is a campus uni — Online-mode courses must be rejected.

@@ -1,9 +1,123 @@
-# Federation University Australia — stub created for Week 5 scale-up.
-# Hostname: federation.edu.au  (course catalogue under /study)
-# Pathway-heavy — confirms Week 2 Prompt 5 (skip central English) and
-# Prompt 6 (lower sanity floors for pathway programs) work as advertised.
-discovery: {}
+# Federation University Australia (federation.edu.au)
+# Per-uni overrides — none of these affect any other university.
+#
+# Issues fixed by this file (verified 2026-05-09):
+#   1. "Online" leaking into multi-campus location lists.
+#      Federation lists e.g. "Ballarat, Mount Helen, Online" on a course
+#      page; the global location extractor's _REMOVE_VIRTUAL is
+#      case-sensitive and only matches lowercase "online", so capitalised
+#      "Online" survived. Fixed here via text_cleaning strip patterns
+#      (case-insensitive) — no global change.
+#   2. Discovery harvesting non-course /study/* info pages
+#      ("Mid-year Entry", "Free Tafe", "Regional Students",
+#      "International Students", "Pathways Through Tafe", "Tafe to
+#      Undergraduate", "Early School Leavers" …). Page-type classifier
+#      treats them as course-like; sitemap returns 235 candidates and
+#      the first ~30 are info pages. Fixed via discovery.block_url_patterns.
+#   3. Per-course pages don't expose international fees in scrape-friendly
+#      form. Federation publishes the international fee schedule centrally;
+#      pointed there via extraction.fees.central_page so the existing
+#      central-pages prefetcher can join fees by course name.
+
+discovery:
+  # Drop info / pathway / general-information pages that BFS + sitemap
+  # surface but are not actual course-detail pages.
+  block_url_patterns:
+    - "/study/intakes/"
+    - "/study/information/"
+    - "/study/skills"
+    - "/study/early-offer"
+    - "/study/atars"
+    - "/study/guaranteed-atars"
+    - "/study/free-tafe"
+    - "/study/college"
+    - "/study/mid-year"
+    - "/study/pathways"
+    - "/study/high-school"
+    - "/study/advance-to-university"
+    - "/study/federation-college"
+    - "/study/fees/"
+    - "/study/scholarships"
+    - "/study/how-to-apply"
+    - "/study/apply"
+    - "/study/search"
+
 extraction:
+  fees:
+    # The /international/fees-scholarships-and-living-costs hub is JS-
+    # rendered (curl returns ~empty HTML), so the central-pages
+    # prefetcher recovers 0 records from it. Federation publishes the
+    # actual per-course tuition figures in a downloadable Higher Ed
+    # fee schedule PDF; point the per-course PDF pipeline at it.
+    #
+    # Known coverage gap: this PDF only covers Higher Ed courses
+    # (Bachelor / Master / Postgrad / Honours). VET / TAFE courses
+    # (Cert III, Diploma of …, Cert IV) sit in a separate VET fee
+    # schedule that lives behind https://www.federation.edu.au/students/
+    # student-essentials/fees/fees-vet/vet-fees/ and isn't a stable
+    # direct PDF URL. VET courses will keep falling back to the uni-wide
+    # value (or stay blank) until either the schema grows multi-PDF
+    # support or the VET PDF gets a stable URL.
+    fees_pdf_url: "https://www.federation.edu.au/siteassets/files/students/fees/2026_higher_ed_indicative_commencing_international_student_tuition_fee_schedule.pdf"
+
+    # Federation's HE fee schedule has a different column layout from
+    # the Torrens / ASA layout the shared _PDF_DATA_ROW_RE expects:
+    #   <name> <course-code> <CRICOS> [bullet markers ⬤⬤⬤] $<annual>
+    #     $<semester> <weeks> <credits> <years>
+    # i.e. CRICOS comes AFTER the name (not before), there are 2 dollar
+    # amounts not 3, and duration is at the END not the start. This
+    # per-uni regex captures CRICOS + the first dollar amount (the
+    # annual fee — the second amount is exactly half and is the
+    # semester rate). The override is opt-in via YAML and has zero
+    # effect on any other university.
+    #
+    # \uf06c is a private-use unicode character — pypdf substitutes it
+    # for the campus-availability bullet glyph used in the schedule.
+    # Extended 2026-05-10 to ALSO capture the trailing duration column
+    # (e.g. "$42,000 $21,000 120 52 1 year") via optional named groups
+    # `duration` + `duration_unit`. The trailing block is wrapped in a
+    # `(?:...)?` so rows without credit/unit/duration columns still match.
+    # Downstream, `university_pdfs.py` lifts the values into
+    # `duration_pdf` / `duration_term_pdf`, and `single_course.py` uses
+    # them as a last-resort fallback when payload `duration` is NULL.
+    pdf_row_pattern: '\b(?P<cricos>\d{6}[A-Z])\b[\s\uf06c]*\$(?P<annual>\d[\d,]*)\s+\$\d[\d,]*(?:(?:\s+\d+){0,3}\s+(?P<duration>\d+(?:\.\d+)?)\s*(?P<duration_unit>years?|months?|semesters?|trimesters?))?'
+    pdf_fee_term: "Annual"
+
+    # Per-course PDF row aliases — opt-in dict mapping the lower-cased DB
+    # course name (after _TITLE_SUFFIX strips "| Federation University") to
+    # the exact title used in the HE fee schedule PDF. Federation publishes
+    # course pages with "Bachelor of IT (Foo)" but the PDF uses the long
+    # form "Bachelor of Information Technology (Foo)", so the per-course
+    # PDF matcher misses these courses without explicit aliases.
+    # Verified against the live 2026 schedule PDF on 2026-05-10.
+    course_pdf_aliases:
+      "bachelor of it (business analysis)": "Bachelor of Information Technology (Business Analysis)"
+      "bachelor of it (cybersecurity)": "Bachelor of Information Technology (Cybersecurity)"
+      "bachelor of it (software application development)": "Bachelor of Information Technology (Software Application Development)"
+
+  text_cleaning:
+    location:
+      # Strip "Online", "Open Universities Australia" and similar virtual
+      # / partner tokens from comma-joined location lists. Applied BEFORE
+      # the rest of the location-sanitise pipeline so they never reach the
+      # final string. Case-insensitive.
+      strip_patterns:
+        # Standalone "Online" surrounded by commas / start / end of string.
+        - '(?:^|,)\s*online\s*(?=,|$)'
+        # "Open Universities Australia" (a virtual partner, not a campus)
+        - '(?:^|,)\s*open\s+universities\s+australia\s*(?=,|$)'
+        # Trailing parentheticals like "Melbourne (Southbank)" → keep the
+        # city; only strip explicit (Online) / (Virtual) markers.
+        - '\s*\(\s*(?:online|virtual|distance|external)\s*\)'
+
   filters:
     domestic_only:
-      enabled: false
+      # Federation's VET / TAFE Certificate III, Certificate IV and Diploma
+      # pages render a "StudentTypeBlock" JSON with `"hasInternational": false`
+      # when the International tab is greyed out (course not offered to
+      # international students). The global _DOMESTIC_ONLY_RE pattern matches
+      # that exact JSON marker, so enabling this filter drops those pages at
+      # the staging gate. HE courses (Bachelor / Master / Postgrad) that DO
+      # accept international students either omit the block or set
+      # `hasInternational: true` and stage normally.
+      enabled: true

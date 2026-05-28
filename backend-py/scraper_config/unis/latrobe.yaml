@@ -2,16 +2,95 @@
 # Hostname: www.latrobe.edu.au
 #
 # Bug history / rationale:
-#   - La Trobe has multiple campuses across Victoria and NSW.  Location extraction
-#     sometimes returns overly verbose strings (e.g. 'Bundoora (Melbourne Campus)')
-#     that should be normalised to just 'Melbourne'.
-#   - English requirements are published on a central page; individual course pages
-#     typically link to it rather than repeating the requirements.
+#   - 2026-05-12: scrape staged only ~6 rows, all of which were CATEGORY
+#     LANDING PAGES ("Research degrees", "Global partnerships",
+#     "Rankings and ratings", "Your undergraduate degree") rather than
+#     real course pages. Root cause: BFS classifier marked these /study/
+#     and /international/study/ marketing pages as "listing" pages and
+#     followed their internal links — which point to MORE marketing
+#     pages, not courses. BFS hit its 25-page budget after touching only
+#     37 candidates of which the gate dropped most.
 #
-# TODO: add english.central_page once the stable URL is confirmed.
-# TODO: confirm campus normalisation approach in location extractor.
+#     Real La Trobe course pages live at /courses/<slug> where the slug
+#     starts with bachelor-, master-, diploma-, graduate-, doctor-,
+#     associate-, global-master-, professional-certificate-, or
+#     undergraduate-certificate-. The sitemap.xml at /sitemap.xml
+#     publishes 392 /courses/ URLs in total — 215 real courses and 177
+#     category pages (e.g. /courses/aboriginal-studies, /courses/anthropology).
+#
+#     Fix is four knobs in this YAML:
+#       1. allow_url_patterns whitelists only the real course slug
+#          shapes — keeps category pages out of staging.
+#       2. block_url_patterns drops the worst offenders the BFS
+#          classifier promoted (/study/undergrad, /international/study/...,
+#          /courses/a-z, /courses/diplomas, /courses/packages).
+#       3. always_sitemap_supplement: true — the 392-entry sitemap is
+#          where the real course catalogue lives; without it BFS can
+#          only see the ~14 visible cards on each category page.
+#       4. max_candidates: 250 — leaves headroom above the ~215 real
+#          courses so none get dropped at the cap (same fix as the
+#          2026-05-12 CQU adjustment).
+#
+#   - La Trobe per-course pages are JS-heavy (the static head returns
+#     `(function() { var requirePrehiding = true; ...` — meaning fees,
+#     IELTS, duration are all rendered client-side). The browser
+#     fallback in the per-course extractor will need to fire for almost
+#     every page; this is already handled by the existing pipeline.
+
+discovery:
+  # Whitelist real La Trobe course slugs. Anchored on /courses/ + a
+  # known degree-type prefix so category pages like /courses/anthropology
+  # or /courses/aboriginal-studies (which look like courses to BFS but
+  # are actually subject-area landing pages) are excluded.
+  allow_url_patterns:
+    - "/courses/(?:bachelor|master|diploma|graduate|doctor|associate|global-master|professional-certificate|undergraduate-certificate)-"
+
+  block_url_patterns:
+    # Aggregate listing / index pages that match the slug whitelist
+    # incidentally (e.g. /courses/diplomas).
+    - "/courses/a-z$"
+    - "/courses/diplomas$"
+    - "/courses/packages$"
+    # Marketing / category pages the BFS classifier loves to promote.
+    # No trailing `$`: BFS otherwise still crawls the subtree (e.g.
+    # /study/undergrad/find-your-course-by-atar) and burns budget on
+    # more marketing pages — the log showed exactly that on the failing
+    # run.
+    - "/study/undergrad"
+    - "/study/online"
+    - "/study/aspire"
+    - "/study/double-degrees"
+    - "/study/life/"
+    - "/international/study"
+    # General noise.
+    - "/news/"
+    - "/about-us/"
+    - "/events/"
+
+  # Critical: the sitemap is the canonical source of truth for the
+  # course catalogue. BFS alone returns ~14 candidates per category
+  # page; the sitemap exposes 392 /courses/ URLs in one fetch.
+  always_sitemap_supplement: true
+
+  # Bump BFS budget so additional listing pages get crawled even if
+  # the sitemap is temporarily unavailable.
+  bfs_page_budget: 60
+
+  # Headroom above the ~215 real-course count so the cap doesn't
+  # silently drop late-alphabet entries.
+  max_candidates: 250
 
 extraction:
   filters:
     domestic_only:
       enabled: true   # Preserve current prod behaviour: filter runs for all unis.
+
+  fees:
+    central_page: "https://www.latrobe.edu.au/international/applying/fees"
+    fees_pdf_url: ""
+
+  english:
+    # English requirements live on a central page; per-course pages
+    # typically link to it rather than republishing the table.
+    central_page: ""
+    requirements_pdf_url: ""

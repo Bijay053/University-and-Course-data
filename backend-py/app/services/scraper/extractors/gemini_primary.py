@@ -31,17 +31,23 @@ log = logging.getLogger(__name__)
 
 _HARD_FIELDS: dict[str, str] = {
     "international_fee": (
-        "International tuition fee (number in local currency, e.g. 34500 or 125970). "
+        "International tuition fee (number in local currency, e.g. 34500 or 42194). "
         "MUST come from the International section of the page (see CRITICAL rule above). "
         "NEVER use a Commonwealth Supported Place / CSP / HECS-HELP fee here — "
         "those are domestic fees. "
-        "PRIORITY ORDER — use the first that applies: "
-        "(1) 'Full course fee' or 'Total course fee' label → extract that total amount "
-        "     and set fee_term='Full Course'. "
-        "(2) Annual / per-year fee label → extract the annual amount and set fee_term='Annual'. "
-        "(3) Per-semester/trimester only → multiply to annual equivalent. "
-        "NEVER extract a 'First year fee' or '1st year fee' when a 'Full course fee' is "
-        "also shown on the same page — the full-course total is always preferred. "
+        "PRIORITY ORDER — use the FIRST that applies (annual is strongly preferred): "
+        "(1) Annual / per-year fee — labels like 'Indicative year 1 fee', "
+        "    '1st year fee', 'First year fee', 'Annual fee', 'Per year', "
+        "    'Tuition fee per year', '$X/yr', '$X per annum' → extract that "
+        "    annual amount and set fee_term='Annual'. ALWAYS prefer this when "
+        "    the page shows BOTH an annual and a full-course total (e.g. "
+        "    'Indicative year 1 fee $42,194' alongside 'Total indicative course "
+        "    fee $168,776' — pick the $42,194). "
+        "(2) Per-semester / per-trimester only (no annual published) → multiply "
+        "    to the annual equivalent and set fee_term='Annual'. "
+        "(3) Only a 'Full course fee' or 'Total course fee' total is shown "
+        "    (no annual or per-semester figure anywhere on the page) → extract "
+        "    that total and set fee_term='Full Course'. "
         "Null if not explicitly stated in the International section."
     ),
     "domestic_fee": (
@@ -53,8 +59,12 @@ _HARD_FIELDS: dict[str, str] = {
     "fee_term": (
         "Fee payment period matching the fee you extracted. Pick EXACTLY one: "
         "'Annual', 'Semester', 'Trimester', 'Full Course', 'Per Unit'. "
-        "Use 'Full Course' when you extracted a 'Full course fee' or 'Total course fee' label. "
-        "Use 'Annual' for per-year fees. Null if ambiguous."
+        "Use 'Annual' for per-year fees including 'Indicative year 1 fee', "
+        "'First year fee', '$X/yr', '$X per annum'. This is the strongly "
+        "preferred value. "
+        "Use 'Full Course' ONLY when the page shows just a total course fee "
+        "with NO annual or per-semester figure anywhere. "
+        "Null if ambiguous."
     ),
     "duration_value": (
         "Total duration from enrolment to graduation — FULL-TIME equivalent — "
@@ -105,7 +115,12 @@ _HARD_FIELDS: dict[str, str] = {
     "sub_category": (
         "Academic discipline/specialisation of this course "
         "(e.g. 'Business Administration', 'Computer Science', 'Nursing', "
-        "'Hospitality Management'). Be specific. Null if uncertain."
+        "'Psychology', 'Hospitality Management'). Be specific. "
+        "MUST be a research field, NEVER the degree name. "
+        "If the course title is just 'Doctor of Philosophy' / 'PhD' / "
+        "'Master of Philosophy' with no discipline mentioned anywhere on "
+        "the page, return null — do NOT echo the degree name as the "
+        "sub_category. Null if uncertain."
     ),
     "category": (
         "Broad academic field. Pick the BEST match from: "
@@ -113,6 +128,10 @@ _HARD_FIELDS: dict[str, str] = {
         "'Health Sciences', 'Education', 'Arts & Humanities', 'Law', "
         "'Science', 'Social Sciences', 'Built Environment', "
         "'Hospitality, Tourism & Events', 'Accounting & Finance'. "
+        "If the course title is a generic 'Doctor of Philosophy' / 'PhD' / "
+        "'Master of Philosophy' AND the page does not name a specific "
+        "research discipline (e.g. Psychology, Physics, Education), "
+        "return null — do NOT default to 'Science'. "
         "Null if none fit."
     ),
     "mode": (
@@ -140,6 +159,47 @@ _HARD_FIELDS: dict[str, str] = {
         "Online-only trimesters/semesters and columns where ALL physical "
         "campus rows show ✗ / cross / 'Not available'. "
         "Return unique months only. Null if not stated."
+    ),
+    "academic_level": (
+        "Minimum prior academic qualification required for ENTRY into this "
+        "course (international student section only). Pick EXACTLY one of: "
+        "'Year 12', 'Diploma', \"Bachelor's degree\", \"Master's degree\", "
+        "'Other'. "
+        "Use 'Year 12' for Australian Year 12 / equivalent senior secondary "
+        "qualifications and for foundation-year / pathway entry. "
+        "Use 'Diploma' for completed AQF Diploma, Advanced Diploma, or "
+        "associate degree pathways. "
+        "Use \"Bachelor's degree\" for any course that requires a completed "
+        "undergraduate degree (typical for Master's coursework). "
+        "Use \"Master's degree\" for doctorate / PhD / Master's-by-research "
+        "courses that explicitly require a prior Master's. "
+        "Use 'Other' for portfolio-only, audition-only, or work-experience "
+        "pathways with no formal academic prerequisite. "
+        "Null if the page does not state an academic entry requirement."
+    ),
+    "academic_score": (
+        "Minimum numeric academic score required for entry. Number only "
+        "(no units). Examples: 70 (ATAR), 65 (WAM), 5.0 (GPA on 7-point), "
+        "3.0 (GPA on 4-point), 60 (overall percentage). "
+        "Extract from phrases like 'minimum ATAR of 70', 'WAM of 65 or "
+        "higher', 'GPA of 5.0', 'a credit average (65%)'. "
+        "If a range is given (e.g. 'ATAR 65-75'), return the MINIMUM. "
+        "Null if no numeric score is stated, or if entry is qualification-"
+        "only (e.g. 'completion of a Bachelor's degree' with no grade "
+        "requirement)."
+    ),
+    "other_requirement": (
+        "Additional non-English, non-numeric entry requirements stated on "
+        "the page. Free-text summary, max 300 characters. "
+        "Include: prerequisite subjects (e.g. 'Pass in Year 12 General "
+        "Mathematics'), portfolio / audition / interview requirements, "
+        "work-experience requirements, professional registration, GAMSAT/"
+        "GMAT/UCAT, personal statement, references. "
+        "Concatenate multiple requirements with '; '. "
+        "Do NOT include English-language test scores (those go in "
+        "ielts_overall etc.). "
+        "Do NOT repeat the academic_level or academic_score values. "
+        "Null if no additional requirements are listed."
     ),
     "location_text": (
         "Campus location(s) where this course is physically taught "
@@ -187,9 +247,12 @@ Rules you MUST follow when this structure is present:
 4. Extract ielts_overall, pte_overall, toefl_overall, cambridge_overall,
    duolingo_overall from the International section ONLY.  Domestic
    admission requirements (GPA, ATAR, ATARs) must be ignored.
-5. If the page says both a "Total course fee (international)" and an
-   "Annual rate per year" for international students, prefer the annual
-   rate for international_fee and set fee_term='Annual'.
+5. If the page shows BOTH a per-year amount (e.g. "Indicative year 1
+   fee", "1st year fee", "Annual rate per year", "$X/yr") AND a
+   "Total course fee" / "Total indicative course fee" for international
+   students, ALWAYS prefer the per-year amount and set
+   fee_term='Annual'. The full-course total is a fallback only — used
+   when no annual/per-year figure is published anywhere on the page.
 
 Fields to extract:
 {fields_block}
@@ -546,10 +609,12 @@ def _coerce(field_key: str, value: Any) -> Any | None:
         "duration_value",
         "ielts_overall", "pte_overall", "toefl_overall",
         "cambridge_overall", "duolingo_overall",
+        "academic_score",
     }
     _STR_FIELDS = {
         "fee_term", "duration_unit", "duration_text",
         "sub_category", "category", "mode", "intake_text", "location_text",
+        "academic_level", "other_requirement",
     }
 
     if field_key in _FLOAT_FIELDS:
@@ -560,7 +625,14 @@ def _coerce(field_key: str, value: Any) -> Any | None:
 
     if field_key in _STR_FIELDS:
         s = str(value).strip()
-        return s or None
+        if not s:
+            return None
+        # Free-text other_requirement is hard-capped so a runaway Gemini
+        # response can't blow past the DB column comfort zone (the column
+        # is text but downstream UI/CSV exports assume short summaries).
+        if field_key == "other_requirement" and len(s) > 300:
+            s = s[:297].rstrip() + "..."
+        return s
 
     return value
 
@@ -570,6 +642,19 @@ def _coerce(field_key: str, value: Any) -> Any | None:
 _VALID_FEE_TERMS = {"Annual", "Semester", "Trimester", "Full Course", "Per Unit"}
 _VALID_DURATION_UNITS = {"years", "months", "weeks"}
 _VALID_MODES = {"On Campus", "Online", "Blended"}
+# academic_level is a controlled vocabulary; case- and apostrophe-insensitive
+# match (Gemini sometimes emits curly apostrophes or lowercased values) is
+# applied in _validate via a normalised lookup.
+_VALID_ACADEMIC_LEVELS = {
+    "Year 12",
+    "Diploma",
+    "Bachelor's degree",
+    "Master's degree",
+    "Other",
+}
+_ACADEMIC_LEVEL_LOOKUP = {
+    v.lower().replace("\u2019", "'"): v for v in _VALID_ACADEMIC_LEVELS
+}
 
 
 def _validate(field_key: str, value: Any) -> Any | None:
@@ -600,6 +685,24 @@ def _validate(field_key: str, value: Any) -> Any | None:
         return None
     if field_key == "international_fee" and not (1_000 <= value <= 300_000):
         log.debug("gemini_primary: international_fee %s out of range — discarding", value)
+        return None
+    # academic_level: normalise to the canonical controlled-vocab spelling.
+    # Reject any value that doesn't map to one of the five allowed labels so
+    # Gemini paraphrases ("Senior Secondary Certificate", "Undergraduate
+    # degree", etc.) don't pollute the column.
+    if field_key == "academic_level":
+        if not isinstance(value, str):
+            return None
+        canon = _ACADEMIC_LEVEL_LOOKUP.get(value.lower().replace("\u2019", "'"))
+        if canon is None:
+            log.debug("gemini_primary: invalid academic_level %r — discarding", value)
+            return None
+        return canon
+    # academic_score: 0..100 covers ATAR (0..99.95), WAM (0..100),
+    # percentage (0..100), and 7-point GPA (0..7) without false-rejecting
+    # any of those scales.
+    if field_key == "academic_score" and not (0 <= value <= 100):
+        log.debug("gemini_primary: academic_score %s out of range — discarding", value)
         return None
     return value
 
@@ -641,7 +744,7 @@ async def extract_primary(
 
     try:
         resp = await _asyncio.wait_for(
-            gemini_client.generate(prompt, max_output_tokens=512),
+            gemini_client.generate(prompt, max_output_tokens=768),
             timeout=timeout,
         )
     except _asyncio.TimeoutError:
@@ -662,6 +765,47 @@ async def extract_primary(
         validated = _validate(fk, coerced)
         if validated is not None:
             filled[fk] = validated
+
+    # ── Annual-fee preference fallback ──────────────────────────────────────
+    # User preference: per-year (Annual) fees are strongly preferred over
+    # Full Course totals. The prompt already instructs Gemini to pick the
+    # annual amount when both are published, but on pages where ONLY a
+    # full-course total was extracted AND we know the duration, derive the
+    # annual equivalent so downstream UI shows e.g. $42,194/yr instead of
+    # $168,776/Full Course (Curtin "Total indicative course fee" pattern).
+    fee = filled.get("international_fee")
+    term = filled.get("fee_term")
+    dur_val = filled.get("duration_value")
+    dur_unit = filled.get("duration_unit")
+    if (
+        term == "Full Course"
+        and isinstance(fee, (int, float))
+        and isinstance(dur_val, (int, float))
+        and isinstance(dur_unit, str)
+    ):
+        years: float | None = None
+        if dur_unit == "years" and dur_val > 0:
+            years = float(dur_val)
+        elif dur_unit == "months" and dur_val > 0:
+            years = float(dur_val) / 12.0
+        elif dur_unit == "weeks" and dur_val > 0:
+            # Rare for tuition pricing but in _VALID_DURATION_UNITS; cover
+            # it so a 26-week intensive doesn't silently fall through.
+            years = float(dur_val) / 52.0
+        # Skip programs shorter than half a year — for those, the
+        # full-course total IS effectively the per-period fee, and dividing
+        # would inflate the number nonsensically. The 1_000–300_000 sanity
+        # check below provides a second guard against runaway divides.
+        if years and years >= 0.5:
+            derived = round(fee / years, 2)
+            if 1_000 <= derived <= 300_000:
+                log.info(
+                    "gemini_primary[fee_derive]: %s — Full Course $%.0f / "
+                    "%.2f yr → Annual $%.0f",
+                    url, fee, years, derived,
+                )
+                filled["international_fee"] = derived
+                filled["fee_term"] = "Annual"
 
     log.info(
         "gemini_primary: %s → %d fields filled, cost=$%.6f",

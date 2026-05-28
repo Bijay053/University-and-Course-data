@@ -24,11 +24,51 @@ field_key = "international_fee"
 
 # Currency tokens recognised in either prefix or suffix position.
 _CURRENCY_TOKEN = r"A\$|NZ\$|CA\$|US\$|S\$|£|€|\$|AUD|NZD|CAD|USD|GBP|SGD|EUR"
+# Amount grammar: 1-3 leading digits, then any number of (separator + 3-digit
+# group) repetitions, optional decimal tail.  Separator includes comma AND
+# the European/Australian space-style thousands separators (regular space,
+# NBSP U+00A0, narrow NBSP U+202F).  La Trobe writes "A$42 200" with a
+# regular space — without space-as-separator support every La Trobe fee
+# silently failed extraction.  The strict 3-digit grouping prevents the
+# regex from greedily slurping unrelated whitespace-separated digits in
+# the same paragraph (e.g. "A$42 200 ... 80 students" stops at 200).
+_THOUSANDS_SEP = r"[,\u00a0\u202f ]"
+# Amount body alternation (order matters — leftmost-longest preferred):
+#   1. Grouped: 1-3 leading digits + (sep + 3-digit group)+ + optional decimal
+#      → "$1,500", "A$42 200", "$1,500,000"
+#   2. Raw 4-7 digit: no thousands separator at all
+#      → "$17136", "$102816"  (UOW renders fees this way fleet-wide;
+#      without this branch the engine matched only "$171" / "$102" and
+#      both were filtered out as implausible by the downstream gate)
+#   3. Raw 1-3 digit + optional decimal — keeps "$0", "$500", "AUD 9999.50"
+# The grouped branch is listed first so "$1,500" still parses as 1500
+# rather than being split into "1" + ",500".
+_AMOUNT_BODY = (
+    rf"(?:\d{{1,3}}(?:{_THOUSANDS_SEP}\d{{3}})+(?:\.\d+)?"
+    rf"|\d{{4,7}}(?:\.\d+)?"
+    rf"|\d{{1,3}}(?:\.\d+)?)"
+)
 _AMOUNT_RE = re.compile(
-    rf"(?:({_CURRENCY_TOKEN})\s*([\d,]+(?:\.\d+)?))"
-    rf"|(?:([\d,]+(?:\.\d+)?)\s*({_CURRENCY_TOKEN}))",
+    rf"(?:({_CURRENCY_TOKEN})\s*({_AMOUNT_BODY}))"
+    rf"|(?:({_AMOUNT_BODY})\s*({_CURRENCY_TOKEN}))",
     re.IGNORECASE,
 )
+# Characters stripped before int() — keeps the parser tolerant of any
+# combination of comma / space / NBSP separators within a single amount.
+_AMOUNT_STRIP_RE = re.compile(r"[,\u00a0\u202f ]")
+
+
+def _parse_amount(raw: str) -> int | None:
+    """Parse a regex-captured amount string (possibly containing comma,
+    space, NBSP, or narrow-NBSP thousands separators) to an int.  Returns
+    ``None`` when the cleaned string is not a valid number."""
+    cleaned = _AMOUNT_STRIP_RE.sub("", raw)
+    try:
+        return int(float(cleaned))
+    except ValueError:
+        return None
+
+
 _SALARY_CTX = re.compile(
     r"\b(salary|salaries|earn|earning|earnings|wage|wages|income|"
     r"starting\s+pay|graduate\s+(?:salary|outcomes?|income))\b",
@@ -43,13 +83,22 @@ _PER_YEAR_CTX = re.compile(r"\b(per\s+year|per\s+annum|p\.?a\.?|annual|annually|
 # Full-course-total context — strongly prefer over annual / per-year amounts
 # (Murdoch shows "Full course fee: $125,970" alongside "First year fee: $41,990").
 _FULL_COURSE_LABEL_CTX = re.compile(
-    r"\b(?:full\s+course|total\s+course|complete\s+course|total\s+program(?:me)?)\s+fee",
+    # Allow up to one optional adjective between "total" / "full" and "course"
+    # so labels like Curtin's "Total indicative course fee" still match
+    # (previously only literal "total course fee" matched, so $141,348 was
+    # silently classified as Annual instead of Full Course).
+    r"\b(?:full|total|complete)\s+(?:\w+\s+)?(?:course|program(?:me)?)\s+fee",
     re.IGNORECASE,
 )
-# First-year fee context — penalise: picking the first-year sticker as the
-# representative international fee always under-reports the total programme cost.
+# First-year fee context — penalise by default (picking the first-year sticker
+# as the representative international fee always under-reports the total
+# programme cost). Per-uni YAML knob ``prefer_year_one_over_total`` flips
+# the sign for universities (e.g. Curtin) where the year-1 amount IS the
+# operator-facing Annual figure.
 _FIRST_YEAR_FEE_CTX = re.compile(
-    r"\b(?:first\s+year|1st\s+year|year\s+1)\s+fee",
+    # "year one" added so "Indicative year one fee" / similar variants match;
+    # "year 1 fee" remains the most common form.
+    r"\b(?:first\s+year|1st\s+year|year\s+(?:1|one))\s+fee",
     re.IGNORECASE,
 )
 _YEAR_RE = re.compile(r"\b(20\d{2})\b")
@@ -195,7 +244,15 @@ def _maybe_compute_full_course(amount: int, fee_term: str, text: str) -> tuple[i
     return total, "Full Course"
 
 
-def _normalize_fee_term(ctx: str) -> str:
+def _normalize_fee_term(ctx: str, *, prefer_year_one: bool = False) -> str:
+    # When the per-uni knob ``extraction.fees.prefer_year_one_over_total``
+    # is set, a year-1 label near the amount means the operator wants the
+    # value stored as Annual.  Must run BEFORE the total/full-course
+    # branch below — Curtin pages publish both "Indicative year 1 fee"
+    # and "Total indicative course fee" inside the same 320-char window
+    # so without this gate the term would still resolve to Full Course.
+    if prefer_year_one and _FIRST_YEAR_FEE_CTX.search(ctx):
+        return "Annual"
     if re.search(r"per\s*trimester|per\s*trim\b", ctx, re.I):
         return "Trimester"
     if re.search(r"per\s*semester", ctx, re.I):
@@ -295,9 +352,8 @@ def _classify_fee_value(value: str) -> tuple[int, str] | None:
     if not m:
         return None
     raw = m.group(2) or m.group(3) or ""
-    try:
-        amount = int(float(raw.replace(",", "")))
-    except ValueError:
+    amount = _parse_amount(raw)
+    if amount is None:
         return None
     # Week 2 P6 — log-and-accept low values; only the upper bound rejects.
     # Pathway-program / TAFE / short-course fees can fall below the historic
@@ -406,9 +462,8 @@ def _candidates(text: str) -> Iterable[tuple[int, str, str]]:
     for m in _AMOUNT_RE.finditer(text):
         cur = m.group(1) or m.group(4) or ""
         raw = m.group(2) or m.group(3) or ""
-        try:
-            amount = int(float(raw.replace(",", "")))
-        except ValueError:
+        amount = _parse_amount(raw)
+        if amount is None:
             continue
         # Compute the local context first so the per-unit floor can use
         # it. Per-unit tuition typically sits at $1.5K-$8K per subject;
@@ -462,23 +517,44 @@ def _candidates(text: str) -> Iterable[tuple[int, str, str]]:
         yield amount, cur, ctx
 
 
-def _score(amount: int, ctx: str) -> int:
+def _score(amount: int, ctx: str, *, prefer_year_one: bool = False) -> int:
     s = 0
     if _INTL_CTX.search(ctx):
         s += 5
     if _TUITION_CTX.search(ctx):
         s += 3
-    # "Full course fee" / "Total course fee" label — strongly prefer over
-    # per-year or first-year amounts (e.g. Murdoch $125,970 full-course total
-    # vs $41,990 first-year fee).
-    if _FULL_COURSE_LABEL_CTX.search(ctx):
-        s += 4
-    # "First year fee" / "1st year fee" — penalise: this is the per-year
-    # sticker, not the total programme cost we want to surface.
-    elif _FIRST_YEAR_FEE_CTX.search(ctx):
-        s -= 3
-    elif _PER_YEAR_CTX.search(ctx):
-        s += 2
+    if prefer_year_one:
+        # Per-uni override (e.g. Curtin): both labels typically appear in
+        # the same 320-char window, so use proximity — whichever label is
+        # closer to the amount wins.  The amount itself sits roughly at
+        # ctx[160] (the candidate window is m.start()-160 .. m.end()+160).
+        anchor = min(160, len(ctx) // 2)
+        full_dist = min(
+            (abs(m.start() - anchor) for m in _FULL_COURSE_LABEL_CTX.finditer(ctx)),
+            default=float("inf"),
+        )
+        yr1_dist = min(
+            (abs(m.start() - anchor) for m in _FIRST_YEAR_FEE_CTX.finditer(ctx)),
+            default=float("inf"),
+        )
+        if yr1_dist < full_dist and yr1_dist != float("inf"):
+            s += 5  # strong preference for year-1 amount
+        elif full_dist < yr1_dist and full_dist != float("inf"):
+            s -= 4  # penalise total-course amount
+        elif _PER_YEAR_CTX.search(ctx):
+            s += 2
+    else:
+        # "Full course fee" / "Total course fee" label — strongly prefer over
+        # per-year or first-year amounts (e.g. Murdoch $125,970 full-course total
+        # vs $41,990 first-year fee).
+        if _FULL_COURSE_LABEL_CTX.search(ctx):
+            s += 4
+        # "First year fee" / "1st year fee" — penalise: this is the per-year
+        # sticker, not the total programme cost we want to surface.
+        elif _FIRST_YEAR_FEE_CTX.search(ctx):
+            s -= 3
+        elif _PER_YEAR_CTX.search(ctx):
+            s += 2
     # Prefer amounts in the realistic international tuition band.
     # Extend upper bound to 400k so full-course totals also receive the bonus.
     if 12_000 <= amount <= 400_000:
@@ -496,6 +572,17 @@ async def extract(
     # DOM directly so a flattened-text boundary collision can't bleed
     # an adjacent paragraph's currency figure (scholarship, deposit,
     # building cost) into the fee capture.
+    # Per-uni knob: when set, prefer the year-1 amount over a full-course
+    # total when both labels appear on the same per-course page (Curtin).
+    prefer_yr1 = False
+    try:
+        from app.services.scraper.config.context import get_uni_config
+        _cfg = get_uni_config()
+        if _cfg is not None:
+            prefer_yr1 = bool(_cfg.extraction.fees.prefer_year_one_over_total)
+    except Exception:  # noqa: BLE001 — defensive; keep extractor working
+        prefer_yr1 = False
+
     structural, snippet = _extract_strong_label_value(html)
     if structural is not None:
         amount, value_ctx = structural
@@ -506,7 +593,7 @@ async def extract(
             _url_cur = _infer_currency_from_url(url)
             if _url_cur:
                 currency = _url_cur
-        fee_term = _normalize_fee_term(value_ctx)
+        fee_term = _normalize_fee_term(value_ctx, prefer_year_one=prefer_yr1)
         method = "fee.structural"
         rollup = _maybe_compute_full_course(
             amount, fee_term, compact(html_to_text(html))
@@ -535,9 +622,18 @@ async def extract(
         return []
     best: tuple[int, int, str] | None = None  # (score, amount, ctx)
     for amount, _cur, ctx in _candidates(text):
-        sc = _score(amount, ctx)
-        if best is None or sc > best[0] or (sc == best[0] and amount > best[1]):
+        sc = _score(amount, ctx, prefer_year_one=prefer_yr1)
+        if best is None or sc > best[0]:
             best = (sc, amount, ctx)
+        elif sc == best[0]:
+            # Default tiebreak: prefer larger amount (full-course wins).
+            # When the per-uni knob flips the preference, prefer smaller
+            # so the year-1 figure beats any larger numeric on the page
+            # that happens to score equally (e.g. mid-year intake total).
+            if (not prefer_yr1 and amount > best[1]) or (
+                prefer_yr1 and amount < best[1]
+            ):
+                best = (sc, amount, ctx)
     if best is None:
         return []
     score, amount, ctx = best
@@ -553,7 +649,7 @@ async def extract(
         _url_cur = _infer_currency_from_url(url)
         if _url_cur:
             currency = _url_cur
-    fee_term = _normalize_fee_term(ctx)
+    fee_term = _normalize_fee_term(ctx, prefer_year_one=prefer_yr1)
     method = "regex"
     # Per-Unit → Full Course rollup (T203). Mirrors Node's behaviour at
     # routes/scrape.ts:2102: when a per-unit fee is detected and the page

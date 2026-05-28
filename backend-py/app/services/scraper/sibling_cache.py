@@ -49,25 +49,24 @@ _ENGLISH_SLOTS: Final = (
 
 # Subset of _ENGLISH_SLOTS that the sibling-cache is permitted to backfill.
 #
-# PTE, TOEFL, Cambridge, and Duolingo scores are institution-wide equivalences,
-# NOT per-course values.  ACU (and many other universities) publish only the
-# IELTS requirement on individual course pages; the PTE/TOEFL/CAE/DET
-# equivalences live on a central Admissions policy page that may not map
-# cleanly to each course's true minimum.  Backfilling these from siblings
-# causes every course to show the same non-IELTS scores even when those tests
-# are never mentioned on the course page itself, flagged by data-quality checks
-# as inconsistent (e.g. IELTS 6.0 + Cambridge 176 = IELTS 7.0 threshold gap).
+# Globally empty since 2026-05-15: IELTS — like PTE, TOEFL, Cambridge and
+# Duolingo before it — is now never propagated from one course to another.
 #
-# Rule: sibling-cache may only propagate IELTS scores. PTE / TOEFL / CAE /
-# Duolingo are left null unless they were explicitly on the course page itself.
-# This applies globally across all universities.
-_SIBLING_BACKFILL_SLOTS: Final = (
-    "ielts_overall",
-    "ielts_listening",
-    "ielts_reading",
-    "ielts_writing",
-    "ielts_speaking",
-)
+# Rationale: even within a same-bucket group (postgraduate, research, etc.)
+# the *modal* IELTS value across siblings does not reliably reflect the
+# requirement of the receiving course.  Concrete failure that prompted the
+# removal: Flinders' Master of Science (Biology) and Master of Science
+# (Environmental Science) staged with ielts_overall=6.0 inherited from a
+# postgrad-bucket consensus of 8 sibling courses, even though those course
+# pages publish no IELTS at all.  The user's principled stance — "if there
+# is no IELTS leave blank, do not add from a sibling" — applies to all
+# English tests symmetrically.
+#
+# Rule: sibling-cache no longer propagates ANY English-test score. Per-course
+# pages, the central English-Language-Requirements page (when degree-level
+# bucketed), and the per-uni PDF backfill remain authoritative; everything
+# else stays null.
+_SIBLING_BACKFILL_SLOTS: Final = ()
 
 _UNDERGRAD_HINTS: Final = (
     "bachelor", "undergraduate", "diploma", "certificate", "associate",

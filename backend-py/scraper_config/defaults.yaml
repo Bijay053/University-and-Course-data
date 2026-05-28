@@ -100,7 +100,10 @@ extraction:
 
     online_only:
       # Drop courses with all-online delivery during staging.
-      enabled: false
+      # Default true preserves the historical hard-coded reject in
+      # guards.py.  Distance-education-heavy unis (e.g. CSU) opt out via
+      # their per-uni YAML by setting this to false.
+      enabled: true
 
   text_cleaning:
     location:

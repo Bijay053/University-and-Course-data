@@ -29,6 +29,21 @@ _PATTERNS = (
     re.compile(rf"\b(?:{_LABELS})\b[\s:.\-]{{0,40}}(\d+(?:\.\d+)?)\s*({_UNIT})\b", re.I),
     re.compile(rf"\bfull[- ]?time\b[\s:.\-]{{0,20}}(\d+(?:\.\d+)?)\s*({_UNIT})\b", re.I),
     re.compile(rf"\b(\d+(?:\.\d+)?)\s*({_UNIT})\s*(?:full[- ]?time)?\b", re.I),
+    # JSON / data-attribute shape used by NextJS-driven CMSs (Federation
+    # University and similar): the static HTML embeds key/value blocks
+    # like  "heading": "Duration", "summary": "3 years full-time".  The
+    # character class in pattern 0 ([\s:.\-]) excludes commas and quotes,
+    # so this wider gap regex (allowing the JSON punctuation between
+    # the label and the value) is required to lift the value out of the
+    # serialised JSON.  Appended at the END (index 3) so the existing
+    # `pat_idx == 2` loose-fallback gate at line ~754 continues to target
+    # only the bare-number fallback; this pattern carries its own label
+    # context and is treated as a strong (label-priority) signal.
+    re.compile(
+        rf"""(?:{_LABELS})['"]?\s*[:,]\s*['"]?\s*(?:summary|value|text)?\s*['"]?\s*[:,]?\s*['"]\s*"""
+        rf"""(\d+(?:\.\d+)?)\s*({_UNIT})\b""",
+        re.I,
+    ),
 )
 _ACCELERATED = re.compile(
     r"\b(accelerat(?:ed|ion)|fast[- ]?track|condensed|intensive\s+(?:mode|stream|study)|"
@@ -43,7 +58,16 @@ _ACCELERATED = re.compile(
 # bug the user reported (Masters showing 5 instead of 2).
 _CREDIT_POINT_CONTEXT = re.compile(
     r"\b(credit\s+points?|cp\b|subjects?\s+(?:per|of)|units?\s+(?:per|of)|"
-    r"per\s+(?:trimester|semester|term))\b",
+    # VU unit-list rows render as "Unit code: NIT1001 | Credits: 12 Year 1,
+    # Semester 2 ..." after html_to_text flattens the DOM.  Pattern-3
+    # (`<num> <unit>`) then matches "12 Year" by gluing the per-unit credit
+    # value to the next semester heading, and the bachelor floor sanity
+    # check nullifies the resulting 12-Year duration entirely (real bug:
+    # VU "Bachelor of Data Science", "Bachelor of Cyber Security",
+    # "Bachelor of Dermal Sciences", etc., all had duration "-" in the
+    # review table).  Treat any "Credits: <num>" cell as credit-point
+    # context so Pattern-3 in that sentence is demoted ×0.01.
+    r"credits?\s*[:=])\b",
     re.I,
 )
 # PR-1.5 prod regression: VIT MBA rows staged with duration=10 Year because
@@ -485,7 +509,95 @@ def _extract_strong_label_value(
     return None, None
 
 
+# ── QUT structural reader (qut.edu.au) ─────────────────────────────────────
+# QUT's per-course pages are Cloudflare-walled and JS-rendered.  The rendered
+# sidebar "Explore this course" panel exposes the international duration in
+# `<ul data-course-map-key="quickBoxDurationINT">` with a single `<li>` value
+# (e.g. "24 weeks full-time", "1.5 years full-time").  The same UL family
+# also publishes `quickBoxDurationINTFt` / `quickBoxDurationDOMFt` variants
+# for the full-time-only breakdown, but the canonical INT entry is the
+# preferred source because it matches what the live page shows international
+# applicants.
+#
+# Without this structural reader, the generic regex cascade reads the
+# course description prose and lifts a stray "5.5" or "Year 1, Year 2"
+# token instead of the canonical "24 weeks full-time" value, and the
+# arbiter rejects the result (selected=false) so `duration` stages NULL.
+# Verified 2026-05-17 on Graduate Diploma in Legal Practice
+# (university_id QUT, course id 22761).
+def _from_qut_quickbox(html: str, url: str) -> tuple[tuple[float, str], str] | None:
+    from urllib.parse import urlparse as _urlparse
+    host = (_urlparse(url or "").hostname or "").lower()
+    if not (host == "qut.edu.au" or host.endswith(".qut.edu.au")):
+        return None
+    from bs4 import BeautifulSoup
+    soup = BeautifulSoup(html, "html.parser")
+    selected = None
+    selected_key = ""
+    # Preference order: INT (canonical international value) → INTFt
+    # (full-time-only INT variant) → DOM (last-resort domestic value).
+    for preferred in (
+        "quickBoxDurationINT",
+        "quickBoxDurationINTFt",
+        "quickBoxDurationDOM",
+    ):
+        for el in soup.find_all(attrs={"data-course-map-key": True}):
+            key = el.get("data-course-map-key") or ""
+            # Exact-match — substring (`preferred in key`) would let
+            # `quickBoxDurationINTFt` satisfy the `quickBoxDurationINT`
+            # pass and break the intended INT > INTFt > DOM precedence
+            # whenever the Ft variant appears earlier in the DOM.
+            if not isinstance(key, str) or key.strip() != preferred:
+                continue
+            # Allow either a UL/OL with LIs OR a leaf element holding the
+            # raw text — QUT uses both shapes across course pages.
+            texts: list[str] = []
+            lis = el.find_all("li") if el.name in ("ul", "ol") else []
+            if lis:
+                for li in lis:
+                    t = compact(li.get_text(" ", strip=True))
+                    if t:
+                        texts.append(t)
+            else:
+                t = compact(el.get_text(" ", strip=True))
+                if t:
+                    texts.append(t)
+            if texts:
+                selected = texts[0]  # canonical single-value entry
+                selected_key = key
+                break
+        if selected is not None:
+            break
+    if not selected:
+        return None
+    parsed = _classify_duration_value(selected)
+    if parsed is None:
+        return None
+    return parsed, f"qut.quickbox[{selected_key}]: {selected[:80]}"
+
+
 async def extract(html: str, url: str) -> list[ExtractionResult]:
+    # QUT structural pre-pass — see _from_qut_quickbox above.  Runs BEFORE
+    # the generic structural/regex cascade because QUT pages have no
+    # `<strong>Duration</strong>` / `<dl>` / `<table>` duration cell that
+    # the generic pre-pass can latch onto; reading the canonical
+    # `quickBoxDurationINT` UL directly is the only way to surface "24
+    # weeks full-time" instead of the unrelated prose tokens the regex
+    # tournament otherwise rejects.
+    qut = _from_qut_quickbox(html, url)
+    if qut is not None:
+        (amount, unit), snippet = qut
+        amount, unit = _convert_weeks(amount, unit)
+        return [
+            ExtractionResult(
+                field_key="duration",
+                value=amount,
+                normalized={"duration": amount, "duration_term": unit},
+                confidence=0.95,
+                snippet=snippet,
+                method="duration.qut_quickbox",
+            )
+        ]
     # Structural pre-pass FIRST — see _extract_strong_label_value for
     # the rationale. When the page publishes duration as a
     # `<strong>Duration</strong>` / `<dt>/<dd>` / `<th>/<td>` pair,
@@ -780,7 +892,14 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
             # weight tournament — exact failure mode on UniSQ MRes page.
             # Pattern 0 → ×100 (labeled), Pattern 1 → ×10 (full-time),
             # Pattern 2 → ×1 (fallback).
-            pattern_priority = 100.0 if pat_idx == 0 else (10.0 if pat_idx == 1 else 1.0)
+            # Pattern 3 (JSON-shape, e.g. `"heading":"Duration","summary":"3 years"`)
+            # carries an explicit label and is as trustworthy as Pattern 0,
+            # so it gets the same ×100 priority boost.  Pattern 2 (loose
+            # bare-number fallback) keeps ×1.
+            pattern_priority = (
+                100.0 if pat_idx in (0, 3)
+                else (10.0 if pat_idx == 1 else 1.0)
+            )
             weeks = amount * _WEEKS[unit]
             parsed.append((
                 (weeks * 100 + _UNIT_RANK[unit]) * weight_mod * pattern_priority,

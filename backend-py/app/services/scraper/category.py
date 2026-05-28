@@ -75,8 +75,13 @@ _KEYWORDS: tuple[tuple[str, tuple[str, ...]], ...] = (
         (
             "medicine", "nursing", "pharmacy", "dentistry", "physiotherapy",
             "occupational therapy", "public health", "health science",
-            "biomedical science", "midwifery", "paramedic", "psychology",
-            "clinical", "radiography", "medical", "healthcare", "podiatry",
+            "biomedical science", "midwifery", "paramedic",
+            # Note: bare "psychology" lives under Arts, Humanities & Social
+            # Sciences (matches the live DB taxonomy). Only the clinical
+            # variant belongs to Medicine & Health — caught by the multi-word
+            # phrase below.
+            "clinical psychology", "clinical",
+            "radiography", "medical", "healthcare", "podiatry",
             "optometry", "chiropractic", "veterinary",
         ),
     ),
@@ -88,6 +93,11 @@ _KEYWORDS: tuple[tuple[str, tuple[str, ...]], ...] = (
             "political science", "international relations", "criminology",
             "social science", "language", "creative writing", "music",
             "performing arts", "theatre", "fine arts",
+            # Psychology lives here per the live DB taxonomy
+            # ("course_sub_categories" has Psychology under
+            # Arts, Humanities & Social Sciences, and Clinical Psychology
+            # under Medicine & Health).
+            "psychology",
         ),
     ),
     (
@@ -233,7 +243,9 @@ _SUB_CATEGORY_MAP: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("Business & Management",     "Management",             ("business management", "management studies", "master of management", "graduate diploma of management", "graduate certificate of management")),
     ("Computer Science & IT",     "Networking",             ("networking", "network engineering", "computer networks")),
     ("Computer Science & IT",     "Data Science",           ("data science", "data analytics")),
-    ("Computer Science & IT",     "Cyber Security",         ("cyber",)),
+    # "cyber" alone matches "cyber security"; "cybersecurity" handles the
+    # one-word spelling that the word-boundary regex would otherwise miss.
+    ("Computer Science & IT",     "Cyber Security",         ("cyber", "cybersecurity")),
     ("Computer Science & IT",     "Artificial Intelligence", ("artificial intelligence", "machine learning")),
     ("Computer Science & IT",     "Software Engineering",   ("software engineering", "software development", "software application development", "application development")),
     ("Computer Science & IT",     "Information Systems",    ("information systems", "information technology", "it management")),
@@ -246,7 +258,10 @@ _SUB_CATEGORY_MAP: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("Medicine & Health",     "Pharmacy",               ("pharmacy",)),
     ("Medicine & Health",     "Physiotherapy",          ("physiotherapy",)),
     ("Medicine & Health",     "Public Health",          ("public health",)),
-    ("Medicine & Health",     "Psychology",             ("psychology",)),
+    # Clinical Psychology stays in Medicine & Health (matches DB taxonomy).
+    # Plain "psychology" is mapped to the Arts/Humanities bucket below.
+    ("Medicine & Health",     "Clinical Psychology",    ("clinical psychology",)),
+    ("Arts, Humanities & Social Sciences", "Psychology", ("psychology",)),
     ("Medicine & Health",     "Dentistry",              ("dentistry", "dental")),
     ("Education & Social Work",   "Early Childhood",        ("early childhood",)),
     ("Education & Social Work",   "Social Work",            ("social work",)),
@@ -281,6 +296,13 @@ _SUB_CATEGORY_MAP: tuple[tuple[str, str, tuple[str, ...]], ...] = (
 _PARENS_RE = re.compile(r"\(([^)]+)\)")
 
 
+_GENERIC_DOCTORATE_RE = re.compile(
+    r"^\s*(doctor of philosophy|doctor of professional studies|master of philosophy|"
+    r"phd|d\.phil|dphil|m\.phil|mphil)\s*$",
+    re.IGNORECASE,
+)
+
+
 def map_course_to_category(course_name: str) -> dict | None:
     """Return ``{"category": str, "sub_category": str}`` if a confident
     keyword pre-map fires, otherwise ``None``.
@@ -294,8 +316,14 @@ def map_course_to_category(course_name: str) -> dict | None:
 
     Both passes use whole-word, case-insensitive, first-hit-wins matching
     against ``_SUB_CATEGORY_MAP``.
+
+    Generic doctorate guard: bare "Doctor of Philosophy" / "PhD" / "MPhil"
+    have no field info — return None so the reviewer picks the discipline
+    rather than letting downstream defaults bucket them as "Maths & Sciences".
     """
     if not course_name:
+        return None
+    if _GENERIC_DOCTORATE_RE.match(course_name.strip()):
         return None
     n = course_name.lower()
 

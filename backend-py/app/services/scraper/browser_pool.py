@@ -4,8 +4,38 @@ from __future__ import annotations
 import asyncio
 import logging
 from contextlib import asynccontextmanager
+from urllib.parse import urlparse
 
 from app.config import settings
+from app.services.scraper.extractors.curtin_session import (
+    playwright_cookies_for_url,
+)
+
+# Sentinel returned by fetch_html when the remote server responds with HTTP 429
+# (Too Many Requests / Cloudflare rate-limit).  Callers that need to
+# distinguish a rate-limit from a generic failure (e.g. to apply a long
+# cooldown before retrying) can check ``result is BROWSER_RATE_LIMITED``.
+BROWSER_RATE_LIMITED: object = object()
+
+
+# Per-host browser concurrency caps.  Cloudflare / Akamai-protected sites
+# cascade into 503 / "challenge failed" responses when our 10-concurrent
+# global pool hammers them in parallel.  UTAS in prod (job_..._utas) showed
+# 116/120 fetch_failed when Browser=10 because every parallel request hit
+# Cloudflare before the prior request had finished issuing cf_clearance.
+# Capping concurrent in-flight requests per host gives the bot-protection
+# layer time to process challenges and yields drastically higher staging
+# rates with the same total wall-time.
+#
+# Keep this map TIGHT — every entry serializes one host, slowing it down.
+# Only add hosts that empirically choke at Browser=10.
+_HOST_CONCURRENCY_CAPS: dict[str, int] = {
+    # Lowered from 3 → 2 (2026-05-11) after job_..._utas showed 69/120
+    # fetch_failed even with a 2.0s single retry. Cloudflare on UTAS still
+    # rate-limited the parallel browser fetches at concurrency=3; halving the
+    # in-flight count gives cf_clearance reliably more time to issue.
+    "utas.edu.au": 2,
+}
 
 log = logging.getLogger(__name__)
 
@@ -131,6 +161,26 @@ class BrowserPool:
         self._pw = None
         self._browser = None
         self._lock = asyncio.Lock()
+        # Lazily-created per-host semaphores.  Acquired BEFORE the global
+        # semaphore in fetch_html so a flood of UTAS requests can't starve
+        # the global pool from healthy hosts.
+        self._host_sems: dict[str, asyncio.Semaphore] = {}
+
+    def _host_sem_for(self, url: str) -> asyncio.Semaphore | None:
+        """Return the per-host concurrency semaphore for ``url`` if the host
+        appears in :data:`_HOST_CONCURRENCY_CAPS`, otherwise ``None``."""
+        try:
+            host = (urlparse(url).hostname or "").lower()
+        except Exception:
+            return None
+        for capped_host, cap in _HOST_CONCURRENCY_CAPS.items():
+            if host == capped_host or host.endswith("." + capped_host):
+                sem = self._host_sems.get(capped_host)
+                if sem is None:
+                    sem = asyncio.Semaphore(cap)
+                    self._host_sems[capped_host] = sem
+                return sem
+        return None
 
     async def _ensure(self):
         if self._browser is not None:
@@ -272,6 +322,20 @@ class BrowserPool:
     ) -> str | None:
         try:
             async with self.page() as page:
+                # Per-host session priming (currently only Curtin —
+                # see extractors/curtin_session.py for rationale). Must
+                # happen BEFORE page.goto so the cookie is sent on the
+                # very first request, not just on subsequent navigations.
+                # Returns [] for every other host.
+                _cookies = playwright_cookies_for_url(url)
+                if _cookies:
+                    try:
+                        await page.context.add_cookies(_cookies)
+                    except Exception as _cookie_exc:
+                        log.warning(
+                            "browser cookie prime failed for %s: %s",
+                            url, _cookie_exc,
+                        )
                 # Set referer to look like coming from Google
                 await page.set_extra_http_headers({"Referer": "https://www.google.com/"})
                 # PR-5 Bug 3: catch the SPECIFIC navigation-timeout case
@@ -321,6 +385,9 @@ class BrowserPool:
                 if resp is None:
                     log.warning("browser fetch %s: no response", url)
                     return None
+                if resp.status == 429:
+                    log.warning("browser fetch %s -> %s", url, resp.status)
+                    return BROWSER_RATE_LIMITED  # type: ignore[return-value]
                 if resp.status >= 400:
                     log.warning("browser fetch %s -> %s", url, resp.status)
                     return None

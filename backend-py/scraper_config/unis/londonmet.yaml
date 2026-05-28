@@ -1,0 +1,102 @@
+# London Metropolitan University (UK)
+# Hostname: www.londonmet.ac.uk
+# University ID: dev=6 (prod: lookup by name).
+#
+# Bug history / rationale (2026-05-13):
+#   - Live data showed only 2 staged courses (PhD MPhil/PhD, MPhil) for a
+#     university that publishes 100+ programmes.  All staged rows carried a
+#     placeholder international_fee of £10,000/Annual that was never present
+#     on the actual course pages.
+#   - Discovery log: BFS found only 19 candidates and most were category
+#     landing pages ("Postgraduate teacher training courses",
+#     "Extended Degrees Foundation Year Programmes", "Postgraduate", etc.) —
+#     the homepage and faculty pages link almost exclusively to category
+#     index pages, not to individual course detail pages.  After
+#     gate-dropping, only 11 remained for extraction, of which only 4 were
+#     real courses.
+#   - 19 > _SITEMAP_FALLBACK_THRESHOLD (5), so the conditional sitemap
+#     fallback never fired and the 482-URL course catalogue from the
+#     sitemap stayed invisible to the pipeline.
+#   - LondonMet publishes a non-standard sitemap location via robots.txt:
+#     `Sitemap: https://www.londonmet.ac.uk/new-sitemap-en.xml` (the
+#     standard /sitemap.xml 404s).  sitemap.py already reads robots.txt for
+#     non-standard `Sitemap:` directives, so we don't need a hardcoded
+#     `sitemap_url` override — we only need to *force* the supplement to
+#     run despite BFS exceeding the fallback threshold.
+#   - Allow pattern keys on the `---<degree>` infix that every real course
+#     URL carries (e.g. `---bsc-hons`, `---ma`, `---msc`, `---pgce`,
+#     `---phd`, `---mphil`, `---llm`).  Non-course sitemap entries
+#     (/courses/short/, /courses/extended-degrees/, /courses/top-up/,
+#     /research/research-collections/...) lack this infix and are dropped
+#     before consuming candidate-cap slots.
+#   - LondonMet is a UK university — fees are quoted in GBP (£), not AUD.
+#     The default_currency override prevents the regex sweep from labelling
+#     £10,000 as AUD$10,000 in staging.
+
+discovery:
+  # Force sitemap merge: LondonMet's homepage + faculty pages link only to
+  # category index pages, so BFS finds plenty of "candidates" that are all
+  # listings.  The sitemap (auto-discovered via robots.txt) carries the
+  # full 482-URL course catalogue and must always be merged in.
+  always_sitemap_supplement: true
+
+  # Pre-filter the 7,920-URL sitemap down to actual course pages BEFORE
+  # they consume candidate-cap slots.  Keys on the `---<degree>` infix
+  # that every real LondonMet course URL contains (e.g.
+  # /courses/postgraduate/translation---ma/,
+  # /courses/undergraduate/economics---bsc-hons/).  Also accepts research
+  # MPhil/PhD pages under /research/courses/.
+  allow_url_patterns:
+    - "/courses/(undergraduate|postgraduate|extended-degrees|accelerated-degrees|top-up|online-and-distance-learning-courses|routes-into-teaching|mycourses)/.+---[a-z0-9-]+/?$"
+    - "/research/courses/.+---[a-z0-9-]+/?$"
+
+  # Block the category landing pages that BFS keeps surfacing as
+  # "candidates".  These are listing pages, not course detail pages, and
+  # the gate already drops them — but blocking earlier saves a fetch.
+  block_url_patterns:
+    - "/courses/(undergraduate|postgraduate|extended-degrees|accelerated-degrees|top-up|short|short-courses-and-professional-development|mycourses|online-and-distance-learning-courses|routes-into-teaching|apprenticeships|international-pathway-programmes|global-partnerships|english-language-courses|professional-courses|open-language-programme|our-collaborative-partnerships|routes-into-law)/?$"
+    - "/courses/short/"
+    - "/courses/short-courses/"
+
+  # Raise the candidate cap above the default 200: LondonMet has ~482
+  # course URLs in the sitemap and we want a healthy first-pass discovery
+  # rather than truncating at the alphabetic cut-off.
+  max_candidates: 500
+
+  # The BFS budget is fine at 25 — the sitemap supplement does the heavy
+  # lifting, BFS just needs to seed the home/category structure.
+
+extraction:
+  fees:
+    # London Met is a UK university — quoted fees are in GBP (£).  In
+    # practice currency is already inferred correctly from the literal £
+    # token in the page text and from the .ac.uk TLD, so this knob is a
+    # belt-and-braces default rather than the active enforcement
+    # mechanism.  Kept for clarity of intent.
+    default_currency: "GBP"
+
+# Bug history / 2026-05-14 brand-chrome scrub:
+#   A review-queue inspection showed only 5 staged rows out of 322
+#   discovered, and every staged row carried bogus contamination from
+#   page brand chrome:
+#     - international_fee=£10,000/Annual sourced from a "Postgraduate
+#       Loan of over £10,000" advert that appears on every London
+#       Met PG page (this is a UK government loan advert, NOT a
+#       tuition fee)
+#     - course_location set to the literal "London Metropolitan
+#       University" string from the page header/footer brand chrome
+#     - ielts_overall=6 hallucinated from incidental "Level 6" text
+#       in MBA professional-qualifications copy
+#   The first two are now scrubbed by
+#   `app/services/scraper/extractors/londonmet_chrome_scrub.py`,
+#   which NULLs the affected fields when triggered.  After scrubbing,
+#   the bogus rows fail the existing should_stage_course
+#   ``no_international_fee`` gate and are dropped — the correct
+#   outcome until a separate Fees & Funding sub-page fetcher is built.
+#
+#   FOLLOW-UP NEEDED: London Met does NOT publish per-course fees on
+#   the per-course page; the real fees live on a shared tuition-fees
+#   page.  Recovering them requires a per-uni "fees sub-page"
+#   fetcher.  Same problem for IELTS — the per-course page only ever
+#   shows "this course requires you to meet our standard requirements"
+#   and links out to a dedicated entry-requirements page.

@@ -1,7 +1,59 @@
-# University of Newcastle (Australia) — stub created for Week 5 scale-up.
-# Hostname: www.newcastle.edu.au  (course catalogue at /study)
-# Already partially scraped pre-Week 5; check existing data before re-running.
-discovery: {}
+# University of Newcastle (Australia)
+# Hostname: www.newcastle.edu.au
+# uni_id: 17 (dev)
+#
+# ─── 2026-05-15 — Discovery rewrite (was: empty stub) ────────────────────
+# Symptom: every UoN scrape staged 0 courses.  Discovery yielded only the
+# homepage as a candidate ("category_landing_page" skip), because:
+#   * www.newcastle.edu.au is Cloudflare-protected — every plain-HTTP
+#     fetch of /study, /study/central-coast, etc. returns HTTP 403, so
+#     BFS finds zero outbound links.
+#   * The remaining /study/* URLs that ARE reachable
+#     (/study/postgraduate, /study/undergraduate, /study/international,
+#     /study/international/south-asia) are all classified as
+#     `category_landing_page` by guards.py and dropped before being
+#     crawled, so even a successful fetch wouldn't yield candidates.
+#   * Sitemap returns 0 unique candidates (UoN's published sitemap is
+#     news/marketing-only, no /degrees/* entries).
+#   * All 7 generic alt-listing-paths (/our-courses, /our-programs/all,
+#     etc.) 404 — UoN's catalogue lives at /degrees/<slug>, not any of
+#     the conventional paths.
+#
+# Fix mirrors UTAS (also Cloudflare-protected):
+#   1. always_browser_discover=true — Playwright is the PRIMARY discovery
+#      tier; BFS is skipped entirely (orchestrator.py line ~748).  The
+#      browser pass uses the _HOST_EXTRA_SEEDS entry for
+#      www.newcastle.edu.au in browser_discover_generic.py to reach the
+#      /degrees A-Z catalogue pages.
+#   2. allow_url_patterns=["/degrees/[^/]+"] — UoN's canonical course
+#      path.  Re-applied at orchestrator Phase A.5b AFTER browser
+#      discovery merges, so any non-course URL the Playwright pass
+#      sweeps in (homepage, study-area landings, etc.) is dropped.
+#      Pattern allows /degrees/<slug> and /degrees/<slug>/<sub> but
+#      keeps the chokepoint tight.
+#   3. block_url_patterns drops the /degrees/compare and
+#      /degrees/saved-courses UI shells (already covered by guards.py
+#      _UI_PAGE_PATH_HINTS but listed here for documentation; the YAML
+#      list is also re-applied at Phase A.5b-pre).
+#
+# IMPORTANT: with always_browser_discover=true the BFS-only knobs
+# (must_contain, always_sitemap_supplement, fallback_subdomains,
+# bfs_page_budget) are inert because discover_course_links() is
+# skipped entirely.  Only block_url_patterns / allow_url_patterns are
+# re-applied post-discovery.  Don't add those inert knobs back without
+# also wiring them into the post-discovery path in orchestrator.py.
+#
+# Domestic-only filter is left disabled — UoN does not publish
+# domestic-only banners on individual course pages.
+discovery:
+  always_browser_discover: true
+  allow_url_patterns:
+    - "/degrees/[^/]+"
+  block_url_patterns:
+    - "/degrees/compare"
+    - "/degrees/saved-courses"
+    - "/degrees/favourites"
+
 extraction:
   filters:
     domestic_only:

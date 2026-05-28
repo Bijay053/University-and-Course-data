@@ -1,0 +1,181 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# CQUNIVERSITY (CQU)
+# File: backend-py/scraper_config/unis/cqu.yaml
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# URL structure on CQU's site:
+#
+# - University-level courses (bachelor, master, doctorate, grad cert/dip) live at:
+#     /courses/<letter><letter><digit><digit>/<slug>
+#   Examples (all verified live via Google's index):
+#     /courses/cg72/bachelor-of-theatre
+#     /courses/cg21/bachelor-of-engineering-technology
+#     /courses/cq18/bachelor-of-information-technology
+#     /courses/cl86/bachelor-of-business
+#     /courses/cb84/bachelor-of-occupational-therapy-honours
+#     /courses/cc24/bachelor-of-digital-media
+#     /courses/cl09/bachelor-of-aviation
+#   These pages serve content under ?audience=INTERNATIONAL and publish
+#   real international tuition fees.
+#
+# - TAFE / VET certificates and diplomas live at:
+#     /courses/<6-digit-id>/<slug>
+#   Examples:
+#     /courses/981672/certificate-iii-in-aboriginal-and-torres-strait-islander-primary-health-care
+#     /courses/1185718/certificate-iii-in-animal-care-services
+#     /courses/852601/diploma-of-beauty-therapy
+#   These are domestic-only and don't have an international audience version
+#   (URL returns CQU's 500 error template with or without ?audience query).
+#   Per user requirement, we do NOT want these.
+#
+# Discovery history that led here:
+# - The first CQU YAML in this debugging session used a tight pattern that
+#   correctly captured letter-prefix course codes but only 4-5 chars
+#   (/courses/c[a-z][0-9]{2,3}). It worked structurally but mis-rejected
+#   54 URLs in one run.
+# - We then broadened to /courses/ to "fix" the 54 missing. That was
+#   wrong — those 54 were not missing international courses, they were
+#   TAFE noise. The broader pattern then captured 40 TAFE URLs, all of
+#   which 500 because they don't have international pages.
+# - Returning to the original strict pattern with an explicit 4-character
+#   code (letter+letter+digit+digit), which matches what Google has
+#   indexed for international audience.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+
+discovery:
+  # University-level courses only. The 4-char letter-prefix code is the
+  # discriminator that excludes TAFE numeric-ID URLs.
+  #
+  # Pattern reads: /courses/ + two letters + two digits + / + slug
+  # Catches: cg72, cq18, cl86, cb84, cc24, cl09, cg21, cc32, etc.
+  # Rejects: 981672, 1185718, 852601 (TAFE numeric IDs)
+  # Rejects: /courses/ on its own (the listing page)
+  # Rejects: /courses/pdc, /courses/all-courses, etc.
+  allow_url_patterns:
+    - "/courses/[a-z]{2}[0-9]{2}/[a-z]"
+
+  block_url_patterns:
+    # PDC = professional development / continuing education. Not degrees.
+    - "/courses/pdc"
+    # Aggregate listing pages.
+    - "/courses/all-courses"
+    - "/courses/find-a-course"
+    - "/courses/study-areas"
+    # Generic landing pages that the discovery classifier sometimes
+    # promotes despite the whitelist.
+    - "/study/apprenticeships-traineeships"
+    - "/study/tafe"
+    - "/study/tafe-certificates-diplomas"
+    # General noise.
+    - "/news/"
+    - "/about-us/"
+    - "/events/"
+
+  # Sitemap supplement is essential here — CQU is a JS-heavy site and
+  # the static BFS pass returns very few course URLs. The 723-entry
+  # sitemap is what surfaces the real bachelor/master pages.
+  always_sitemap_supplement: true
+
+  # BFS budget bumped from default 25 because the bare /courses/ landing
+  # page returned 0 candidates on the most recent run; sitemap is doing
+  # the work but a higher budget gives BFS room to find additional links.
+  bfs_page_budget: 60
+
+  # 2026-05-12 fix: the CQU sitemap publishes 199 unique URLs that match
+  # our HE allow pattern, but BFS already fills ~54 slots before the
+  # supplement runs, so only 146 sitemap slots remain at the default 200
+  # cap.  That truncation silently drops late-alphabet courses like
+  # cv82 (Master of Engineering, sitemap allow-index 168) and ~30 others.
+  # 250 leaves comfortable headroom for the full HE catalogue.
+  max_candidates: 250
+
+extraction:
+  filters:
+    # 2026-05-12 fix: CQU's ?audience=INTERNATIONAL rewrite serves a
+    # 200-OK 137-char branded "The server encountered an error" page on
+    # ~40+ legitimate Bachelors and Masters (Health Science, Paramedicine,
+    # Education Secondary, every coursework Master's, etc.) even though
+    # the bare /courses/<code>/<slug> URL returns ~18-20 KB of full
+    # international-eligible content with the correct CRICOS, fees,
+    # IELTS, intake months, etc. Without this knob the global
+    # broken-CMS short-circuit silently dropped them all and the
+    # staging table held only ~40 of CQU's ~150+ international courses.
+    # When the broken-CMS marker fires AND the URL has a query string,
+    # the pipeline retries the bare URL once and uses that content if
+    # it is real (≥400 chars and no broken-CMS marker).
+    broken_cms_retry_strip_query: true
+
+    # Keep enabled. Legitimate domestic-only programs (e.g. double-degree
+    # bachelors of law with no international audience version) should
+    # still be filtered.
+    domestic_only:
+      enabled: true
+
+  fees:
+    # Per-course pages publish the international fee under "Fees &
+    # Scholarships" when ?audience=INTERNATIONAL is in the URL.
+    central_page: ""
+    fees_pdf_url: ""
+
+  english:
+    # IELTS/PTE/TOEFL live in a JS-rendered slide-out panel on per-course
+    # pages and are not in the static HTML. Central page has them in prose
+    # (NOT in a table) and is itself JS-rendered (returns ~200 chars of
+    # static body text), so neither the per-course nor the central-page
+    # parser can recover the values. Until those parsers are upgraded,
+    # the institutional defaults below are the authoritative fallback.
+    central_page: "https://www.cqu.edu.au/international/applying-to-cquniversity/english-language-requirements"
+    requirements_pdf_url: ""
+
+    # CQU's published institutional minimums for international entry,
+    # taken verbatim from the central English page above:
+    #   IELTS Academic: 6.5 overall (no individual band below 6.0)
+    #   PTE Academic:   58 overall  (no communicative skill below 50)
+    #   TOEFL iBT:      79 overall
+    # These are the PG/most-UG floor; a few health programs (Nursing,
+    # Physiotherapy, Speech Pathology) require IELTS 7.0 and will need
+    # per-course readings to override. The institutional default is
+    # applied with confidence 0.40 — any real per-course value, central
+    # page reading, or sibling-cache vote (all ≥ 0.50) will win over it.
+    default_ielts: 6.5
+    default_pte: 58
+    default_toefl: 79
+
+  # URL rewrite: append ?audience=INTERNATIONAL to every per-course URL
+  # so the page renders international tuition fees server-side. Verified
+  # working — last run's logs show this is being applied to every URL.
+  # Path prefix guard ensures it only fires on /courses/<code>/ URLs,
+  # not on central pages or listings.
+  url_rewrites:
+    - host: "www.cqu.edu.au"
+      append_query: "audience=INTERNATIONAL"
+      path_prefix: "/courses/"
+
+# ── Expected next-run outcome ────────────────────────────────────────────────
+#
+# DISCOVERY
+#   The strict allow whitelist will reject all the TAFE numeric-ID URLs.
+#   Expected staged count: 80-130 university-level courses (bachelor,
+#   master, doctorate, grad cert/dip), drawn from the sitemap.
+#
+# FEES
+#   Should render as international values via the audience=INTERNATIONAL
+#   rewrite, e.g.:
+#     Bachelor of Nursing                ~$27,000/year
+#     Bachelor of Education (Primary)    ~$20,700/year
+#     Bachelor of Health Science         ~$29,600/year
+#     Bachelor of Theatre                ~$25,500/year (verified live)
+#
+# IELTS
+#   Per-course IELTS will remain blank for most courses (JS-rendered
+#   slide-out panel, not in static HTML). Fix is in the central English
+#   page parser (separate bug from this YAML).
+#
+# IF DISCOVERY STILL RETURNS ZERO URLS
+#   Check that the sitemap supplement is firing. Earlier logs show
+#   "+723 candidates" from sitemap and "supplement added 146 new
+#   candidate(s)". The new allow pattern will filter that 146 down to
+#   the real university courses. If you see "+0 candidates from sitemap",
+#   the supplement isn't running and BFS alone won't find the bachelor's
+#   URLs — that's the next thing to investigate.

@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import logging
 import math
+import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
@@ -423,6 +424,43 @@ async def stage_course(
             if not payload.get("sub_category"):
                 payload["sub_category"] = det.get("sub_category")
 
+    # ── DB taxonomy canonicalisation ─────────────────────────────────────────
+    # Last line of defence: if a sub_category survived to this point with a
+    # value that came from Gemini (e.g. "Applied Cyber Security"), match it
+    # against the live `course_sub_categories` rows for the same category and
+    # snap it to the existing canonical name ("Cyber Security") whenever
+    # there is a strong fuzzy match. This prevents Gemini's free-text guesses
+    # from fragmenting the taxonomy with near-duplicate auto-added rows.
+    #
+    # The matcher is conservative — when no existing row passes the 50%
+    # token-overlap threshold, the raw value flows through unchanged so a
+    # genuinely new discipline is still surfaced for the reviewer.
+    _cat_for_match = payload.get("category")
+    _sub_for_match = payload.get("sub_category")
+    if _cat_for_match and _sub_for_match:
+        try:
+            from app.services.sub_category_matcher import resolve_sub_category
+            # auto_add=False — the staging transaction may still roll back
+            # later, so we must not INSERT new taxonomy rows here. We only
+            # *snap* Gemini's value to an existing canonical row when there
+            # is a confident fuzzy match; otherwise the raw value flows
+            # through and approve_course.py will INSERT (commit-safely) if
+            # the row is ever promoted.
+            canonical = await resolve_sub_category(
+                db, _cat_for_match, _sub_for_match, auto_add=False,
+            )
+            if canonical and canonical != _sub_for_match:
+                log.info(
+                    "stage_course: snapped sub_category %r → %r for %r (cat=%s)",
+                    _sub_for_match, canonical, name, _cat_for_match,
+                )
+                payload["sub_category"] = canonical
+        except Exception as exc:  # noqa: BLE001 — never let canonicalisation abort staging
+            log.warning(
+                "stage_course: sub_category canonicalisation failed for %r: %s",
+                name, exc,
+            )
+
     # All rejection reasons are transient: every re-scrape re-evaluates every
     # course from scratch.  If the extraction code changes or a university
     # updates its page, a previously rejected course gets a fresh chance
@@ -445,6 +483,113 @@ async def stage_course(
     if _canon:
         payload = dict(payload)
         payload["degree_level"] = _canon
+
+    # Universal "Online" / virtual-mode scrub for course_location.
+    #
+    # Rationale: the location extractor cascade calls _sanitise_for_display
+    # (which strips Online via _REMOVE_VIRTUAL), but Online still leaks into
+    # course_location via at least three other paths:
+    #   1. AI fallback (gemini_primary / ai_fallback) writes location_text /
+    #      course_location values that pass page-text validation because
+    #      "Online" appears verbatim on Federation / Mt-Helen-style pages.
+    #   2. Direct uni-specific writes (Bond / ECU / CSU) bypass the
+    #      cascade entirely and assign payload["course_location"] directly.
+    #   3. Central PDF / fee-page extractors that join campus tokens with
+    #      ", " around an Online row.
+    # Online is a delivery mode, not a campus, so it must never appear in
+    # course_location regardless of source.  Scrubbing here is the single
+    # chokepoint every staged row passes through.
+    _raw_loc = (payload.get("course_location") or "").strip()
+    if _raw_loc:
+        try:
+            from app.services.scraper.extractors.location import _REMOVE_VIRTUAL
+            parts = [p.strip() for p in _raw_loc.split(",") if p.strip()]
+            kept = [p for p in parts if not _REMOVE_VIRTUAL.search(p)]
+            if len(kept) != len(parts):
+                payload = dict(payload)
+                payload["course_location"] = ", ".join(kept) if kept else None
+                log.info(
+                    "[LOC SCRUB] %s: %r → %r",
+                    name, _raw_loc, payload["course_location"],
+                )
+        except Exception:  # noqa: BLE001
+            pass  # never block staging on scrub failure
+
+    # 2026-05-13: Defensive trailing-country strip for course_location.
+    # The structural cascade in extractors/location.py no longer appends
+    # ", Australia" / ", New Zealand" (per user preference — every uni in
+    # this system is AU/NZ so the country tag is noise), and the cascade's
+    # _sanitise_for_display strips bare country tokens.  But other paths
+    # (Gemini fallback location_text, label-derived strong-tag captures
+    # off VU's "Sydney, Melbourne, Brisbane, Australia" footer-style
+    # campus list, central fee-page joins, ECU static extract) can still
+    # leak a trailing country word past staging.  This is the single
+    # chokepoint every staged row passes through, so strip here too.
+    _raw_loc2 = (payload.get("course_location") or "").strip()
+    if _raw_loc2:
+        _stripped = re.sub(
+            r"\s*,\s*(?:Australia|New Zealand|NZ)\s*$",
+            "",
+            _raw_loc2,
+            flags=re.IGNORECASE,
+        ).strip(" ,")
+        if _stripped != _raw_loc2:
+            payload = dict(payload)
+            payload["course_location"] = _stripped if _stripped else None
+            log.info(
+                "[LOC COUNTRY STRIP] %s: %r → %r",
+                name, _raw_loc2, payload["course_location"],
+            )
+
+    # ── Per-uni global_substring_blocklist + field_overrides (opt-in) ────────
+    # Two YAML knobs applied here so they affect EVERY string field on the
+    # final payload regardless of which extractor wrote it:
+    #   text_cleaning.global_substring_blocklist  → strip boilerplate
+    #   text_cleaning.field_overrides             → URL-regex hard overrides
+    # Both are no-ops when the lists are empty (default).
+    try:
+        from app.services.scraper.config.context import get_uni_config
+        _cfg = get_uni_config()
+    except Exception:  # noqa: BLE001
+        _cfg = None
+    if _cfg is not None:
+        # 1) global substring blocklist (case-insensitive)
+        _blk = [s for s in (_cfg.extraction.text_cleaning.global_substring_blocklist or []) if s and s.strip()]
+        if _blk:
+            payload = dict(payload)
+            for _fld, _val in list(payload.items()):
+                if not isinstance(_val, str) or not _val:
+                    continue
+                _new = _val
+                for _sub in _blk:
+                    if not _sub:
+                        continue
+                    _new = re.sub(re.escape(_sub), "", _new, flags=re.IGNORECASE)
+                _new = re.sub(r"\s{2,}", " ", _new).strip(" ,;:-\t\n")
+                if _new != _val:
+                    payload[_fld] = _new if _new else None
+                    log.info(
+                        "[TEXT BLOCKLIST] %s.%s: %r → %r",
+                        name, _fld, _val[:80], (_new[:80] if _new else None),
+                    )
+        # 2) field_overrides (per-URL regex hard sets)
+        _fos = list(_cfg.extraction.text_cleaning.field_overrides or [])
+        if _fos:
+            _course_url = (payload.get("course_website") or payload.get("source_url") or "").strip()
+            if _course_url:
+                payload = dict(payload)
+                for _fo in _fos:
+                    try:
+                        if re.search(_fo.url_regex, _course_url, re.IGNORECASE):
+                            _old = payload.get(_fo.field)
+                            _new_val = _fo.value if (_fo.value is not None and _fo.value != "") else None
+                            payload[_fo.field] = _new_val
+                            log.info(
+                                "[FIELD OVERRIDE] %s.%s: %r → %r (url=%s, regex=%s)",
+                                name, _fo.field, _old, _new_val, _course_url, _fo.url_regex,
+                            )
+                    except re.error:
+                        log.warning("field_overrides: invalid regex skipped: %s", _fo.url_regex)
 
     # Sanitize NaN/Inf floats before writing — PostgreSQL accepts NaN as a
     # FLOAT value but Python's JSON encoder will later raise ValueError on it.

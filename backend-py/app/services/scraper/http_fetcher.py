@@ -12,6 +12,7 @@ from contextlib import asynccontextmanager
 import httpx
 
 from app.config import settings
+from app.services.scraper.extractors.curtin_session import cookies_for_url
 
 log = logging.getLogger(__name__)
 _sem = asyncio.Semaphore(settings.max_http_concurrency)
@@ -43,7 +44,11 @@ async def fetch_html(url: str, *, retries: int = 2) -> str | None:
         async with _sem:
             try:
                 async with _client() as c:
-                    r = await c.get(url)
+                    # Per-host session priming (currently only Curtin —
+                    # see extractors/curtin_session.py for rationale).
+                    # Returns {} for every other host so this is a true
+                    # no-op for ~100 universities in the fleet.
+                    r = await c.get(url, cookies=cookies_for_url(url))
                     if r.status_code == 200:
                         return r.text
                     log.warning("fetch %s -> %s", url, r.status_code)

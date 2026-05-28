@@ -29,8 +29,62 @@
 # / CSP/HECS anchors in the flat plain-text passed to Gemini.  This is a
 # belt-and-suspenders fix for the cases where the browser tab-click misses
 # (e.g. Cloudflare CAPTCHA, tab not mounted yet).
+#
+# ── Discovery strategy (2026-05-11) ─────────────────────────────────────────
+#
+# UTAS BFS starts from /courses and returns ~84 URLs via HTTP-accessible
+# faculties (health, sci-eng, tsbe, ...).  Arts-soc and other faculties
+# consistently return 403 for plain HTTP, so BFS silently misses them.
+# Master of Teaching (e7g) lives under arts-soc and was absent from every run.
+#
+# Fix: always_browser_discover=true runs Playwright browser discovery IN
+# ADDITION to BFS (merging results), sweeping the faculty A-Z pages via
+# browser.  browser_discover_generic.py seeds utas.edu.au with the full
+# faculty listing pages (_HOST_EXTRA_SEEDS) so each faculty's A-Z index is
+# visited in the browser pass.
+#
+# extra_course_urls is a belt-and-suspenders entry for e7g specifically —
+# ensures it is present in the discovered set even if browser discovery
+# cannot navigate arts-soc due to Cloudflare rate-limiting on the day.
+
+discovery:
+  always_browser_discover: true   # skip BFS; browser is primary discovery (9 faculty seeds in _HOST_EXTRA_SEEDS)
+  # Only keep URLs that match the canonical UTAS course-page pattern
+  # (/courses/<faculty>/courses/<code>-<name>).  Browser discovery sweeps
+  # nav links and can pick up /study/pathways-to-university,
+  # /study/work-integrated-learning, etc. — these consume semaphore slots
+  # and trigger 429s without ever yielding a stageable course.
+  allow_url_patterns:
+    - "/courses/[^/]+/courses/"       # current format: /courses/<faculty>/courses/<code>
+    - "/courses/\\d{4}/[^/]+/courses/" # Wayback-archived legacy format (pre-2016): /courses/2015/<faculty>/courses/<code>
+  # Drop URLs whose path ends with "-domestic" — UTAS appends this suffix to
+  # domestic-only course pages (e.g. 35a2-graduate-certificate-in-business-studies-domestic).
+  # These are never international-student courses so they waste a browser slot
+  # and can trigger a 429 cooldown.  Applied at Phase A.5b (after browser-discovery
+  # merge) in addition to the BFS-phase discovery.py block.
+  block_url_patterns:
+    - "-domestic(?:/|$)"
+  extra_course_urls:
+    # Master of Teaching — under arts-soc which returns 403 for plain HTTP.
+    # Belt-and-suspenders: injected unconditionally after all discovery tiers.
+    - https://www.utas.edu.au/courses/arts-soc/courses/e7g-master-of-teaching
 
 extraction:
+  # When every extractor returns blank course_location (common on browser-fetched
+  # partial HTML from arts-soc / health faculties), fall back to "Hobart" so the
+  # UTAS-specific blank-location online guard does not reject valid on-campus courses.
+  default_course_location: "Hobart"
+  # Cap concurrent browser sessions to 1 to avoid Cloudflare 429 rate-limiting.
+  # UTAS's Cloudflare blocks even 2 simultaneous browser sessions with 600s cooldowns;
+  # 1 sequential session eliminates 429s entirely at a modest speed cost.
+  max_parallel_fetch: 1
+  fees:
+    # UTAS publishes international fees on a central schedule, not on each course
+    # page.  Without this flag, courses whose browser-rendered HTML does not
+    # surface the fee table are rejected by the no_international_fee staging gate
+    # (~43/84 courses per run).  With this flag they pass to the review queue so
+    # a reviewer can fill the fee from the central schedule.
+    force_central_fee_stage: true
   filters:
     domestic_only:
       enabled: true   # UTAS lists some domestic-only short courses; drop them.

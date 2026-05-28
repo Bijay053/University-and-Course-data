@@ -54,9 +54,60 @@ import re as _re
 # chrome phrases is treated as noise and discarded so the course gets
 # location=None → the online-only rejection filter can fire correctly.
 _LOCATION_CHROME_RE = _re.compile(
-    r"\b(?:key\s+information|entry\s+requirements?|course\s+rules?)\b",
+    r"\b(?:"
+    # UTAS panel-heading chrome (#tabInternational hidden panel).
+    r"key\s+information|entry\s+requirements?|course\s+rules?"
+    # UniSQ (unisq.edu.au) footer quick-links column.  When the structural
+    # `_from_unisq_quickfacts` reader returns None on an off-shape course
+    # page, Gemini's location_text falls through and reads the homepage-
+    # footer quick-links ("Accommodation UniSQ Events Contributing to our
+    # communities") as the location.  Observed 2026-05-18 fleet-wide on
+    # ~40 % of staged UniSQ rows (Master of Laws, Bachelor of Laws Honours,
+    # Diploma of Multidisciplinary Studies, Master of Nursing, etc.).
+    # The full junk string contains all three phrases; the ≥2-matches
+    # guard rejects it while real UniSQ campus names (Ipswich, Toowoomba,
+    # Springfield, Online, External) never match any of these phrases.
+    r"|accommodation|unisq\s+events|contributing\s+to\s+our\s+communit(?:y|ies)"
+    r")\b",
     _re.IGNORECASE,
 )
+
+
+# AI-target slot → canonical regex-output slot for the UOW timeout guard's
+# canonical-slot bypass (2026-05-17).  When the regex pass on static HTML
+# already filled the canonical slot, the AI fallback won't actually synthesise
+# a new value, so the guard must not block the row.  Module-private so the
+# regression test can import it instead of mirroring the mapping locally.
+_UOW_CANONICAL_FOR: dict[str, str] = {
+    "duration_text": "duration",
+    "intake_text": "intake_months",
+}
+
+
+def _uow_timeout_guessed_fields(
+    payload: dict, missing: list[str] | set[str]
+) -> list[str]:
+    """Return the UOW render-required fields that the AI fallback WOULD have
+    to guess given the current ``payload`` and ``missing`` list.
+
+    Used by the UOW browser-timeout guard at single_course.py inside
+    ``extract_course``.  A text-shape slot (``duration_text`` / ``intake_text``)
+    only counts as "would be AI-guessed" when BOTH the text slot is missing
+    AND the canonical slot (``duration`` / ``intake_months``) is blank —
+    if the canonical slot is already populated by the static-HTML regex
+    pass, the AI fallback won't synthesise a new value, so the guard must
+    not flip ``parser_error`` and drop the row from staging.
+
+    ``study_mode`` has no canonical/text duality, so a blank value always
+    counts.
+    """
+    out: list[str] = []
+    for f in ("duration_text", "intake_text"):
+        if f in missing and not payload.get(_UOW_CANONICAL_FOR.get(f, f)):
+            out.append(f)
+    if not payload.get("study_mode"):
+        out.append("study_mode")
+    return out
 
 
 def _is_location_chrome(text: str) -> bool:
@@ -81,27 +132,66 @@ _DOMESTIC_ONLY_RE = _re.compile(
     r"this\s+(?:course|program|degree)\s+is\s+(?:only\s+)?not\s+available\s+(?:for|to)\s+international"
     r"|this\s+(?:course|program|degree)\s+is\s+not\s+open\s+to\s+international"
     r"|this\s+(?:course|program|degree)\s+is\s+only\s+available\s+to\s+(?:australian|domestic)"
+    # QUT (qut.edu.au): banner reads "This course is only available FOR
+    # Australian and New Zealand students." on every domestic-only course
+    # page (e.g. /courses/diploma-in-architectural-studies-bachelor-of-
+    # architectural-design?domestic). The existing "only available TO" and
+    # "only FOR" patterns above don't cover the "only available FOR …"
+    # phrasing, so QUT domestic-only courses were staging with full
+    # international fees from the regex Fee pattern hit on the page chrome.
+    # Verified live 2026-05-17 (job_…, uni 1011): Diploma in Architectural
+    # Studies/Bachelor of Architectural Design staged with A$40,700/Annual
+    # despite the banner.
+    r"|this\s+(?:course|program|degree)\s+is\s+only\s+available\s+for\s+(?:australian|domestic)"
     r"|this\s+(?:program|course|degree)\s+is\s+only\s+for\s+(?:australian|domestic)"
     r"|this\s+(?:program|course|degree)\s+does\s+not\s+accept\s+international"
     # "Sorry, this course is not available to international students"
     r"|sorry[,.]?\s+this\s+(?:course|program)\s+is\s+not\s+available\s+to\s+international"
+    # ECU "Important" callout: "This course is not (currently) offered for
+    # study on-campus in Australia to international students with a student
+    # visa."  Appears in the international-tab Important panel on courses ECU
+    # does not offer to visa-holding international students (e.g. Master of
+    # Nursing (Nurse Practitioner), Graduate Certificate in News and
+    # Entertainment Media). Verified live 2026-05-12. ECU sometimes inserts
+    # the word "currently" between "not" and "offered" — both phrasings must
+    # match (regression caught 2026-05-12 via news-and-entertainment-media).
+    r"|this\s+(?:course|program|degree)\s+is\s+not(?:\s+currently)?\s+offered\s+(?:for\s+study\s+)?on[-\s]campus\s+(?:in\s+australia\s+)?to\s+international\s+students?"
     # "Open to domestic applicants only" — rare but unambiguous
     r"|open\s+to\s+domestic\s+applicants\s+only"
-    # Broader unambiguous negatives — no "this course" qualifier needed.
-    # "Not available to international students" is unambiguous on a course
-    # detail page.  We do NOT match just "not available to international"
-    # (without "students") to avoid false-positives on short snippets.
-    r"|not\s+available\s+to\s+international\s+students?"
+    # NOTE (2026-05-15 fix): the bare "not available to international
+    # students" pattern (no "this course/program/degree" anchor) was
+    # REMOVED.  It produced fleet-wide false-positive domestic_only
+    # rejections at UOW, whose Bachelor / Master pages embed a
+    # part-time-mode tooltip:
+    #   "Part time study is not available to international students
+    #    studying onshore on a student visa."
+    # That sentence is about the *study mode*, not the course, yet it
+    # tripped the bare pattern and caused the entire UOW catalogue to
+    # skip with [DOMESTIC ONLY] (verified live 2026-05-15 against
+    # Bachelor of Arts and 145+ other UOW pages).  All legitimate
+    # "this course is not available to international students" hits
+    # are still covered by the explicit course-anchored patterns
+    # above (line ~81), keeping test_explicit_hard_phrase_still_flags
+    # green.  Per the file-level rule on line 73 ("All patterns require
+    # the COURSE / PROGRAM to be the explicit subject") we should not
+    # carve more bare-noun-phrase exceptions.
     # "International applications are not accepted" / "not accepting
     # international student applications" — Federation and similar.
     r"|international\s+(?:student\s+)?applications?\s+(?:are\s+)?not\s+(?:accepted|available|open)"
     r"|not\s+currently\s+accepting\s+international\s+(?:student\s+)?applications?"
-    # "your application to study as a domestic student" — Torrens HDR-specific
-    # phrasing where the entire admissions section is framed for domestic
-    # applicants only (e.g. Doctor of Philosophy by Prior Works).  The phrase
-    # is unambiguous on a course-detail page: international-eligible courses
-    # have a parallel section framed for international applicants.
-    r"|(?:begin\s+your|your)\s+application\s+to\s+study\s+as\s+a\s+domestic\s+student"
+    # NOTE (2026-05-10 fix): The Torrens "begin your application to study as
+    # a domestic student" phrase was REMOVED from the hard pattern.  The
+    # original assumption ("international-eligible courses have a parallel
+    # section") was wrong — the phrase appears in the Admission criteria
+    # boilerplate on EVERY Torrens course page, including legitimate
+    # international courses (Master of Education Advanced, MBA Advanced,
+    # Bachelor of Business (Sport Management), Diploma of Health Science,
+    # Graduate Diploma of Public Health, etc.) which all have CRICOS codes,
+    # international fees, and Domestic/International audience tabs.  Treating
+    # it as a hard signal silently dropped ~30+ Torrens courses per scrape.
+    # If genuinely domestic-only HDR courses (e.g. Doctor of Philosophy by
+    # Prior Works) need filtering, prefer per-course/per-uni YAML rules over
+    # a global text pattern that fires on universal page chrome.
     # UTAS distance-courses disclaimer — hard signal even when the page has a
     # structural #tabInternational panel (UTAS includes that tab on every page).
     # The phrase "please see the list of distance courses (i.e. online and
@@ -111,6 +201,47 @@ _DOMESTIC_ONLY_RE = _re.compile(
     # holders.  Treating it as a hard pattern avoids the _has_international_
     # section suppression that would otherwise swallow the soft signal.
     r"|please\s+see\s+the\s+list\s+of\s+distance\s+courses"
+    # Federation University: course pages embed a `StudentTypeBlock` JSON in
+    # a <script> tag with `"hasInternational": false` for courses that the
+    # International tab is greyed out for (e.g. VET / TAFE Certificates and
+    # Diplomas with no international offering). HE courses with international
+    # availability either omit the block or set the value to true.
+    #
+    # The pattern requires the `StudentTypeBlock` anchor to appear within a
+    # short window before the `hasInternational: false` marker so the rule
+    # is effectively scoped to Federation's CMS shape and won't incidentally
+    # fire on a generic page that happens to contain the bare token in
+    # another context. The 0..400-char window covers the JSON wrapper +
+    # `props` block + label fields that sit between the two markers.
+    r'|"StudentTypeBlock"[\s\S]{0,400}?"hasInternational"\s*:\s*false'
+    # Torrens University: course pages render a `studenttypes="..."`
+    # attribute on the audience-tab component. International-eligible
+    # courses publish `studenttypes="Domestic, International"` (or
+    # similar comma-separated list). Domestic-only courses publish the
+    # literal `studenttypes="Domestic"` with no `International` token.
+    # The pattern requires the closing quote IMMEDIATELY after `Domestic`
+    # so a comma-separated list never matches. Verified live (job_a334b…)
+    # against Bachelor of Media Production and Communication +
+    # Graduate Diploma of Counselling (both domestic-only) vs Bachelor
+    # of Interior Design (Commercial) (international) which carries
+    # `studenttypes="Domestic, International"` and does not match.
+    r'|studenttypes\s*=\s*"Domestic"'
+    # Victoria University: every /courses/<slug>/ URL is rewritten to
+    # /courses/<slug>/international by the URL-rewrite block ~line 815 so
+    # the international tab (intl fee, IELTS, intake, full campus list)
+    # is visible to the regex extractor.  For courses NOT offered to
+    # international students (TAFE/VET certificates, domestic-only
+    # diplomas) the /international URL returns HTTP 200 with a soft-404
+    # body whose <title> is literally "Page not found | Victoria
+    # University".  Without this signal the pipeline falls through and
+    # Gemini reads the visible domestic VET fee from the body, then the
+    # row gets staged with the domestic fee shown as international (e.g.
+    # "Diploma of Sport SIS50321" — A$18,360/Annual stamped despite the
+    # course carrying a "Domestic students only" badge).  Verified live
+    # 2026-05-14 against diploma-of-sport-sis50321,
+    # certificate-i-in-work-education vs bachelor-of-business-bbns
+    # (which keeps a real <title>Bachelor of Business | Victoria University</title>).
+    r"|<title[^>]*>\s*page\s+not\s+found\s*\|\s*victoria\s+university\s*</title>"
     r")",
     _re.IGNORECASE,
 )
@@ -157,6 +288,173 @@ def _has_international_section(html: str) -> bool:
     return False
 
 
+# ── "Not currently accepting / no current intake" rejection ──────────────────
+# Some universities leave dormant ("rested") course pages live but explicitly
+# state the program is closed to applications. Newcastle's Bachelor of
+# Midwifery is the canonical 2026-05-15 example: the page renders a sidebar
+# panel "<h5>No current intake</h5> <p>This program is not currently accepting
+# new applications.</p>" and a meta tag "<meta name=\"UON.Degree.DegreeStatus\"
+# content=\"rested\">". Without an explicit guard the pipeline still extracts
+# the (stale) campus list and Gemini fills in fee/duration from old structured
+# data, staging a course that should never appear in the catalogue.
+#
+# All patterns are unambiguous course-level closure statements. The Newcastle
+# meta-tag pattern is host-shape-anchored (requires the UON namespace) so it
+# cannot fire on an unrelated page that happens to mention the word "rested".
+_NOT_ACCEPTING_RE = _re.compile(
+    r"(?:"
+    # Newcastle "<h5>No current intake</h5>" panel — a hard signal that the
+    # program is dormant. The h5 wrapper is required so a chance occurrence
+    # of the phrase in marketing copy does not match.
+    r"<h\d[^>]*>\s*no\s+current\s+intake\s*</h\d>"
+    # Generic "this program/course/degree is not currently accepting (new)
+    # applications" — Newcastle uses this in the rested-program panel
+    # alongside the h5 above. Anchored on "this <noun> is" to keep the
+    # course/program the explicit subject (per the file-level rule).
+    r"|this\s+(?:program|course|degree)\s+is\s+not\s+currently\s+accepting\s+(?:new\s+)?applications"
+    # Newcastle UON.Degree.DegreeStatus meta tag with content="rested" or
+    # content="closed" — the canonical machine-readable signal published in
+    # the page <head>. Host-shape-anchored on the UON namespace.
+    r'|<meta[^>]*name=["\']UON\.Degree\.DegreeStatus["\'][^>]*content=["\'](?:rested|closed|inactive)["\']'
+    # JSON-shape variant of the same UON status (sometimes appears inside a
+    # <script> body): "UON.Degree.DegreeStatus":"rested".
+    r'|"UON\.Degree\.DegreeStatus"\s*:\s*"(?:rested|closed|inactive)"'
+    r")",
+    _re.IGNORECASE,
+)
+
+
+# ── Newcastle online-only rejection ───────────────────────────────────────────
+# Newcastle (newcastle.edu.au) per-degree pages publish a machine-readable
+# meta tag listing the campuses the course is offered at:
+#
+#   <meta name="UON.Degree.Location" content="location_callaghan; location_online">
+#   <meta name="UON.Degree.Location" content="location_online">
+#
+# When the meta value is the bare token "location_online" (no other
+# location_* token alongside it), the course is delivered exclusively
+# online — the Study-location toggle group has a single Online radio
+# and no physical-campus option (verified 2026-05-15 against
+# graduate-certificate-in-mental-health-nursing,
+# graduate-certificate-in-marketing-and-digital-strategy).
+#
+# Without this guard the pipeline falls through to Gemini, which often
+# misreads the auxiliary `ShortCourses.ModeOfDelivery="Face to Face,
+# Online"` meta and stamps `study_mode="On Campus"` — that bypasses the
+# generic online_only guard in guards.py (which only fires when
+# study_mode contains "online" AND no campus keyword) and the row is
+# staged with course_location BLANK and the wrong mode.
+#
+# The pattern is host-shape-anchored on the UON namespace and requires
+# the value to be exactly "location_online" (optionally surrounded by
+# whitespace), with no other location_* token, so it cannot fire on a
+# multi-campus course that happens to include Online as one option.
+_UON_ONLINE_ONLY_META_RE = _re.compile(
+    r'<meta[^>]*name=["\']UON\.Degree\.Location["\'][^>]*'
+    r'content=["\']\s*location_online\s*["\']',
+    _re.IGNORECASE,
+)
+# JSON-shape variant — same value, inside a <script> body.
+_UON_ONLINE_ONLY_JSON_RE = _re.compile(
+    r'"UON\.Degree\.Location"\s*:\s*"\s*location_online\s*"',
+    _re.IGNORECASE,
+)
+
+
+def _is_uon_online_only_page(html: str) -> bool:
+    """True when a Newcastle page's UON.Degree.Location is online-only.
+
+    Matches BOTH the meta-tag form and the JSON-shape form. Returns
+    False for multi-campus courses (e.g. content="location_callaghan;
+    location_online") because such values do not match the bare
+    "location_online" pattern (any preceding/trailing token before the
+    closing quote would prevent the match).
+    """
+    if not html:
+        return False
+    if _UON_ONLINE_ONLY_META_RE.search(html):
+        return True
+    if _UON_ONLINE_ONLY_JSON_RE.search(html):
+        return True
+    return False
+
+
+# ── UniSQ pure-online course detector ─────────────────────────────────────
+#
+# UniSQ (unisq.edu.au) renders the primary Location quickfact as an
+# unordered list immediately following a `<div class="fw-semibold">Location
+# </div>` header.  For pure-online courses (e.g. Graduate Diploma of
+# Information Technology, Graduate Diploma of Information Systems, Diploma
+# of Multidisciplinary Studies) the list contains ONLY virtual entries
+# (`<li>Online</li>`, `<li>External</li>`) with no physical campus.
+#
+# Without an explicit detector here:
+#   1. `_from_unisq_quickfacts` correctly returns "Online" / "External"
+#   2. `_sanitise_for_display` strips both via `_REMOVE_VIRTUAL` → None
+#   3. payload[course_location] stays None
+#   4. study_mode gets stamped "On Campus" by a downstream rule (the page
+#      DOES include lower-down delivery-mode panels listing
+#      "Springfield, Toowoomba, Online" as alternative cohorts — those
+#      panels confuse the mode rule)
+#   5. generic `online_only` guard in guards.py never fires (it requires
+#      study_mode to contain "online" AND no campus keyword)
+#   6. row stages with course_location BLANK and the wrong mode
+#
+# This is structurally identical to the Newcastle UON online-only bug
+# (2026-05-15) so we use the same skip pattern. The detector scans for
+# the primary Location `<ul>` and confirms every `<li>` is a virtual
+# value; multi-campus courses (e.g. `<li>Toowoomba</li><li>Online</li>`)
+# deliberately do NOT match — only courses where EVERY listed campus is
+# virtual are skipped.
+_UNISQ_PRIMARY_LOCATION_BLOCK_RE = _re.compile(
+    r'<div[^>]*class="[^"]*fw-semibold[^"]*"[^>]*>\s*Location\s*</div>\s*'
+    r'<ul[^>]*>(.*?)</ul>',
+    _re.IGNORECASE | _re.DOTALL,
+)
+_UNISQ_LI_TEXT_RE = _re.compile(r'<li[^>]*>\s*([^<]+?)\s*</li>', _re.IGNORECASE)
+_UNISQ_VIRTUAL_VALUES = {"online", "external", "distance", "remote"}
+
+
+def _is_unisq_online_only_page(html: str) -> bool:
+    """True when a UniSQ page's primary Location list is all-virtual.
+
+    Returns False when:
+      * No primary Location panel is found (page doesn't follow the idiom)
+      * The `<ul>` is empty
+      * ANY `<li>` carries a non-virtual value (physical campus)
+
+    Returns True only when every `<li>` text is one of the virtual
+    values in `_UNISQ_VIRTUAL_VALUES`.
+    """
+    if not html:
+        return False
+    m = _UNISQ_PRIMARY_LOCATION_BLOCK_RE.search(html)
+    if not m:
+        return False
+    li_texts = _UNISQ_LI_TEXT_RE.findall(m.group(1))
+    if not li_texts:
+        return False
+    for raw in li_texts:
+        if raw.strip().lower() not in _UNISQ_VIRTUAL_VALUES:
+            return False
+    return True
+
+
+def _is_not_accepting_page(html: str) -> bool:
+    """Return True when the page explicitly states the program is closed.
+
+    Covers Newcastle's rested-program signals (h5 panel, generic phrase,
+    UON.Degree.DegreeStatus meta tag) and any future host-anchored variant
+    added to ``_NOT_ACCEPTING_RE``.
+
+    Runs against RAW html so attribute-bearing markers (the meta tag) and
+    h5 wrapper survive — both would be eaten by a tag-strip pass.
+    """
+    if not html:
+        return False
+    return bool(_NOT_ACCEPTING_RE.search(html))
+
+
 def _is_domestic_only_page(html: str) -> bool:
     """Return True when the page explicitly states it is for domestic students only.
 
@@ -169,9 +467,18 @@ def _is_domestic_only_page(html: str) -> bool:
     """
     if not html:
         return False
+    # Hard patterns: unambiguous course-level exclusion statements.
+    # Run against RAW html FIRST so attribute-in-tag markers
+    # (e.g. Torrens ``<div data-studenttypes="Domestic">``) survive —
+    # the tag-strip below would otherwise eat the whole tag including
+    # its attribute and the regex would never see the marker. Federation's
+    # ``"hasInternational": false`` JSON sits inside a <script> tag's
+    # text content (not an attribute), so it survives the strip and
+    # would still match either way.
+    if _DOMESTIC_ONLY_RE.search(html):
+        return True
     text = _re.sub(r"<[^>]+>", " ", html)
     text = _re.sub(r"\s+", " ", text)
-    # Hard patterns: unambiguous course-level exclusion statements.
     if _DOMESTIC_ONLY_RE.search(text):
         return True
     # Soft pattern: "may not be available" — only block when there is no
@@ -361,6 +668,15 @@ _STRUCTURAL_COURSE_PAGE_PREFIXES: tuple[str, ...] = (
     "description.",    # description.meta, description.og, …
     "study_mode:",     # study_mode:rule — reads explicit Delivery/Mode label
     "location.",       # location.strong, location.structured, …
+    "intake.",         # intake.structural, intake.summary_start, intake.session_names,
+                       # intake.semester, intake.ecu_semester, intake.campus_pivot —
+                       # all non-AI structural / DOM-anchored intake passes.  Without
+                       # this prefix the 0.75-confidence gemini_primary value silently
+                       # supersedes a 0.80-confidence intake.structural read of the
+                       # exact <strong>Start dates (X)</strong> sidebar value
+                       # (2026-05-15 Newcastle Bachelor of Physiotherapy bug:
+                       # structural read ["January"] from "Semester 1 — 27 Jan 2026"
+                       # but Gemini returned ["January","February"] and won).
     "rule:duration",   # rule-based duration inference from degree label
     "rule:intake",     # rule-based intake inference
     "rule:study_mode", # rule-based study-mode inference
@@ -528,6 +844,43 @@ def _apply_ai_duration_mapping(payload: dict[str, Any], ai_filled: dict[str, Any
       • regex term is Month or Week (not Semester/Trimester which are valid)
       • AI unit normalises to Year
       • AI value is a plausible program length (1–10 years)
+
+    B30 (Torrens bachelor "1 year accelerated" rescue): pages such as
+    Torrens Bachelor of Game Programming publish duration as
+    "3 years full time, 1 year accelerated".  The regex sometimes locks
+    onto the accelerated "1 year" token and writes ``duration=1.0,
+    duration_term="Year"``.  The downstream bachelor-floor sanity check
+    (single_course.py: ``_bachelor_floor_breach``) then nullifies the value
+    because it falls below 2.0 years — leaving the course with no duration
+    even when AI correctly returned the standard 3-year program length.
+
+    Extension: when the regex value would already be nullified by the
+    bachelor-floor (Year unit, value < 2.0) AND the AI independently
+    returns a strictly-longer Year-level duration that the validator
+    accepts (digits must appear in page text), prefer the AI value.
+
+    The rescue is conservative — it only fires when:
+      • the regex value is below the floor and would be nullified anyway, AND
+      • the AI value is strictly larger
+    so it can never replace a genuine short-program duration with a longer one.
+
+    UOW BoSocSci rescue (2026-05-18): the symmetric above-sanity-max case.
+    UOW's static HTML on Bachelor of Social Science variants causes the
+    duration regex to extract "12.0 Year" (likely from a "12 subjects"
+    or "12 sessions" panel that survives the JS-shell strip), which the
+    downstream sanity check at single_course.py:_check_warnings then
+    nullifies because 12 > 7.0 (the bachelor/master ceiling). Net effect:
+    payload["duration"]=None on every BoSocSci major variant despite AI
+    correctly returning duration_value=3, duration_unit="years" via the
+    fallback. We mirror the bachelor-floor rescue: when the regex value
+    normalised to years would exceed the per-degree-level suspicious
+    maximum AND the AI returns a Year-level value that lands strictly
+    inside the sanity window, prefer the AI value. The rescue stays
+    conservative because:
+      • it only fires when regex would be nullified anyway, AND
+      • AI must be inside the same sanity window the regex broke, AND
+      • AI must be a Year-shape value (Sessions/Trimesters etc. are out)
+    so it can never replace a plausible regex hit with an AI guess.
     """
     from app.services.scraper.extractors.duration import _normalise_unit
 
@@ -543,7 +896,74 @@ def _apply_ai_duration_mapping(payload: dict[str, Any], ai_filled: dict[str, Any
         _ai_plausible = ai_val_raw is not None and 1.0 <= float(ai_val_raw) <= 10.0
     except (TypeError, ValueError):
         _ai_plausible = False
-    _rescue = _sub_year_regex and _ai_says_years and _ai_plausible
+
+    # B30: regex Year value below the bachelor-floor — rescue when the AI
+    # value is strictly longer.  Equality (e.g. both say 1.0 Year) does NOT
+    # trigger the rescue, so genuine 1-year diplomas are never altered.
+    _existing_dur = payload.get("duration")
+    _below_floor_year = (
+        existing_term == "Year"
+        and isinstance(_existing_dur, (int, float))
+        and 0 < float(_existing_dur) < 2.0
+    )
+    _ai_strictly_longer = False
+    if _below_floor_year and _ai_says_years and _ai_plausible:
+        try:
+            _ai_strictly_longer = float(ai_val_raw) > float(_existing_dur)
+        except (TypeError, ValueError):
+            _ai_strictly_longer = False
+
+    # UOW BoSocSci: regex value above the per-degree-level sanity ceiling.
+    # Compute the ceiling using the same rules as the suspicious-duration
+    # check at single_course.py:~L4732 so the two stay in lock-step.
+    _degree_l = (payload.get("degree_level") or "").lower()
+    _is_bachelor_master = any(x in _degree_l for x in ("bachelor", "master", "honours"))
+    _is_grad_short = any(x in _degree_l for x in (
+        "graduate certificate", "graduate diploma",
+        "postgraduate certificate", "postgraduate diploma",
+    ))
+    _SUSPICIOUS_MAX_YEARS = (
+        7.0 if _is_bachelor_master
+        else 4.0 if _is_grad_short
+        else 12.0
+    )
+
+    def _to_years(val: Any, term: str) -> float | None:
+        try:
+            v = float(val)
+        except (TypeError, ValueError):
+            return None
+        t = (term or "Year").lower()
+        if "month" in t:
+            return v / 12
+        if "week" in t:
+            return v / 52
+        if "semester" in t:
+            return v / 2
+        if "trimester" in t:
+            return v / 3
+        return v  # Year, or unknown unit treated as Year
+
+    _existing_years = _to_years(_existing_dur, existing_term) if _existing_dur is not None else None
+    _ai_above_max_rescue = False
+    if (
+        _existing_years is not None
+        and _existing_years > _SUSPICIOUS_MAX_YEARS
+        and _ai_says_years
+        and _ai_plausible
+    ):
+        try:
+            _ai_years = float(ai_val_raw)
+            # AI must land STRICTLY inside the sanity window the regex broke.
+            _ai_above_max_rescue = 0.25 <= _ai_years <= _SUSPICIOUS_MAX_YEARS
+        except (TypeError, ValueError):
+            _ai_above_max_rescue = False
+
+    _rescue = (
+        (_sub_year_regex and _ai_says_years and _ai_plausible)
+        or _ai_strictly_longer
+        or _ai_above_max_rescue
+    )
 
     if ("duration" not in payload or _rescue) and ai_val_raw is not None:
         try:
@@ -554,6 +974,20 @@ def _apply_ai_duration_mapping(payload: dict[str, Any], ai_filled: dict[str, Any
         term = _normalise_unit(ai_unit_raw)
         if term:
             ai_filled["duration_term"] = term
+
+    # B30 rescue: when the rescue branch fires, the existing regex-extracted
+    # values in ``payload`` ("duration"/"duration_term") MUST be overwritten —
+    # but the downstream merge loop in ``run`` uses ``payload.setdefault(k, v)``
+    # which is a no-op for keys already present.  Without this explicit
+    # overwrite, the AI value lands in ``ai_filled`` but never reaches the
+    # payload, and the bachelor-floor sanity check then nullifies the regex
+    # value (e.g. Torrens BGP 1.0y → null; BIDC 1.7y → null) leaving the
+    # course with no duration even though AI returned the correct 3 years.
+    if _rescue:
+        if "duration" in ai_filled:
+            payload["duration"] = ai_filled["duration"]
+        if "duration_term" in ai_filled:
+            payload["duration_term"] = ai_filled["duration_term"]
 
 
 # Each entry: (module, kwargs the extractor accepts beyond html/url).
@@ -604,7 +1038,48 @@ async def extract_course(
     # bypassing run_scrape/run_repair — fix by adding set_uni_config() there.
     # _uc is unused in Week 1; Week-2+ extractors will read config from it.
     from app.services.scraper.config.context import require_uni_config as _ruc
-    _uc = _ruc()  # noqa: F841
+    _uc = _ruc()
+
+    # ── YAML-driven per-host URL rewrites ──────────────────────────────────
+    # Generic version of the hardcoded UNE/UOW/ACU/UniSQ blocks below. Reads
+    # extraction.url_rewrites from the active uni config and applies every
+    # matching rewrite. Each rewrite matches on (host, optional path_contains)
+    # and merges append_query into the URL — idempotent: a key already present
+    # in the URL is never overwritten. New unis only need a YAML edit; the
+    # hardcoded blocks below stay in place for backwards compatibility.
+    try:
+        _yaml_rewrites = list(getattr(_uc.extraction, "url_rewrites", []) or [])
+    except Exception:  # noqa: BLE001 — config access must never crash a fetch
+        _yaml_rewrites = []
+    if _yaml_rewrites:
+        _parsed_url = urlparse(url)
+        _netloc = (_parsed_url.netloc or "").lower()
+        _path = _parsed_url.path or ""
+        for _rw in _yaml_rewrites:
+            _host = (_rw.host or "").lower()
+            if not _host:
+                continue
+            # Match either exact host or its bare-apex/www variant.
+            _bare = _host[4:] if _host.startswith("www.") else _host
+            _wwwd = _host if _host.startswith("www.") else f"www.{_host}"
+            if _netloc not in (_host, _bare, _wwwd):
+                continue
+            if _rw.path_contains and _rw.path_contains not in _path:
+                continue
+            _qs = parse_qs(_parsed_url.query)
+            _new_qs = parse_qs(_rw.append_query or "")
+            _changed = False
+            for _k, _v in _new_qs.items():
+                if _k not in _qs and _v:
+                    _qs[_k] = _v
+                    _changed = True
+            if _changed:
+                url = urlunparse(
+                    _parsed_url._replace(
+                        query=urlencode({k: v[0] for k, v in _qs.items()})
+                    )
+                )
+                _parsed_url = urlparse(url)  # re-parse for any later rewrite
 
     # UNE: international student info (IELTS, PTE, fees, campus availability)
     # is only visible on the ?international=true variant of each course page.
@@ -659,6 +1134,25 @@ async def extract_course(
         if changed:
             url = urlunparse(_parsed_url._replace(query=urlencode({k: v[0] for k, v in _qs.items()})))
 
+    # VU (Victoria University): every course detail page under /courses/<slug>/
+    # ships a Domestic tab by default.  The international tab — which carries
+    # the international fee, IELTS scores, intake months, and full campus list
+    # — lives at /courses/<slug>/international (path suffix, NOT a query
+    # parameter).  Without this rewrite the regex extractor reads the prominent
+    # domestic VET fee (e.g. $1,337/year for the Cert IV in Tertiary
+    # Preparation) and stamps it into international_fee.  Append "/international"
+    # to the path when missing; idempotent.  Excludes /vu-sydney/ paths because
+    # the VU Sydney sub-site uses a different URL shape.
+    _parsed_url = urlparse(url)
+    if (
+        _parsed_url.netloc in ("www.vu.edu.au", "vu.edu.au")
+        and _parsed_url.path.startswith("/courses/")
+        and not _parsed_url.path.rstrip("/").endswith("/international")
+        and not _parsed_url.path.rstrip("/").endswith("/domestic")
+    ):
+        _new_path = _parsed_url.path.rstrip("/") + "/international"
+        url = urlunparse(_parsed_url._replace(path=_new_path))
+
     # UTAS: course listing pages sometimes link to the domestic-tab anchor
     # (``#tabDomestic``).  URL fragments are stripped by every HTTP client
     # before sending the request so the server always returns the full-page
@@ -680,21 +1174,193 @@ async def extract_course(
         # HTTP fetch failed (Cloudflare, bot-protection, JS-gate, etc.).
         # Try a real Playwright browser before giving up — this handles any
         # site where plain httpx gets a 403/challenge/empty body.
+        #
+        # Use the per-host browser config (_browser_config_for) so Cloudflare-
+        # protected hosts like UTAS get networkidle + 5s settle + 60s budget
+        # rather than the previous hardcoded domcontentloaded + 2s / 35s,
+        # which left UTAS at 116/120 fetch_failed in prod (job_..._utas)
+        # because the Cloudflare interstitial hadn't cleared yet.
         try:
-            from app.services.scraper.browser_pool import pool as _bp
+            from app.services.scraper.browser_pool import (
+                BROWSER_RATE_LIMITED, pool as _bp,
+            )
+            from app.services.scraper.per_course_browser import (
+                _browser_config_for, should_retry_browser,
+            )
             if emit:
                 await emit(
                     "status",
                     f"[BROWSER↑] HTTP blocked for {url[:70]} — retrying via browser",
                     phase="extract", kind="browser_http_fallback", url=url,
                 )
+            wait_until, settle_ms, _outer_sec, goto_ms = _browser_config_for(url)
             html = await _bp.fetch_html(
-                url, wait_until="domcontentloaded", timeout=35_000, settle_ms=2000
+                url, wait_until=wait_until, timeout=goto_ms, settle_ms=settle_ms,
             )
+            # ── 429 rate-limit cooldown ──────────────────────────────────────
+            # When Cloudflare issues a hard 429 (not a timeout / partial page),
+            # short retries just burn through the rate-limit budget.  Instead
+            # we detect the BROWSER_RATE_LIMITED sentinel and sleep 600 s
+            # (10 min) so the Cloudflare counter resets before we try once more.
+            # Belt-and-suspenders for arts-soc UTAS pages that are 429'd when
+            # the extraction pass starts but become accessible ~10 min in once
+            # the discovery-phase browser session cools down.
+            _is_rate_limited = html is BROWSER_RATE_LIMITED
+            if _is_rate_limited:
+                html = None
+                _rl_wait = 600
+                log.warning(
+                    "[BROWSER↑] 429 rate-limit for %s — returning retry_after=%ds "
+                    "(orchestrator will sleep outside semaphore so other courses proceed)",
+                    url, _rl_wait,
+                )
+                if emit:
+                    await emit(
+                        "status",
+                        f"[BROWSER↑⏳] 429 rate-limited — releasing slot, retrying {url[:60]} after {_rl_wait}s",
+                        phase="extract",
+                        kind="browser_rate_limit_cooldown",
+                        url=url,
+                        wait_seconds=_rl_wait,
+                    )
+                # Return a retry sentinel instead of sleeping in-place.
+                # The orchestrator's _bounded wrapper will exit the semaphore
+                # (releasing the slot to other courses), sleep _rl_wait seconds
+                # outside the sem, then re-run full extraction for this URL.
+                # Previously this asyncio.sleep(600) held the semaphore slot,
+                # freezing all N concurrent slots simultaneously on a 429 storm.
+                return {
+                    "_retry_after": _rl_wait,
+                    "payload": {},
+                    "evidence": [],
+                    "error": "browser_rate_limit_retry",
+                }
+            # Up to 2 additional retries with exponential backoff for known
+            # Cloudflare/anti-bot hosts.  The first attempt routinely fails on
+            # UTAS because cf_clearance has not yet been set; the second
+            # usually passes once the failed attempt's session cookie is
+            # cached.  Bumped from 1 → 2 retries (2026-05-11) after a UTAS
+            # run still showed 69/120 fetch_failed even with the single
+            # 2.0s retry — the third attempt with a longer 4.5s settle
+            # rescues most of the residual Cloudflare-throttled URLs.
+            # (Skip short retries if we just did a 429-cooldown retry above.)
+            if not html and not _is_rate_limited and should_retry_browser(url):
+                for _attempt, _backoff in enumerate((2.0, 4.5), start=1):
+                    await asyncio.sleep(_backoff)
+                    if emit:
+                        await emit(
+                            "status",
+                            f"[BROWSER↑↻{_attempt}] retry for {url[:70]}",
+                            phase="extract",
+                            kind="browser_http_fallback_retry",
+                            url=url,
+                            attempt=_attempt,
+                        )
+                    html = await _bp.fetch_html(
+                        url, wait_until=wait_until, timeout=goto_ms, settle_ms=settle_ms,
+                    )
+                    if html and html is not BROWSER_RATE_LIMITED:
+                        break
+                    if html is BROWSER_RATE_LIMITED:
+                        html = None
+                        break
         except Exception as _exc:
             log.warning("browser fallback failed for %s: %s", url, _exc)
     if not html:
         return {"url": url, "error": "fetch_failed", "payload": {}, "evidence": []}
+
+    # ── Federation stub-page guard (2026-05-10) ──────────────────────────
+    # Federation pages such as Cert II in Furniture Making are content
+    # stubs (nav + footer chrome only — no Duration JSON, no
+    # StudentTypeBlock anywhere on the page). Feeding these to the rest
+    # of the pipeline triggers Gemini fee/IELTS/duration hallucinations
+    # because the model has no real data to ground against. Skip them
+    # before any extractor / Gemini call fires.
+    from app.services.scraper.extractors import federation_json as _fed_json
+    if _fed_json.is_federation_host(url) and _fed_json.is_stub_page(html):
+        log.info(
+            "[FED STUB] %s — page lacks Duration JSON and StudentTypeBlock; "
+            "skipping (would otherwise produce hallucinated AI fields)",
+            url,
+        )
+        if emit:
+            await emit(
+                "status",
+                f"[FED STUB] skipping content-stub page: {url[:80]}",
+                phase="extract",
+                kind="federation_stub_skip",
+                url=url,
+            )
+        return {
+            "url": url,
+            "error": "federation_stub_page",
+            "payload": {},
+            "evidence": [],
+        }
+
+    # ── VU brand-chrome scrub (2026-05-14) ────────────────────────────────
+    # VU pages ship two footer chunks on EVERY page that list "Sydney",
+    # "Melbourne", and "Brisbane" as VU brand-chrome (Indigenous
+    # acknowledgement of country anchored on "Kulin Nation", and the CRICOS
+    # registration line "00124K (Melbourne), 02475D (Sydney and Brisbane)").
+    # The structured "Course essentials" panel that vu_course_card.py
+    # parses is hydrated by JS and ABSENT from the static HTML the pipeline
+    # actually sees, so the bag-of-text location fallback was reading the
+    # brand-chrome chunks and stamping "Sydney, Melbourne, Brisbane" as the
+    # campus list on courses delivered exclusively at Footscray Park (e.g.
+    # NMPM Master of Project Management — user-reported 2026-05-14).
+    # Scrubbing both chunks before any extractor runs lets regex bag-of-text
+    # AND Gemini see only real course content; for Footscray-only courses
+    # this means location stays NULL (acceptable — better than wrong data),
+    # and for genuine multi-city VU courses the Sydney/Melbourne/Brisbane
+    # references in real course content (e.g. "Sydney Campus") are
+    # untouched.  Hostname-gated; pure parse, no extra HTTP request.
+    from app.services.scraper.extractors import vu_course_card as _vu_cc_pre
+    if _vu_cc_pre.is_vu_host(url):
+        html = _vu_cc_pre.scrub_brand_chrome_html(html)
+
+    # ── University of Newcastle: strip the "related courses" tile block ──
+    # www.newcastle.edu.au course pages render a "More degrees you may like"
+    # / related-courses carousel at the bottom of every page.  Each tile
+    # contains the SIBLING course's own admission summary, e.g.
+    #   "Bachelor of Medical Radiation Science (Honours) (Diagnostic
+    #    Radiography)  Selection Rank: 94.00 (Newcastle)
+    #    Indicative Fee1: AUD 43,250  Full-time duration: 4 years
+    #    Locations: Newcastle  Learn more"
+    # The fee extractor's currency-amount scan walks the flattened text
+    # left-to-right and the first amount it scores often comes from one of
+    # those tiles instead of the page's own "Indicative fee1 AUD 48,535"
+    # admission-info sidebar — every UoN course was therefore staged with
+    # the SAME tile fee (A$43,250) regardless of its real international
+    # tuition.  The tile block also contributes stray month names to
+    # intake_months ("February" was bleeding in fleet-wide).
+    #
+    # The tiles are deterministic: each one contains "Selection Rank:" —
+    # a phrase that does not appear anywhere in the main course content
+    # on UoN /degrees/<slug> pages.  Strip from the first occurrence of
+    # "Selection Rank" through to the end of the document so the fee /
+    # intake / english extractors only see the course's own fields.
+    try:
+        from urllib.parse import urlparse as _up_n
+        _n_host = (_up_n(url).hostname or "").lower()
+        if _n_host == "newcastle.edu.au" or _n_host.endswith(".newcastle.edu.au"):
+            _sr_idx = _re.search(
+                r"selection\s+rank\s*[:\-]", html, _re.IGNORECASE,
+            )
+            if _sr_idx is not None:
+                # Walk back to the start of the enclosing tile so we don't
+                # leave a dangling "Bachelor of X (...)" course-name fragment
+                # in the truncated HTML (which would otherwise feed the
+                # course_name fallback).  Cap the rewind at 4 KB so we never
+                # over-strip on pathological pages.
+                _cut = _sr_idx.start()
+                _rewind_floor = max(0, _cut - 4096)
+                _tile_open = html.rfind("<", _rewind_floor, _cut)
+                if _tile_open != -1:
+                    _cut = _tile_open
+                html = html[:_cut]
+    except Exception as _ncl_exc:  # noqa: BLE001
+        log.debug("newcastle related-tile scrub skipped on %s: %s", url, _ncl_exc)
 
     payload: dict[str, Any] = {"course_website": url}
     evidence: list[dict[str, Any]] = []
@@ -721,6 +1387,355 @@ async def extract_course(
         )
         return {"url": url, "payload": payload, "evidence": evidence}
 
+    # ── Not-currently-accepting / rested-program early exit ──────────────────
+    # Newcastle (and similar): pages whose program status is "rested" or
+    # whose sidebar shows "<h5>No current intake</h5> This program is not
+    # currently accepting new applications." MUST be rejected before the
+    # extractors run, otherwise stale fee/duration/campus data gets staged
+    # for a course that no longer accepts students. Reuses the same
+    # ``domestic_only`` payload key so the existing staging guard
+    # (guards.py:394) rejects the row with reason "domestic_only".
+    if _is_not_accepting_page(html):
+        payload["domestic_only"] = True
+        payload["not_accepting"] = True
+        await emit(
+            "status",
+            f"[NOT ACCEPTING] {url} — course page states program is closed / not currently accepting applications; skipping",
+            phase="extract",
+            kind="not_accepting_skip",
+            url=url,
+        )
+        return {"url": url, "payload": payload, "evidence": evidence}
+
+    # ── Newcastle online-only early exit ─────────────────────────────────────
+    # Newcastle pages with <meta name="UON.Degree.Location"
+    # content="location_online"> are delivered exclusively online (single
+    # Online toggle, no physical campus). The pipeline should not stage
+    # them — without this guard Gemini misreads the auxiliary
+    # ShortCourses.ModeOfDelivery meta and stamps study_mode="On Campus",
+    # bypassing the generic online_only guard in guards.py and producing
+    # a row with course_location BLANK and the wrong mode. Reuses the
+    # existing domestic_only payload key so guards.py:394 rejects with
+    # reason "domestic_only"; also sets online_only_uon=True for metrics.
+    if _is_uon_online_only_page(html):
+        payload["domestic_only"] = True
+        payload["online_only_uon"] = True
+        await emit(
+            "status",
+            f"[ONLINE ONLY] {url} — Newcastle UON.Degree.Location=location_online; skipping",
+            phase="extract",
+            kind="online_only_skip",
+            url=url,
+        )
+        return {"url": url, "payload": payload, "evidence": evidence}
+
+    # UniSQ (unisq.edu.au) pure-online courses — primary Location <ul>
+    # contains only Online/External/Distance with no physical campus.
+    # See _is_unisq_online_only_page docstring for full rationale.
+    # Reuses domestic_only payload key so guards.py:394 rejects with
+    # reason "domestic_only"; also sets online_only_unisq=True for metrics.
+    if "unisq.edu.au" in (url or "").lower() and _is_unisq_online_only_page(html):
+        payload["domestic_only"] = True
+        payload["online_only_unisq"] = True
+        await emit(
+            "status",
+            f"[ONLINE ONLY] {url} — UniSQ primary Location list is all-virtual; skipping",
+            phase="extract",
+            kind="online_only_skip",
+            url=url,
+        )
+        return {"url": url, "payload": payload, "evidence": evidence}
+
+    # ── Broken-CMS-page short-circuit ─────────────────────────────────────────
+    # Some universities (notably CQU's `?audience=INTERNATIONAL` rewrite on
+    # certain course shapes) return a 200-OK branded error template instead
+    # of real content.  The body text is a single short error sentence, e.g.
+    #   "The server encountered an error and cannot process your request."
+    # If we let the rest of the pipeline run on these pages, Gemini fires
+    # against ~70 chars of text and either returns all-nulls (wasted budget)
+    # or hallucinates a course named "There Was A Problem on Our End" that
+    # then pollutes the staging table.
+    #
+    # Detection has two tiers:
+    #   1. **Tiny page**: <400 chars of compacted body text AND known error
+    #      sentence — original CQU 137-char branded error template shape.
+    #   2. **Visible-body marker** (2026-05-12 fix): error sentence appears
+    #      within the FIRST 500 chars of compacted text. This catches CQU's
+    #      Next.js variant where the error UI renders at the top followed by
+    #      a multi-MB embedded `__NEXT_DATA__` JSON dump (e.g.
+    #      `cm17/bachelor-of-medical-science-pathway-to-medicine?audience=
+    #      INTERNATIONAL` returned 594 KB / 468 KB compact text starting
+    #      with "There was a problem on our end The server encountered an
+    #      error..." — the length-only gate let it slip through and the
+    #      page-regex extractor mined a $33,300 fee from the JSON dump,
+    #      polluting staging).  Real course pages start with the course
+    #      title ("<Course Name> - CQUniversity ..."), never with the
+    #      error-template phrases — verified across the 5 working bare URLs.
+    try:
+        from app.services.scraper.extractors._text import (
+            html_to_text as _html_to_text,
+            compact as _compact,
+        )
+        _broken_text = _compact(_html_to_text(html or ""))
+        _lower = _broken_text.lower()
+        _BROKEN_MARKERS = (
+            "server encountered an error and cannot process",
+            "there was a problem on our end",
+            "the server encountered an error",
+            # VU (Victoria University) soft-404: dead /courses/<slug> URLs
+            # return HTTP 200 with a branded "Page not found" template.
+            # The page title is "Page not found | Victoria University" and
+            # the body text starts "An error occurred Sorry, we can't find
+            # the page you were looking for. It may have been moved or
+            # deleted." (2026-05-13 — fleet-wide soft-404 bug: the regex
+            # extractor pulled "May" out of "It MAY have been moved" into
+            # intake_months and Gemini hallucinated "Sydney, Melbourne,
+            # Brisbane" from VU brand chrome on the error page, producing
+            # ghost rows like "Bachelor of Laws (Honours)/Bachelor of
+            # Criminology" with bogus values.)
+            "an error occurred sorry, we can",
+            "we can't find the page you were looking for",
+            "we cannot find the page you were looking for",
+            # 2026-05-14 — VU's soft-404 template's body text is 3,249
+            # characters (over the 400-char ``broken_short`` threshold)
+            # AND the historic ``"an error occurred…"`` marker first
+            # appears at offset ~700 (well past the [:500] window the
+            # ``broken_visible`` check uses).  Result: every dead VU
+            # /courses/<slug>/international URL silently slipped past
+            # the gate, was treated as a real course, and produced a
+            # ghost row with intake "May" (regex pulled out of "It MAY
+            # have been moved") and location "Sydney, Melbourne,
+            # Brisbane" (extracted from VU's Indigenous acknowledgement
+            # of country footer + CRICOS registration line).  The page
+            # title — "Page not found | Victoria University" — is the
+            # very first thing in the visible body, so adding it here
+            # is enough to catch the entire family.
+            "page not found | victoria university",
+        )
+        _broken_visible = any(m in _lower[:500] for m in _BROKEN_MARKERS)
+        _broken_short = (
+            len(_broken_text) < 400
+            and any(m in _lower for m in _BROKEN_MARKERS)
+        )
+        if _broken_visible or _broken_short:
+            # Per-uni recovery: when ``broken_cms_retry_strip_query``
+            # is enabled AND the URL carries a query string, refetch
+            # the bare URL once. CQU's ?audience=INTERNATIONAL rewrite
+            # serves a 200-OK 137-char branded error template on most
+            # Bachelors / Masters even though the bare URL returns a
+            # full ~18-20 KB international-eligible page. Without this
+            # retry the broken-CMS guard silently dropped ~40+ real
+            # CQU programs (Bachelor of Health Science, Bachelor of
+            # Paramedicine, Bachelor of Education Secondary, every
+            # coursework Master's, etc.).
+            _retry_strip = False
+            try:
+                _retry_strip = bool(
+                    _uc.extraction.filters.broken_cms_retry_strip_query
+                )
+            except Exception:  # noqa: BLE001
+                _retry_strip = False
+            _retry_html: str | None = None
+            # Diagnostic: when the retry path is enabled but does NOT
+            # recover the page, capture the precise reason so the next
+            # scrape's logs are actionable instead of silently emitting
+            # the same generic [BROKEN CMS] skip line.  Without this,
+            # CQU's 137 broken-CMS skips were indistinguishable from the
+            # 34 successful retries — we couldn't tell whether the bare
+            # URL also returned the CMS error template, returned <400
+            # chars, or whether fetch_html itself raised.
+            _retry_attempted = False
+            _retry_fail_reason: str | None = None
+            _retry_fail_detail: str | None = None
+            if _retry_strip:
+                _pu = urlparse(url)
+                if _pu.query:
+                    _retry_attempted = True
+                    _bare_url = urlunparse(_pu._replace(query=""))
+                    try:
+                        _retry_html = await fetch_html(_bare_url)
+                    except Exception as _exc:  # noqa: BLE001
+                        log.warning(
+                            "broken-cms retry-without-query failed for %s: %s",
+                            _bare_url,
+                            _exc,
+                        )
+                        _retry_html = None
+                        _retry_fail_reason = "fetch_exception"
+                        _retry_fail_detail = type(_exc).__name__
+                    if _retry_html:
+                        _retry_text = _compact(_html_to_text(_retry_html))
+                        _retry_lower = _retry_text.lower()
+                        # Mirror the two-tier gate above so a bare URL
+                        # that returns a multi-MB Next.js error variant
+                        # (error UI at top + JSON dump) is also rejected.
+                        _retry_broken = (
+                            any(m in _retry_lower[:500] for m in _BROKEN_MARKERS)
+                            or (
+                                len(_retry_text) < 400
+                                and any(m in _retry_lower for m in _BROKEN_MARKERS)
+                            )
+                        )
+                        if not _retry_broken and len(_retry_text) >= 400:
+                            await emit(
+                                "status",
+                                f"[BROKEN CMS RETRY] {url[:80]} — "
+                                f"bare URL returned {len(_retry_text)} chars; "
+                                f"continuing extraction",
+                                phase="extract",
+                                kind="broken_cms_retry_ok",
+                                url=url,
+                            )
+                            html = _retry_html
+                            # Fall through to the rest of extraction.
+                        else:
+                            _retry_html = None
+                            if _retry_broken:
+                                _retry_fail_reason = "still_broken"
+                                _retry_fail_detail = f"{len(_retry_text)} chars"
+                            else:
+                                _retry_fail_reason = "too_short"
+                                _retry_fail_detail = f"{len(_retry_text)} chars"
+                    elif _retry_fail_reason is None:
+                        # fetch_html returned empty/None without raising.
+                        _retry_fail_reason = "empty_response"
+                        _retry_fail_detail = "fetch_html returned no body"
+            # ── VU /international path-suffix retry (2026-05-13) ──────────
+            # Victoria University's URL rewriter (above, ~L815) blindly
+            # appends ``/international`` to every /courses/<slug>/ URL so
+            # extractors see the international fee/IELTS/intake/campus
+            # tab.  For ~50+ valid courses the /international variant
+            # returns VU's branded "An error occurred / Page not found"
+            # template (489 KB), even though the bare URL returns the
+            # full real page (~970 KB) with all the data inline.
+            # Symptom: Master of Enterprise Resource Planning, Master
+            # of Research, Master of Applied Research, Graduate Diploma
+            # in Business / Financial Planning / Migration Law, etc.
+            # all logged "[WARN] An Error Occurred — Fee section
+            # detected but fee is blank" and either dropped from
+            # staging or staged with bogus location ("Sydney, Melbourne,
+            # Brisbane" hallucinated by AI from VU brand chrome on the
+            # error page) and intake "May" (regex pulled out of "It MAY
+            # have been moved").
+            # Recovery: when broken-CMS fires AND the URL is a VU
+            # /courses/<slug>/international and the strip-query retry
+            # didn't recover, refetch the bare URL once.  Hostname-
+            # gated → no behaviour change for any other uni.
+            if not _retry_html:
+                _vu_pu = urlparse(url)
+                _vu_path = _vu_pu.path.rstrip("/")
+                if (
+                    _vu_pu.netloc in ("www.vu.edu.au", "vu.edu.au")
+                    and _vu_path.startswith("/courses/")
+                    and _vu_path.endswith("/international")
+                ):
+                    _retry_attempted = True
+                    _bare_path = _vu_path[: -len("/international")]
+                    _bare_url = urlunparse(_vu_pu._replace(path=_bare_path))
+                    try:
+                        _retry_html = await fetch_html(_bare_url)
+                    except Exception as _exc:  # noqa: BLE001
+                        log.warning(
+                            "VU /international strip retry failed for %s: %s",
+                            _bare_url,
+                            _exc,
+                        )
+                        _retry_html = None
+                        _retry_fail_reason = "vu_strip_intl_fetch_exception"
+                        _retry_fail_detail = type(_exc).__name__
+                    if _retry_html:
+                        _retry_text = _compact(_html_to_text(_retry_html))
+                        _retry_lower = _retry_text.lower()
+                        _retry_broken = (
+                            any(m in _retry_lower[:500] for m in _BROKEN_MARKERS)
+                            or (
+                                len(_retry_text) < 400
+                                and any(m in _retry_lower for m in _BROKEN_MARKERS)
+                            )
+                        )
+                        # Defensive guard (code-review): the bare URL
+                        # serves the DOMESTIC tab by default — accepting
+                        # it without an international-signal check would
+                        # re-introduce the very domestic-fee leak the
+                        # /international rewriter was added to prevent
+                        # (e.g. $1,337/yr Cert IV in Tertiary Prep).
+                        # Require the bare HTML to contain at least one
+                        # unambiguous international marker (CRICOS code,
+                        # "international student(s)", or an explicit
+                        # international-fee/tuition phrase) before
+                        # adopting it as the extraction source.  The
+                        # real Master-of-ERP page contains all three;
+                        # a true domestic-only landing page contains
+                        # none.
+                        _intl_signals = (
+                            "cricos",
+                            "international student",
+                            "international fee",
+                            "international tuition",
+                            "for international",
+                        )
+                        _has_intl_signal = any(
+                            s in _retry_lower for s in _intl_signals
+                        )
+                        if (
+                            not _retry_broken
+                            and len(_retry_text) >= 400
+                            and _has_intl_signal
+                        ):
+                            await emit(
+                                "status",
+                                f"[VU /INTL STRIP] {url[:80]} — bare URL "
+                                f"returned {len(_retry_text)} chars w/ "
+                                f"intl signals; continuing extraction "
+                                f"from {_bare_url[:80]}",
+                                phase="extract",
+                                kind="vu_intl_strip_retry_ok",
+                                url=url,
+                            )
+                            html = _retry_html
+                            url = _bare_url
+                            # Keep payload provenance consistent with
+                            # the URL we're actually extracting from —
+                            # course_website was set to the original
+                            # /international URL earlier in the pipeline
+                            # and would otherwise diverge from the
+                            # source_url stamped on every evidence row.
+                            payload["course_website"] = _bare_url
+                        else:
+                            _retry_html = None
+                            if _retry_broken:
+                                _retry_fail_reason = "vu_strip_intl_still_broken"
+                            elif not _has_intl_signal:
+                                _retry_fail_reason = "vu_strip_intl_no_intl_signal"
+                            else:
+                                _retry_fail_reason = "vu_strip_intl_too_short"
+                            _retry_fail_detail = f"{len(_retry_text)} chars"
+                    elif _retry_fail_reason is None:
+                        _retry_fail_reason = "vu_strip_intl_empty_response"
+                        _retry_fail_detail = "fetch_html returned no body"
+            if _retry_attempted and _retry_fail_reason:
+                await emit(
+                    "status",
+                    f"[BROKEN CMS RETRY-FAIL] {url[:80]} — "
+                    f"reason={_retry_fail_reason} ({_retry_fail_detail})",
+                    phase="extract",
+                    kind="broken_cms_retry_fail",
+                    url=url,
+                )
+            if not _retry_html:
+                payload["_rejection_reason"] = "broken_cms_page"
+                await emit(
+                    "status",
+                    f"[BROKEN CMS] {url[:80]} — page returned CMS error template "
+                    f"({len(_broken_text)} chars); skipping",
+                    phase="extract",
+                    kind="broken_cms_skip",
+                    url=url,
+                )
+                return {"url": url, "payload": payload, "evidence": evidence}
+    except Exception as exc:  # noqa: BLE001 — never abort extraction
+        log.warning("broken-cms-page check errored on %s: %s", url, exc)
+
     # ── CSU pre-seed: runs BEFORE _EXTRACTORS ────────────────────────────────
     # CSU pages embed all course data as inline JS (fees, ocb_metadata,
     # session_data).  Standard regex extractors reliably mis-fire on the
@@ -745,13 +1760,22 @@ async def extract_course(
             for _k, _v in _csu_pre.items():
                 payload[_k] = _v  # direct write — extractors use setdefault
                 if _v not in (None, "", 0, []):
+                    # source_url + snippet are REQUIRED by enforce_source_evidence
+                    # (guards.py) for the critical-field set: international_fee,
+                    # ielts_overall, pte_overall, toefl_overall, study_mode,
+                    # location_text, duration_text. Without proof the field is
+                    # nullified at staging time. Bond and ECU pre-seeds set the
+                    # same shape; CSU was historically missing it, which silently
+                    # blanked every CSU fee + English-test column on the review
+                    # page. Mirror the Bond/ECU snippet shape exactly.
                     evidence.append(
                         {
                             "field_key": _k,
                             "value": _v,
                             "confidence": 0.9,
                             "method": "csu_static",
-                            "snippet": None,
+                            "source_url": url,
+                            "snippet": f"CSU pre-seed: {_k}={_v}",
                         }
                     )
             if emit:
@@ -911,7 +1935,17 @@ async def extract_course(
         if _is_ecu(url):
             _ecu_pre = _ecu_apply(url, html)
             # Direct-write keys prevent generic extractor noise from winning.
-            _ECU_DIRECT_KEYS = {"has_central_fee_page", "course_location"}
+            # ``intake_months`` is direct-write because the structured
+            # availability grid (parse_availability_grid) is authoritative —
+            # ties FT/PT presence to (campus, semester) pairs, unlike the
+            # text-only intake.ecu_semester extractor which adds both Feb+Jul
+            # whenever the page mentions "Semester 1" or "Semester 2" (every
+            # ECU course page does, regardless of which semester is offered).
+            _ECU_DIRECT_KEYS = {
+                "has_central_fee_page",
+                "course_location",
+                "intake_months",
+            }
             for _ek, _ev in _ecu_pre.items():
                 if _ek == "scrape_warnings":
                     _ew = list(payload.get("scrape_warnings") or [])
@@ -925,11 +1959,19 @@ async def extract_course(
                 else:
                     payload.setdefault(_ek, _ev)
                 if _ev not in (None, "", 0, []):
+                    # intake_months from the grid is structured DOM data —
+                    # use 0.95 so it beats intake.ecu_semester (0.85) and any
+                    # other text-based intake guess in the merge ranker.
+                    _ecu_conf = 0.95 if _ek == "intake_months" else 0.85
                     evidence.append({
                         "field_key": _ek,
                         "value": _ev,
-                        "confidence": 0.85,
-                        "method": "ecu_static",
+                        "confidence": _ecu_conf,
+                        "method": (
+                            "ecu_static:availability_grid"
+                            if _ek in ("intake_months", "course_location")
+                            else "ecu_static"
+                        ),
                         "source_url": url,
                         "snippet": f"ECU pre-seed: {_ek}={_ev}",
                     })
@@ -1132,25 +2174,41 @@ async def extract_course(
         )
     )
     if _only_rule_based_on_campus:
-        payload["study_mode"] = "Online"
-        evidence.append(
-            {
-                "field_key": "study_mode",
-                "value": "Online",
-                "confidence": 0.55,
-                "method": "study_mode:no_location_online_override",
-                "snippet": (
-                    "study_mode:rule returned 'On Campus' but course_location "
-                    "and location_text are both blank — sidebar contamination "
-                    "suspected. Downgraded to Online for online_only guard."
-                ),
-            }
-        )
-        log.info(
-            "[STUDY_MODE OVERRIDE] course=%r — rule-only 'On Campus' with no "
-            "location evidence; downgraded to Online for guard evaluation.",
-            payload.get("course_name") or url,
-        )
+        # Exception: if an international fee was already extracted from the
+        # page (via Gemini, regex, or the browser extended-extract pass), the
+        # course IS accessible to international students and the fee panel
+        # loaded successfully — the blank location is a scrape miss, not
+        # evidence of online-only delivery.  Downgrading would incorrectly
+        # reject legitimate on-campus courses at the online_only guard.
+        _has_extracted_fee = payload.get("international_fee") is not None
+        if _has_extracted_fee:
+            log.info(
+                "[STUDY_MODE OVERRIDE SKIPPED] course=%r — rule-only 'On Campus' "
+                "but international_fee=%r already extracted; location miss is a "
+                "scrape failure, not online delivery evidence. Keeping On Campus.",
+                payload.get("course_name") or url,
+                payload["international_fee"],
+            )
+        else:
+            payload["study_mode"] = "Online"
+            evidence.append(
+                {
+                    "field_key": "study_mode",
+                    "value": "Online",
+                    "confidence": 0.55,
+                    "method": "study_mode:no_location_online_override",
+                    "snippet": (
+                        "study_mode:rule returned 'On Campus' but course_location "
+                        "and location_text are both blank — sidebar contamination "
+                        "suspected. Downgraded to Online for online_only guard."
+                    ),
+                }
+            )
+            log.info(
+                "[STUDY_MODE OVERRIDE] course=%r — rule-only 'On Campus' with no "
+                "location evidence; downgraded to Online for guard evaluation.",
+                payload.get("course_name") or url,
+            )
 
     # T002: per-course Bootstrap-modal English-test extractor. Runs BEFORE
     # the per-course browser pass because (a) it's pure-CPU (no Playwright
@@ -1271,6 +2329,8 @@ async def extract_course(
             _gp_dbg: dict[str, Any] = {}
             _gp_in_tok: int = 0
             _gp_out_tok: int = 0
+            _gp_cost: float = 0.0
+            _gp_full_ran: bool = False
 
             if _gate_skip:
                 # All high-value fields already covered at high confidence — skip.
@@ -1334,6 +2394,7 @@ async def extract_course(
                     timeout=_AI_FALLBACK_TIMEOUT_SEC,
                 )
                 _gemini_primary_cost = _gp_cost
+                _gp_full_ran = True
 
                 # ── DEBUG: emit via the SSE/Celery log path so it appears in journalctl
                 if emit and _gp_dbg:
@@ -1394,6 +2455,35 @@ async def extract_course(
                 if _months:
                     _gp_filled["intake_months"] = _months
 
+            # ── UTAS online-only flag from Gemini's `mode` field ───────────────
+            # UTAS course pages publish a single "Location" panel which reads
+            # exactly "Online" for online-only courses (e.g. Graduate Certificate
+            # in Dementia, M5x, https://www.utas.edu.au/courses/health/courses/
+            # m5x-graduate-certificate-in-dementia).  The location extractor
+            # strips virtual keywords → course_location ends up blank →
+            # `utas.yaml`'s `extraction.default_course_location: "Hobart"`
+            # fallback fills it with "Hobart" → the existing UTAS blank-location
+            # online-only guard in guards.py is masked and the row is staged
+            # with the bogus "Hobart" / "On Campus" combo (user-reported
+            # 2026-05-17). The YAML default itself is intentional — partial-HTML
+            # browser fetches on Cloudflare-protected arts-soc / health pages
+            # often omit the Location panel for legitimate Hobart courses and
+            # the default keeps those from being rejected as online-only.
+            #
+            # Gemini's `mode` field reads the Location panel directly (the
+            # _HARD_FIELDS prompt explicitly says: "If the page lists
+            # 'Location: Online', always use 'Online'"). Surface that as a
+            # payload flag so guards.py can reject online-only UTAS rows even
+            # when the YAML default has masked the blank-location signal.
+            # Pure positive signal: only fires when Gemini explicitly says
+            # mode="Online"; never affects courses with any on-campus content.
+            try:
+                _gp_mode = str(_gp_filled.get("mode") or "").strip().lower()
+                if "utas.edu.au" in (url or "").lower() and _gp_mode == "online":
+                    payload["online_only_utas"] = True
+            except Exception:  # noqa: BLE001 — never break the pipeline
+                pass
+
             # Map location_text → canonical course_location (Text). Gemini
             # returns a string like "Melbourne" or "Ballarat, Gippsland"; the
             # DB column is course_location. The regex extractor only succeeds
@@ -1430,10 +2520,19 @@ async def extract_course(
                     try:
                         from app.services.scraper.extractors.location import (
                             _strip_period_labels as _spl,
+                            _sanitise_for_display as _sfd,
                         )
                         _loc_clean = _spl(_loc)
                         if _loc_clean:
                             _loc = _loc_clean
+                        # Strip trailing country-name parts (e.g. Gemini returns
+                        # "Sydney, Melbourne, Brisbane, Australia" for Torrens —
+                        # "Australia" is not a campus, must be removed).  Mirrors
+                        # the same _sanitise_for_display call the structural
+                        # location extractor cascade already runs.
+                        _loc_sane = _sfd(_loc)
+                        if _loc_sane:
+                            _loc = _loc_sane
                     except Exception:
                         pass  # never block on import/runtime error
                 if _loc and _loc.lower() not in _STUDY_MODE_KEYWORDS:
@@ -1544,6 +2643,21 @@ async def extract_course(
                     if (isinstance(_gp_v, str)
                             and _gp_v.strip().lower() in _STUDY_MODE_KEYWORDS):
                         continue  # study-mode phrase — not a real location
+                    # Guard 3 (2026-05-22 — UniSQ fleet-wide footer leak):
+                    # Reject chrome text when Gemini PRIMARY returns the
+                    # field directly as `course_location` (not via the
+                    # location_text → course_location mapping at line 2429,
+                    # which already runs _is_location_chrome at line 2434).
+                    # Observed: Gemini fills course_location="Accommodation
+                    # UniSQ Events Contributing to our communities" verbatim
+                    # on ~40% of UniSQ rows when the structural quickfacts
+                    # reader returns None and the per-course page has no
+                    # "Location:" label — Gemini then reads the
+                    # site-footer quick-links column. The FALLBACK loop at
+                    # line ~3696 already covers this for the AI-fallback
+                    # path; this guard closes the PRIMARY path.
+                    if isinstance(_gp_v, str) and _is_location_chrome(_gp_v):
+                        continue  # site-chrome text — not a real location
                     _cl_method = _best_ev_method("course_location")
                     if _cl_method and _cl_method.startswith("location."):
                         continue  # structural extractor already owns this field
@@ -1589,8 +2703,12 @@ async def extract_course(
                     "decision_status": "selected",
                 })
 
-            # Always emit so every course has a [GEMINI] line in the live log
-            if emit:
+            # Emit the [GEMINI] line only for the full-extraction path —
+            # the skip-gate and classification_only branches above already
+            # emitted their own [GEMINI] line, so re-emitting here would be
+            # a duplicate and would also reference _gp_cost / _gp_in_tok /
+            # _gp_out_tok that those branches do not populate.
+            if emit and _gp_full_ran:
                 _gp_skip_note = (
                     f" SKIP={_gp_dbg.get('skip_reason', '?')!r}"
                     if _gp_dbg and _gp_dbg.get("skipped")
@@ -1624,6 +2742,46 @@ async def extract_course(
         )
 
         _force = _force_browser_for_url(url)
+        # ── Sparse-static rescue ────────────────────────────────────────────
+        # When the static HTML was an SPA shell, the regex/structural
+        # extractors find nothing and Gemini-primary fills slots with
+        # generic defaults (intake="May", location="Melbourne", IELTS=6).
+        # The default browser-refetch gate at maybe_browser_refetch()
+        # short-circuits whenever any english slot is populated — so the
+        # bogus Gemini values prevent the JS-rendered page from ever being
+        # fetched, leaving fee/duration blank fleet-wide.
+        #
+        # Detection signature: BOTH international_fee AND duration are
+        # blank after the Gemini-primary pass. Static HTML providing
+        # neither of these critical fields is conclusive evidence that
+        # the page was an SPA shell. Force a Playwright refetch with
+        # override=True so the rendered DOM can replace the bogus
+        # Gemini fallback values with the real course data.
+        #
+        # Verified live (2026-05-14) on VU Bachelor of Dermal Sciences,
+        # Diploma of Education Studies, etc. — both staged at 54-62%
+        # completeness with intake="May", location="Melbourne", fee NULL,
+        # duration NULL. Re-extracting via the browser path recovers
+        # full data ($16k-20k fee, real campus, July intake).
+        if (
+            not _force
+            and payload.get("international_fee") in (None, "", 0)
+            and payload.get("duration") in (None, "", 0)
+        ):
+            _force = True
+            log.info(
+                "[SPARSE STATIC RESCUE] %s — fee+duration both blank after "
+                "Gemini-primary; forcing browser refetch with override",
+                url,
+            )
+            if emit:
+                await emit(
+                    "status",
+                    f"[sparse-static rescue] {url} — forcing browser refetch",
+                    phase="fallback",
+                    kind="sparse_static_rescue",
+                    url=url,
+                )
         browser_filled, browser_evidence, rendered_html, _override = (
             await maybe_browser_refetch(url, payload, emit=emit, force=_force)
         )
@@ -1707,22 +2865,48 @@ async def extract_course(
         )
     )
     # Phase 3: gated on extraction.filters.domestic_only.enabled (fail-open).
+    #
+    # Two-tier check on the rendered HTML:
+    #
+    #   1. HARD signal (`_DOMESTIC_ONLY_RE` direct hit) — unambiguous
+    #      attribute or JSON markers like Torrens
+    #      ``data-studenttypes="Domestic"`` or Federation's
+    #      ``"StudentTypeBlock" … "hasInternational": false``. These
+    #      MUST flip the flag even when fee+English data is present in
+    #      the payload, because that data may have leaked in from
+    #      (a) per-course PDF matching against an unrelated row, or
+    #      (b) the central English-requirements page applied to every
+    #      course on the site. The ``_browser_confirmed_intl`` exemption
+    #      was designed to protect SOFT markers from false positives,
+    #      not to override an unambiguous CMS-level domestic-only flag.
+    #      Verified live (job_7f369…) on Bachelor of Media Production
+    #      & Communication: PDF matched a $37,500 row → IELTS came from
+    #      central English page → guard incorrectly bypassed.
+    #
+    #   2. SOFT/full check (``_is_domestic_only_page``, which also
+    #      runs the soft "may not be available" pattern) keeps the
+    #      ``_browser_confirmed_intl`` + ``_url_signals_international``
+    #      exemptions to avoid false positives on pages that genuinely
+    #      do display international data.
     if (
         not payload.get("domestic_only")
         and rendered_html
-        and _domestic_only_filter_enabled() and _is_domestic_only_page(rendered_html)
+        and _domestic_only_filter_enabled()
         and not _url_signals_international
-        and not _browser_confirmed_intl
     ):
-        payload["domestic_only"] = True
-        await emit(
-            "status",
-            f"[DOMESTIC ONLY] {url} — rendered page states domestic-students-only; skipping",
-            phase="extract",
-            kind="domestic_only_skip",
-            url=url,
-        )
-        return {"url": url, "payload": payload, "evidence": evidence}
+        _hard_marker_hit = bool(_DOMESTIC_ONLY_RE.search(rendered_html))
+        if _hard_marker_hit or (
+            _is_domestic_only_page(rendered_html) and not _browser_confirmed_intl
+        ):
+            payload["domestic_only"] = True
+            await emit(
+                "status",
+                f"[DOMESTIC ONLY] {url} — rendered page states domestic-students-only; skipping",
+                phase="extract",
+                kind="domestic_only_skip",
+                url=url,
+            )
+            return {"url": url, "payload": payload, "evidence": evidence}
 
     try:
         if not _vision_ocr_trusted():
@@ -2204,13 +3388,19 @@ async def extract_course(
                     if payload.get(k) not in (None, "", 0):
                         continue
                     payload[k] = v
+                    # source_url + non-empty snippet are required by
+                    # enforce_source_evidence (guards.py) for the critical
+                    # field set (location_text, duration_text, study_mode).
+                    # Mirrors the Bond/ECU/CSU pre-seed shape so the recovered
+                    # values aren't silently nulled at staging time.
                     evidence.append(
                         {
                             "field_key": k,
                             "value": v,
                             "confidence": 0.85,
                             "method": "vit_static_fallback",
-                            "snippet": None,
+                            "source_url": url,
+                            "snippet": f"VIT fallback: {k}={v}",
                         }
                     )
                 if emit and vit_filled:
@@ -2307,15 +3497,22 @@ async def extract_course(
             # withholds the row from the review queue rather than showing
             # incorrect data.
             if _is_uow_host and not _had_render:
-                # duration_text and intake_text are in _ai_target_keys so they
-                # appear in `missing` when blank.  study_mode is NOT in that
-                # list, so we check it directly against the payload.
-                _uow_guessed = [
-                    f for f in ("duration_text", "intake_text")
-                    if f in missing
-                ] + (
-                    ["study_mode"] if not payload.get("study_mode") else []
-                )
+                # CANONICAL-SLOT BYPASS (2026-05-17): the prior version only
+                # checked the *text-shape* slots (duration_text, intake_text)
+                # against `missing`.  But the static-HTML regex pass on UOW
+                # pages reliably fills the *canonical* slots — `duration` via
+                # the generic regex cascade and `intake_months` via
+                # `intake.session_names` ("Autumn Session" → March, "Spring
+                # Session" → July).  When those are already populated, the
+                # downstream AI fallback won't synthesise new values — yet
+                # the prior guard still flipped parser_error=True and the
+                # orchestrator (orchestrator.py:1996) silently dropped the
+                # row from the staging queue.  Net effect: hundreds of
+                # legitimate UOW rows were withheld on every scrape where
+                # the browser refetch hit its outer timeout on the JS-only
+                # shell pages.  Delegated to module-private helper so the
+                # regression test can import it directly.
+                _uow_guessed = _uow_timeout_guessed_fields(payload, missing)
                 if _uow_guessed:
                     payload["parser_error"] = True
                     payload["parser_error_fields"] = (
@@ -2396,6 +3593,170 @@ async def extract_course(
         # `duration_term` (Year/Month/Week/...). Translate before merging
         # so AI-filled units don't silently drop on the floor. See B20.
         _apply_ai_duration_mapping(payload, ai_filled)
+
+        # ── Federation JSON-block authoritative override (2026-05-10) ──
+        # Federation embeds the canonical course summary as a JSON tree
+        # inside <script>; the standard text-strip wipes it, so the
+        # downstream regex extractors never see "4 years full-time" /
+        # "Berwick (on campus)<br>Gippsland (on campus)<br>Mt Helen ...".
+        # Net effect upstream: NULL durations on B Occupational Therapy
+        # (Honours) / M Data Science / M Social Work, plus Gemini-
+        # hallucinated locations ("Sydney" appearing on Berwick-only
+        # programmes). Run AFTER ai_fallback / _apply_ai_duration_mapping
+        # so the JSON value REPLACES whatever Gemini guessed (gates the
+        # PDF-merge condition at L2742 are then irrelevant for these
+        # rows; the JSON is strictly more reliable than either source).
+        # Hostname-gated → no-op for every other uni.
+        if _fed_json.is_federation_host(url):
+            try:
+                _fed_json.apply_overrides(
+                    payload, html, url=url, rendered_html=rendered_html
+                )
+            except Exception as _fed_exc:  # noqa: BLE001 — never break a scrape
+                log.warning("federation_json override failed on %s: %s", url, _fed_exc)
+        # ── CQU JSON-block authoritative override (2026-05-11) ──
+        # CQU is a NextJS / Sitecore site that ships every course's
+        # canonical AIMSData inside __NEXT_DATA__. The text-strip wipes
+        # it (page text drops to ~57 chars), so the regex extractors
+        # pull intake-panel UI fragments ("2026", "Next start term
+        # Anytime", "& 3 more") into course_location, IELTS goes 99%
+        # NULL, and the fee extractor picks up the domestic CSP rate.
+        # Hostname-gated → no-op for every other uni.
+        from app.services.scraper.extractors import cqu_json as _cqu_json
+        if _cqu_json.is_cqu_host(url):
+            try:
+                _cqu_json.apply_overrides(payload, html, url=url, evidence=evidence)
+            except Exception as _cqu_exc:  # noqa: BLE001 — never break a scrape
+                log.warning("cqu_json override failed on %s: %s", url, _cqu_exc)
+        # ── La Trobe per-course JSON authoritative override (2026-05-13) ──
+        # La Trobe per-course pages are SPA shells — fees, duration,
+        # intake months, and per-course campus are loaded client-side
+        # via a separate JSON document at
+        #   /courses/data/{year}/{locale}/{campus}/{slug}?v=...
+        # The static HTML lists every variant in an inline
+        # ``allDetailUrls`` block but contains none of the actual
+        # values, so the regex extractors return NULL on
+        # international_fee / duration / intake_months for ~all 219
+        # La Trobe rows and the central fee page also yields 0 records.
+        # This override fetches the international JSON and replaces
+        # those fields with the canonical values.
+        # Hostname-gated → no-op for every other uni. Async because
+        # it issues one extra HTTP request per course page.
+        from app.services.scraper.extractors import latrobe_json as _latrobe_json
+        if _latrobe_json.is_latrobe_host(url):
+            try:
+                await _latrobe_json.apply_overrides(
+                    payload, html, url=url, evidence=evidence
+                )
+            except Exception as _ltu_exc:  # noqa: BLE001 — never break a scrape
+                log.warning("latrobe_json override failed on %s: %s", url, _ltu_exc)
+        # MIT (Melbourne Institute of Technology) per-course fee table
+        # override.  MIT's per-course page genuinely contains no
+        # international fee — Gemini sees the "DomesticInternational"
+        # toggle text and returns null.  The complete fee schedule
+        # lives in a single HTML table at /study-with-us/tuition-fees
+        # (international accordion section).  Without this override,
+        # the central-page generic parser broadcast a single wrong fee
+        # (A$13,320 = 2027 Master of ICT Research per-trimester)
+        # onto every course as "Full Course" — confirmed by the
+        # 2026-05-13 user-reported staged data showing 22 wrong rows.
+        # Hostname-gated; one cached fetch per worker.
+        # ── MIT title-major course-name override (2026-05-13) ──
+        # MIT publishes one URL per major specialisation
+        # (e.g. master-networking-project-management) but the on-page <h1>
+        # always reads the bare program name ("Master of Networking"),
+        # so the standard h1-based course_name extractor produces 6
+        # identical staged rows for the 6 Master-of-Networking variants.
+        # The page <title> tag carries the major
+        # ("Master of Networking | major in Project Management"), so this
+        # extractor pulls the major from the title and rewrites
+        # course_name to the canonical "<base> - Major in <Major>" form
+        # so each variant has a unique, parseable name.
+        # MUST run BEFORE mit_fees so the central fee-table lookup can
+        # exact-match on the now-fully-qualified course_name.
+        from app.services.scraper.extractors import mit_course_name as _mit_cn
+        if _mit_cn.is_mit_host(url):
+            try:
+                _mit_cn.apply_overrides(
+                    payload, html, url=url, evidence=evidence
+                )
+            except Exception as _mit_cn_exc:  # noqa: BLE001 — never break a scrape
+                log.warning("mit_course_name override failed on %s: %s", url, _mit_cn_exc)
+        from app.services.scraper.extractors import mit_fees as _mit_fees
+        if _mit_fees.is_mit_host(url):
+            try:
+                await _mit_fees.apply_overrides(
+                    payload, url=url, evidence=evidence
+                )
+            except Exception as _mit_exc:  # noqa: BLE001 — never break a scrape
+                log.warning("mit_fees override failed on %s: %s", url, _mit_exc)
+        # ── Torrens per-course JSON-LD location override (2026-05-13) ──
+        # Torrens course pages publish a marketing-style "Campus locations"
+        # header listing ALL Torrens-network campuses
+        # ("Sydney, Melbourne, Brisbane, Adelaide, Online") on EVERY course,
+        # even when the course is only delivered at 1-2 of them.  The
+        # visible-text extractor was picking up that brand statement
+        # verbatim and stamping all 4 cities onto every staged row,
+        # producing the user-reported 2026-05-13 bug where Education and
+        # Cybersecurity courses (only at 2 campuses) were shown as offered
+        # at all 4.  The page also carries a JSON-LD <Course> block whose
+        # hasCourseInstance[] entries give the actual per-campus
+        # availability — that's what we use to REPLACE course_location.
+        # Hostname-gated; pure parse, no extra HTTP request.
+        from app.services.scraper.extractors import torrens_json as _torrens_json
+        if _torrens_json.is_torrens_host(url):
+            try:
+                _torrens_json.apply_overrides(
+                    payload, html, url=url, evidence=evidence
+                )
+            except Exception as _tor_exc:  # noqa: BLE001 — never break a scrape
+                log.warning("torrens_json override failed on %s: %s", url, _tor_exc)
+        # ── VU per-course course-card location override (2026-05-14) ──
+        # VU course pages contain a footer Indigenous-acknowledgement
+        # of country plus a CRICOS registration line that both list
+        # "Sydney", "Melbourne", and "Brisbane" as brand-chrome.  The
+        # bag-of-text location fallback was picking those up and
+        # stamping them as the course location, even on courses
+        # delivered at a single campus (user-reported: SIT50422
+        # Diploma of Hospitality Management staged with location
+        # "Sydney, Melbourne, Brisbane" instead of "Footscray
+        # Nicholson Campus").  This override REPLACE-writes
+        # course_location with the value from VU's structured
+        # "Course essentials" panel
+        # (.vu-course-essentials-content-label "Location" → matching
+        # .vu-course-essentials-content-value).  Hostname-gated;
+        # pure parse, no extra HTTP request.
+        from app.services.scraper.extractors import vu_course_card as _vu_cc
+        if _vu_cc.is_vu_host(url):
+            try:
+                _vu_cc.apply_overrides(
+                    payload, html, url=url, evidence=evidence
+                )
+            except Exception as _vu_exc:  # noqa: BLE001 — never break a scrape
+                log.warning("vu_course_card override failed on %s: %s", url, _vu_exc)
+        # ── London Met brand-chrome scrub (2026-05-14) ─────────────
+        # London Met staged 5 ghost rows out of 322 discovered, all
+        # carrying international_fee=£10,000/Annual sourced from a
+        # "Postgraduate Loan of over £10,000" advert in the page
+        # chrome (NOT a real fee), and 2 of those 5 had
+        # course_location set to the literal string "London
+        # Metropolitan University" from the brand chrome.  This
+        # scrub NULLs the loan-banner false-positive fee triple
+        # AND the brand-name location.  After scrubbing, those
+        # ghost rows fail the existing should_stage_course
+        # ``no_international_fee`` gate and are dropped — the
+        # correct outcome until a separate Fees & Funding sub-page
+        # fetcher is built (real London Met fees do not live on
+        # the per-course page; that is follow-up work).
+        # Hostname-gated; pure parse, no extra HTTP request.
+        from app.services.scraper.extractors import londonmet_chrome_scrub as _lm_scrub
+        if _lm_scrub.is_londonmet_host(url):
+            try:
+                _lm_scrub.apply_overrides(
+                    payload, html, url=url, evidence=evidence
+                )
+            except Exception as _lm_exc:  # noqa: BLE001 — never break a scrape
+                log.warning("londonmet_chrome_scrub failed on %s: %s", url, _lm_exc)
         # Build a lookup of which fields already have evidence from a
         # non-ai_fallback method so the guard below can log drop attempts.
         # First-write-wins: the earliest non-ai_fallback entry for each field
@@ -2427,6 +3788,35 @@ async def extract_course(
             # rejection filter can fire correctly.
             if k in ("location_text", "course_location") and isinstance(v, str) and _is_location_chrome(v):
                 continue
+            # Virtual-only location guard.  Newcastle Master of Nursing and
+            # similar multi-campus pages render "Online | Newcastle" as a
+            # JS-injected radio-toggle group; when the browser pass times
+            # out before the toggles hydrate, the AI fallback sees only the
+            # default-selected "Online" pill and returns course_location=
+            # "Online" (or "Online (Newcastle)").  `_sanitise_for_display`
+            # would later strip the entire value via `_REMOVE_VIRTUAL` and
+            # the dashboard column ends up blank.  Reject the AI value here
+            # so the structural toggle reader (run on the next scrape, or
+            # on a retry with a longer browser settle) can fill it cleanly.
+            # Only fires when EVERY comma-split part is a virtual token; a
+            # mixed value like "Newcastle, Online" is kept and downstream
+            # sanitise drops the "Online" part, preserving "Newcastle".
+            if (
+                k in ("location_text", "course_location")
+                and isinstance(v, str)
+                and v.strip()
+            ):
+                _parts = [p.strip() for p in v.split(",") if p.strip()]
+                from app.services.scraper.extractors.location import (
+                    _REMOVE_VIRTUAL as _LOC_REMOVE_VIRTUAL,
+                )
+                if _parts and all(_LOC_REMOVE_VIRTUAL.fullmatch(p) for p in _parts):
+                    log.info(
+                        "[AI_FALLBACK REJECT] %s=%r — virtual-only "
+                        "(every comma part matches _REMOVE_VIRTUAL); "
+                        "rejecting on %s", k, v, url,
+                    )
+                    continue
             # Belt-and-braces override block: AI fallback can only fill fields
             # that have no prior evidence from a higher-authority method.
             # payload.setdefault() already prevents payload overwrite, but this
@@ -2564,10 +3954,33 @@ async def extract_course(
                 match_course_in_pdf_table,
             )
 
+            # Per-uni PDF course-name aliases (YAML: extraction.fees.
+            # course_pdf_aliases). Lets an operator map a DB course name
+            # to its real PDF row title when the row carries a qualifier
+            # the DB name lacks (e.g. Torrens "Master of Design" →
+            # "Master of Design (Non-Cognate)"). Empty for every uni
+            # that has not opted in, so the global behaviour is unchanged.
+            # NOTE: do NOT re-import get_uni_config here — the module-level
+            # import at the top of this file already binds the name. A local
+            # ``from ... import get_uni_config`` would mark the symbol as a
+            # function-local for the ENTIRE extract_course() body, and the
+            # earlier call at line ~1750 would then raise UnboundLocalError
+            # ("cannot access local variable 'get_uni_config' …").
+            _pdf_aliases: dict[str, str] = {}
+            try:
+                _cfg = get_uni_config()
+                if _cfg is not None:
+                    _pdf_aliases = dict(
+                        getattr(_cfg.extraction.fees, "course_pdf_aliases", {}) or {}
+                    )
+            except Exception:  # noqa: BLE001
+                _pdf_aliases = {}
+
             matched_row, _match_suffix = match_course_in_pdf_table(
                 payload.get("course_name") or "",
                 fee_by_course,
                 cricos_code=payload.get("cricos_code"),
+                course_pdf_aliases=_pdf_aliases,
             )
             if matched_row:
                 log.info(
@@ -2583,6 +3996,29 @@ async def extract_course(
                     if _match_suffix == "cricos_match"
                     else "uni_pdf:fees:per_course"
                 )
+                # 2026-05-10: when the matched PDF row also carries a
+                # trailing duration column (per-uni regex extension —
+                # currently Federation only), use it as a last-resort
+                # fallback for payload duration. We only fill when the
+                # per-course HTML extractor came back NULL — never
+                # overwrite a real page-derived value. Empty / None for
+                # every uni whose pdf_row_pattern has no duration group,
+                # so this branch is a no-op there.
+                _pdf_dur = matched_row.get("duration_pdf")
+                _pdf_dur_term = matched_row.get("duration_term_pdf")
+                if (
+                    _pdf_dur is not None
+                    and _pdf_dur_term
+                    and payload.get("duration") in (None, "")
+                ):
+                    payload["duration"] = _pdf_dur
+                    payload["duration_term"] = _pdf_dur_term
+                    log.info(
+                        "[DURATION] filled from PDF row for %r: %s %s",
+                        payload.get("course_name"),
+                        _pdf_dur,
+                        _pdf_dur_term,
+                    )
             elif per_course_table_active:
                 # No per-course row matched, but the schedule itself
                 # parses cleanly. Suppress the uni-wide stamp so we
@@ -2644,6 +4080,35 @@ async def extract_course(
                     payload.get("course_name"),
                 )
 
+        # Per-uni knob ``pdf_overrides_page_regex``: when True and we have
+        # a per-course PDF row match, treat the PDF as authoritative for
+        # the four fee slots (international_fee / currency / fee_term /
+        # fee_year). Overwrites whatever a page regex / Gemini prose grab
+        # wrote earlier — fixes Torrens-style marketing copy like
+        # "will cost an international student $82,800" overriding the
+        # official $31,600/Annual figure from the 2026 fee schedule PDF.
+        # Default False preserves course-page-wins for every other uni.
+        _pdf_overrides_regex = False
+        if fee_method.startswith("uni_pdf:") and fee_method != "uni_pdf:fees":
+            try:
+                _cfg = get_uni_config()
+                if _cfg is not None:
+                    _pdf_overrides_regex = bool(
+                        getattr(
+                            _cfg.extraction.fees,
+                            "pdf_overrides_page_regex",
+                            False,
+                        )
+                    )
+            except Exception:  # noqa: BLE001
+                _pdf_overrides_regex = False
+        _PDF_AUTHORITATIVE_FEE_KEYS = {
+            "international_fee",
+            "currency",
+            "fee_term",
+            "fee_year",
+        }
+
         if trust_fee_fallback:
             for k, v in fee_block.items():
                 if v is None:
@@ -2655,8 +4120,24 @@ async def extract_course(
                 # never blocks the PDF backfill. Course-page-wins still
                 # holds — see step-1 extractors which strip Nones before
                 # setdefault, so a real extraction is always truthy.
-                if payload.get(k) not in (None, "", 0):
+                #
+                # Per-uni override: when ``pdf_overrides_page_regex`` is
+                # enabled AND we matched a real per-course PDF row, the
+                # four fee slots are overwritten unconditionally — the
+                # PDF schedule wins over any page-derived value.
+                _override = (
+                    _pdf_overrides_regex
+                    and k in _PDF_AUTHORITATIVE_FEE_KEYS
+                )
+                if not _override and payload.get(k) not in (None, "", 0):
                     continue
+                # When overriding, mark the prior evidence row as
+                # superseded so the Evidence Review still shows the
+                # page-regex / Gemini value but flags it as not winning.
+                if _override and payload.get(k) not in (None, "", 0):
+                    for _prior_ev in evidence:
+                        if _prior_ev.get("field_key") == k:
+                            _prior_ev["decision_status"] = "superseded"
                 payload[k] = v
                 evidence.append(
                     {
@@ -2674,33 +4155,59 @@ async def extract_course(
                 )
         # Course-page-wins: only fill empty english slots from the
         # uni-PDF backfill. The PDF's value gets stored verbatim — no
-        # bump or other heuristic. If the PDF only publishes a bachelor
-        # tier, masters courses end up with that tier; that's a known
-        # gap to be solved upstream (per-degree-level PDF parsing or
-        # OCR of course-page screenshots), NOT by guessing here.
-        for k, v in english_block.items():
-            if v is None:
-                continue
-            # Empty-aware: see fee-block comment above.
-            if payload.get(k) not in (None, "", 0):
-                continue
-            payload[k] = v
-            evidence.append(
-                {
-                    "field_key": k,
-                    "value": v,
-                    "confidence": 0.7,
-                    "method": "uni_pdf:requirements",
-                    # source_url: PDF URL when known; course-page URL as
-                    # provenance fallback so enforce_source_evidence never
-                    # drops english fields just because reqs_pdf_url is
-                    # absent (fixes MIT SW missing-english bug).
-                    # snippet is always descriptive text — never the URL —
-                    # so it doesn't duplicate the source link in Evidence Review.
-                    "source_url": reqs_pdf_url or url,
-                    "snippet": f"uni_pdf english: {k}={v}",
-                }
+        # bump or other heuristic.
+        #
+        # Tier-mismatch guard (2026-05-10 — ASA Masters CAE/DET bug):
+        # The PDF row is internally consistent — IELTS, PTE, TOEFL, CAE
+        # and DET all describe ONE entry tier. ASA's central admissions
+        # PDF only publishes the bachelor tier (IELTS 6.0 / CAE 169 /
+        # DET 100). When a master course already has a higher IELTS
+        # from per_course_vision (e.g. 6.5 from MaSTER.png), filling
+        # its empty CAE/DET slots from this PDF row imports
+        # bachelor-tier scores onto a master course (CAE 169 / DET 100
+        # instead of ~176 / ~110). Skip the entire english block when
+        # the PDF's IELTS tier disagrees with the course's IELTS — better
+        # to leave CAE/DET null than to write wrong values that look
+        # authoritative.
+        _pdf_ielts = english_block.get("ielts_overall")
+        _payload_ielts = payload.get("ielts_overall")
+        _tier_mismatch = (
+            _pdf_ielts is not None
+            and _payload_ielts not in (None, "", 0)
+            and abs(float(_payload_ielts) - float(_pdf_ielts)) > 0.25
+        )
+        if _tier_mismatch:
+            log.info(
+                "[UNI_PDF SKIP english] %s: course IELTS=%s != PDF IELTS=%s "
+                "— skipping english backfill (tier mismatch); leaving "
+                "non-IELTS slots null rather than importing wrong-tier "
+                "CAE/DET/PTE/TOEFL from %s",
+                url, _payload_ielts, _pdf_ielts, reqs_pdf_url or "(unknown PDF)",
             )
+        else:
+            for k, v in english_block.items():
+                if v is None:
+                    continue
+                # Empty-aware: see fee-block comment above.
+                if payload.get(k) not in (None, "", 0):
+                    continue
+                payload[k] = v
+                evidence.append(
+                    {
+                        "field_key": k,
+                        "value": v,
+                        "confidence": 0.7,
+                        "method": "uni_pdf:requirements",
+                        # source_url: PDF URL when known; course-page URL as
+                        # provenance fallback so enforce_source_evidence never
+                        # drops english fields just because reqs_pdf_url is
+                        # absent (fixes MIT SW missing-english bug).
+                        # snippet is always descriptive text — never the URL —
+                        # so it doesn't duplicate the source link in Evidence Review.
+                        "source_url": reqs_pdf_url or url,
+                        "snippet": f"uni_pdf english: {k}={v}",
+                    }
+                )
 
     # ── Pathway program detection ─────────────────────────────────────────────
     # Pathway / preparatory programs (Foundation Studies, ELICOS, UniPrep,
@@ -3095,6 +4602,104 @@ async def extract_course(
         if central_data.get("fee_page_url"):
             payload["has_central_fee_page"] = True
 
+    # ── Institutional English defaults (last-resort fallback) ─────────────────
+    # When a university publishes a single institutional minimum English score
+    # for international entry (e.g. CQU's "IELTS 6.5 / PTE 58 / TOEFL 79"),
+    # the YAML can declare it via extraction.english.default_ielts /
+    # default_pte / default_toefl.  These fill English slots only when EVERY
+    # earlier path returned null — per-course HTML, browser, vision OCR,
+    # central page, sibling cache, all came up empty.
+    #
+    # Confidence 0.40 is intentionally lower than central_page:english (0.50)
+    # so a real central page always wins.  Pathway / ELICOS courses are
+    # exempt for the same reason as central English: their own pages may
+    # state a lower requirement that would be wrongly overridden.
+    try:
+        _eng_cfg = getattr(getattr(get_uni_config(), "extraction", None), "english", None)
+        if _eng_cfg is not None and not bool(payload.get("is_pathway")):
+            _defaults = (
+                ("ielts_overall",     getattr(_eng_cfg, "default_ielts",  None)),
+                ("pte_overall",       getattr(_eng_cfg, "default_pte",    None)),
+                ("toefl_overall",     getattr(_eng_cfg, "default_toefl",  None)),
+            )
+            # Build a set of slots that have at least one "proven" evidence row
+            # (both source_url AND snippet populated).  guards.enforce_source_evidence
+            # will null any critical english slot lacking such proof at staging time.
+            # If an upstream extractor wrote a value WITHOUT proof, the value is doomed
+            # to become NULL anyway — so we should treat the slot as empty here and let
+            # the institutional default (which always carries proof) win.  This was the
+            # 2026-05-13 IELTS-blank bug: per-course extractor wrote ielts_overall
+            # without source_url+snippet, the default-fill saw a non-null value and
+            # skipped, then enforce_source_evidence dropped the value, leaving IELTS
+            # NULL while PTE/TOEFL got the default (they were null at default-fill
+            # because no extractor wrote them).
+            _proven_slots: set[str] = set()
+            for _ev in evidence or []:
+                if not isinstance(_ev, dict):
+                    continue
+                _fk = _ev.get("field_key")
+                if not _fk:
+                    continue
+                _src = (_ev.get("source_url") or "").strip()
+                _snip = (_ev.get("snippet") or "").strip()
+                if _src and _snip:
+                    _proven_slots.add(str(_fk))
+            _eng_default_filled: list[str] = []
+            _eng_default_replaced: list[str] = []
+            for _slot, _default_val in _defaults:
+                if _default_val in (None, "", 0):
+                    continue
+                _existing = payload.get(_slot)
+                _has_value = _existing not in (None, "", 0)
+                _is_proven = _slot in _proven_slots
+                # Skip when there's already a value AND it has supporting proof:
+                # a real extractor reading won.  Replace when there's a value but
+                # no proof: enforce_source_evidence would null it anyway, so swap
+                # in the institutional default (which carries proof) now.
+                if _has_value and _is_proven:
+                    continue
+                payload[_slot] = _default_val
+                evidence.append({
+                    "field_key": _slot,
+                    "value": _default_val,
+                    "confidence": 0.40,
+                    "method": "uni_config:english_default",
+                    "source_url": url,
+                    "snippet": (
+                        f"institutional default from per-uni YAML: {_slot}={_default_val}"
+                    ),
+                })
+                if _has_value:
+                    _eng_default_replaced.append(_slot)
+                else:
+                    _eng_default_filled.append(_slot)
+            if _eng_default_replaced:
+                log.info(
+                    "[ENG-DEFAULT REPLACE] %s — replaced unproven values with "
+                    "institutional defaults (would have been nulled by "
+                    "enforce_source_evidence): %s",
+                    url, _eng_default_replaced,
+                )
+            # Combined log message uses both buckets so the existing emit logic
+            # (and downstream test expectations) keep seeing the same shape.
+            _eng_default_filled = _eng_default_filled + _eng_default_replaced
+            if emit and _eng_default_filled:
+                _scores = " ".join(
+                    f"{k.replace('_overall', '')}={payload.get(k)}"
+                    for k in _eng_default_filled
+                )
+                await emit(
+                    "status",
+                    f"[ENG-DEFAULT] {payload.get('course_name', url)[:40]} — "
+                    f"institutional defaults applied: {_scores}",
+                    phase="fallback",
+                    kind="english_default_applied",
+                    url=url,
+                    filled=_eng_default_filled,
+                )
+    except Exception as exc:  # noqa: BLE001 — never abort extraction
+        log.warning("english institutional-defaults fallback errored on %s: %s", url, exc)
+
     # Rule-based category classifier — runs after every other slot is
     # populated so we can use the (possibly AI-filled) course_name. The
     # Review table's Category column reads scraped_courses.category; without
@@ -3105,26 +4710,35 @@ async def extract_course(
     # well-known compound titles ("Hospitality Management" → Tourism &
     # Hospitality / Hospitality Management). Runs first; the body-text
     # classify_category fallback only fires when no pre-map keyword hit.
+    #
+    # **Rule wins over Gemini**: when the rule-based map fires, OVERWRITE
+    # any prior AI / extractor value. The rule map is hand-curated against
+    # the live DB taxonomy (`course_sub_categories`), so its output is
+    # guaranteed to match an existing canonical row. Gemini's free-text
+    # output (e.g. "Applied Cyber Security") otherwise gets inserted as a
+    # new auto-added sub-category, fragmenting the taxonomy. Gemini's value
+    # only survives when the rule map returns no hit AND no other extractor
+    # has populated category/sub_category — i.e. last-resort fallback.
     det = map_course_to_category(cname)
     if det:
-        if not payload.get("category"):
+        if payload.get("category") != det["category"]:
             payload["category"] = det["category"]
             evidence.append(
                 {
                     "field_key": "category",
                     "value": det["category"],
-                    "confidence": 0.7,
+                    "confidence": 0.9,
                     "method": "category:det",
                     "snippet": cname,
                 }
             )
-        if not payload.get("sub_category"):
+        if payload.get("sub_category") != det["sub_category"]:
             payload["sub_category"] = det["sub_category"]
             evidence.append(
                 {
                     "field_key": "sub_category",
                     "value": det["sub_category"],
-                    "confidence": 0.7,
+                    "confidence": 0.9,
                     "method": "category:det",
                     "snippet": cname,
                 }
@@ -3301,7 +4915,40 @@ async def extract_course(
             # type; a null is far safer to display than "1 Semester".
             # (Australian bachelor degrees are never shorter than 2 years.)
             _is_bachelor_only = "bachelor" in _degree_l and not _is_grad_short
-            _bachelor_floor_breach = _is_bachelor_only and 0 < _dur_years < 2.0
+            # Honours exception: a Bachelor (Honours) is a 1-year top-up
+            # degree taken AFTER a 3-year bachelor — the floor of 2.0 is
+            # legitimately violated. Federation's
+            # /courses/dsz8-bachelor-of-science-honours/ publishes
+            # "Duration: 1 year full-time" in its JSON; nullifying it
+            # here loses real data.
+            #
+            # Detection: honours signal in course_name OR degree_level
+            # (covers cases where the canonical-name override hasn't
+            # fired yet and degree_level still carries "Bachelor (Honours)").
+            #
+            # Tightened range: only exempt 0.9..1.25 years — the genuine
+            # 1-year top-up. Values like 0.5 year (1-semester scrape noise
+            # that happens to land on an honours page) or 1.7 years
+            # (regex picking up an "accelerated" sub-clause) still get
+            # nullified so bad data never reaches staging.
+            _course_name_l = (payload.get("course_name") or "").lower()
+            _honours_signal = (
+                "honours" in _course_name_l
+                or "(hons)" in _course_name_l
+                or "hons)" in _course_name_l
+                or "honours" in _degree_l
+                or "(hons)" in _degree_l
+            )
+            _is_honours_one_year = (
+                _honours_signal
+                and _dur_term == "year"
+                and 0.9 <= _dur_years <= 1.25
+            )
+            _bachelor_floor_breach = (
+                _is_bachelor_only
+                and not _is_honours_one_year
+                and 0 < _dur_years < 2.0
+            )
             if _dur_years > _SUSPICIOUS_MAX or _dur_years < 0.25 or _bachelor_floor_breach:
                 # Nullify the value so bad data never reaches staging.
                 # A missing duration is better than a wrong one — operators
@@ -3329,6 +4976,30 @@ async def extract_course(
 
     # ── No intake months ────────────────────────────────────────────────────
     _intake_months = payload.get("intake_months") or []
+    if not _intake_months:
+        # Per-uni rolling-enrollment fallback (research degrees).
+        # When the page describes continuous / rolling enrolment AND the
+        # uni opted in via YAML, surface that in the catalogue instead
+        # of leaving the column blank. Curtin PhD / MPhil pages are the
+        # canonical case ("Enrolment shall be continuous").
+        _rolling_label: Optional[str] = None
+        _rolling_markers: list[str] = []
+        try:
+            _ic = get_uni_config()
+            if _ic is not None:
+                _rolling_label = _ic.extraction.intake.rolling_enrollment_label
+                _rolling_markers = list(
+                    _ic.extraction.intake.rolling_enrollment_markers or []
+                )
+        except Exception:
+            _rolling_label = None
+            _rolling_markers = []
+        if _rolling_label and _rolling_markers and any(
+            m.lower() in _check_lower for m in _rolling_markers
+        ):
+            payload["intake_months"] = [_rolling_label]
+            _intake_months = payload["intake_months"]
+
     if not _intake_months:
         # Only warn if page had explicit intake-related text (avoid false
         # positives for universities that don't publish intake schedules).
@@ -3433,6 +5104,102 @@ async def extract_course(
             )
     except Exception as _conf_exc:  # never break the pipeline
         log.warning("Confidence scoring failed on %s: %s", url, _conf_exc)
+
+    # ── Per-band IELTS floor backfill (global, fail-safe) ─────────────────
+    # When ielts_overall is set (from any source — regex, Gemini, vision,
+    # central PDF, sibling cache, etc.) but the four sub-band slots are
+    # empty, scan the full page text for "no band less than X" /
+    # "no band below X" / "no individual band below X" and apply the floor
+    # value to all four sub-bands. This catches the common phrasing used by
+    # Federation, UNE, ECU and others that the per_course_modal extractor
+    # only handles when an actual modal element is present on the page.
+    # _PER_BAND_FLOOR_RE already covers all wording variants ("less than",
+    # "below", "lower than", "under") and is the same regex the english_test
+    # extractor's existing fallback paths use, so behaviour is consistent.
+    try:
+        if payload.get("ielts_overall") is not None and not any(
+            payload.get(_k) is not None for _k in (
+                "ielts_listening", "ielts_reading",
+                "ielts_writing", "ielts_speaking",
+            )
+        ):
+            from app.services.scraper.extractors.english_test import _PER_BAND_FLOOR_RE
+            from app.services.scraper.extractors._text import html_to_text
+            _band_text = html_to_text(rendered_html or html or "")
+            _band_match = _PER_BAND_FLOOR_RE.search(_band_text)
+            if _band_match:
+                _floor = float(_band_match.group(1))
+                if 4.0 <= _floor <= 9.0:
+                    for _slot in (
+                        "ielts_listening", "ielts_reading",
+                        "ielts_writing", "ielts_speaking",
+                    ):
+                        payload[_slot] = _floor
+                    log.info(
+                        "[IELTS BANDS] backfilled L/R/W/S=%s on %s from per-band floor clause",
+                        _floor, url,
+                    )
+    except Exception as _band_exc:  # noqa: BLE001 — never break the pipeline
+        log.warning("IELTS per-band floor backfill failed on %s: %s", url, _band_exc)
+
+    # ── Per-uni default location fallback ──────────────────────────────────
+    # When every extractor (regex, browser, Gemini, PDF) returns an empty
+    # course_location, apply the YAML-configured default (if any).  The
+    # canonical use-case is UTAS: Cloudflare-protected arts-soc and health
+    # pages are often fetched via browser with partial HTML that omits the
+    # Location panel entirely.  Without a fallback these real on-campus
+    # Hobart courses fail the UTAS-specific blank-location guard in guards.py
+    # and are rejected as online-only — even though they ARE on campus.
+    # Safety: only fires when course_location is genuinely empty; never
+    # overwrites a value set by a real extractor.
+    try:
+        # NOTE: get_uni_config is already imported at module level from
+        # app.services.scraper.config.context — use it directly rather than
+        # re-importing inside this try block (see note at ~L2839 for why
+        # local re-imports of get_uni_config cause UnboundLocalError).
+        _uc = get_uni_config()
+        _default_loc = (
+            getattr(getattr(_uc, "extraction", None), "default_course_location", None)
+            or None
+        )
+        if _default_loc and not (payload.get("course_location") or "").strip():
+            payload["course_location"] = _default_loc
+            evidence.append({
+                "field_key": "course_location",
+                "value": _default_loc,
+                "normalized": _default_loc,
+                "method": "yaml:default_course_location",
+                "confidence": 0.4,
+                "snippet": f"YAML default_course_location='{_default_loc}' applied (no extractor found location)",
+            })
+            log.info(
+                "[LOCATION DEFAULT] course=%r — applied YAML default '%s' "
+                "(all extractors returned empty course_location)",
+                payload.get("course_name") or url,
+                _default_loc,
+            )
+    except Exception as _dloc_exc:  # noqa: BLE001 — never break the pipeline
+        log.warning("default_course_location fallback failed on %s: %s", url, _dloc_exc)
+
+    # ── YAML force_central_fee_stage flag ───────────────────────────────────
+    # When extraction.fees.force_central_fee_stage=true in the per-uni YAML,
+    # mark every course payload as has_central_fee_page=True so the
+    # no_international_fee staging gate is bypassed for universities that
+    # publish fees on a separate central schedule rather than per course page
+    # (e.g. UTAS).  Only sets the flag; never clears an individual fee already
+    # extracted by a real extractor.
+    try:
+        _uc_fees = getattr(get_uni_config(), "extraction", None)
+        _uc_fees = getattr(_uc_fees, "fees", None)
+        if getattr(_uc_fees, "force_central_fee_stage", False):
+            payload.setdefault("has_central_fee_page", True)
+            log.info(
+                "[CENTRAL FEE] force_central_fee_stage=true — marking "
+                "has_central_fee_page=True for %r",
+                payload.get("course_name") or url,
+            )
+    except Exception as _fcfs_exc:  # noqa: BLE001 — never break the pipeline
+        log.warning("force_central_fee_stage check failed on %s: %s", url, _fcfs_exc)
 
     # ── Evidence selection finalisation ────────────────────────────────────
     # Mark the winning evidence row for each field as decision_status="selected"

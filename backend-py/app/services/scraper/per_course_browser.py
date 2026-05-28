@@ -49,6 +49,14 @@ _INTERNATIONAL_TOGGLE_HOSTS = (
     # campus/location availability. The toggle button text is "INTERNATIONAL"
     # (all-caps) which the JS lowercases before matching ^international$.
     "utas.edu.au",
+    # University of Newcastle (uni_id 17): right-sidebar "Student type"
+    # block has Domestic | International buttons. Domestic is active by
+    # default and shows the domestic indicative fee + (for some
+    # programs, e.g. Bachelor of Physiotherapy Honours) a different
+    # nominal duration (5 years domestic vs 4 years international).
+    # Clicking International switches both fee and duration to the
+    # international view used in the catalogue.
+    "newcastle.edu.au",
 )
 
 
@@ -144,6 +152,12 @@ _NETWORKIDLE_HOSTS: tuple[str, ...] = (
     # networkidle before the International toggle click fires correctly, otherwise
     # the toggle target element hasn't mounted yet.
     "murdoch.edu.au",
+    # University of Newcastle: Cloudflare-protected Sitecore SPA.  The
+    # student-type toggle (Domestic | International) is hydrated AFTER
+    # initial render; domcontentloaded fires before the toggle exists in
+    # the DOM, so the click is a no-op.  networkidle + 3s settle gives
+    # the React hydration time to mount the buttons.
+    "newcastle.edu.au",
     # UOW: course details (fee, IELTS, intakes, campus) are loaded via XHR
     # into accordion panels after initial page load. domcontentloaded misses
     # all of it; networkidle + 3s settle is required.
@@ -178,7 +192,51 @@ _SLOW_HOSTS: tuple[str, ...] = (
     "asahe.edu.au",
     "kbs.edu.au",
     "study.csu.edu.au",
+    # UTAS: Cloudflare-protected. Per-course pages return a JS challenge via
+    # HTTP (which is why every URL hits [BROWSER↑] HTTP blocked) and the
+    # browser must wait for Cloudflare to issue cf_clearance AND for the
+    # JS-rendered International tab to mount.  Default domcontentloaded + 1.5s
+    # left UTAS at 116/120 fetch_failed in prod (job_..._utas) because the
+    # Cloudflare interstitial hadn't cleared by the time we grabbed
+    # page.content().  networkidle + 5s settle (see _NETWORKIDLE_SETTLE_OVERRIDES)
+    # gives the challenge time to resolve and yields full course HTML.
+    "utas.edu.au",
 )
+
+
+# Per-host overrides for the networkidle settle window.  Default is
+# _NETWORKIDLE_SETTLE_MS (3000ms) — bump here for hosts whose post-render
+# settle needs more time (e.g. Cloudflare JS challenges that finish 3-8s
+# AFTER networkidle reports the network has settled).
+_NETWORKIDLE_SETTLE_OVERRIDES: dict[str, int] = {
+    "utas.edu.au": 5000,
+}
+
+
+# Hosts where the first browser attempt is allowed to retry once with a
+# short backoff when it returns None.  Used for sites where Cloudflare /
+# Akamai routinely block the first request but pass the second once a
+# session cookie (cf_clearance / akamai_*) has been set by the failed
+# attempt.  Keep this list TIGHT — every entry doubles worst-case wall-time
+# for that host on a hard outage.
+_BROWSER_RETRY_HOSTS: tuple[str, ...] = (
+    "utas.edu.au",
+)
+
+
+def should_retry_browser(url: str) -> bool:
+    """Return True for URLs whose host is in :data:`_BROWSER_RETRY_HOSTS`.
+
+    Used by the HTTP→browser fallback in single_course.py to decide whether
+    to retry once after the first browser attempt returns None.  Cloudflare-
+    protected hosts (UTAS) often pass on the second attempt because the first
+    attempt's failed request still set cf_clearance.
+    """
+    try:
+        host = (urlparse(url).hostname or "").lower()
+    except Exception:
+        return False
+    return any(host == h or host.endswith("." + h) for h in _BROWSER_RETRY_HOSTS)
 
 # Hosts whose static HTML contains misleading site-wide IELTS/English
 # statements that cause the browser pass to be skipped too early (the
@@ -285,9 +343,16 @@ def _browser_config_for(url: str) -> tuple[str, int, int, int]:
     except Exception:
         host = ""
     if any(host == h or host.endswith("." + h) for h in _SLOW_HOSTS):
+        # Per-host settle override (e.g. UTAS Cloudflare needs 5s) wins
+        # over the default 3s.
+        settle_ms = _NETWORKIDLE_SETTLE_MS
+        for h, override_ms in _NETWORKIDLE_SETTLE_OVERRIDES.items():
+            if host == h or host.endswith("." + h):
+                settle_ms = override_ms
+                break
         return (
             "networkidle",
-            _NETWORKIDLE_SETTLE_MS,
+            settle_ms,
             _SLOW_OUTER_TIMEOUT_SEC,
             _SLOW_GOTO_TIMEOUT_MS,
         )
@@ -418,6 +483,16 @@ _EXTENDED_SLOTS: tuple[str, ...] = (
     "duration_term",
     "duration_text",
     "location_text",
+    # location.extract normalises to "course_location" (not "location_text"),
+    # so without this entry the rendered-HTML cascade result is silently
+    # dropped by the slot filter at ~L556.  Newcastle Master of Nursing
+    # (and every other UON Master/GradCert page whose `#degree-location-
+    # toggles` div is JS-injected and therefore absent from the static HTML)
+    # was reaching the AI fallback with course_location empty; the fallback
+    # then filled "Online" which `_sanitise_for_display` stripped via
+    # `_REMOVE_VIRTUAL`, leaving the dashboard column blank even though the
+    # rendered page clearly shows "Online | Newcastle" toggles.
+    "course_location",
     "study_mode",
 )
 

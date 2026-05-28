@@ -1,0 +1,124 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# PER-UNIVERSITY SCRAPER CONFIG — TEMPLATE
+# ─────────────────────────────────────────────────────────────────────────────
+# Save this file as: backend-py/scraper_config/unis/<slug>.yaml
+#   where <slug> matches the university's lower-cased short name
+#   (e.g. "uow.yaml", "ecu.yaml", "torrens.yaml").
+#
+# This file is *merged on top of* backend-py/scraper_config/defaults.yaml at
+# the start of every scrape job for this university. Anything you DO NOT set
+# here inherits the global default — keep this file MINIMAL and only override
+# what is genuinely different for this university.
+#
+# Tip: copy the closest existing per-uni YAML (a similar CMS or region) and
+# tweak it, rather than starting from this template.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── Discovery ────────────────────────────────────────────────────────────────
+# Controls how the scraper finds course pages on the university website.
+discovery:
+  # Raise BFS page budget if the catalogue has many listing pages.
+  # Default: 25.  Set to ~70 when the listing has 50+ paginated pages.
+  bfs_page_budget: 25
+
+  # Subdomains to probe when the primary URL yields fewer than 5 candidates.
+  # `{domain}` is replaced with the university's primary hostname.
+  fallback_subdomains: []
+  #   - "handbook.{domain}"
+  #   - "study.{domain}"
+
+  # Always merge sitemap candidates with BFS, even if BFS exceeded threshold.
+  # Set to true for JS-heavy SPAs (Torrens / CDU style).
+  always_sitemap_supplement: false
+
+  # URL filters (regex).  Block patterns run before allow patterns.
+  block_url_patterns: []
+  allow_url_patterns: []
+  #   - "/study/courses/"
+  #   - "/degrees/courses/"
+
+  # Substring whitelist (case-insensitive) — simpler than allow_url_patterns
+  # when you just need a substring (e.g. "/courses/") to be present.
+  # If non-empty, candidate URLs missing ALL of these are dropped.
+  must_contain: []
+  #   - "/courses/"
+  #   - "/study/"
+
+# ── Extraction ───────────────────────────────────────────────────────────────
+# Per-field extraction overrides.  Most universities only need a few of these.
+extraction:
+
+  # Domestic-only / international tab filter.
+  filters:
+    domestic_only:
+      enabled: false   # set true if site has a tab that hides international
+
+  # English language requirement central page (used when each course page
+  # does NOT publish IELTS/PTE — the scraper falls back to this URL).
+  english:
+    central_page: ""               # e.g. "https://www.uni.edu.au/english-requirements/"
+    requirements_pdf_url: ""       # optional PDF override
+    # Drop these tests from the extracted English requirements (case-insensitive).
+    # Use when a uni page mentions a test it does not actually accept (e.g.
+    # "KITE" appears as a competitor product link, polluting results).
+    # Valid values: ielts, pte, toefl, cambridge, duolingo, kite
+    test_blocklist: []
+    #   - "kite"
+    #   - "duolingo"
+
+  # Fee extraction overrides.
+  fees:
+    fees_pdf_url: ""               # central international-fees PDF if any
+    # Course-name aliases for matching DB rows against rows in a multi-row
+    # PDF table when the PDF uses a slightly different title than the DB.
+    # Lower-cased DB course name → exact PDF row title.
+    course_pdf_aliases: {}
+    #   "master of design": "Master of Design (Non-Cognate)"
+
+  # Per-host URL rewriting — append query params before fetching each course.
+  # Useful for sites that gate the international fee/IELTS/intake behind a
+  # `?international=true`, `?audience=INTERNATIONAL`, or similar toggle.
+  # Each rewrite matches on `host` (apex AND www. forms both work). Set
+  # `path_contains` to limit to course pages only when a host mixes content.
+  # `append_query` is parsed as a query string — each key is only added
+  # if it isn't already present (idempotent).
+  url_rewrites: []
+  #   - host: "www.example.edu.au"
+  #     path_contains: "/courses/"
+  #     append_query: "audience=INTERNATIONAL"
+  #   - host: "www.uow.edu.au"
+  #     path_contains: "/courses/"
+  #     append_query: "students=international&year=2026"
+
+  # Generic text-cleaning knobs applied to the FINAL staged payload.
+  text_cleaning:
+    # Substrings stripped from EVERY string field on the payload immediately
+    # before DB write (case-insensitive, whitespace collapsed afterwards).
+    # Useful for stock boilerplate that pollutes multiple fields.
+    global_substring_blocklist: []
+    #   - "Apply Now"
+    #   - "Find out more"
+    #   - "Click here to enquire"
+
+    # Per-URL hard overrides — when the course URL matches `url_regex`,
+    # the named payload `field` is hard-set to `value`. Use sparingly:
+    # extractor / YAML fixes are preferred over manual overrides.
+    field_overrides: []
+    #   - url_regex: "/courses/data-science-honours"
+    #     field: "course_location"
+    #     value: "Sydney"
+    #   - url_regex: "/online/"
+    #     field: "study_mode"
+    #     value: "Online"
+
+# ── Notes ────────────────────────────────────────────────────────────────────
+# Document the *why* of every override so the next maintainer (or you in 6
+# months) knows what motivated each value.  Bug history is welcome.
+#
+# Example:
+#   bfs_page_budget=70 — UOW catalogue has 62 listing pages; the default 25
+#     burns its budget on navigation pages and misses ~70% of courses.
+#   fees_pdf_url=...  — Federation does not publish per-course international
+#     fees on the course page; the central PDF is the only authoritative
+#     source.  Wired into both `prefetch_central_pages` and
+#     `uni_scrape_config["uniPages"]["feesPdf"]` (orchestrator.py ~L873).

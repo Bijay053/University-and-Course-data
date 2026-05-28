@@ -1,8 +1,23 @@
-# University of Southern Queensland (UniSQ) — stub created for Week 5 scale-up.
-# Hostname: www.unisq.edu.au  (formerly USQ; rebranded 2022-09)
-# Was the Week 3 cost-optimisation test bed; should be a low-risk scrape.
+# University of Southern Queensland (UniSQ) — Hostname: www.unisq.edu.au
+# Per-course pages only publish IELTS; PTE/TOEFL live on the central
+# /study/apply/entry-requirements/english-language-requirements page which
+# is JS-rendered (curl returns ~50 KB with no score table). Until the
+# central-page parser is upgraded, the institutional defaults below are
+# the authoritative fallback so every UniSQ row gets PTE + TOEFL scores
+# instead of NULL. Confidence 0.40 — any real per-course / central-page
+# reading wins over it.
+#
+# UniSQ's published institutional minimum for international entry:
+#   IELTS Academic: 6.5 overall (6.0 in each band)
+#   PTE Academic:   58 overall   (standard ETS/Pearson equivalency for IELTS 6.5)
+#   TOEFL iBT:      79 overall   (standard ETS equivalency for IELTS 6.5)
+# Source: https://www.unisq.edu.au/study/apply/entry-requirements/english-language-requirements
 discovery: {}
 extraction:
   filters:
     domestic_only:
       enabled: false
+  english:
+    default_ielts: 6.5
+    default_pte: 58
+    default_toefl: 79

@@ -259,12 +259,21 @@ _PDF_DATA_ROW_RE = re.compile(
     # versions only matched integer years and silently dropped every
     # half-year row, which then got swallowed as continuation text
     # into the previous row's primary name and polluted the matcher.
+    # Fee columns are OPTIONAL: many fee schedules print "TBA", "N/A",
+    # "—", a dash, or simply leave the cell blank for courses whose fee
+    # has not yet been published. Earlier versions required three literal
+    # ``$xxx`` captures and silently dropped every such row, leading to
+    # Torrens-class coverage loss (32 of 110 rows extracted). We now
+    # accept either a ``$amount`` or a placeholder/blank, and downstream
+    # logic treats missing amounts as ``None`` instead of failing the
+    # whole row.
     r"\b(?P<cricos>\d{6}[A-Z]|\d{7,8})\b\s+"
     r"(?P<duration>\d+(?:\.\d+)?(?:\s*Months?)?)\s+"
     r"(?P<units>\d+\*?)\s+"
-    r"\$(?P<per_unit>[\d,]+)\s+"
-    r"\$(?P<annual>[\d,]+)\s+"
-    r"\$(?P<total>[\d,]+)",
+    r"(?:\$(?P<per_unit>[\d,]+)|(?P<per_unit_alt>TBA|N/?A|[—\-–]+))\s+"
+    r"(?:\$(?P<annual>[\d,]+)|(?P<annual_alt>TBA|N/?A|[—\-–]+))\s+"
+    r"(?:\$(?P<total>[\d,]+)|(?P<total_alt>TBA|N/?A|[—\-–]+))",
+    re.I,
 )
 
 # A "name line" is one that starts with a degree-level word. Continuation
@@ -473,6 +482,31 @@ def _extract_primary_name(name_block: str) -> tuple[str, str]:
 
     primary = " ".join(primary_parts).strip()
     extras = " ".join(extras_parts).strip()
+    # Strip trailing internal academic-catalogue product codes from the
+    # primary name (e.g. Federation: "Bachelor of Nursing NN5",
+    # "Bachelor of Business (Accounting) BU5.ACC", "Bachelor of
+    # Information Technology (Business Analysis) IT5.BA",
+    # "Master of Engineering Technology (Mining) EZ9.MIN",
+    # "Graduate Certificate in Maintenance Management** GMM4"). These
+    # codes appear AFTER the human-readable course title and BEFORE the
+    # CRICOS identifier in tabular fee schedules. Without this strip,
+    # the parser folds the code into the primary name, which inflates
+    # the PDF token bag with noise tokens (``nn5``, ``bu5``, ``it5``)
+    # and prevents single-token DB course names ("Bachelor of Nursing"
+    # → ``{nursing}``) from passing the exact-primary escape hatch in
+    # ``match_course_in_pdf_table`` — Federation symptom: 18+ courses
+    # with no fee even though the PDF row exists.
+    #
+    # Pattern: 2-4 uppercase letters + 1-3 digits + optional ".SUFFIX",
+    # anchored to the end of the primary, with optional trailing "*"
+    # footnote markers. Conservative: only fires when the rest of the
+    # primary still has at least 2 words so legitimate short titles are
+    # never mangled.
+    _code_strip = re.sub(
+        r"\s+\*{0,2}[A-Z]{2,4}\d{1,3}(?:\.[A-Z]+)?\*{0,2}\s*$", "", primary
+    )
+    if _code_strip != primary and len(_code_strip.split()) >= 2:
+        primary = _code_strip
     # Strip trailing campus suffixes from the primary so token-based
     # matching against the DB course name (which never carries campus
     # info) doesn't get drowned out. The dropped tokens are folded
@@ -504,9 +538,43 @@ def _pick_per_course_amounts(text: str) -> dict[str, dict[str, Any]]:
     if not text:
         return {}
 
+    # Per-uni override: when YAML supplies extraction.fees.pdf_row_pattern,
+    # use it instead of the shared _PDF_DATA_ROW_RE. Lets a uni whose fee
+    # PDF uses a different column layout (e.g. Federation: CRICOS + 2
+    # dollar amounts, no per-unit / total) opt-in to its own regex
+    # without disturbing every other uni. None (default) → unchanged
+    # behaviour.
+    row_re = _PDF_DATA_ROW_RE
+    pdf_fee_term_override: str | None = None
+    prefer_annual: bool = False
+    try:
+        from app.services.scraper.config.context import get_uni_config
+
+        _cfg = get_uni_config()
+        if _cfg is not None:
+            _pat = getattr(_cfg.extraction.fees, "pdf_row_pattern", None)
+            if _pat:
+                row_re = re.compile(_pat, re.I)
+                log.debug("PDF row pattern override applied (per-uni YAML).")
+            pdf_fee_term_override = getattr(
+                _cfg.extraction.fees, "pdf_fee_term", None
+            )
+            prefer_annual = bool(
+                getattr(_cfg.extraction.fees, "prefer_annual_over_total", False)
+            )
+    except Exception as exc:  # noqa: BLE001
+        log.warning(
+            "Per-uni PDF row pattern override failed (%s); falling back "
+            "to shared _PDF_DATA_ROW_RE.",
+            exc,
+        )
+        row_re = _PDF_DATA_ROW_RE
+        pdf_fee_term_override = None
+        prefer_annual = False
+
     # Collect the matches AND track end-positions so we can slice out the
     # text BEFORE each row as the candidate course name.
-    matches = list(_PDF_DATA_ROW_RE.finditer(text))
+    matches = list(row_re.finditer(text))
     if len(matches) < 2:
         return {}
 
@@ -531,22 +599,92 @@ def _pick_per_course_amounts(text: str) -> dict[str, dict[str, Any]]:
         if not primary:
             continue
 
-        try:
-            per_unit = int(m.group("per_unit").replace(",", ""))
-            annual = int(m.group("annual").replace(",", ""))
-            total = int(m.group("total").replace(",", ""))
-        except (ValueError, AttributeError):
-            continue
+        # Each fee column is OPTIONAL — when the cell was TBA / N/A /
+        # dash / blank the named groups capture None. We still want to
+        # record the row (so the matcher can find the course by name and
+        # avoid falsely falling back to the uni-wide value), but we mark
+        # every fee field as None.
+        def _parse_amount(g: str | None) -> int | None:
+            if not g:
+                return None
+            try:
+                return int(g.replace(",", ""))
+            except ValueError:
+                return None
 
-        # Sanity bounds match the uni-wide picker.
-        if not (1000 < total < 200000):
+        # Use groupdict().get() so per-uni override patterns that omit
+        # one of these named groups (e.g. Federation only captures
+        # CRICOS + a single annual amount) don't raise IndexError.
+        gd = m.groupdict()
+        per_unit = _parse_amount(gd.get("per_unit"))
+        annual = _parse_amount(gd.get("annual"))
+        total = _parse_amount(gd.get("total"))
+
+        # Optional trailing duration (per-uni regex extension — Federation
+        # 2026-05-10). When the override pattern captures `duration` +
+        # `duration_unit` named groups (e.g. "1 year", "0.5 year",
+        # "6 months", "2 semesters"), normalise to a (value, term) pair
+        # so the downstream merge in single_course.py can fill payload
+        # duration whenever the per-course HTML extractor came back NULL.
+        # Empty for every uni whose pdf_row_pattern has no duration group.
+        duration_pdf: float | None = None
+        duration_term_pdf: str | None = None
+        try:
+            _dur_raw = gd.get("duration")
+            _dur_unit = (gd.get("duration_unit") or "").strip().lower()
+            if _dur_raw and _dur_unit:
+                _dval = float(_dur_raw)
+                if _dur_unit.startswith("year"):
+                    duration_pdf, duration_term_pdf = _dval, "Year"
+                elif _dur_unit.startswith("month"):
+                    duration_pdf, duration_term_pdf = _dval, "Month"
+                elif _dur_unit.startswith("semester"):
+                    duration_pdf, duration_term_pdf = _dval, "Semester"
+                elif _dur_unit.startswith("trimester"):
+                    duration_pdf, duration_term_pdf = _dval, "Trimester"
+        except (ValueError, TypeError):
+            duration_pdf, duration_term_pdf = None, None
+
+        # When the override pattern only carries an annual figure
+        # (no per-unit / total — Federation), promote it to the
+        # ``total`` slot so the rest of the pipeline (which keys
+        # ``international_fee`` off ``total``) can use it.
+        if total is None and annual is not None and per_unit is None:
+            total = annual
+            annual = None
+
+        # Sanity bounds match the uni-wide picker, but only when a real
+        # number was extracted — TBA/blank rows pass through with
+        # ``total = None`` and no fee fields populated.
+        if total is not None and not (1000 < total < 200000):
             continue
 
         # ``Total Course Fee`` in ASA's table is exactly that — the full
         # programme cost. Mark accordingly so the dashboard label is
         # right and the per-course value isn't misread as a single-year
         # number.
-        term = "Full Course" if total > annual else "Annual"
+        if total is not None and annual is not None:
+            term = "Full Course" if total > annual else "Annual"
+        else:
+            term = None
+
+        # Per-uni YAML override: when the PDF only publishes annual
+        # figures (no annual/total comparison possible) the auto-derived
+        # term is None — fall back to the YAML-declared term so the
+        # dashboard label is correct.
+        if term is None and pdf_fee_term_override:
+            term = pdf_fee_term_override
+
+        # Per-uni YAML knob ``prefer_annual_over_total``: when both the
+        # annual figure and the multi-year total are present (e.g.
+        # Torrens 3-year Bachelor: $31,600 annual / $94,800 total),
+        # store the annual figure with ``Annual`` term instead of the
+        # default total / ``Full Course``. Off by default to preserve
+        # historical behaviour for every other uni.
+        emitted_fee = total
+        if prefer_annual and annual is not None and total is not None:
+            emitted_fee = annual
+            term = "Annual"
 
         # Key by CRICOS, NOT by normalized token set. CRICOS codes are
         # nationally unique per course, so a Certificate / Diploma /
@@ -557,10 +695,16 @@ def _pick_per_course_amounts(text: str) -> dict[str, dict[str, Any]]:
         # happen.)
         cricos = m.group("cricos")
         out[cricos] = {
-            "international_fee": total,
-            "currency": "AUD",
+            "international_fee": emitted_fee,
+            "currency": "AUD" if emitted_fee is not None else None,
             "fee_term": term,
             "fee_year": year_default,
+            # Optional duration lifted from the same PDF row (per-uni
+            # regex must declare `duration` + `duration_unit` named
+            # groups). None for every uni without those groups, so the
+            # downstream merge is a no-op there.
+            "duration_pdf": duration_pdf,
+            "duration_term_pdf": duration_term_pdf,
             # Private fields used by the matcher only:
             # Match text combines primary + "Including Majors" extras so
             # variant names like "Bachelor of Business Hospitality
@@ -573,10 +717,233 @@ def _pick_per_course_amounts(text: str) -> dict[str, dict[str, Any]]:
     return out
 
 
+# Columnar PDF parser regexes — used by ``_pick_per_course_amounts_columnar``
+# only, kept module-private so they don't leak into the legacy parser's
+# behaviour. See _pick_per_course_amounts_columnar() for the full design.
+_COL_CRICOS_RE = re.compile(r"\b(\d{6}[A-Z])\b")
+_COL_FEE_RE = re.compile(r"\$([\d,]+)")
+_COL_CITY_RE = re.compile(
+    r"\b(Sydney|Melbourne|Brisbane|Adelaide|Perth|Online|Darwin|Canberra|"
+    r"Hobart|Auckland|Wellington|Mountains|Townsville|Cairns|Newcastle|"
+    r"Wollongong|Geelong|Ballarat|Bendigo|Gippsland|Berwick|Mt\.?\s*Helen)\b",
+    re.I,
+)
+_COL_DEGREE_INNER_RE = re.compile(
+    r"\b(Bachelor|Master|Graduate Certificate|Graduate Diploma|"
+    r"Postgraduate Certificate|Postgraduate Diploma|Advanced Diploma|"
+    r"Associate Degree|Associate Diploma|Diploma|Certificate|Doctor|"
+    r"Doctorate|Honours|Honors)\b",
+    re.I,
+)
+_COL_DEGREE_AT_START_RE = re.compile(
+    r"^\s*(Bachelor|Master|Graduate Certificate|Graduate Diploma|"
+    r"Postgraduate Certificate|Postgraduate Diploma|Advanced Diploma|"
+    r"Associate Degree|Associate Diploma|Diploma|Certificate|Doctor|"
+    r"Doctorate|Honours|Honors)\b",
+    re.I,
+)
+
+
+def _pdftotext_layout(raw_pdf: bytes) -> str:
+    """Run ``pdftotext -layout`` (poppler) over PDF bytes and return text.
+
+    Returns ``""`` when the binary is missing or the subprocess fails so
+    callers can transparently fall back to the pypdf path. ``-layout``
+    preserves column alignment with whitespace, which is what
+    :func:`_pick_per_course_amounts_columnar` needs to recover course
+    names that wrap across multiple PDF table cells.
+    """
+    import subprocess
+    try:
+        result = subprocess.run(
+            ["pdftotext", "-layout", "-", "-"],
+            input=raw_pdf,
+            capture_output=True,
+            timeout=30,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired) as exc:
+        log.warning("pdftotext layout extraction failed (%s); falling back to pypdf", exc)
+        return ""
+    if result.returncode != 0:
+        log.warning("pdftotext returned %s; stderr=%s", result.returncode, result.stderr[:200])
+        return ""
+    return result.stdout.decode("utf-8", errors="replace")
+
+
+def _pick_per_course_amounts_columnar(text: str) -> dict[str, dict[str, Any]]:
+    """Parse a per-course tuition table using CRICOS-anchored column slicing.
+
+    Designed for ``pdftotext -layout`` output where the multi-column table
+    structure is preserved via fixed-position whitespace. The legacy
+    line-regex parser (:func:`_pick_per_course_amounts`) fails on PDFs
+    whose course titles wrap across 2-3 lines (e.g. Torrens:
+    ``Diploma of Branded`` / ``Fashion Design`` on separate lines) because
+    pypdf flattens the layout and the row regex requires CRICOS+fees on a
+    single line.
+
+    Strategy:
+      1. Each line containing ``\\b\\d{6}[A-Z]\\b`` (CRICOS) AND a ``$``
+         amount is a row anchor.
+      2. The course-name + campus blob lives at column ``[0, cricos_pos]``.
+      3. Split off the campus column by locating the first city-name token
+         in the blob (>= column 25 to skip Field-of-study prefix).
+      4. Extract the course title proper by scanning the remaining text
+         for the first degree-lead word.
+      5. Walk forward up to 3 lines: if the line has no CRICOS / no fees /
+         no degree-lead at start, treat its column-aligned slice as a
+         wrap-line continuation of the current row's course name.
+      6. Fees come from the trailing ``$`` amounts on the anchor line —
+         ``total`` = last, ``annual`` = second-to-last.
+
+    Returns ``{cricos: row_dict}`` keyed identically to the legacy parser
+    so :func:`match_course_in_pdf_table` and the merge layer require no
+    changes. Returns ``{}`` when fewer than 2 rows are extracted.
+    """
+    if not text:
+        return {}
+    lines = text.split("\n")
+    cricos_lines = [
+        (i, l) for i, l in enumerate(lines)
+        if _COL_CRICOS_RE.search(l) and _COL_FEE_RE.search(l)
+    ]
+    if len(cricos_lines) < 2:
+        return {}
+
+    year_default = None
+    year_match = _FEE_YEAR_RE.search(text)
+    if year_match:
+        year_default = int(year_match.group(1))
+
+    # Per-uni knob (mirrors ``_pick_per_course_amounts``): prefer the
+    # annual column over the total-course column when both are present.
+    prefer_annual: bool = False
+    try:
+        from app.services.scraper.config.context import get_uni_config
+
+        _cfg = get_uni_config()
+        if _cfg is not None:
+            prefer_annual = bool(
+                getattr(_cfg.extraction.fees, "prefer_annual_over_total", False)
+            )
+    except Exception:  # noqa: BLE001
+        prefer_annual = False
+
+    rows: dict[str, dict[str, Any]] = {}
+    for idx, anchor in cricos_lines:
+        m = _COL_CRICOS_RE.search(anchor)
+        if not m:
+            continue
+        cricos = m.group(1)
+        if cricos in rows:
+            # First-seen wins on duplicate CRICOS (rare, but defensive).
+            continue
+        cricos_pos = m.start()
+        blob = anchor[:cricos_pos]
+        # Locate the campus column: first city token at column >= 25.
+        # The 25-char floor skips the "Field of study" leading column so
+        # categories like "Sydney School of Business" — if any — won't be
+        # mistaken for a campus list.
+        campus_match = None
+        for cm in _COL_CITY_RE.finditer(blob):
+            if cm.start() >= 25:
+                campus_match = cm
+                break
+        course_part = (
+            blob[: campus_match.start()].rstrip(" ,")
+            if campus_match
+            else blob.rstrip()
+        )
+        # The course title starts at the first degree-lead word — anything
+        # before is the Field-of-study column header.
+        dm = _COL_DEGREE_INNER_RE.search(course_part)
+        if not dm:
+            continue
+        course_main = course_part[dm.start():].strip()
+
+        # Walk forward to fold wrap-fragments at the same column slice.
+        # Stop at any of: next CRICOS row, line with fee data, line that
+        # starts with a degree word (= next row's course title), or a
+        # section header like "Undergraduate" / "Postgraduate".
+        wrap_after: list[str] = []
+        for off in (1, 2, 3):
+            j = idx + off
+            if j >= len(lines):
+                break
+            nl = lines[j]
+            if _COL_CRICOS_RE.search(nl):
+                break
+            if _COL_FEE_RE.search(nl):
+                break
+            slice_text = nl[:cricos_pos].rstrip()
+            # Drop the campus column from the wrap line too.
+            cm2 = _COL_CITY_RE.search(slice_text)
+            frag = slice_text[: cm2.start()] if cm2 else slice_text
+            frag = frag.strip(" ,")
+            if not frag:
+                continue
+            if _COL_DEGREE_AT_START_RE.match(frag):
+                break
+            if frag.lower() in ("undergraduate", "postgraduate"):
+                break
+            wrap_after.append(frag)
+
+        primary = re.sub(r"\s+", " ", (course_main + " " + " ".join(wrap_after)).strip())
+
+        # Extract fee amounts from the anchor line tail (after CRICOS).
+        amounts = [
+            int(a.replace(",", ""))
+            for a in _COL_FEE_RE.findall(anchor[m.end():])
+        ]
+        if not amounts:
+            continue
+        total = amounts[-1]
+        annual = amounts[-2] if len(amounts) >= 2 else None
+        if not (1000 < total < 200000):
+            continue
+        if annual is not None and total > annual:
+            term = "Full Course"
+        elif annual is not None:
+            term = "Annual"
+        else:
+            term = None
+
+        # Per-uni knob: prefer annual when the row exposes the full
+        # 3-column shape (per-unit + annual + total — e.g. Torrens
+        # 3-year Bachelor: $4,450 / $31,600 / $94,800). Requires
+        # ``len(amounts) >= 3`` because in this columnar parser the
+        # second-to-last amount is positional, not semantic — for a
+        # 2-amount row [per_unit, annual] we would otherwise emit
+        # the per-unit figure under fee_term="Annual". Off by default;
+        # preserves historical "report total" behaviour for every
+        # other uni.
+        emitted_fee = total
+        if (
+            prefer_annual
+            and annual is not None
+            and len(amounts) >= 3
+            and total > annual
+        ):
+            emitted_fee = annual
+            term = "Annual"
+
+        rows[cricos] = {
+            "international_fee": emitted_fee,
+            "currency": "AUD",
+            "fee_term": term,
+            "fee_year": year_default,
+            "_pdf_match_text": primary,
+            "_pdf_primary_name": primary,
+            "_cricos": cricos,
+        }
+
+    return rows
+
+
 def match_course_in_pdf_table(
     course_name: str,
     by_course: dict[str, dict[str, Any]],
     cricos_code: str | None = None,
+    course_pdf_aliases: dict[str, str] | None = None,
 ) -> tuple[dict[str, Any] | None, str]:
     """Find the best PDF row for a given DB course name.
 
@@ -609,8 +976,26 @@ def match_course_in_pdf_table(
     fall back to the
     uni-wide value rather than mis-stamp a course.
     """
-    db_tokens = _name_tokens(course_name)
-    db_level = _degree_level(course_name)
+    # Per-uni alias hook: when an operator has mapped this DB course name
+    # to its actual PDF row title (e.g. Torrens "Master of Design" → PDF
+    # row "Master of Design (Non-Cognate)"), swap in the alias for token
+    # extraction. The DB course name still appears in logs and remains
+    # the matching identity downstream — only the token bag used to score
+    # PDF rows is enriched. Empty / unset → preserves the original
+    # behaviour for every other university.
+    matching_name = course_name
+    if course_pdf_aliases and course_name:
+        alias = course_pdf_aliases.get(course_name.strip().lower())
+        if alias:
+            matching_name = alias
+            log.debug(
+                "PDF alias applied for %r → matching as %r",
+                course_name,
+                alias,
+            )
+
+    db_tokens = _name_tokens(matching_name)
+    db_level = _degree_level(matching_name) or _degree_level(course_name)
     if not db_tokens or not by_course:
         return None, "no_match"
 
@@ -731,14 +1116,52 @@ async def _parse_fee_pdf(url: str, country: str | None, emit=None) -> dict[str, 
         log.debug("fee PDF text extraction failed for %s: %s", url, exc)
         text = ""
 
+    # Per-uni parser-strategy override: when YAML supplies
+    # extraction.fees.pdf_parser="columnar", re-extract text via
+    # ``pdftotext -layout`` (poppler) and use the CRICOS-anchored,
+    # column-position-aware row parser. This fixes PDFs whose course
+    # titles wrap across 2-3 lines (Torrens fee schedule) — pypdf
+    # flattens those into a single line and the legacy regex misses
+    # them entirely. None / "legacy" / unset → unchanged behaviour for
+    # every other university.
+    pdf_parser_strategy: str | None = None
+    try:
+        from app.services.scraper.config.context import get_uni_config
+        _cfg = get_uni_config()
+        if _cfg is not None:
+            pdf_parser_strategy = getattr(_cfg.extraction.fees, "pdf_parser", None)
+    except Exception as exc:  # noqa: BLE001
+        log.debug("pdf_parser strategy lookup failed (%s); using legacy", exc)
+        pdf_parser_strategy = None
+
     out: dict[str, Any] = {}
     by_course: dict[str, dict[str, Any]] = {}
-    if text:
+    if pdf_parser_strategy == "columnar":
+        layout_text = _pdftotext_layout(raw)
+        if layout_text:
+            by_course = _pick_per_course_amounts_columnar(layout_text)
+            log.info(
+                "fee PDF %s: columnar parser produced %d rows",
+                url,
+                len(by_course),
+            )
+        if not by_course and text:
+            # Safety net: columnar parser produced nothing (binary missing,
+            # PDF unsupported, etc.) — fall back to legacy so the row was
+            # never silently dropped relative to baseline.
+            by_course = _pick_per_course_amounts(text)
+            log.info(
+                "fee PDF %s: columnar parser empty, legacy fallback produced %d rows",
+                url,
+                len(by_course),
+            )
+    elif text:
         # NEW: per-course table parser runs first. When the PDF is a
         # multi-row schedule (ASA, Torrens, …), this returns one row
         # per course so each course gets its OWN fee — no more "max
         # amount stamped on every sibling".
         by_course = _pick_per_course_amounts(text)
+    if text:
 
         # Bug G: try the PDF-specific pickAmounts heuristic. The
         # single-page fee extractor is preserved as a safety net for the

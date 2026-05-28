@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from datetime import datetime, timezone
 from typing import Any
 
@@ -675,6 +676,38 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             # one pass and the full course catalogue is harvested.
             if _scrape_host in ("www.unisq.edu.au", "unisq.edu.au"):
                 max_pages = 60
+            # Federation: sitemap publishes ~223 /courses/ URLs and a handful
+            # of late-listed courses (e.g. dhw9-master-of-social-work-qualifying
+            # at position 216, dhy5-bachelor-of-psychological-science at 217)
+            # were silently dropped by the default 200-candidate cap. Raise the
+            # cap to 250 so the entire Federation catalogue reaches the
+            # extractor in one pass. Tests: discovery still respects max_pages
+            # and per-uni block_url_patterns continue to filter info pages.
+            if _scrape_host in ("www.federation.edu.au", "federation.edu.au"):
+                max_courses = 250
+            # Per-uni YAML override (`discovery.max_candidates`) — used for
+            # sitemap-heavy catalogues whose allow_url_patterns-matching URL
+            # count exceeds the default 200 cap (e.g. CQU 199 HE courses
+            # minus 54 BFS = only 146 sitemap slots, dropping late-alphabet
+            # codes like cv82 master-of-engineering at index 168).
+            try:
+                _yaml_cap = getattr(_uni_cfg.discovery, "max_candidates", None)
+                if _yaml_cap and int(_yaml_cap) > max_courses:
+                    max_courses = int(_yaml_cap)
+            except Exception:  # noqa: BLE001
+                pass
+            # Per-uni YAML override (`discovery.bfs_page_budget`) — used
+            # for sites with many listing pages (UOW pagination, La Trobe
+            # category subtrees) where the default 25-page BFS budget runs
+            # out before reaching all faculty index pages. Honoured here
+            # alongside the hardcoded UOW/UniSQ overrides above so newly-
+            # onboarded unis can opt in via YAML without a code change.
+            try:
+                _yaml_pb = getattr(_uni_cfg.discovery, "bfs_page_budget", None)
+                if _yaml_pb and int(_yaml_pb) > max_pages:
+                    max_pages = int(_yaml_pb)
+            except Exception:  # noqa: BLE001
+                pass
         log.info("Discovering course links from %s (fast_mode=%s)", scrape_url, job.fast_mode)
         await emit("status", f"Fetching {scrape_url}...", phase="fetch")
         await emit("status", "Discovering candidate course pages...", phase="discover")
@@ -688,6 +721,16 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # parser later instead of discarding them).
         _discover_blocked_fee_urls: list[str] = []
         links: list[dict] = []
+
+        # Read browser-first flag early so we can skip BFS when configured.
+        # When always_browser_discover=True, the browser discovery step below
+        # covers all faculties (including Cloudflare-protected ones) via
+        # _HOST_EXTRA_SEEDS.  Running BFS first on a CF-protected domain burns
+        # time, triggers sitemap + 7 alt-path probes that all fail, and may
+        # extend the Cloudflare rate-limit window — all for zero gain since
+        # browser discovery subsumes the BFS result set.
+        _always_browser = getattr(_uni_cfg.discovery, "always_browser_discover", False)
+
         if "study.csu.edu.au/international/courses" in scrape_url:
             try:
                 from app.services.scraper.csu_browser_discover import (
@@ -700,7 +743,103 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             except Exception as _csu_disc_exc:  # noqa: BLE001
                 log.warning("CSU browser discovery failed: %s — falling back to BFS", _csu_disc_exc)
 
-        if not links:
+        # Macquarie (mq.edu.au) — Cloudflare-protected + Svelte SPA whose
+        # course URLs use /study/find-a-course/(undergraduate|postgraduate)/
+        # <slug>, which the generic browser-discover's _NAV_LINK_SELECTOR
+        # ('a[href*="/courses/"]', ...) cannot match.  Use a dedicated
+        # MQ-shape sweep BEFORE BFS / generic browser so we never have to
+        # fall back to wandering nav links and harvesting junk category
+        # pages.  Falls through to BFS / generic browser / Wayback when
+        # the module returns [] (Cloudflare challenge etc.).
+        # Host guard reused below to short-circuit generic browser + Wayback
+        # tiers once MQ has produced links — those tiers would either
+        # double-harvest the same SPA (generic browser, which can't match
+        # MQ URL shapes anyway) or stall on archive.org for a Cloudflare-
+        # walled host that Wayback hasn't crawled deeply.
+        # Use canonical hostname parsing (not substring matching) so a URL
+        # like "https://example.com/?ref=mq.edu.au" can't accidentally
+        # trigger the MQ branch.
+        try:
+            from urllib.parse import urlparse as _urlparse
+            _mq_hostname = (_urlparse(scrape_url).hostname or "").lower()
+        except Exception:  # noqa: BLE001
+            _mq_hostname = ""
+        _is_mq_host = _mq_hostname in {"mq.edu.au", "www.mq.edu.au"}
+        if not links and _is_mq_host:
+            try:
+                from app.services.scraper.mq_browser_discover import (
+                    browser_discover_mq,
+                    _DISCOVERY_FLOOR as _MQ_DISCOVERY_FLOOR,
+                )
+                links = await browser_discover_mq(
+                    emit=emit,
+                    max_courses=max_courses,
+                )
+                # Defense-in-depth: even when ≥1 link is harvested, persist
+                # a discovery_failure_alerts row whenever we undershoot the
+                # MQ soft floor (~150 vs the ~300-course catalogue).  The
+                # downstream Tier-7 gate only fires when the FINAL link
+                # count is <3; a partial harvest of e.g. 40 links is a
+                # silent regression without this alert.
+                #
+                # NOTE on the 0 < lower bound: the literal "<150" reading
+                # would include len(links)==0, but the universal Tier-7
+                # path at orchestrator.py:~1035 already persists a
+                # DiscoveryFailureAlert + fires deliver_discovery_failure_alert
+                # for that case (after all fallback tiers run).  Emitting
+                # a second alert here would double-notify the operator
+                # for every empty MQ run, so we deliberately exclude 0.
+                if 0 < len(links) < _MQ_DISCOVERY_FLOOR:
+                    try:
+                        from app.models.discovery_failure_alert import (
+                            DiscoveryFailureAlert,
+                        )
+                        from app.services.scraper.alert_delivery import (
+                            deliver_discovery_failure_alert,
+                        )
+                        _mq_diag = {
+                            "job_id": str(job.id),
+                            "scrape_url": scrape_url,
+                            "candidates_found": len(links),
+                            "discovery_floor": _MQ_DISCOVERY_FLOOR,
+                            "source": "mq_browser_discover",
+                            "fast_mode": bool(job.fast_mode),
+                            "discovered_at": datetime.now(timezone.utc).isoformat(),
+                            "uni_slug": _uni_cfg.slug,
+                        }
+                        db.add(DiscoveryFailureAlert(
+                            university_id=uni_id,
+                            candidates_found=len(links),
+                            diagnostic=_mq_diag,
+                        ))
+                        await db.commit()
+                        log.warning(
+                            "[MQ DISCOVERY] Below-floor alert persisted "
+                            "(harvested=%d, floor=%d, job=%s)",
+                            len(links), _MQ_DISCOVERY_FLOOR, job.id,
+                        )
+                        asyncio.create_task(asyncio.to_thread(
+                            deliver_discovery_failure_alert,
+                            uni_name=uni_name,
+                            uni_id=uni_id,
+                            scrape_url=scrape_url,
+                            candidates_found=len(links),
+                            diagnostic=_mq_diag,
+                        ))
+                    except Exception as _mq_alert_exc:  # noqa: BLE001
+                        log.error(
+                            "[MQ DISCOVERY] Failed to persist below-floor "
+                            "alert: %s", _mq_alert_exc,
+                        )
+            except Exception as _mq_disc_exc:  # noqa: BLE001
+                log.warning(
+                    "MQ browser discovery failed: %s — falling back to BFS",
+                    _mq_disc_exc,
+                )
+
+        # Skip BFS when always_browser_discover=True — the browser step below
+        # is the primary discovery mechanism for Cloudflare-protected sites.
+        if not links and not _always_browser:
             links = await discover_course_links(
                 scrape_url,
                 max_pages=max_pages,
@@ -710,30 +849,63 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 discovery_config=_uni_cfg.discovery,
             )
 
-        # ── Fallback 1: Generic Playwright browser discovery ─────────────────
-        # Fires when the plain-HTTP BFS crawler returns 0 results, which
-        # happens on Cloudflare-protected or JS-rendered sites (e.g. UEL).
-        # A real Chromium browser renders the page, passes JS challenges,
-        # and harvests course links from the DOM.
-        if not links:
+        # ── Fallback 1 / Primary: Generic Playwright browser discovery ────────
+        # When always_browser_discover=True: browser is the PRIMARY discovery
+        # mechanism (BFS was skipped above).  _HOST_EXTRA_SEEDS in
+        # browser_discover_generic.py seed every faculty listing page for hosts
+        # like UTAS so the full catalogue is swept without relying on BFS.
+        #
+        # When always_browser_discover=False: fires only when BFS returned 0,
+        # which happens on Cloudflare-protected or JS-rendered sites (e.g. UEL).
+        # Short-circuit for MQ: when the MQ-specific sweep produced links,
+        # skip the generic browser tier — generic_NAV_LINK_SELECTOR cannot
+        # match MQ's /study/find-a-course/<level>/<slug> URL shape, so the
+        # tier would only re-harvest junk nav pages (the original symptom
+        # of Task #85 before this fix).
+        if (not links or _always_browser) and not (_is_mq_host and links):
             try:
                 from app.services.scraper.browser_discover_generic import (
                     browser_discover_generic,
                 )
-                await emit(
-                    "status",
-                    "[DISCOVER] BFS returned 0 links — trying browser-based discovery "
-                    "(handles Cloudflare / JS-heavy sites)...",
-                    phase="discover",
-                )
-                links = await browser_discover_generic(
+                _bfs_had_links = bool(links)
+                if _bfs_had_links:
+                    await emit(
+                        "status",
+                        f"[DISCOVER] always_browser_discover=True — running browser "
+                        f"discovery in addition to {len(links)} BFS links to sweep "
+                        f"Cloudflare-protected faculty pages...",
+                        phase="discover",
+                    )
+                else:
+                    await emit(
+                        "status",
+                        "[DISCOVER] BFS returned 0 links — trying browser-based discovery "
+                        "(handles Cloudflare / JS-heavy sites)...",
+                        phase="discover",
+                    )
+                _browser_links = await browser_discover_generic(
                     scrape_url, max_courses=max_courses, emit=emit
                 )
-                if links:
+                if _browser_links:
                     log.info(
                         "browser_discover_generic: found %d course links for %s",
-                        len(links), uni_name,
+                        len(_browser_links), uni_name,
                     )
+                if _bfs_had_links and _browser_links:
+                    # Merge mode: add browser-found URLs not already in BFS results.
+                    _existing_urls = {item["url"] for item in links}
+                    _added = 0
+                    for _item in _browser_links:
+                        if _item["url"] not in _existing_urls:
+                            links.append(_item)
+                            _existing_urls.add(_item["url"])
+                            _added += 1
+                    log.info(
+                        "browser_discover_generic merge: +%d new URLs (total now %d) for %s",
+                        _added, len(links), uni_name,
+                    )
+                elif _browser_links:
+                    links = _browser_links
             except Exception as _br_exc:  # noqa: BLE001
                 log.warning(
                     "browser_discover_generic failed for %s: %s — trying Wayback CDX",
@@ -745,26 +917,132 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # IP bans), the Internet Archive CDX index gives us the full set of
         # URLs Wayback has ever crawled for this domain — completely free,
         # no API key, and cannot be blocked because we query archive.org.
-        if not links:
+        #
+        # Two firing modes:
+        #   - ``use_wayback=True`` in the per-uni discovery YAML: ALWAYS run
+        #     CDX after BFS+browser and merge the results.  Use for sites
+        #     where BFS+browser structurally undercount the catalogue (e.g.
+        #     QUT: Cloudflare-walled + JS-SPA listings yield ~56 / ~200).
+        #   - default (False): only fire when BFS+browser returned 0 links.
+        _use_wayback = getattr(_uni_cfg.discovery, "use_wayback", False)
+        # Short-circuit for MQ: when MQ-specific sweep produced links, skip
+        # Wayback — archive.org has shallow coverage of this Cloudflare-
+        # walled host and the tier would just add latency / noise.
+        if (not links or _use_wayback) and not (_is_mq_host and links):
             try:
                 from app.services.scraper.wayback_discover import wayback_discover
-                await emit(
-                    "status",
-                    "[DISCOVER] Browser discovery returned 0 links — "
-                    "trying Wayback Machine CDX archive...",
-                    phase="discover",
-                )
-                links = await wayback_discover(
+                if links and _use_wayback:
+                    await emit(
+                        "status",
+                        f"[DISCOVER] use_wayback=True — running Wayback CDX "
+                        f"in addition to {len(links)} BFS+browser link(s) to "
+                        f"sweep the full archived catalogue...",
+                        phase="discover",
+                    )
+                else:
+                    await emit(
+                        "status",
+                        "[DISCOVER] Browser discovery returned 0 links — "
+                        "trying Wayback Machine CDX archive...",
+                        phase="discover",
+                    )
+                _wb_links = await wayback_discover(
                     scrape_url, max_courses=max_courses, emit=emit
                 )
-                if links:
+                if _wb_links:
                     log.info(
                         "wayback_discover: found %d course URLs for %s",
-                        len(links), uni_name,
+                        len(_wb_links), uni_name,
                     )
+                if links and _wb_links:
+                    _existing_urls = {item["url"] for item in links}
+                    _added = 0
+                    for _item in _wb_links:
+                        if _item["url"] not in _existing_urls:
+                            links.append(_item)
+                            _existing_urls.add(_item["url"])
+                            _added += 1
+                    log.info(
+                        "wayback_discover merge: +%d new URLs (total now %d) for %s",
+                        _added, len(links), uni_name,
+                    )
+                elif _wb_links:
+                    links = _wb_links
             except Exception as _wb_exc:  # noqa: BLE001
                 log.warning(
                     "wayback_discover failed for %s: %s", uni_name, _wb_exc
+                )
+
+        # ── UTAS Wayback URL normalisation ───────────────────────────────────
+        # The Wayback CDX archives pre-2016 UTAS URLs in the legacy format:
+        #   /courses/2015/<faculty>/courses/<code>-<name>
+        # The current UTAS site uses:
+        #   /courses/<faculty>/courses/<code>-<name>
+        # Rewrite the old format to the new so that (a) allow_url_patterns
+        # accepts them and (b) the actual HTTP fetch hits the live page.
+        if _scrape_host in ("www.utas.edu.au", "utas.edu.au") and links:
+            import re as _re
+            _utas_legacy = _re.compile(r"(/courses)/\d{4}/([^/]+/courses/)")
+            _normalised = 0
+            for _lnk in links:
+                _new = _utas_legacy.sub(r"\1/\2", _lnk["url"])
+                if _new != _lnk["url"]:
+                    _lnk["url"] = _new
+                    _normalised += 1
+            if _normalised:
+                log.info(
+                    "utas_wayback_normalise: rewrote %d legacy /courses/YYYY/… URLs "
+                    "to current /courses/… format for %s",
+                    _normalised, uni_name,
+                )
+                # Dedup in case normalisation created collisions
+                _seen_norm: set[str] = set()
+                _deduped: list[dict] = []
+                for _lnk in links:
+                    if _lnk["url"] not in _seen_norm:
+                        _seen_norm.add(_lnk["url"])
+                        _deduped.append(_lnk)
+                links = _deduped
+
+        # ── Extra course URLs (surgical YAML override) ───────────────────────
+        # Explicit URLs listed under discovery.extra_course_urls in the per-uni
+        # YAML are injected here, AFTER all discovery tiers, bypassing BFS /
+        # sitemap / browser / Wayback entirely.  Only use for known-CRICOS
+        # courses that every discovery tier consistently misses.
+        _extra_urls = getattr(_uni_cfg.discovery, "extra_course_urls", [])
+        if _extra_urls:
+            # Insert / move extra URLs to the 1/3 mark of the discovered list.
+            # Position 0 (front) is too early: the browser discovery session
+            # just finished and Cloudflare's rate-limit counter hasn't cleared
+            # yet — the course gets 429 immediately.  Position N-1 (back) is
+            # too late: accumulated requests have re-triggered the rate-limit.
+            # The 1/3 mark lands ~10 min into the extraction run (empirically
+            # validated on UTAS), right when the rate limit window resets and
+            # arts-soc pages become accessible — matching the timing of other
+            # arts-soc courses (e7h, e6j, e5n) that successfully stage.
+            _insert_pos = max(0, len(links) // 3)
+            _injected = 0
+            _moved = 0
+            for _eurl in _extra_urls:
+                existing_idx = next(
+                    (i for i, item in enumerate(links) if item["url"] == _eurl), None
+                )
+                if existing_idx is not None:
+                    # Already discovered — move to 1/3 position
+                    _item = links.pop(existing_idx)
+                    # Adjust insert pos if pop shifted items before it
+                    _adj = _insert_pos if existing_idx >= _insert_pos else max(0, _insert_pos - 1)
+                    links.insert(_adj, _item)
+                    _moved += 1
+                else:
+                    # Not yet discovered — inject at 1/3 position
+                    links.insert(_insert_pos, {"url": _eurl, "name": ""})
+                    _injected += 1
+            if _injected or _moved:
+                log.info(
+                    "extra_course_urls: injected %d new + moved %d existing URL(s) "
+                    "to position %d/%d for %s",
+                    _injected, _moved, _insert_pos, len(links), uni_name,
                 )
 
         summary["discovered"] = len(links)
@@ -857,6 +1135,39 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
 
         # University-level PDF data (fee schedule, admissions/IELTS policy)
         # — fetched ONCE per job, used as last-resort fallback for every course.
+        #
+        # Per-uni YAML override: extraction.fees.fees_pdf_url (and the english
+        # equivalent) must be merged into uni_scrape_config BEFORE this call,
+        # because load_university_pdf_data reads scrape_config["uniPages"]["feesPdf"]
+        # — not the YAML directly. The same overrides are also injected into
+        # effective_config below (Priority 0.5) for prefetch_central_pages.
+        # Both injections are opt-in via YAML; empty defaults are no-ops with
+        # zero global impact. Without this merge, per-uni PDF URLs (e.g.
+        # Federation's HE fee schedule) would be invisible to the per-course
+        # PDF matcher even though they're in the YAML.
+        try:
+            from app.services.scraper.config.context import get_uni_config as _get_uc
+            _pdf_yaml_cfg = _get_uc()
+        except Exception:  # noqa: BLE001
+            _pdf_yaml_cfg = None
+        if _pdf_yaml_cfg is not None:
+            if uni_scrape_config is None:
+                uni_scrape_config = {}
+            _pdf_pages = uni_scrape_config.setdefault("uniPages", {})
+            _pdf_fees = _pdf_yaml_cfg.extraction.fees
+            if _pdf_fees.fees_pdf_url and not _pdf_pages.get("feesPdf"):
+                _pdf_pages["feesPdf"] = _pdf_fees.fees_pdf_url
+                log.info(
+                    "[YAML] injected fees_pdf_url into uni_scrape_config: %s",
+                    _pdf_fees.fees_pdf_url,
+                )
+            _pdf_eng = _pdf_yaml_cfg.extraction.english
+            if _pdf_eng.requirements_pdf_url and not _pdf_pages.get("requirementsPdf"):
+                _pdf_pages["requirementsPdf"] = _pdf_eng.requirements_pdf_url
+                log.info(
+                    "[YAML] injected english requirements_pdf_url into uni_scrape_config: %s",
+                    _pdf_eng.requirements_pdf_url,
+                )
         try:
             uni_pdf_data = await load_university_pdf_data(uni_scrape_config, uni_country)
         except Exception as exc:  # noqa: BLE001
@@ -915,6 +1226,53 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     _bond_pages["entryPage"] = (
                         "https://bond.edu.au/international-students/"
                         "english-language-requirements"
+                    )
+
+            # ── Priority 0.5: per-uni YAML overrides ────────────────────────
+            # extraction.fees.central_page / fees_pdf_url from per-uni YAML
+            # are injected here, BEFORE UI overrides (Priority 1) so the UI
+            # can still override. Opt-in via YAML only — empty defaults are
+            # no-ops, no global impact. Fixes universities like Federation
+            # whose individual course pages don't expose international fees
+            # but publish a stable central fee schedule URL.
+            try:
+                from app.services.scraper.config.context import get_uni_config
+                _yaml_cfg = get_uni_config()
+            except Exception:  # noqa: BLE001
+                _yaml_cfg = None
+            if _yaml_cfg is not None:
+                _yaml_fees = _yaml_cfg.extraction.fees
+                _yaml_pages = effective_config.setdefault("uniPages", {})
+                if _yaml_fees.central_page and not _yaml_pages.get("feePage"):
+                    _yaml_pages["feePage"] = _yaml_fees.central_page
+                    await emit(
+                        "status",
+                        f"[YAML] fee page from per-uni config: {_yaml_fees.central_page}",
+                        phase="discover",
+                        kind="yaml_fee_page",
+                        url=_yaml_fees.central_page,
+                    )
+                if _yaml_fees.fees_pdf_url and not _yaml_pages.get("feesPdf"):
+                    _yaml_pages["feesPdf"] = _yaml_fees.fees_pdf_url
+                    await emit(
+                        "status",
+                        f"[YAML] fees PDF from per-uni config: {_yaml_fees.fees_pdf_url}",
+                        phase="discover",
+                        kind="yaml_fees_pdf",
+                        url=_yaml_fees.fees_pdf_url,
+                    )
+                _yaml_eng = _yaml_cfg.extraction.english
+                if _yaml_eng.central_page and not (
+                    _yaml_pages.get("entryPage") or _yaml_pages.get("requirementsPage")
+                ):
+                    _yaml_pages["entryPage"] = _yaml_eng.central_page
+                    _yaml_pages["requirementsPage"] = _yaml_eng.central_page
+                    await emit(
+                        "status",
+                        f"[YAML] english page from per-uni config: {_yaml_eng.central_page}",
+                        phase="discover",
+                        kind="yaml_english_page",
+                        url=_yaml_eng.central_page,
                     )
 
             # ── Priority 1: request-body overrides (UI Advanced fields) ─────
@@ -1060,6 +1418,125 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 )
             links = kept
 
+        # Phase A.5b-pre — per-uni YAML block_url_patterns deny-list re-applied.
+        # discovery.block_url_patterns is applied inside discover_course_links
+        # (BFS phase) but NOT after the browser-discovery merge, so unwanted
+        # URLs picked up by the browser pass (e.g. UTAS "-domestic" URLs) still
+        # reach extraction.  Re-apply the deny-list here as a final chokepoint,
+        # AFTER all discovery tiers, so any URL matching a block pattern is
+        # dropped before a browser slot is consumed.  Empty list = no-op.
+        _block_pats_raw_a5b: list[str] = (
+            list(getattr(_uni_cfg.discovery, "block_url_patterns", None) or [])
+            if _uni_cfg and _uni_cfg.discovery else []
+        )
+        if _block_pats_raw_a5b and links:
+            _compiled_block_a5b: list[re.Pattern[str]] = []
+            for _bp_str in _block_pats_raw_a5b:
+                try:
+                    _compiled_block_a5b.append(re.compile(_bp_str, re.IGNORECASE))
+                except re.error:
+                    log.warning(
+                        "discovery.block_url_patterns: invalid regex skipped (Phase A.5b): %s",
+                        _bp_str,
+                    )
+            if _compiled_block_a5b:
+                _pre_block_a5b = len(links)
+                links = [
+                    _lk for _lk in links
+                    if not any(_bp.search(_lk.get("url") or "") for _bp in _compiled_block_a5b)
+                ]
+                _block_dropped_a5b = _pre_block_a5b - len(links)
+                if _block_dropped_a5b:
+                    log.info(
+                        "[EXTRACT] block_url_patterns: dropped %d / %d blocked URLs (%d remain)",
+                        _block_dropped_a5b, _pre_block_a5b, len(links),
+                    )
+                    await emit(
+                        "status",
+                        f"[EXTRACT] block_url_patterns: dropped {_block_dropped_a5b} blocked URL(s) "
+                        f"({len(links)} remain)",
+                        phase="extract",
+                        kind="extract_block_url_filter",
+                        dropped=_block_dropped_a5b,
+                        kept=len(links),
+                    )
+
+        # Phase A.5b — per-uni YAML allow_url_patterns whitelist.
+        # discovery.allow_url_patterns is applied inside discover_course_links
+        # (BFS phase) but NOT after the browser-discovery merge, so non-course
+        # URLs picked up by the browser pass still reach extraction.  Re-apply
+        # the whitelist here as a final chokepoint, AFTER all discovery tiers
+        # and the is_blocked_page gate above, so only URLs matching at least
+        # one pattern survive.  Empty list (default) = no-op.
+        _allow_pats_raw: list[str] = (
+            list(getattr(_uni_cfg.discovery, "allow_url_patterns", None) or [])
+            if _uni_cfg and _uni_cfg.discovery else []
+        )
+        if _allow_pats_raw and links:
+            _compiled_allow: list[re.Pattern[str]] = []
+            for _ap_str in _allow_pats_raw:
+                try:
+                    _compiled_allow.append(re.compile(_ap_str, re.IGNORECASE))
+                except re.error:
+                    log.warning(
+                        "discovery.allow_url_patterns: invalid regex skipped: %s", _ap_str
+                    )
+            if _compiled_allow:
+                _pre_allow = len(links)
+                links = [
+                    _lk for _lk in links
+                    if any(_ap.search(_lk.get("url") or "") for _ap in _compiled_allow)
+                ]
+                _allow_dropped = _pre_allow - len(links)
+                if _allow_dropped:
+                    log.info(
+                        "[EXTRACT] allow_url_patterns: kept %d / %d (dropped %d non-matching URLs)",
+                        len(links), _pre_allow, _allow_dropped,
+                    )
+                    await emit(
+                        "status",
+                        f"[EXTRACT] allow_url_patterns: dropped {_allow_dropped} URL(s) "
+                        f"not matching per-uni whitelist ({len(links)} remain)",
+                        phase="extract",
+                        kind="extract_allow_url_filter",
+                        dropped=_allow_dropped,
+                        kept=len(links),
+                    )
+
+        # Phase A.5b — per-uni YAML must_contain substring whitelist.
+        # discovery.must_contain is applied inside discover_course_links (BFS
+        # phase) but NOT after browser/Wayback merges, so URLs picked up by
+        # those tiers can bypass the substring requirement.  Re-apply here as
+        # the final chokepoint so opt-in unis (e.g. QUT must_contain=["/courses/"])
+        # actually drop merged Wayback URLs that lack the required substring
+        # (e.g. /about/, /research/ archive cruft).  Empty list (default) = no-op.
+        _must_contain_raw: list[str] = (
+            list(getattr(_uni_cfg.discovery, "must_contain", None) or [])
+            if _uni_cfg and _uni_cfg.discovery else []
+        )
+        if _must_contain_raw and links:
+            _pre_mc = len(links)
+            _mc_lower = [_s.lower() for _s in _must_contain_raw if _s]
+            links = [
+                _lk for _lk in links
+                if any(_sub in (_lk.get("url") or "").lower() for _sub in _mc_lower)
+            ]
+            _mc_dropped = _pre_mc - len(links)
+            if _mc_dropped:
+                log.info(
+                    "[EXTRACT] must_contain: kept %d / %d (dropped %d URLs lacking required substring)",
+                    len(links), _pre_mc, _mc_dropped,
+                )
+                await emit(
+                    "status",
+                    f"[EXTRACT] must_contain: dropped {_mc_dropped} URL(s) "
+                    f"lacking required substring ({len(links)} remain)",
+                    phase="extract",
+                    kind="extract_must_contain_filter",
+                    dropped=_mc_dropped,
+                    kept=len(links),
+                )
+
         await emit("status", f"Extracting course details ({len(links)} pages)...", phase="extract")
 
         # 1) Extraction phase — parallel network calls, no DB shared state.
@@ -1067,7 +1544,23 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # "[EXTRACT] N/total: <name>" as each page is *picked up* (not at the
         # end). The counter is mutated only inside the semaphore, so it is
         # effectively serialised.
-        sem = asyncio.Semaphore(_MAX_PARALLEL_FETCH)
+        # Per-uni YAML can cap the semaphore below the global default to avoid
+        # Cloudflare 429 storms on heavily-protected sites (e.g. UTAS).  When
+        # max_parallel_fetch is set in extraction config, use the smaller of the
+        # two values — the global cap is still an absolute ceiling.
+        try:
+            _uc_max = getattr(get_uni_config().extraction, "max_parallel_fetch", None)
+            _effective_parallel = (
+                min(_MAX_PARALLEL_FETCH, _uc_max) if _uc_max else _MAX_PARALLEL_FETCH
+            )
+        except Exception:  # noqa: BLE001
+            _effective_parallel = _MAX_PARALLEL_FETCH
+        if _effective_parallel != _MAX_PARALLEL_FETCH:
+            log.info(
+                "[CONCURRENCY] per-uni max_parallel_fetch=%d overrides global %d",
+                _effective_parallel, _MAX_PARALLEL_FETCH,
+            )
+        sem = asyncio.Semaphore(_effective_parallel)
         total = len(links)
         progress = [0]
         # Per-scrape-run vision OCR cache, keyed by absolute image URL.
@@ -1086,54 +1579,84 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         vision_image_cache: VisionImageCache = new_vision_image_cache()
 
         async def _bounded(link: dict) -> dict:
-            async with sem:
-                # Stop check INSIDE the semaphore so all queued coroutines
-                # waiting on the sem also short-circuit once the user has
-                # clicked Stop. Returning a sentinel keeps gather() honest
-                # — the staging loop already filters non-dict results.
-                if stop_flag[0]:
-                    return {
-                        "name": (link.get("name") or "").strip() or "?",
-                        "url": link.get("url"),
-                        "error": "stopped",
-                    }
-                progress[0] += 1
-                idx = progress[0]
-                nm = (link.get("name") or "").strip() or link.get("url", "?")
-                await emit(
-                    "status",
-                    f"[EXTRACT] {idx}/{total}: {nm}",
-                    phase="extract",
-                    kind="extract_start",
-                    index=idx,
-                    total=total,
-                    url=link.get("url"),
-                )
-                # Also emit a structured `progress` log row so the frontend
-                # progress bar (which keys off event="progress" with
-                # `current`/`total` fields) renders the live N/total counter,
-                # elapsed time, and ETA. The status emit above keeps the
-                # familiar `[EXTRACT] N/total: name` line in the textual log.
-                await emit(
-                    "progress",
-                    f"Fetching {idx}/{total}: {nm}",
-                    phase="extract",
-                    current=idx,
-                    total=total,
-                    courseName=nm,
-                    url=link.get("url"),
-                )
-                # Pass the emit hook into extract_course so AI fallback can
-                # stream "[FALLBACK] AI enriching ... (missing: ...)" lines.
-                # central_data is the pre-fetched central-pages payload (Bug 2).
-                return await _extract_only(
-                    link,
-                    uni_country,
-                    uni_pdf_data or None,
-                    emit=emit,
-                    vision_image_cache=vision_image_cache,
-                    central_data=central_data,
-                )
+            # Loop supports at most one 429-cooldown retry per URL.
+            # When extract_course returns {"_retry_after": N, ...} the
+            # semaphore is released (we've exited the `async with sem:` block)
+            # BEFORE sleeping N seconds, so other courses can proceed in the
+            # meantime.  Previously the sleep happened inside the sem block,
+            # freezing every concurrent slot simultaneously on a 429 storm.
+            _retry_delay: float = 0.0
+            _retry_count = 0
+            _max_retries = 2  # two 429-cooldown retries (3 total attempts)
+            while True:
+                if _retry_delay:
+                    log.info(
+                        "[429 COOLDOWN] semaphore released — sleeping %.0fs for %s",
+                        _retry_delay, (link.get("url") or "?")[:70],
+                    )
+                    await asyncio.sleep(_retry_delay)
+                    _retry_delay = 0.0
+                async with sem:
+                    # Stop check INSIDE the semaphore so all queued coroutines
+                    # waiting on the sem also short-circuit once the user has
+                    # clicked Stop. Returning a sentinel keeps gather() honest
+                    # — the staging loop already filters non-dict results.
+                    if stop_flag[0]:
+                        return {
+                            "name": (link.get("name") or "").strip() or "?",
+                            "url": link.get("url"),
+                            "error": "stopped",
+                        }
+                    progress[0] += 1
+                    idx = progress[0]
+                    nm = (link.get("name") or "").strip() or link.get("url", "?")
+                    await emit(
+                        "status",
+                        f"[EXTRACT] {idx}/{total}: {nm}",
+                        phase="extract",
+                        kind="extract_start",
+                        index=idx,
+                        total=total,
+                        url=link.get("url"),
+                    )
+                    # Also emit a structured `progress` log row so the frontend
+                    # progress bar (which keys off event="progress" with
+                    # `current`/`total` fields) renders the live N/total counter,
+                    # elapsed time, and ETA. The status emit above keeps the
+                    # familiar `[EXTRACT] N/total: name` line in the textual log.
+                    await emit(
+                        "progress",
+                        f"Fetching {idx}/{total}: {nm}",
+                        phase="extract",
+                        current=idx,
+                        total=total,
+                        courseName=nm,
+                        url=link.get("url"),
+                    )
+                    # Pass the emit hook into extract_course so AI fallback can
+                    # stream "[FALLBACK] AI enriching ... (missing: ...)" lines.
+                    # central_data is the pre-fetched central-pages payload (Bug 2).
+                    result = await _extract_only(
+                        link,
+                        uni_country,
+                        uni_pdf_data or None,
+                        emit=emit,
+                        vision_image_cache=vision_image_cache,
+                        central_data=central_data,
+                    )
+                # ── semaphore released here ──────────────────────────────────
+                # Check for 429-cooldown retry sentinel AFTER exiting `async
+                # with sem:` so the slot is free during the sleep.
+                if (
+                    isinstance(result, dict)
+                    and result.get("_retry_after")
+                    and _retry_count < _max_retries
+                ):
+                    _retry_delay = float(result["_retry_after"])
+                    _retry_count += 1
+                    progress[0] -= 1  # will be re-incremented on next iteration
+                    continue
+                return result
 
         results = await asyncio.gather(
             *[_bounded(lk) for lk in links], return_exceptions=True
@@ -1348,35 +1871,113 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             return level.strip().lower()
 
         try:
+            from urllib.parse import urlparse  # noqa: PLC0415
+
             from app.services.scraper.confidence import (  # noqa: PLC0415
                 score_payload as _sc_score,
             )
 
-            _name_best: dict[tuple[str, str], dict] = {}
+            def _slug_of(url: str) -> str:
+                """Return the last meaningful path segment of ``url``."""
+                try:
+                    p = urlparse(url or "").path.rstrip("/")
+                except Exception:
+                    return ""
+                if not p:
+                    return ""
+                return p.rsplit("/", 1)[-1].lower()
+
+            def _strip_common_prefix_tokens(slugs: list[str]) -> list[str]:
+                """Strip dash-separated tokens shared by every slug.
+
+                ``['bits', 'bits-application-development', 'bits-cyber-security']``
+                → ``['', 'application-development', 'cyber-security']`` so the
+                disambiguating suffix is the *unique* tail, not the redundant
+                program-prefix.
+                """
+                token_lists = [s.split("-") if s else [] for s in slugs]
+                common = 0
+                if all(token_lists):
+                    for col in zip(*token_lists):
+                        if len(set(col)) == 1:
+                            common += 1
+                        else:
+                            break
+                return ["-".join(toks[common:]) for toks in token_lists]
+
+            # First pass: GROUP results by (name, tier) — don't reject yet.
+            _groups: dict[tuple[str, str], list[dict]] = {}
             for _r in results:
                 if not isinstance(_r, dict) or _r.get("error"):
                     continue
                 _pl = _r.get("payload") or {}
                 _raw_name = (_pl.get("course_name") or _r.get("name") or "").strip()
-                _cn_key = (
+                if not _raw_name:
+                    continue
+                _key = (
                     _raw_name.lower(),
                     _degree_tier(_raw_name, _pl.get("degree_level") or ""),
                 )
-                if not _cn_key[0]:
+                _groups.setdefault(_key, []).append(_r)
+
+            # Second pass: resolve each group.
+            #
+            # If every member of a multi-result group has a DISTINCT URL slug
+            # (e.g. VIT's /bits, /bits/bits-application-development,
+            # /bits/bits-cyber-security, …) the pages are legitimately different
+            # courses (specialisations / majors of the same parent program),
+            # NOT duplicates.  Keep all of them and disambiguate ``course_name``
+            # with the slug-derived suffix so they remain distinguishable in
+            # the UI and in the staged-row unique constraint.
+            #
+            # Otherwise (e.g. Flinders' two distinct programs that both expose
+            # the H1 "Bachelor of Science" with no slug differentiator the user
+            # can read) fall back to the original behaviour: keep the highest-
+            # confidence result and reject the rest.
+            for _key, _bucket in _groups.items():
+                if len(_bucket) <= 1:
                     continue
-                if _cn_key not in _name_best:
-                    _name_best[_cn_key] = _r
-                else:
-                    _existing = _name_best[_cn_key]
-                    _existing_score = _sc_score(_existing.get("payload") or {})["score"]
-                    _new_score = _sc_score(_pl)["score"]
-                    if _new_score > _existing_score:
-                        # New result is better — demote the previous winner.
-                        _existing["error"] = "rejected: duplicate_name_deduplicated"
-                        _name_best[_cn_key] = _r
+
+                _slugs = [_slug_of(_r.get("url") or "") for _r in _bucket]
+                # Gate is strict: EVERY member must have a non-empty slug AND
+                # all slugs must be unique. A single empty slug (e.g. a hostname-
+                # rooted URL like https://uni.edu/) signals an ambiguous parent
+                # page that we cannot safely disambiguate from a sibling, so we
+                # fall through to the score-based dedup.
+                if (
+                    len(_slugs) >= 2
+                    and all(_slugs)
+                    and len(set(_slugs)) == len(_slugs)
+                ):
+                    # All members have distinct, non-empty-or-distinguishably-
+                    # rooted slugs → distinct courses.  Disambiguate names.
+                    _suffixes = _strip_common_prefix_tokens(_slugs)
+                    for _r, _suffix in zip(_bucket, _suffixes):
+                        _pl = _r.get("payload") or {}
+                        _orig = (_pl.get("course_name") or "").strip()
+                        if not _suffix:
+                            # Root URL of the program (e.g. /bits) — keep the
+                            # original course_name unchanged.
+                            continue
+                        _hint = _suffix.replace("-", " ").replace("_", " ").strip().title()
+                        if _hint and _hint.lower() not in _orig.lower():
+                            _pl["course_name"] = (
+                                f"{_orig} ({_hint})" if _orig else _hint
+                            )
+                            _r["payload"] = _pl
+                    continue
+
+                # Slugs are missing or non-distinct → fall back to score-based
+                # dedup; reject all but the highest-confidence member.
+                _best = _bucket[0]
+                _best_score = _sc_score(_best.get("payload") or {})["score"]
+                for _candidate in _bucket[1:]:
+                    _new_score = _sc_score(_candidate.get("payload") or {})["score"]
+                    if _new_score > _best_score:
+                        _best["error"] = "rejected: duplicate_name_deduplicated"
+                        _best, _best_score = _candidate, _new_score
                     else:
-                        # Existing is at least as good — demote the newcomer.
-                        _r["error"] = "rejected: duplicate_name_deduplicated"
+                        _candidate["error"] = "rejected: duplicate_name_deduplicated"
 
             _dedup_count = sum(
                 1 for _r in results
@@ -1421,6 +2022,23 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     f"[STAGE] worker exception: {r}",
                     phase="stage",
                     kind="worker_error",
+                )
+                continue
+            if r.get("_retry_after"):
+                # Rate-limited and all retries exhausted — never had a payload.
+                # Skip quickly without calling stage_course (empty payload would
+                # just be rejected at the staging gate anyway, wasting a DB call).
+                summary["fetch_failed"] += 1
+                log.warning(
+                    "[429-EXHAUSTED] all retries used up for %s — skipping staging",
+                    r.get("url", "?")[:80],
+                )
+                await emit(
+                    "status",
+                    f"[STAGE] 429-exhausted (all retries): {r.get('name', '?')}",
+                    phase="stage",
+                    kind="rate_limited_exhausted",
+                    url=r.get("url"),
                 )
                 continue
             if r.get("error"):
@@ -1641,7 +2259,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             # for.
             f"[TIMING] Total: {mins}m {secs}s | Courses: {course_count} "
             f"| Avg: {avg_per_course:.1f}s/course "
-            f"| Concurrency: HTTP={_MAX_PARALLEL_FETCH} Browser={settings.max_browser_concurrency}",
+            f"| Concurrency: HTTP={_effective_parallel}/{_MAX_PARALLEL_FETCH} Browser={settings.max_browser_concurrency}",
             phase="complete",
             elapsed_seconds=elapsed_sec,
             avg_seconds_per_course=avg_per_course,
@@ -1777,6 +2395,46 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 await deliver_alerts(_alerts)
             except Exception as _alert_exc:  # noqa: BLE001
                 log.warning("[ALERTS] failed for run %s: %s", runtime_job_id, _alert_exc)
+
+            # ── YAML cascade auto-trigger ──────────────────────────────────
+            # Fire when a NEW university (no per-uni YAML on disk) produced
+            # poor results. Defined as <5 staged courses OR avg completeness
+            # below 50%. The cascade picks the best-fit existing YAML, clones
+            # it to unis/<slug>.yaml, and the user's NEXT scrape benefits.
+            # Strict safety: the cascade itself refuses to overwrite any
+            # existing per-uni YAML, so the 43 hand-tuned files are untouched.
+            try:
+                from pathlib import Path as _P
+                _slug = (_uni_cfg.slug or "").lower() if _uni_cfg else ""
+                _yaml_root = _P(__file__).resolve().parents[3] / "scraper_config" / "unis"
+                _has_yaml = bool(_slug) and (_yaml_root / f"{_slug}.yaml").exists()
+                _staged_n = int(summary.get("staged") or 0)
+                # avg completeness across this job's staged rows
+                from sqlalchemy import select as _sel, func as _func
+                from app.models import ScrapedCourse as _SC
+                _avg_row = (await db.execute(
+                    _sel(_func.avg(_SC.completeness)).where(
+                        _SC.scrape_job_id == runtime_job_id,
+                        _SC.completeness.isnot(None),
+                    )
+                )).scalar()
+                _avg = float(_avg_row) if _avg_row is not None else 0.0
+                _poor = _staged_n < 5 or _avg < 50.0
+                if not _has_yaml and _poor:
+                    log.info(
+                        "[CASCADE] auto-triggering for uni_id=%s slug=%r "
+                        "(staged=%d avg_completeness=%.1f no per-uni YAML)",
+                        uni_id, _slug, _staged_n, _avg,
+                    )
+                    from app.tasks.scrape_tasks import (
+                        cascade_match_for_university as _cascade_task,
+                    )
+                    _cascade_task.delay(int(uni_id))
+            except Exception as _cascade_exc:  # noqa: BLE001
+                log.warning(
+                    "[CASCADE] auto-trigger failed for run %s: %s",
+                    runtime_job_id, _cascade_exc,
+                )
 
         return {"ok": finished_cleanly, **summary}
     except Exception as exc:

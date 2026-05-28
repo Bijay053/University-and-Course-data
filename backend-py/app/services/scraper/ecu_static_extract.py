@@ -146,7 +146,180 @@ _NON_AU_LOCATION_NOISE_RE = re.compile(
     re.IGNORECASE,
 )
 
-_DEFAULT_ECU_LOCATION = "Perth, Australia"
+_DEFAULT_ECU_LOCATION = "Perth"  # 2026-05-13: dropped ", Australia" suffix per user preference (every ECU campus is in WA)
+
+
+# ---------------------------------------------------------------------------
+# Availability & Campus grid parser (2026-05-12)
+# ---------------------------------------------------------------------------
+#
+# ECU course pages render a structured table at the "Availability & Campus"
+# panel:
+#
+#     <table class="info-table info-table-availability">
+#       <thead>
+#         <tr>
+#           <th>Location</th>
+#           <th>Semester 1</th>
+#           <th>Semester 2</th>
+#         </tr>
+#       </thead>
+#       <tbody>
+#         <tr>
+#           <th scope="row">Joondalup</th>
+#           <td><span title="Full Time Available">FT</span></td>
+#           <td><span title="Part Time Available">PT</span></td>
+#         </tr>
+#         …
+#       </tbody>
+#     </table>
+#
+# Bug history (2026-05-12 user report):
+#   - The substring-based ``_extract_ecu_location`` was returning every
+#     campus name that appeared anywhere in the page, including row labels
+#     for empty rows (City Campus / South West / Sri Lanka), so e.g.
+#     Bachelor of Arts (only Joondalup + Online have FT/PT) was staged as
+#     "Joondalup, South West".
+#   - The text-only intake extractor (``intake.ecu_semester`` in
+#     extractors/intake.py, conf=0.85) sees both "Semester 1" and "Semester
+#     2" column headers regardless of which one actually has FT/PT cells,
+#     so every ECU course was staged with intake_months=["February","July"].
+#     E.g. Master of Nursing (Graduate Entry) only offers Joondalup S1 FT
+#     PT — should be ["February"], not ["February","July"].
+#
+# This parser walks the table HTML, ties each non-empty FT/PT cell back to
+# its (campus, semester) pair, and returns:
+#   - campuses with at least one FT/PT cell anywhere in their row
+#   - intake months mapped from semesters with at least one FT/PT cell
+#     anywhere in their column
+#
+# When the grid is found but EVERY cell is empty (e.g. Master of Nursing
+# (Nurse Practitioner) on the international tab — paired with the
+# domestic-only banner "This course is not offered for study on-campus in
+# Australia to international students"), both lists are empty and the
+# pre-seed leaves location/intake unset so the global domestic-only filter
+# in single_course.py can drop the page.
+
+_AVAIL_TABLE_RE = re.compile(
+    # Accept both double- and single-quoted class attributes — ECU itself uses
+    # double quotes today, but unquoted/single-quoted variants must not silently
+    # disable the parser if the template ever changes.
+    r"<table\b[^>]*\bclass\s*=\s*[\"'][^\"']*\binfo-table-availability\b[^\"']*[\"'][^>]*>"
+    r"(?P<body>.*?)</table>",
+    re.S | re.I,
+)
+_THEAD_RE = re.compile(r"<thead\b[^>]*>(.*?)</thead>", re.S | re.I)
+_TBODY_RE = re.compile(r"<tbody\b[^>]*>(.*?)</tbody>", re.S | re.I)
+_TR_RE = re.compile(r"<tr\b[^>]*>(.*?)</tr>", re.S | re.I)
+_TH_RE = re.compile(r"<th\b[^>]*>(.*?)</th>", re.S | re.I)
+_TD_RE = re.compile(r"<td\b[^>]*>(.*?)</td>", re.S | re.I)
+_TAGS_RE = re.compile(r"<[^>]+>")
+_WS_RE = re.compile(r"\s+")
+_SEM_HEADER_RE = re.compile(r"\bSemester\s+([1-3])\b", re.I)
+_FT_PT_RE = re.compile(
+    r"\b(?:FT|PT|Full[\s-]?Time|Part[\s-]?Time)\b",
+    re.I,
+)
+
+# Maps Australian academic semester → start month (ECU follows the standard
+# AU calendar — Sem 1 = Feb, Sem 2 = Jul, Sem 3 = Oct).
+_ECU_SEMESTER_TO_MONTH: dict[int, str] = {
+    1: "February",
+    2: "July",
+    3: "October",
+}
+
+# Canonical names for the row labels that appear in ECU's availability grid.
+# Sri Lanka is intentionally excluded — it's an offshore partner campus
+# that the scraper has historically filtered out of location extraction
+# (see ``_NON_AU_LOCATION_NOISE_RE`` above).  Online IS included because
+# it represents a delivery option ECU exposes per-course.
+_ECU_GRID_CAMPUS_NORM: dict[str, str] = {
+    "joondalup": "Joondalup",
+    "mount lawley": "Mount Lawley",
+    "south west": "South West",
+    "bunbury": "South West",
+    "perth city": "Perth City",
+    "city campus": "Perth City",
+    "online": "Online",
+}
+
+
+def _strip_tags(s: str) -> str:
+    return _WS_RE.sub(" ", _TAGS_RE.sub(" ", s)).strip()
+
+
+def parse_availability_grid(html: str) -> dict[str, list[str]] | None:
+    """Parse ECU's <table class="info-table-availability"> grid.
+
+    Returns a dict ``{"campuses": [...], "intake_months": [...]}`` where
+    each list contains only entries with at least one FT/PT cell.  Returns
+    ``None`` when no such table is present (e.g. non-course pages, or ECU
+    pages that pre-date the current template).  Returns the dict with
+    BOTH lists empty when the table exists but every cell is blank — the
+    caller should treat that as a strong "no offering on this tab" signal.
+    """
+    if not html:
+        return None
+    table_m = _AVAIL_TABLE_RE.search(html)
+    if not table_m:
+        return None
+    table_html = table_m.group("body")
+
+    # Resolve column → semester number from the <thead> row.
+    sem_cols: list[int | None] = []
+    thead_m = _THEAD_RE.search(table_html)
+    if thead_m:
+        head_row_m = _TR_RE.search(thead_m.group(1))
+        if head_row_m:
+            for th in _TH_RE.findall(head_row_m.group(1)):
+                hm = _SEM_HEADER_RE.search(_strip_tags(th))
+                sem_cols.append(int(hm.group(1)) if hm else None)
+    if not any(sem_cols):
+        # No recognisable semester headers — abort and let the caller fall
+        # back to the legacy substring extractor.
+        return None
+
+    # Collect FT/PT presence per (campus_row, semester_col).
+    tbody_m = _TBODY_RE.search(table_html)
+    body_html = tbody_m.group(1) if tbody_m else table_html
+    rows = _TR_RE.findall(body_html)
+
+    campuses_with_offer: list[str] = []
+    seen_campuses: set[str] = set()
+    sems_with_offer: set[int] = set()
+
+    for row_html in rows:
+        first_th = _TH_RE.search(row_html)
+        if not first_th:
+            continue
+        row_label = _strip_tags(first_th.group(1)).lower()
+        canonical = _ECU_GRID_CAMPUS_NORM.get(row_label)
+        cells = _TD_RE.findall(row_html)
+        any_offer = False
+        for td_idx, cell_html in enumerate(cells):
+            cell_text = _strip_tags(cell_html)
+            if not cell_text or not _FT_PT_RE.search(cell_text):
+                continue
+            any_offer = True
+            # td index N corresponds to thead column N+1 (the first thead
+            # column is "Location" which has no <td> in body rows).
+            sem_thead_idx = td_idx + 1
+            if 0 <= sem_thead_idx < len(sem_cols):
+                sem_num = sem_cols[sem_thead_idx]
+                if sem_num:
+                    sems_with_offer.add(sem_num)
+        if any_offer and canonical and canonical not in seen_campuses:
+            campuses_with_offer.append(canonical)
+            seen_campuses.add(canonical)
+
+    months: list[str] = []
+    for n in sorted(sems_with_offer):
+        month = _ECU_SEMESTER_TO_MONTH.get(n)
+        if month and month not in months:
+            months.append(month)
+
+    return {"campuses": campuses_with_offer, "intake_months": months}
 
 
 def _extract_ecu_location(html: str) -> str:
@@ -230,11 +403,44 @@ def apply_ecu_extraction(url: str, html: str) -> dict[str, Any]:
     # Always-set: bypass the no_international_fee hard rejection.
     result["has_central_fee_page"] = True
 
-    # Always-set: clean location derived from page content only.
-    # Uses direct assignment (not setdefault) so the generic location
-    # extractor — which grabs footer text containing "Sri Lanka" etc. —
-    # cannot overwrite this authoritative value.
-    result["course_location"] = _extract_ecu_location(html or "")
+    # Authoritative location + intake months from the structured
+    # Availability & Campus grid (2026-05-12 fix).  When the grid is
+    # present we ALWAYS prefer it: it ties FT/PT presence to
+    # (campus, semester) pairs so empty rows / columns no longer leak
+    # into the staged values.  Falls back to the legacy substring scan
+    # only when no grid is found (older template / non-standard pages).
+    grid = parse_availability_grid(html or "")
+    if grid is not None:
+        if grid["campuses"]:
+            result["course_location"] = ", ".join(grid["campuses"])
+        else:
+            # Grid exists but EVERY cell is empty — do not write a default
+            # location.  Two cases reach here:
+            #   1. Page also carries the domestic-only banner (e.g. Master
+            #      of Nursing (Nurse Practitioner)) — the global filter in
+            #      single_course.py drops the page before staging anyway.
+            #   2. Page has no banner but no offerings either (rare; usually
+            #      a template glitch or a course that's between intakes) —
+            #      we surface "ecu_no_offerings" as a scrape warning so
+            #      operators can review in the UI rather than silently
+            #      seeding "Perth, Australia" / wrong intakes.
+            warns = list(result.get("scrape_warnings") or [])
+            if "ecu_no_offerings" not in warns:
+                warns.append("ecu_no_offerings")
+            result["scrape_warnings"] = warns
+        if grid["intake_months"]:
+            # Higher priority than intake.ecu_semester (conf=0.85) so this
+            # wins the merge in single_course.py.
+            result["intake_months"] = grid["intake_months"]
+        log.info(
+            "[ECU grid] %s — campuses=%s intakes=%s",
+            url,
+            grid["campuses"],
+            grid["intake_months"],
+        )
+    else:
+        # Pre-2026-05 template / non-standard pages: best-effort substring scan.
+        result["course_location"] = _extract_ecu_location(html or "")
 
     # Best-effort fee from static HTML.
     intl_fee = _extract_international_fee(html or "")
@@ -243,7 +449,10 @@ def apply_ecu_extraction(url: str, html: str) -> dict[str, Any]:
         result["fee_term"] = "year"
         log.info("[ECU] %s — fee extracted from static HTML: %.0f", url, intl_fee)
     else:
-        result["scrape_warnings"] = ["ecu_fee_review"]
+        warns = list(result.get("scrape_warnings") or [])
+        if "ecu_fee_review" not in warns:
+            warns.append("ecu_fee_review")
+        result["scrape_warnings"] = warns
         log.info(
             "[ECU] %s — fee not in static HTML; staging with has_central_fee_page=True",
             url,

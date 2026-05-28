@@ -1,0 +1,107 @@
+# KOI (koi)
+discovery:
+  # The course listing page has a clear `/courses/` path.
+  allow_url_patterns:
+    - "/courses/.*"
+  # The page lists general information pages like "About Us", "Students", "Partners",
+  # which do not contain course details.
+  block_url_patterns:
+    - "/about-us/"
+    - "/students/"
+    - "/partners/"
+    - "/careers/"
+    - "/accreditation/"
+    - "/financial-standing/"
+    - "/consent-matters-program/"
+    - "/sexual-assault-sexual-harassment-and-gender-based-violence/"
+    - "/life-at-koi/"
+    - "/professional-internship-program/"
+    - "/e-learning/"
+    - "/student-portals/"
+    - "/my-library/"
+    - "/student-handbook/"
+    - "/support-for-students/"
+    - "/gen-ai/"
+    - "/graduation/"
+    - "/gpa-calculator/"
+    - "/my-equals/"
+    - "/alumni/"
+    - "/preventing-sexual-harm/"
+    - "/support-services-for-sexual-harm/"
+    - "/policies-forms/"
+    - "/testimonials/"
+    - "/agent-portal-instructions/"
+    - "/international_partners/"
+    - "/become-an-agent/"
+    - "/find-an-agent/"
+    - "/faq_category/"
+    - "/contact/"
+    - "/fee-help/"
+    - "/accommodation/"
+    - "/student-guide/"
+    - "/graduate-register/"
+    - "/aibm-koi-organisation/"
+    - "/academic-staff-profile/"
+    - "/newcastle/"
+    - "/blog/"
+    - "/partners/"
+    - "/about-us/"
+    - "/faq/"
+    - "/koi-student-support-services-directory/"
+    - "/intakes/"
+
+extraction:
+  # The provided operator notes indicate specific PDFs for international entry requirements and fees.
+  english:
+    requirements_pdf_url: "https://koi.edu.au/international-applicants-entry-requirement/"
+  fees:
+    fees_pdf_url: "https://koi.edu.au/wp-content/uploads/2025/11/KOI_TUITION_FEES_2026-V_07_NOV_2025.pdf"
+  # The university has intake dates that might be relevant for the extraction process.
+  # This field can be used to inject the URL to the intake dates page if it's not automatically discovered.
+  # We are not adding an explicit URL here as it might be discovered, but it's a potential override.
+  # intake_dates_url: "https://koi.edu.au/koi-intake-dates/"
+  # The provided operator notes mention "KOI intake dates". This suggests a central page for intake dates.
+  # While not directly an extraction override, it's noted for potential future use if discovery fails.
+  # intake_dates_central_page: "https://koi.edu.au/koi-intake-dates/"
+  # The course listing page implies that courses are primarily delivered in Australia.
+  # No explicit override needed for online_only.enabled as the default is true.
+  # filters:
+  #   online_only:
+  #     enabled: true
+  # The "International Applicants Entry Requirement" link indicates a focus on international admissions.
+  # However, there isn't a specific "International Only" tab visible on the main listing page that would warrant `domestic_only.enabled: true`.
+  # The default `false` is appropriate here.
+  # filters:
+  #   domestic_only:
+  #     enabled: false
+
+  # The sample course URL shows a structure that is directly discoverable.
+  # No need for `extra_course_urls` unless specific courses are consistently missed.
+  # No indication of aggressive rate limiting, so `max_parallel_fetch` can inherit the default.
+  # No obvious boilerplate text that needs global stripping.
+  # No complex text cleaning rules or field overrides are immediately apparent.
+
+# This university has standard URL patterns for courses.
+# The provided sample URLs are directly under `/courses/`.
+# No specific `url_rewrites` are needed as there's no clear indication of
+# international/domestic query parameters for course details.
+# The provided "operator_notes" specify the international entry requirement page and the fee PDF.
+# These are valuable for the extraction phase.
+# The fees are specified for 2026, so this indicates the need for precise fee extraction.
+# The URL path for courses is clearly `/courses/`.
+# No specific `must_contain` needed if `allow_url_patterns` is sufficient.
+# No indication of sitemap issues requiring `sitemap_url` override.
+# No indication of JS-rendering issues requiring `always_sitemap_supplement`.
+# No indication of WAF issues requiring `use_wayback`.
+# The BFS page budget can inherit the default unless the number of course listing pages is exceptionally large.
+# No complex fallback subdomains are apparent.
+# No need for `always_browser_discover` as the site doesn't appear to be a SPA or heavily protected by Cloudflare.
+# No indication of `domestic_only.enabled: true` as there's no explicit "domestic only" tab.
+# The `extraction.filters.online_only.enabled` should inherit the default `true` unless KOI is a known distance-education provider.
+# The `default_currency` should be "AUD" as it's an Australian university.
+# No need for `trust_vision_ocr` override.
+# No `test_blocklist` needed unless specific issues arise.
+# No `default_ielts/pte/toefl` are specified, so these should inherit defaults.
+# No `default_course_location` is specified, so this can inherit the default.
+# No `max_parallel_fetch` override is needed as there's no indication of rate limiting.
+# No `text_cleaning.global_substring_blocklist` or `text_cleaning.field_overrides` are immediately apparent.

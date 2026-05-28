@@ -25,3 +25,74 @@ extraction:
   filters:
     domestic_only:
       enabled: true   # Preserve current prod behaviour: filter runs for all unis.
+
+  fees:
+    # Per-uni PDF parser override.
+    #
+    # Why: the Torrens fee schedule uses a 3+ column table where many
+    # course titles wrap across 2-3 lines (e.g. "Diploma of Branded" /
+    # "Fashion Design", "Bachelor of Game" / "Programming",
+    # "Diploma of UX &" / "Web Design", "Graduate Certificate" /
+    # "of Research Studies"). pypdf flattens this into a single line
+    # in inconsistent ways, so the legacy line-anchored regex parser
+    # silently drops 7+ courses per scrape.
+    #
+    # The "columnar" strategy uses ``pdftotext -layout`` (poppler) and
+    # a CRICOS-anchored, column-position-aware row parser
+    # (_pick_per_course_amounts_columnar) which correctly folds wrap
+    # fragments back into the row's primary name. Falls back to legacy
+    # automatically if the pdftotext binary is unavailable.
+    pdf_parser: columnar
+
+    # 2026-05-12 fix: prefer the "Indicative annual fees" column over the
+    # "Indicative total course tuition fees" column when the PDF row
+    # exposes BOTH (e.g. 3-year Bachelor of Business
+    # (Hospitality and Tourism Management): annual=$31,600 / total=$94,800).
+    # Without this, every multi-year Torrens degree was being staged with
+    # the total-course figure under fee_term="Full Course" — operators
+    # wanted the per-year figure displayed in the catalogue. 1-year
+    # courses (Diploma, Graduate Certificate) are unaffected because
+    # annual == total there.
+    prefer_annual_over_total: true
+
+    # 2026-05-12 fix: make the per-course PDF row authoritative for the
+    # international_fee / currency / fee_term / fee_year slots, even when
+    # an earlier extractor (page regex, Gemini prose) already wrote a
+    # value. Required because Torrens course pages contain marketing
+    # sentences like "will cost an international student $82,800" in a
+    # description block — the page regex grabbed that as the fee and
+    # the existing course-page-wins guard prevented the official PDF
+    # value ($31,600/Annual for the same course) from overriding.
+    # Scope is limited to the four fee slots; every other field
+    # continues to honour course-page-wins.
+    pdf_overrides_page_regex: true
+
+    # Per-course PDF row aliases.
+    #
+    # Why this exists:
+    #   The Torrens international fee schedule lists Design awards under
+    #   their cognate / non-cognate variants (e.g. row title
+    #   "Master of Design (Non-Cognate) 2 13** $4,450 $35,600 $71,200"),
+    #   but the DB course name is the bare "Master of Design".  After
+    #   stop-word stripping (master / of) the DB tokens collapse to
+    #   {design} — a single distinctive token — which fails the matcher's
+    #   ≥2-distinctive-token floor and the row is rejected.  Result: the
+    #   table cell is left blank even though the schedule clearly carries
+    #   the fee.
+    #
+    #   Setting an alias here swaps the DB course name for the longer
+    #   PDF row title only inside ``match_course_in_pdf_table`` — the DB
+    #   record is unchanged.  The alias supplies the extra distinctive
+    #   tokens (non, cognate) so the row scores cleanly.
+    #
+    # Key   = lower-cased DB course name.
+    # Value = the course title as it appears in the Torrens fee PDF.
+    course_pdf_aliases:
+      # The columnar parser captures the Master of Design row as
+      # "Master of Design (Cognate)" (the first of two stacked variants
+      # in the PDF). The bare DB course name lacks the (Cognate) /
+      # (Non-Cognate) qualifier; aliasing supplies the extra distinctive
+      # token so the matcher's >=2-token floor passes. Graduate Certificate
+      # of Design has no qualifier in the columnar parse, so no alias is
+      # needed for it.
+      "master of design": "Master of Design (Cognate)"

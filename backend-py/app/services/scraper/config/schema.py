@@ -147,6 +147,16 @@ class FeesConfig(BaseModel):
         default=None,
         description="URL of the university-wide fee schedule PDF.",
     )
+    force_central_fee_stage: bool = Field(
+        default=False,
+        description=(
+            "When true, sets has_central_fee_page=True in every course payload "
+            "so courses without an individual fee listing still pass the "
+            "no_international_fee staging gate and land in the review queue. "
+            "Use for universities (e.g. UTAS) that publish fees on a separate "
+            "central schedule rather than on each course page."
+        ),
+    )
     default_currency: str = Field(
         default="AUD",
         description="ISO currency code used when no currency marker is found on the page.",
@@ -157,6 +167,110 @@ class FeesConfig(BaseModel):
             "Number of credit points per unit of study.  When set, per-unit fees are "
             "multiplied by this value to derive the full-course fee.  "
             "None = use the extracted credit-point count from the page."
+        ),
+    )
+    course_pdf_aliases: dict[str, str] = Field(
+        default_factory=dict,
+        description=(
+            "Per-uni alias map: DB course name (lower-cased) → the course "
+            "name as it actually appears in the fee schedule PDF. Used by "
+            "match_course_in_pdf_table to augment / replace the DB course's "
+            "token bag so fuzzy matching can clear the ≥2-distinctive-token "
+            "floor when the PDF row carries a qualifier (e.g. "
+            "'Master of Design (Non-Cognate)') the DB course name lacks. "
+            "Empty by default — opt-in per university only. "
+            "Match is case-insensitive on the key."
+        ),
+    )
+    pdf_row_pattern: Optional[str] = Field(
+        default=None,
+        description=(
+            "Per-uni regex override for the per-course PDF data row. "
+            "When None (default), _pick_per_course_amounts uses the shared "
+            "_PDF_DATA_ROW_RE pattern (CRICOS + duration + units + 3 dollar "
+            "amounts — Torrens / ASA layout). Set this when a university's "
+            "fee PDF uses a fundamentally different column layout (e.g. "
+            "Federation: CRICOS + 2 dollar amounts, no per-unit / total). "
+            "Pattern MUST define a named group ``cricos``; ``per_unit``, "
+            "``annual``, ``total`` are looked up via ``groupdict().get()`` "
+            "so missing groups are tolerated. Compiled with re.I."
+        ),
+    )
+    pdf_fee_term: Optional[str] = Field(
+        default=None,
+        description=(
+            "Per-uni override for the fee_term emitted by per-course PDF "
+            "rows. When None (default), the term is auto-derived from the "
+            "annual vs total comparison. Set to ``\"Annual\"`` for PDFs "
+            "(e.g. Federation) whose row only carries an annual figure, or "
+            "``\"Full Course\"`` for whole-of-programme schedules."
+        ),
+    )
+    prefer_annual_over_total: bool = Field(
+        default=False,
+        description=(
+            "When the per-course PDF row exposes BOTH an annual figure and "
+            "a total-course figure (e.g. Torrens: $31,600 annual / $94,800 "
+            "total over 3 years), store the annual value as "
+            "``international_fee`` with ``fee_term=\"Annual\"`` instead of "
+            "the total / ``\"Full Course\"`` default. The default (False) "
+            "preserves the original behaviour of preferring the total "
+            "course tuition. Enable per-uni only when annual fees are the "
+            "value the operator wants displayed in the catalogue."
+        ),
+    )
+    prefer_year_one_over_total: bool = Field(
+        default=False,
+        description=(
+            "When the per-course PAGE publishes BOTH a 'Year 1 fee' "
+            "(e.g. 'Indicative year 1 fee $47,116') and a 'Total course "
+            "fee' (e.g. 'Total indicative course fee $141,348') label, "
+            "store the year-1 amount as ``international_fee`` with "
+            "``fee_term=\"Annual\"`` instead of the total / "
+            "``\"Full Course\"`` default. The default (False) preserves "
+            "the original page-regex preference for the larger total. "
+            "Enable per-uni only when the year-1 figure is the value the "
+            "operator wants displayed in the catalogue (e.g. Curtin "
+            "publishes 3-year Bachelor degrees with both labels and the "
+            "operator-facing column reads ``$X/Annual`` not ``$X/Full "
+            "Course``). Independent of ``prefer_annual_over_total`` which "
+            "covers the PDF-row path; this knob covers the page-regex "
+            "extractor in ``extractors/fee.py``."
+        ),
+    )
+    pdf_overrides_page_regex: bool = Field(
+        default=False,
+        description=(
+            "When True, a successful per-course PDF row match OVERWRITES "
+            "any existing payload values for ``international_fee``, "
+            "``currency``, ``fee_term`` and ``fee_year`` even if those "
+            "slots were already filled by an earlier extractor (page "
+            "regex / Gemini prose / sibling cache). The default (False) "
+            "keeps the historical course-page-wins behaviour where the "
+            "PDF only fills empty slots. Enable for universities whose "
+            "per-course HTML pages contain marketing prose with stale or "
+            "non-tuition dollar amounts (e.g. Torrens: ``\"will cost an "
+            "international student $82,800\"`` for a course whose "
+            "official 2026 PDF schedule lists $31,600/Annual). Treats "
+            "the central PDF schedule as the authoritative tuition "
+            "source for the affected uni."
+        ),
+    )
+    pdf_parser: Optional[str] = Field(
+        default=None,
+        description=(
+            "Per-uni override for the per-course PDF parser strategy. "
+            "When None (default), the legacy regex-based ``_pick_per_course_amounts`` "
+            "is used over pypdf-extracted text — works well for PDFs whose course "
+            "names fit on the same line as the CRICOS+fee data. Set to "
+            "``\"columnar\"`` to switch to ``_pick_per_course_amounts_columnar``, "
+            "which uses ``pdftotext -layout`` (poppler) and a CRICOS-anchored, "
+            "column-position-aware row parser. The columnar parser correctly "
+            "handles fee schedules where course titles wrap across 2-3 lines "
+            "(e.g. Torrens: ``Diploma of Branded`` / ``Fashion Design`` on "
+            "separate lines) — pypdf flattens these and the legacy line-anchored "
+            "regex misses them entirely. Requires ``pdftotext`` to be on PATH; "
+            "falls back to legacy on subprocess failure."
         ),
     )
 
@@ -207,6 +321,17 @@ class EnglishConfig(BaseModel):
         default=None,
         description="Institutional TOEFL iBT default.",
     )
+    test_blocklist: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Per-uni list of English-test names to drop from extracted results "
+            "(case-insensitive match on test name: ielts / pte / toefl / "
+            "cambridge / duolingo / kite). Use when a university page "
+            "incidentally mentions a test it does not actually accept (e.g. a "
+            "marketing page links 'KITE' as a competitor product, polluting "
+            "the extracted English requirements). Empty by default."
+        ),
+    )
 
 
 class DomesticOnlyFilter(BaseModel):
@@ -222,10 +347,39 @@ class DomesticOnlyFilter(BaseModel):
 
 class OnlineOnlyFilter(BaseModel):
     enabled: bool = Field(
-        default=False,
+        default=True,
         description=(
-            "When true, courses with all-online delivery are dropped during staging. "
-            "Rarely needed — most international portals already exclude pure-online."
+            "When true, courses with all-online delivery are dropped during "
+            "staging.  Default true mirrors the historical hard-coded reject "
+            "in guards.should_stage_course.  Distance-education-heavy unis "
+            "(e.g. CSU, OUA) opt out by setting this to false in their "
+            "per-uni YAML."
+        ),
+    )
+
+
+class IntakeConfig(BaseModel):
+    rolling_enrollment_label: Optional[str] = Field(
+        default=None,
+        description=(
+            "When set AND the page text contains any of "
+            "rolling_enrollment_markers AND no intake months were "
+            "extracted by any other path, write [label] into "
+            "intake_months. Used for research degrees (PhD / MPhil) "
+            "where the university accepts continuous enrolment "
+            "rather than fixed semester intakes — e.g. Curtin's "
+            "'Enrolment shall be continuous' wording. Off by default; "
+            "opt-in per uni so undergraduate/postgrad pages without "
+            "an extracted intake still raise the no_intake_months "
+            "warning."
+        ),
+    )
+    rolling_enrollment_markers: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Lower-cased substrings searched in the page body to "
+            "trigger the rolling_enrollment_label fallback. Match is "
+            "case-insensitive substring (no regex). Empty by default."
         ),
     )
 
@@ -236,6 +390,20 @@ class FiltersConfig(BaseModel):
     )
     online_only: OnlineOnlyFilter = Field(
         default_factory=OnlineOnlyFilter,
+    )
+    broken_cms_retry_strip_query: bool = Field(
+        default=False,
+        description=(
+            "When the global broken-CMS short-circuit fires AND the URL "
+            "carries a query string, retry the bare URL once before "
+            "giving up. Use only when the uni serves a real, fully-"
+            "international-eligible page at the bare URL but a "
+            "YAML-driven query rewrite (e.g. CQU "
+            "?audience=INTERNATIONAL on most Bachelors and Masters) "
+            "returns a 200-OK 137-char branded error template. Off by "
+            "default — preserves the strict skip-on-broken-CMS "
+            "behaviour for every other uni."
+        ),
     )
 
 
@@ -261,12 +429,91 @@ class DurationCleaningConfig(BaseModel):
     )
 
 
+class FieldOverride(BaseModel):
+    """Hard-set a payload field when a course URL matches a regex.
+
+    Use as a surgical last-mile fix when an extractor consistently writes
+    a wrong value for a small set of pages and per-uni tweaks to the
+    extractor are not justified. E.g. a single department page whose
+    ``course_location`` always comes out wrong.
+    """
+
+    url_regex: str = Field(
+        description="Regex applied (case-insensitive) to the course URL. Must match for the override to fire.",
+    )
+    field: str = Field(
+        description="Payload key to overwrite (e.g. 'course_location', 'study_mode', 'duration_term').",
+    )
+    value: Optional[str] = Field(
+        default=None,
+        description="Value to write. Use null/empty to clear the field instead.",
+    )
+
+
+class UrlRewrite(BaseModel):
+    """Per-host URL rewriting applied right before each course page is fetched.
+
+    Many universities gate the international-student view (fees, IELTS,
+    intakes, campus list) behind a query flag like ``?international=true``
+    or ``?audience=INTERNATIONAL``. Without that flag the page renders the
+    domestic CSP view and every fee comes out at the domestic price.
+
+    Each entry matches a request when ``host`` matches the URL netloc
+    (case-insensitive; bare and ``www.`` variants both match) AND, if
+    ``path_contains`` is set, the URL path includes that substring. When
+    a rewrite fires it parses ``append_query`` as a query string and adds
+    each key only if NOT already present (idempotent).
+    """
+
+    host: str = Field(
+        description=(
+            "Hostname this rewrite applies to (e.g. 'www.cqu.edu.au'). "
+            "The bare apex form (cqu.edu.au) is also matched automatically."
+        ),
+    )
+    path_contains: Optional[str] = Field(
+        default=None,
+        description=(
+            "Optional substring the URL path must contain for the rewrite to "
+            "fire (e.g. '/courses/'). Useful when a uni mixes course and "
+            "non-course pages on the same host. None = no path filter."
+        ),
+    )
+    append_query: str = Field(
+        description=(
+            "Query string to merge into the URL (e.g. 'audience=INTERNATIONAL' "
+            "or 'students=international&year=2026'). Each key is only added "
+            "if it is not already present in the URL."
+        ),
+    )
+
+
 class TextCleaningConfig(BaseModel):
     location: LocationCleaningConfig = Field(
         default_factory=LocationCleaningConfig,
     )
     duration: DurationCleaningConfig = Field(
         default_factory=DurationCleaningConfig,
+    )
+    global_substring_blocklist: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Substrings (case-insensitive) stripped from EVERY string field on "
+            "the staged payload immediately before DB write. Useful for stock "
+            "boilerplate that pollutes multiple fields (e.g. 'Apply Now', "
+            "'Find out more', a stray cookie banner fragment). Whitespace is "
+            "collapsed after stripping. Empty by default."
+        ),
+    )
+    field_overrides: list[FieldOverride] = Field(
+        default_factory=list,
+        description=(
+            "List of per-URL hard overrides. Each entry has url_regex, field, "
+            "and value. When the course URL matches the regex, the named "
+            "payload field is set to the supplied value (overwriting whatever "
+            "extractors wrote). Apply sparingly — extractor / YAML fixes are "
+            "preferred. Empty by default."
+        ),
     )
 
 
@@ -287,9 +534,45 @@ class ExtractionConfig(BaseModel):
 
     fees: FeesConfig = Field(default_factory=FeesConfig)
     english: EnglishConfig = Field(default_factory=EnglishConfig)
+    intake: IntakeConfig = Field(default_factory=IntakeConfig)
     filters: FiltersConfig = Field(default_factory=FiltersConfig)
     text_cleaning: TextCleaningConfig = Field(default_factory=TextCleaningConfig)
     staging: StagingConfig = Field(default_factory=StagingConfig)
+    url_rewrites: list[UrlRewrite] = Field(
+        default_factory=list,
+        description=(
+            "Per-host query-param rewrites applied to every course URL "
+            "before fetch. Used to switch a site into its international-"
+            "student view (e.g. ?audience=INTERNATIONAL on CQU). Empty "
+            "by default."
+        ),
+    )
+    default_course_location: Optional[str] = Field(
+        default=None,
+        description=(
+            "Fallback value written to course_location when every extractor "
+            "(regex, browser, Gemini, PDF) returns an empty string.  Useful "
+            "for universities whose Cloudflare-protected pages occasionally "
+            "deliver partial HTML that omits the Location panel — UTAS is the "
+            "canonical example.  Set to the primary campus city/name (e.g. "
+            "'Hobart') so that the online-only staging guard does not reject "
+            "legitimate on-campus courses whose location text was simply "
+            "missing from the crawled HTML."
+        ),
+    )
+    max_parallel_fetch: Optional[int] = Field(
+        default=None,
+        description=(
+            "Cap the asyncio.Semaphore concurrency used during the extraction "
+            "gather phase for this university.  When None (default), the global "
+            "_MAX_PARALLEL_FETCH value (currently 4) is used.  Set to 2 or 1 "
+            "for Cloudflare-heavy sites (e.g. UTAS) where 4 simultaneous "
+            "browser sessions trigger aggressive 429 rate-limiting, causing "
+            "10-minute stalls that multiply across every URL batch.  Lower "
+            "values reduce throughput per-batch but eliminate the 600s "
+            "cooldown penalties, typically making the overall run faster."
+        ),
+    )
 
 
 # ── Merged UniConfig ─────────────────────────────────────────────────────────
