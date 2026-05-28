@@ -169,25 +169,27 @@ _NETWORKIDLE_HOSTS: tuple[str, ...] = (
     # networkidle with a tighter 30s / 25s budget is sufficient for SPA
     # hydration and avoids over-waiting on vocational pages.
     "vit.edu.au",
-    # UWA (University of Western Australia): Sitecore SXA SPA identical in
-    # structure to Newcastle.  Graduate Cert/Dip pages embed Schema.org
-    # JSON-LD with IELTS in static HTML; Bachelor/Master pages do NOT —
-    # requirements are hydrated client-side after page load.  Static HTML
-    # for a Bachelor page returns "3 Year" (duration) so the sparse-static
-    # rescue (fee=None AND duration=None) never fires, and the browser was
-    # never invoked.  networkidle + 3s settle (same budget as Newcastle)
-    # gives the Sitecore hydration time to mount the requirements panel.
-    # UWA pages appear to show international content by default (no
-    # Domestic/International toggle observed); add to _INTERNATIONAL_TOGGLE_HOSTS
-    # only if a first scrape confirms a toggle exists.
-    "uwa.edu.au",
 )
 
 # Hosts that need domcontentloaded + a longer-than-default JS settle window.
 # Add hosts here when networkidle is unsuitable (e.g. long-poll analytics
 # widgets that prevent idle from firing) but a brief DCL+settle window is
 # enough to mount the feature the scraper needs to click.
-_DCL_SETTLE_MS_OVERRIDES: dict[str, int] = {}
+_DCL_SETTLE_MS_OVERRIDES: dict[str, int] = {
+    # UWA (University of Western Australia): Sitecore SXA SPA.
+    # networkidle NEVER fires — UWA has persistent analytics/chat
+    # connections (askuwa.widget.custhelp.com, GA) that prevent the
+    # network from going idle.  goto times out at 25s, the partial-HTML
+    # fallback grabs page.content() immediately (no settle), and the
+    # Sitecore requirements panel hasn't hydrated yet → rendered=0B.
+    # Confirmed live: Masters staging fine from static JSON-LD; Bachelors
+    # have NO IELTS in static HTML so rendered=0B = 0 english_test = fail.
+    # Fix: domcontentloaded fires in ~1-2s, then 5s settle gives Sitecore
+    # time to hydrate the requirements panel — same pattern as VIT.
+    # _FORCE_BROWSER_HOSTS (below) ensures browser is called even when
+    # static HTML succeeds with duration populated.
+    "uwa.edu.au": 5000,
+}
 
 # Hosts that need the full 60s / networkidle treatment.
 # These are sites that are either genuinely slow from our DigitalOcean
