@@ -479,12 +479,14 @@ async def bulk_academic(
     db: Annotated[AsyncSession, Depends(get_db)],
     body: Annotated[dict, Body(...)],
 ) -> dict | list:
-    """Bulk-add academic requirement rows across many courses (Bug O).
+    """Bulk-add academic requirement rows across many courses.
 
-    Each requested country produces a SEPARATE row per course. If any
-    (course, country) pair already exists we 409 with the conflict
-    list — no partial inserts (matches Node behaviour so the UI's
-    "duplicate" branch keeps working).
+    Each requested country produces a SEPARATE row per course.
+
+    If ``forceReplace`` is falsy (default) and any (course, country) pair
+    already exists, a 409 is returned with the conflict list — no partial
+    inserts.  The UI can re-send with ``forceReplace: true`` to delete
+    conflicting rows and re-insert them with the new values.
     """
     course_ids_raw = body.get("courseIds") or []
     if not isinstance(course_ids_raw, list) or not course_ids_raw:
@@ -497,6 +499,7 @@ async def bulk_academic(
         ]
     else:
         countries = [None]
+    force_replace: bool = bool(body.get("forceReplace", False))
 
     course_name_rows = (
         await db.execute(
@@ -515,6 +518,7 @@ async def bulk_academic(
     ).scalars().all()
 
     conflicts: list[dict] = []
+    conflict_ids: list[int] = []
     for cid in course_ids:
         for country in countries:
             dup = next(
@@ -533,13 +537,19 @@ async def bulk_academic(
                         "country": country,
                     }
                 )
-    if conflicts:
-        # Node returns the body at the top level (`{error, conflicts}`),
-        # not wrapped under `detail`. Use JSONResponse so the UI's
-        # `json.error === "duplicate"` branch keeps working.
+                conflict_ids.append(dup.id)
+
+    if conflicts and not force_replace:
         return JSONResponse(
             status_code=409,
             content={"error": "duplicate", "conflicts": conflicts},
+        )
+
+    if conflict_ids:
+        await db.execute(
+            delete(AcademicRequirement).where(
+                AcademicRequirement.id.in_(conflict_ids)
+            )
         )
 
     rows = [

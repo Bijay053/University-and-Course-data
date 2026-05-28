@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRoute, Link } from "wouter";
-import { useGetUniversity, getGetUniversityQueryKey, useListCourses } from "@workspace/api-client-react";
+import { useGetUniversity, getGetUniversityQueryKey, useListCourses, getListCoursesQueryKey } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -446,6 +446,7 @@ export default function UniversityDetail() {
   // ── Conflict warning from 409 duplicate check ─────────────────────────────
   type ConflictItem = { courseId: number; courseName: string; country: string | null };
   const [conflictWarning, setConflictWarning] = useState<ConflictItem[] | null>(null);
+  const [conflictPendingBody, setConflictPendingBody] = useState<{ endpoint: string; body: Record<string, unknown> } | null>(null);
 
   // ── English edit / delete ──────────────────────────────────────────────────
   type EngEditVals = { l: string; s: string; w: string; r: string; o: string };
@@ -1194,6 +1195,7 @@ export default function UniversityDetail() {
       if (res.status === 409 && bulkMode === "academic") {
         const json = await res.json() as { error: string; conflicts: ConflictItem[] };
         setConflictWarning(json.conflicts);
+        setConflictPendingBody({ endpoint, body });
         return;
       }
 
@@ -1203,6 +1205,9 @@ export default function UniversityDetail() {
       setBulkMode(null);
       if (bulkMode === "academic") {
         await loadAcademicReqs();
+        await queryClient.invalidateQueries({ queryKey: getListCoursesQueryKey({ universityId: id, limit: 500 }) });
+      } else if (bulkMode === "english") {
+        await queryClient.invalidateQueries({ queryKey: getListCoursesQueryKey({ universityId: id, limit: 500 }) });
       } else if (bulkMode === "scholarships") {
         await loadScholarshipCourses();
       }
@@ -2839,8 +2844,35 @@ export default function UniversityDetail() {
                 </tbody>
               </table>
             </div>
-            <DialogFooter className="mt-2">
-              <Button onClick={() => setConflictWarning(null)} className="cursor-pointer">OK, go back</Button>
+            <DialogFooter className="mt-2 flex gap-2">
+              <Button variant="outline" onClick={() => { setConflictWarning(null); setConflictPendingBody(null); }} className="cursor-pointer">Cancel</Button>
+              {conflictPendingBody && (
+                <Button
+                  variant="destructive"
+                  className="cursor-pointer"
+                  onClick={async () => {
+                    const { endpoint, body } = conflictPendingBody;
+                    setConflictWarning(null);
+                    setConflictPendingBody(null);
+                    setBulkApplying(true);
+                    try {
+                      const res = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...body, forceReplace: true }) });
+                      if (!res.ok) throw new Error(await res.text());
+                      const data = await res.json() as { updated: number };
+                      toast({ title: "Bulk update applied", description: `${data.updated} requirement${data.updated !== 1 ? "s" : ""} updated` });
+                      setBulkMode(null);
+                      await loadAcademicReqs();
+                      await queryClient.invalidateQueries({ queryKey: getListCoursesQueryKey({ universityId: id, limit: 500 }) });
+                    } catch (err) {
+                      toast({ title: "Error", description: String(err), variant: "destructive" });
+                    } finally {
+                      setBulkApplying(false);
+                    }
+                  }}
+                >
+                  Replace conflicts &amp; save
+                </Button>
+              )}
             </DialogFooter>
           </DialogContent>
         </Dialog>
