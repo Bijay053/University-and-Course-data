@@ -6,13 +6,25 @@
 #     1. Discovery harvested /study/ nav pages instead of /study/courses/<name>.
 #     2. Real courses extracted fine but rejected no_international_fee —
 #        UWA publishes fees via a per-credit-point CALCULATOR, not a flat number.
+#
+#   - Fix (2026-05-28): Point discovery at the explicit study sitemap.
+#     UWA's study/sitemap.xml lists 430 individual course pages as Sitecore
+#     internal paths (sitecore/content/uwafs/home/courses/<slug>) which 301
+#     redirect to https://www.uwa.edu.au/study/courses/<slug>.
+#     must_contain now accepts EITHER pattern so the pre-redirect sitemap URLs
+#     are not filtered out before fetch, and post-redirect BFS links are kept.
+#
+#   - fallback_subdomains note: handbook.uwa.edu.au 404s (it's handbooks — plural)
+#     and handbooks.uwa.edu.au has no sitemap.xml. Removed the fallback.
 discovery:
+  sitemap_url: "https://www.uwa.edu.au/study/sitemap.xml"
   always_sitemap_supplement: true
-  fallback_subdomains:
-    - handbook.{domain}
-  # Keep ONLY real course-detail pages. Drops CELT pages, discover-uwa,
-  # HDR pages, etc. — anything not under /study/courses/.
+  # Keep ONLY real course-detail pages (drop nav, CELT, HDR, etc.).
+  # Two patterns needed:
+  #   /home/courses/  — matches Sitecore paths in the sitemap (pre-redirect)
+  #   /study/courses/ — matches the real canonical URL (post-redirect / BFS)
   must_contain:
+    - "/home/courses/"
     - "/study/courses/"
   block_url_patterns:
     - /study/discover-uwa
