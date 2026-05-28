@@ -488,6 +488,100 @@ def _is_domestic_only_page(html: str) -> bool:
     return False
 
 
+_FEDERATION_HOSTS: frozenset[str] = frozenset(
+    {"www.federation.edu.au", "federation.edu.au"}
+)
+
+
+def _is_federation_host(url: str | None) -> bool:
+    """Strict netloc guard so the Federation-specific domestic-only signals
+    below can never fire on another university's pages (same discipline as
+    the host-gated UOW/ECU blocks in intake.py)."""
+    if not url:
+        return False
+    return (urlparse(url).netloc or "").lower() in _FEDERATION_HOSTS
+
+
+# Commonwealth Supported Place (CSP) / HECS-HELP are Australian government
+# domestic-funding categories.  International students are NEVER offered a
+# CSP — so a course whose ONLY fee signal is "Commonwealth Supported Place"
+# (with no parallel international dollar amount) is domestic-only by
+# definition.  This is the high-precision signal behind the greyed-out
+# International tab on pages like the Bachelor of Exercise and Sport Science
+# (federation.edu.au/courses/dpk5-...): Fees = "Commonwealth Supported Place".
+_CSP_RE = _re.compile(
+    r"commonwealth\s+supported\s+place|\bCSP\b|HECS[-\s]?HELP", _re.IGNORECASE
+)
+# A real international tuition figure looks like "$42,000" / "A$42,000" /
+# "AUD 42000".  Used to confirm the page exposes NO international dollar fee
+# before we trust the CSP-only signal.
+_INTL_DOLLAR_FEE_RE = _re.compile(
+    r"(?:A\$|AUD\s*|\$)\s?\d{2,3}(?:[,\s]?\d{3})\b", _re.IGNORECASE
+)
+
+
+def _federation_domestic_only_signal(rendered_html: str, url: str) -> str | None:
+    """Federation-scoped domestic-only detection from the RENDERED DOM.
+
+    Returns a short reason string when the rendered page indicates the course
+    is not offered to international students, else None.  Host-gated to
+    federation.edu.au so it cannot affect any other university.
+
+    Two independent signals, either is sufficient:
+
+      1. CSP-only fees — the page shows a Commonwealth Supported Place / HECS
+         fee and NO international dollar amount anywhere.  CSP is domestic-only
+         by definition.
+      2. Disabled International tab — the audience toggle's "International"
+         button is rendered disabled/greyed-out.
+
+    Designed to run AFTER the existing ``_DOMESTIC_ONLY_RE`` /
+    ``_is_domestic_only_page`` checks as a supplement, catching the cases
+    where the ``"hasInternational": false`` JSON string your existing guard
+    hunts for isn't in the rendered DOM (the React app disables the tab via
+    component state rather than emitting that literal string).
+    """
+    if not rendered_html or not _is_federation_host(url):
+        return None
+
+    # Signal 2: disabled International tab.  Check both attribute orderings
+    # (disabled-before-label and label-before-disabled) with a tight window
+    # so we only match the actual tab element, not unrelated copy.
+    _disabled_before = _re.search(
+        r"<(?:button|a)\b[^>]*(?:\bdisabled\b|aria-disabled\s*=\s*[\"']?true"
+        r"|class\s*=\s*[\"'][^\"']*(?:is-)?disabled)[^>]*>\s*International\s*<",
+        rendered_html, _re.IGNORECASE,
+    )
+    _label_then_disabled = _re.search(
+        r"International\s*</(?:button|a)>",
+        rendered_html, _re.IGNORECASE,
+    )
+    if _disabled_before:
+        return "federation_intl_tab_disabled"
+    if _label_then_disabled:
+        # Confirm the matched tab actually carries a disabled marker within
+        # the same element (look back a bounded window for the opening tag).
+        _start = max(0, _label_then_disabled.start() - 300)
+        _seg = rendered_html[_start:_label_then_disabled.end()]
+        if _re.search(
+            r"\bdisabled\b|aria-disabled\s*=\s*[\"']?true"
+            r"|class\s*=\s*[\"'][^\"']*(?:is-)?disabled",
+            _seg, _re.IGNORECASE,
+        ):
+            return "federation_intl_tab_disabled"
+
+    # Signal 1: CSP-only fees.  Only trust this when there is NO international
+    # dollar figure anywhere on the rendered page (otherwise a genuinely
+    # international course that merely mentions CSP for its domestic cohort
+    # would be wrongly dropped).
+    if _CSP_RE.search(rendered_html) and not _INTL_DOLLAR_FEE_RE.search(
+        rendered_html
+    ):
+        return "federation_csp_domestic_only"
+
+    return None
+
+
 def _domestic_only_filter_enabled() -> bool:
     """Phase 3 gate: return True when the domestic-only filter should run.
 
@@ -2895,13 +2989,28 @@ async def extract_course(
         and not _url_signals_international
     ):
         _hard_marker_hit = bool(_DOMESTIC_ONLY_RE.search(rendered_html))
+        # Federation-scoped supplement: the React app disables the
+        # International tab (and shows a CSP-only fee) via component state
+        # rather than emitting the `"hasInternational": false` JSON string
+        # that _DOMESTIC_ONLY_RE looks for, so the hard marker above misses
+        # courses like the Bachelor of Exercise and Sport Science.  Treat a
+        # disabled-tab / CSP-only signal as a HARD marker too: it must
+        # override _browser_confirmed_intl, because the international_fee in
+        # the payload was leaked by the central fee-schedule PDF matching a
+        # row for a course the live page does not offer to international
+        # students.  Host-gated, so no effect on other universities.
+        _fed_signal = _federation_domestic_only_signal(rendered_html, url)
+        if _fed_signal:
+            _hard_marker_hit = True
         if _hard_marker_hit or (
             _is_domestic_only_page(rendered_html) and not _browser_confirmed_intl
         ):
             payload["domestic_only"] = True
             await emit(
                 "status",
-                f"[DOMESTIC ONLY] {url} — rendered page states domestic-students-only; skipping",
+                f"[DOMESTIC ONLY] {url} — rendered page states domestic-students-only"
+                + (f" ({_fed_signal})" if _fed_signal else "")
+                + "; skipping",
                 phase="extract",
                 kind="domestic_only_skip",
                 url=url,
