@@ -1971,10 +1971,29 @@ async def staged_approve(sc_id: int, db: Annotated[AsyncSession, Depends(get_db)
             },
         )
 
-    sc.status = "approved"
-    sc.reviewed_at = datetime.now(timezone.utc)
-    await db.commit()
-    return {"ok": True, "id": sc_id, "status": "approved", "confidence": _cg["score"]}
+    # Promote to the live courses table (creates/updates Course record, sets course_id)
+    from app.services.scraper.approve_course import approve_scraped_course as _promote
+    try:
+        result = await _promote(db, sc, actor="admin")
+        return {
+            "ok": True,
+            "id": sc_id,
+            "status": "approved",
+            "confidence": _cg["score"],
+            "course_id": result.get("course_id"),
+        }
+    except Exception as exc:
+        # Fallback: at minimum mark as approved even if promotion fails
+        sc.status = "approved"
+        sc.reviewed_at = datetime.now(timezone.utc)
+        await db.commit()
+        return {
+            "ok": True,
+            "id": sc_id,
+            "status": "approved",
+            "confidence": _cg["score"],
+            "promote_error": str(exc),
+        }
 
 
 class _RejectBody(BaseModel):
