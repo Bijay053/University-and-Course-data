@@ -1086,6 +1086,8 @@ export default function SettingsScraperConfigs() {
       setEditorYaml(entry.yaml_content);
       removeDraft(selected);
       setDraftBanner(null);
+      setHistorySelectedEntry(null);
+      setHistoryCompareEntry(null);
       await fetchConfigs();
       await fetchHistory(selected);
     } catch (err) {
