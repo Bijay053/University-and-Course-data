@@ -677,8 +677,20 @@ function HistoryPanel({ history, loading, hasMore, loadingMore, savedYaml, selec
                     size="sm"
                     variant="outline"
                     className="h-6 text-[11px] gap-1"
+                    onClick={() => onRestore(oldEntry)}
+                    disabled={restoringId !== null}
+                  >
+                    {restoringId === oldEntry.id
+                      ? <Loader2 className="w-3 h-3 animate-spin" />
+                      : <RotateCcw className="w-3 h-3" />}
+                    {restoringId === oldEntry.id ? "Restoring…" : "Restore A"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-6 text-[11px] gap-1"
                     onClick={() => onRestore(newEntry)}
-                    disabled={restoringId === newEntry.id}
+                    disabled={restoringId !== null}
                   >
                     {restoringId === newEntry.id
                       ? <Loader2 className="w-3 h-3 animate-spin" />
