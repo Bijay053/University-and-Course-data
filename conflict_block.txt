@@ -1,0 +1,35 @@
+              <div className="px-4 py-1.5 border-t bg-muted/30 text-xs text-muted-foreground flex items-center gap-4">
+<<<<<<< HEAD
+                <span>{editorYaml.split("\n").length} lines</span>
+                <span>Changes take effect on next scrape job</span>
+                {selectedConfig?.university_name && (
+                  <span className="text-green-700">
+                    ✓ Linked to {selectedConfig.university_name}
+                  </span>
+                )}
+                {selected && selectedConfig?.university_id == null && (
+                  <span className="text-amber-600">
+                    ⚠ No university linked — add <code className="font-mono">{'# Hostname: www.example.edu'}</code> to the YAML
+                  </span>
+=======
+                {showDiff ? (
+                  <>
+                    <span>Diff: saved → current edit</span>
+                    {isDirty ? (
+                      <span className="text-amber-600 dark:text-amber-400">Unsaved changes</span>
+                    ) : (
+                      <span>No changes</span>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <span>{editorYaml.split("\n").length} lines</span>
+                    {isDirty ? (
+                      <span className="text-amber-600 dark:text-amber-400">Unsaved changes</span>
+                    ) : (
+                      <span>Changes take effect on next scrape job</span>
+                    )}
+                  </>
+>>>>>>> 6802016 (feat: Add YAML config diff viewer to Scraper Configs page (Task #90))
+                )}
+              </div>

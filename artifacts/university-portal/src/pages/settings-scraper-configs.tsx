@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { SettingsTabs } from "@/components/settings-tabs";
-import { Plus, Save, Trash2, Sparkles, Search, RefreshCw, X, Play, Loader2, CheckCircle2, AlertCircle, Clock } from "lucide-react";
+import { Plus, Save, Trash2, Sparkles, Search, RefreshCw, X, Play, Loader2, CheckCircle2, AlertCircle, Clock, GitCompare, Code } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -75,18 +75,209 @@ function JobStatusBadge({ state, compact = false }: { state: TriggerState; compa
   return null;
 }
 
+// ── Diff engine ───────────────────────────────────────────────────────────────
+
+type DiffOp = "equal" | "insert" | "delete";
+
+interface DiffLine {
+  op: DiffOp;
+  text: string;
+  oldLineNo: number | null;
+  newLineNo: number | null;
+}
+
+function lcs(a: string[], b: string[]): number[][] {
+  const m = a.length;
+  const n = b.length;
+  const dp: number[][] = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      dp[i][j] = a[i - 1] === b[j - 1] ? dp[i - 1][j - 1] + 1 : Math.max(dp[i - 1][j], dp[i][j - 1]);
+    }
+  }
+  return dp;
+}
+
+function computeDiff(oldText: string, newText: string): DiffLine[] {
+  const oldLines = oldText === "" ? [] : oldText.split("\n");
+  const newLines = newText === "" ? [] : newText.split("\n");
+
+  const dp = lcs(oldLines, newLines);
+
+  const result: DiffLine[] = [];
+  let i = oldLines.length;
+  let j = newLines.length;
+  const ops: Array<[DiffOp, string]> = [];
+
+  while (i > 0 || j > 0) {
+    if (i > 0 && j > 0 && oldLines[i - 1] === newLines[j - 1]) {
+      ops.push(["equal", oldLines[i - 1]]);
+      i--;
+      j--;
+    } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
+      ops.push(["insert", newLines[j - 1]]);
+      j--;
+    } else {
+      ops.push(["delete", oldLines[i - 1]]);
+      i--;
+    }
+  }
+
+  ops.reverse();
+
+  let oldNo = 1;
+  let newNo = 1;
+  for (const [op, text] of ops) {
+    if (op === "equal") {
+      result.push({ op, text, oldLineNo: oldNo++, newLineNo: newNo++ });
+    } else if (op === "delete") {
+      result.push({ op, text, oldLineNo: oldNo++, newLineNo: null });
+    } else {
+      result.push({ op, text, oldLineNo: null, newLineNo: newNo++ });
+    }
+  }
+
+  return result;
+}
+
+const CONTEXT_LINES = 3;
+
+function collapseDiff(lines: DiffLine[]): Array<DiffLine | { type: "hunk"; count: number }> {
+  const changed = new Set<number>();
+  lines.forEach((l, idx) => {
+    if (l.op !== "equal") {
+      for (let k = Math.max(0, idx - CONTEXT_LINES); k <= Math.min(lines.length - 1, idx + CONTEXT_LINES); k++) {
+        changed.add(k);
+      }
+    }
+  });
+
+  const result: Array<DiffLine | { type: "hunk"; count: number }> = [];
+  let skipCount = 0;
+
+  for (let idx = 0; idx < lines.length; idx++) {
+    if (changed.has(idx)) {
+      if (skipCount > 0) {
+        result.push({ type: "hunk", count: skipCount });
+        skipCount = 0;
+      }
+      result.push(lines[idx]);
+    } else {
+      skipCount++;
+    }
+  }
+
+  if (skipCount > 0) result.push({ type: "hunk", count: skipCount });
+
+  return result;
+}
+
+// ── Diff viewer component ─────────────────────────────────────────────────────
+
+function DiffViewer({ oldYaml, newYaml }: { oldYaml: string; newYaml: string }) {
+  const diffLines = computeDiff(oldYaml, newYaml);
+  const hasChanges = diffLines.some(l => l.op !== "equal");
+
+  if (!hasChanges) {
+    return (
+      <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
+        No changes — editor matches the saved version.
+      </div>
+    );
+  }
+
+  const collapsed = collapseDiff(diffLines);
+
+  const added = diffLines.filter(l => l.op === "insert").length;
+  const removed = diffLines.filter(l => l.op === "delete").length;
+
+  return (
+    <div className="flex-1 overflow-auto font-mono text-xs">
+      <div className="sticky top-0 bg-muted/80 border-b px-4 py-1.5 text-xs flex gap-3 z-10 backdrop-blur-sm">
+        <span className="text-green-600 dark:text-green-400">+{added} added</span>
+        <span className="text-red-600 dark:text-red-400">−{removed} removed</span>
+      </div>
+
+      <table className="w-full border-collapse">
+        <colgroup>
+          <col className="w-10" />
+          <col className="w-10" />
+          <col />
+        </colgroup>
+        <tbody>
+          {collapsed.map((item, idx) => {
+            if ("type" in item) {
+              return (
+                <tr key={idx} className="bg-blue-50 dark:bg-blue-950/30">
+                  <td colSpan={3} className="px-4 py-0.5 text-blue-500 dark:text-blue-400 select-none">
+                    @@ {item.count} unchanged line{item.count !== 1 ? "s" : ""} hidden
+                  </td>
+                </tr>
+              );
+            }
+
+            const { op, text, oldLineNo, newLineNo } = item;
+            const rowCls =
+              op === "insert"
+                ? "bg-green-50 dark:bg-green-950/30"
+                : op === "delete"
+                  ? "bg-red-50 dark:bg-red-950/30"
+                  : "";
+            const gutterCls =
+              op === "insert"
+                ? "text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/40"
+                : op === "delete"
+                  ? "text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/40"
+                  : "text-muted-foreground";
+            const prefix = op === "insert" ? "+" : op === "delete" ? "−" : " ";
+
+            return (
+              <tr key={idx} className={rowCls}>
+                <td className={cn("px-2 text-right select-none border-r", gutterCls)}>
+                  {oldLineNo ?? ""}
+                </td>
+                <td className={cn("px-2 text-right select-none border-r", gutterCls)}>
+                  {newLineNo ?? ""}
+                </td>
+                <td className="px-3 py-px whitespace-pre-wrap break-all">
+                  <span
+                    className={
+                      op === "insert"
+                        ? "text-green-700 dark:text-green-300"
+                        : op === "delete"
+                          ? "text-red-700 dark:text-red-300"
+                          : ""
+                    }
+                  >
+                    {prefix} {text}
+                  </span>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
+
+
 export default function SettingsScraperConfigs() {
   const { toast } = useToast();
   const [configs, setConfigs] = useState<ConfigEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<string | null>(null);
   const [editorYaml, setEditorYaml] = useState("");
+  const [savedYaml, setSavedYaml] = useState("");
   const [editorSlug, setEditorSlug] = useState("");
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [filter, setFilter] = useState("");
   const [showNewModal, setShowNewModal] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [showDiff, setShowDiff] = useState(false);
   const [genForm, setGenForm] = useState<GenerateForm>({
     university_name: "",
     website_url: "",
@@ -193,6 +384,8 @@ export default function SettingsScraperConfigs() {
     setSelected(slug);
     setEditorSlug(slug);
     setEditorYaml(cfg.yaml);
+    setSavedYaml(cfg.yaml);
+    setShowDiff(false);
   };
 
   const handleSave = async () => {
@@ -207,8 +400,9 @@ export default function SettingsScraperConfigs() {
       });
       if (!res.ok) { const d = await res.json(); throw new Error(d.detail ?? "Save failed"); }
       const data = await res.json();
-      await fetchConfigs();
-      setSelected(editorSlug.trim());
+      toast({ title: "Saved", description: `Config for '${editorSlug}' saved` });
+      setSavedYaml(editorYaml);
+      setShowDiff(false);
 
       if (data.git_pushed && data.git_message && !data.git_message.includes("up-to-date")) {
         toast({ title: "Saved & synced to GitHub", description: data.git_message });
@@ -218,9 +412,9 @@ export default function SettingsScraperConfigs() {
           description: data.git_message,
           variant: "destructive",
         });
-      } else {
-        toast({ title: "Saved", description: `Config for '${editorSlug}' saved` });
       }
+      await fetchConfigs();
+      setSelected(editorSlug.trim());
     } catch (err) {
       toast({ title: "Save failed", description: (err as Error).message, variant: "destructive" });
     } finally {
@@ -241,7 +435,9 @@ export default function SettingsScraperConfigs() {
       toast({ title: "Deleted", description: `Config for '${selected}' removed` });
       setSelected(null);
       setEditorYaml("");
+      setSavedYaml("");
       setEditorSlug("");
+      setShowDiff(false);
       await fetchConfigs();
     } catch (err) {
       toast({ title: "Delete failed", description: (err as Error).message, variant: "destructive" });
@@ -266,8 +462,10 @@ export default function SettingsScraperConfigs() {
       if (!res.ok) { const d = await res.json(); throw new Error(d.detail ?? "Generation failed"); }
       const data = await res.json();
       setEditorYaml(data.yaml ?? "");
+      setSavedYaml("");
       setEditorSlug(data.slug ?? "");
       setSelected(null);
+      setShowDiff(false);
       setShowNewModal(false);
       toast({ title: "Generated!", description: "Review and edit the config below, then save." });
       setTimeout(() => textareaRef.current?.focus(), 100);
@@ -285,6 +483,7 @@ export default function SettingsScraperConfigs() {
   const selectedConfig = selected ? configs.find(c => c.slug === selected) : null;
   const selectedJob = selected ? triggerJobs[selected] : undefined;
   const selectedJobActive = selectedJob && !TERMINAL_STATUSES.includes(selectedJob.status);
+  const isDirty = editorYaml !== savedYaml;
 
   return (
     <div className="space-y-6">
@@ -332,6 +531,8 @@ export default function SettingsScraperConfigs() {
                 const isRunning = job && !TERMINAL_STATUSES.includes(job.status);
                 const isThisTriggering = triggering === cfg.slug;
                 const hasUni = cfg.university_id != null;
+                const configIsDirty = selected === cfg.slug && isDirty;
+
                 return (
                   <div
                     key={cfg.slug}
@@ -344,7 +545,12 @@ export default function SettingsScraperConfigs() {
                       onClick={() => selectConfig(cfg.slug)}
                       className="flex-1 text-left px-3 py-2 text-sm min-w-0"
                     >
-                      <div className={cn("font-medium truncate", selected === cfg.slug && "text-primary")}>{cfg.slug}</div>
+                      <div className={cn("font-medium truncate flex items-center gap-1.5", selected === cfg.slug && "text-primary")}>
+                        {cfg.slug}
+                        {configIsDirty && (
+                          <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-500 flex-shrink-0" title="Unsaved changes" />
+                        )}
+                      </div>
                       <div className="text-xs text-muted-foreground truncate">{cfg.title}</div>
                       {job && (
                         <div className="mt-0.5">
@@ -390,7 +596,7 @@ export default function SettingsScraperConfigs() {
           </div>
         </div>
 
-        {/* Right — editor */}
+        {/* Right — editor / diff */}
         <div className="flex-1 border rounded-lg overflow-hidden flex flex-col bg-background">
           {!selected && !editorYaml ? (
             <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
@@ -449,6 +655,26 @@ export default function SettingsScraperConfigs() {
                       </Button>
                     </div>
                   )}
+
+                  {/* Preview changes toggle — only shown when there are unsaved edits */}
+                  {(isDirty || showDiff) && (
+                    <Button
+                      size="sm"
+                      variant={showDiff ? "secondary" : "outline"}
+                      className={cn(
+                        "h-7 text-xs",
+                        !showDiff && isDirty && "border-amber-400 text-amber-600 hover:text-amber-700 dark:text-amber-400"
+                      )}
+                      onClick={() => setShowDiff(d => !d)}
+                      title={showDiff ? "Back to editor" : "Preview changes vs saved version"}
+                    >
+                      {showDiff ? (
+                        <><Code className="h-3.5 w-3.5 mr-1" />Editor</>
+                      ) : (
+                        <><GitCompare className="h-3.5 w-3.5 mr-1" />Preview changes</>
+                      )}
+                    </Button>
+                  )}
                   {selected && (
                     <Button
                       size="sm"
@@ -468,18 +694,39 @@ export default function SettingsScraperConfigs() {
                 </div>
               </div>
 
-              <textarea
-                ref={textareaRef}
-                className="flex-1 resize-none font-mono text-xs p-4 bg-muted/20 focus:outline-none focus:bg-background transition-colors"
-                value={editorYaml}
-                onChange={e => setEditorYaml(e.target.value)}
-                spellCheck={false}
-                placeholder={`# University Name\n# Hostname: www.example.edu.au\n\ndiscovery: {}\nextraction:\n  fees:\n    default_currency: "AUD"\n`}
-              />
+              {showDiff ? (
+                <DiffViewer oldYaml={savedYaml} newYaml={editorYaml} />
+              ) : (
+                <textarea
+                  ref={textareaRef}
+                  className="flex-1 resize-none font-mono text-xs p-4 bg-muted/20 focus:outline-none focus:bg-background transition-colors"
+                  value={editorYaml}
+                  onChange={e => setEditorYaml(e.target.value)}
+                  spellCheck={false}
+                  placeholder={`# University Name\n# Hostname: www.example.edu.au\n\ndiscovery: {}\nextraction:\n  fees:\n    default_currency: "AUD"\n`}
+                />
+              )}
 
               <div className="px-4 py-1.5 border-t bg-muted/30 text-xs text-muted-foreground flex items-center gap-4">
-                <span>{editorYaml.split("\n").length} lines</span>
-                <span>Changes take effect on next scrape job</span>
+                {showDiff ? (
+                  <>
+                    <span>Diff: saved → current edit</span>
+                    {isDirty ? (
+                      <span className="text-amber-600 dark:text-amber-400">Unsaved changes</span>
+                    ) : (
+                      <span>No changes</span>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <span>{editorYaml.split("\n").length} lines</span>
+                    {isDirty ? (
+                      <span className="text-amber-600 dark:text-amber-400">Unsaved changes</span>
+                    ) : (
+                      <span>Changes take effect on next scrape job</span>
+                    )}
+                  </>
+                )}
                 {selectedConfig?.university_name && (
                   <span className="text-green-700">
                     ✓ Linked to {selectedConfig.university_name}
