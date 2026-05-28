@@ -276,6 +276,7 @@ export default function SettingsScraperConfigs() {
   const [deleting, setDeleting] = useState(false);
   const [filter, setFilter] = useState("");
   const [showNewModal, setShowNewModal] = useState(false);
+  const [pendingSlug, setPendingSlug] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [showDiff, setShowDiff] = useState(false);
   const [genForm, setGenForm] = useState<GenerateForm>({
@@ -386,6 +387,22 @@ export default function SettingsScraperConfigs() {
     setEditorYaml(cfg.yaml);
     setSavedYaml(cfg.yaml);
     setShowDiff(false);
+  };
+
+  const handleSelectConfig = (slug: string) => {
+    if (slug === selected) return;
+    if (editorYaml !== savedYaml) {
+      setPendingSlug(slug);
+    } else {
+      selectConfig(slug);
+    }
+  };
+
+  const confirmDiscard = () => {
+    if (pendingSlug) {
+      selectConfig(pendingSlug);
+      setPendingSlug(null);
+    }
   };
 
   const handleSave = async () => {
@@ -542,7 +559,7 @@ export default function SettingsScraperConfigs() {
                     )}
                   >
                     <button
-                      onClick={() => selectConfig(cfg.slug)}
+                      onClick={() => handleSelectConfig(cfg.slug)}
                       className="flex-1 text-left px-3 py-2 text-sm min-w-0"
                     >
                       <div className={cn("font-medium truncate flex items-center gap-1.5", selected === cfg.slug && "text-primary")}>
@@ -814,6 +831,37 @@ export default function SettingsScraperConfigs() {
             <p className="text-xs text-muted-foreground text-center">
               Uses Gemini AI · review the output before saving
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* Unsaved changes confirmation dialog */}
+      {pendingSlug !== null && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-background rounded-xl shadow-xl w-full max-w-sm p-6 space-y-4">
+            <div>
+              <h2 className="font-semibold text-base">Unsaved changes</h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                You have unsaved edits to <span className="font-mono font-medium">{selected}</span>.
+                Switching to <span className="font-mono font-medium">{pendingSlug}</span> will discard them.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => setPendingSlug(null)}
+              >
+                Keep editing
+              </Button>
+              <Button
+                variant="destructive"
+                className="flex-1"
+                onClick={confirmDiscard}
+              >
+                Discard & switch
+              </Button>
+            </div>
           </div>
         </div>
       )}
