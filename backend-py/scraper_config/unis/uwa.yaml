@@ -3,22 +3,17 @@
 #
 # Bug history / rationale:
 #   - First scrape (uni 1091): 19 found, 0 staged. Two failures:
-#     1. Discovery harvested /study/ nav pages (discover-uwa,
-#        higher-degree-by-research, robert-street-prize, japanese-garden)
-#        instead of the real catalogue. Real courses live at /study/courses/<name>.
-#     2. Real courses (Master of Architecture, Public Health, Landscape Arch,
-#        Translation) extracted fine but were rejected no_international_fee —
+#     1. Discovery harvested /study/ nav pages instead of /study/courses/<name>.
+#     2. Real courses extracted fine but rejected no_international_fee —
 #        UWA publishes fees via a per-credit-point CALCULATOR, not a flat number.
-#   - SPA render issue: /study/ pages return rendered=0B ("Loading component...").
-#     Course /study/courses/ pages embed enough STATIC handbook text to extract.
 discovery:
-  # /study/ BFS fills up on nav pages before reaching the catalogue, so force
-  # the sitemap to run regardless of BFS yield.
   always_sitemap_supplement: true
-  # Authoritative course data lives on the handbook subdomain.
   fallback_subdomains:
     - handbook.{domain}
-  # Block the nav/info/research-admin pages the /study/ crawl surfaces.
+  # Keep ONLY real course-detail pages. Drops CELT pages, discover-uwa,
+  # HDR pages, etc. — anything not under /study/courses/.
+  must_contain:
+    - "/study/courses/"
   block_url_patterns:
     - /study/discover-uwa
     - /study/explore-courses/higher-degree-by-research
@@ -28,11 +23,11 @@ discovery:
 extraction:
   fees:
     default_currency: "AUD"
-    # UWA has no flat per-course fee (per-credit-point calculator). If UWA
-    # publishes an indicative international fee schedule page, point here so
-    # the central-pages prefetcher can join fees and the no_international_fee
-    # gate stops rejecting real courses:
-    # central_page: https://www.uwa.edu.au/<indicative-fee-schedule-url>
+    # UWA fees are per-credit-point via calculator — no flat per-course figure
+    # exists on the page. Force every UWA course to be treated as having a
+    # central fee page, so the no_international_fee gate passes them into the
+    # review queue (international_fee=None) instead of rejecting them.
+    force_central_fee_stage: true
   filters:
     domestic_only:
       enabled: false
