@@ -1,9 +1,9 @@
 #!/bin/bash
 set -e
 pnpm install --frozen-lockfile
-# `pnpm --filter db push` is a no-op when no `db` workspace package exists;
-# the `|| true` prevents set -e from aborting the script in that case.
-# If a `db` package is ever added this will execute normally.
-pnpm --filter db push || true
+# NOTE: Do NOT run `pnpm --filter db push` (drizzle-kit push) here.
+# The lib/db Drizzle schema is a partial view of the database only.
+# The full schema is managed exclusively by Alembic (Python migrations).
+# Running drizzle push would attempt to DROP ~20 tables and 13+ columns of live data.
 # Apply any pending Python/Alembic DB migrations.
 cd backend-py && PYTHONPATH=. python -m alembic upgrade head

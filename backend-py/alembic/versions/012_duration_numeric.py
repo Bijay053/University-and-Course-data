@@ -72,13 +72,21 @@ def upgrade() -> None:
 
     # 4. Recreate the view using the captured definition.
     if view_def:
+        # pg_matviews.definition sometimes ends with a trailing semicolon which
+        # causes "syntax error at end of input" when appending WITH DATA.
+        clean_def = view_def.rstrip().rstrip(";").rstrip()
         op.execute(
-            f"CREATE MATERIALIZED VIEW course_search_view AS {view_def} WITH DATA"
+            f"CREATE MATERIALIZED VIEW course_search_view AS {clean_def} WITH DATA"
         )
         for idx_def in idx_defs:
             op.execute(idx_def)
-        # Re-grant read access to the application role.
-        op.execute("GRANT SELECT ON course_search_view TO uniportal")
+        # Re-grant read access to the application role (prod only; role may not exist in dev).
+        conn2 = op.get_bind()
+        role_exists = conn2.execute(
+            sa.text("SELECT 1 FROM pg_roles WHERE rolname = 'uniportal'")
+        ).fetchone()
+        if role_exists:
+            op.execute("GRANT SELECT ON course_search_view TO uniportal")
 
 
 def downgrade() -> None:
