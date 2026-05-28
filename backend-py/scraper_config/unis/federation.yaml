@@ -41,18 +41,13 @@ discovery:
     - "/study/how-to-apply"
     - "/study/apply"
     - "/study/search"
-    # Added 2026-05-28 (reviewer gap-analysis after Fix 4 deploy).
-    # Original YAML comment named "Regional Students", "International
-    # Students", "Early School Leavers" as known offenders but no pattern
-    # actually caught them — only prefix-matching strings like
-    # `/study/mid-year` and `/study/pathways` were present.  Also adding
-    # `/study/entry-pathways/` which the reviewer predicted (after
-    # observing the Federation sitemap structure) would still slip
-    # through.  All four are extra block patterns; if Federation's
-    # sitemap doesn't actually contain them they are no-ops.
-    - "/study/regional-students"
-    - "/study/international-students"
-    - "/study/early-school-leavers"
+    # Added 2026-05-28: reviewer predicted /study/entry-pathways/* would
+    # slip through after Fix 4 deploy because no existing pattern matches
+    # that path.  The "Regional Students" / "International Students" /
+    # "Early School Leavers" pages flagged in the YAML header comment are
+    # already covered by the existing `/study/information/` pattern (their
+    # real paths are /study/information/regional-students/ etc.), so they
+    # don't need their own entries.
     - "/study/entry-pathways"
 
 extraction:
