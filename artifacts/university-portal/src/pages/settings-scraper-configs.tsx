@@ -268,6 +268,15 @@ const DRAFT_PREFIX = "scraper-draft:";
 
 interface DraftEntry { yaml: string; savedAt: string; }
 
+function isDraftEntry(v: unknown): v is DraftEntry {
+  return (
+    typeof v === "object" &&
+    v !== null &&
+    typeof (v as Record<string, unknown>).yaml === "string" &&
+    typeof (v as Record<string, unknown>).savedAt === "string"
+  );
+}
+
 function writeDraft(slug: string, yaml: string): void {
   try {
     const entry: DraftEntry = { yaml, savedAt: new Date().toISOString() };
@@ -280,14 +289,20 @@ function readDraft(slug: string): string | null {
     const raw = localStorage.getItem(`${DRAFT_PREFIX}${slug}`);
     if (raw === null) return null;
     try {
-      const entry = JSON.parse(raw) as DraftEntry;
-      if (Date.now() - new Date(entry.savedAt).getTime() > DRAFT_TTL_MS) {
-        localStorage.removeItem(`${DRAFT_PREFIX}${slug}`);
-        return null; // expired
+      const parsed: unknown = JSON.parse(raw);
+      if (isDraftEntry(parsed)) {
+        const age = Date.now() - new Date(parsed.savedAt).getTime();
+        if (isNaN(age) || age > DRAFT_TTL_MS) {
+          localStorage.removeItem(`${DRAFT_PREFIX}${slug}`);
+          return null; // expired or invalid date
+        }
+        return parsed.yaml;
       }
-      return entry.yaml;
+      // Valid JSON but not a DraftEntry (e.g. a legacy bare string like "foo",
+      // a number, or a plain object without the right shape) — treat as current
+      return raw;
     } catch {
-      return raw; // bare-string draft from before task-104 — treat as current
+      return raw; // not valid JSON — treat as current bare string
     }
   } catch { return null; }
 }
@@ -305,11 +320,13 @@ function pruneOldDrafts(): void {
       const raw = localStorage.getItem(key);
       if (!raw) continue;
       try {
-        const entry = JSON.parse(raw) as DraftEntry;
-        if (Date.now() - new Date(entry.savedAt).getTime() > DRAFT_TTL_MS) {
-          toDelete.push(key);
+        const parsed: unknown = JSON.parse(raw);
+        if (isDraftEntry(parsed)) {
+          const age = Date.now() - new Date(parsed.savedAt).getTime();
+          if (isNaN(age) || age > DRAFT_TTL_MS) toDelete.push(key);
         }
-      } catch { /* bare string — keep it, let readDraft handle it on next access */ }
+        // Non-DraftEntry JSON or bare string — leave it for readDraft to handle
+      } catch { /* not valid JSON — keep */ }
     }
     toDelete.forEach(k => localStorage.removeItem(k));
   } catch { /* ignore */ }
