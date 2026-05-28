@@ -1,12 +1,38 @@
-# University of Western Australia — stub created for Week 4 scale-up.
-# Hostname: www.uwa.edu.au  (course catalogue under /study)
+# University of Western Australia — www.uwa.edu.au
+# Course catalogue lives at /study/courses/<name> on www.uwa.edu.au.
+# handbook.uwa.edu.au is the authoritative handbook subdomain and is
+# probed as a fallback if BFS + sitemap yield < 5 candidates.
 #
-# Bug history: none yet — fill in after first scrape.
-# Note: UWA uses handbook.uwa.edu.au for the authoritative course handbook.
+# Discovery fix (2026-05-28):
+#   BFS from /study was landing on SPA nav pages (discover-uwa,
+#   higher-degree-by-research, japanese-garden, robert-street-prize)
+#   which all return rendered=0B / "Loading component..." in static
+#   HTML.  Real course pages at /study/courses/* have full static
+#   content (text_len=17000-25000, Gemini extracts 15 fields, 75%).
+#   Fix: always_sitemap_supplement enumerates the full catalogue;
+#   must_contain drops everything that isn't a /study/courses/ page.
+#
+# Fee fix (2026-05-28):
+#   UWA does not publish flat international fees — it uses a fee
+#   calculator.  force_central_fee_stage: true sets has_central_fee_page
+#   on every payload so the no_international_fee staging gate passes
+#   courses to the human review queue instead of auto-rejecting them.
+#   Reviewers can fill in indicative fees manually or point at a fee
+#   schedule once one is located.
+
 discovery:
+  always_sitemap_supplement: true
+  must_contain:
+    - "/study/courses/"
   fallback_subdomains:
     - "handbook.{domain}"
+
 extraction:
+  fees:
+    # UWA uses a fee calculator — no per-course flat fee is published.
+    # Stage courses for human review rather than auto-rejecting on
+    # missing international_fee.
+    force_central_fee_stage: true
   filters:
     domestic_only:
       enabled: false
