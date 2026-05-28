@@ -261,6 +261,60 @@ function DiffViewer({ oldYaml, newYaml }: { oldYaml: string; newYaml: string }) 
   );
 }
 
+// ── localStorage draft helpers ────────────────────────────────────────────────
+
+const DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+const DRAFT_PREFIX = "scraper-draft:";
+
+interface DraftEntry { yaml: string; savedAt: string; }
+
+function writeDraft(slug: string, yaml: string): void {
+  try {
+    const entry: DraftEntry = { yaml, savedAt: new Date().toISOString() };
+    localStorage.setItem(`${DRAFT_PREFIX}${slug}`, JSON.stringify(entry));
+  } catch { /* storage quota */ }
+}
+
+function readDraft(slug: string): string | null {
+  try {
+    const raw = localStorage.getItem(`${DRAFT_PREFIX}${slug}`);
+    if (raw === null) return null;
+    try {
+      const entry = JSON.parse(raw) as DraftEntry;
+      if (Date.now() - new Date(entry.savedAt).getTime() > DRAFT_TTL_MS) {
+        localStorage.removeItem(`${DRAFT_PREFIX}${slug}`);
+        return null; // expired
+      }
+      return entry.yaml;
+    } catch {
+      return raw; // bare-string draft from before task-104 — treat as current
+    }
+  } catch { return null; }
+}
+
+function removeDraft(slug: string): void {
+  try { localStorage.removeItem(`${DRAFT_PREFIX}${slug}`); } catch { /* ignore */ }
+}
+
+function pruneOldDrafts(): void {
+  try {
+    const toDelete: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key?.startsWith(DRAFT_PREFIX)) continue;
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      try {
+        const entry = JSON.parse(raw) as DraftEntry;
+        if (Date.now() - new Date(entry.savedAt).getTime() > DRAFT_TTL_MS) {
+          toDelete.push(key);
+        }
+      } catch { /* bare string — keep it, let readDraft handle it on next access */ }
+    }
+    toDelete.forEach(k => localStorage.removeItem(k));
+  } catch { /* ignore */ }
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 
@@ -310,12 +364,15 @@ export default function SettingsScraperConfigs() {
 
   useEffect(() => { void fetchConfigs(); }, [fetchConfigs]);
 
+  // Prune stale drafts once on mount
+  useEffect(() => { pruneOldDrafts(); }, []);
+
   // Debounced draft persistence to localStorage
   useEffect(() => {
     if (!editorSlug || editorYaml === savedYaml) return;
     if (draftTimerRef.current) clearTimeout(draftTimerRef.current);
     draftTimerRef.current = window.setTimeout(() => {
-      try { localStorage.setItem(`scraper-draft:${editorSlug}`, editorYaml); } catch { /* quota */ }
+      writeDraft(editorSlug, editorYaml);
       draftTimerRef.current = null;
     }, 600);
     return () => {
@@ -397,8 +454,7 @@ export default function SettingsScraperConfigs() {
   const selectConfig = (slug: string) => {
     const cfg = configs.find(c => c.slug === slug);
     if (!cfg) return;
-    let draft: string | null = null;
-    try { draft = localStorage.getItem(`scraper-draft:${slug}`); } catch { /* storage unavailable */ }
+    const draft = readDraft(slug);
     setSelected(slug);
     setEditorSlug(slug);
     setSavedYaml(cfg.yaml);
@@ -429,7 +485,7 @@ export default function SettingsScraperConfigs() {
   };
 
   const discardDraft = () => {
-    try { localStorage.removeItem(`scraper-draft:${editorSlug}`); } catch { /* ignore */ }
+    removeDraft(draftBanner?.slug ?? editorSlug);
     setEditorYaml(savedYaml);
     setDraftBanner(null);
   };
@@ -450,7 +506,7 @@ export default function SettingsScraperConfigs() {
       setSavedYaml(editorYaml);
       setShowDiff(false);
       setDraftBanner(null);
-      try { localStorage.removeItem(`scraper-draft:${editorSlug.trim()}`); } catch { /* ignore */ }
+      removeDraft(editorSlug.trim());
 
       if (data.git_pushed && data.git_message && !data.git_message.includes("up-to-date")) {
         toast({ title: "Saved & synced to GitHub", description: data.git_message });
