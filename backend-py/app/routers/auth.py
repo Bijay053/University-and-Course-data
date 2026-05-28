@@ -123,17 +123,34 @@ async def me(
     db_user = await _load_user_by_email(db, user.get("email", ""))
     if not db_user or not db_user.is_active:
         return MeResponse(user=None)
+
+    # Belt-and-suspenders: the configured admin account must always be
+    # super-admin.  If the DB row has drifted (e.g. manual edit, failed
+    # startup bootstrap), heal it now so the UI doesn't end up blank.
+    admin_email = os.environ.get("ADMIN_EMAIL", "admin@university-portal.local")
+    is_admin_account = db_user.email.lower() == admin_email.lower()
+    if is_admin_account and not db_user.is_super_admin:
+        db_user.is_super_admin = True
+        db_user.updated_at = datetime.now(timezone.utc)
+        try:
+            await db.commit()
+            log.info("Healed is_super_admin for admin account %s via /me", db_user.email)
+        except Exception:  # noqa: BLE001
+            await db.rollback()
+            log.exception("Could not heal is_super_admin for %s — using in-memory override", db_user.email)
+
+    is_super = db_user.is_super_admin or is_admin_account
     perms = _perm_keys(db_user)
     safe = {
         "id": db_user.id,
         "email": db_user.email,
         "name": db_user.full_name,
-        "role": "admin" if db_user.is_super_admin else "user",
+        "role": "admin" if is_super else "user",
     }
     return MeResponse(
         user=safe,
         permissions=perms,
-        is_super_admin=db_user.is_super_admin,
+        is_super_admin=is_super,
     )
 
 
@@ -209,6 +226,7 @@ async def reset_password(
 # ---------------------------------------------------------------------------
 async def ensure_admin_user() -> None:
     from sqlalchemy import select as _select
+    from sqlalchemy import text as _text
 
     from app.database import AsyncSessionLocal
     from app.models.user import UserPermission
@@ -226,6 +244,20 @@ async def ensure_admin_user() -> None:
                 existing.is_active = True
                 existing.updated_at = datetime.now(timezone.utc)
                 await db.commit()
+                log.info("Restored is_super_admin=true for admin account %s", admin_email)
+            # Belt-and-suspenders: also issue a raw SQL UPDATE in case the ORM
+            # session has a stale view or the column type caused a comparison
+            # mismatch.  This is idempotent and cheap.
+            await db.execute(
+                _text(
+                    "UPDATE users SET is_super_admin = true, is_active = true,"
+                    " updated_at = now() AT TIME ZONE 'utc'"
+                    " WHERE lower(email) = lower(:email)"
+                    "   AND (NOT is_super_admin OR NOT is_active)"
+                ),
+                {"email": admin_email},
+            )
+            await db.commit()
             admin_id = existing.id
         else:
             admin = User(

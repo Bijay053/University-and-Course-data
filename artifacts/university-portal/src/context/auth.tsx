@@ -87,13 +87,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsSuperAdmin(false);
   }
 
+  // Super-admins always pass; also check user.role === "admin" as a
+  // belt-and-suspenders fallback in case isSuperAdmin state hasn't been
+  // hydrated yet (e.g. stale JWT cookie with is_super_admin=false while
+  // the /me response is in-flight and the DB fix hasn't propagated).
+  const isAdmin = isSuperAdmin || user?.role === "admin";
+
   const can = useCallback(
-    (key: string) => isSuperAdmin || permissions.has(key),
-    [isSuperAdmin, permissions],
+    (key: string) => isAdmin || permissions.has(key),
+    [isAdmin, permissions],
   );
   const canAny = useCallback(
-    (keys: string[]) => isSuperAdmin || keys.some((k) => permissions.has(k)),
-    [isSuperAdmin, permissions],
+    (keys: string[]) => isAdmin || keys.some((k) => permissions.has(k)),
+    [isAdmin, permissions],
   );
 
   return (
