@@ -83,6 +83,7 @@ class UserOut(BaseModel):
     is_super_admin: bool
     role_id: int | None = None
     role_name: str | None = None
+    is_protected: bool = False
 
 
 class UserCreateBody(BaseModel):

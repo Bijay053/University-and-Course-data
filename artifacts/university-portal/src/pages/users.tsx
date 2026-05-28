@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, FormEvent } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Plus, Trash2, KeyRound, ShieldCheck, ShieldOff,
-  Eye, EyeOff, Tag, Pencil, Users,
+  Eye, EyeOff, Tag, Pencil, Users, Lock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,6 +34,7 @@ interface UserRow {
   is_super_admin: boolean;
   role_id: number | null;
   role_name: string | null;
+  is_protected?: boolean;
 }
 
 interface RoleRow {
@@ -143,6 +144,7 @@ export default function UsersPage() {
                             {u.is_super_admin ? (
                               <Badge className="bg-violet-600 gap-1">
                                 <ShieldCheck className="h-3 w-3" /> Super admin
+                                {u.is_protected && <Lock className="h-3 w-3 ml-0.5" title="Protected admin account" />}
                               </Badge>
                             ) : u.role_name ? (
                               <Badge variant="outline" className="gap-1">
@@ -509,9 +511,18 @@ function EditUserDialog({ user, roles, onClose, onSaved, currentUserId }: {
                 {isSuper ? <ShieldCheck className="h-4 w-4 text-violet-600" /> : <ShieldOff className="h-4 w-4 text-muted-foreground" />}
                 Super admin
               </p>
-              <p className="text-xs text-muted-foreground">Bypasses all permission checks.</p>
+              <p className="text-xs text-muted-foreground">
+                {user.is_protected
+                  ? "Protected — this is the configured admin account and cannot be demoted."
+                  : "Bypasses all permission checks."}
+              </p>
             </div>
-            <Switch checked={isSuper} onCheckedChange={setIsSuper} disabled={isSelf} />
+            <Switch
+              checked={isSuper}
+              onCheckedChange={setIsSuper}
+              disabled={isSelf || !!user.is_protected}
+              title={user.is_protected ? "The default admin account cannot lose super-admin status" : undefined}
+            />
           </div>
           {!isSuper && (
             <div className="space-y-1.5">

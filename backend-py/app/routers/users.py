@@ -4,6 +4,7 @@ All endpoints require ``users.manage`` (super admins always pass).
 """
 from __future__ import annotations
 
+import os
 from datetime import datetime, timezone
 from typing import Annotated
 
@@ -42,6 +43,14 @@ def _role_out(r: Role) -> RoleOut:
     )
 
 
+_ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "admin@university-portal.local").lower()
+
+
+def _is_protected(u: User) -> bool:
+    """Return True if this account is the configured bootstrap admin."""
+    return u.email.lower() == _ADMIN_EMAIL
+
+
 def _to_out(u: User) -> UserOut:
     return UserOut(
         id=u.id,
@@ -51,6 +60,7 @@ def _to_out(u: User) -> UserOut:
         is_super_admin=u.is_super_admin,
         role_id=u.role_id,
         role_name=u.role.name if u.role else None,
+        is_protected=_is_protected(u),
     )
 
 
@@ -229,6 +239,15 @@ async def update_user(
         if user.id == actor.get("id") and body.is_super_admin is False:
             raise HTTPException(
                 status_code=400, detail="You cannot remove your own super-admin status"
+            )
+        if _is_protected(user) and body.is_super_admin is False:
+            raise HTTPException(
+                status_code=403,
+                detail=(
+                    f"The account '{user.email}' is the configured admin account "
+                    f"(ADMIN_EMAIL) and cannot lose super-admin status. "
+                    f"Change ADMIN_EMAIL on the server to unprotect it."
+                ),
             )
         user.is_super_admin = body.is_super_admin
     if body.role_id is not None:
