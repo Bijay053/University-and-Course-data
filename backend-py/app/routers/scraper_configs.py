@@ -114,25 +114,32 @@ async def list_scraper_configs(
                 SELECT id, name,
                        LOWER(REGEXP_REPLACE(
                            COALESCE(scrape_url, website, ''),
-                           '^https?://(www\\.)?', ''
+                           '^https?://', ''
                        )) AS bare_url
                 FROM universities
                 WHERE COALESCE(scrape_url, website, '') != ''
             """)
         )).all()
-        # Match: config hostname appears at the start of the bare URL (after stripping www.)
+        # Pre-compute the host-only portion of each DB URL (strip path and www.)
+        db_entries = []
+        for uni_id, uni_name, bare_url in rows:
+            if not bare_url:
+                continue
+            url_host = bare_url.split("/")[0]  # just the hostname, no path
+            url_host = re.sub(r"^www\.", "", url_host)  # strip www.
+            db_entries.append((uni_id, uni_name, url_host))
+
         for cfg in configs:
             if not cfg["hostname"]:
                 continue
-            h = cfg["hostname"].lower()
-            # strip www. from the config hostname too for comparison
-            h_bare = re.sub(r"^www\.", "", h)
-            for uni_id, uni_name, bare_url in rows:
-                if bare_url and (
-                    bare_url == h_bare
-                    or bare_url.startswith(h_bare + "/")
-                    or bare_url.startswith(h_bare + ":")
-                ):
+            # Strip www. from config hostname to get the apex-ish domain
+            h_bare = re.sub(r"^www\.", "", cfg["hostname"].lower())
+            for uni_id, uni_name, url_host in db_entries:
+                # Match if:
+                #   1. exact match after www-stripping (e.g. vit.edu.au == vit.edu.au)
+                #   2. config domain is the apex of the URL host, allowing subdomains
+                #      (e.g. study.csu.edu.au ends with .csu.edu.au)
+                if url_host == h_bare or url_host.endswith("." + h_bare):
                     cfg["university_id"] = uni_id
                     cfg["university_name"] = uni_name
                     break
