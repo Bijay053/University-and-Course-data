@@ -554,6 +554,7 @@ export default function SettingsScraperConfigs() {
       });
       if (!res.ok) { const d = await res.json(); throw new Error(d.detail ?? "Delete failed"); }
       toast({ title: "Deleted", description: `Config for '${selected}' removed` });
+      removeDraft(selected);
       setSelected(null);
       setEditorYaml("");
       setSavedYaml("");
