@@ -1303,8 +1303,19 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     overrides=_applied_overrides,
                 )
 
+            _eff_uni_pages = effective_config.get("uniPages") or {}
             has_fee_page = bool(
-                (effective_config.get("uniPages") or {}).get("feePage")
+                # feePage: explicit HTML fee schedule URL
+                _eff_uni_pages.get("feePage")
+                # feesPdf: YAML fees_pdf_url (e.g. Federation's HE tuition PDF).
+                # Without this check, a university whose YAML configures
+                # fees_pdf_url (→ uniPages["feesPdf"]) but has no HTML feePage
+                # incorrectly sees has_fee_page=False, triggers
+                # discover_fee_url_from_course_pages, and the vote-based
+                # auto-discovery picks a generic nav link (e.g. /apply/) instead
+                # of the configured PDF — flooding the review queue with
+                # blank-fee courses.
+                or _eff_uni_pages.get("feesPdf")
             )
             if not has_fee_page and links:
                 # Bug 7: discovery may have encountered a real fee-page URL and
