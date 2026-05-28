@@ -1027,8 +1027,15 @@ async def discover_course_links(
             if not u or u in found:
                 continue
             found[u] = n
-            if len(found) >= max_courses:
-                break
+            # NOTE: no max_courses cap here.  The sitemap is a pre-enumerated
+            # finite list (e.g. Federation: 239 URLs).  Capping here prevents
+            # the per-uni block_url_patterns filter (below, line ~1404) from
+            # ever seeing URLs beyond position max_courses in the sitemap —
+            # junk pages that fall after the cap are truncated before the
+            # block filter runs, so they never get dropped and go on to waste
+            # browser+vision budget.  The final [:max_courses] slice at the
+            # very end of this function enforces the output limit AFTER the
+            # block filter has had a chance to clean the full candidate set.
 
     # ── Alternative listing path probe ───────────────────────────────────────
     # When the seed URL failed (e.g. /courses 404s) and the sitemap is
@@ -1249,8 +1256,10 @@ async def discover_course_links(
                 continue
             found[_su] = _sn
             _supp_added += 1
-            if len(found) >= max_courses:
-                break
+            # NOTE: no max_courses cap here — same reasoning as the sitemap
+            # fallback loop above.  allow_url_patterns already filters non-HE
+            # URLs (CQU regression fix), and block_url_patterns below removes
+            # junk; [:max_courses] at line 1476 limits the final output.
         if emit and _supp_added:
             await emit(
                 "status",
