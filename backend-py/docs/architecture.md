@@ -4,6 +4,12 @@ This document captures what was built in Sprint 1 and which invariants
 must be preserved going forward.  Update when shipping anything that
 changes one of the invariant categories below.
 
+For the operator-facing field reference and cookbook see
+`docs/YAML_OPERATIONS_GUIDE.md`.  For known failing tests see
+`KNOWN_ISSUES.md`.
+
+---
+
 ## What we built in Sprint 1
 
 ### Data correctness layer (Week 1-2)
@@ -44,10 +50,28 @@ changes one of the invariant categories below.
 - `scraper_config/defaults.yaml` — global defaults; protected by
   regression-sweep policy.
 - `scraper_config/unis/<slug>.yaml` — per-uni overrides.
-- `app/services/scraper/config/` package: schema (Pydantic UniConfig),
-  loader (deep-merge), context (ContextVar scoped to each scrape job).
+- `app/services/scraper/config/` package: schema (Pydantic `UniConfig`),
+  loader (deep-merge: defaults → DB `scrape_config` → per-uni YAML),
+  context (`ContextVar` scoped to each scrape job).
 - Tier-3 playback uses `for_tier3_replay()` to strip `extraction:` so
   per-uni filter assumptions cannot contaminate unknown-uni scrapes.
+- **Discovery fields shipped this Sprint** (all per-uni opt-in via YAML):
+  `must_contain`, `allow_url_patterns`, `block_url_patterns`,
+  `fallback_subdomains`, `bfs_page_budget`, `max_candidates`,
+  `always_sitemap_supplement`, `always_browser_discover`,
+  `use_stealth_browser`, `use_wayback`, `extra_course_urls`.
+- **Extraction fields shipped this Sprint** (all per-uni opt-in):
+  `fees.force_central_fee_stage`, `fees.fees_pdf_url`,
+  `fees.prefer_annual_over_total`, `fees.prefer_year_one_over_total`,
+  `fees.pdf_overrides_page_regex`, `fees.pdf_parser`,
+  `fees.pdf_row_pattern`, `fees.pdf_fee_term`, `fees.course_pdf_aliases`,
+  `english.trust_tier1_vision_ocr_english`, `english.test_blocklist`,
+  `intake.rolling_enrollment_label`,
+  `text_cleaning.duration.reject_sentence_patterns`,
+  `text_cleaning.global_substring_blocklist`,
+  `text_cleaning.field_overrides`,
+  `course_name.strip_title_suffixes`,
+  `url_rewrites`, `default_course_location`, `max_parallel_fetch`.
 
 ### Promotion path hardening (Week 5)
 - `approve_scraped_course` raises a clear `ValueError` on empty
@@ -57,8 +81,14 @@ changes one of the invariant categories below.
   the session and made every subsequent row fail.
 
 ### Production scale (Week 4-5)
-- Top 10 AU universities — prep pack shipped (Week 4).
+- Top 10 AU universities — prep pack shipped (Week 4).  UWA is the
+  most fully-tuned example YAML in `scraper_config/unis/uwa.yaml`
+  (not a stub — it carries force_central_fee_stage, prefer_year_one_over_total,
+  must_contain, reject_sentence_patterns, and course_name overrides
+  tuned across multiple live scrape iterations).
 - Next 20 AU universities — stub YAMLs + ranked list (Week 5).
+
+---
 
 ## Architecture invariants
 
@@ -81,16 +111,47 @@ These constraints must hold for any change to merge.
    before opening the transaction; `bulk_approve.py` must rollback on
    per-row exception.
 
+---
+
+## Production deployment — permanent trip wires
+
+These are not fragilities to clean up — they are deliberate workarounds for
+fixed conditions of this server.  Changing them will break production.
+
+### DB URL must use `127.0.0.1`, NOT `localhost`
+**Why:** This DigitalOcean droplet's internal DNS (`getaddrinfo("localhost")`)
+fails with `Errno -3 Temporary failure in name resolution` when asyncpg
+attempts SSL hostname verification.  Using the IP literal `127.0.0.1` bypasses
+the DNS lookup entirely.  The hardcoded default in `app/config.py` is already
+set correctly.  Do NOT "clean up" this to `localhost` — it will break
+every async DB connection in production.
+
+### Do NOT run `alembic upgrade head` on production
+**Why:** Same DNS issue — alembic's connection string goes through TCP to
+`localhost`, which triggers the same `Errno -3` failure.  Apply all schema
+changes via direct `psql` instead:
+```bash
+sudo -u postgres psql -d university_portal -c "ALTER TABLE ..."
+```
+The `alembic_version` table on production contains manually-inserted fake
+version IDs that do not match actual migration filenames.  Ignore alembic
+version tracking on production entirely.
+
+---
+
 ## Known limitations (Sprint 2 candidates)
 
 See `backend-py/docs/sprint2_backlog.md` for the prioritised backlog.
+See `KNOWN_ISSUES.md` for currently failing tests.
+
+---
 
 ## Reference docs
 
-- `docs/uni_onboarding_patterns.md` — site-platform patterns and
-  per-uni status table.
+- `docs/YAML_OPERATIONS_GUIDE.md` — **operator field reference and cookbook** (start here).
+- `docs/uni_onboarding_patterns.md` — site-platform patterns and per-uni status table.
 - `docs/week4_scale_up_log.md` — top-10 status + per-uni run log.
-- `docs/sprint2_backlog.md` — Sprint 2 candidate items with effort /
-  impact estimates.
-- `scraper_config/unis/` — per-uni YAML library.
+- `docs/sprint2_backlog.md` — Sprint 2 candidate items with effort / impact estimates.
+- `scraper_config/unis/` — per-uni YAML library.  `uwa.yaml` is the most complete example.
 - `scripts/week4_*` and `scripts/week5_*` — operational scripts.
+- `KNOWN_ISSUES.md` — pre-existing test failures and their root causes.
