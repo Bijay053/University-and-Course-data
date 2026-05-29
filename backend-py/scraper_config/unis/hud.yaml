@@ -2,43 +2,35 @@
 # Hostname: www.hud.ac.uk
 #
 # Bug history / rationale:
-#   2026-05-29 — BFS on www.hud.ac.uk discovers only nav/research pages (9 junk
-#     candidates).  All real course pages live on the courses.hud.ac.uk subdomain
-#     at URLs like /2025-26/{study_mode}/{study_level}/{urltitle}.
-#     Fix: block_url_patterns drops all www.hud.ac.uk non-year pages so BFS ends
-#     with 0 candidates (<5), which triggers the fallback_subdomains probe of
-#     courses.hud.ac.uk.  allow_url_patterns then keeps only /2025-26/… URLs.
-#   2026-05-29 — Fees are NOT on individual course pages.  The university
-#     publishes fee bands on a central schedule page (hud.ac.uk/study/fees/).
-#     force_central_fee_stage: true lets courses pass staging without a per-page fee.
+#   2026-05-29 — Both www.hud.ac.uk and courses.hud.ac.uk are React SPAs.
+#     HTTP BFS finds only nav/research pages (none are real taught courses).
+#     always_browser_discover=true uses Playwright to render the JS and find
+#     actual course links across both domains.
+#   2026-05-29 — The old Scrapy spider used courses.hud.ac.uk/json/2025-26/sort:title
+#     which now returns a 24KB SPA shell, not JSON. Browser rendering is the
+#     only viable discovery path.
+#   2026-05-29 — Fees are on a central schedule page, not individual course pages.
 
 discovery:
-  # When BFS on www.hud.ac.uk finds < 5 valid candidates, probe this subdomain.
-  # All 500+ courses are served from courses.hud.ac.uk, not www.hud.ac.uk.
-  fallback_subdomains:
-    - courses.{domain}
+  # Use Playwright to render the JS-heavy SPA and discover course links.
+  # Without this, BFS only sees the 24KB HTML shell with no course links.
+  always_browser_discover: true
 
-  # Accept only URLs that look like real course pages: /2025-26/full-time/…
-  # This drops the junk www.hud.ac.uk candidates so the fallback above fires.
-  allow_url_patterns:
-    - '/\d{4}-\d{2}/'
+  # Raise budget so the browser can sweep category listing pages.
+  bfs_page_budget: 80
+  max_candidates: 500
 
-  # Block known non-course pages that BFS self-classifies as candidates.
+  # Block known non-course pages that the classifier picks up as candidates.
   block_url_patterns:
-    - '/postgraduate/research/'
     - '/postgraduate/fees'
     - '/postgraduate/funding'
-    - '/postgraduate/types-of-study'
     - '/postgraduate/research/graduate-school'
     - '/postgraduate/research/writing-a-research-proposal'
     - '/postgraduate/research/research-scholarships'
-    - '/study/'
-    - '/undergraduate/'
     - '/open-days/'
-
-  # Raise budget so BFS can walk enough of courses.hud.ac.uk to seed the catalog.
-  bfs_page_budget: 80
-  max_candidates: 500
+    - '/how-to-apply'
+    - '/student-life'
+    - '/contact'
 
 extraction:
 
@@ -56,9 +48,6 @@ extraction:
 
   # ── English requirements ───────────────────────────────────────────────────
   english:
-    # IELTS is in the Entry Requirements section of each course page.
-    # The spider finds it at //div[@id='entry']//text()[contains(., 'IELTS')].
-    # Let the standard extractor run; add a default only as a last resort.
     default_ielts: 6.0
 
   # ── Filters ───────────────────────────────────────────────────────────────
@@ -72,5 +61,4 @@ extraction:
   # ── Concurrency ───────────────────────────────────────────────────────────
   max_parallel_fetch: 5
 
-  # Spider always sets city = "Huddersfield".
   default_course_location: "Huddersfield"
