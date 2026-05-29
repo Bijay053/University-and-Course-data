@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "YFtWn_S26umLD2SG4_Vys"
+uri = "file://system_architecture.pdf"
+type = "pdf"
+title = "University Portal — System Architecture"
