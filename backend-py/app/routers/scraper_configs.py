@@ -629,15 +629,17 @@ async def _probe_university_site(base_url: str) -> dict:
     """Crawl the university site to gather real facts for the AI prompt.
 
     Returns a dict with keys:
-      homepage_ok, is_spa, sitemap_ok, nav_links,
-      found_fee_url, found_english_url, probe_errors
+      homepage_ok, homepage_status, waf_blocked, is_spa, spa_hits,
+      sitemap_ok, nav_links, found_fee_url, found_english_url, probe_errors
     """
-    import re as _re
     from urllib.parse import urljoin, urlparse
 
     result: dict = {
         "homepage_ok": False,
+        "homepage_status": None,   # actual HTTP status code
+        "waf_blocked": False,      # True when site returns 403/407/429 (Cloudflare/Akamai)
         "is_spa": False,
+        "spa_hits": [],
         "sitemap_ok": False,
         "nav_links": [],
         "found_fee_url": None,
@@ -648,9 +650,15 @@ async def _probe_university_site(base_url: str) -> dict:
     parsed = urlparse(base_url)
     origin = f"{parsed.scheme}://{parsed.netloc}"
 
+    # Use a realistic browser UA to reduce WAF friction
     headers = {
-        "User-Agent": "Mozilla/5.0 (compatible; UniPortalBot/1.0; +https://university-portal.local)",
-        "Accept": "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8",
+        "User-Agent": (
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/124.0.0.0 Safari/537.36"
+        ),
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-AU,en;q=0.9",
     }
 
     try:
@@ -665,7 +673,10 @@ async def _probe_university_site(base_url: str) -> dict:
             # ── 1. Homepage ──────────────────────────────────────────────────
             try:
                 resp = await client.get(base_url)
-                if resp.status_code < 400:
+                result["homepage_status"] = resp.status_code
+                if resp.status_code in (403, 407, 429):
+                    result["waf_blocked"] = True
+                elif resp.status_code < 400:
                     result["homepage_ok"] = True
                     html = resp.text
 
@@ -675,15 +686,15 @@ async def _probe_university_site(base_url: str) -> dict:
                     result["is_spa"] = len(spa_hits) >= 1
                     result["spa_hits"] = spa_hits[:3]
 
-                    # Extract <a href> links from nav/header — keyword-filtered
+                    # Extract nav links matching fee/english/entry keywords
                     _kw = re.compile(
-                        r"fee|tuition|english|language|entry.require|international|ielts|pte|toefl",
+                        r"fee|tuition|english|language|entry.require|ielts|pte|toefl",
                         re.I,
                     )
                     hrefs = re.findall(r'href=["\']([^"\']+)["\']', html)
                     nav_links = []
                     for h in hrefs:
-                        if _kw.search(h) or _kw.search(html[max(0, html.find(h) - 60):html.find(h) + len(h) + 60]):
+                        if _kw.search(h):
                             full = h if h.startswith("http") else urljoin(origin, h)
                             if urlparse(full).netloc == parsed.netloc and full not in nav_links:
                                 nav_links.append(full)
@@ -698,39 +709,39 @@ async def _probe_university_site(base_url: str) -> dict:
                     if sm_resp.status_code == 200 and "<url" in sm_resp.text.lower():
                         result["sitemap_ok"] = True
                         break
-                except Exception as exc:
-                    result["probe_errors"].append(f"sitemap: {exc}")
+                except Exception:
+                    pass
 
-            # ── 3. Probe fee URLs ────────────────────────────────────────────
-            for path in _FEE_PATHS:
-                try:
-                    r = await client.head(origin + path, timeout=6.0)
-                    if r.status_code < 400:
-                        result["found_fee_url"] = origin + path
-                        break
-                    # Some servers reject HEAD — fallback to GET (first 512 bytes)
-                    if r.status_code == 405:
-                        r2 = await client.get(origin + path, timeout=6.0)
-                        if r2.status_code < 400:
+            # ── 3. Probe fee URLs (skip if WAF-blocked — all paths will also 403) ──
+            if not result["waf_blocked"]:
+                for path in _FEE_PATHS:
+                    try:
+                        r = await client.head(origin + path, timeout=6.0)
+                        if r.status_code < 400:
                             result["found_fee_url"] = origin + path
                             break
-                except Exception:
-                    pass
+                        if r.status_code == 405:
+                            r2 = await client.get(origin + path, timeout=6.0)
+                            if r2.status_code < 400:
+                                result["found_fee_url"] = origin + path
+                                break
+                    except Exception:
+                        pass
 
-            # ── 4. Probe English requirement URLs ────────────────────────────
-            for path in _ENGLISH_PATHS:
-                try:
-                    r = await client.head(origin + path, timeout=6.0)
-                    if r.status_code < 400:
-                        result["found_english_url"] = origin + path
-                        break
-                    if r.status_code == 405:
-                        r2 = await client.get(origin + path, timeout=6.0)
-                        if r2.status_code < 400:
+                # ── 4. Probe English requirement URLs ────────────────────────
+                for path in _ENGLISH_PATHS:
+                    try:
+                        r = await client.head(origin + path, timeout=6.0)
+                        if r.status_code < 400:
                             result["found_english_url"] = origin + path
                             break
-                except Exception:
-                    pass
+                        if r.status_code == 405:
+                            r2 = await client.get(origin + path, timeout=6.0)
+                            if r2.status_code < 400:
+                                result["found_english_url"] = origin + path
+                                break
+                    except Exception:
+                        pass
 
     except Exception as exc:
         result["probe_errors"].append(f"client init: {exc}")
@@ -784,82 +795,110 @@ async def generate_scraper_config(
              probe["found_fee_url"], probe["found_english_url"], len(probe["nav_links"]),
              probe["probe_errors"])
 
-    # Build the "LIVE SITE FINDINGS" section for the prompt
-    _findings_lines = [
-        "=== LIVE SITE FINDINGS (crawled just now — use these facts, not assumptions) ===",
-        f"Homepage reachable: {probe['homepage_ok']}",
-        f"SPA detected (React/Next/Vue/Angular): {probe['is_spa']}"
-        + (f"  [markers found: {', '.join(probe.get('spa_hits', []))}]" if probe.get('spa_hits') else ""),
-        f"sitemap.xml exists and has <url> entries: {probe['sitemap_ok']}",
-    ]
+    # ── Translate probe results into concrete YAML decisions ─────────────────
+    # These drive what we TELL Gemini to set — never bleed raw probe output
+    # into the YAML comment block.
+    _discovery_directives: list[str] = []
+    _extraction_directives: list[str] = []
+    _rationale_lines: list[str] = []
+
+    if probe["waf_blocked"]:
+        _discovery_directives.append(
+            f'  use_stealth_browser: true  '
+            f'# Site returned HTTP {probe["homepage_status"]} (WAF/Cloudflare) — '
+            f'plain HTTP probes are blocked; stealth Playwright bypasses it'
+        )
+        _discovery_directives.append(
+            '  always_sitemap_supplement: true  '
+            '# WAF-protected sites are usually SPAs; sitemap is more reliable than BFS'
+        )
+        _rationale_lines.append(
+            f'  - Site returns HTTP {probe["homepage_status"]} to plain HTTP probes '
+            f'(Cloudflare/WAF). Stealth browser mode enabled.'
+        )
+    elif probe["is_spa"]:
+        _discovery_directives.append(
+            f'  always_sitemap_supplement: true  '
+            f'# SPA detected ({", ".join(probe["spa_hits"][:2])}); '
+            f'BFS misses JS-rendered course pages'
+        )
+        _rationale_lines.append(
+            f'  - JS-rendered SPA (markers: {", ".join(probe["spa_hits"][:2])}). '
+            f'Sitemap supplement ensures full course discovery.'
+        )
+
+    if probe["sitemap_ok"] and not probe["is_spa"] and not probe["waf_blocked"]:
+        _rationale_lines.append('  - sitemap.xml present and usable.')
+
+    _fees_lines: list[str] = [f'    default_currency: "{_currency}"']
     if probe["found_fee_url"]:
-        _findings_lines.append(f"Fee page — CONFIRMED LIVE URL (HTTP 200): {probe['found_fee_url']}")
-    else:
-        _findings_lines.append("Fee page — none of the standard paths returned HTTP 200 (leave central_page null or find manually)")
+        _fees_lines.append(f'    central_page: "{probe["found_fee_url"]}"  # confirmed HTTP 200')
+        _rationale_lines.append(f'  - Fee page confirmed at: {probe["found_fee_url"]}')
+
+    _english_lines: list[str] = []
     if probe["found_english_url"]:
-        _findings_lines.append(f"English requirements page — CONFIRMED LIVE URL (HTTP 200): {probe['found_english_url']}")
-    else:
-        _findings_lines.append("English requirements page — none of the standard paths returned HTTP 200 (leave central_page null or find manually)")
-    if probe["nav_links"]:
-        _findings_lines.append("Navigation links containing fee/english/entry-requirement keywords:")
-        for lnk in probe["nav_links"]:
-            _findings_lines.append(f"  - {lnk}")
-    else:
-        _findings_lines.append("No relevant navigation links extracted from homepage.")
-    if probe["probe_errors"]:
-        _findings_lines.append(f"Probe errors (non-fatal): {'; '.join(probe['probe_errors'])}")
-    _findings_block = "\n".join(_findings_lines)
+        _english_lines.append(f'    central_page: "{probe["found_english_url"]}"  # confirmed HTTP 200')
+        _rationale_lines.append(f'  - English requirements page confirmed at: {probe["found_english_url"]}')
+
+    # Nav links found but no confirmed standard path — give Gemini the list to pick from
+    _nav_hint = ""
+    if probe["nav_links"] and not probe["found_fee_url"] and not probe["found_english_url"]:
+        _nav_hint = (
+            "\n\nThese navigation links were extracted from the homepage "
+            "(fee/english/entry keywords). You may recognise the correct "
+            "fee or English-requirements page URL from this list — if so, "
+            "include it as extraction.fees.central_page or "
+            "extraction.english.central_page. If unsure, omit the field entirely:\n"
+            + "\n".join(f"  - {lnk}" for lnk in probe["nav_links"])
+        )
+
+    _rationale_block = (
+        "#\n# Bug history / rationale:\n"
+        + "\n".join(f"#   {l}" for l in _rationale_lines)
+        if _rationale_lines else ""
+    )
+
+    _discovery_block = (
+        "discovery:\n" + "\n".join(_discovery_directives)
+        if _discovery_directives else ""
+    )
+
+    _fees_block = "  fees:\n" + "\n".join(f"  {l}" for l in _fees_lines)
+
+    _extraction_inner = _fees_block
+    if _english_lines:
+        _extraction_inner += "\n  english:\n" + "\n".join(f"  {l}" for l in _english_lines)
+
+    _yaml_template = f"""# {body.university_name}
+# Hostname: {body.website_url.split("//")[-1].rstrip("/").split("/")[0]}
+{_rationale_block}
+{_discovery_block}
+extraction:
+{_extraction_inner}
+  filters:
+    domestic_only:
+      enabled: ???  # true if site mixes domestic+international; false if international-only listing"""
 
     prompt = f"""You are a scraper configuration expert for a university course data system.
 
-Generate a comprehensive per-university YAML scraper config for:
-- University name: {body.university_name}
-- Website: {body.website_url}
-- Country: {body.country}
-- Additional notes: {body.notes or "None"}
+Complete the following YAML scraper config for {body.university_name} ({body.website_url}).
+Country: {body.country}.
+Operator notes: {body.notes or "none"}.{_nav_hint}
 
-{_findings_block}
+START FROM THIS TEMPLATE (already populated with live probe data — do not change confirmed URLs or WAF settings):
+{_yaml_template}
 
-Available YAML fields and their defaults:
+YOUR JOB — fix only these things:
+1. Replace `domestic_only.enabled: ???` with true or false based on your knowledge of {body.university_name}'s website. true = site shows both domestic and international courses mixed. false = site only lists international courses (most AU/NZ universities).
+2. Use your knowledge of {body.university_name} to add any other useful settings from the available fields below — but ONLY if you are confident they apply. When in doubt, omit the field.
+3. Keep the comment block clean: only include rationale lines that are already there or that you can verify. Do NOT add lines about "no fee page found" or "homepage unreachable" — omit them.
+4. Do NOT output any section (discovery:, extraction:, etc.) that would be completely empty.
+5. Output ONLY valid YAML — no markdown fences, no extra text.
+
+Available extra fields you may add if appropriate:
 {_DEFAULTS_YAML_SUMMARY}
 
-RULES:
-1. Output ONLY valid YAML — no markdown fences, no extra text before or after.
-2. Start with a comment block: university name, hostname, and a brief rationale / bug-history section.
-3. Currency is "{_currency}" for {body.country}.
-4. Always include both discovery: and extraction: sections so operators have a complete template.
-5. CRITICAL — URLs: use ONLY the confirmed live URLs from "LIVE SITE FINDINGS" above.
-   - If a fee URL was confirmed, set extraction.fees.central_page to that exact URL.
-   - If an English URL was confirmed, set extraction.english.central_page to that exact URL.
-   - If a URL was NOT confirmed, leave the field commented out with "# not found — verify manually".
-   - NEVER invent or guess URLs that were not in the live findings.
-6. SPA: if "SPA detected" is true above, set discovery.always_sitemap_supplement: true.
-7. Add a brief inline comment on every non-trivial setting.
-
-EXAMPLE of a well-populated config (do not copy URLs verbatim — use the live findings above):
-# Auckland University of Technology
-# Hostname: www.aut.ac.nz
-#
-# Bug history / rationale:
-#   - NZ university — fees in NZD.
-#   - JS-rendered SPA; sitemap supplement needed to discover all courses.
-
-discovery:
-  always_sitemap_supplement: true  # SPA confirmed — BFS misses JS-rendered pages
-  bfs_page_budget: 60
-
-extraction:
-  fees:
-    default_currency: "NZD"
-    central_page: "https://www.aut.ac.nz/study/fees-and-scholarships"  # confirmed live
-  english:
-    central_page: "https://www.aut.ac.nz/study/entry-requirements/english-language-requirements"  # confirmed live
-    default_ielts: 6.0
-  filters:
-    domestic_only:
-      enabled: true
-
-Now generate the config for {body.university_name}:"""
+Output the completed YAML now:"""
 
     try:
         response = client.models.generate_content(
