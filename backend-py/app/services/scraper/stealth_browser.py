@@ -235,13 +235,31 @@ async def stealth_fetch_html(
     timeout_ms: int = 45_000,
     settle_ms: int = 6_000,
 ) -> Optional[str]:
-    """Fetch a single URL through the stealth (patchright + Xvfb) stack.
+    """Fetch a single URL through the stealth stack.
+
+    Strategy (cheapest-first):
+    1. curl_cffi Chrome TLS impersonation — zero browser overhead, bypasses
+       Cloudflare JA3/JA4 fingerprinting in ~50-200 ms.  Free, no API key.
+    2. patchright + Xvfb headed Chromium — heavy fallback for sites that
+       require a real JS execution environment (e.g. full Turnstile solve).
 
     Returns the rendered HTML on success or None on failure.  Cloudflare
     challenge interstitials (title "Just a moment...") are treated as failure.
     Concurrency-gated by ``_STEALTH_MAX_CONCURRENCY`` to keep peak headed-
     Chromium processes bounded on the worker.
     """
+    # ── Step 1: curl_cffi TLS impersonation (free, fast, no browser) ─────────
+    try:
+        from app.services.scraper.http_fetcher import fetch_html_cffi
+        cffi_result = await fetch_html_cffi(url)
+        if cffi_result is not None:
+            log.info("stealth_fetch_html %s: curl_cffi bypass succeeded", url)
+            return cffi_result
+        log.info("stealth_fetch_html %s: curl_cffi returned None — trying patchright+Xvfb", url)
+    except Exception as _cffi_exc:
+        log.warning("stealth_fetch_html %s: curl_cffi error (%s) — falling back to patchright", url, _cffi_exc)
+
+    # ── Step 2: patchright + Xvfb headed browser ──────────────────────────────
     async with _stealth_sem():
         try:
             async with stealth_context() as ctx:

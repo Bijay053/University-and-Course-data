@@ -22,3 +22,4 @@ rapidfuzz>=3.9.0
 # Scraper-only (install separately on workers):
 # playwright>=1.44.0
 # pdfplumber>=0.11.0
+curl_cffi>=0.7.0

@@ -1,24 +1,34 @@
 # University of Notre Dame Australia
 # Hostname: www.notredame.edu.au
 #
-# Bug history / rationale:
-#   - 2026-05-29 attempt 1: scrape_url=https://www.notredame.edu.au/ → 0 found.
-#     Homepage navigation goes through a Funnelback search interface, no
-#     direct course links in static HTML.
-#   - 2026-05-29 attempt 2: scrape_url=https://search.nd.edu.au/s/search.html
-#     → 0 found. Funnelback results are JS-rendered; stealth browser path
-#     also returned 0 links.
-#   - 2026-05-29 attempt 3: try /programs/ as entry point, since the real
-#     course detail pages live at www.notredame.edu.au/programs/<area>/...
-#     If this also returns 0, the underlying issue is likely that Notre
-#     Dame's catalogue is only enumerable via Funnelback's JSON API and
-#     needs a per-uni discovery module (engineering task, not YAML).
+# BLOCKER — Cloudflare Enterprise Bot Management (IP-level block)
+# ==============================================================
+# Notre Dame runs Cloudflare Enterprise with Bot Management, which blocks
+# all cloud datacenter IPs (AWS, GCP, Hetzner, DigitalOcean, Replit, etc.)
+# at the network layer — regardless of browser fingerprinting or stealth
+# configuration.  Verified 2026-05-29:
+#
+#   curl -I (Chrome UA)          → HTTP 403, cf-mitigated: challenge
+#   curl_cffi chrome124          → HTTP 403  (TLS impersonation not enough)
+#   patchright + Xvfb headed     → HTTP 403  (IP blocked before JS runs)
+#
+# Course URL pattern (confirmed from real URL):
+#   www.notredame.edu.au/programs/<faculty>/<level>/<slug>
+#   e.g. /programs/arts-and-sciences/postgraduate/master-of-architecture
+#
+# Fix options (in order of effort):
+#   1. Run the scraper from a residential IP (home broadband / mobile hotspot)
+#      — not possible from Replit/DigitalOcean.
+#   2. Residential proxy service (ScraperAPI, Brightdata, Zyte) — paid.
+#   3. Manual data entry for ~150-200 courses.
+#   4. Contact Notre Dame IT for a crawler whitelist / API access.
+#
+# DO NOT attempt another automated scrape until one of the above is resolved.
+# The YAML below is kept for when a fix is available.
 
 discovery:
   use_stealth_browser: true
   always_sitemap_supplement: true
-  must_contain:
-    - "/programs/"
 
 extraction:
   fees:
