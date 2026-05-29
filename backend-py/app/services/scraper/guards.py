@@ -258,6 +258,8 @@ _DEGREE_QUALIFIER_RE = re.compile(
     r"master(?:s|'s)?(?!\s+of\s+ceremonies)|"  # reject "Master of Ceremonies"
     r"doctor(?:ate)?|"
     r"graduate\s+(?:certificate|diploma)|"
+    r"postgraduate\s+(?:certificate|diploma)|"  # UK PgCert / PgDip (Huddersfield)
+    r"foundation\s+degree|"                      # UK FdSc / FdA
     r"advanced\s+diploma|"
     r"associate\s+degree|"
     r"diploma(?:\s+of|\s+in)?(?!\s+of\s+(?:ceremonies|honor))|"

@@ -28,9 +28,81 @@ from pydantic import BaseModel, Field
 
 # ── Discovery ───────────────────────────────────────────────────────────────
 
+class SearchStaxConfig(BaseModel):
+    """Custom data-source provider: a SearchStax-hosted Solr course index.
+
+    Some universities (e.g. University of Huddersfield) serve their course
+    catalogue from a SearchStax Solr core — the same endpoint their live
+    React SPA queries client-side.  When this block is present the
+    orchestrator skips HTML discovery + per-course extraction entirely and
+    builds fully-formed staged-course records straight from the Solr docs
+    (see ``searchstax_hud.py``).  No page fetching is needed because the
+    ``content`` field carries the full page text (IELTS, entry reqs, etc.).
+
+    The ``token`` is the SearchStax read token the SPA ships to every
+    browser, so it is not a server secret — but operators should rotate it
+    periodically.  Prefer ``token_env`` to read it from an environment
+    variable instead of committing it to YAML.
+    """
+
+    endpoint: str = Field(
+        description="Full Solr select URL (e.g. '.../emselect').",
+    )
+    token: Optional[str] = Field(
+        default=None,
+        description=(
+            "SearchStax read token used in the 'Authorization: Token <t>' "
+            "header.  This is the public client token the SPA exposes; not a "
+            "server secret.  Prefer token_env over hardcoding here."
+        ),
+    )
+    token_env: Optional[str] = Field(
+        default=None,
+        description=(
+            "Name of an environment variable to read the token from. When "
+            "set and present, overrides the literal `token` field."
+        ),
+    )
+    filter_query: str = Field(
+        default="sectionType_s:course",
+        description="Solr fq applied to restrict the result set to courses.",
+    )
+    page_size: int = Field(
+        default=100,
+        description="Number of Solr docs fetched per paginated request.",
+    )
+    max_courses: Optional[int] = Field(
+        default=None,
+        description="Optional cap on the number of course docs staged (debug).",
+    )
+    fee_year: int = Field(
+        default=2025,
+        description="Academic fee year written into every staged fee row.",
+    )
+    currency: str = Field(
+        default="GBP",
+        description="ISO currency code written into every staged fee row.",
+    )
+    central_fee_page: Optional[str] = Field(
+        default=None,
+        description=(
+            "URL of the central fee schedule page used as the source_url for "
+            "the international_fee evidence row (the fee is band-derived, not "
+            "on the course page)."
+        ),
+    )
+
+
 class DiscoveryConfig(BaseModel):
     """Safe to replay against unknown universities (Tier-3 playbook matching)."""
 
+    searchstax: Optional[SearchStaxConfig] = Field(
+        default=None,
+        description=(
+            "When present, route discovery + extraction through the SearchStax "
+            "Solr provider instead of HTML crawling. See SearchStaxConfig."
+        ),
+    )
     fallback_subdomains: list[str] = Field(
         default_factory=list,
         description=(

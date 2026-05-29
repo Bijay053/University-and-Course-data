@@ -284,6 +284,14 @@ async def _extract_only(
     Passed through to ``extract_course`` where it is applied as a
     last-resort fallback after all per-course and PDF extractors.
     """
+    # Custom-provider short-circuit: a provider (e.g. searchstax_hud) may
+    # embed a fully-formed result under ``searchstax_result``. Return it
+    # verbatim — no network fetch, no extraction. Shape matches this
+    # function's normal output: {name, url, payload, evidence}.
+    _pre = link.get("searchstax_result")
+    if _pre is not None:
+        return _pre
+
     name = (link.get("name") or "").strip() or "Unknown course"
     url = link["url"]
     try:
@@ -731,7 +739,24 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # browser discovery subsumes the BFS result set.
         _always_browser = getattr(_uni_cfg.discovery, "always_browser_discover", False)
 
-        if "study.csu.edu.au/international/courses" in scrape_url:
+        # ── SearchStax Solr provider (e.g. University of Huddersfield) ────────
+        # When a uni's YAML declares a discovery.searchstax block, the course
+        # catalogue is fetched straight from its SearchStax Solr core. Each doc
+        # already carries structured fields + full page text, so we build
+        # fully-formed staged-course records here and skip HTML discovery,
+        # browser rendering, AND per-course extraction (the prebuilt result is
+        # returned verbatim by _extract_only). See searchstax_hud.py.
+        _searchstax_cfg = getattr(_uni_cfg.discovery, "searchstax", None)
+        if _searchstax_cfg is not None:
+            from app.services.scraper.searchstax_hud import fetch_searchstax_links
+            try:
+                links = await fetch_searchstax_links(_searchstax_cfg, emit=emit)
+            except Exception as _ss_exc:  # noqa: BLE001
+                log.error("SearchStax provider failed: %s", _ss_exc, exc_info=True)
+                links = []
+            _always_browser = False  # never run browser discovery for these
+
+        if not links and "study.csu.edu.au/international/courses" in scrape_url:
             try:
                 from app.services.scraper.csu_browser_discover import (
                     browser_discover_csu_international,

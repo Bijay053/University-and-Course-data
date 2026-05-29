@@ -2,48 +2,43 @@
 # Hostname: www.hud.ac.uk
 #
 # Bug history / rationale:
-#   2026-05-29 — Both www.hud.ac.uk and courses.hud.ac.uk are React SPAs.
-#     HTTP BFS finds only nav/research pages (none are real taught courses).
-#     always_browser_discover=true uses Playwright to render the JS and find
-#     actual course links across both domains.
-#   2026-05-29 — The old Scrapy spider used courses.hud.ac.uk/json/2025-26/sort:title
-#     which now returns a 24KB SPA shell, not JSON. Browser rendering is the
-#     only viable discovery path.
-#   2026-05-29 — Fees are on a central schedule page, not individual course pages.
+#   2026-05-29 — Both www.hud.ac.uk and courses.hud.ac.uk are React SPAs behind
+#     Cloudflare. HTTP BFS finds only nav/research pages; Playwright browser
+#     discovery was unreliable and slow.
+#   2026-05-29 — The old Scrapy spider used courses.hud.ac.uk/json/2025-26/...
+#     which now returns a 24KB SPA shell, not JSON.
+#   2026-05-29 — SOLVED: the SPA itself queries a SearchStax-hosted Solr core
+#     client-side. We query that core directly (discovery.searchstax below).
+#     It returns all ~790 course docs with structured fields PLUS the full
+#     page-text `content` (IELTS + entry reqs), so NO page fetching is needed.
+#     See backend-py/app/services/scraper/searchstax_hud.py.
 
 discovery:
-  # Use Playwright to render the JS-heavy SPA and discover course links.
-  # Without this, BFS only sees the 24KB HTML shell with no course links.
-  always_browser_discover: true
-
-  # Raise budget so the browser can sweep category listing pages.
-  bfs_page_budget: 80
-  max_candidates: 500
-
-  # Block known non-course pages that the classifier picks up as candidates.
-  block_url_patterns:
-    - '/postgraduate/fees'
-    - '/postgraduate/funding'
-    - '/postgraduate/research/graduate-school'
-    - '/postgraduate/research/writing-a-research-proposal'
-    - '/postgraduate/research/research-scholarships'
-    - '/open-days/'
-    - '/how-to-apply'
-    - '/student-life'
-    - '/contact'
+  # Fetch the full course catalogue straight from the SearchStax Solr core.
+  # When this block is present the orchestrator skips HTML/browser discovery
+  # AND per-course extraction entirely.
+  searchstax:
+    endpoint: https://searchcloud-1-eu-west-2.searchstax.com/29847/huddersfielddevelopment-4954/emselect
+    # The SPA ships this read token to every browser, but we still treat it as
+    # a credential: it is read ONLY from the HUD_SEARCHSTAX_TOKEN secret — no
+    # literal is committed to the repo. Set the secret in every environment.
+    # Operators should rotate it periodically in the SearchStax console.
+    token_env: HUD_SEARCHSTAX_TOKEN
+    filter_query: "sectionType_s:course"
+    page_size: 100
+    fee_year: 2025
+    currency: GBP
+    central_fee_page: https://www.hud.ac.uk/study/fees/
 
 extraction:
 
   # ── Fees ──────────────────────────────────────────────────────────────────
   fees:
     default_currency: "GBP"
-
-    # The fee schedule lives on a central page, NOT on individual course pages.
-    # Bands (2025-26 international): UG £16,500 / £17,600 / £18,700;
-    #                                PG £17,600 / £18,700 per year.
-    central_page: https://www.hud.ac.uk/study/fees/
-
-    # Allow courses through staging even when no per-page fee was found.
+    # Fees are band-derived from a central subject schedule inside the
+    # provider (searchstax_hud.py) and the provider sets has_central_fee_page
+    # on every payload, so we do NOT set `central_page` here — fetching it
+    # only yields a Cloudflare 403 and adds nothing.
     force_central_fee_stage: true
 
   # ── English requirements ───────────────────────────────────────────────────
