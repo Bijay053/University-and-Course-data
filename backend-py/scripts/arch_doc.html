@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<style>
+  @page { size: A4; margin: 14mm 12mm; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+    color: #1a1a1a; font-size: 10px; line-height: 1.45;
+  }
+  h1 { font-size: 22px; color: #0f172a; margin-bottom: 2px; }
+  .sub { color: #64748b; font-size: 10px; margin-bottom: 14px; }
+  h2 {
+    font-size: 13px; color: #fff; padding: 5px 10px; margin: 16px 0 8px;
+    border-radius: 4px; page-break-after: avoid;
+  }
+  h3 { font-size: 11px; margin: 10px 0 4px; color: #0f172a; page-break-after: avoid; }
+  p { margin-bottom: 6px; }
+  .lead { font-size: 10.5px; color: #334155; margin-bottom: 12px; }
+
+  .frontend { background:#3b82f6; }
+  .api      { background:#0d9488; }
+  .workers  { background:#7c3aed; }
+  .scraper  { background:#ea580c; }
+  .config   { background:#b45309; }
+  .db       { background:#16a34a; }
+  .deploy   { background:#475569; }
+  .repo     { background:#334155; }
+
+  .grid { display:flex; gap:8px; margin-bottom:8px; }
+  .col { flex:1; }
+  .card {
+    border:1px solid #e2e8f0; border-radius:5px; padding:8px 10px;
+    margin-bottom:8px; page-break-inside:avoid; background:#fafafa;
+  }
+  .card .t { font-weight:700; font-size:10.5px; margin-bottom:4px; color:#0f172a; }
+  .card.fe { border-left:4px solid #3b82f6; }
+  .card.ap { border-left:4px solid #0d9488; }
+  .card.wk { border-left:4px solid #7c3aed; }
+  .card.sc { border-left:4px solid #ea580c; }
+  .card.cf { border-left:4px solid #b45309; }
+  .card.dbc{ border-left:4px solid #16a34a; }
+  .card.dp { border-left:4px solid #475569; }
+  table { width:100%; border-collapse:collapse; margin-bottom:8px; font-size:9.3px; }
+  th { background:#1e293b; color:#fff; text-align:left; padding:4px 6px; font-weight:600; }
+  td { border:1px solid #e2e8f0; padding:4px 6px; vertical-align:top; }
+  td:first-child { font-family:"SF Mono",Consolas,monospace; font-weight:600; color:#0f172a; white-space:nowrap; }
+  code { font-family:"SF Mono",Consolas,monospace; background:#eef2ff; padding:1px 4px; border-radius:3px; font-size:9px; }
+  ul { margin:2px 0 2px 16px; }
+  li { margin-bottom:2px; }
+  .flow {
+    display:flex; align-items:center; justify-content:center; gap:6px;
+    flex-wrap:wrap; margin:6px 0 14px; font-size:9.5px;
+  }
+  .node { padding:6px 10px; border-radius:5px; color:#fff; font-weight:600; text-align:center; }
+  .arrow { color:#94a3b8; font-weight:700; font-size:13px; }
+  .pagebreak { page-break-before: always; }
+  .note { background:#fef9c3; border-left:4px solid #ca8a04; padding:6px 10px; border-radius:4px; font-size:9.3px; margin-bottom:8px; }
+  .crit { background:#fee2e2; border-left:4px solid #dc2626; padding:6px 10px; border-radius:4px; font-size:9.3px; margin-bottom:8px; }
+</style>
+</head>
+<body>
+
+<h1>University Portal &mdash; System Architecture</h1>
+<div class="sub">Course / Fee / Intake &amp; Requirement Management System &nbsp;|&nbsp; pnpm monorepo &nbsp;|&nbsp; FastAPI + React + Celery + PostgreSQL</div>
+
+<p class="lead">
+A centralised admin portal for universities to manage course data &mdash; courses, fees, intakes, scholarships and
+admission requirements &mdash; with AI-powered web scraping, bulk Excel upload/download, and change detection.
+The system is a <b>pnpm monorepo</b>: a React/Vite frontend talks to a Python FastAPI backend (port 8080).
+Heavy scraping work runs asynchronously in Celery workers (Redis broker), with Gemini AI as a fallback extractor.
+All data is persisted in PostgreSQL.
+</p>
+
+<h3>End-to-end request &amp; data flow</h3>
+<div class="flow">
+  <div class="node frontend">Browser<br>React UI</div>
+  <span class="arrow">&rarr;</span>
+  <div class="node api">Nginx<br>proxy /api</div>
+  <span class="arrow">&rarr;</span>
+  <div class="node api">FastAPI<br>:8080</div>
+  <span class="arrow">&rarr;</span>
+  <div class="node db">PostgreSQL</div>
+</div>
+<div class="flow">
+  <div class="node api">FastAPI<br>trigger scrape</div>
+  <span class="arrow">&rarr;</span>
+  <div class="node workers">Redis<br>queue</div>
+  <span class="arrow">&rarr;</span>
+  <div class="node workers">Celery<br>worker</div>
+  <span class="arrow">&rarr;</span>
+  <div class="node scraper">Scraper<br>+ Gemini</div>
+  <span class="arrow">&rarr;</span>
+  <div class="node db">scraped_courses<br>(staging)</div>
+  <span class="arrow">&rarr;</span>
+  <div class="node db">courses<br>(live)</div>
+</div>
+
+<h2 class="frontend">Layer 1 &mdash; Frontend</h2>
+<div class="card fe">
+  <div class="t">Browser / Admin Portal &nbsp;<code>artifacts/university-portal/</code></div>
+  <table>
+    <tr><td>Framework</td><td>React 18 + Vite, TypeScript 5.9</td></tr>
+    <tr><td>UI</td><td>shadcn/ui (Radix primitives) + Tailwind CSS</td></tr>
+    <tr><td>Data fetching</td><td>TanStack React Query &mdash; server-state caching, mutations, auto-refetch</td></tr>
+    <tr><td>Routing</td><td>Wouter &mdash; lightweight client-side SPA routing</td></tr>
+    <tr><td>Auth</td><td>HTTPOnly JWT cookie <code>session</code> (7-day). <code>AuthGuard</code> wraps all protected routes; <code>src/context/auth.tsx</code> exposes <code>useAuth()</code> + <code>AuthProvider</code></td></tr>
+    <tr><td>Pages</td><td>Dashboard &middot; Universities &middot; Courses &middot; Scraper Jobs &middot; Import History &middot; Scraped Changes</td></tr>
+    <tr><td>API comms</td><td>Relative URLs through the shared Nginx proxy; Orval-generated React Query hooks from the OpenAPI spec</td></tr>
+  </table>
+  <b>How it works:</b> On load, the app calls <code>GET /api/auth/me</code>. No valid session &rarr; redirect to <code>/login</code>.
+  Each page uses React Query hooks to fetch from the API; mutations (create/edit/approve) invalidate the relevant
+  query keys so the UI refreshes automatically.
+</div>
+
+<h2 class="api">Layer 2 &mdash; API Server (FastAPI)</h2>
+<div class="grid">
+  <div class="col">
+    <div class="card ap">
+      <div class="t">FastAPI :8080 (Uvicorn)</div>
+      <ul>
+        <li>Python 3.12, ASGI via Uvicorn</li>
+        <li>Dev: port 8080 (<code>--reload</code>)</li>
+        <li>Prod: port 8000 behind Nginx</li>
+        <li>Nginx: <code>/api &rarr; 127.0.0.1:8000</code></li>
+        <li>Entry: <code>backend-py/app/main.py</code></li>
+        <li>DB: asyncpg + SQLAlchemy (async)</li>
+      </ul>
+    </div>
+  </div>
+  <div class="col">
+    <div class="card ap">
+      <div class="t">Auth (JWT Cookie)</div>
+      <ul>
+        <li><code>POST /api/auth/login</code> &mdash; sets cookie</li>
+        <li><code>POST /api/auth/logout</code> &mdash; clears cookie</li>
+        <li><code>GET /api/auth/me</code> &mdash; session check</li>
+        <li>Cookie <code>session</code> (HTTPOnly, 7-day)</li>
+        <li>Default <code>admin@university-portal.local</code></li>
+        <li>Override: <code>ADMIN_EMAIL</code>/<code>ADMIN_PASSWORD</code></li>
+      </ul>
+    </div>
+  </div>
+</div>
+<div class="card ap">
+  <div class="t">API Routers &nbsp;<code>backend-py/app/routers/</code></div>
+  <table>
+    <tr><td>courses.py</td><td>Course CRUD + bulk CSV export (with asyncpg NUMERIC&rarr;float decimal fix)</td></tr>
+    <tr><td>universities.py</td><td>University CRUD + associated course listing</td></tr>
+    <tr><td>scraper_jobs.py</td><td>Trigger scrape, poll job status, approve/reject scraped changes</td></tr>
+    <tr><td>bulk_import.py</td><td>Excel (.xlsx) upload &rarr; validation &rarr; <code>import_jobs</code> table</td></tr>
+    <tr><td>dashboard.py</td><td>Stats overview, courses by degree level, upcoming intakes, recent changes</td></tr>
+    <tr><td>change_history.py</td><td>Field-level diff log (before/after values) for the audit trail</td></tr>
+    <tr><td>auth.py</td><td>login / logout / me endpoints</td></tr>
+  </table>
+</div>
+
+<h2 class="workers">Layer 3 &mdash; Background Workers</h2>
+<div class="grid">
+  <div class="col">
+    <div class="card wk">
+      <div class="t">Celery Worker &nbsp;<code>app/tasks/</code></div>
+      <ul>
+        <li>4 concurrent workers, queue <code>-Q scrape</code></li>
+        <li>Broker + backend: Redis :6379</li>
+        <li>Tasks: <code>run_scrape()</code>, <code>run_repair()</code>, <code>bulk_approve()</code></li>
+        <li>Start: <code>celery -A app.tasks.celery_app worker --concurrency=4 --beat</code></li>
+      </ul>
+    </div>
+  </div>
+  <div class="col">
+    <div class="card wk">
+      <div class="t">Redis :6379 + Celery Beat</div>
+      <ul>
+        <li>Redis: in-memory broker only, no persistence (<code>--save ''</code>)</li>
+        <li>Bind <code>127.0.0.1:6379</code></li>
+        <li>Beat: <code>nightly_sweep</code> @ 02:00 UTC</li>
+        <li>&rarr; baseline snapshot &rarr; regression diff &rarr; drift alert</li>
+      </ul>
+    </div>
+  </div>
+</div>
+<div class="card wk">
+  <b>How background scraping works:</b> The API enqueues a scrape job onto Redis. A Celery worker claims it, runs the
+  full discovery + extraction pipeline, and writes results into the <code>scraped_courses</code> staging table. The nightly
+  Beat task snapshots every university, diffs against the previous night, and fires a drift alert if unexpected
+  field-value changes appear.
+</div>
+
+<div class="pagebreak"></div>
+
+<h2 class="scraper">Layer 4 &mdash; Scraper Engine</h2>
+<div class="card sc">
+  <div class="t">Orchestrator &mdash; 7-tier discovery &nbsp;<code>orchestrator.py</code></div>
+  <table>
+    <tr><td>Tier 1</td><td>BFS crawl &mdash; breadth-first link crawl from the base URL</td></tr>
+    <tr><td>Tier 2</td><td>Sitemap &mdash; parse <code>sitemap.xml</code> / <code>sitemap_index.xml</code></td></tr>
+    <tr><td>Tier 3</td><td>Alt-path probes &mdash; <code>/courses</code>, <code>/programs</code>, <code>/study</code>, <code>/international</code> &hellip;</td></tr>
+    <tr><td>Tier 4</td><td>Subdomain fallback &mdash; <code>handbook.&lt;domain&gt;</code>, <code>study.&lt;domain&gt;</code> (YAML-configured)</td></tr>
+    <tr><td>Tier 5</td><td>Playwright browser &mdash; headless Chrome for JS-heavy sites (RMIT, Deakin, UNSW)</td></tr>
+    <tr><td>Tier 6</td><td>Wayback Machine &mdash; archive.org fallback for blocked/broken sites</td></tr>
+    <tr><td>Tier 7</td><td>Discovery-failure alert &mdash; fires if &lt;3 course links found after all tiers</td></tr>
+  </table>
+  Per-university YAML config is loaded at run start into a contextvar and deep-merged with global defaults.
+</div>
+<div class="grid">
+  <div class="col">
+    <div class="card sc">
+      <div class="t">Per-course Pipeline</div>
+      <ul>
+        <li><code>stage_course.py</code> &mdash; write to <code>scraped_courses</code></li>
+        <li>Auto-publish gate &mdash; <b>85% completeness floor</b></li>
+        <li>13 review fields: name, degree_level, category, mode, location, duration, intakes, fee, description, academic level/score, english_test, other_req</li>
+        <li><code>approve_course.py</code> &mdash; promote to <code>courses</code></li>
+        <li><code>bulk_approve.py</code> &mdash; batch promotion</li>
+        <li>Repair scrape &mdash; back-fill blank fields only (never overwrites)</li>
+      </ul>
+    </div>
+  </div>
+  <div class="col">
+    <div class="card wk">
+      <div class="t">Gemini AI &mdash; <code>gemini-2.5-flash-lite</code></div>
+      <ul>
+        <li>AI fallback for hard-to-extract fields</li>
+        <li><b>Skip gate:</b> skip if &ge;90% fields filled at &ge;0.70 confidence (saves 30&ndash;50%)</li>
+        <li><b>Circuit breaker:</b> trips on 5 quota errors / 60s, stays open 5 min</li>
+        <li><b>Cost ceiling:</b> per-job USD budget cap</li>
+        <li><b>Call log:</b> <code>gemini_call_log</code> &mdash; tokens, cost, duration, success</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<h2 class="scraper">Layer 5 &mdash; Field Extractors &nbsp;<code>app/services/scraper/extractors/</code></h2>
+<table>
+  <tr><th style="width:18%">Extractor</th><th>What it does</th></tr>
+  <tr><td>course_name.py</td><td>DOM title extraction, strips title suffixes / institution tails (driven by YAML <code>strip_title_suffixes</code>)</td></tr>
+  <tr><td>duration.py</td><td>DOM structural pass + sentence tournament; YAML <code>reject_sentence_patterns</code> filters bad text like "up to N years"</td></tr>
+  <tr><td>fee.py</td><td>International tuition extraction, PDF fee-table matching, CRICOS-matched rows, per-course PDF parsing</td></tr>
+  <tr><td>english_test.py</td><td>IELTS / PTE / TOEFL / CAE / DET band scores (overall + sub-bands); per-host PTE blocklist suppresses false positives</td></tr>
+  <tr><td>location.py</td><td>Campus city extraction, country-suffix append, online/virtual strip, slash-separated city normalisation; YAML <code>strip_patterns</code></td></tr>
+  <tr><td>intake.py</td><td>Intake-month extraction; session&rarr;month map (Autumn&rarr;Mar, Spring&rarr;Jul, Summer&rarr;Nov for AU unis)</td></tr>
+  <tr><td>cricos_code.py</td><td>CRICOS code regex, PDF pipeline integration, AU universities only; provenance into <code>scraped_field_evidence</code></td></tr>
+  <tr><td>degree_level.py</td><td>Degree-level + category classification</td></tr>
+  <tr><td>description.py / eligibility.py</td><td>Course description &amp; eligibility extraction</td></tr>
+  <tr><td>gemini_primary.py / ai_fallback.py</td><td>AI-based extraction when rule-based extractors miss</td></tr>
+</table>
+
+<h2 class="config">Layer 6 &mdash; Per-University YAML Config System</h2>
+<div class="card cf">
+  <div class="t">scraper_config/ &nbsp;<code>backend-py/scraper_config/</code></div>
+  <table>
+    <tr><td>defaults.yaml</td><td>Conservative global defaults (changing needs a full regression sweep + human approval)</td></tr>
+    <tr><td>unis/&lt;slug&gt;.yaml</td><td>Per-university overrides &mdash; 30+ stubs (uwa, acap, bond, csu, monash &hellip;)</td></tr>
+    <tr><td>config/schema.py</td><td>Pydantic <code>UniConfig</code> split into <code>discovery</code> + <code>extraction</code> sections</td></tr>
+    <tr><td>config/loader.py</td><td>Deep-merge chain: defaults &rarr; DB <code>scrape_config</code> &rarr; per-uni YAML</td></tr>
+    <tr><td>config/context.py</td><td><code>ContextVar[UniConfig]</code> scoped to each scrape job</td></tr>
+  </table>
+  <div class="note"><b>Architecture rule:</b> ALL per-university quirks live in <code>scraper_config/unis/&lt;slug&gt;.yaml</code> &mdash;
+  never in global extractor code. Key fields: <code>strip_title_suffixes</code>, <code>reject_sentence_patterns</code>,
+  <code>strip_patterns</code>, <code>domestic_only</code>, <code>fallback_subdomains</code>, <code>always_sitemap_supplement</code>.
+  This means onboarding a new university needs zero global code changes.</div>
+</div>
+
+<div class="pagebreak"></div>
+
+<h2 class="db">Layer 7 &mdash; Database (PostgreSQL)</h2>
+<div class="grid">
+  <div class="col">
+    <div class="card dbc">
+      <div class="t">Core data tables</div>
+      <table>
+        <tr><td>universities</td><td>name, website, country, scrape_config (JSONB)</td></tr>
+        <tr><td>courses</td><td>live courses: name, degree_level, fee, duration, location, mode</td></tr>
+        <tr><td>intakes</td><td>intake months per course</td></tr>
+        <tr><td>fees</td><td>fee breakdown per course</td></tr>
+        <tr><td>english_requirements</td><td>IELTS/PTE/TOEFL/CAE/DET bands</td></tr>
+        <tr><td>academic_requirements</td><td>GPA, score, level</td></tr>
+        <tr><td>scholarships</td><td>scholarship info per course</td></tr>
+      </table>
+    </div>
+  </div>
+  <div class="col">
+    <div class="card dbc">
+      <div class="t">Scraping &amp; ops tables</div>
+      <table>
+        <tr><td>scraped_courses</td><td>staging: pending&rarr;review&rarr;approved&rarr;promoted</td></tr>
+        <tr><td>scraped_field_evidence</td><td>per-field provenance: method, source, confidence</td></tr>
+        <tr><td>scrape_runtime_jobs</td><td>job stats: found, staged, cost, elapsed</td></tr>
+        <tr><td>scrape_run_alerts</td><td>rule-based alerts per run</td></tr>
+        <tr><td>discovery_failure_alerts</td><td>Tier-7 fired alerts</td></tr>
+        <tr><td>gemini_call_log</td><td>every AI call: tokens, cost, success</td></tr>
+        <tr><td>import_jobs</td><td>Excel import history</td></tr>
+        <tr><td>change_history</td><td>field-level before/after audit log</td></tr>
+      </table>
+    </div>
+  </div>
+</div>
+<div class="card dbc">
+  <div class="t">SQL cost / coverage views</div>
+  <ul>
+    <li><code>v_gemini_cost_by_university</code> &mdash; per-uni Gemini spend</li>
+    <li><code>v_gemini_cost_by_call_type</code> &mdash; spend by call type</li>
+    <li><code>v_gemini_top_spenders_30d</code> &mdash; top spenders last 30 days</li>
+    <li><code>v_gemini_skip_efficiency</code> &mdash; how often the skip gate fires</li>
+    <li><code>v_cricos_coverage_au</code> &mdash; CRICOS match rate per AU university</li>
+  </ul>
+</div>
+
+<h2 class="deploy">Deployment &mdash; Production</h2>
+<div class="card dp">
+  <div class="t">DigitalOcean Droplet &middot; 159.65.152.72 &middot; Ubuntu 24.04</div>
+  <table>
+    <tr><td>Git repo</td><td><code>/root/University-and-Course-data</code></td></tr>
+    <tr><td>GitHub</td><td>github.com/Studyinfocentre/University-and-course-managment</td></tr>
+    <tr><td>Deploy</td><td><code>git pull origin main</code> + <code>systemctl restart uni-api-py.service uni-celery.service</code></td></tr>
+    <tr><td>FastAPI</td><td><code>uni-api-py.service</code> (Uvicorn :8000), Nginx proxies <code>/api &rarr; 127.0.0.1:8000</code></td></tr>
+    <tr><td>Celery</td><td><code>uni-celery.service</code> (4 workers + beat)</td></tr>
+    <tr><td>Database</td><td>Local PostgreSQL, DB <code>university_portal</code>, owner <code>uniportal</code></td></tr>
+  </table>
+  <div class="crit"><b>Critical:</b> The DB URL must use <code>127.0.0.1</code>, NOT <code>localhost</code> &mdash; asyncpg's SSL hostname
+  verification fails on this server's DNS. Apply all schema changes via direct <code>psql</code>; do NOT run alembic on prod
+  (same DNS issue over TCP).</div>
+</div>
+
+<h2 class="repo">Monorepo Structure (pnpm workspaces)</h2>
+<div class="grid">
+  <div class="col">
+    <div class="card dp">
+      <div class="t">Directory layout</div>
+      <ul style="font-family:Consolas,monospace; font-size:9px;">
+        <li>artifacts/university-portal/ &mdash; React+Vite UI</li>
+        <li>&nbsp;&nbsp;src/pages, src/components, src/context</li>
+        <li>backend-py/ &mdash; Python backend</li>
+        <li>&nbsp;&nbsp;app/main.py &mdash; FastAPI entry</li>
+        <li>&nbsp;&nbsp;app/routers/ &mdash; API handlers</li>
+        <li>&nbsp;&nbsp;app/services/scraper/ &mdash; engine</li>
+        <li>&nbsp;&nbsp;&nbsp;&nbsp;extractors/ &mdash; 15+ extractors</li>
+        <li>&nbsp;&nbsp;&nbsp;&nbsp;config/ &mdash; YAML config pkg</li>
+        <li>&nbsp;&nbsp;&nbsp;&nbsp;pipelines/ &mdash; PDF pipeline</li>
+        <li>&nbsp;&nbsp;scraper_config/unis/ &mdash; per-uni YAMLs</li>
+        <li>&nbsp;&nbsp;scripts/ &mdash; ops scripts</li>
+        <li>&nbsp;&nbsp;tests/ &mdash; pytest suite</li>
+      </ul>
+    </div>
+  </div>
+  <div class="col">
+    <div class="card dp">
+      <div class="t">Key ops scripts &nbsp;<code>backend-py/scripts/</code></div>
+      <ul style="font-size:9px;">
+        <li><code>bulk_approve.py</code> &mdash; batch promote staged courses</li>
+        <li><code>capture_baseline.py</code> &mdash; snapshot all unis</li>
+        <li><code>regression_sweep.py</code> &mdash; diff snapshots</li>
+        <li><code>bond_enrich.py</code> &mdash; Bond JSON API enrichment</li>
+        <li><code>csu_promotion_diagnostic.py</code></li>
+        <li><code>week4_preflight.sh</code> / <code>week5_preflight.sh</code></li>
+        <li><code>cricos_coverage_diagnostic.py</code></li>
+        <li><code>check_gemini_model.py</code> &mdash; verify cost-optimal model</li>
+        <li><code>apply_migration_*.py</code> &mdash; schema migrations</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
