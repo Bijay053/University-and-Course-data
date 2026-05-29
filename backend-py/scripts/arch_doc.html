@@ -58,6 +58,31 @@
   .pagebreak { page-break-before: always; }
   .note { background:#fef9c3; border-left:4px solid #ca8a04; padding:6px 10px; border-radius:4px; font-size:9.3px; margin-bottom:8px; }
   .crit { background:#fee2e2; border-left:4px solid #dc2626; padding:6px 10px; border-radius:4px; font-size:9.3px; margin-bottom:8px; }
+
+  /* vertical pipeline diagram */
+  .pipe { margin:8px 0 12px; }
+  .pstep {
+    display:flex; align-items:stretch; gap:0; margin-bottom:0;
+    page-break-inside:avoid;
+  }
+  .pnum {
+    width:26px; min-width:26px; background:#ea580c; color:#fff; font-weight:700;
+    display:flex; align-items:center; justify-content:center; font-size:11px;
+    border-radius:5px 0 0 5px;
+  }
+  .pbody {
+    flex:1; border:1px solid #fed7aa; border-left:none; border-radius:0 5px 5px 0;
+    padding:6px 10px; background:#fff7ed;
+  }
+  .pbody .pt { font-weight:700; color:#9a3412; font-size:10.5px; }
+  .pbody .pf { font-family:Consolas,monospace; font-size:8.5px; color:#c2410c; }
+  .pbody .pd { font-size:9.3px; color:#431407; margin-top:2px; }
+  .pdown { text-align:center; color:#fb923c; font-size:14px; line-height:1; margin:1px 0; }
+
+  /* config merge chain */
+  .merge { display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin:8px 0 12px; font-size:9px; }
+  .mbox { padding:6px 9px; border-radius:5px; text-align:center; color:#fff; font-weight:600; min-width:90px; }
+  .marr { color:#94a3b8; font-weight:700; font-size:14px; }
 </style>
 </head>
 <body>
@@ -362,6 +387,168 @@ All data is persisted in PostgreSQL.
     </div>
   </div>
 </div>
+
+<div class="pagebreak"></div>
+
+<h1 style="font-size:18px;">Scraping Architecture &mdash; How It Works</h1>
+<div class="sub">From "trigger scrape" to a live course row &mdash; the full pipeline in <code>app/services/scraper/</code></div>
+
+<p class="lead">
+A scrape runs entirely inside a Celery worker. <code>orchestrator.run_scrape(university_id)</code> drives every phase below.
+Per-university behaviour is decided up front (Phase 0) and read by every extractor through a contextvar, so no
+site-specific logic is hard-coded in the engine.
+</p>
+
+<div class="pipe">
+  <div class="pstep">
+    <div class="pnum">0</div>
+    <div class="pbody">
+      <div class="pt">Load configuration</div>
+      <div class="pf">config/loader.py:load_uni_config() &rarr; config/context.py:set_uni_config()</div>
+      <div class="pd">Slug is derived from the hostname (<code>www.acu.edu.au &rarr; acu</code>). The merged <code>UniConfig</code> is stored in a <code>ContextVar</code>; extractors read it later via <code>require_uni_config()</code>.</div>
+    </div>
+  </div>
+  <div class="pdown">&#9660;</div>
+  <div class="pstep">
+    <div class="pnum">1</div>
+    <div class="pbody">
+      <div class="pt">Discover course URLs</div>
+      <div class="pf">discovery.py:discover_course_links()</div>
+      <div class="pd"><b>Tier 1 BFS crawl</b> from <code>scrape_url</code> (<code>_LinkExtractor</code> + <code>_looks_like_course()</code> URL/anchor hints) &rarr; <b>Tier 2 sitemap</b> if &lt;5 candidates or <code>always_sitemap_supplement</code> &rarr; <b>Tier 3 browser/Wayback</b> for JS-heavy or WAF-blocked sites. <code>_dedup_year_variants()</code> collapses <code>/2026/</code> vs <code>/2027/</code> URLs.</div>
+    </div>
+  </div>
+  <div class="pdown">&#9660;</div>
+  <div class="pstep">
+    <div class="pnum">2</div>
+    <div class="pbody">
+      <div class="pt">Fetch each page</div>
+      <div class="pf">http_fetcher.py &nbsp;|&nbsp; stealth_browser.py (if use_stealth_browser)</div>
+      <div class="pd">Plain HTTP by default; falls back to a headless stealth browser for sites that block bots. Per-host URL rewriting (e.g. UNE <code>?international=true</code>, UOW <code>?students=international</code>) is applied here.</div>
+    </div>
+  </div>
+  <div class="pdown">&#9660;</div>
+  <div class="pstep">
+    <div class="pnum">3</div>
+    <div class="pbody">
+      <div class="pt">Extractor cascade</div>
+      <div class="pf">pipelines/single_course.py:extract_course() &rarr; extractors/*.py</div>
+      <div class="pd">Rule-based extractors run first (<code>course_name</code>, <code>fee</code>, <code>intake</code>, <code>duration</code>, <code>english_test</code>, <code>location</code>, <code>cricos_code</code> &hellip;). Each returns an <code>ExtractionResult</code> (normalized value + evidence). If fields are still missing, <code>ai_fallback.py</code> calls Gemini; <code>per_course_vision.py</code> OCRs fee-table images as a last resort.</div>
+    </div>
+  </div>
+  <div class="pdown">&#9660;</div>
+  <div class="pstep">
+    <div class="pnum">4</div>
+    <div class="pbody">
+      <div class="pt">Staging gates &amp; completeness</div>
+      <div class="pf">stage_course.py:should_stage_course() &rarr; compute_completeness()</div>
+      <div class="pd"><code>OnlineOnlyFilter</code> drops all-online courses (unless YAML opts out); <code>DomesticOnlyFilter</code> rejects "not available to international students" pages. <code>reject_if_missing</code> fields (e.g. <code>course_name</code>) are enforced. A 0&ndash;100 completeness score is computed for the auto-publish gate.</div>
+    </div>
+  </div>
+  <div class="pdown">&#9660;</div>
+  <div class="pstep">
+    <div class="pnum">5</div>
+    <div class="pbody">
+      <div class="pt">Persist to staging</div>
+      <div class="pf">scraped_courses + scraped_field_evidence + gemini_call_log</div>
+      <div class="pd">Each course is written serially (to avoid DB deadlocks). <code>_persist_evidence()</code> stores source snippets per field for the UI "Evidence Review" modal. Old <code>pending</code> rows for the same URL from earlier jobs are deleted to prevent clutter.</div>
+    </div>
+  </div>
+  <div class="pdown">&#9660;</div>
+  <div class="pstep">
+    <div class="pnum">6</div>
+    <div class="pbody">
+      <div class="pt">Approve &amp; promote to live</div>
+      <div class="pf">approve_course.py:approve_scraped_course() &nbsp;|&nbsp; scripts/bulk_approve.py</div>
+      <div class="pd">Triggered by an operator or the auto-publish service (<b>85% completeness floor</b>). <code>resolve_sub_category()</code> snaps free-text categories to the canonical taxonomy. An upsert into the live <code>courses</code> table (+ satellite tables <code>fees</code>, <code>intakes</code>, <code>english_requirements</code>) matches on <code>(university_id, lower(name))</code> so re-runs update rather than duplicate.</div>
+    </div>
+  </div>
+</div>
+
+<div class="note"><b>Why staging exists:</b> scraping never writes directly to the live <code>courses</code> table. Everything lands in
+<code>scraped_courses</code> first, where it is scored, evidence-backed, and reviewed. Only an explicit approval (manual or
+auto-publish above the 85% floor) promotes data to live &mdash; this is what makes the AI-assisted scrape safe.</div>
+
+<div class="pagebreak"></div>
+
+<h1 style="font-size:18px;">University YAML Config &mdash; Deep Dive</h1>
+<div class="sub">The mechanism that keeps per-university quirks out of the engine code</div>
+
+<p class="lead">
+Every university scrapes differently &mdash; different page structures, fee formats, subdomains, and filtering needs.
+Instead of branching on hostname inside extractors, all of that lives in declarative YAML. Onboarding a new
+university means writing a small YAML file, <b>not</b> changing engine code.
+</p>
+
+<h3>Merge chain &mdash; lowest to highest priority</h3>
+<div class="merge">
+  <div class="mbox" style="background:#94a3b8;">Pydantic<br>schema.py<br>defaults</div>
+  <span class="marr">&rarr;</span>
+  <div class="mbox" style="background:#64748b;">defaults.yaml<br>global</div>
+  <span class="marr">&rarr;</span>
+  <div class="mbox" style="background:#0d9488;">DB scrape_config<br>(JSONB, legacy)</div>
+  <span class="marr">&rarr;</span>
+  <div class="mbox" style="background:#b45309;">unis/&lt;slug&gt;.yaml<br>per-uni override</div>
+  <span class="marr">=</span>
+  <div class="mbox" style="background:#16a34a;">merged<br>UniConfig</div>
+</div>
+<p style="font-size:9.5px; color:#334155;">
+<code>config/loader.py:load_uni_config()</code> deep-merges these four sources. Later sources win, so a single field in
+<code>unis/uwa.yaml</code> overrides the global default without touching anything else. The result is set into a
+<code>ContextVar</code> (<code>config/context.py</code>) for the duration of the scrape job.
+</p>
+
+<div class="grid">
+  <div class="col">
+    <div class="card cf">
+      <div class="t">discovery: &nbsp;<span style="font-weight:400;color:#64748b;">safe to replay on unknown unis</span></div>
+      <table>
+        <tr><td>fallback_subdomains</td><td>Extra subdomains to probe (<code>handbook.{domain}</code>)</td></tr>
+        <tr><td>always_sitemap_supplement</td><td>Merge sitemap with BFS (JS SPAs)</td></tr>
+        <tr><td>block_url_patterns</td><td>Regex drop-list of URLs</td></tr>
+        <tr><td>allow_url_patterns</td><td>Regex whitelist of URLs</td></tr>
+        <tr><td>sitemap_url</td><td>Explicit sitemap override</td></tr>
+        <tr><td>use_wayback</td><td>archive.org fallback for WAF-blocked sites</td></tr>
+        <tr><td>bfs_page_budget</td><td>Override crawl page budget</td></tr>
+      </table>
+    </div>
+  </div>
+  <div class="col">
+    <div class="card cf">
+      <div class="t">extraction: &nbsp;<span style="font-weight:400;color:#64748b;">site-specific, NOT replayed</span></div>
+      <table>
+        <tr><td>fees.central_page</td><td>University-wide fee page / PDF URL</td></tr>
+        <tr><td>fees.default_currency</td><td>AUD / NZD per country</td></tr>
+        <tr><td>english.trust_vision_ocr</td><td>Disable OCR where it hallucinates</td></tr>
+        <tr><td>english.default_ielts/pte</td><td>Last-resort institutional standard</td></tr>
+        <tr><td>filters.domestic_only</td><td>Drop domestic-only courses</td></tr>
+        <tr><td>filters.online_only</td><td>Drop all-online (CSU opts out)</td></tr>
+        <tr><td>text_cleaning.location.strip_patterns</td><td>Regex noise removal</td></tr>
+        <tr><td>staging.reject_if_missing</td><td>Required fields to stage</td></tr>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="note"><b>Why the split matters:</b> <code>discovery</code> settings make no assumptions about a specific site's content,
+so they are safe to replay in Tier-3 playbook matching against an unknown university. <code>extraction</code> settings encode
+site-specific knowledge and must never leak onto a different university &mdash; <code>UniConfig.for_tier3_replay()</code>
+strips the entire <code>extraction</code> section to enforce this.</div>
+
+<h3>Example &mdash; a minimal per-university override</h3>
+<div class="card cf" style="font-family:Consolas,monospace; font-size:9px; background:#0f172a; color:#e2e8f0; border-left-color:#b45309;">
+<span style="color:#94a3b8;"># scraper_config/unis/csu.yaml &mdash; Charles Sturt (distance-education heavy)</span><br>
+discovery:<br>
+&nbsp;&nbsp;always_sitemap_supplement: <span style="color:#fbbf24;">true</span>&nbsp;&nbsp;<span style="color:#94a3b8;"># BFS misses paginated catalogue</span><br>
+extraction:<br>
+&nbsp;&nbsp;filters:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;online_only:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;enabled: <span style="color:#fbbf24;">false</span>&nbsp;&nbsp;<span style="color:#94a3b8;"># keep CSU's online courses</span>
+</div>
+
+<div class="crit"><b>Modification policy:</b> <code>defaults.yaml</code> is the single highest-impact file &mdash; a change there affects
+EVERY university without an override. It requires a full regression sweep + human approval before merge. Per-uni YAML
+changes only re-run that one university, so they are safe after single-uni validation. <b>Always prefer a per-uni override
+over editing defaults.</b></div>
 
 </body>
 </html>
