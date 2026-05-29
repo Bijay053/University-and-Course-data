@@ -110,6 +110,7 @@ type StagedCourse = {
   scholarship?: string | null;
   completeness?: number | null;
   scrape_job_id?: string | null;
+  course_id?: number | null;
   created_at?: string | null;
 };
 
@@ -1190,6 +1191,12 @@ export default function UniversityDetail() {
       setEditingCourse(null);
       setEditForm(null);
       await fetchRawData();
+      // If this was an approved course linked to a live course, refresh the
+      // Courses tab so the edits are immediately visible there too.
+      if (editingCourse.status === "approved" && editingCourse.course_id) {
+        await queryClient.invalidateQueries({ queryKey: getListCoursesQueryKey({ universityId: id, limit: 500 }) });
+        await queryClient.invalidateQueries({ queryKey: getGetUniversityQueryKey(id) });
+      }
     } catch (e) {
       toast({ title: "Error", description: (e as Error).message, variant: "destructive" });
     } finally {

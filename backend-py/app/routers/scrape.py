@@ -2183,14 +2183,17 @@ async def staged_update(
     db: Annotated[AsyncSession, Depends(get_db)],
     body: Annotated[dict, Body(...)],
 ) -> dict:
-    from app.models import ScrapedCourse
+    from app.models import ScrapedCourse, Course
 
     sc = await db.get(ScrapedCourse, sc_id)
     if sc is None:
         raise HTTPException(status_code=404, detail="Not found")
-    if sc.status != "pending":
+    # Allow editing both pending and approved staged courses.
+    # Previously blocked approved edits, but the UI needs to let operators
+    # correct data in the Approved Raw Data view.
+    if sc.status not in ("pending", "approved"):
         raise HTTPException(
-            status_code=400, detail="Can only edit pending courses"
+            status_code=400, detail="Can only edit pending or approved courses"
         )
     changed = False
     for camel, snake in _STAGED_EDITABLE_FIELDS.items():
@@ -2206,6 +2209,36 @@ async def staged_update(
             sc.completeness = score
         except Exception:  # pragma: no cover — best-effort
             pass
+
+    # ── Propagate edits to the live courses row ────────────────────────────
+    # If this staged row is already linked to a live course (course_id is
+    # set), mirror the basic course-table fields so changes in Raw Data are
+    # immediately reflected in the Courses tab without a re-approve cycle.
+    # Fee/English-req/intake fields live in separate tables and are NOT
+    # touched here — those are managed by the approve pipeline.
+    _STAGED_TO_COURSE: dict[str, str] = {
+        "course_name": "name",
+        "category": "category",
+        "sub_category": "sub_category",
+        "course_website": "course_website",
+        "duration": "duration",
+        "duration_term": "duration_term",
+        "course_location": "course_location",
+        "study_mode": "study_mode",
+        "degree_level": "degree_level",
+        "study_load": "study_load",
+        "language": "language",
+        "description": "description",
+        "other_requirement": "other_requirement",
+    }
+    if sc.course_id and changed:
+        live = await db.get(Course, sc.course_id)
+        if live is not None:
+            for staged_col, course_col in _STAGED_TO_COURSE.items():
+                new_val = getattr(sc, staged_col, None)
+                if new_val is not None:
+                    setattr(live, course_col, new_val)
+
     await db.commit()
     await db.refresh(sc)
     return {
