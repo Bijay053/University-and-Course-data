@@ -1,0 +1,97 @@
+# University of Huddersfield
+# Hostname: courses.hud.ac.uk
+#
+# Bug history / rationale:
+#   - Course discovery relies on a centralized JSON catalog API.
+#   - Fees are hardcoded via string matching in python script, default currency set to GBP.
+
+# ── WHEN TO EDIT THIS FILE ────────────────────────────────────────────────────
+# Edit when a scrape of THIS university produces wrong or missing data due to
+# site-specific quirks. Safe pattern:
+#   1. Run scrape → inspect staged rows in the portal
+#   2. Find the symptom in the table at the bottom of this file
+#   3. Uncomment the relevant field → re-run THIS university only
+#
+# Do NOT edit scraper_config/defaults.yaml — changes there affect every university
+# and require a full regression sweep + human approval.
+# Do NOT edit extractor code in app/services/scraper/extractors/ — same risk.
+
+# ── DISCOVERY ─────────────────────────────────────────────────────────────────
+# Settings that are safe to replay against unknown universities (Tier-3).
+# They do not assume anything about a specific site's content structure.
+
+discovery:
+  # Keep ONLY URLs matching at least one of these patterns (allow-list).
+  # Matches the URL template generation in the spider: /2025-26/{study_mode}/{study_level}/
+  allow_url_patterns:
+    - '/\d{4}-\d{2}/'
+
+  # Overriding default page budget and candidates to account for the comprehensive JSON feed
+  bfs_page_budget: 100
+  max_candidates: 500
+
+  # Inject specific course page URLs directly into the discovered set.
+  # Using the primary course API directory found in the start_urls as our seeding baseline
+  extra_course_urls:
+    - https://courses.hud.ac.uk/json/2025-26/sort:title
+
+# ── EXTRACTION ────────────────────────────────────────────────────────────────
+# Settings that depend on a specific university's content structure.
+# Must NOT be replayed against unknown universities in Tier-3.
+
+extraction:
+
+  # ── Fees ──────────────────────────────────────────────────────────────────
+  fees:
+    # Set to Pound Sterling as explicitly matched in the spider logic (fee_currency: "Pound Sterling")
+    default_currency: "GBP" 
+
+  # ── English requirements ───────────────────────────────────────────────────
+  english:
+    # Setting fallback defaults based on typical baseline parsing logic
+    default_ielts: 6.0
+
+  # ── Filters ───────────────────────────────────────────────────────────────
+  filters:
+    domestic_only:
+      enabled: false
+
+    online_only:
+      enabled: false
+
+  # ── Concurrency ───────────────────────────────────────────────────────────
+  # Cap parallel page fetches to ensure we don't trip security systems when scraping the generated URLs
+  max_parallel_fetch: 5
+
+  # Fallback course_location when all extractors return empty. 
+  # Spider explicitly sets il.add_value("city", "Huddersfield")
+  default_course_location: "Huddersfield"
+
+# ── QUICK REFERENCE — symptom → YAML field ────────────────────────────────────
+# Symptom                                        Field to set
+# ─────────────────────────────────────────────────────────────────────────────
+# Discovery finds nav/news pages, not courses    discovery.must_contain
+#                                                discovery.block_url_patterns
+# Sitemap not auto-discovered                    discovery.sitemap_url
+# BFS finds < 5 courses (subdomain)              discovery.fallback_subdomains
+# Cloudflare blocks plain-HTTP BFS               discovery.always_browser_discover
+# Cloudflare blocks headless Playwright too      discovery.use_stealth_browser
+# All courses staged as no_international_fee      extraction.fees.force_central_fee_stage
+# Fee PDF has multi-line course titles           extraction.fees.pdf_parser: "columnar"
+# Page shows Year-1 fee; we want annual          extraction.fees.prefer_year_one_over_total
+# IELTS hallucinated from decorative images      extraction.english.trust_vision_ocr: false
+# PTE/TOEFL appears on pages that don't list it  extraction.english.test_blocklist
+# Duration shows max-candidature time            extraction.text_cleaning.duration.reject_sentence_patterns
+# Location panel blank on Cloudflare-heavy site  extraction.default_course_location
+# Location string has CMS junk suffix           extraction.text_cleaning.location.strip_patterns
+# Course title ends with " : University of X"   extraction.course_name.strip_title_suffixes
+# PhD shows no intake months                     extraction.intake.rolling_enrollment_label
+# Domestic-only courses are being staged         extraction.filters.domestic_only.enabled: true
+# Site uses per-unit fees                        extraction.fees.credit_points_per_unit
+# International view needs a query parameter     extraction.url_rewrites
+# ─────────────────────────────────────────────────────────────────────────────
+# NOT YAML-fixable (ask engineering):
+#   rendered=0B even with browser flags          → per_course_browser.py _NETWORKIDLE_HOSTS
+#   scrape times out, all pages blank            → per_course_browser.py _SKIP_BROWSER_HOSTS
+#   Cloudflare WAF still blocks stealth browser  → new extraction route needed
+#   Fees only on JS calculator (no HTML)         → new XHR extractor needed

@@ -1891,26 +1891,6 @@ export default function SettingsScraperConfigs() {
               </button>
             </div>
 
-            {/* Mode tabs */}
-            <div className="flex rounded-lg border overflow-hidden text-sm">
-              <button
-                className={cn("flex-1 py-1.5 font-medium transition-colors", newModalMode === "ai" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")}
-                onClick={() => setNewModalMode("ai")}
-                disabled={generating}
-              >
-                <Sparkles className="inline h-3.5 w-3.5 mr-1.5 -mt-0.5" />
-                Generate with AI
-              </button>
-              <button
-                className={cn("flex-1 py-1.5 font-medium transition-colors", newModalMode === "manual" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")}
-                onClick={() => setNewModalMode("manual")}
-                disabled={generating}
-              >
-                <Code className="inline h-3.5 w-3.5 mr-1.5 -mt-0.5" />
-                Write Manually
-              </button>
-            </div>
-
             {newModalMode === "ai" ? (
               <>
                 <p className="text-sm text-muted-foreground">
@@ -1987,9 +1967,18 @@ export default function SettingsScraperConfigs() {
                 )}
 
                 {!generating && (
-                  <p className="text-xs text-muted-foreground text-center">
-                    Uses Gemini AI · crawls the site first · review before saving
-                  </p>
+                  <div className="flex flex-col items-center gap-1">
+                    <p className="text-xs text-muted-foreground">
+                      Uses Gemini AI · crawls the site first · review before saving
+                    </p>
+                    <button
+                      className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
+                      onClick={() => setNewModalMode("manual")}
+                    >
+                      <Code className="inline h-3 w-3 mr-1 -mt-0.5" />
+                      Write manually instead
+                    </button>
+                  </div>
                 )}
               </>
             ) : (
