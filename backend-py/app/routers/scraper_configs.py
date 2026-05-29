@@ -892,17 +892,19 @@ It has already been populated from a live probe of the site. Output it with ONLY
 
 {_yaml_template}
 
-ALLOWED CHANGES (operator notes say: {body.notes or "none"}):
-- You may add discovery.bfs_page_budget if {body.university_name} is a large university with many courses.
-- You may add discovery.block_url_patterns if you know specific URL patterns to avoid.
-- Keep the comment block exactly as written — do NOT add or change any rationale lines.
-- Do NOT change any confirmed WAF/SPA settings or confirmed URLs.
+Operator notes: {body.notes or "none"}.
 
-STRICTLY FORBIDDEN — these cause silent data corruption:
-- DO NOT add default_ielts or default_pte — these stamp fabricated values onto every course that lacks real data. Blank is always better than a wrong number.
-- DO NOT change domestic_only.enabled to true — the safe default is false. Only true if you have confirmed the site physically serves ONLY domestic courses with no international option at all.
-- DO NOT invent or guess any central_page, fees_pdf_url, or other URL not already in the template above.
-- DO NOT add any field you are not 100% certain applies. When in doubt, omit it.
+THIS IS A FIRST-RUN STUB. Output the template above UNCHANGED.
+The only permitted modification is incorporating specific information from the operator notes above, if any.
+
+STRICTLY FORBIDDEN — every item below causes real harm:
+- DO NOT add bfs_page_budget — it is set after a real scrape shows BFS hitting the page cap. Guessing 750 on a small university wastes 30-60 minutes of stealth-browser time per run.
+- DO NOT add block_url_patterns — these are written from actual [DISCOVER] log output after a first scrape, never speculatively. Wrong patterns silently drop real course pages.
+- DO NOT add default_ielts or default_pte — these stamp fabricated scores onto every course with no real data. A student sees 6.5, applies to Nursing (real requirement: 7.0), gets rejected.
+- DO NOT change domestic_only.enabled to true — false is the safe default.
+- DO NOT invent or guess any URL (central_page, fees_pdf_url, etc.) not already confirmed in the template.
+- DO NOT add or change any rationale comment lines.
+- DO NOT add any field not already in the template unless the operator notes explicitly request it.
 
 Output ONLY the completed YAML — no markdown fences, no commentary:"""
 
