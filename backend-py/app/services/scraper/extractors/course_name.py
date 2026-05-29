@@ -42,6 +42,14 @@ _INSTITUTION_TAIL = (
     # must come before shorter prefixes ("Uni") so the regex engine consumes
     # them first and never strips just the "Uni" prefix from "University".
     r"[A-Z][A-Za-z& ]{1,40}\s+(?:University|Uni|College|Institute|Academy|School)\b|"
+    # "University of [Place]" pattern — handles universities whose name
+    # starts with "University of" rather than ending with it, e.g.:
+    #   "the University of Western Australia"
+    #   "University of Melbourne"
+    #   "University of New South Wales"
+    # Anchored at $ (via _TITLE_SUFFIX) so it can't accidentally fire on
+    # course names containing "University of" in the middle.
+    r"(?:the\s+)?University\s+of\s+(?:[A-Za-z]+\s+){0,3}[A-Za-z]+|"
     # Explicit acronym/short-name list. Case-insensitive match handles
     # "Aibi" (title-case) and "AIBI" (all-caps) uniformly.
     # Orchestrator._strip_provider_name_from_title() is the second layer that
