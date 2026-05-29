@@ -983,15 +983,32 @@ export default function Bulk() {
           </Button>
           </Can>
 
-          <div className="rounded-xl border bg-gray-50 p-5 text-sm text-gray-600 space-y-2">
-            <p className="font-medium text-gray-700">Expected Column Format</p>
-            <p>The Excel file should use the Scrapy pipeline output format with these key columns:</p>
-            <div className="flex flex-wrap gap-1 mt-2">
+          <div className="rounded-xl border bg-gray-50 p-5 text-sm text-gray-600 space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="font-medium text-gray-700">Expected Column Format</p>
+                <p className="text-xs text-gray-500 mt-0.5">Download the sample sheet to see all columns with example data.</p>
+              </div>
+              <a
+                href={`${import.meta.env.BASE_URL}sample-import.xlsx`}
+                download="sample-import.xlsx"
+                className="shrink-0"
+              >
+                <Button variant="outline" size="sm" className="gap-1.5 text-xs">
+                  <Download className="h-3.5 w-3.5" />
+                  Download Sample
+                </Button>
+              </a>
+            </div>
+            <div className="flex flex-wrap gap-1">
               {[
                 "Course Name", "Category", "Sub Category", "Degree Level", "Duration", "Duration Term",
-                "Study Mode", "Study Load", "Intake Month", "International Fee", "Fee Term", "Currency",
-                "IELTS Overall", "IELTS Listening", "PTE Overall", "TOEFL Overall",
-                "Academic Level", "Academic Country", "Scholarship", "Course Website",
+                "Study Mode", "Study Load", "Course Location", "Intake Month",
+                "International Fee", "Fee Term", "Fee Year", "Currency",
+                "IELTS Overall", "IELTS Listening", "IELTS Speaking", "IELTS Writing", "IELTS Reading",
+                "PTE Overall", "TOEFL Overall",
+                "Academic Level", "Academic Score", "Academic Country",
+                "Scholarship", "CRICOS Code", "Course Website", "Description",
               ].map((col) => (
                 <Badge key={col} variant="secondary" className="text-xs">{col}</Badge>
               ))}
