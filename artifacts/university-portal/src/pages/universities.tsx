@@ -53,6 +53,7 @@ export default function Universities() {
   const [editCountry, setEditCountry] = useState("");
   const [editSaving, setEditSaving] = useState(false);
   const [featuredSavingId, setFeaturedSavingId] = useState<number | null>(null);
+  const [featuredConfirm, setFeaturedConfirm] = useState<{ id: number; name: string; current: boolean } | null>(null);
 
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
@@ -318,7 +319,7 @@ export default function Universities() {
                           <button
                             type="button"
                             disabled={featuredSavingId === uni.id}
-                            onClick={() => toggleFeatured(uni.id, isFeatured)}
+                            onClick={() => setFeaturedConfirm({ id: uni.id, name: uni.name, current: isFeatured })}
                             title={isFeatured ? "Featured — click to disable" : "Mark as Featured"}
                             className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-full border transition-all cursor-pointer disabled:opacity-50 ${
                               isFeatured
@@ -327,7 +328,7 @@ export default function Universities() {
                             }`}
                           >
                             <Star className={`w-3 h-3 ${isFeatured ? "fill-amber-500 text-amber-500" : ""}`} />
-                            {isFeatured ? "ON" : "OFF"}
+                            {featuredSavingId === uni.id ? "…" : isFeatured ? "ON" : "OFF"}
                           </button>
                         </td>
 
@@ -490,6 +491,41 @@ export default function Universities() {
           </>
         )}
       </div>
+
+      {/* Featured confirmation dialog */}
+      <Dialog open={featuredConfirm !== null} onOpenChange={(o) => { if (!o) setFeaturedConfirm(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Star className={`w-4 h-4 ${featuredConfirm?.current ? "text-gray-400" : "fill-amber-500 text-amber-500"}`} />
+              {featuredConfirm?.current ? "Remove from Featured" : "Mark as Featured"}
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            {featuredConfirm?.current
+              ? <>Remove <span className="font-semibold text-foreground">{featuredConfirm?.name}</span> from featured universities?</>
+              : <>Mark <span className="font-semibold text-foreground">{featuredConfirm?.name}</span> as a featured university?</>
+            }
+          </p>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setFeaturedConfirm(null)}>Cancel</Button>
+            <Button
+              variant={featuredConfirm?.current ? "destructive" : "default"}
+              disabled={featuredSavingId === featuredConfirm?.id}
+              onClick={async () => {
+                if (!featuredConfirm) return;
+                await toggleFeatured(featuredConfirm.id, featuredConfirm.current);
+                setFeaturedConfirm(null);
+              }}
+            >
+              {featuredSavingId === featuredConfirm?.id
+                ? "Saving…"
+                : featuredConfirm?.current ? "Remove Featured" : "Mark as Featured"
+              }
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Edit dialog */}
       <Dialog open={editId !== null} onOpenChange={(o) => { if (!o) setEditId(null); }}>
