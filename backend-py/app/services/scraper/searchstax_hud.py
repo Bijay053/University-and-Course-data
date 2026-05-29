@@ -411,50 +411,81 @@ def _map_doc(doc: dict, cfg: SearchStaxConfig) -> Optional[dict]:
             payload["ielts_writing"] = ielts_band
             payload["ielts_speaking"] = ielts_band
 
-    # Evidence rows. Only the critical fields the source-evidence guard
-    # (guards.enforce_source_evidence) checks need a row with a non-empty
-    # source_url + snippet: international_fee, ielts_overall, study_mode.
+    def _ev(field_key, value, method, source, page_type, snippet, confidence):
+        return {
+            "field_key": field_key,
+            "value": value,
+            "normalized": value,
+            "source_url": source,
+            "page_type": page_type,
+            "method": method,
+            "snippet": snippet,
+            "confidence": confidence,
+            "decision_status": "selected",
+        }
+
     evidence: list[dict[str, Any]] = []
+
+    # Course identity fields
+    evidence.append(_ev(
+        "course_name", name, "searchstax:h1", url, "course",
+        f"Solr h1/searchTitle: {raw_title}", 0.95,
+    ))
+    evidence.append(_ev(
+        "degree_level", degree_level, "searchstax:title_reformat", url, "course",
+        f"Qualification token extracted from title: {raw_title}", 0.9,
+    ))
+    evidence.append(_ev(
+        "course_location", "Huddersfield", "searchstax:hardcoded", url, "course",
+        "All Huddersfield courses delivered at Huddersfield campus (or Distance Learning).", 0.99,
+    ))
+
+    # Duration / mode from Solr duration_t
+    if duration_t:
+        if duration is not None:
+            evidence.append(_ev(
+                "duration", duration, "searchstax:duration_t", url, "course",
+                f"Solr duration_t: {duration_t}", 0.85,
+            ))
+        if study_mode:
+            evidence.append(_ev(
+                "study_mode", study_mode, "searchstax:duration_t", url, "course",
+                f"Solr duration_t: {duration_t}", 0.8,
+            ))
+
+    # Intake months from Solr start_dates_s
+    if intakes:
+        start_dates_raw = _first(doc.get("start_dates_s")) or ""
+        evidence.append(_ev(
+            "intake_months", ", ".join(intakes), "searchstax:start_dates_s", url, "course",
+            f"Solr start_dates_s: {start_dates_raw}", 0.85,
+        ))
+
+    # International fee from central band schedule
     if fee is not None:
-        evidence.append({
-            "field_key": "international_fee",
-            "value": fee,
-            "normalized": fee,
-            "source_url": cfg.central_fee_page or url,
-            "page_type": "central_fee",
-            "method": "searchstax:fee_band",
-            "snippet": (
+        evidence.append(_ev(
+            "international_fee", fee, "searchstax:fee_band",
+            cfg.central_fee_page or url, "central_fee",
+            (
                 f"International tuition fee band for "
                 f"{(fee_subject or 'this subject area').title()}: "
                 f"£{fee:,}/year ({cfg.fee_year}-{(cfg.fee_year + 1) % 100:02d})"
             ),
-            "confidence": 0.7,
-            "decision_status": "selected",
-        })
+            0.7,
+        ))
+
+    # IELTS from Solr content field
     if ielts_overall is not None:
-        evidence.append({
-            "field_key": "ielts_overall",
-            "value": ielts_overall,
-            "normalized": ielts_overall,
-            "source_url": url,
-            "page_type": "course",
-            "method": "searchstax:content",
-            "snippet": ielts_snippet or f"IELTS {ielts_overall} overall",
-            "confidence": 0.85,
-            "decision_status": "selected",
-        })
-    if study_mode:
-        evidence.append({
-            "field_key": "study_mode",
-            "value": study_mode,
-            "normalized": study_mode,
-            "source_url": url,
-            "page_type": "course",
-            "method": "searchstax:duration_t",
-            "snippet": duration_t or study_mode,
-            "confidence": 0.8,
-            "decision_status": "selected",
-        })
+        evidence.append(_ev(
+            "ielts_overall", ielts_overall, "searchstax:content", url, "course",
+            ielts_snippet or f"IELTS {ielts_overall} overall", 0.85,
+        ))
+        if ielts_band is not None:
+            for sub in ("ielts_listening", "ielts_reading", "ielts_writing", "ielts_speaking"):
+                evidence.append(_ev(
+                    sub, ielts_band, "searchstax:content", url, "course",
+                    f"No element lower than {ielts_band} (derived from IELTS band requirement)", 0.75,
+                ))
 
     result = {"name": name, "url": url, "payload": payload, "evidence": evidence}
     return {"name": name, "url": url, "searchstax_result": result}
