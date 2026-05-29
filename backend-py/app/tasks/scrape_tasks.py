@@ -511,7 +511,9 @@ def nightly_sweep_and_alert(self) -> dict:  # type: ignore[override]
     import subprocess
 
     _backend_py = pathlib.Path(__file__).resolve().parent.parent.parent
-    _python = _backend_py / "venv" / "bin" / "python3"
+    # Use sys.executable so the correct interpreter is found in any environment
+    # (Replit uses .pythonlibs, production uses venv — neither is at a fixed path).
+    _python = sys.executable
     _env = {**os.environ, "PYTHONPATH": "."}
 
     today = datetime.now(timezone.utc).strftime("%Y%m%d")
