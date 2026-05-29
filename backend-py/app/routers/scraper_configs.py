@@ -597,6 +597,147 @@ extraction:
 """
 
 
+_SPA_MARKERS = [
+    "__NEXT_DATA__", "_nuxt", "ng-version", "data-reactroot",
+    "data-react-helmet", "__vue", "window.__INITIAL_STATE__",
+    "window.Ember", "id=\"root\"", "id=\"app\"", "id=\"__next\"",
+]
+
+_FEE_PATHS = [
+    "/international/fees", "/international/tuition",
+    "/study/fees-and-scholarships", "/study/fees",
+    "/fees-and-scholarships", "/fees", "/tuition-fees",
+    "/future-students/fees", "/future-students/international/fees",
+    "/international/study/fees", "/courses/fees",
+    "/international/costs-and-funding",
+]
+
+_ENGLISH_PATHS = [
+    "/international/english-language-requirements",
+    "/international/entry-requirements/english-language",
+    "/international/entry-requirements",
+    "/entry-requirements/english-language-requirements",
+    "/study/entry-requirements/english-language-requirements",
+    "/english-language-requirements",
+    "/international/apply/english-language-requirements",
+    "/future-students/international/entry-requirements",
+    "/international/how-to-apply/english-language-requirements",
+]
+
+
+async def _probe_university_site(base_url: str) -> dict:
+    """Crawl the university site to gather real facts for the AI prompt.
+
+    Returns a dict with keys:
+      homepage_ok, is_spa, sitemap_ok, nav_links,
+      found_fee_url, found_english_url, probe_errors
+    """
+    import re as _re
+    from urllib.parse import urljoin, urlparse
+
+    result: dict = {
+        "homepage_ok": False,
+        "is_spa": False,
+        "sitemap_ok": False,
+        "nav_links": [],
+        "found_fee_url": None,
+        "found_english_url": None,
+        "probe_errors": [],
+    }
+
+    parsed = urlparse(base_url)
+    origin = f"{parsed.scheme}://{parsed.netloc}"
+
+    headers = {
+        "User-Agent": "Mozilla/5.0 (compatible; UniPortalBot/1.0; +https://university-portal.local)",
+        "Accept": "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8",
+    }
+
+    try:
+        import httpx
+        async with httpx.AsyncClient(
+            headers=headers,
+            follow_redirects=True,
+            timeout=12.0,
+            verify=False,
+        ) as client:
+
+            # ── 1. Homepage ──────────────────────────────────────────────────
+            try:
+                resp = await client.get(base_url)
+                if resp.status_code < 400:
+                    result["homepage_ok"] = True
+                    html = resp.text
+
+                    # SPA detection
+                    html_lower = html.lower()
+                    spa_hits = [m for m in _SPA_MARKERS if m.lower() in html_lower]
+                    result["is_spa"] = len(spa_hits) >= 1
+                    result["spa_hits"] = spa_hits[:3]
+
+                    # Extract <a href> links from nav/header — keyword-filtered
+                    _kw = re.compile(
+                        r"fee|tuition|english|language|entry.require|international|ielts|pte|toefl",
+                        re.I,
+                    )
+                    hrefs = re.findall(r'href=["\']([^"\']+)["\']', html)
+                    nav_links = []
+                    for h in hrefs:
+                        if _kw.search(h) or _kw.search(html[max(0, html.find(h) - 60):html.find(h) + len(h) + 60]):
+                            full = h if h.startswith("http") else urljoin(origin, h)
+                            if urlparse(full).netloc == parsed.netloc and full not in nav_links:
+                                nav_links.append(full)
+                    result["nav_links"] = nav_links[:15]
+            except Exception as exc:
+                result["probe_errors"].append(f"homepage: {exc}")
+
+            # ── 2. Sitemap ───────────────────────────────────────────────────
+            for sm_path in ["/sitemap.xml", "/sitemap_index.xml"]:
+                try:
+                    sm_resp = await client.get(origin + sm_path)
+                    if sm_resp.status_code == 200 and "<url" in sm_resp.text.lower():
+                        result["sitemap_ok"] = True
+                        break
+                except Exception as exc:
+                    result["probe_errors"].append(f"sitemap: {exc}")
+
+            # ── 3. Probe fee URLs ────────────────────────────────────────────
+            for path in _FEE_PATHS:
+                try:
+                    r = await client.head(origin + path, timeout=6.0)
+                    if r.status_code < 400:
+                        result["found_fee_url"] = origin + path
+                        break
+                    # Some servers reject HEAD — fallback to GET (first 512 bytes)
+                    if r.status_code == 405:
+                        r2 = await client.get(origin + path, timeout=6.0)
+                        if r2.status_code < 400:
+                            result["found_fee_url"] = origin + path
+                            break
+                except Exception:
+                    pass
+
+            # ── 4. Probe English requirement URLs ────────────────────────────
+            for path in _ENGLISH_PATHS:
+                try:
+                    r = await client.head(origin + path, timeout=6.0)
+                    if r.status_code < 400:
+                        result["found_english_url"] = origin + path
+                        break
+                    if r.status_code == 405:
+                        r2 = await client.get(origin + path, timeout=6.0)
+                        if r2.status_code < 400:
+                            result["found_english_url"] = origin + path
+                            break
+                except Exception:
+                    pass
+
+    except Exception as exc:
+        result["probe_errors"].append(f"client init: {exc}")
+
+    return result
+
+
 @router.post("/scraper-configs/generate")
 async def generate_scraper_config(
     body: GenerateConfigBody,
@@ -635,6 +776,40 @@ async def generate_scraper_config(
     else:
         _currency = "AUD"
 
+    # ── Pre-crawl the real site so Gemini works from facts, not hallucinations ──
+    log.info("Probing university site %r before Gemini generation", body.website_url)
+    probe = await _probe_university_site(body.website_url)
+    log.info("Probe result for %r: homepage_ok=%s is_spa=%s sitemap_ok=%s fee_url=%s english_url=%s nav_links=%d errors=%s",
+             body.website_url, probe["homepage_ok"], probe["is_spa"], probe["sitemap_ok"],
+             probe["found_fee_url"], probe["found_english_url"], len(probe["nav_links"]),
+             probe["probe_errors"])
+
+    # Build the "LIVE SITE FINDINGS" section for the prompt
+    _findings_lines = [
+        "=== LIVE SITE FINDINGS (crawled just now — use these facts, not assumptions) ===",
+        f"Homepage reachable: {probe['homepage_ok']}",
+        f"SPA detected (React/Next/Vue/Angular): {probe['is_spa']}"
+        + (f"  [markers found: {', '.join(probe.get('spa_hits', []))}]" if probe.get('spa_hits') else ""),
+        f"sitemap.xml exists and has <url> entries: {probe['sitemap_ok']}",
+    ]
+    if probe["found_fee_url"]:
+        _findings_lines.append(f"Fee page — CONFIRMED LIVE URL (HTTP 200): {probe['found_fee_url']}")
+    else:
+        _findings_lines.append("Fee page — none of the standard paths returned HTTP 200 (leave central_page null or find manually)")
+    if probe["found_english_url"]:
+        _findings_lines.append(f"English requirements page — CONFIRMED LIVE URL (HTTP 200): {probe['found_english_url']}")
+    else:
+        _findings_lines.append("English requirements page — none of the standard paths returned HTTP 200 (leave central_page null or find manually)")
+    if probe["nav_links"]:
+        _findings_lines.append("Navigation links containing fee/english/entry-requirement keywords:")
+        for lnk in probe["nav_links"]:
+            _findings_lines.append(f"  - {lnk}")
+    else:
+        _findings_lines.append("No relevant navigation links extracted from homepage.")
+    if probe["probe_errors"]:
+        _findings_lines.append(f"Probe errors (non-fatal): {'; '.join(probe['probe_errors'])}")
+    _findings_block = "\n".join(_findings_lines)
+
     prompt = f"""You are a scraper configuration expert for a university course data system.
 
 Generate a comprehensive per-university YAML scraper config for:
@@ -643,48 +818,48 @@ Generate a comprehensive per-university YAML scraper config for:
 - Country: {body.country}
 - Additional notes: {body.notes or "None"}
 
+{_findings_block}
+
 Available YAML fields and their defaults:
 {_DEFAULTS_YAML_SUMMARY}
 
-IMPORTANT RULES:
+RULES:
 1. Output ONLY valid YAML — no markdown fences, no extra text before or after.
-2. Start with a comment block containing the university name, hostname, and a brief rationale section.
-3. Currency: use "{_currency}" for {body.country} universities.
-4. Populate every section (discovery: AND extraction:) — even with sensible defaults — so operators have a complete template to edit. Do NOT omit sections.
-5. Use your knowledge of {body.university_name}'s website to make educated guesses:
-   - Is it a React/Angular/Vue SPA? → always_sitemap_supplement: true
-   - Does it publish a fee schedule or PDF? → add the likely URL under extraction.fees
-   - Does it publish an English requirements page? → add it under extraction.english.central_page
-   - Does the site show mixed domestic+international courses? → domestic_only.enabled: true
-   - Is it a large university (>200 courses)? → raise bfs_page_budget to 60-80
-6. Add a comment on every non-trivial setting explaining why it is set.
-7. If you don't know a specific URL, use a placeholder like "# TODO: find correct URL" rather than omitting the field.
+2. Start with a comment block: university name, hostname, and a brief rationale / bug-history section.
+3. Currency is "{_currency}" for {body.country}.
+4. Always include both discovery: and extraction: sections so operators have a complete template.
+5. CRITICAL — URLs: use ONLY the confirmed live URLs from "LIVE SITE FINDINGS" above.
+   - If a fee URL was confirmed, set extraction.fees.central_page to that exact URL.
+   - If an English URL was confirmed, set extraction.english.central_page to that exact URL.
+   - If a URL was NOT confirmed, leave the field commented out with "# not found — verify manually".
+   - NEVER invent or guess URLs that were not in the live findings.
+6. SPA: if "SPA detected" is true above, set discovery.always_sitemap_supplement: true.
+7. Add a brief inline comment on every non-trivial setting.
 
-EXAMPLE of a well-populated config (for a different university — do not copy verbatim):
-# Auckland University of Technology (New Zealand)
+EXAMPLE of a well-populated config (do not copy URLs verbatim — use the live findings above):
+# Auckland University of Technology
 # Hostname: www.aut.ac.nz
 #
 # Bug history / rationale:
-#   - AUT is a NZ university. Fees are in NZD.
-#   - BFS burns budget on info pages before visiting all faculty listings.
-#     Sitemap supplement catches all courses across remaining faculties.
+#   - NZ university — fees in NZD.
+#   - JS-rendered SPA; sitemap supplement needed to discover all courses.
 
 discovery:
-  always_sitemap_supplement: true  # JS-heavy SPA — sitemap is more reliable than BFS
-  bfs_page_budget: 60              # Large university with many faculties
+  always_sitemap_supplement: true  # SPA confirmed — BFS misses JS-rendered pages
+  bfs_page_budget: 60
 
 extraction:
   fees:
     default_currency: "NZD"
-    central_page: "https://www.aut.ac.nz/study/fees-and-scholarships"
+    central_page: "https://www.aut.ac.nz/study/fees-and-scholarships"  # confirmed live
   english:
-    central_page: "https://www.aut.ac.nz/study/entry-requirements/english-language-requirements"
+    central_page: "https://www.aut.ac.nz/study/entry-requirements/english-language-requirements"  # confirmed live
     default_ielts: 6.0
   filters:
     domestic_only:
-      enabled: true  # Site lists both domestic and international courses mixed
+      enabled: true
 
-Now generate the config for {body.university_name} ({body.website_url}):"""
+Now generate the config for {body.university_name}:"""
 
     try:
         response = client.models.generate_content(
