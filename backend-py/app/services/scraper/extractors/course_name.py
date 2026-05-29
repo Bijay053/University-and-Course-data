@@ -268,8 +268,26 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:  # noqa: ARG00
     # and drops the "MBA –" prefix, so we cannot rely on page content alone).
     mba_prefix_name = _url_mba_spec_name(url)
 
+    # Per-university literal suffix strips defined in the uni's YAML under
+    # extraction.course_name.strip_title_suffixes.  Applied to the RAW
+    # candidate text before _clean() runs, so operators can neutralise CMS
+    # provider-name appendages without touching global scraping code.
+    _strip_suffixes: list[str] = []
+    try:
+        from app.services.scraper.config.context import get_uni_config
+        _uni_cfg = get_uni_config()
+        _strip_suffixes = _uni_cfg.extraction.course_name.strip_title_suffixes
+    except Exception:
+        pass
+
     for method, raw, conf in candidates:
-        cleaned = _clean(raw)
+        # Apply per-uni suffix strips before any regex cleaning.
+        _raw = raw
+        for _suffix in _strip_suffixes:
+            if _raw.endswith(_suffix):
+                _raw = _raw[: -len(_suffix)].rstrip()
+                break  # only one suffix per candidate
+        cleaned = _clean(_raw)
         if cleaned:
             # If this is an MBA specialisation sub-page and the extracted
             # name is missing the degree prefix, add it now.

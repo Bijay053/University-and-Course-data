@@ -488,6 +488,20 @@ class UrlRewrite(BaseModel):
     )
 
 
+class CourseNameConfig(BaseModel):
+    strip_title_suffixes: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Literal substrings stripped from the raw H1/title text before the "
+            "standard suffix-detection regex runs.  Use when a university's CMS "
+            "appends a fixed provider string that the generic regex cannot match "
+            "automatically.  Matching is case-sensitive and checked from the END "
+            "of the raw text.  "
+            "Example (UWA): [' : the University of Western Australia']"
+        ),
+    )
+
+
 class TextCleaningConfig(BaseModel):
     location: LocationCleaningConfig = Field(
         default_factory=LocationCleaningConfig,
@@ -537,6 +551,7 @@ class ExtractionConfig(BaseModel):
     intake: IntakeConfig = Field(default_factory=IntakeConfig)
     filters: FiltersConfig = Field(default_factory=FiltersConfig)
     text_cleaning: TextCleaningConfig = Field(default_factory=TextCleaningConfig)
+    course_name: CourseNameConfig = Field(default_factory=CourseNameConfig)
     staging: StagingConfig = Field(default_factory=StagingConfig)
     url_rewrites: list[UrlRewrite] = Field(
         default_factory=list,

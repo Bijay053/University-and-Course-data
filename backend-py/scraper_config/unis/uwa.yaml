@@ -37,6 +37,12 @@ discovery:
     - /study/login
     - /facilities/
 extraction:
+  course_name:
+    # UWA's Sitecore CMS appends " : the University of Western Australia" to
+    # every H1 tag. Strip it here so no global scraping code needs to change
+    # when this pattern appears on other universities in the future.
+    strip_title_suffixes:
+      - " : the University of Western Australia"
   fees:
     default_currency: "AUD"
     # UWA fees are per-credit-point via calculator — no flat per-course figure
