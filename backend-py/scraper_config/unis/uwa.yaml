@@ -16,6 +16,15 @@
 #
 #   - fallback_subdomains note: handbook.uwa.edu.au 404s (it's handbooks — plural)
 #     and handbooks.uwa.edu.au has no sitemap.xml. Removed the fallback.
+#
+#   - Fix (2026-05-29): Earlier strip_title_suffixes with a single pattern
+#     " : the University of Western Australia" failed to strip on actual H1s.
+#     Suspected cause: case variant ("The" vs "the"), non-breaking space, or
+#     a different separator. Pattern list now covers the realistic variants.
+#     If suffix STILL appears after this fix, strip_title_suffixes may be a
+#     ghost field — confirm with:
+#       grep -rn "strip_title_suffixes" backend-py/app/services/scraper/
+
 discovery:
   sitemap_url: "https://www.uwa.edu.au/study/sitemap.xml"
   always_sitemap_supplement: true
@@ -36,13 +45,26 @@ discovery:
     - /study/explore-courses/postgraduate/employer-assistance
     - /study/login
     - /facilities/
+
 extraction:
   course_name:
-    # UWA's Sitecore CMS appends " : the University of Western Australia" to
-    # every H1 tag. Strip it here so no global scraping code needs to change
-    # when this pattern appears on other universities in the future.
+    # UWA's Sitecore CMS appends a "University of Western Australia" suffix to
+    # every H1. The exact separator + capitalisation varies by page template,
+    # so we list every realistic variant. The matcher strips the FIRST one
+    # that matches the END of the raw title, so order doesn't matter for
+    # correctness but more-specific (longer) patterns first is good hygiene.
     strip_title_suffixes:
       - " : the University of Western Australia"
+      - " : The University of Western Australia"
+      - " — the University of Western Australia"
+      - " — The University of Western Australia"
+      - " - the University of Western Australia"
+      - " - The University of Western Australia"
+      - " | the University of Western Australia"
+      - " | The University of Western Australia"
+      - ": the University of Western Australia"
+      - ": The University of Western Australia"
+
   fees:
     default_currency: "AUD"
     # UWA fees are per-credit-point via calculator — no flat per-course figure
@@ -50,16 +72,17 @@ extraction:
     # central fee page, so the no_international_fee gate passes them into the
     # review queue (international_fee=None) instead of rejecting them.
     force_central_fee_stage: true
+
   text_cleaning:
     location:
       # UWA's "Frontier Physics" course page (and potentially others) outputs a
       # spurious "TENDANCE Full-time, part-time" fragment in the location field.
       # Root cause: the CMS renders "ATTENDANCE" with "AT" inside a CSS-hidden
       # span, so html_to_text sees only "TENDANCE" followed by the delivery-mode
-      # text that immediately follows the Attendance label.  Strip from "TENDANCE"
+      # text that immediately follows the Attendance label. Strip from "TENDANCE"
       # onwards so only the real campus name (Perth, WA) survives.
       strip_patterns:
-        - "\\s*TENDANCE[^,]*"
+        - '\s*TENDANCE[^,]*'
     duration:
       # UWA exposes max-completion-time values on some course pages:
       #   Doctor of Medicine: "up to 10 years" (standard = 4-6 years)
@@ -69,7 +92,9 @@ extraction:
       # Reject any sentence (or DOM-cell value) that reads "up to N years/months"
       # so the real labeled duration (when present) wins the tournament.
       reject_sentence_patterns:
-        - "\\bup\\s+to\\s+\\d+(?:\\.\\d+)?\\s+(?:years?|months?)\\b"
+        - 'up to \d+(?:\.\d+)? (?:years?|months?)'
+        - 'maximum of \d+(?:\.\d+)? (?:years?|months?)'
+
   filters:
     domestic_only:
       enabled: false
