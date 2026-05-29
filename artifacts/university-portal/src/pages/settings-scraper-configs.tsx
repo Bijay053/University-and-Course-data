@@ -1137,6 +1137,9 @@ export default function SettingsScraperConfigs() {
   const [deleting, setDeleting] = useState(false);
   const [filter, setFilter] = useState("");
   const [showNewModal, setShowNewModal] = useState(false);
+  const [newModalMode, setNewModalMode] = useState<"ai" | "manual">("ai");
+  const [manualSlug, setManualSlug] = useState("");
+  const [manualYaml, setManualYaml] = useState(SAMPLE_YAML);
   const [copiedSample, setCopiedSample] = useState(false);
   const [pendingSlug, setPendingSlug] = useState<string | null>(null);
   const [draftBanner, setDraftBanner] = useState<{ slug: string; lineCount: number } | null>(null);
@@ -1409,6 +1412,28 @@ export default function SettingsScraperConfigs() {
     }
   };
 
+  const handleCreateManually = () => {
+    const slug = manualSlug.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    if (!slug) {
+      toast({ title: "Slug required", description: "Enter a slug (e.g. 'macquarie' or 'utas').", variant: "destructive" });
+      return;
+    }
+    if (configs.some(c => c.slug === slug)) {
+      toast({ title: "Slug already exists", description: `A config for '${slug}' already exists. Select it from the list to edit.`, variant: "destructive" });
+      return;
+    }
+    setEditorYaml(manualYaml);
+    setSavedYaml("");
+    setEditorSlug(slug);
+    setSelected(null);
+    setView("editor");
+    setHistory([]);
+    setDraftBanner(null);
+    setShowNewModal(false);
+    toast({ title: "Config created", description: "Edit the YAML below, then save when ready." });
+    setTimeout(() => textareaRef.current?.focus(), 100);
+  };
+
   const handleGenerate = async () => {
     if (!genForm.university_name.trim() || !genForm.website_url.trim()) {
       toast({ title: "Name and URL required", variant: "destructive" });
@@ -1595,6 +1620,9 @@ export default function SettingsScraperConfigs() {
               className="w-full h-8 text-xs"
               onClick={() => {
                 setGenForm({ university_name: "", website_url: "", country: "Australia", notes: "" });
+                setNewModalMode("ai");
+                setManualSlug("");
+                setManualYaml(SAMPLE_YAML);
                 setShowNewModal(true);
               }}
             >
@@ -1855,7 +1883,7 @@ export default function SettingsScraperConfigs() {
       {/* Generate modal */}
       {showNewModal && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-          <div className="bg-background rounded-xl shadow-xl w-full max-w-md p-6 space-y-4">
+          <div className={cn("bg-background rounded-xl shadow-xl w-full p-6 space-y-4", newModalMode === "manual" ? "max-w-2xl" : "max-w-md")}>
             <div className="flex items-center justify-between">
               <h2 className="font-semibold text-lg">New University Config</h2>
               <button onClick={() => setShowNewModal(false)} className="p-1 rounded hover:bg-muted">
@@ -1863,83 +1891,159 @@ export default function SettingsScraperConfigs() {
               </button>
             </div>
 
-            <p className="text-sm text-muted-foreground">
-              Enter the university details and let AI generate a starter YAML config based on the website structure.
-            </p>
-
-            <div className="space-y-3">
-              <div>
-                <Label className="text-xs">University Name *</Label>
-                <Input
-                  className="mt-1"
-                  placeholder="e.g. Macquarie University"
-                  value={genForm.university_name}
-                  onChange={e => setGenForm(f => ({ ...f, university_name: e.target.value }))}
-                />
-              </div>
-              <div>
-                <Label className="text-xs">Website URL *</Label>
-                <Input
-                  className="mt-1"
-                  placeholder="e.g. https://www.mq.edu.au"
-                  value={genForm.website_url}
-                  onChange={e => setGenForm(f => ({ ...f, website_url: e.target.value }))}
-                />
-              </div>
-              <div>
-                <Label className="text-xs">Country</Label>
-                <div className="mt-1">
-                  <CountrySelect
-                    value={genForm.country}
-                    onChange={v => setGenForm(f => ({ ...f, country: v }))}
-                    className="h-9"
-                  />
-                </div>
-              </div>
-              <div>
-                <Label className="text-xs">Notes for AI (optional)</Label>
-                <Input
-                  className="mt-1"
-                  placeholder="e.g. React SPA, NZ dollars, filters domestic courses"
-                  value={genForm.notes}
-                  onChange={e => setGenForm(f => ({ ...f, notes: e.target.value }))}
-                />
-              </div>
-            </div>
-
-            <div className="flex gap-2 pt-1">
-              <Button variant="outline" className="flex-1" onClick={() => setShowNewModal(false)} disabled={generating}>
-                Cancel
-              </Button>
-              <Button
-                className="flex-1"
-                onClick={handleGenerate}
-                disabled={generating || !genForm.university_name.trim() || !genForm.website_url.trim()}
+            {/* Mode tabs */}
+            <div className="flex rounded-lg border overflow-hidden text-sm">
+              <button
+                className={cn("flex-1 py-1.5 font-medium transition-colors", newModalMode === "ai" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")}
+                onClick={() => setNewModalMode("ai")}
+                disabled={generating}
               >
-                {generating
-                  ? <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  : <Sparkles className="h-4 w-4 mr-2" />}
-                {generating ? "Working…" : "Generate with AI"}
-              </Button>
+                <Sparkles className="inline h-3.5 w-3.5 mr-1.5 -mt-0.5" />
+                Generate with AI
+              </button>
+              <button
+                className={cn("flex-1 py-1.5 font-medium transition-colors", newModalMode === "manual" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")}
+                onClick={() => setNewModalMode("manual")}
+                disabled={generating}
+              >
+                <Code className="inline h-3.5 w-3.5 mr-1.5 -mt-0.5" />
+                Write Manually
+              </button>
             </div>
 
-            {generating && (
-              <div className="space-y-1.5">
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <Loader2 className="h-3 w-3 animate-spin shrink-0" />
-                  <span className="truncate">{genStage}</span>
-                </div>
-                <div className="w-full h-1 bg-muted rounded-full overflow-hidden relative">
-                  <style>{`@keyframes indbar{0%{transform:translateX(-100%)}100%{transform:translateX(350%)}}`}</style>
-                  <div className="absolute h-full w-1/3 bg-primary rounded-full" style={{ animation: "indbar 1.4s ease-in-out infinite" }} />
-                </div>
-              </div>
-            )}
+            {newModalMode === "ai" ? (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  Enter the university details and let AI generate a starter YAML config based on the website structure.
+                </p>
 
-            {!generating && (
-              <p className="text-xs text-muted-foreground text-center">
-                Uses Gemini AI · crawls the site first · review before saving
-              </p>
+                <div className="space-y-3">
+                  <div>
+                    <Label className="text-xs">University Name *</Label>
+                    <Input
+                      className="mt-1"
+                      placeholder="e.g. Macquarie University"
+                      value={genForm.university_name}
+                      onChange={e => setGenForm(f => ({ ...f, university_name: e.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Website URL *</Label>
+                    <Input
+                      className="mt-1"
+                      placeholder="e.g. https://www.mq.edu.au"
+                      value={genForm.website_url}
+                      onChange={e => setGenForm(f => ({ ...f, website_url: e.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Country</Label>
+                    <div className="mt-1">
+                      <CountrySelect
+                        value={genForm.country}
+                        onChange={v => setGenForm(f => ({ ...f, country: v }))}
+                        className="h-9"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-xs">Notes for AI (optional)</Label>
+                    <Input
+                      className="mt-1"
+                      placeholder="e.g. React SPA, NZ dollars, filters domestic courses"
+                      value={genForm.notes}
+                      onChange={e => setGenForm(f => ({ ...f, notes: e.target.value }))}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex gap-2 pt-1">
+                  <Button variant="outline" className="flex-1" onClick={() => setShowNewModal(false)} disabled={generating}>
+                    Cancel
+                  </Button>
+                  <Button
+                    className="flex-1"
+                    onClick={handleGenerate}
+                    disabled={generating || !genForm.university_name.trim() || !genForm.website_url.trim()}
+                  >
+                    {generating
+                      ? <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      : <Sparkles className="h-4 w-4 mr-2" />}
+                    {generating ? "Working…" : "Generate with AI"}
+                  </Button>
+                </div>
+
+                {generating && (
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Loader2 className="h-3 w-3 animate-spin shrink-0" />
+                      <span className="truncate">{genStage}</span>
+                    </div>
+                    <div className="w-full h-1 bg-muted rounded-full overflow-hidden relative">
+                      <style>{`@keyframes indbar{0%{transform:translateX(-100%)}100%{transform:translateX(350%)}}`}</style>
+                      <div className="absolute h-full w-1/3 bg-primary rounded-full" style={{ animation: "indbar 1.4s ease-in-out infinite" }} />
+                    </div>
+                  </div>
+                )}
+
+                {!generating && (
+                  <p className="text-xs text-muted-foreground text-center">
+                    Uses Gemini AI · crawls the site first · review before saving
+                  </p>
+                )}
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  Enter a slug and write or paste the YAML config directly. The sample template is pre-loaded — edit as needed.
+                </p>
+
+                <div className="space-y-3">
+                  <div>
+                    <Label className="text-xs">Config Slug *</Label>
+                    <Input
+                      className="mt-1 font-mono"
+                      placeholder="e.g. macquarie or utas"
+                      value={manualSlug}
+                      onChange={e => setManualSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
+                    />
+                    <p className="text-[11px] text-muted-foreground mt-1">
+                      Lowercase letters, numbers, hyphens. Usually the university's short name.
+                    </p>
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <Label className="text-xs">YAML Config</Label>
+                      <button
+                        className="text-[11px] text-muted-foreground hover:text-foreground underline"
+                        onClick={() => setManualYaml(SAMPLE_YAML)}
+                      >
+                        Reset to template
+                      </button>
+                    </div>
+                    <textarea
+                      className="w-full h-64 font-mono text-xs border rounded-md p-2 bg-muted/30 resize-y focus:outline-none focus:ring-2 focus:ring-ring"
+                      value={manualYaml}
+                      onChange={e => setManualYaml(e.target.value)}
+                      spellCheck={false}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex gap-2 pt-1">
+                  <Button variant="outline" className="flex-1" onClick={() => setShowNewModal(false)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    className="flex-1"
+                    onClick={handleCreateManually}
+                    disabled={!manualSlug.trim()}
+                  >
+                    <Code className="h-4 w-4 mr-2" />
+                    Open in Editor
+                  </Button>
+                </div>
+              </>
             )}
           </div>
         </div>
