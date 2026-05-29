@@ -1224,9 +1224,9 @@ export default function UniversityDetail() {
     { key: "assessment", label: "Key Insights", icon: <ClipboardList className="w-4 h-4" /> },
     { key: "english", label: "English Proficiency", icon: <Languages className="w-4 h-4" /> },
     { key: "academic", label: "Academic Requirements", icon: <GraduationCap className="w-4 h-4" /> },
+    { key: "locations", label: "Locations", icon: <MapPin className="w-4 h-4" /> },
     { key: "scholarships", label: "Scholarships", icon: <Award className="w-4 h-4" /> },
     { key: "rawdata", label: "Raw Data", icon: <Database className="w-4 h-4" /> },
-    { key: "locations", label: "Locations", icon: <MapPin className="w-4 h-4" /> },
   ];
 
   // ── Bulk apply handler ──────────────────────────────────────────
