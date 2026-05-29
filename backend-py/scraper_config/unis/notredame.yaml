@@ -37,7 +37,10 @@ discovery:
   use_wayback: true
   use_stealth_browser: false
   always_sitemap_supplement: false
-  scrape_do_fallback: true   # Cloudflare Enterprise blocks all DC IPs; residential proxy bypasses it
+  # scrape_do_fallback: true is NOT set — scrape.do returns 502 for Notre Dame
+  # (Cloudflare Enterprise also blocks residential-proxy datacenter exit nodes).
+  # The 60s timeout per attempt would make every page 60× slower with no benefit.
+  scrape_do_fallback: false
 
 extraction:
   fees:

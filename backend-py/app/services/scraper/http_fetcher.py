@@ -144,7 +144,7 @@ async def fetch_html_scrape_do(url: str) -> str | None:
         "render": "false",
     }
     try:
-        async with httpx.AsyncClient(timeout=60, follow_redirects=True) as c:
+        async with httpx.AsyncClient(timeout=15, follow_redirects=True) as c:
             r = await c.get(endpoint, params=params)
             if r.status_code == 200:
                 log.info(
