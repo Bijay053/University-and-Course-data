@@ -612,39 +612,79 @@ async def generate_scraper_config(
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"Gemini client error: {exc}") from exc
 
-    slug_candidate = re.sub(r"[^a-z0-9]+", "", body.university_name.lower().split()[0])[:20] or "university"
+    # Build a meaningful slug by skipping generic words and joining the rest
+    _GENERIC_WORDS = {"university", "of", "the", "and", "college", "institute",
+                      "technology", "for", "at", "in", "a", "an"}
+    _name_words = [
+        re.sub(r"[^a-z0-9]+", "", w)
+        for w in body.university_name.lower().split()
+        if re.sub(r"[^a-z0-9]+", "", w) not in _GENERIC_WORDS
+    ]
+    slug_candidate = "".join(_name_words)[:30] or re.sub(r"[^a-z0-9]+", "", body.university_name.lower())[:20] or "university"
+
+    # Derive currency from country
+    _country_lower = body.country.lower()
+    if "new zealand" in _country_lower or "nz" in _country_lower:
+        _currency = "NZD"
+    elif "united kingdom" in _country_lower or "uk" in _country_lower or "britain" in _country_lower:
+        _currency = "GBP"
+    elif "canada" in _country_lower:
+        _currency = "CAD"
+    elif "united states" in _country_lower or "usa" in _country_lower:
+        _currency = "USD"
+    else:
+        _currency = "AUD"
 
     prompt = f"""You are a scraper configuration expert for a university course data system.
 
-Generate a per-university YAML scraper config for:
+Generate a comprehensive per-university YAML scraper config for:
 - University name: {body.university_name}
 - Website: {body.website_url}
 - Country: {body.country}
 - Additional notes: {body.notes or "None"}
 
+Available YAML fields and their defaults:
 {_DEFAULTS_YAML_SUMMARY}
 
-Rules:
-1. Start with a comment block: # {body.university_name}\\n# Hostname: <derived from URL>
-2. Only include fields that need to be DIFFERENT from defaults — keep the config minimal.
-3. For NZ/UK universities, set default_currency to "NZD" or "GBP".
-4. If the site is known to be React/Vue/Angular SPA (check domain hints), set always_sitemap_supplement: true.
-5. If the university only lists international courses, domestic_only.enabled should be false (default).
-6. Add a brief comment explaining each non-default setting.
-7. Output ONLY valid YAML — no markdown fences, no extra text before or after.
+IMPORTANT RULES:
+1. Output ONLY valid YAML — no markdown fences, no extra text before or after.
+2. Start with a comment block containing the university name, hostname, and a brief rationale section.
+3. Currency: use "{_currency}" for {body.country} universities.
+4. Populate every section (discovery: AND extraction:) — even with sensible defaults — so operators have a complete template to edit. Do NOT omit sections.
+5. Use your knowledge of {body.university_name}'s website to make educated guesses:
+   - Is it a React/Angular/Vue SPA? → always_sitemap_supplement: true
+   - Does it publish a fee schedule or PDF? → add the likely URL under extraction.fees
+   - Does it publish an English requirements page? → add it under extraction.english.central_page
+   - Does the site show mixed domestic+international courses? → domestic_only.enabled: true
+   - Is it a large university (>200 courses)? → raise bfs_page_budget to 60-80
+6. Add a comment on every non-trivial setting explaining why it is set.
+7. If you don't know a specific URL, use a placeholder like "# TODO: find correct URL" rather than omitting the field.
 
-Example minimal config:
-# Example University
-# Hostname: example.edu.au
+EXAMPLE of a well-populated config (for a different university — do not copy verbatim):
+# Auckland University of Technology (New Zealand)
+# Hostname: www.aut.ac.nz
+#
+# Bug history / rationale:
+#   - AUT is a NZ university. Fees are in NZD.
+#   - BFS burns budget on info pages before visiting all faculty listings.
+#     Sitemap supplement catches all courses across remaining faculties.
+
+discovery:
+  always_sitemap_supplement: true  # JS-heavy SPA — sitemap is more reliable than BFS
+  bfs_page_budget: 60              # Large university with many faculties
 
 extraction:
+  fees:
+    default_currency: "NZD"
+    central_page: "https://www.aut.ac.nz/study/fees-and-scholarships"
   english:
-    central_page: "https://example.edu.au/international/english-requirements"
+    central_page: "https://www.aut.ac.nz/study/entry-requirements/english-language-requirements"
+    default_ielts: 6.0
   filters:
     domestic_only:
-      enabled: true  # Site lists domestic and international courses mixed
+      enabled: true  # Site lists both domestic and international courses mixed
 
-Now generate the config for {body.university_name}:"""
+Now generate the config for {body.university_name} ({body.website_url}):"""
 
     try:
         response = client.models.generate_content(
