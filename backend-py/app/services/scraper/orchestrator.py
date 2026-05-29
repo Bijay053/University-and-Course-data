@@ -2433,14 +2433,11 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 _poor = _staged_n < 5 or _avg < 50.0
                 if not _has_yaml and _poor:
                     log.info(
-                        "[CASCADE] auto-triggering for uni_id=%s slug=%r "
-                        "(staged=%d avg_completeness=%.1f no per-uni YAML)",
+                        "[CASCADE] poor result for uni_id=%s slug=%r "
+                        "(staged=%d avg_completeness=%.1f no per-uni YAML) — "
+                        "cascade task not available, skipping auto-trigger",
                         uni_id, _slug, _staged_n, _avg,
                     )
-                    from app.tasks.scrape_tasks import (
-                        cascade_match_for_university as _cascade_task,
-                    )
-                    _cascade_task.delay(int(uni_id))
             except Exception as _cascade_exc:  # noqa: BLE001
                 log.warning(
                     "[CASCADE] auto-trigger failed for run %s: %s",
