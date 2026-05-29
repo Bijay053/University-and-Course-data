@@ -1141,6 +1141,7 @@ export default function SettingsScraperConfigs() {
   const [pendingSlug, setPendingSlug] = useState<string | null>(null);
   const [draftBanner, setDraftBanner] = useState<{ slug: string; lineCount: number } | null>(null);
   const [generating, setGenerating] = useState(false);
+  const [genStage, setGenStage] = useState("");
   const [view, setView] = useState<EditorView>("editor");
   const [genForm, setGenForm] = useState<GenerateForm>({
     university_name: "",
@@ -1414,6 +1415,23 @@ export default function SettingsScraperConfigs() {
       return;
     }
     setGenerating(true);
+
+    // Cycle through descriptive stage messages so the user knows what's happening
+    const stages = [
+      "Fetching homepage…",
+      "Detecting SPA framework…",
+      "Probing fee pages…",
+      "Probing English requirement pages…",
+      "Extracting nav links…",
+      "Generating YAML with AI…",
+    ];
+    let stageIdx = 0;
+    setGenStage(stages[0]);
+    const stageTimer = window.setInterval(() => {
+      stageIdx = Math.min(stageIdx + 1, stages.length - 1);
+      setGenStage(stages[stageIdx]);
+    }, 6000);
+
     try {
       const res = await fetchWithAuth(`${BASE}/api/settings/scraper-configs/generate`, {
         method: "POST",
@@ -1435,7 +1453,9 @@ export default function SettingsScraperConfigs() {
     } catch (err) {
       toast({ title: "AI generation failed", description: (err as Error).message, variant: "destructive" });
     } finally {
+      clearInterval(stageTimer);
       setGenerating(false);
+      setGenStage("");
     }
   };
 
@@ -1888,7 +1908,7 @@ export default function SettingsScraperConfigs() {
             </div>
 
             <div className="flex gap-2 pt-1">
-              <Button variant="outline" className="flex-1" onClick={() => setShowNewModal(false)}>
+              <Button variant="outline" className="flex-1" onClick={() => setShowNewModal(false)} disabled={generating}>
                 Cancel
               </Button>
               <Button
@@ -1896,14 +1916,31 @@ export default function SettingsScraperConfigs() {
                 onClick={handleGenerate}
                 disabled={generating || !genForm.university_name.trim() || !genForm.website_url.trim()}
               >
-                <Sparkles className="h-4 w-4 mr-2" />
-                {generating ? "Generating…" : "Generate with AI"}
+                {generating
+                  ? <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  : <Sparkles className="h-4 w-4 mr-2" />}
+                {generating ? "Working…" : "Generate with AI"}
               </Button>
             </div>
 
-            <p className="text-xs text-muted-foreground text-center">
-              Uses Gemini AI · review the output before saving
-            </p>
+            {generating && (
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Loader2 className="h-3 w-3 animate-spin shrink-0" />
+                  <span className="truncate">{genStage}</span>
+                </div>
+                <div className="w-full h-1 bg-muted rounded-full overflow-hidden relative">
+                  <style>{`@keyframes indbar{0%{transform:translateX(-100%)}100%{transform:translateX(350%)}}`}</style>
+                  <div className="absolute h-full w-1/3 bg-primary rounded-full" style={{ animation: "indbar 1.4s ease-in-out infinite" }} />
+                </div>
+              </div>
+            )}
+
+            {!generating && (
+              <p className="text-xs text-muted-foreground text-center">
+                Uses Gemini AI · crawls the site first · review before saving
+              </p>
+            )}
           </div>
         </div>
       )}
