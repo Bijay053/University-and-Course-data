@@ -93,6 +93,51 @@ class SearchStaxConfig(BaseModel):
     )
 
 
+class ScrapyConfig(BaseModel):
+    """Run a Scrapy spider for course URL discovery (or full extraction).
+
+    The spider runs in a subprocess — isolating Scrapy's Twisted event loop
+    from the asyncio/Celery stack.  Output items are written to a temp JSON
+    lines file by Scrapy's built-in feed exporter, then read back by the
+    bridge (``scrapy_bridge.py``) and fed into the normal staging pipeline.
+
+    Spider files must live in ``backend-py/spiders/<spider>.py``.  Copy
+    ``backend-py/spiders/template_spider.py`` as a starting point.
+
+    Minimum item shape (discovery-only mode)::
+
+        {"name": "Course Name", "url": "https://..."}
+
+    Rich mode (bypasses per-course extraction, like SearchStax)::
+
+        {"name": "...", "url": "...", "payload": {...}, "evidence": [...]}
+
+    ``payload`` keys match the ``scraped_courses`` staging columns.
+    """
+
+    spider: str = Field(
+        description=(
+            "Spider filename without the .py extension. "
+            "File must exist at backend-py/spiders/<spider>.py."
+        ),
+    )
+    settings: dict = Field(
+        default_factory=dict,
+        description=(
+            "Scrapy SETTINGS overrides passed via -s KEY=VALUE on the CLI. "
+            "E.g. {'DOWNLOAD_DELAY': 1, 'CONCURRENT_REQUESTS': 4}."
+        ),
+    )
+    max_courses: Optional[int] = Field(
+        default=None,
+        description="Optional cap on returned links (useful for debug runs).",
+    )
+    timeout_seconds: int = Field(
+        default=600,
+        description="Maximum seconds the spider subprocess may run before it is killed.",
+    )
+
+
 class DiscoveryConfig(BaseModel):
     """Safe to replay against unknown universities (Tier-3 playbook matching)."""
 
@@ -101,6 +146,15 @@ class DiscoveryConfig(BaseModel):
         description=(
             "When present, route discovery + extraction through the SearchStax "
             "Solr provider instead of HTML crawling. See SearchStaxConfig."
+        ),
+    )
+    scrapy: Optional[ScrapyConfig] = Field(
+        default=None,
+        description=(
+            "When present, run the named Scrapy spider for discovery. "
+            "Spider output feeds the normal staging pipeline. "
+            "Falls through to BFS/sitemap if the spider returns 0 links. "
+            "See ScrapyConfig and backend-py/spiders/template_spider.py."
         ),
     )
     fallback_subdomains: list[str] = Field(

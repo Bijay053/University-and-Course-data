@@ -292,6 +292,13 @@ async def _extract_only(
     if _pre is not None:
         return _pre
 
+    # Scrapy rich-mode: spider pre-built the full payload + evidence rows.
+    # Falls through to normal extraction when the spider used discovery-only
+    # mode (no "payload" key in item → no "scrapy_result" in link).
+    _scrapy_pre = link.get("scrapy_result")
+    if _scrapy_pre is not None:
+        return _scrapy_pre
+
     name = (link.get("name") or "").strip() or "Unknown course"
     url = link["url"]
     try:
@@ -782,6 +789,33 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 job.error_message = _failure_msg
                 await db.commit()
                 return
+
+        # ── Scrapy spider provider ────────────────────────────────────────────
+        # When a uni's YAML declares a discovery.scrapy block, run the named
+        # spider in a subprocess (isolating Scrapy's Twisted loop from asyncio)
+        # and collect course links.  Unlike SearchStax this is a supplemental
+        # tier — if the spider returns 0 links the job falls through to BFS,
+        # sitemap, and browser tiers rather than aborting.
+        _scrapy_cfg = getattr(_uni_cfg.discovery, "scrapy", None)
+        if _scrapy_cfg is not None and not links:
+            from app.services.scraper.scrapy_bridge import run_scrapy_spider
+            try:
+                _scrapy_links = await run_scrapy_spider(_scrapy_cfg, emit=emit)
+            except Exception as _scrapy_exc:  # noqa: BLE001
+                log.error("Scrapy provider failed: %s", _scrapy_exc, exc_info=True)
+                _scrapy_links = []
+            if _scrapy_links:
+                links = _scrapy_links
+                log.info(
+                    "[SCRAPY] %d link(s) from spider '%s'",
+                    len(links), _scrapy_cfg.spider,
+                )
+                _always_browser = False  # spider already discovered; skip browser
+            else:
+                log.warning(
+                    "[SCRAPY] spider '%s' returned 0 links — falling through to BFS",
+                    _scrapy_cfg.spider,
+                )
 
         if not links and "study.csu.edu.au/international/courses" in scrape_url:
             try:

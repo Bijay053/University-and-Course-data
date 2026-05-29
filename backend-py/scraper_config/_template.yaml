@@ -39,6 +39,24 @@ discovery:
   scrape_do_fallback: false
   #   Example: scrape_do_fallback: true   # Notre Dame — Cloudflare Enterprise block
 
+  # Run a Scrapy spider for course discovery (supplemental tier).
+  # The spider runs in a subprocess (avoiding asyncio/Twisted conflicts).
+  # Its items flow into the normal staging pipeline exactly like BFS candidates.
+  # If the spider returns 0 links, the job falls through to BFS/sitemap/browser.
+  #
+  # spider:          filename without .py, relative to backend-py/spiders/
+  # settings:        Scrapy SETTINGS overrides (optional)
+  # max_courses:     cap for debug runs (optional)
+  # timeout_seconds: kill subprocess after this many seconds (default 600)
+  #
+  # Copy backend-py/spiders/template_spider.py as your starting point.
+  # scrapy:
+  #   spider: example_uni_spider
+  #   settings:
+  #     DOWNLOAD_DELAY: 1
+  #     CONCURRENT_REQUESTS: 4
+  #   timeout_seconds: 600
+
   # URL filters (regex).  Block patterns run before allow patterns.
   block_url_patterns: []
   allow_url_patterns: []
