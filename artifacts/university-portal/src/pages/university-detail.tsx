@@ -987,6 +987,7 @@ export default function UniversityDetail() {
   );
 
   const pendingCount = rawData.filter((c) => c.status === "pending").length;
+  const approvedCount = rawData.filter((c) => c.status === "approved").length;
 
   async function handleApprove(courseId: number) {
     setApprovingId(courseId);
@@ -2377,6 +2378,9 @@ export default function UniversityDetail() {
                   {s}
                   {s === "pending" && pendingCount > 0 && (
                     <span className="ml-1.5 bg-amber-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">{pendingCount}</span>
+                  )}
+                  {s === "approved" && approvedCount > 0 && (
+                    <span className="ml-1.5 bg-green-600 text-white text-[10px] px-1.5 py-0.5 rounded-full">{approvedCount}</span>
                   )}
                 </button>
               ))}
