@@ -1,44 +1,39 @@
 # University of Notre Dame Australia
-# Hostname: www.nd.edu.au
+# Hostname: www.notredame.edu.au
 #
 # Bug history / rationale:
-#   - 2026-05-29: First scrape failed (0 found, 0 staged) because the DB
-#     scrape_url pointed at notredame.edu.au — wrong domain. Real domain
-#     is nd.edu.au. Fixed by updating universities.scrape_url in DB.
-#   - Course catalogue is served via Funnelback search at
-#     search.nd.edu.au/s/search.html?...&collection=und~sp-program
-#     Standard BFS/sitemap may not surface individual course detail pages.
-#     If first scrape with correct domain returns few courses, the next
-#     fix is likely to point sitemap_url at the right sitemap, or use
-#     extra_course_urls / a Funnelback-aware discovery path.
-#   - use_stealth_browser kept ON for now because earlier probe returned
-#     HTTP 403 — but that probe was against the WRONG domain, so the 403
-#     may have been from a parked-domain server, not Notre Dame's WAF.
-#     Verify on first scrape: if BFS now succeeds without stealth, remove
-#     use_stealth_browser to speed up runs significantly.
+#   - 2026-05-29: First scrape from homepage returned 0 candidates because
+#     Notre Dame's navigation goes through a Funnelback search interface
+#     (search.nd.edu.au) rather than direct links from the homepage. The
+#     course detail pages live at www.notredame.edu.au/programs/<area>/
+#     <level>/<slug>, but the homepage doesn't link to them directly.
+#
+#   - Fix: point discovery at the Funnelback search results page. The
+#     search-result HTML contains the full list of course URLs, which
+#     BFS can then follow into the real /programs/ detail pages.
+#     `must_contain: /programs/` keeps only real course pages and drops
+#     navigation/search-control links.
 
 discovery:
-  # Keep stealth on for the first run as insurance. Remove after the first
-  # successful scrape if logs show no Cloudflare/WAF interaction — stealth
-  # adds ~3-5s per page and isn't free.
+  # Stealth was added when the original 0-results scrape looked like a
+  # WAF block. With the corrected entry URL, BFS may work without stealth.
+  # Keep ON for the first scrape; if logs show no Cloudflare interaction,
+  # remove this line next iteration to speed up runs (~3-5s per page).
   use_stealth_browser: true
 
-  # Safety net: merge sitemap results with BFS so Funnelback-search-only
-  # courses can be picked up if they appear in a sitemap.
   always_sitemap_supplement: true
+
+  # Keep ONLY real course detail pages — drop navigation, search facets,
+  # filters, and the search interface itself.
+  must_contain:
+    - "/programs/"
 
 extraction:
   fees:
     default_currency: "AUD"
 
   filters:
-    # Notre Dame Australia lists both domestic and international courses.
-    # Setting enabled:true would silently drop real international courses
-    # whenever the domestic-only flagger has a false positive.
     domestic_only:
-      enabled: false
-
-    # Not a distance-education university — Fremantle / Sydney / Broome
-    # campuses are physical.
+      enabled: false      # Notre Dame lists both domestic and international courses
     online_only:
-      enabled: false
+      enabled: false      # Multi-campus on-campus uni (Fremantle / Sydney / Broome)
