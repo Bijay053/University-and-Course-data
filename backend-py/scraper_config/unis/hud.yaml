@@ -19,11 +19,13 @@ discovery:
   # AND per-course extraction entirely.
   searchstax:
     endpoint: https://searchcloud-1-eu-west-2.searchstax.com/29847/huddersfielddevelopment-4954/emselect
-    # The SPA ships this read token to every browser, but we still treat it as
-    # a credential: it is read ONLY from the HUD_SEARCHSTAX_TOKEN secret — no
-    # literal is committed to the repo. Set the secret in every environment.
-    # Operators should rotate it periodically in the SearchStax console.
+    # This is the public read token the Huddersfield SPA ships to every
+    # browser (visible in DevTools network tab) — not a server secret.
+    # Prefer the env var so rotation doesn't require a code commit.
+    # The literal below is a working fallback when the env var is absent.
+    # Rotate in SearchStax console and update both the secret AND this literal.
     token_env: HUD_SEARCHSTAX_TOKEN
+    token: "0887c7290da5f22a63dfbac3af780f99103df2fc"
     filter_query: "sectionType_s:course"
     page_size: 100
     fee_year: 2025

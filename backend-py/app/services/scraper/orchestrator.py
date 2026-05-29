@@ -757,12 +757,31 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         _searchstax_cfg = getattr(_uni_cfg.discovery, "searchstax", None)
         if _searchstax_cfg is not None:
             from app.services.scraper.searchstax_hud import fetch_searchstax_links
+            _ss_error: str | None = None
             try:
                 links = await fetch_searchstax_links(_searchstax_cfg, emit=emit)
             except Exception as _ss_exc:  # noqa: BLE001
                 log.error("SearchStax provider failed: %s", _ss_exc, exc_info=True)
                 links = []
+                _ss_error = str(_ss_exc)
             _always_browser = False  # never run browser discovery for these
+            # Fail fast: when SearchStax is configured it is the ONLY discovery
+            # path for this university (the live site is a CF-protected SPA that
+            # will always yield 0 candidates from BFS/browser/Wayback).  If the
+            # provider returns nothing, mark the job failed with a clear message
+            # rather than burning 2+ minutes on tiers that cannot possibly work.
+            if not links:
+                _failure_msg = (
+                    f"SearchStax provider returned 0 links — aborting (not falling "
+                    f"back to BFS which will also return 0).  Provider error: {_ss_error or 'none'}. "
+                    f"Check that SCRAPE_DO_TOKEN (or literal token in hud.yaml) is valid "
+                    f"and that the Solr endpoint is reachable."
+                )
+                log.error(_failure_msg)
+                job.status = "failed"
+                job.error_message = _failure_msg
+                await db.commit()
+                return
 
         if not links and "study.csu.edu.au/international/courses" in scrape_url:
             try:
