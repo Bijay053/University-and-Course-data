@@ -184,6 +184,24 @@ _HOST_EXTRA_SEEDS: dict[str, list[str]] = {
         "https://www.newcastle.edu.au/degrees/postgraduate",
         "https://www.newcastle.edu.au/degrees/research",
     ],
+    # University of Huddersfield — uni_id 1166.
+    # Both www.hud.ac.uk and courses.hud.ac.uk are React SPAs.  HTTP BFS on
+    # www.hud.ac.uk finds only nav/research pages (no taught course links).
+    # The full catalogue of 500+ taught courses lives on courses.hud.ac.uk.
+    # Seeding the browser at courses.hud.ac.uk/ lets Playwright render the
+    # SPA and harvest the JS-injected <a> links to individual course pages.
+    # The cross-domain filter in _process_links is relaxed for seed hosts so
+    # courses.hud.ac.uk/* links are accepted (see _allowed_hosts below).
+    "www.hud.ac.uk": [
+        "https://courses.hud.ac.uk/",
+        "https://courses.hud.ac.uk/undergraduate",
+        "https://courses.hud.ac.uk/postgraduate",
+    ],
+    "hud.ac.uk": [
+        "https://courses.hud.ac.uk/",
+        "https://courses.hud.ac.uk/undergraduate",
+        "https://courses.hud.ac.uk/postgraduate",
+    ],
     # Queensland University of Technology (QUT) — uni_id 1011.
     # Cloudflare-walled (HTTP 403 for plain BFS) + JS-rendered SPA shells +
     # no sitemap.xml.  Without seeds, the browser-discover homepage-nav
@@ -311,10 +329,24 @@ async def browser_discover_generic(
     results: list[dict] = []
     nav_queue: list[str] = []
 
-    for seed_url in _HOST_EXTRA_SEEDS.get(host, []):
+    _seed_urls = _HOST_EXTRA_SEEDS.get(host, [])
+    for seed_url in _seed_urls:
         if seed_url not in seen:
             nav_queue.append(seed_url)
             seen.add(seed_url)
+
+    # Build allowed-hosts set: the primary host + every host referenced in
+    # extra seeds.  This lets seeds on a different subdomain/domain (e.g.
+    # courses.hud.ac.uk for www.hud.ac.uk) contribute course links without
+    # being silently dropped by the cross-domain filter below.
+    _allowed_hosts: set[str] = {host}
+    for _seed in _seed_urls:
+        try:
+            _sh = urlparse(_seed).netloc
+            if _sh:
+                _allowed_hosts.add(_sh)
+        except Exception:
+            pass
 
     try:
         from app.services.scraper.discovery import (
@@ -332,7 +364,7 @@ async def browser_discover_generic(
             if not url:
                 continue
             p = urlparse(url)
-            if p.netloc and p.netloc != host:
+            if p.netloc and p.netloc not in _allowed_hosts:
                 continue
             if url in seen:
                 continue
