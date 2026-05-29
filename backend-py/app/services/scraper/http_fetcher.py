@@ -3,8 +3,8 @@
 Used by extractors when JS rendering isn't required (most fee/intake pages).
 Falls back to ``BrowserPool`` for SPAs.
 
-Cloudflare bypass (free, no API key) — three-tier fallback:
-------------------------------------------------------------
+Cloudflare bypass — four-tier fallback (cheapest first):
+---------------------------------------------------------
 1. ``httpx`` with browser UA/Accept headers.  Works for most sites.
 2. ``curl_cffi`` Chrome TLS impersonation.  Cloudflare blocks scrapers at
    the TLS handshake level — Python's standard SSL library emits a different
@@ -12,21 +12,26 @@ Cloudflare bypass (free, no API key) — three-tier fallback:
    to send the exact TLS ClientHello Chrome 124 uses, which passes the
    fingerprint check without spawning any browser process.  Cost: zero.
    Overhead: ~50-200 ms per page.  Handles TLS-fingerprint-only CF protection.
-3. ``fetch_html_wayback`` — Wayback Machine archived HTML.  Some sites (e.g.
-   Notre Dame Australia) use Cloudflare Enterprise Bot Management that blocks
-   at the IP/ASN level regardless of TLS fingerprint — datacenter IPs from
-   Replit or DigitalOcean receive HTTP 403 no matter what we send.  For these,
-   we fall back to the Internet Archive's CDX API to find the most recent
-   snapshot of the URL, then fetch the raw archived HTML (via the ``id_``
-   Wayback modifier that strips the IA toolbar and returns clean HTML).  The
-   archived data may be weeks/months old, but for stable course-catalogue
-   content this is usually acceptable and far better than returning nothing.
+3. ``fetch_html_scrape_do`` — scrape.do residential proxy.  When both httpx
+   and curl_cffi are blocked (IP/ASN-level Cloudflare Enterprise), scrape.do
+   routes the request through a residential IP that CF does not block.  Costs
+   API credits (SCRAPE_DO_TOKEN required).  Enabled ONLY for universities that
+   set ``discovery.scrape_do_fallback: true`` in their YAML.  Never called
+   fleet-wide.  Overhead: ~1-3 s per page.
+4. ``fetch_html_wayback`` — Wayback Machine archived HTML (free, zero API
+   cost).  Some sites block all datacenter IPs at the IP/ASN level.  For
+   these, we fall back to the Internet Archive's CDX API to find the most
+   recent snapshot of the URL, then fetch the raw archived HTML via the ``id_``
+   Wayback modifier.  The archived data may be weeks/months old, but for
+   stable course-catalogue content this is usually acceptable.
    Cost: zero.  Overhead: two HTTP calls to archive.org (~1-3 s).
 """
 from __future__ import annotations
 
 import asyncio
 import logging
+import os
+import urllib.parse
 from contextlib import asynccontextmanager
 
 import httpx
@@ -36,6 +41,29 @@ from app.services.scraper.extractors.curtin_session import cookies_for_url
 
 log = logging.getLogger(__name__)
 _sem = asyncio.Semaphore(settings.max_http_concurrency)
+
+# Per-job scrape.do opt-in flag.  Set to True by set_scrape_do_fallback()
+# when the current university has ``discovery.scrape_do_fallback: true`` in
+# its YAML.  Cleared after every scrape job by clear_scrape_do_fallback() so
+# it never bleeds into the next job on the same worker process.
+_scrape_do_enabled: bool = False
+
+
+def set_scrape_do_fallback(enabled: bool) -> None:
+    """Enable or disable the scrape.do fallback tier for the current job.
+
+    Call once after loading per-uni config.  Always pair with a corresponding
+    ``clear_scrape_do_fallback()`` call in the job's finally block.
+    """
+    global _scrape_do_enabled
+    _scrape_do_enabled = enabled
+
+
+def clear_scrape_do_fallback() -> None:
+    """Reset the scrape.do flag after a scrape job finishes."""
+    global _scrape_do_enabled
+    _scrape_do_enabled = False
+
 
 # Per-job Wayback timestamp cache: normalised-url → CDX timestamp string.
 # Populated by wayback_discover() during the discovery phase so that
@@ -81,6 +109,54 @@ def _is_cloudflare_block(resp: httpx.Response) -> bool:
     if resp.headers.get("cf-ray"):
         return True
     return False
+
+
+async def fetch_html_scrape_do(url: str) -> str | None:
+    """Fetch via scrape.do residential proxy (paid, opt-in per-uni fallback).
+
+    Called ONLY when:
+      1. The current university has ``discovery.scrape_do_fallback: true``.
+      2. Both httpx and curl_cffi were blocked (Cloudflare WAF / IP block).
+
+    The scrape.do API accepts a plain GET:
+      https://api.scrape.do?token=TOKEN&url=ENCODED_URL&render=false
+
+    ``render=false`` (default) requests static HTML — cheaper than JS
+    rendering and sufficient for all server-rendered university pages.  Do
+    NOT set ``render=true`` here; that is 5× more expensive and should only
+    be used if the caller explicitly needs JS execution (use the browser pool
+    instead for those cases).
+
+    Cost accounting: every call consumes at least one scrape.do credit.
+    Operators can monitor spend in the scrape.do dashboard.
+
+    Returns the response text on HTTP 200, None on any failure.
+    """
+    token = os.environ.get("SCRAPE_DO_TOKEN", "")
+    if not token:
+        log.warning("scrape.do fallback requested but SCRAPE_DO_TOKEN is not set — skipping")
+        return None
+
+    endpoint = "https://api.scrape.do"
+    params = {
+        "token": token,
+        "url": url,
+        "render": "false",
+    }
+    try:
+        async with httpx.AsyncClient(timeout=60, follow_redirects=True) as c:
+            r = await c.get(endpoint, params=params)
+            if r.status_code == 200:
+                log.info(
+                    "scrape.do fetch %s -> 200 (%d chars, 1 credit consumed)",
+                    url, len(r.text),
+                )
+                return r.text
+            log.warning("scrape.do fetch %s -> %s", url, r.status_code)
+            return None
+    except Exception as exc:
+        log.warning("scrape.do fetch %s failed: %s", url, exc)
+        return None
 
 
 async def fetch_html_cffi(url: str) -> str | None:
@@ -279,12 +355,26 @@ async def fetch_html(url: str, *, retries: int = 2) -> str | None:
         cffi_result = await fetch_html_cffi(url)
         if cffi_result is not None:
             return cffi_result
-        # curl_cffi also blocked (IP/ASN-level block — TLS fingerprint is not
-        # the issue).  Last resort: fetch archived HTML from Wayback Machine.
-        log.info(
-            "fetch %s: curl_cffi also blocked — trying Wayback Machine archived HTML",
-            url,
-        )
+        # curl_cffi also blocked (IP/ASN-level block — TLS fingerprint alone
+        # is not the issue).
+        if _scrape_do_enabled:
+            log.info(
+                "fetch %s: curl_cffi blocked — trying scrape.do residential proxy",
+                url,
+            )
+            scrape_do_result = await fetch_html_scrape_do(url)
+            if scrape_do_result is not None:
+                return scrape_do_result
+            log.info(
+                "fetch %s: scrape.do also failed — falling back to Wayback Machine",
+                url,
+            )
+        else:
+            log.info(
+                "fetch %s: curl_cffi blocked — trying Wayback Machine archived HTML "
+                "(scrape.do not enabled for this university)",
+                url,
+            )
         return await fetch_html_wayback(url)
 
     if last_exc:

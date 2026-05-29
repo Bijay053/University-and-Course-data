@@ -662,6 +662,14 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             f"scraper_config/unis/{_uni_cfg.slug}.yaml",
             _uni_cfg.discovery.always_sitemap_supplement,
         )
+        if _uni_cfg.discovery.scrape_do_fallback:
+            from app.services.scraper.http_fetcher import set_scrape_do_fallback
+            set_scrape_do_fallback(True)
+            log.info(
+                "scrape.do fallback ENABLED for %r (discovery.scrape_do_fallback=true) — "
+                "will be used only if httpx + curl_cffi are both blocked",
+                _uni_cfg.slug,
+            )
         # ─────────────────────────────────────────────────────────────────────
 
         max_pages = 12 if job.fast_mode else 25
@@ -2528,7 +2536,11 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # wayback_discover() so stale timestamps don't bleed into the
         # next job on the same worker process.
         try:
-            from app.services.scraper.http_fetcher import clear_wayback_timestamps
+            from app.services.scraper.http_fetcher import (
+                clear_scrape_do_fallback,
+                clear_wayback_timestamps,
+            )
             clear_wayback_timestamps()
+            clear_scrape_do_fallback()
         except Exception:  # noqa: BLE001
             pass
