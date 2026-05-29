@@ -7,6 +7,7 @@ import { SettingsTabs } from "@/components/settings-tabs";
 import { Plus, Save, Trash2, Sparkles, Search, RefreshCw, X, Play, Loader2, CheckCircle2, AlertCircle, Clock, GitCompare, Code, History, RotateCcw, Download, Clipboard, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { fetchWithAuth } from "@/lib/api";
+import { CountrySelect } from "@/components/country-select";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -1867,12 +1868,13 @@ export default function SettingsScraperConfigs() {
               </div>
               <div>
                 <Label className="text-xs">Country</Label>
-                <Input
-                  className="mt-1"
-                  placeholder="Australia"
-                  value={genForm.country}
-                  onChange={e => setGenForm(f => ({ ...f, country: e.target.value }))}
-                />
+                <div className="mt-1">
+                  <CountrySelect
+                    value={genForm.country}
+                    onChange={v => setGenForm(f => ({ ...f, country: v }))}
+                    className="h-9"
+                  />
+                </div>
               </div>
               <div>
                 <Label className="text-xs">Notes for AI (optional)</Label>
