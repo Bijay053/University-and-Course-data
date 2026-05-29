@@ -50,12 +50,34 @@ discovery:
   # timeout_seconds: kill subprocess after this many seconds (default 600)
   #
   # Copy backend-py/spiders/template_spider.py as your starting point.
+  # It contains five ready-to-use patterns (A–E):
+  #   A — HTML crawl + BeautifulSoup  (server-rendered sites, most common)
+  #   B — JSON/REST API + tenacity    (sites with internal JSON API)
+  #   C — Scrapy-Playwright           (JS-rendered SPAs, see settings below)
+  #   D — Excel / CSV feed            (universities that publish a spreadsheet)
+  #   E — API discovery + HTML extract (combined: API URLs, page data)
+  #
+  # Minimum config (Patterns A, B, D, E):
   # scrapy:
   #   spider: example_uni_spider
   #   settings:
   #     DOWNLOAD_DELAY: 1
   #     CONCURRENT_REQUESTS: 4
   #   timeout_seconds: 600
+  #
+  # Pattern C — scrapy-playwright (JS rendering via real Chromium browser):
+  # Also run once on the server: playwright install chromium
+  # scrapy:
+  #   spider: example_uni_spider
+  #   settings:
+  #     DOWNLOAD_HANDLERS:
+  #       https: scrapy_playwright.handler.ScrapyPlaywrightDownloadHandler
+  #       http:  scrapy_playwright.handler.ScrapyPlaywrightDownloadHandler
+  #     TWISTED_REACTOR: twisted.internet.asyncioreactor.AsyncioSelectorReactor
+  #     PLAYWRIGHT_BROWSER_TYPE: chromium
+  #     DOWNLOAD_DELAY: 1
+  #     CONCURRENT_REQUESTS: 2   # keep low — each request holds a browser tab
+  #   timeout_seconds: 900       # JS sites are slower; raise the kill timeout
 
   # URL filters (regex).  Block patterns run before allow patterns.
   block_url_patterns: []
