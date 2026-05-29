@@ -2,38 +2,29 @@
 # Hostname: www.notredame.edu.au
 #
 # Bug history / rationale:
-#   - 2026-05-29: First scrape from homepage returned 0 candidates because
-#     Notre Dame's navigation goes through a Funnelback search interface
-#     (search.nd.edu.au) rather than direct links from the homepage. The
-#     course detail pages live at www.notredame.edu.au/programs/<area>/
-#     <level>/<slug>, but the homepage doesn't link to them directly.
-#
-#   - Fix: point discovery at the Funnelback search results page. The
-#     search-result HTML contains the full list of course URLs, which
-#     BFS can then follow into the real /programs/ detail pages.
-#     `must_contain: /programs/` keeps only real course pages and drops
-#     navigation/search-control links.
+#   - 2026-05-29 attempt 1: scrape_url=https://www.notredame.edu.au/ → 0 found.
+#     Homepage navigation goes through a Funnelback search interface, no
+#     direct course links in static HTML.
+#   - 2026-05-29 attempt 2: scrape_url=https://search.nd.edu.au/s/search.html
+#     → 0 found. Funnelback results are JS-rendered; stealth browser path
+#     also returned 0 links.
+#   - 2026-05-29 attempt 3: try /programs/ as entry point, since the real
+#     course detail pages live at www.notredame.edu.au/programs/<area>/...
+#     If this also returns 0, the underlying issue is likely that Notre
+#     Dame's catalogue is only enumerable via Funnelback's JSON API and
+#     needs a per-uni discovery module (engineering task, not YAML).
 
 discovery:
-  # Stealth was added when the original 0-results scrape looked like a
-  # WAF block. With the corrected entry URL, BFS may work without stealth.
-  # Keep ON for the first scrape; if logs show no Cloudflare interaction,
-  # remove this line next iteration to speed up runs (~3-5s per page).
   use_stealth_browser: true
-
   always_sitemap_supplement: true
-
-  # Keep ONLY real course detail pages — drop navigation, search facets,
-  # filters, and the search interface itself.
   must_contain:
     - "/programs/"
 
 extraction:
   fees:
     default_currency: "AUD"
-
   filters:
     domestic_only:
-      enabled: false      # Notre Dame lists both domestic and international courses
+      enabled: false
     online_only:
-      enabled: false      # Multi-campus on-campus uni (Fremantle / Sydney / Broome)
+      enabled: false
