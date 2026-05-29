@@ -866,39 +866,45 @@ async def generate_scraper_config(
     _fees_block = "  fees:\n" + "\n".join(f"  {l}" for l in _fees_lines)
 
     _extraction_inner = _fees_block
+    # english.central_page: ONLY if the live probe confirmed a real URL —
+    # never from Gemini guessing (unverified URLs produce noise or zero records)
     if _english_lines:
         _extraction_inner += "\n  english:\n" + "\n".join(f"  {l}" for l in _english_lines)
 
+    _hostname = body.website_url.split("//")[-1].rstrip("/").split("/")[0]
+
     _yaml_template = f"""# {body.university_name}
-# Hostname: {body.website_url.split("//")[-1].rstrip("/").split("/")[0]}
+# Hostname: {_hostname}
 {_rationale_block}
 {_discovery_block}
 extraction:
 {_extraction_inner}
   filters:
     domestic_only:
-      enabled: ???  # true if site mixes domestic+international; false if international-only listing"""
+      enabled: false  # SAFE DEFAULT — only set true if you have confirmed the site serves ONLY domestic courses
+    online_only:
+      enabled: false  # set true only for distance-education-only institutions"""
 
     prompt = f"""You are a scraper configuration expert for a university course data system.
 
-Complete the following YAML scraper config for {body.university_name} ({body.website_url}).
-Country: {body.country}.
-Operator notes: {body.notes or "none"}.{_nav_hint}
+The following is a complete, safe starter YAML config for {body.university_name} ({body.website_url}).
+It has already been populated from a live probe of the site. Output it with ONLY the improvements listed below.
 
-START FROM THIS TEMPLATE (already populated with live probe data — do not change confirmed URLs or WAF settings):
 {_yaml_template}
 
-YOUR JOB — fix only these things:
-1. Replace `domestic_only.enabled: ???` with true or false based on your knowledge of {body.university_name}'s website. true = site shows both domestic and international courses mixed. false = site only lists international courses (most AU/NZ universities).
-2. Use your knowledge of {body.university_name} to add any other useful settings from the available fields below — but ONLY if you are confident they apply. When in doubt, omit the field.
-3. Keep the comment block clean: only include rationale lines that are already there or that you can verify. Do NOT add lines about "no fee page found" or "homepage unreachable" — omit them.
-4. Do NOT output any section (discovery:, extraction:, etc.) that would be completely empty.
-5. Output ONLY valid YAML — no markdown fences, no extra text.
+ALLOWED CHANGES (operator notes say: {body.notes or "none"}):
+- You may add discovery.bfs_page_budget if {body.university_name} is a large university with many courses.
+- You may add discovery.block_url_patterns if you know specific URL patterns to avoid.
+- Keep the comment block exactly as written — do NOT add or change any rationale lines.
+- Do NOT change any confirmed WAF/SPA settings or confirmed URLs.
 
-Available extra fields you may add if appropriate:
-{_DEFAULTS_YAML_SUMMARY}
+STRICTLY FORBIDDEN — these cause silent data corruption:
+- DO NOT add default_ielts or default_pte — these stamp fabricated values onto every course that lacks real data. Blank is always better than a wrong number.
+- DO NOT change domestic_only.enabled to true — the safe default is false. Only true if you have confirmed the site physically serves ONLY domestic courses with no international option at all.
+- DO NOT invent or guess any central_page, fees_pdf_url, or other URL not already in the template above.
+- DO NOT add any field you are not 100% certain applies. When in doubt, omit it.
 
-Output the completed YAML now:"""
+Output ONLY the completed YAML — no markdown fences, no commentary:"""
 
     try:
         response = client.models.generate_content(
