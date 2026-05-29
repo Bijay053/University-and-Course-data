@@ -316,16 +316,16 @@ _FORCE_BROWSER_HOSTS: tuple[str, ...] = (
     # mq_browser_discover._resolve_to_study_urls), so this single host
     # entry covers the entire MQ catalogue.
     "mq.edu.au",
-    # UWA (University of Western Australia): Sitecore SXA SPA.  Bachelor
-    # and Master pages do NOT embed IELTS/requirements in static HTML —
-    # they hydrate client-side.  The static fetch succeeds (~134KB) and
-    # returns "3 Year" duration, so the sparse-static rescue
-    # (fee=None AND duration=None) never fires and the browser is never
-    # invoked.  Forcing the browser ensures networkidle + 3s settle runs
-    # for every UWA page so the rendered requirements panel is scraped.
-    # Graduate Cert/Dip pages already have IELTS in static JSON-LD; the
-    # override flag is harmless for them (rendered values agree).
-    "uwa.edu.au",
+    # UWA (University of Western Australia): removed from _FORCE_BROWSER_HOSTS.
+    # Live testing confirmed UWA static HTML DOES contain IELTS (6.5) for
+    # Masters/Grad Certs/Grad Dips via regex; forcing browser on all 402
+    # courses added ~108 min to the job for zero gain on postgrad pages.
+    # Standalone Bachelor pages genuinely have no IELTS anywhere (UWA uses
+    # ATAR-based admission, not per-course IELTS) so browser adds nothing
+    # there either. Sparse-static rescue (fee+duration both None) won't
+    # re-fire because duration IS in static HTML for all UWA pages.
+    # _DCL_SETTLE_MS_OVERRIDES entry is kept for the rare pages that do
+    # need a browser render (future per-uni toggle if needed).
 )
 
 _NETWORKIDLE_SETTLE_MS = 3000
