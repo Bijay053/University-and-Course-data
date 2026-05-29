@@ -16,6 +16,27 @@ const SAMPLE_YAML = `# University Full Name
 # Bug history / rationale:
 #   (add notes here as you discover site-specific quirks)
 
+# ── WHEN TO EDIT THIS FILE ────────────────────────────────────────────────────
+# Edit when a scrape of THIS university produces wrong or missing data due to
+# site-specific quirks. Safe pattern:
+#   1. Run scrape → inspect staged rows in the portal
+#   2. Find the symptom in the table at the bottom of this file
+#   3. Uncomment the relevant field → re-run THIS university only
+#
+# Do NOT edit scraper_config/defaults.yaml — changes there affect every university
+# and require a full regression sweep + human approval.
+# Do NOT edit extractor code in app/services/scraper/extractors/ — same risk.
+#
+# NOT YAML-fixable — escalate to engineering instead:
+#   - Page returns 0 bytes even with always_browser_discover/use_stealth_browser →
+#     needs a code change to per_course_browser.py (_NETWORKIDLE_HOSTS or
+#     _SKIP_BROWSER_HOSTS) or a new XHR/API extraction route.
+#   - Cloudflare 403 that use_stealth_browser does not solve (WAF fingerprinting).
+#   - Fees live only behind a JS fee calculator (AJAX, no static HTML to parse).
+#   - English requirements are behind a login wall.
+#   - CRICOS 0% coverage even though the page contains "CRICOS" → regex pattern
+#     mismatch; fix is in extractors/cricos_code.py, not YAML.
+
 # ── DISCOVERY ─────────────────────────────────────────────────────────────────
 # Settings that are safe to replay against unknown universities (Tier-3).
 # They do not assume anything about a specific site's content structure.
@@ -99,7 +120,9 @@ extraction:
     # fees_pdf_url: https://www.example.edu.au/fees-schedule.pdf
 
     # Mark all staged courses as "has central fee page" so the staging gate
-    # does not reject courses without a per-course fee listing (e.g. UTAS):
+    # does not reject courses without a per-course fee listing.
+    # Use when the university publishes fees on a calculator/central schedule
+    # rather than on individual course pages (e.g. UWA research degrees):
     # force_central_fee_stage: true
 
     # Number of credit points per unit of study. Set when the site publishes
@@ -121,8 +144,8 @@ extraction:
     # pdf_parser: "columnar"
 
     # Per-uni PDF row regex. Must define a named group "cricos". Optional
-    # groups: per_unit, annual, total:
-    # pdf_row_pattern: "(?P<cricos>\\d{6}[A-Z])\\s+(?P<annual>\\$[\\d,]+)"
+    # groups: per_unit, annual, total. Use single quotes — no YAML escaping needed:
+    # pdf_row_pattern: '(?P<cricos>\\d{6}[A-Z])\\s+(?P<annual>\\$[\\d,]+)'
 
     # Fee term to emit for per-course PDF rows when it cannot be auto-derived:
     # pdf_fee_term: "Annual"
@@ -198,20 +221,23 @@ extraction:
   # ── Text cleaning ─────────────────────────────────────────────────────────
   text_cleaning:
     location:
-      # Regex patterns stripped from raw location strings before parsing:
+      # Regex patterns stripped from raw location strings before parsing.
+      # Use single quotes — backslashes need no extra escaping in YAML single-quoted strings:
       # strip_patterns:
-      #   - "\\^\\s*\\^.*$"          # ACAP "^ ^Available in Perth" cruft
-      #   - "\\bDelivery method\\b"
+      #   - '\\^\\s*\\^.*$'          # ACAP "^ ^Available in Perth" cruft
+      #   - '\\bDelivery\\s*method\\b'
 
     duration:
       # Split compound duration strings on '/' before parsing:
       # split_on_slash: true
 
       # Reject sentences that match these patterns from the duration tournament
-      # (e.g. max-completion-time phrases the global filter misses):
+      # (e.g. max-completion-time phrases the global filter misses).
+      # Use single quotes for all regex patterns:
       # reject_sentence_patterns:
-      #   - "up to \\d+ years to complete"
-      #   - "up to \\d+ months"
+      #   - 'up to \\d+ years to complete'
+      #   - 'up to \\d+ months'
+      #   - 'candidature.*\\d+ years'
 
     # Substrings stripped from EVERY string field on the staged payload.
     # Use for stock boilerplate that pollutes multiple fields:
@@ -249,6 +275,35 @@ extraction:
   # Fallback course_location when all extractors return empty (e.g. UTAS whose
   # Cloudflare occasionally delivers partial HTML that omits the Location panel):
   # default_course_location: "Hobart"
+
+# ── QUICK REFERENCE — symptom → YAML field ────────────────────────────────────
+# Symptom                                        Field to set
+# ─────────────────────────────────────────────────────────────────────────────
+# Discovery finds nav/news pages, not courses    discovery.must_contain
+#                                                discovery.block_url_patterns
+# Sitemap not auto-discovered                    discovery.sitemap_url
+# BFS finds < 5 courses (subdomain)              discovery.fallback_subdomains
+# Cloudflare blocks plain-HTTP BFS               discovery.always_browser_discover
+# Cloudflare blocks headless Playwright too      discovery.use_stealth_browser
+# All courses staged as no_international_fee     extraction.fees.force_central_fee_stage
+# Fee PDF has multi-line course titles           extraction.fees.pdf_parser: "columnar"
+# Page shows Year-1 fee; we want annual          extraction.fees.prefer_year_one_over_total
+# IELTS hallucinated from decorative images      extraction.english.trust_vision_ocr: false
+# PTE/TOEFL appears on pages that don't list it  extraction.english.test_blocklist
+# Duration shows max-candidature time            extraction.text_cleaning.duration.reject_sentence_patterns
+# Location panel blank on Cloudflare-heavy site  extraction.default_course_location
+# Location string has CMS junk suffix            extraction.text_cleaning.location.strip_patterns
+# Course title ends with " : University of X"   extraction.course_name.strip_title_suffixes
+# PhD shows no intake months                     extraction.intake.rolling_enrollment_label
+# Domestic-only courses are being staged         extraction.filters.domestic_only.enabled: true
+# Site uses per-unit fees                        extraction.fees.credit_points_per_unit
+# International view needs a query parameter     extraction.url_rewrites
+# ─────────────────────────────────────────────────────────────────────────────
+# NOT YAML-fixable (ask engineering):
+#   rendered=0B even with browser flags          → per_course_browser.py _NETWORKIDLE_HOSTS
+#   scrape times out, all pages blank            → per_course_browser.py _SKIP_BROWSER_HOSTS
+#   Cloudflare WAF still blocks stealth browser  → new extraction route needed
+#   Fees only on JS calculator (no HTML)         → new XHR extractor needed
 `;
 
 function downloadSampleYaml() {

@@ -207,14 +207,16 @@ extraction:
 
 ### Recipe D1 — "Duration shows maximum candidature time instead of program length"
 
+Use YAML single-quoted strings for regex patterns:
+
 ```yaml
 extraction:
   text_cleaning:
     duration:
       reject_sentence_patterns:
-        - "up to \\d+ years to complete"
-        - "up to \\d+ months"
-        - "candidature.*\\d+ years"
+        - 'up to \d+ years to complete'
+        - 'up to \d+ months'
+        - 'candidature.*\d+ years'
 ```
 
 ---
@@ -228,12 +230,15 @@ extraction:
 
 ### Recipe E1 — "Location includes a trailing label like 'Delivery method'"
 
+Use YAML single-quoted strings for all regex patterns — backslashes need no extra escaping:
+
 ```yaml
 extraction:
   text_cleaning:
     location:
       strip_patterns:
-        - "\\bDelivery\\s*method\\b.*"
+        - '\bDelivery\s*method\b.*'
+        - '^\s*\^.*$'          # ACAP "^ ^Available in Perth" cruft
 ```
 
 ### Recipe E2 — "Cloudflare occasionally delivers partial HTML that omits the Location panel"
@@ -332,15 +337,16 @@ Real examples shipped to production:
 If the problem is one of the following, **do not spend time iterating on YAML** —
 escalate to engineering.
 
-| Problem | Why YAML can't fix it |
-|---------|----------------------|
-| Course page renders as 0 bytes (SPA, React/Next.js behind Cloudflare) | Needs a JS rendering fix or a new XHR/API extraction path, not a crawl config change |
-| University publishes fees only through a fee calculator (AJAX) | Requires a custom API extractor; no static HTML to parse |
-| English requirements are behind a login wall | Cannot be crawled at all without authentication |
-| Course data is inside an embedded iframe from a third-party system | Iframe cross-origin restriction; requires a custom fetcher targeting the iframe src directly |
-| All discovered URLs return HTTP 403 even with stealth browser | WAF with fingerprinting beyond what patchright bypasses; needs engineering investigation |
-| CRICOS code not matching (0% cricos_coverage) but page does contain CRICOS | The regex pattern doesn't match the site's CRICOS formatting; run `scripts/cricos_coverage_diagnostic.py` to confirm, then fix the regex in `extractors/cricos_code.py` |
-| Test failures in `test_location.py`, `test_universities_bulk_import.py` | Pre-existing failures; see `KNOWN_ISSUES.md` |
+| Problem | Why YAML can't fix it | Engineering fix |
+|---------|----------------------|-----------------|
+| Course page renders as 0 bytes — `always_browser_discover` and `use_stealth_browser` both tried | SPA hydrates content via XHR after page load; browser may be timing out before render | Add host to `_NETWORKIDLE_HOSTS` in `per_course_browser.py` so browser waits for `networkidle` + settle time instead of `domcontentloaded` |
+| Scrape times out on every page for a specific host | Heavy third-party trackers prevent `networkidle` from ever settling; browser eats full 60s per course | Add host to `_SKIP_BROWSER_HOSTS` in `per_course_browser.py` to skip browser pass entirely (static HTML must be sufficient) |
+| Cloudflare 403 even with `use_stealth_browser: true` | WAF fingerprinting beyond what patchright bypasses | Engineering investigation; may need a new XHR/API extraction route |
+| Fees only behind a JS fee calculator (AJAX endpoint) | No static HTML to parse | Custom API extractor targeting the calculator's XHR endpoint |
+| English requirements behind a login wall | Cannot be crawled without authentication | Out of scope unless the university provides a public API or credential |
+| Course data inside an embedded third-party iframe | Cross-origin restriction blocks the iframe content | Custom fetcher targeting the iframe `src` URL directly |
+| CRICOS 0% coverage even though page contains "CRICOS" | Regex pattern doesn't match the site's CRICOS formatting | Run `scripts/cricos_coverage_diagnostic.py --uni-id N`, then fix regex in `extractors/cricos_code.py` |
+| Test failures in `test_location.py`, `test_universities_bulk_import.py` | Pre-existing failures unrelated to YAML | See `KNOWN_ISSUES.md` |
 
 ---
 
