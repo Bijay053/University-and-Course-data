@@ -23,6 +23,7 @@ class LoginResponse(BaseModel):
     user: dict
     permissions: list[str] = []
     is_super_admin: bool = False
+    token: str | None = None
 
 
 class MeResponse(BaseModel):

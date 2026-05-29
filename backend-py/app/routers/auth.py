@@ -102,6 +102,7 @@ async def login(
         user={k: v for k, v in payload.items() if k not in ("permissions", "is_super_admin")},
         permissions=perms,
         is_super_admin=user.is_super_admin,
+        token=token,
     )
 
 

@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react";
+import { fetchWithAuth, setAuthToken, loadAuthToken } from "@/lib/api";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -41,7 +42,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refresh = useCallback(async () => {
     try {
-      const res = await fetch(`${BASE}/api/auth/me`, { credentials: "include" });
+      loadAuthToken();
+      const res = await fetchWithAuth(`${BASE}/api/auth/me`);
       const data = await res.json();
       setUser(data.user ?? null);
       setPermissions(new Set<string>(Array.isArray(data.permissions) ? data.permissions : []));
@@ -75,13 +77,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           : "Login failed";
       throw new Error(message);
     }
+    if (data.token) {
+      setAuthToken(data.token);
+    }
     setUser(data.user);
     setPermissions(new Set<string>(Array.isArray(data.permissions) ? data.permissions : []));
     setIsSuperAdmin(Boolean(data.is_super_admin));
   }
 
   async function logout() {
-    await fetch(`${BASE}/api/auth/logout`, { method: "POST", credentials: "include" });
+    await fetchWithAuth(`${BASE}/api/auth/logout`, { method: "POST" });
+    setAuthToken(null);
     setUser(null);
     setPermissions(new Set());
     setIsSuperAdmin(false);

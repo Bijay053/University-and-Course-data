@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { SettingsTabs } from "@/components/settings-tabs";
 import { Plus, Save, Trash2, Sparkles, Search, RefreshCw, X, Play, Loader2, CheckCircle2, AlertCircle, Clock, GitCompare, Code, History, RotateCcw, Download, Clipboard, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { fetchWithAuth } from "@/lib/api";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -919,7 +920,7 @@ export default function SettingsScraperConfigs() {
   const fetchConfigs = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${BASE}/api/settings/scraper-configs`, { credentials: "include" });
+      const res = await fetchWithAuth(`${BASE}/api/settings/scraper-configs`);
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
       setConfigs(data.configs ?? []);
@@ -943,7 +944,7 @@ export default function SettingsScraperConfigs() {
       const params = new URLSearchParams();
       if (opts?.beforeId != null) params.set("before_id", String(opts.beforeId));
       const url = `${BASE}/api/settings/scraper-configs/${slug}/history${params.size ? `?${params}` : ""}`;
-      const res = await fetch(url, { credentials: "include" });
+      const res = await fetchWithAuth(url);
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
       const newEntries: HistoryEntry[] = data.history ?? [];
@@ -1009,7 +1010,7 @@ export default function SettingsScraperConfigs() {
       }
       await Promise.all(current.map(async ([slug, state]) => {
         try {
-          const res = await fetch(`${BASE}/api/scrape/status/${state.jobId}`, { credentials: "include" });
+          const res = await fetchWithAuth(`${BASE}/api/scrape/status/${state.jobId}`);
           if (!res.ok) return;
           const d = await res.json();
           setTriggerJobs(prev => ({
@@ -1033,9 +1034,8 @@ export default function SettingsScraperConfigs() {
     if (triggering === slug) return;
     setTriggering(slug);
     try {
-      const res = await fetch(`${BASE}/api/settings/scraper-configs/${slug}/trigger`, {
+      const res = await fetchWithAuth(`${BASE}/api/settings/scraper-configs/${slug}/trigger`, {
         method: "POST",
-        credentials: "include",
       });
       const data = await res.json();
       if (!res.ok) {
@@ -1103,9 +1103,8 @@ export default function SettingsScraperConfigs() {
     if (!editorSlug.trim()) { toast({ title: "Slug required", variant: "destructive" }); return; }
     setSaving(true);
     try {
-      const res = await fetch(`${BASE}/api/settings/scraper-configs/${editorSlug.trim()}`, {
+      const res = await fetchWithAuth(`${BASE}/api/settings/scraper-configs/${editorSlug.trim()}`, {
         method: "PUT",
-        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ yaml_content: editorYaml }),
       });
@@ -1140,9 +1139,8 @@ export default function SettingsScraperConfigs() {
     if (!confirm(`Delete config for '${selected}'? This cannot be undone.`)) return;
     setDeleting(true);
     try {
-      const res = await fetch(`${BASE}/api/settings/scraper-configs/${selected}`, {
+      const res = await fetchWithAuth(`${BASE}/api/settings/scraper-configs/${selected}`, {
         method: "DELETE",
-        credentials: "include",
       });
       if (!res.ok) { const d = await res.json(); throw new Error(d.detail ?? "Delete failed"); }
       toast({ title: "Deleted", description: `Config for '${selected}' removed` });
@@ -1169,9 +1167,8 @@ export default function SettingsScraperConfigs() {
     }
     setGenerating(true);
     try {
-      const res = await fetch(`${BASE}/api/settings/scraper-configs/generate`, {
+      const res = await fetchWithAuth(`${BASE}/api/settings/scraper-configs/generate`, {
         method: "POST",
-        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(genForm),
       });
@@ -1199,9 +1196,8 @@ export default function SettingsScraperConfigs() {
     if (!confirm(`Restore this version saved ${formatRelativeTime(entry.saved_at)}? The current saved YAML will be replaced.`)) return;
     setRestoringId(entry.id);
     try {
-      const res = await fetch(`${BASE}/api/settings/scraper-configs/${selected}/restore/${entry.id}`, {
+      const res = await fetchWithAuth(`${BASE}/api/settings/scraper-configs/${selected}/restore/${entry.id}`, {
         method: "POST",
-        credentials: "include",
       });
       if (!res.ok) { const d = await res.json(); throw new Error(d.detail ?? "Restore failed"); }
       toast({ title: "Restored", description: `Config for '${selected}' reverted to version from ${formatRelativeTime(entry.saved_at)}` });

@@ -23,8 +23,18 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/auth";
+import { fetchWithAuth } from "@/lib/api";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+
+async function api<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetchWithAuth(`${BASE}${path}`, init);
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(typeof data.detail === "string" ? data.detail : `HTTP ${res.status}`);
+  }
+  return res.status === 204 ? (undefined as T) : ((await res.json()) as T);
+}
 
 interface UserRow {
   id: number;
@@ -47,15 +57,6 @@ interface RoleRow {
 interface RegistryGroup {
   group: string;
   permissions: { key: string; label: string }[];
-}
-
-async function api<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, { credentials: "include", ...init });
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(typeof data.detail === "string" ? data.detail : `HTTP ${res.status}`);
-  }
-  return res.status === 204 ? (undefined as T) : ((await res.json()) as T);
 }
 
 export default function UsersPage() {
