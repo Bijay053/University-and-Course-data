@@ -31,6 +31,14 @@ discovery:
   # Set to true for JS-heavy SPAs (Torrens / CDU style).
   always_sitemap_supplement: false
 
+  # Route failed HTTP/browser fetches through scrape.do residential proxy.
+  # Enable for universities whose live site is protected by Cloudflare Enterprise
+  # Bot Management or similar WAF that blocks all cloud/datacenter IPs.
+  # Requires the SCRAPE_DO_TOKEN env secret (uses API credits per request).
+  # Pair with use_wayback: true when you also need CDX-based discovery.
+  scrape_do_fallback: false
+  #   Example: scrape_do_fallback: true   # Notre Dame — Cloudflare Enterprise block
+
   # URL filters (regex).  Block patterns run before allow patterns.
   block_url_patterns: []
   allow_url_patterns: []
