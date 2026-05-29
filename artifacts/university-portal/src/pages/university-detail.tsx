@@ -868,6 +868,10 @@ export default function UniversityDetail() {
     });
     setRawSelectedIds(new Set());
     await fetchRawData();
+    if (approved > 0) {
+      await queryClient.invalidateQueries({ queryKey: getListCoursesQueryKey({ universityId: id, limit: 500 }) });
+      await queryClient.invalidateQueries({ queryKey: getGetUniversityQueryKey(id) });
+    }
     setBulkApproveRunning(false);
   };
 
@@ -1079,6 +1083,8 @@ export default function UniversityDetail() {
       }
       toast({ title: "Approved", description: "Course imported to production." });
       await fetchRawData();
+      await queryClient.invalidateQueries({ queryKey: getListCoursesQueryKey({ universityId: id, limit: 500 }) });
+      await queryClient.invalidateQueries({ queryKey: getGetUniversityQueryKey(id) });
     } catch (e) {
       toast({ title: "Cannot approve", description: (e as Error).message, variant: "destructive" });
     } finally {
@@ -1152,6 +1158,10 @@ export default function UniversityDetail() {
       variant: failed > 0 && succeeded === 0 ? "destructive" : "default",
     });
     await fetchRawData();
+    if (succeeded > 0) {
+      await queryClient.invalidateQueries({ queryKey: getListCoursesQueryKey({ universityId: id, limit: 500 }) });
+      await queryClient.invalidateQueries({ queryKey: getGetUniversityQueryKey(id) });
+    }
     setImportingAll(false);
   }
 
