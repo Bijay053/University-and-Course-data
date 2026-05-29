@@ -48,7 +48,7 @@ const COUNTRIES = [
 ];
 
 
-type Tab = "courses" | "english" | "academic" | "scholarships" | "assessment" | "rawdata";
+type Tab = "courses" | "english" | "academic" | "scholarships" | "assessment" | "rawdata" | "locations";
 
 const DEGREE_COLORS: Record<string, string> = {
   Bachelor: "bg-blue-100 text-blue-700",
@@ -989,6 +989,82 @@ export default function UniversityDetail() {
   const pendingCount = rawData.filter((c) => c.status === "pending").length;
   const approvedCount = rawData.filter((c) => c.status === "approved").length;
 
+  // ── Locations tab state ───────────────────────────────────────────────────
+  type ULocation = {
+    id: number; universityId: number; displayName: string; fullAddress: string | null;
+    city: string | null; stateRegion: string | null; country: string | null;
+    latitude: number | null; longitude: number | null; courseCount: number; isVerified: boolean;
+  };
+  const [locations, setLocations] = useState<ULocation[]>([]);
+  const [locsLoading, setLocsLoading] = useState(false);
+  const [locsSyncing, setLocsSyncing] = useState(false);
+  const [locsGeocodingId, setLocsGeocodingId] = useState<number | null>(null);
+  const [locsEditId, setLocsEditId] = useState<number | null>(null);
+  const [locsEditForm, setLocsEditForm] = useState<Partial<ULocation>>({});
+
+  const fetchLocations = useCallback(async () => {
+    if (!id) return;
+    setLocsLoading(true);
+    try {
+      const res = await fetch(`${BASE}/api/universities/${id}/locations`, { credentials: "include" });
+      if (res.ok) setLocations(await res.json());
+    } catch { /* ignore */ } finally { setLocsLoading(false); }
+  }, [id]);
+
+  useEffect(() => { if (tab === "locations") fetchLocations(); }, [tab, fetchLocations]);
+
+  const syncLocations = async () => {
+    if (!id) return;
+    setLocsSyncing(true);
+    try {
+      const res = await fetch(`${BASE}/api/universities/${id}/locations/sync`, { method: "POST", credentials: "include" });
+      if (!res.ok) throw new Error(await res.text());
+      const d = await res.json() as { added: number; updated: number; total: number };
+      toast({ title: "Locations synced", description: `${d.added} added, ${d.updated} updated, ${d.total} total` });
+      await fetchLocations();
+    } catch (e) { toast({ title: "Sync failed", description: String(e), variant: "destructive" }); }
+    finally { setLocsSyncing(false); }
+  };
+
+  const geocodeLocation = async (locId: number) => {
+    if (!id) return;
+    setLocsGeocodingId(locId);
+    try {
+      const res = await fetch(`${BASE}/api/universities/${id}/locations/${locId}/geocode`, { method: "POST", credentials: "include" });
+      if (!res.ok) throw new Error(await res.text());
+      const updated = await res.json() as ULocation;
+      setLocations((prev) => prev.map((l) => l.id === locId ? updated : l));
+      toast({ title: "Geocoded", description: `${updated.fullAddress ?? updated.displayName}` });
+    } catch (e) { toast({ title: "Geocode failed", description: String(e), variant: "destructive" }); }
+    finally { setLocsGeocodingId(null); }
+  };
+
+  const saveLocationEdit = async () => {
+    if (!id || locsEditId === null) return;
+    try {
+      const res = await fetch(`${BASE}/api/universities/${id}/locations/${locsEditId}`, {
+        method: "PATCH", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(locsEditForm),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const updated = await res.json() as ULocation;
+      setLocations((prev) => prev.map((l) => l.id === locsEditId ? updated : l));
+      setLocsEditId(null);
+      toast({ title: "Location saved" });
+    } catch (e) { toast({ title: "Save failed", description: String(e), variant: "destructive" }); }
+  };
+
+  const deleteLocation = async (locId: number) => {
+    if (!id) return;
+    try {
+      const res = await fetch(`${BASE}/api/universities/${id}/locations/${locId}`, { method: "DELETE", credentials: "include" });
+      if (!res.ok && res.status !== 204) throw new Error(await res.text());
+      setLocations((prev) => prev.filter((l) => l.id !== locId));
+      toast({ title: "Location deleted" });
+    } catch (e) { toast({ title: "Delete failed", description: String(e), variant: "destructive" }); }
+  };
+
   async function handleApprove(courseId: number) {
     setApprovingId(courseId);
     try {
@@ -1150,6 +1226,7 @@ export default function UniversityDetail() {
     { key: "academic", label: "Academic Requirements", icon: <GraduationCap className="w-4 h-4" /> },
     { key: "scholarships", label: "Scholarships", icon: <Award className="w-4 h-4" /> },
     { key: "rawdata", label: "Raw Data", icon: <Database className="w-4 h-4" /> },
+    { key: "locations", label: "Locations", icon: <MapPin className="w-4 h-4" /> },
   ];
 
   // ── Bulk apply handler ──────────────────────────────────────────
@@ -2811,6 +2888,161 @@ export default function UniversityDetail() {
           </div>
         </div>
       )}
+
+      {/* ── LOCATIONS TAB ── */}
+      {tab === "locations" && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-semibold">Campus Locations</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Extracted from course location fields. Use "Sync" to rebuild from current courses, then "Geocode" to add coordinates.
+              </p>
+            </div>
+            <Button size="sm" variant="outline" onClick={syncLocations} disabled={locsSyncing} className="gap-1.5">
+              {locsSyncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+              {locsSyncing ? "Syncing…" : "Sync from Courses"}
+            </Button>
+          </div>
+
+          {locsLoading && (
+            <div className="py-12 text-center text-muted-foreground text-sm">Loading locations…</div>
+          )}
+
+          {!locsLoading && locations.length === 0 && (
+            <div className="py-12 text-center border rounded-xl bg-muted/20">
+              <MapPin className="w-10 h-10 mx-auto mb-3 text-muted-foreground/30" />
+              <p className="font-medium text-gray-700">No locations yet</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                Click <strong>Sync from Courses</strong> to extract campus locations from course data.
+              </p>
+            </div>
+          )}
+
+          {!locsLoading && locations.length > 0 && (
+            <div className="border rounded-xl overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 border-b text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                  <tr>
+                    <th className="px-4 py-2.5 text-left">Campus Name</th>
+                    <th className="px-4 py-2.5 text-left">City / State</th>
+                    <th className="px-4 py-2.5 text-left">Country</th>
+                    <th className="px-4 py-2.5 text-left">Coordinates</th>
+                    <th className="px-4 py-2.5 text-center">Courses</th>
+                    <th className="px-4 py-2.5 text-center">Verified</th>
+                    <th className="px-4 py-2.5 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {locations.map((loc) => (
+                    <tr key={loc.id} className="bg-white hover:bg-gray-50 transition-colors">
+                      <td className="px-4 py-2.5 font-medium text-gray-800">{loc.displayName}</td>
+                      <td className="px-4 py-2.5 text-gray-600">
+                        {[loc.city, loc.stateRegion].filter(Boolean).join(", ") || <span className="text-muted-foreground">—</span>}
+                      </td>
+                      <td className="px-4 py-2.5 text-gray-600">{loc.country ?? <span className="text-muted-foreground">—</span>}</td>
+                      <td className="px-4 py-2.5 text-xs text-gray-500 font-mono">
+                        {loc.latitude != null && loc.longitude != null
+                          ? `${loc.latitude.toFixed(4)}, ${loc.longitude.toFixed(4)}`
+                          : <span className="text-muted-foreground">—</span>}
+                      </td>
+                      <td className="px-4 py-2.5 text-center">
+                        <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-50 text-blue-700 text-xs font-semibold">{loc.courseCount}</span>
+                      </td>
+                      <td className="px-4 py-2.5 text-center">
+                        {loc.isVerified
+                          ? <Check className="w-4 h-4 text-green-600 mx-auto" />
+                          : <span className="text-muted-foreground text-xs">—</span>}
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            size="sm" variant="ghost"
+                            className="h-7 px-2 text-xs gap-1"
+                            disabled={locsGeocodingId === loc.id}
+                            onClick={() => geocodeLocation(loc.id)}
+                            title="Geocode via OpenStreetMap"
+                          >
+                            {locsGeocodingId === loc.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Globe className="w-3 h-3" />}
+                            Geocode
+                          </Button>
+                          <Button
+                            size="sm" variant="ghost"
+                            className="h-7 px-2 text-xs gap-1"
+                            onClick={() => { setLocsEditId(loc.id); setLocsEditForm({ displayName: loc.displayName, city: loc.city ?? "", stateRegion: loc.stateRegion ?? "", country: loc.country ?? "", fullAddress: loc.fullAddress ?? "", latitude: loc.latitude ?? undefined, longitude: loc.longitude ?? undefined, isVerified: loc.isVerified }); }}
+                          >
+                            <Pencil className="w-3 h-3" /> Edit
+                          </Button>
+                          <Button
+                            size="sm" variant="ghost"
+                            className="h-7 px-2 text-xs text-red-500 hover:text-red-700 hover:bg-red-50 gap-1"
+                            onClick={() => deleteLocation(loc.id)}
+                          >
+                            <Trash2 className="w-3 h-3" /> Delete
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Location Edit Dialog ── */}
+      <Dialog open={locsEditId !== null} onOpenChange={(o) => { if (!o) setLocsEditId(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MapPin className="w-4 h-4 text-blue-500" /> Edit Location
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label className="text-xs">Campus Name</Label>
+              <Input value={locsEditForm.displayName ?? ""} onChange={(e) => setLocsEditForm((f) => ({ ...f, displayName: e.target.value }))} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">City</Label>
+                <Input value={locsEditForm.city ?? ""} onChange={(e) => setLocsEditForm((f) => ({ ...f, city: e.target.value }))} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">State / Region</Label>
+                <Input value={locsEditForm.stateRegion ?? ""} onChange={(e) => setLocsEditForm((f) => ({ ...f, stateRegion: e.target.value }))} />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Country</Label>
+              <Input value={locsEditForm.country ?? ""} onChange={(e) => setLocsEditForm((f) => ({ ...f, country: e.target.value }))} />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Full Address</Label>
+              <Input value={locsEditForm.fullAddress ?? ""} onChange={(e) => setLocsEditForm((f) => ({ ...f, fullAddress: e.target.value }))} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Latitude</Label>
+                <Input type="number" step="any" value={locsEditForm.latitude ?? ""} onChange={(e) => setLocsEditForm((f) => ({ ...f, latitude: e.target.value ? parseFloat(e.target.value) : undefined }))} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Longitude</Label>
+                <Input type="number" step="any" value={locsEditForm.longitude ?? ""} onChange={(e) => setLocsEditForm((f) => ({ ...f, longitude: e.target.value ? parseFloat(e.target.value) : undefined }))} />
+              </div>
+            </div>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" checked={locsEditForm.isVerified ?? false} onChange={(e) => setLocsEditForm((f) => ({ ...f, isVerified: e.target.checked }))} className="rounded" />
+              <span className="text-sm">Mark as verified</span>
+            </label>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setLocsEditId(null)}>Cancel</Button>
+            <Button onClick={saveLocationEdit}>Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* ── Duplicate Country Conflict Warning ── */}
       {conflictWarning && (
