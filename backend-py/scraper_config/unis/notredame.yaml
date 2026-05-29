@@ -37,6 +37,7 @@ discovery:
   use_wayback: true
   use_stealth_browser: false
   always_sitemap_supplement: false
+  scrape_do_fallback: true   # Cloudflare Enterprise blocks all DC IPs; residential proxy bypasses it
 
 extraction:
   fees:
