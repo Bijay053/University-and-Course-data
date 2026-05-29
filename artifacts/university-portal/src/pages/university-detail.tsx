@@ -2892,7 +2892,7 @@ export default function UniversityDetail() {
       {/* ── LOCATIONS TAB ── */}
       {tab === "locations" && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between rounded-xl border bg-card px-5 py-4 shadow-sm">
             <div>
               <h2 className="text-base font-semibold">Campus Locations</h2>
               <p className="text-xs text-muted-foreground mt-0.5">
