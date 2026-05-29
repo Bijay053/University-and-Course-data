@@ -193,14 +193,14 @@ _HOST_EXTRA_SEEDS: dict[str, list[str]] = {
     # The cross-domain filter in _process_links is relaxed for seed hosts so
     # courses.hud.ac.uk/* links are accepted (see _allowed_hosts below).
     "www.hud.ac.uk": [
-        "https://courses.hud.ac.uk/",
-        "https://courses.hud.ac.uk/undergraduate",
-        "https://courses.hud.ac.uk/postgraduate",
+        "https://courses.hud.ac.uk/2025-26/",
+        "https://courses.hud.ac.uk/2025-26/undergraduate/",
+        "https://courses.hud.ac.uk/2025-26/postgraduate/",
     ],
     "hud.ac.uk": [
-        "https://courses.hud.ac.uk/",
-        "https://courses.hud.ac.uk/undergraduate",
-        "https://courses.hud.ac.uk/postgraduate",
+        "https://courses.hud.ac.uk/2025-26/",
+        "https://courses.hud.ac.uk/2025-26/undergraduate/",
+        "https://courses.hud.ac.uk/2025-26/postgraduate/",
     ],
     # Queensland University of Technology (QUT) — uni_id 1011.
     # Cloudflare-walled (HTTP 403 for plain BFS) + JS-rendered SPA shells +
