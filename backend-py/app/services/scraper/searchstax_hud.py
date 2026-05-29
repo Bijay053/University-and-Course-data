@@ -53,20 +53,37 @@ _FIELDS = (
 _UG_BANDS: list[tuple[int, list[str]]] = [
     (18700, [
         "midwifery", "physiotherapy", "podiatry", "occupational therapy",
-        "operating department practice",
+        "operating department practice", "perioperative",
+        "nursing", "paramedic", "paramedic practice", "paramedic science",
+        "radiography", "diagnostic radiography", "therapeutic radiography",
+        "dental hygiene", "dental therapy", "dental",
+        "orthoptics", "audiology",
+        "speech and language therapy",
+        "operating department",
     ]),
     (17600, [
         "computing", "engineering", "games development", "mathematics",
         "music", "social work", "geography", "science", "biological",
-        "chemistry", "forensic", "pharmacy", "optometry",
+        "chemistry", "forensic", "pharmacy", "pharmacology", "optometry",
+        "biochemistry", "biomedical", "biomedicine",
+        "biology", "genetics", "microbiology", "immunology", "neuroscience",
+        "analytical", "data science",
+        "computer science", "cyber security", "information technology",
+        "software", "electronic", "electrical", "mechanical", "civil",
+        "chemical", "environmental", "architectural",
     ]),
     (16500, [
         "accountancy", "finance", "business", "economics", "events",
         "hospitality", "law", "logistics", "marketing", "tourism",
+        "trade", "international trade", "international relations",
         "education", "health", "psychology", "social sciences", "sport",
         "youth and community", "architecture", "art", "design", "drama",
         "english", "fashion", "journalism", "media", "history", "music",
-        "music technology",
+        "music technology", "counselling", "criminology", "criminal justice",
+        "crime", "policing", "quantity surveying", "construction", "surveying",
+        "photography", "animation", "film", "graphic", "illustration",
+        "product design", "product innovation", "interior", "textile",
+        "tesol", "teaching english", "teacher", "languages",
     ]),
 ]
 _PG_BANDS: list[tuple[int, list[str]]] = [
@@ -75,21 +92,34 @@ _PG_BANDS: list[tuple[int, list[str]]] = [
         "health studies", "public health", "biological", "chemistry",
         "forensic", "podiatry", "computing", "engineering", "mathematics",
         "music technology", "sound production msc", "science",
+        "nursing", "clinical pharmacy", "pharmacy", "pharmacology", "paramedic",
+        "radiography", "dental", "physiotherapy", "occupational therapy",
+        "perioperative", "audiology", "speech and language", "biomedical",
+        "biomedicine", "biology", "genetics", "microbiology", "biochemistry",
+        "analytical", "data science", "computer science", "cyber security",
+        "information technology", "software", "electronic", "electrical",
+        "mechanical", "civil", "chemical", "automotive", "advanced project",
+        "advanced practice", "clinical", "investigative psychology",
     ]),
     (17600, [
         "architecture", "art", "design", "drama", "english", "fashion",
         "history", "journalism", "media", "musicology", "music technology",
         "sound production", "education", "psychology", "social sciences",
         "social work", "sport", "youth and community",
-        "health and human sciences",
+        "health and human sciences", "counselling", "criminology",
+        "criminal justice", "crime", "policing", "animation", "film",
+        "creative music", "costume", "fine art",
+        "illustration", "photography", "textile",
     ]),
     (16500, [
         "accountancy", "finance", "business", "economics", "events",
         "hospitality", "law", "logistics", "marketing", "tourism",
-        "education", "health", "psychology", "social sciences", "sport",
-        "youth and community", "architecture", "art", "design", "drama",
-        "english", "fashion", "journalism", "media", "history", "music",
-        "music technology",
+        "trade", "international", "quantity surveying", "construction",
+        "housing", "leadership", "management", "information systems",
+        "intelligence and analytics", "banking", "accounting",
+        "strategic", "project management",
+        "career development", "employability",
+        "tesol", "teaching english", "teacher",
     ]),
 ]
 
@@ -316,6 +346,22 @@ def _map_doc(doc: dict, cfg: SearchStaxConfig) -> Optional[dict]:
     raw_title = _first(doc.get("h1")) or _first(doc.get("searchTitle")) or ""
     study_level = _first(doc.get("study_level_s")) or ""
 
+    # ── Flags-based filters ──────────────────────────────────────────────────
+    flags: list[str] = list(doc.get("flags_list_ss") or [])
+
+    # Apprenticeship = UK employer-funded scheme; never open to international
+    # visa students.
+    if "Apprenticeship" in flags:
+        log.info("[SEARCHSTAX] skip (apprenticeship): %r", raw_title)
+        return None
+
+    # Research Degree stubs (MRes / MPhil by-research entries) have no
+    # structured fee / IELTS / intake data in Solr — they map to 31%
+    # completeness and are not actionable for international admissions.
+    if "Research Degree" in flags:
+        log.info("[SEARCHSTAX] skip (research degree stub): %r", raw_title)
+        return None
+
     name, degree_level = _reformat_name(raw_title, study_level)
     if not name:
         log.info("[SEARCHSTAX] skip (unclassifiable title): %r", raw_title)
@@ -323,6 +369,15 @@ def _map_doc(doc: dict, cfg: SearchStaxConfig) -> Optional[dict]:
 
     duration_t = _first(doc.get("duration_t")) or ""
     duration, duration_term, study_mode = _parse_duration(duration_t)
+
+    # ── Part-time on-campus filter ────────────────────────────────────────────
+    # UK Student Visa requires full-time study. On-campus part-time courses are
+    # therefore domestic-only. Distance-learning part-time courses can be
+    # studied from abroad and are kept.
+    is_distance = "Distance Learning" in flags
+    if study_mode == "Part-time" and not is_distance:
+        log.info("[SEARCHSTAX] skip (part-time on-campus, domestic only): %r", raw_title)
+        return None
     intakes = _parse_intakes(_first(doc.get("start_dates_s")) or "")
     content = _first(doc.get("content")) or ""
     ielts_overall, ielts_band, ielts_snippet = _extract_ielts(content)
