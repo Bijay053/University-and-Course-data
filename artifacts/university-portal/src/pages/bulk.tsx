@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { readResponseJson } from "@/lib/readResponseJson";
 import { Can } from "@/components/can";
+import { CountrySelect } from "@/components/country-select";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type ImportResult = {
@@ -915,7 +916,9 @@ export default function Bulk() {
                 </div>
                 <div>
                   <Label>Country</Label>
-                  <Input className="mt-1" placeholder="e.g. United Kingdom" value={newUniCountry} onChange={(e) => setNewUniCountry(e.target.value)} />
+                  <div className="mt-1">
+                    <CountrySelect value={newUniCountry} onChange={setNewUniCountry} className="h-9" />
+                  </div>
                 </div>
                 <div>
                   <Label>City</Label>
