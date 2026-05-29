@@ -427,6 +427,26 @@ class DurationCleaningConfig(BaseModel):
             "compound patterns like 'X years / Y subjects / Z trimesters'."
         ),
     )
+    reject_sentence_patterns: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Regex patterns (case-insensitive) applied to each candidate sentence "
+            "before it enters the duration tournament.  Any sentence matching one "
+            "of these patterns is skipped entirely — it contributes no candidates. "
+            "Also applied to the raw value text of any structural DOM match "
+            "(strong/dt/th) so that a labeled 'Duration' cell whose value reads "
+            "'up to N years' (a max-completion-time phrase) is not returned early "
+            "as the program duration.\n\n"
+            "Use when a university's pages expose maximum-completion-time or "
+            "candidature-cap text using phrasing that the global "
+            "_DURATION_RESEARCH_CAP_RE and _DURATION_ANTI_CONTEXT filters don't "
+            "catch — e.g. 'up to 10 years to complete' or 'up to 35 months'.\n\n"
+            "Patterns are compiled with re.IGNORECASE.  Empty by default — no "
+            "sentences are rejected.  Do NOT replicate global anti-context patterns "
+            "here; only add patterns that are specific to this university's CMS "
+            "phrasing and would create false positives on other universities."
+        ),
+    )
 
 
 class FieldOverride(BaseModel):

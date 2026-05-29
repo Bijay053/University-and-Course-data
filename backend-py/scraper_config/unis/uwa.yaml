@@ -50,6 +50,26 @@ extraction:
     # central fee page, so the no_international_fee gate passes them into the
     # review queue (international_fee=None) instead of rejecting them.
     force_central_fee_stage: true
+  text_cleaning:
+    location:
+      # UWA's "Frontier Physics" course page (and potentially others) outputs a
+      # spurious "TENDANCE Full-time, part-time" fragment in the location field.
+      # Root cause: the CMS renders "ATTENDANCE" with "AT" inside a CSS-hidden
+      # span, so html_to_text sees only "TENDANCE" followed by the delivery-mode
+      # text that immediately follows the Attendance label.  Strip from "TENDANCE"
+      # onwards so only the real campus name (Perth, WA) survives.
+      strip_patterns:
+        - "\\s*TENDANCE[^,]*"
+    duration:
+      # UWA exposes max-completion-time values on some course pages:
+      #   Doctor of Medicine: "up to 10 years" (standard = 4-6 years)
+      #   MBA: "up to 35 months" (standard ≈ 18-24 months)
+      # These phrases escape the global _DURATION_RESEARCH_CAP_RE filter which
+      # targets "maximum candidature / maximum completion time" vocabulary.
+      # Reject any sentence (or DOM-cell value) that reads "up to N years/months"
+      # so the real labeled duration (when present) wins the tournament.
+      reject_sentence_patterns:
+        - "\\bup\\s+to\\s+\\d+(?:\\.\\d+)?\\s+(?:years?|months?)\\b"
   filters:
     domestic_only:
       enabled: false

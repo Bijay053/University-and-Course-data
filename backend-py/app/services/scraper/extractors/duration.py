@@ -577,6 +577,25 @@ def _from_qut_quickbox(html: str, url: str) -> tuple[tuple[float, str], str] | N
 
 
 async def extract(html: str, url: str) -> list[ExtractionResult]:
+    # Per-uni: load reject_sentence_patterns from the contextvar set by
+    # set_uni_config() before extraction runs.  These are compiled once
+    # here and applied in two places below:
+    #   1. Structural pre-pass — if the DOM-cell value matches, we fall
+    #      through to the sentence tournament instead of returning early.
+    #   2. Sentence tournament — any sentence matching a pattern is skipped
+    #      entirely (same effect as the global _ACCELERATED filter).
+    _uni_reject_pats: list[re.Pattern[str]] = []
+    try:
+        from app.services.scraper.config.context import get_uni_config
+        _dcfg = get_uni_config().extraction.text_cleaning.duration
+        for _p in _dcfg.reject_sentence_patterns:
+            try:
+                _uni_reject_pats.append(re.compile(_p, re.IGNORECASE))
+            except re.error:
+                pass  # invalid pattern in YAML — skip silently
+    except Exception:
+        pass  # contextvar not set or config missing — treat as empty list
+
     # QUT structural pre-pass — see _from_qut_quickbox above.  Runs BEFORE
     # the generic structural/regex cascade because QUT pages have no
     # `<strong>Duration</strong>` / `<dl>` / `<table>` duration cell that
@@ -605,6 +624,15 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
     # boundary collision with the previous field's value can't bleed
     # an unrelated `<num> <unit>` token run into the duration capture.
     structural, snippet = _extract_strong_label_value(html)
+    # Per-uni: if the structural DOM-cell text matches a configured reject
+    # pattern (e.g. "up to 10 years" = max-completion-time, not standard
+    # duration), discard the structural result and fall through to the
+    # sentence tournament so the real labeled duration can be found instead.
+    if structural is not None and _uni_reject_pats:
+        raw_cell = snippet or ""
+        if any(_pat.search(raw_cell) for _pat in _uni_reject_pats):
+            structural = None
+            snippet = None
     if structural is not None:
         amount, unit = structural
         amount, unit = _convert_weeks(amount, unit)  # Issue 4: week→year/month
@@ -686,6 +714,19 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
     for s in sentences:
         if _ACCELERATED.search(s):
             continue
+        # Per-uni: strip reject_sentence_pattern fragments from the sentence
+        # before it enters the tournament.  We strip rather than skip so that
+        # a page where "up to N years" and "M year program" appear in the same
+        # text block (e.g. when html_to_text collapses multiple block elements
+        # into one long line) still extracts the correct M-year duration.
+        # Example: "Duration up to 10 years The Doctor of Medicine is a 4 year
+        #            program..." → strip "up to 10 years" → "4 year" wins.
+        if _uni_reject_pats:
+            for _rp in _uni_reject_pats:
+                s = _rp.sub("", s)
+            s = re.sub(r"\s{2,}", " ", s).strip()
+            if not s:
+                continue
         # Flag sentences about research degree candidature caps, part-time
         # equivalents, and research periods.  These have large numbers
         # (e.g. "maximum candidature: 8 years", "part-time equivalent: 8 years")
