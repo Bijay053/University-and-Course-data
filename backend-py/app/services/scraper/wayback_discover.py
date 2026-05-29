@@ -97,6 +97,17 @@ _HOST_CDX_URL_PREFIX: dict[str, str] = {
     # ~75 % of /courses/<slug> URLs that the live site cannot enumerate.
     "www.qut.edu.au": "www.qut.edu.au/courses/*",
     "qut.edu.au": "www.qut.edu.au/courses/*",
+    # Notre Dame Australia: course pages live at /programs/<school>/<level>/<slug>
+    # (confirmed real URL: /programs/arts-and-sciences/postgraduate/master-of-architecture).
+    # The site is fully Cloudflare Enterprise Bot Management protected (HTTP 403 for
+    # plain httpx, curl_cffi, and patchright+Xvfb — IP-level block from datacenter).
+    # Wayback CDX with the top-level wildcard returns 10 000 mixed URLs sorted in
+    # SURT order — paths like /about/, /careers/, /contact/ sort before /programs/
+    # and exhaust the 10 000-row limit, leaving 0 slots for course pages.
+    # Targeting /programs/* returns only the course subtree; faculty-level landings
+    # (/programs/arts-and-sciences/) are rejected by _is_category_landing() downstream.
+    "www.notredame.edu.au": "www.notredame.edu.au/programs/*",
+    "notredame.edu.au": "www.notredame.edu.au/programs/*",
 }
 
 

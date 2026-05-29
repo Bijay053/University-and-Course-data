@@ -1,34 +1,42 @@
 # University of Notre Dame Australia
 # Hostname: www.notredame.edu.au
 #
-# BLOCKER — Cloudflare Enterprise Bot Management (IP-level block)
-# ==============================================================
+# Cloudflare Enterprise Bot Management — IP-level block
+# ======================================================
 # Notre Dame runs Cloudflare Enterprise with Bot Management, which blocks
 # all cloud datacenter IPs (AWS, GCP, Hetzner, DigitalOcean, Replit, etc.)
-# at the network layer — regardless of browser fingerprinting or stealth
+# at the network layer, regardless of browser fingerprinting or stealth
 # configuration.  Verified 2026-05-29:
 #
 #   curl -I (Chrome UA)          → HTTP 403, cf-mitigated: challenge
 #   curl_cffi chrome124          → HTTP 403  (TLS impersonation not enough)
 #   patchright + Xvfb headed     → HTTP 403  (IP blocked before JS runs)
 #
-# Course URL pattern (confirmed from real URL):
-#   www.notredame.edu.au/programs/<faculty>/<level>/<slug>
+# SOLUTION (implemented 2026-05-29) — fully free, no paid proxy needed:
+# -----------------------------------------------------------------------
+# 1. DISCOVERY via Wayback CDX:
+#    CDX prefix "www.notredame.edu.au/programs/*" returns real course URLs
+#    (e.g. /programs/arts-and-sciences/postgraduate/master-of-architecture).
+#    The top-level wildcard /* was broken — non-course pages (/about/,
+#    /careers/, /contact/, …) exhausted the 10 000-row CDX limit in SURT
+#    order before any /programs/ URLs were returned (0 course URLs found).
+#    Targeting /programs/* yields ~150 course pages directly.
+#    Configured via _HOST_CDX_URL_PREFIX in wayback_discover.py.
+#
+# 2. EXTRACTION via Wayback archived HTML:
+#    fetch_html() → httpx 403 → curl_cffi 403 → fetch_html_wayback()
+#    CDX lookup finds most-recent snapshot timestamp, then fetches
+#    https://web.archive.org/web/{timestamp}id_/{url} (raw HTML, no toolbar).
+#    Archived data is typically 1-4 weeks old — acceptable for stable
+#    course-catalogue content (degree names, fee tables, IELTS requirements).
+#
+# Course URL pattern: www.notredame.edu.au/programs/<faculty>/<level>/<slug>
 #   e.g. /programs/arts-and-sciences/postgraduate/master-of-architecture
-#
-# Fix options (in order of effort):
-#   1. Run the scraper from a residential IP (home broadband / mobile hotspot)
-#      — not possible from Replit/DigitalOcean.
-#   2. Residential proxy service (ScraperAPI, Brightdata, Zyte) — paid.
-#   3. Manual data entry for ~150-200 courses.
-#   4. Contact Notre Dame IT for a crawler whitelist / API access.
-#
-# DO NOT attempt another automated scrape until one of the above is resolved.
-# The YAML below is kept for when a fix is available.
 
 discovery:
-  use_stealth_browser: true
-  always_sitemap_supplement: true
+  use_wayback: true
+  use_stealth_browser: false
+  always_sitemap_supplement: false
 
 extraction:
   fees:

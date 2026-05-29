@@ -3,16 +3,25 @@
 Used by extractors when JS rendering isn't required (most fee/intake pages).
 Falls back to ``BrowserPool`` for SPAs.
 
-Cloudflare bypass (free, no API key):
---------------------------------------
-When httpx receives HTTP 403 with Cloudflare signatures (``cf-mitigated``
-header or ``server: cloudflare``), we automatically retry the request using
-``curl_cffi`` with Chrome TLS impersonation.  Cloudflare blocks scrapers at
-the TLS handshake level — Python's standard SSL library emits a different JA3
-fingerprint than a real Chrome browser.  ``curl_cffi`` patches libcurl to send
-the exact TLS ClientHello Chrome 124 uses, which passes the fingerprint check
-without spawning any browser process.  Cost: zero.  Overhead: ~50-200 ms per
-page (vs 3-5 s for Xvfb/patchright).
+Cloudflare bypass (free, no API key) — three-tier fallback:
+------------------------------------------------------------
+1. ``httpx`` with browser UA/Accept headers.  Works for most sites.
+2. ``curl_cffi`` Chrome TLS impersonation.  Cloudflare blocks scrapers at
+   the TLS handshake level — Python's standard SSL library emits a different
+   JA3 fingerprint than a real Chrome browser.  ``curl_cffi`` patches libcurl
+   to send the exact TLS ClientHello Chrome 124 uses, which passes the
+   fingerprint check without spawning any browser process.  Cost: zero.
+   Overhead: ~50-200 ms per page.  Handles TLS-fingerprint-only CF protection.
+3. ``fetch_html_wayback`` — Wayback Machine archived HTML.  Some sites (e.g.
+   Notre Dame Australia) use Cloudflare Enterprise Bot Management that blocks
+   at the IP/ASN level regardless of TLS fingerprint — datacenter IPs from
+   Replit or DigitalOcean receive HTTP 403 no matter what we send.  For these,
+   we fall back to the Internet Archive's CDX API to find the most recent
+   snapshot of the URL, then fetch the raw archived HTML (via the ``id_``
+   Wayback modifier that strips the IA toolbar and returns clean HTML).  The
+   archived data may be weeks/months old, but for stable course-catalogue
+   content this is usually acceptable and far better than returning nothing.
+   Cost: zero.  Overhead: two HTTP calls to archive.org (~1-3 s).
 """
 from __future__ import annotations
 
@@ -87,6 +96,82 @@ async def fetch_html_cffi(url: str) -> str | None:
         return None
 
 
+async def fetch_html_wayback(url: str) -> str | None:
+    """Fetch archived HTML from Wayback Machine (last-resort for IP-blocked sites).
+
+    Two-step process:
+    1.  Wayback Availability API — a single fast call to
+        ``https://archive.org/wayback/available?url=<url>`` returns the
+        closest archived snapshot URL and timestamp.  Much faster than the
+        CDX search API (~0.5 s vs 5-20 s under CDX load).
+    2.  Raw HTML fetch — retrieve the archived page via the ``id_`` Wayback
+        modifier (inserted before the original URL in the snapshot URL), which
+        strips the IA toolbar and returns clean HTML identical to what the
+        original server returned.
+
+    Suitable for sites like Notre Dame Australia where Cloudflare Enterprise
+    Bot Management blocks all datacenter IPs at the IP/ASN level — httpx and
+    curl_cffi both receive HTTP 403 regardless of TLS fingerprint.  archive.org
+    is not behind the university's Cloudflare zone so we can always reach it.
+
+    The archived HTML may be weeks-to-months old.  For stable course-catalogue
+    content (degree names, fee tables, English requirements) this is usually
+    acceptable and far better than returning nothing.  The extraction pipeline
+    records ``extraction_method`` so operators can see which courses were
+    sourced from Wayback vs the live site.
+
+    Returns response text on success, ``None`` on any failure (so the caller
+    can fall through to the browser pool).
+    """
+    _AVAIL_ENDPOINT = "https://archive.org/wayback/available"
+
+    # Step 1: Wayback Availability API — find the most recent snapshot URL.
+    try:
+        async with httpx.AsyncClient(timeout=30, follow_redirects=True) as c:
+            avail_r = await c.get(_AVAIL_ENDPOINT, params={"url": url})
+            if avail_r.status_code != 200:
+                log.info(
+                    "wayback fetch: Availability API returned %s for %s",
+                    avail_r.status_code, url,
+                )
+                return None
+            data = avail_r.json()
+            closest = data.get("archived_snapshots", {}).get("closest", {})
+            if not closest or not closest.get("available"):
+                log.info("wayback fetch: no archived snapshot found for %s", url)
+                return None
+            snapshot_url: str = closest["url"]          # e.g. http://web.archive.org/web/20251207034520/https://...
+            timestamp: str = closest.get("timestamp", "?")
+    except Exception as exc:
+        log.warning("wayback fetch: Availability API failed for %s: %s", url, exc)
+        return None
+
+    # Step 2: retrieve raw archived HTML.
+    # The Availability API returns a URL like:
+    #   http://web.archive.org/web/20251207034520/https://...
+    # Inserting "id_" after the timestamp returns the raw HTML without the
+    # Wayback toolbar (same content the original server served at that moment).
+    raw_url = snapshot_url.replace(
+        f"/web/{timestamp}/", f"/web/{timestamp}id_/", 1
+    )
+    try:
+        async with httpx.AsyncClient(timeout=60, follow_redirects=True) as c:
+            r = await c.get(raw_url, headers={"User-Agent": _BROWSER_UA})
+            if r.status_code == 200:
+                log.info(
+                    "wayback fetch %s -> 200 (snapshot %s, %d chars)",
+                    url, timestamp, len(r.text),
+                )
+                return r.text
+            log.warning(
+                "wayback fetch %s -> %s (snapshot %s)", url, r.status_code, timestamp
+            )
+            return None
+    except Exception as exc:
+        log.warning("wayback fetch %s failed: %s", url, exc)
+        return None
+
+
 @asynccontextmanager
 async def _client():
     async with httpx.AsyncClient(
@@ -131,7 +216,16 @@ async def fetch_html(url: str, *, retries: int = 2) -> str | None:
         await asyncio.sleep(1.5 * (attempt + 1))
 
     if got_cloudflare_block:
-        return await fetch_html_cffi(url)
+        cffi_result = await fetch_html_cffi(url)
+        if cffi_result is not None:
+            return cffi_result
+        # curl_cffi also blocked (IP/ASN-level block — TLS fingerprint is not
+        # the issue).  Last resort: fetch archived HTML from Wayback Machine.
+        log.info(
+            "fetch %s: curl_cffi also blocked — trying Wayback Machine archived HTML",
+            url,
+        )
+        return await fetch_html_wayback(url)
 
     if last_exc:
         log.error("fetch %s exhausted retries: %s", url, last_exc)
