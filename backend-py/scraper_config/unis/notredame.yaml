@@ -1,0 +1,18 @@
+# university of notre dame
+# Hostname: www.notredame.edu.au
+#
+# Bug history / rationale:
+#     - Site returns HTTP 403 to plain HTTP probes (Cloudflare/WAF). Stealth browser mode enabled.
+discovery:
+  use_stealth_browser: true  # Site returned HTTP 403 (WAF/Cloudflare) — plain HTTP probes are blocked; stealth Playwright bypasses it
+  always_sitemap_supplement: true  # WAF-protected sites are usually SPAs; sitemap is more reliable than BFS
+extraction:
+  fees:
+    default_currency: "AUD"
+  filters:
+    domestic_only:
+      enabled: false  # SAFE DEFAULT — only set true if you have confirmed the site serves ONLY domestic courses
+    online_only:
+      enabled: false  # set true only for distance-education-only institutions
+
+Operator notes: none.
