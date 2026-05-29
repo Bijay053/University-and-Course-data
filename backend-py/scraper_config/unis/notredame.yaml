@@ -41,6 +41,15 @@ discovery:
 extraction:
   fees:
     default_currency: "AUD"
+    # Notre Dame publishes fees via a JavaScript calculator on a central fee
+    # page (/study/fees-costs-and-scholarships/tuition-fees) — not embedded
+    # in individual course pages.  The archived static HTML of that page has
+    # no structured table (0 rows), so per-course fee extraction always fails.
+    # Setting force_central_fee_stage=true marks every course payload with
+    # has_central_fee_page=True so courses bypass the no_international_fee
+    # staging-gate reject and land in the review queue instead.
+    force_central_fee_stage: true
+    central_page: "https://www.notredame.edu.au/study/fees-costs-and-scholarships/tuition-fees"
   filters:
     domestic_only:
       enabled: false
