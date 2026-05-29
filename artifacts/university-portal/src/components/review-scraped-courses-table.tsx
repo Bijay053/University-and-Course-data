@@ -373,7 +373,7 @@ export function ReviewScrapedCoursesTable({ courses, readOnly, showEvidence }: P
         <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b">
             <tr>
-              {showEvidence ? <th className="p-2 w-8" /> : null}
+              {showEvidence ? <th className="p-2 text-xs font-medium text-slate-500 text-center whitespace-nowrap">Evidence</th> : null}
               <th className="text-left p-2 font-medium text-gray-600 min-w-[200px]">Course Name</th>
               <th className="text-center p-2 font-medium text-gray-600 w-16">Score</th>
               <th className="text-left p-2 font-medium text-gray-600">Level</th>
@@ -397,37 +397,39 @@ export function ReviewScrapedCoursesTable({ courses, readOnly, showEvidence }: P
                 <Fragment key={course.id}>
                   <tr className="hover:bg-gray-50">
                     {showEvidence ? (
-                      <td className="p-1 align-top">
+                      <td className="p-1 align-top text-center">
                         <Button
-                          size="icon"
+                          size="sm"
                           variant="ghost"
-                          className="h-6 w-6 text-slate-500 hover:bg-slate-100"
+                          className={`h-7 px-2 text-xs font-medium gap-1 ${evidenceCount > 0 ? "text-blue-600 hover:bg-blue-50 hover:text-blue-700" : "text-slate-300 cursor-not-allowed"}`}
                           onClick={() => toggle(course.id)}
                           title={`${isOpen ? "Hide" : "Show"} ${evidenceCount} evidence row${evidenceCount === 1 ? "" : "s"}`}
                           disabled={evidenceCount === 0}
                         >
-                          {isOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                          {isOpen ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                          {evidenceCount > 0 ? `${evidenceCount}` : "—"}
                         </Button>
                       </td>
                     ) : null}
                     <td className="p-2 align-top">
-                      <div className="flex items-start gap-1 min-w-[280px] max-w-[420px]">
+                      <div className="min-w-[280px] max-w-[420px]">
                         <span className="font-medium text-gray-800 break-words" title={course.courseName ?? undefined}>
                           {course.courseName ?? "—"}
                         </span>
-                        {course.courseWebsite && (
-                          <a
-                            href={course.courseWebsite}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            title={`Verify: ${course.courseWebsite}`}
-                            className="flex-shrink-0 text-blue-400 hover:text-blue-600 transition-colors mt-1"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <ExternalLink className="w-3.5 h-3.5" />
-                          </a>
-                        )}
                       </div>
+                      {course.courseWebsite && (
+                        <a
+                          href={course.courseWebsite}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title={course.courseWebsite}
+                          className="inline-flex items-center gap-1 text-[11px] text-blue-500 hover:text-blue-700 hover:underline mt-0.5 max-w-[420px] truncate"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <ExternalLink className="w-2.5 h-2.5 flex-shrink-0" />
+                          <span className="truncate">{course.courseWebsite.replace(/^https?:\/\//, "")}</span>
+                        </a>
+                      )}
                       {course.category && (
                         <div className="text-xs text-gray-400 break-words">{course.category}</div>
                       )}

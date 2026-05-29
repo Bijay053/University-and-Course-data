@@ -387,6 +387,7 @@ def _map_doc(doc: dict, cfg: SearchStaxConfig) -> Optional[dict]:
         "course_name": name,
         "degree_level": degree_level,
         "course_location": "Huddersfield",
+        "course_website": url,
         "description": _build_description(content, name),
         "has_central_fee_page": True,
     }
