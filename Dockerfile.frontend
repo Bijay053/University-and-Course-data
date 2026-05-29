@@ -1,0 +1,34 @@
+
+     
+FROM node:24-alpine
+
+WORKDIR /app
+RUN npm install -g serve
+COPY --from=builder /frontend/artifacts/university-portal/dist ./dist
+EXPOSE 5173
+# CMD ["serve", "-s", "dist", "-l", "5173"]
+CMD ["npm", "run", "dev", "--", "--host"]
+
+FROM node:24
+
+WORKDIR /frontend
+
+RUN npm install -g pnpm@10
+
+# Copy configuration files
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml tsconfig.* ./
+COPY artifacts ./artifacts
+COPY lib ./lib
+COPY scripts ./scripts
+COPY attached_assets ./attached_assets
+     
+# Install ALL dependencies (including Vite)
+RUN pnpm install --ignore-scripts
+
+# Set the working directory directly to your web project app
+WORKDIR /frontend/artifacts/university-portal
+
+EXPOSE 5173
+
+# Run the live-reloading development server
+# CMD ["pnpm", "run", "dev", "--host"]

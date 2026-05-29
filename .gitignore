@@ -51,6 +51,8 @@ Thumbs.db
 
 # Local environment files
 .env
+.client.env
+.env.*
 .env.local
 .env.development.local
 .env.production.local
