@@ -1370,12 +1370,6 @@ export default function SettingsScraperConfigs() {
 
       if (data.git_pushed && data.git_message && !data.git_message.includes("up-to-date")) {
         toast({ title: "Saved & synced to GitHub", description: data.git_message });
-      } else if (!data.git_skipped && !data.git_pushed && data.git_message) {
-        toast({
-          title: "Saved locally — GitHub sync failed",
-          description: data.git_message,
-          variant: "destructive",
-        });
       }
       await fetchConfigs();
       setSelected(editorSlug.trim());
