@@ -37,6 +37,31 @@ from app.services.scraper.extractors.curtin_session import cookies_for_url
 log = logging.getLogger(__name__)
 _sem = asyncio.Semaphore(settings.max_http_concurrency)
 
+# Per-job Wayback timestamp cache: normalised-url → CDX timestamp string.
+# Populated by wayback_discover() during the discovery phase so that
+# fetch_html_wayback() can use the exact timestamp from the CDX index
+# instead of re-querying the Availability API (which is inconsistent —
+# it returns the "closest to now" snapshot, which may be a 404/301,
+# even when the CDX has a valid 200 snapshot at an older timestamp).
+_wayback_ts_cache: dict[str, str] = {}
+
+
+def set_wayback_timestamps(url_timestamps: dict[str, str]) -> None:
+    """Register Wayback CDX timestamps found during discovery.
+
+    Called by ``wayback_discover()`` once per scrape job.  The mapping
+    is *url → timestamp* where *url* is already in normalised
+    ``https://host/path`` form (as returned by ``_normalise_wayback_url``)
+    and *timestamp* is the 14-digit CDX timestamp string (e.g.
+    ``"20251207034443"``).
+    """
+    _wayback_ts_cache.update(url_timestamps)
+
+
+def clear_wayback_timestamps() -> None:
+    """Discard the per-job timestamp cache after the scrape finishes."""
+    _wayback_ts_cache.clear()
+
 _BROWSER_UA = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 13_5) "
     "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -123,12 +148,53 @@ async def fetch_html_wayback(url: str) -> str | None:
     Returns response text on success, ``None`` on any failure (so the caller
     can fall through to the browser pool).
     """
-    _AVAIL_ENDPOINT = "https://archive.org/wayback/available"
+    # Fast path: use the CDX timestamp cached by wayback_discover() during
+    # the discovery phase.  This avoids the Availability API entirely, which
+    # is inconsistent — it returns the "closest to NOW" snapshot and often
+    # resolves to a 404 or 301 for URLs whose last 200 snapshot is years old,
+    # even though the CDX index has a perfectly valid 200 snapshot at that
+    # earlier timestamp.  The cache is populated with the exact timestamps
+    # that the CDX wildcard query returned, so they are guaranteed to be
+    # real 200 snapshots.
+    cached_ts = _wayback_ts_cache.get(url)
+    if cached_ts:
+        raw_url = f"https://web.archive.org/web/{cached_ts}id_/{url}"
+        try:
+            async with httpx.AsyncClient(timeout=60, follow_redirects=True) as c:
+                r = await c.get(raw_url, headers={"User-Agent": _BROWSER_UA})
+                if r.status_code == 200:
+                    log.info(
+                        "wayback fetch %s -> 200 (CDX-cached snapshot %s, %d chars)",
+                        url, cached_ts, len(r.text),
+                    )
+                    return r.text
+                log.warning(
+                    "wayback fetch %s -> %s (CDX-cached snapshot %s) — "
+                    "falling through to Availability API",
+                    url, r.status_code, cached_ts,
+                )
+        except Exception as exc:
+            log.warning(
+                "wayback fetch %s (CDX-cached snapshot %s) failed: %s — "
+                "falling through to Availability API",
+                url, cached_ts, exc,
+            )
 
-    # Step 1: Wayback Availability API — find the most recent snapshot URL.
+    # Slow path: Availability API lookup for URLs not in the CDX cache
+    # (e.g. PDF central pages, fee pages, or non-Wayback-discovered URLs).
+    _AVAIL_ENDPOINT = "https://archive.org/wayback/available"
     try:
         async with httpx.AsyncClient(timeout=30, follow_redirects=True) as c:
-            avail_r = await c.get(_AVAIL_ENDPOINT, params={"url": url})
+            avail_r = await c.get(
+                _AVAIL_ENDPOINT,
+                params={
+                    "url": url,
+                    # Request a snapshot close to late 2025 — well before the
+                    # usual CF Enterprise Bot Management activation window and
+                    # likely to match snapshots in the CDX index.
+                    "timestamp": "20251201000000",
+                },
+            )
             if avail_r.status_code != 200:
                 log.info(
                     "wayback fetch: Availability API returned %s for %s",
@@ -140,31 +206,25 @@ async def fetch_html_wayback(url: str) -> str | None:
             if not closest or not closest.get("available"):
                 log.info("wayback fetch: no archived snapshot found for %s", url)
                 return None
-            snapshot_url: str = closest["url"]          # e.g. http://web.archive.org/web/20251207034520/https://...
+            snapshot_url: str = closest["url"]
             timestamp: str = closest.get("timestamp", "?")
     except Exception as exc:
         log.warning("wayback fetch: Availability API failed for %s: %s", url, exc)
         return None
 
-    # Step 2: retrieve raw archived HTML.
-    # The Availability API returns a URL like:
-    #   http://web.archive.org/web/20251207034520/https://...
-    # Inserting "id_" after the timestamp returns the raw HTML without the
-    # Wayback toolbar (same content the original server served at that moment).
-    raw_url = snapshot_url.replace(
-        f"/web/{timestamp}/", f"/web/{timestamp}id_/", 1
-    )
+    raw_url = snapshot_url.replace(f"/web/{timestamp}/", f"/web/{timestamp}id_/", 1)
     try:
         async with httpx.AsyncClient(timeout=60, follow_redirects=True) as c:
             r = await c.get(raw_url, headers={"User-Agent": _BROWSER_UA})
             if r.status_code == 200:
                 log.info(
-                    "wayback fetch %s -> 200 (snapshot %s, %d chars)",
+                    "wayback fetch %s -> 200 (Availability snapshot %s, %d chars)",
                     url, timestamp, len(r.text),
                 )
                 return r.text
             log.warning(
-                "wayback fetch %s -> %s (snapshot %s)", url, r.status_code, timestamp
+                "wayback fetch %s -> %s (Availability snapshot %s)",
+                url, r.status_code, timestamp,
             )
             return None
     except Exception as exc:

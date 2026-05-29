@@ -2501,3 +2501,12 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 await _bg_task
             except (asyncio.CancelledError, Exception):  # noqa: BLE001
                 pass
+
+        # Clear the per-job Wayback timestamp cache populated by
+        # wayback_discover() so stale timestamps don't bleed into the
+        # next job on the same worker process.
+        try:
+            from app.services.scraper.http_fetcher import clear_wayback_timestamps
+            clear_wayback_timestamps()
+        except Exception:  # noqa: BLE001
+            pass

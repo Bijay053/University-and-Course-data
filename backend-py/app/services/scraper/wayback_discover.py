@@ -268,7 +268,7 @@ async def wayback_discover(
     params = {
         "url": cdx_prefix,
         "output": "json",
-        "fl": "original",
+        "fl": "original,timestamp",   # timestamp threaded to fetch_html_wayback cache
         "collapse": "urlkey",
         "filter": "statuscode:200",
         "limit": str(_CDX_MAX_RESULTS),
@@ -359,19 +359,40 @@ async def wayback_discover(
     # from the staged catalogue.
     seen: set[str] = set()
     all_results: list[dict] = []
+    # url → CDX timestamp for all 200-OK rows (used by fetch_html_wayback to
+    # skip the Availability API — see http_fetcher.set_wayback_timestamps).
+    ts_map: dict[str, str] = {}
 
     for row in rows[1:]:
         if not row:
             continue
-        url = row[0]
-        if not url:
+        raw_url = row[0] if len(row) > 0 else None
+        timestamp = row[1] if len(row) > 1 else ""
+        if not raw_url:
             continue
-        url = _normalise_wayback_url(url)
-        if url in seen:
+        norm_url = _normalise_wayback_url(raw_url)
+        # Keep the most-recent timestamp when the same URL appears more than
+        # once (should be rare after collapse=urlkey, but defensive).
+        if norm_url not in ts_map or (timestamp and timestamp > ts_map[norm_url]):
+            ts_map[norm_url] = timestamp or ""
+        if norm_url in seen:
             continue
-        seen.add(url)
-        if _looks_like_course(url, ""):
-            all_results.append({"url": url, "name": ""})
+        seen.add(norm_url)
+        if _looks_like_course(norm_url, ""):
+            all_results.append({"url": norm_url, "name": ""})
+
+    # Thread the CDX timestamps into the http_fetcher cache so extraction
+    # can fetch directly by timestamp without a round-trip to the
+    # Availability API (which has a known inconsistency for old snapshots).
+    try:
+        from app.services.scraper.http_fetcher import set_wayback_timestamps
+        set_wayback_timestamps(ts_map)
+        log.info(
+            "wayback_discover: populated Wayback timestamp cache with %d URLs for %s",
+            len(ts_map), host,
+        )
+    except Exception as _cache_exc:
+        log.warning("wayback_discover: could not populate timestamp cache: %s", _cache_exc)
 
     results = _interleave_by_degree_level(all_results, max_courses)
 
