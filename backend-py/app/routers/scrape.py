@@ -1222,7 +1222,7 @@ async def staged_one(
     # (routes/scrape.ts:6884) — older callers that expected a bare array
     # still work because the React fetch (scraping.tsx:489) treats
     # ``Array.isArray(payload)`` as the legacy branch.
-    if sc_id_or_job.startswith("job_"):
+    if not sc_id_or_job.isdigit():
         rows = (await db.execute(
             select(ScrapedCourse).where(ScrapedCourse.scrape_job_id == sc_id_or_job)
             .order_by(ScrapedCourse.created_at.desc())
