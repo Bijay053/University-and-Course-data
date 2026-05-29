@@ -2887,8 +2887,18 @@ async def extract_course(
         # completeness with intake="May", location="Melbourne", fee NULL,
         # duration NULL. Re-extracting via the browser path recovers
         # full data ($16k-20k fee, real campus, July intake).
+        # Per-uni opt-out: skip rescue for Cloudflare-Enterprise-blocked sites
+        # where Playwright is also IP-blocked (rendered=0B) — the rescue wastes
+        # 10-30 s per course with zero benefit.  Set extraction.skip_browser_rescue:
+        # true in the per-uni YAML (e.g. notredame.yaml).
+        _uc_rescue = get_uni_config()
+        _skip_rescue = (
+            _uc_rescue is not None
+            and getattr(_uc_rescue.extraction, "skip_browser_rescue", False)
+        )
         if (
             not _force
+            and not _skip_rescue
             and payload.get("international_fee") in (None, "", 0)
             and payload.get("duration") in (None, "", 0)
         ):
@@ -2906,6 +2916,11 @@ async def extract_course(
                     kind="sparse_static_rescue",
                     url=url,
                 )
+        elif _skip_rescue and payload.get("international_fee") in (None, "", 0) and payload.get("duration") in (None, "", 0):
+            log.debug(
+                "[SPARSE STATIC RESCUE] %s — skipped (skip_browser_rescue=true in YAML)",
+                url,
+            )
         browser_filled, browser_evidence, rendered_html, _override = (
             await maybe_browser_refetch(url, payload, emit=emit, force=_force)
         )

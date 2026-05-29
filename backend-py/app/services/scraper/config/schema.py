@@ -732,6 +732,19 @@ class ExtractionConfig(BaseModel):
             "missing from the crawled HTML."
         ),
     )
+    skip_browser_rescue: bool = Field(
+        default=False,
+        description=(
+            "When True, skip the sparse-static rescue browser refetch even "
+            "when both international_fee and duration are blank after the "
+            "Gemini-primary pass.  Enable for universities whose live site is "
+            "protected by Cloudflare Enterprise — Playwright is also IP-blocked "
+            "and the browser rescue wastes 10-30 s per course returning "
+            "rendered=0B.  Notre Dame is the canonical example: the rescue "
+            "adds ~30 s latency per course with zero benefit, inflating a "
+            "210-course job from ~6 minutes to 106 minutes."
+        ),
+    )
     max_parallel_fetch: Optional[int] = Field(
         default=None,
         description=(

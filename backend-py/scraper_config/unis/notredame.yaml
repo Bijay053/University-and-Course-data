@@ -54,6 +54,12 @@ extraction:
     # staging-gate reject and land in the review queue instead.
     force_central_fee_stage: true
     central_page: "https://www.notredame.edu.au/study/fees-costs-and-scholarships/tuition-fees"
+  # Skip the sparse-static rescue browser refetch.
+  # Cloudflare Enterprise blocks Playwright too (rendered=0B) — the rescue
+  # was adding ~30 s of wasted Playwright timeout per course, inflating a
+  # 210-course job from ~6 min to 106 min with zero extra data recovered.
+  skip_browser_rescue: true
+
   filters:
     domestic_only:
       enabled: false
