@@ -1160,16 +1160,48 @@ async def staged_list(
     page: int = Query(default=1, ge=1),
 ):
     from app.models import ScrapedCourse
-    stmt = select(ScrapedCourse)
-    if job_id:
-        stmt = stmt.where(ScrapedCourse.scrape_job_id == job_id)
-    if university_id:
-        stmt = stmt.where(ScrapedCourse.university_id == university_id)
-    if status_f and status_f.lower() != "all":
-        stmt = stmt.where(ScrapedCourse.status == status_f)
-    total = (await db.execute(select(func.count()).select_from(stmt.subquery()))).scalar_one()
-    stmt = stmt.order_by(desc(ScrapedCourse.created_at)).offset((page - 1) * limit).limit(limit)
-    rows = (await db.execute(stmt)).scalars().all()
+
+    # For "approved" + university view: deduplicate by course_id so the
+    # Approved count matches the live Courses count.  Every re-scrape adds a
+    # new approved row pointing to the same course_id; without dedup the
+    # Approved count grows unboundedly while live courses stay constant.
+    # Keep only the most-recent approved row per live course (max id per
+    # course_id).  Rows with course_id IS NULL (failed promotions) are kept
+    # individually as they have no live-course match yet.
+    if status_f and status_f.lower() == "approved" and university_id and not job_id:
+        latest_subq = (
+            select(func.max(ScrapedCourse.id).label("latest_id"))
+            .where(
+                ScrapedCourse.university_id == university_id,
+                ScrapedCourse.status == "approved",
+                ScrapedCourse.course_id.isnot(None),
+            )
+            .group_by(ScrapedCourse.course_id)
+        ).subquery()
+
+        stmt = select(ScrapedCourse).where(
+            ScrapedCourse.university_id == university_id,
+            ScrapedCourse.status == "approved",
+            or_(
+                ScrapedCourse.course_id.is_(None),
+                ScrapedCourse.id.in_(select(latest_subq.c.latest_id)),
+            ),
+        )
+        total = (await db.execute(select(func.count()).select_from(stmt.subquery()))).scalar_one()
+        stmt = stmt.order_by(desc(ScrapedCourse.id)).offset((page - 1) * limit).limit(limit)
+        rows = (await db.execute(stmt)).scalars().all()
+    else:
+        stmt = select(ScrapedCourse)
+        if job_id:
+            stmt = stmt.where(ScrapedCourse.scrape_job_id == job_id)
+        if university_id:
+            stmt = stmt.where(ScrapedCourse.university_id == university_id)
+        if status_f and status_f.lower() != "all":
+            stmt = stmt.where(ScrapedCourse.status == status_f)
+        total = (await db.execute(select(func.count()).select_from(stmt.subquery()))).scalar_one()
+        stmt = stmt.order_by(desc(ScrapedCourse.created_at)).offset((page - 1) * limit).limit(limit)
+        rows = (await db.execute(stmt)).scalars().all()
+
     # UI expects a bare array (Array.isArray check)
     dicts = [_staged_row_to_dict(r) for r in rows]
     await _attach_evidence_bulk(db, dicts)
