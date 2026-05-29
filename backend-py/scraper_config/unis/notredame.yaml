@@ -42,6 +42,15 @@ discovery:
   # The 60s timeout per attempt would make every page 60× slower with no benefit.
   scrape_do_fallback: false
 
+  # Restrict candidates to real course pages under /programs/.
+  # Without this, BFS adds the homepage (/) and category pages like /study
+  # and /study/our-programs/graduate-research as "course" candidates because
+  # the page classifier sees "course content present" in their HTML.
+  # The Wayback CDX is already scoped to /programs/* so all 200 archived
+  # course URLs pass this filter; only the spurious BFS additions are dropped.
+  allow_url_patterns:
+    - "/programs/.+"
+
 extraction:
   fees:
     default_currency: "AUD"
