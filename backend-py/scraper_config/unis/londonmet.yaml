@@ -67,6 +67,19 @@ discovery:
   # lifting, BFS just needs to seed the home/category structure.
 
 extraction:
+  # Skip the sparse-static rescue browser refetch.
+  # London Met's chrome scrub (londonmet_chrome_scrub.py) nullifies the
+  # £10,000 UK government postgraduate loan advert that regex mistakenly
+  # extracts as a tuition fee, leaving fee=None after every static+Gemini
+  # pass.  With fee=None the sparse-static rescue fires on every single
+  # course, forcing a browser refetch that returns rendered=0B (London Met
+  # does not block IPs, but the browser pool simply can't recover fees that
+  # don't exist on per-course pages).  Result: ~70 s wasted per course,
+  # 322 courses → 373 minute job with zero extra data recovered.
+  # London Met fees live on a shared tuition-fees page, not per-course pages;
+  # force_central_fee_stage (below) is the correct long-term path.
+  skip_browser_rescue: true
+
   fees:
     # London Met is a UK university — quoted fees are in GBP (£).  In
     # practice currency is already inferred correctly from the literal £
@@ -74,6 +87,15 @@ extraction:
     # belt-and-braces default rather than the active enforcement
     # mechanism.  Kept for clarity of intent.
     default_currency: "GBP"
+    # Mark every staged course as having a central fee page so it bypasses
+    # the no_international_fee gate and lands in the review queue instead
+    # of being dropped.  London Met does NOT publish per-course fees on the
+    # individual course page; tuition fees are listed on a shared page at
+    # https://www.londonmet.ac.uk/international/costs-and-fees/.
+    # Until a fees sub-page fetcher is built, courses need to reach review
+    # so they can be manually enriched or approved with a known fee.
+    force_central_fee_stage: true
+    central_page: "https://www.londonmet.ac.uk/international/costs-and-fees/"
 
 # Bug history / 2026-05-14 brand-chrome scrub:
 #   A review-queue inspection showed only 5 staged rows out of 322
