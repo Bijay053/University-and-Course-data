@@ -212,8 +212,10 @@ Usage: `PYTHONPATH=. venv/bin/python3 scripts/bond_enrich.py [--workers 8] [--dr
 Pipeline fixes made in Replit (stage_course.py VIT specialization fix, single_course.py
 CENTRAL_ENGLISH_OVERRIDABLE guard, central_pages.py diploma fix) are NOT on GitHub/prod.
 Prod runs the old pipeline code. Any future scrape on prod will use unfixed extractors.
-Resolution: push Replit commits to GitHub via Replit's GitHub integration, then `git pull` on prod.
-The Replit remote is named `github` (not `origin`). Prod remote is `origin`.
+Resolution: push Replit commits to GitHub, then `git pull` on prod.
+GitHub repo: https://github.com/Studyinfocentre/University-and-course-managment (always push here).
+Push command: `git push "https://${STUDYINFO_GITHUB_PAT}@github.com/Studyinfocentre/University-and-course-managment.git" main`
+The Replit `github` remote URL may be stale — always use the push command above directly. Prod remote is `origin`.
 
 ### Next promotion targets (priority order)
 
