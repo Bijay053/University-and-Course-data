@@ -863,13 +863,13 @@ async def generate_scraper_config(
         if _discovery_directives else ""
     )
 
-    _fees_block = "  fees:\n" + "\n".join(f"  {l}" for l in _fees_lines)
+    _fees_block = "  fees:\n" + "\n".join(_fees_lines)
 
     _extraction_inner = _fees_block
     # english.central_page: ONLY if the live probe confirmed a real URL —
     # never from Gemini guessing (unverified URLs produce noise or zero records)
     if _english_lines:
-        _extraction_inner += "\n  english:\n" + "\n".join(f"  {l}" for l in _english_lines)
+        _extraction_inner += "\n  english:\n" + "\n".join(_english_lines)
 
     _hostname = body.website_url.split("//")[-1].rstrip("/").split("/")[0]
 
