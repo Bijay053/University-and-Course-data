@@ -1073,7 +1073,7 @@ def run_quality_actions(
                                SET scrape_config = jsonb_set(
                                      COALESCE(scrape_config, '{}'::jsonb),
                                      '{_p7_last_run}',
-                                     :payload::jsonb
+                                     cast(:payload as jsonb)
                                    )
                              WHERE id = :uni_id
                         """),

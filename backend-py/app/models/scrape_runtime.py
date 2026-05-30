@@ -49,6 +49,7 @@ class ScrapeRuntimeJob(Base):
     requeue_events: Mapped[list | None] = mapped_column(JSONB, nullable=True)
     cost_ceiling_hit: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     total_gemini_cost_usd: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    avg_verification_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )

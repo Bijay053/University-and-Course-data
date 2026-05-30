@@ -22,6 +22,7 @@ from app.dependencies import get_current_user, get_db
 from app.models import ScrapedCourse
 from app.models.evidence import ScrapedFieldEvidence
 from app.models.field_verification import FieldVerificationResult
+from app.models.scrape_runtime import ScrapeRuntimeJob
 
 log = logging.getLogger(__name__)
 router = APIRouter()
@@ -195,6 +196,50 @@ async def get_university_verification_summary(
         for r in field_rows
     ]
 
+    # ── Confidence Trend — last 5 completed jobs for this university ──────────
+    trend_q = await db.execute(
+        select(
+            ScrapeRuntimeJob.runtime_job_id,
+            ScrapeRuntimeJob.completed_at,
+            ScrapeRuntimeJob.avg_verification_confidence,
+        )
+        .where(
+            ScrapeRuntimeJob.university_id == uni_id,
+            ScrapeRuntimeJob.status == "completed",
+            ScrapeRuntimeJob.avg_verification_confidence.is_not(None),
+        )
+        .order_by(ScrapeRuntimeJob.completed_at.desc())
+        .limit(5)
+    )
+    trend_rows = trend_q.fetchall()
+
+    # Chronological order (oldest → newest) for display
+    trend_history = [
+        {
+            "job_id": r.runtime_job_id,
+            "completed_at": r.completed_at.isoformat() if r.completed_at else None,
+            "avg_confidence": round(float(r.avg_verification_confidence), 1),
+        }
+        for r in reversed(trend_rows)
+    ]
+
+    # Compute trend direction and change from the two most-recent jobs
+    trend_direction = "no_data"
+    trend_change_pct: float | None = None
+    if len(trend_rows) >= 2:
+        latest = float(trend_rows[0].avg_verification_confidence)
+        previous = float(trend_rows[1].avg_verification_confidence)
+        delta = latest - previous
+        trend_change_pct = round(delta, 1)
+        if delta > 2:
+            trend_direction = "improving"
+        elif delta < -2:
+            trend_direction = "declining"
+        else:
+            trend_direction = "stable"
+    elif len(trend_rows) == 1:
+        trend_direction = "first_run"
+
     return {
         "university_id": uni_id,
         "course_count": len(sc_ids),
@@ -211,6 +256,13 @@ async def get_university_verification_summary(
             "conflict": conflict,
         },
         "field_breakdown": field_breakdown,
+        "confidence_trend": {
+            "history": trend_history,
+            "trend_direction": trend_direction,
+            "trend_change_pct": trend_change_pct,
+            "latest_confidence": round(float(trend_rows[0].avg_verification_confidence), 1) if trend_rows else None,
+            "previous_confidence": round(float(trend_rows[1].avg_verification_confidence), 1) if len(trend_rows) >= 2 else None,
+        },
     }
 
 
@@ -303,4 +355,11 @@ def _empty_summary(uni_id: int) -> dict[str, Any]:
             "conflict": 0,
         },
         "field_breakdown": [],
+        "confidence_trend": {
+            "history": [],
+            "trend_direction": "no_data",
+            "trend_change_pct": None,
+            "latest_confidence": None,
+            "previous_confidence": None,
+        },
     }

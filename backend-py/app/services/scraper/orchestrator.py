@@ -2716,6 +2716,29 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # Gemini cost tracking (Component 3 & 4)
         job.total_gemini_cost_usd = round(_total_gemini_cost_usd, 8)
         job.cost_ceiling_hit = _cost_monitor.aborted
+        # ── Phase 9: Confidence Trend — store per-job avg confidence ──────────
+        # Query the mean avg_verification_confidence of all courses staged in
+        # this run. Stored on the job row so the trend API can look back over
+        # the last N jobs without scanning scraped_courses each time.
+        try:
+            from sqlalchemy import func as _sa_func
+            from app.models import ScrapedCourse as _ConfSC
+            _conf_q = await db.execute(
+                select(_sa_func.avg(_ConfSC.avg_verification_confidence))
+                .where(
+                    _ConfSC.scrape_job_id == runtime_job_id,
+                    _ConfSC.avg_verification_confidence.is_not(None),
+                )
+            )
+            _conf_avg = _conf_q.scalar_one_or_none()
+            if _conf_avg is not None:
+                job.avg_verification_confidence = round(float(_conf_avg), 2)
+                log.info(
+                    "[CONF_TREND] run=%s avg_conf=%.1f",
+                    runtime_job_id, job.avg_verification_confidence,
+                )
+        except Exception as _conf_exc:  # noqa: BLE001
+            log.warning("[CONF_TREND] failed for run %s: %s", runtime_job_id, _conf_exc)
         if finished_cleanly:
             job.error_message = None  # clear any stale message
         else:

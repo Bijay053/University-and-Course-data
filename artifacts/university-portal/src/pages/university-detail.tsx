@@ -437,6 +437,7 @@ export default function UniversityDetail() {
   const [probeCardOpen, setProbeCardOpen] = useState(false);
 
   // ── Phase 9: Verification Intelligence panel ──────────────────────────────
+  type VerifTrendEntry = { job_id: string; completed_at: string | null; avg_confidence: number };
   type VerifSummary = {
     university_id: number;
     course_count: number;
@@ -448,6 +449,13 @@ export default function UniversityDetail() {
     auto_publish_safe_rate: number;
     status_breakdown: { verified: number; likely_correct: number; needs_review: number; conflict: number };
     field_breakdown: { field: string; avg_confidence: number; verified_count: number; conflict_count: number; total_count: number }[];
+    confidence_trend: {
+      history: VerifTrendEntry[];
+      trend_direction: "improving" | "declining" | "stable" | "first_run" | "no_data";
+      trend_change_pct: number | null;
+      latest_confidence: number | null;
+      previous_confidence: number | null;
+    };
   };
   const [verifSummary, setVerifSummary] = useState<VerifSummary | null>(null);
   const [verifCardOpen, setVerifCardOpen] = useState(false);
@@ -1997,6 +2005,86 @@ export default function UniversityDetail() {
               </div>
             </div>
           )}
+
+          {/* Confidence Trend */}
+          {(() => {
+            const ct = verifSummary.confidence_trend;
+            if (!ct || ct.trend_direction === "no_data") return null;
+            const dirIcon: Record<string, string> = {
+              improving: "↑",
+              declining: "↓",
+              stable: "→",
+              first_run: "◎",
+            };
+            const dirColor: Record<string, string> = {
+              improving: "text-emerald-600",
+              declining: "text-red-600",
+              stable: "text-gray-500",
+              first_run: "text-sky-600",
+            };
+            const dirLabel: Record<string, string> = {
+              improving: "Improving",
+              declining: "Declining",
+              stable: "Stable",
+              first_run: "First scrape",
+            };
+            const icon = dirIcon[ct.trend_direction] ?? "?";
+            const color = dirColor[ct.trend_direction] ?? "text-gray-600";
+            const label = dirLabel[ct.trend_direction] ?? ct.trend_direction;
+            return (
+              <div className="border-t border-sky-200 pt-3 space-y-2">
+                <div className="text-xs font-medium text-sky-800">Confidence Trend</div>
+
+                {/* Summary row */}
+                <div className="flex items-center gap-4 flex-wrap">
+                  <div className="flex items-center gap-1.5">
+                    <span className={`text-lg font-bold ${color}`}>{icon}</span>
+                    <span className={`text-sm font-semibold ${color}`}>{label}</span>
+                    {ct.trend_change_pct !== null && ct.trend_direction !== "first_run" && (
+                      <span className={`text-xs font-mono px-1.5 py-0.5 rounded ${ct.trend_change_pct > 0 ? "bg-emerald-100 text-emerald-700" : ct.trend_change_pct < 0 ? "bg-red-100 text-red-700" : "bg-gray-100 text-gray-600"}`}>
+                        {ct.trend_change_pct > 0 ? "+" : ""}{ct.trend_change_pct.toFixed(1)}pp
+                      </span>
+                    )}
+                  </div>
+                  {ct.previous_confidence !== null && ct.latest_confidence !== null && (
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <span>Last: <strong className="text-gray-700">{ct.previous_confidence.toFixed(0)}%</strong></span>
+                      <span>→</span>
+                      <span>Now: <strong className={ct.latest_confidence >= 85 ? "text-emerald-600" : ct.latest_confidence >= 60 ? "text-amber-600" : "text-red-600"}>{ct.latest_confidence.toFixed(0)}%</strong></span>
+                    </div>
+                  )}
+                  {ct.trend_direction === "first_run" && ct.latest_confidence !== null && (
+                    <span className="text-xs text-muted-foreground">Confidence: <strong className="text-gray-700">{ct.latest_confidence.toFixed(0)}%</strong></span>
+                  )}
+                </div>
+
+                {/* Sparkline-style history bars */}
+                {ct.history.length > 1 && (
+                  <div className="flex items-end gap-1.5 h-12">
+                    {ct.history.map((entry, i) => {
+                      const barH = Math.max(8, Math.round((entry.avg_confidence / 100) * 48));
+                      const isLatest = i === ct.history.length - 1;
+                      const barColor = entry.avg_confidence >= 85 ? "bg-emerald-500" : entry.avg_confidence >= 60 ? "bg-amber-400" : "bg-red-400";
+                      return (
+                        <div key={entry.job_id} className="flex flex-col items-center gap-0.5 flex-1" title={`${entry.avg_confidence.toFixed(1)}% — ${entry.completed_at ? new Date(entry.completed_at).toLocaleDateString() : "unknown"}`}>
+                          <span className={`text-[9px] font-mono ${isLatest ? "text-sky-700 font-bold" : "text-muted-foreground"}`}>
+                            {entry.avg_confidence.toFixed(0)}%
+                          </span>
+                          <div
+                            className={`w-full rounded-t ${barColor} ${isLatest ? "ring-1 ring-sky-400 ring-offset-1" : ""}`}
+                            style={{ height: `${barH}px` }}
+                          />
+                          <span className="text-[8px] text-muted-foreground">
+                            {entry.completed_at ? new Date(entry.completed_at).toLocaleDateString(undefined, { month: "numeric", day: "numeric" }) : "?"}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </div>
       )}
 
