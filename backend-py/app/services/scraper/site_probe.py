@@ -167,6 +167,14 @@ class SiteProfile:
     # More specific than library_stack.situation — used as pattern_store key.
     cms_platform: str | None = None
 
+    # Phase 4B: XHR captures from Playwright network interception
+    # Populated by _capture_xhr_stage(); used by api_classifier + api_schema_analyzer.
+    xhr_captures: list[Any] = field(default_factory=list)   # list[XhrCapture]
+
+    # Phase 4B: field mapping inferred from XHR response schema analysis
+    # Stored in auto_config as _api_type / _field_mapping / _results_path.
+    api_field_mapping: Any = None  # ApiFieldMapping | None
+
     # Search APIs embedded in the page source
     detected_apis: list[DetectedAPI] = field(default_factory=list)
 
@@ -226,6 +234,13 @@ class SiteProfile:
             "strategy_ladder": self.strategy_ladder,
             "library_stack": self.library_stack.to_dict() if self.library_stack else None,
             "notes": self.notes,
+            # Phase 4B
+            "xhr_captures_count": len(self.xhr_captures),
+            "api_field_mapping": (
+                self.api_field_mapping.to_dict()
+                if self.api_field_mapping is not None
+                else None
+            ),
         }
 
 
@@ -264,6 +279,19 @@ async def probe_site(url: str, timeout: float = 15.0) -> SiteProfile:
     # Stage 4: Hidden search-API detection in page source
     if html:
         _detect_search_apis(html, profile, origin=origin)
+
+    # Stage 4.5: XHR capture (Phase 4B) — Playwright intercepts live network calls.
+    # Only triggered when the HTML scan found no APIs (last resort) OR the site is a
+    # JS SPA (APIs won't appear in static HTML).  Skipped when Cloudflare-blocked
+    # (Playwright can't solve CF challenges here) or when SKIP_XHR_CAPTURE=1.
+    import os as _os
+    if (
+        html
+        and not profile.is_cloudflare_blocked
+        and not _os.environ.get("SKIP_XHR_CAPTURE")
+        and (profile.is_js_spa or not profile.detected_apis)
+    ):
+        await _capture_xhr_stage(profile)
 
     # Stage 5: Sitemap probe
     await _probe_sitemap(origin, profile, timeout=timeout)
@@ -359,6 +387,74 @@ def _detect_spa(html: str, profile: SiteProfile) -> None:
 
 
 # ── Phase 4A: CMS platform fingerprinting ────────────────────────────────────
+
+async def _capture_xhr_stage(profile: SiteProfile) -> None:
+    """Stage 4.5 — XHR capture + API classification + schema analysis (Phase 4B).
+
+    Launches a short Playwright session against *profile.url*, captures JSON
+    XHR/fetch calls, classifies the best call into an API type, and maps the
+    response schema to internal course fields.
+
+    Results are written to:
+    - ``profile.xhr_captures``    — raw captures (for logging/debugging)
+    - ``profile.detected_apis``   — XHR-discovered APIs appended as DetectedAPI
+    - ``profile.api_field_mapping``— ApiFieldMapping for auto_config storage
+    """
+    try:
+        from .xhr_interceptor import capture_xhr_signals
+        from .api_classifier import classify_captures
+        from .api_schema_analyzer import analyze_schema
+
+        captures = await capture_xhr_signals(profile.url)
+        if not captures:
+            log.debug("[PROBE] Stage 4.5: no JSON XHR calls captured from %s", profile.url)
+            return
+
+        profile.xhr_captures = captures
+
+        classified = classify_captures(captures)
+        if classified is None:
+            log.debug(
+                "[PROBE] Stage 4.5: %d XHR calls found but none classified confidently",
+                len(captures),
+            )
+            return
+
+        log.info(
+            "[PROBE] Stage 4.5: XHR classified as %r (conf=%.2f) from %s",
+            classified.api_type, classified.confidence, classified.endpoint_url[:80],
+        )
+
+        # Avoid duplicating an API already found via HTML scan
+        existing_providers = {a.provider.lower() for a in profile.detected_apis}
+        if classified.api_type not in existing_providers:
+            profile.detected_apis.append(
+                DetectedAPI(
+                    provider=classified.api_type,
+                    label=f"XHR-detected {classified.api_type}",
+                    endpoint_hint=classified.endpoint_url,
+                    auth_hint=classified.auth_hint or None,
+                )
+            )
+            profile.notes.append(
+                f"XHR intercept: {classified.api_type} API at "
+                f"{classified.endpoint_url[:80]} (conf={classified.confidence:.0%})"
+            )
+
+        # Analyse the response schema → field mapping
+        mapping = analyze_schema(classified)
+        if mapping.overall_confidence >= 0.20 or mapping.field_mapping:
+            profile.api_field_mapping = mapping
+            profile.notes.append(
+                f"API schema: {len(mapping.field_mapping)} fields mapped "
+                f"(conf={mapping.overall_confidence:.0%})"
+            )
+        else:
+            log.debug("[PROBE] Stage 4.5: schema analysis confidence too low — skipped")
+
+    except Exception as exc:
+        log.warning("[PROBE] Stage 4.5 XHR capture failed: %s", exc, exc_info=False)
+
 
 def _detect_cms_platform(html: str, profile: SiteProfile) -> None:  # noqa: PLR0912
     """Detect CMS/platform from HTML source fingerprints (Phase 4A).

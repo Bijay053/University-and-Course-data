@@ -359,6 +359,323 @@ async def fetch_algolia_generic(
     return links
 
 
+# ── Phase 4B: field-mapping helpers ──────────────────────────────────────────
+
+def _navigate_path(obj: Any, dot_path: str) -> Any:
+    """Navigate a dot-notation path into a nested dict/list.
+
+    An empty *dot_path* returns *obj* unchanged (identity path).
+    """
+    if not dot_path:
+        return obj
+    node: Any = obj
+    for key in dot_path.split("."):
+        if isinstance(node, dict):
+            node = node.get(key)
+        elif isinstance(node, list) and key.isdigit():
+            idx = int(key)
+            node = node[idx] if idx < len(node) else None
+        else:
+            return None
+    return node
+
+
+def _apply_field_mapping(
+    item: dict,
+    field_mapping: dict[str, str],
+) -> dict[str, Any]:
+    """Apply ``{internal_field: api_dot_path}`` to one result item.
+
+    Returns a dict keyed by internal field names populated from the item.
+    Fields that navigate to None or "" are omitted.
+    """
+    result: dict[str, Any] = {}
+    for internal_field, api_path in field_mapping.items():
+        value = _navigate_path(item, api_path)
+        if value is not None and value != "":
+            result[internal_field] = value
+    return result
+
+
+def _item_to_link(
+    item: dict,
+    field_mapping: dict[str, str],
+    base_url: str = "",
+) -> dict | None:
+    """Convert one mapped item to a link dict.
+
+    Returns None if neither ``url`` nor ``course_name`` is extractable.
+    """
+    mapped = _apply_field_mapping(item, field_mapping)
+    url = str(mapped.get("url") or "").strip()
+    name = str(mapped.get("course_name") or "").strip()
+
+    if not url and not name:
+        return None
+
+    # Make relative URLs absolute
+    if url and not url.startswith("http") and base_url:
+        from urllib.parse import urljoin
+        url = urljoin(base_url, url)
+
+    link: dict[str, Any] = {"url": url, "name": name}
+    # Forward all other mapped fields as auto_extracted (skips per-course scrape)
+    auto_extracted = {k: v for k, v in mapped.items() if k not in ("url", "course_name")}
+    if auto_extracted:
+        link["auto_extracted"] = auto_extracted
+    return link
+
+
+# ── Phase 4B: Generic REST JSON fetcher ──────────────────────────────────────
+
+async def fetch_rest_json_links(
+    endpoint: str,
+    field_mapping: dict[str, str],
+    results_path: str = "",
+    emit: Callable[..., Any] | None = None,
+    page_size: int = 100,
+    max_pages: int = 30,
+) -> list[dict]:
+    """Fetch a generic REST JSON API using a pre-computed field mapping.
+
+    Tries three pagination strategies in order:
+    1. ``page`` + ``per_page`` (most common)
+    2. ``offset`` + ``limit``
+    3. Single request (no pagination params)
+
+    Parameters
+    ----------
+    endpoint:
+        Base URL of the API endpoint (captured by XHR interceptor).
+    field_mapping:
+        ``{internal_field: api_dot_path}`` from ``ApiFieldMapping.field_mapping``.
+    results_path:
+        Dot-path to the results array in the response (e.g. ``"data"``, ``""``).
+    """
+    import httpx
+    from urllib.parse import urlparse, urlunparse, urlencode, parse_qs
+
+    log.info("[GENERIC_REST] endpoint=%s results_path=%r", endpoint[:80], results_path)
+    if emit:
+        emit("log", f"Generic REST: fetching {endpoint[:60]} …")
+
+    parsed = urlparse(endpoint)
+    base_url = urlunparse((parsed.scheme, parsed.netloc, "", "", "", ""))
+
+    links: list[dict] = []
+    seen: set[str] = set()
+
+    async with httpx.AsyncClient(
+        timeout=30.0, verify=False,
+        headers={"Accept": "application/json"},
+    ) as client:
+        # Strategy A: page + per_page pagination
+        for page in range(max_pages):
+            try:
+                resp = await client.get(
+                    endpoint,
+                    params={"page": page + 1, "per_page": page_size, "limit": page_size},
+                )
+                resp.raise_for_status()
+                body = resp.json()
+            except Exception as exc:
+                log.warning("[GENERIC_REST] page %d fetch failed: %s", page, exc)
+                break
+
+            items_root = _navigate_path(body, results_path) if results_path else body
+            if isinstance(items_root, list):
+                items = items_root
+            elif isinstance(items_root, dict):
+                # Find first list value
+                items = next(
+                    (v for v in items_root.values() if isinstance(v, list)), []
+                )
+            else:
+                items = []
+
+            if not items:
+                break
+
+            if page == 0 and emit:
+                emit("log", f"Generic REST: {len(items)} items in page 1")
+
+            for item in items:
+                if not isinstance(item, dict):
+                    continue
+                link = _item_to_link(item, field_mapping, base_url)
+                if not link:
+                    continue
+                key = link.get("url") or link.get("name", "")
+                if key in seen:
+                    continue
+                seen.add(key)
+                links.append(link)
+
+            if len(items) < page_size:
+                break  # last page
+
+    log.info("[GENERIC_REST] extracted %d links", len(links))
+    return links
+
+
+# ── Phase 4B: Generic Elasticsearch / OpenSearch fetcher ─────────────────────
+
+async def fetch_elasticsearch_links(
+    endpoint: str,
+    field_mapping: dict[str, str],
+    emit: Callable[..., Any] | None = None,
+    page_size: int = 100,
+    max_pages: int = 20,
+) -> list[dict]:
+    """Paginate an Elasticsearch / OpenSearch ``/_search`` endpoint.
+
+    Uses ``from`` + ``size`` pagination with a ``match_all`` query.
+    Fields are extracted from ``_source`` of each hit.
+    """
+    import httpx
+    from urllib.parse import urlparse, urlunparse
+
+    # Ensure endpoint ends in /_search
+    search_url = endpoint
+    if "/_search" not in search_url:
+        search_url = search_url.rstrip("/") + "/_search"
+
+    log.info("[GENERIC_ES] endpoint=%s", search_url[:80])
+    if emit:
+        emit("log", f"Generic Elasticsearch: fetching {search_url[:60]} …")
+
+    base_url = urlunparse(urlparse(search_url)[:2] + ("", "", "", ""))
+    links: list[dict] = []
+    seen: set[str] = set()
+
+    async with httpx.AsyncClient(
+        timeout=30.0, verify=False,
+        headers={"Accept": "application/json", "Content-Type": "application/json"},
+    ) as client:
+        for page in range(max_pages):
+            body = {
+                "from": page * page_size,
+                "size": page_size,
+                "query": {"match_all": {}},
+            }
+            try:
+                resp = await client.post(search_url, json=body)
+                resp.raise_for_status()
+                data = resp.json()
+            except Exception as exc:
+                log.warning("[GENERIC_ES] page %d failed: %s", page, exc)
+                break
+
+            hits_wrapper = data.get("hits") or {}
+            hits = hits_wrapper.get("hits") or [] if isinstance(hits_wrapper, dict) else []
+
+            if not hits:
+                break
+            if page == 0:
+                total = (hits_wrapper.get("total") or {})
+                n = total.get("value", 0) if isinstance(total, dict) else int(total or 0)
+                log.info("[GENERIC_ES] total=%d page_size=%d", n, page_size)
+                if emit:
+                    emit("log", f"Elasticsearch: {n} documents found")
+
+            for hit in hits:
+                if not isinstance(hit, dict):
+                    continue
+                # Merge _source fields into top-level for mapping
+                source = hit.get("_source") or {}
+                merged = {**hit, **source}
+                link = _item_to_link(merged, field_mapping, base_url)
+                if not link:
+                    continue
+                key = link.get("url") or link.get("name", "")
+                if key in seen:
+                    continue
+                seen.add(key)
+                links.append(link)
+
+            if len(hits) < page_size:
+                break
+
+    log.info("[GENERIC_ES] extracted %d links", len(links))
+    return links
+
+
+# ── Phase 4B: Generic GraphQL fetcher ────────────────────────────────────────
+
+_GQL_COURSE_QUERIES = [
+    # Try common course-list query shapes used by education CMS platforms
+    "{ courses { id name url title level fee duration } }",
+    "{ programmes { id title url level tuitionFee duration } }",
+    "{ programs { id name url degreeLevel internationalFee duration } }",
+    "{ allCourses { id name url } }",
+]
+
+
+async def fetch_graphql_links(
+    endpoint: str,
+    field_mapping: dict[str, str],
+    emit: Callable[..., Any] | None = None,
+) -> list[dict]:
+    """Attempt a generic GraphQL query to retrieve course listings.
+
+    Tries heuristic query templates in order; returns links from the first
+    successful response.  This is intentionally best-effort — many GraphQL APIs
+    require introspection or site-specific queries.  If all templates fail,
+    returns [] and the completeness gate triggers a re-probe.
+    """
+    import httpx
+
+    log.info("[GENERIC_GQL] endpoint=%s", endpoint[:80])
+    if emit:
+        emit("log", f"Generic GraphQL: probing {endpoint[:60]} …")
+
+    async with httpx.AsyncClient(
+        timeout=20.0, verify=False,
+        headers={"Content-Type": "application/json", "Accept": "application/json"},
+    ) as client:
+        for query in _GQL_COURSE_QUERIES:
+            try:
+                resp = await client.post(endpoint, json={"query": query})
+                if resp.status_code not in (200, 201):
+                    continue
+                data = resp.json()
+                if "errors" in data and "data" not in data:
+                    continue
+                gql_data = data.get("data") or {}
+                # Find the first list value under data
+                items = next(
+                    (v for v in gql_data.values() if isinstance(v, list)), []
+                )
+                if not items:
+                    continue
+
+                log.info("[GENERIC_GQL] got %d items with query: %s", len(items), query[:60])
+                if emit:
+                    emit("log", f"GraphQL: {len(items)} course items found")
+
+                links: list[dict] = []
+                seen: set[str] = set()
+                for item in items:
+                    if not isinstance(item, dict):
+                        continue
+                    link = _item_to_link(item, field_mapping)
+                    if not link:
+                        continue
+                    key = link.get("url") or link.get("name", "")
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    links.append(link)
+
+                if links:
+                    return links
+            except Exception as exc:
+                log.debug("[GENERIC_GQL] query failed: %s", exc)
+
+    log.warning("[GENERIC_GQL] no usable response from %s — returning []", endpoint[:60])
+    return []
+
+
 # ── Dispatcher ────────────────────────────────────────────────────────────────
 
 async def fetch_generic_api_links(
@@ -369,39 +686,79 @@ async def fetch_generic_api_links(
 ) -> list[dict]:
     """Top-level entry point called by the orchestrator.
 
+    Dispatches based on ``provider`` (set from HTML-scan or XHR classification).
+    Phase 4B adds ``_api_type`` / ``_field_mapping`` keys to auto_config to
+    enable REST / Elasticsearch / GraphQL dispatch without provider-specific code.
+
     Parameters
     ----------
     provider:
         Provider name from ``auto_config._api_provider``
-        (e.g. ``"searchstax"``, ``"algolia"``).
+        (e.g. ``"searchstax"``, ``"algolia"``, ``"elasticsearch"``, ``"rest_json"``).
     endpoint_hint:
         Raw endpoint string from ``auto_config._api_endpoint_hint``.
     auto_config:
-        The full auto_config dict.  May contain ``_api_token_env`` (name of the
-        env var holding the auth token) or ``_api_auth_hint``.
+        The full auto_config dict.  May contain:
+        - ``_api_token_env`` / ``_api_auth_hint`` for auth.
+        - ``_api_type`` — explicit type override (Phase 4B XHR classification).
+        - ``_field_mapping`` — field mapping from schema analyzer (Phase 4B).
+        - ``_results_path`` — dot-path to results array (Phase 4B).
     emit:
         Optional logging callable.
     """
-    if provider == "searchstax":
-        # Resolve token: env var override → auto_config hint → None (public core)
+    # Phase 4B: explicit api_type from XHR classification overrides provider
+    api_type = auto_config.get("_api_type") or provider
+    field_mapping: dict[str, str] = auto_config.get("_field_mapping") or {}
+    results_path: str = auto_config.get("_results_path") or ""
+
+    if api_type == "searchstax" or provider == "searchstax":
         token_env = auto_config.get("_api_token_env") or "GENERIC_SEARCHSTAX_TOKEN"
         token = os.environ.get(token_env, "")
         if not token:
-            # Try known fallback env vars
             for env_name in ("HUD_SEARCHSTAX_TOKEN", "SEARCHSTAX_TOKEN"):
                 token = os.environ.get(env_name, "")
                 if token:
                     break
         if not token:
-            # If no token, attempt unauthenticated (some Solr cores are public)
             log.warning(
                 "[GENERIC_SS] No token found in env vars — attempting unauthenticated"
             )
         return await fetch_searchstax_generic(endpoint_hint, token, emit=emit)
 
-    if provider in ("algolia",):
+    if api_type in ("algolia",) or provider in ("algolia",):
         api_key = auto_config.get("_api_auth_hint") or os.environ.get("ALGOLIA_API_KEY", "")
         return await fetch_algolia_generic(endpoint_hint, api_key, emit=emit)
 
-    log.warning("[GENERIC_API] Unknown provider %r — no links fetched", provider)
+    # Phase 4B: XHR-discovered API types
+    if api_type == "elasticsearch" and field_mapping:
+        return await fetch_elasticsearch_links(
+            endpoint_hint, field_mapping, emit=emit,
+        )
+
+    if api_type == "graphql" and field_mapping:
+        return await fetch_graphql_links(endpoint_hint, field_mapping, emit=emit)
+
+    if api_type in ("rest_json", "solr") and field_mapping:
+        return await fetch_rest_json_links(
+            endpoint_hint, field_mapping,
+            results_path=results_path,
+            emit=emit,
+        )
+
+    if field_mapping and endpoint_hint:
+        # Generic fallback: try REST JSON with whatever field mapping we have
+        log.info(
+            "[GENERIC_API] provider=%r api_type=%r — falling back to REST JSON with field mapping",
+            provider, api_type,
+        )
+        return await fetch_rest_json_links(
+            endpoint_hint, field_mapping,
+            results_path=results_path,
+            emit=emit,
+        )
+
+    log.warning(
+        "[GENERIC_API] Unknown provider %r / api_type %r and no field_mapping — no links fetched",
+        provider, api_type,
+    )
     return []

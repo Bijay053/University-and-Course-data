@@ -2561,6 +2561,38 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             except Exception as _alert_exc:  # noqa: BLE001
                 log.warning("[ALERTS] failed for run %s: %s", runtime_job_id, _alert_exc)
 
+            # ── Phase 4B: promote XHR-discovered API field mapping ─────────
+            # If this job used an auto-discovered REST/ES/GraphQL API type
+            # (stored as _api_type in auto_config), and the job staged enough
+            # courses, record the field mapping in scraper_patterns so future
+            # universities on the same API platform reuse it without re-probing.
+            try:
+                _ac = auto_config or {}
+                _api_type_p4b = _ac.get("_api_type") or ""
+                _field_mapping_p4b = _ac.get("_field_mapping") or {}
+                if _api_type_p4b and _field_mapping_p4b:
+                    _staged = summary.get("staged", 0)
+                    _discovered = max(1, summary.get("discovered", 1))
+                    _stage_rate = _staged / _discovered
+                    # Synthesise per-field fill_rates from the job's stage rate.
+                    # Real per-field rates would need a second SQL query; using
+                    # stage_rate is a conservative but practical approximation.
+                    _synthetic_fill = {
+                        field: _stage_rate for field in _field_mapping_p4b
+                    }
+                    from app.services.scraper.pattern_store import promote_api_mapping
+                    _promoted = await promote_api_mapping(
+                        _api_type_p4b, _field_mapping_p4b, _synthetic_fill, db,
+                    )
+                    if _promoted:
+                        log.info(
+                            "[P4B] API mapping promoted: type=%r fields=%d stage_rate=%.2f run=%s",
+                            _api_type_p4b, len(_field_mapping_p4b),
+                            _stage_rate, runtime_job_id,
+                        )
+            except Exception as _p4b_exc:  # noqa: BLE001
+                log.warning("[P4B] promote_api_mapping failed: %s", _p4b_exc)
+
             # ── YAML cascade auto-trigger ──────────────────────────────────
             # Fire when a NEW university (no per-uni YAML on disk) produced
             # poor results. Defined as <5 staged courses OR avg completeness

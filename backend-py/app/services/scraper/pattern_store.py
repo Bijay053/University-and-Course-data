@@ -190,3 +190,137 @@ async def promote_patterns(
         promoted, len(rules), platform_type, PROMOTE_MIN_FILL_RATE * 100,
     )
     return promoted
+
+
+# ── Phase 4B: API field-mapping storage ──────────────────────────────────────
+# API field mappings are stored in the same ``scraper_patterns`` table using a
+# reserved field_key of ``"__api_mapping"`` and a ``platform_type`` of
+# ``"api:{api_type}"`` (e.g. ``"api:algolia"``).  The ``rules_json`` column
+# holds the full ``ApiFieldMapping.to_dict()`` payload.
+
+_API_MAPPING_FIELD_KEY = "__api_mapping"
+_API_PLATFORM_PREFIX = "api:"
+
+
+async def lookup_api_mapping(api_type: str, db: Any) -> dict | None:
+    """Return the stored field mapping for *api_type*, or None if not found.
+
+    Parameters
+    ----------
+    api_type:
+        e.g. ``"algolia"``, ``"elasticsearch"``, ``"rest_json"``.
+    db:
+        AsyncSession.
+    """
+    from sqlalchemy import text as _t
+
+    if not api_type:
+        return None
+
+    platform_key = f"{_API_PLATFORM_PREFIX}{api_type.lower()}"
+    try:
+        result = await db.execute(
+            _t("""
+                SELECT rules_json, success_count, avg_fill_rate
+                FROM scraper_patterns
+                WHERE platform_type = :pt AND field_key = :fk
+                LIMIT 1
+            """),
+            {"pt": platform_key, "fk": _API_MAPPING_FIELD_KEY},
+        )
+        row = result.fetchone()
+        if row:
+            rules = row[0] if isinstance(row[0], dict) else json.loads(row[0])
+            log.info(
+                "[PATTERN_STORE] API mapping cache hit: type=%r successes=%d avg_fill=%.2f",
+                api_type, row[1] or 0, row[2] or 0.0,
+            )
+            return rules
+    except Exception as exc:
+        log.warning("[PATTERN_STORE] lookup_api_mapping failed: %s", exc)
+    return None
+
+
+async def promote_api_mapping(
+    api_type: str,
+    field_mapping: dict,
+    fill_rates: dict[str, float],
+    db: Any,
+) -> int:
+    """Store or update the API field mapping for *api_type* in scraper_patterns.
+
+    Only promotes if the average fill rate across mapped fields meets the
+    ``PROMOTE_MIN_FILL_RATE`` threshold.
+
+    Parameters
+    ----------
+    api_type:
+        e.g. ``"algolia"``, ``"elasticsearch"``, ``"rest_json"``.
+    field_mapping:
+        ``ApiFieldMapping.to_dict()`` payload — will be stored as ``rules_json``.
+    fill_rates:
+        ``{internal_field: float}`` — per-field fill rates from the completed job.
+    db:
+        AsyncSession.
+
+    Returns
+    -------
+    int
+        1 if promoted / updated, 0 otherwise.
+    """
+    from sqlalchemy import text as _t
+
+    if not api_type or not field_mapping:
+        return 0
+
+    # Compute average fill rate across fields referenced in the mapping
+    mapped_fields = list((field_mapping.get("field_mapping") or field_mapping).keys())
+    rates = [fill_rates[f] for f in mapped_fields if f in fill_rates]
+    avg_rate = sum(rates) / len(rates) if rates else 0.0
+
+    if avg_rate < PROMOTE_MIN_FILL_RATE:
+        log.debug(
+            "[PATTERN_STORE] skip api_mapping %r — avg_fill=%.2f < %.2f",
+            api_type, avg_rate, PROMOTE_MIN_FILL_RATE,
+        )
+        return 0
+
+    platform_key = f"{_API_PLATFORM_PREFIX}{api_type.lower()}"
+    try:
+        await db.execute(
+            _t("""
+                INSERT INTO scraper_patterns
+                    (platform_type, field_key, rules_json,
+                     success_count, avg_fill_rate, last_promoted_at)
+                VALUES
+                    (:pt, :fk, :rj::jsonb, 1, :rate, now())
+                ON CONFLICT (platform_type, field_key) DO UPDATE SET
+                    rules_json       = EXCLUDED.rules_json,
+                    success_count    = scraper_patterns.success_count + 1,
+                    avg_fill_rate    = (
+                        scraper_patterns.avg_fill_rate
+                        * scraper_patterns.success_count
+                        + EXCLUDED.avg_fill_rate
+                    ) / (scraper_patterns.success_count + 1),
+                    last_promoted_at = now()
+            """),
+            {
+                "pt": platform_key,
+                "fk": _API_MAPPING_FIELD_KEY,
+                "rj": json.dumps(field_mapping),
+                "rate": avg_rate,
+            },
+        )
+        await db.commit()
+        log.info(
+            "[PATTERN_STORE] Promoted API mapping: type=%r avg_fill=%.2f",
+            api_type, avg_rate,
+        )
+        return 1
+    except Exception as exc:
+        log.warning("[PATTERN_STORE] promote_api_mapping failed: %s", exc)
+        try:
+            await db.rollback()
+        except Exception:
+            pass
+    return 0

@@ -166,6 +166,25 @@ def _base_config(profile: "SiteProfile") -> dict[str, Any]:  # type: ignore[name
         config["_blocked"] = True
         config["_notes"] = profile.notes
 
+    # Phase 4B: persist XHR-discovered field mapping into auto_config.
+    # api_field_mapping is set by _capture_xhr_stage() in site_probe.py.
+    # We only write _api_type / _field_mapping if not already set by the
+    # provider-specific block above (HTML-detected APIs take priority).
+    _fm = getattr(profile, "api_field_mapping", None)
+    if _fm is not None and _fm.field_mapping:
+        if not config.get("_api_type") and _fm.api_type:
+            config["_api_type"] = _fm.api_type
+        if not config.get("_field_mapping"):
+            config["_field_mapping"] = _fm.field_mapping
+            config["_results_path"] = _fm.results_path
+            log.info(
+                "[AUTO_CONFIG] Phase 4B: stored field mapping for api_type=%r "
+                "(%d fields, overall_conf=%.0f%%)",
+                _fm.api_type,
+                len(_fm.field_mapping),
+                (_fm.overall_confidence or 0.0) * 100,
+            )
+
     return config
 
 
