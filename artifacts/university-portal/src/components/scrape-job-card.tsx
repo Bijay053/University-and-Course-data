@@ -6,6 +6,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import {
   Play, StopCircle, Loader2, Globe, CheckCircle2, AlertCircle,
   ChevronsUpDown, Search, Eye, RefreshCw, ChevronDown, X, Zap, TrendingUp,
+  Bot, AlertTriangle, CheckCheck,
 } from "lucide-react";
 import { getFetchErrorMessage, readResponseJson } from "@/lib/readResponseJson";
 import { CountrySelect } from "@/components/country-select";
@@ -49,6 +50,27 @@ const ACTION_LABELS: Record<string, string> = {
   browser_retry: "Browser Retry",
   manual_review: "Manual Review",
   api_promotion: "API Promotion",
+};
+
+// ── AI Diagnostic types ───────────────────────────────────────────────────────
+type DiagnoseRootCause = { issue: string; explanation: string; severity: "high" | "medium" | "low" };
+type DiagnoseAction    = { action: string; detail: string; auto_fixable: boolean };
+type DiagnosisPayload  = {
+  summary: string;
+  root_causes: DiagnoseRootCause[];
+  recommended_actions: DiagnoseAction[];
+  discovery_verdict?: string;
+  location_verdict?: string;
+};
+type DiagnoseResult = {
+  ok: boolean;
+  job_id: string;
+  university?: string;
+  job_stats?: { total_found: number; imported: number; skipped: number; errors: number; avg_completeness_pct: number };
+  bad_location_samples?: string[];
+  diagnosis?: DiagnosisPayload;
+  fallback?: DiagnosisPayload;
+  error?: string;
 };
 
 export type ScrapeJobCardProps = {
@@ -171,6 +193,11 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
   const qualityPollRef = useRef<number | null>(null);
   const qualityTriggerTimeRef = useRef<number>(0);
 
+  // AI Diagnostic state
+  const [diagnoseResult, setDiagnoseResult] = useState<DiagnoseResult | null>(null);
+  const [diagnoseLoading, setDiagnoseLoading] = useState(false);
+  const [showDiagnosePanel, setShowDiagnosePanel] = useState(false);
+
   const pollRef = useRef<number | null>(null);
   const logIndexRef = useRef(0);
   const pollInFlightRef = useRef(false);
@@ -232,6 +259,29 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
     if (qualityPollRef.current) { clearTimeout(qualityPollRef.current); qualityPollRef.current = null; }
     setUniName("");
   }, [slotKey, startTimeKey]);
+
+  const fetchDiagnose = useCallback(async (jobId: string) => {
+    setDiagnoseLoading(true);
+    setShowDiagnosePanel(true);
+    try {
+      const res = await fetch(`/api/scrape/jobs/${jobId}/diagnose`, {
+        method: "POST",
+        cache: "no-store",
+        headers: { "Cache-Control": "no-cache" },
+      });
+      if (!res.ok) {
+        const msg = await getFetchErrorMessage(res);
+        setDiagnoseResult({ ok: false, job_id: jobId, error: msg || `Error ${res.status}` });
+        return;
+      }
+      const data = await readResponseJson<DiagnoseResult>(res);
+      setDiagnoseResult(data || null);
+    } catch (e) {
+      setDiagnoseResult({ ok: false, job_id: jobId, error: String(e) });
+    } finally {
+      setDiagnoseLoading(false);
+    }
+  }, []);
 
   const fetchQualityData = useCallback(async (jobId: string) => {
     setQualityLoading(true);
@@ -909,6 +959,158 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
                         ↻ Refresh
                       </button>
                     </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── AI Diagnostic Panel ─────────────────────────────────── */}
+            {completedJobId && (
+              <div className="border border-blue-200 rounded-lg overflow-hidden">
+                <button
+                  type="button"
+                  className="w-full flex items-center justify-between px-3 py-2 bg-blue-50 hover:bg-blue-100 transition-colors"
+                  onClick={() => {
+                    if (!diagnoseResult && !diagnoseLoading) {
+                      fetchDiagnose(completedJobId);
+                    } else {
+                      setShowDiagnosePanel((v) => !v);
+                    }
+                  }}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <Bot className="w-3.5 h-3.5 text-blue-600" />
+                    <span className="text-xs font-semibold text-blue-800">AI Scrape Diagnostics</span>
+                    {diagnoseLoading && <Loader2 className="w-3 h-3 animate-spin text-blue-400" />}
+                    {diagnoseResult?.ok && !diagnoseLoading && (
+                      <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full font-medium">
+                        Analysed
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {!diagnoseResult && !diagnoseLoading && (
+                      <span className="text-[10px] text-blue-500 italic">Click to diagnose</span>
+                    )}
+                    <ChevronDown className={`w-3 h-3 text-blue-400 transition-transform ${showDiagnosePanel && diagnoseResult ? "rotate-180" : ""}`} />
+                  </div>
+                </button>
+
+                {showDiagnosePanel && (
+                  <div className="p-3 space-y-2.5">
+                    {diagnoseLoading && (
+                      <div className="flex items-center gap-2 text-[11px] text-blue-600">
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        AI is analysing the scrape job…
+                      </div>
+                    )}
+
+                    {diagnoseResult?.error && (
+                      <div className="text-[10px] text-red-500 bg-red-50 rounded px-2 py-1">
+                        {diagnoseResult.error}
+                      </div>
+                    )}
+
+                    {diagnoseResult && !diagnoseLoading && (() => {
+                      const d = diagnoseResult.diagnosis ?? diagnoseResult.fallback;
+                      const stats = diagnoseResult.job_stats;
+                      return (
+                        <>
+                          {/* Stats row */}
+                          {stats && (
+                            <div className="flex items-center gap-3 flex-wrap text-[10px] text-gray-500 border-b border-gray-100 pb-2">
+                              <span>Found: <strong className="text-gray-700">{stats.total_found}</strong></span>
+                              <span>Staged: <strong className="text-green-700">{stats.imported}</strong></span>
+                              <span>Errors: <strong className="text-red-600">{stats.errors}</strong></span>
+                              <span>Completeness: <strong className={stats.avg_completeness_pct >= 85 ? "text-green-700" : "text-amber-700"}>{stats.avg_completeness_pct}%</strong></span>
+                              {diagnoseResult.bad_location_samples && diagnoseResult.bad_location_samples.length > 0 && (
+                                <span className="text-orange-600 flex items-center gap-0.5">
+                                  <AlertTriangle className="w-2.5 h-2.5" />
+                                  {diagnoseResult.bad_location_samples.length} nav-text location(s) detected
+                                </span>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Summary */}
+                          {d?.summary && (
+                            <p className="text-[11px] text-gray-700 leading-relaxed">{d.summary}</p>
+                          )}
+
+                          {/* Root causes */}
+                          {d?.root_causes && d.root_causes.length > 0 && (
+                            <div className="space-y-1.5">
+                              <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Root Causes</p>
+                              {d.root_causes.map((rc, i) => (
+                                <div key={i} className={`rounded px-2 py-1.5 text-[10px] border-l-2 ${
+                                  rc.severity === "high" ? "border-red-400 bg-red-50" :
+                                  rc.severity === "medium" ? "border-amber-400 bg-amber-50" :
+                                  "border-gray-300 bg-gray-50"
+                                }`}>
+                                  <div className="font-semibold text-gray-800 mb-0.5">{rc.issue}</div>
+                                  <div className="text-gray-600 leading-relaxed">{rc.explanation}</div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Recommended actions */}
+                          {d?.recommended_actions && d.recommended_actions.length > 0 && (
+                            <div className="space-y-1">
+                              <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Recommended Actions</p>
+                              {d.recommended_actions.map((a, i) => (
+                                <div key={i} className="flex items-start gap-2 text-[10px] px-2 py-1.5 rounded bg-gray-50 border border-gray-100">
+                                  <div className={`shrink-0 mt-0.5 ${a.auto_fixable ? "text-green-500" : "text-gray-400"}`}>
+                                    {a.auto_fixable ? <CheckCheck className="w-3 h-3" /> : <AlertTriangle className="w-3 h-3" />}
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="font-semibold text-gray-700 mb-0.5 flex items-center gap-1">
+                                      {a.action}
+                                      {a.auto_fixable && (
+                                        <span className="text-[9px] bg-green-100 text-green-700 px-1 py-0.5 rounded">auto-fixable</span>
+                                      )}
+                                    </div>
+                                    <div className="text-gray-500 leading-relaxed">{a.detail}</div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Verdicts */}
+                          {(d?.discovery_verdict || d?.location_verdict) && (
+                            <div className="flex items-center gap-2 text-[10px] text-gray-400 border-t border-gray-100 pt-2 flex-wrap">
+                              {d.discovery_verdict && (
+                                <span className={`px-1.5 py-0.5 rounded ${
+                                  d.discovery_verdict === "ok" ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"
+                                }`}>
+                                  Discovery: {d.discovery_verdict.replace(/_/g, " ")}
+                                </span>
+                              )}
+                              {d.location_verdict && (
+                                <span className={`px-1.5 py-0.5 rounded ${
+                                  d.location_verdict === "ok" ? "bg-green-100 text-green-700" : "bg-orange-100 text-orange-700"
+                                }`}>
+                                  Location: {d.location_verdict.replace(/_/g, " ")}
+                                </span>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Re-run diagnosis button */}
+                          <div className="flex items-center gap-2 pt-1 border-t border-gray-100">
+                            <button
+                              type="button"
+                              onClick={() => fetchDiagnose(completedJobId)}
+                              disabled={diagnoseLoading}
+                              className="text-[10px] text-blue-500 hover:text-blue-700 disabled:opacity-50 flex items-center gap-1"
+                            >
+                              <Bot className="w-3 h-3" /> Re-run diagnosis
+                            </button>
+                          </div>
+                        </>
+                      );
+                    })()}
                   </div>
                 )}
               </div>

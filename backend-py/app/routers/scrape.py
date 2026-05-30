@@ -3066,3 +3066,155 @@ async def trigger_job_quality_optimizer(
         "task_id": task.id,
         "message": "Quality Optimizer queued — refresh in ~30 seconds to see results",
     }
+
+
+# ── AI Scrape Diagnostic ──────────────────────────────────────────────────────
+
+@router.post("/jobs/{job_id}/diagnose")
+async def diagnose_scrape_job(
+    job_id: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> dict:
+    """Use Gemini to explain why a scrape produced poor results and suggest fixes.
+
+    Reads:
+    - The scrape runtime job row (total_found, imported, errors, status)
+    - Up to 5 staged course samples from this job
+    - Location values that look like nav/footer garbage
+    - The university's scrape_url
+
+    Returns a structured JSON diagnosis with root causes and recommended actions.
+    """
+    from sqlalchemy import select as _sel, func as _func
+    from app.models import ScrapeRuntimeJob, University, ScrapedCourse
+
+    # ── Load job row ──────────────────────────────────────────────────────────
+    job = (await db.execute(
+        _sel(ScrapeRuntimeJob).where(ScrapeRuntimeJob.runtime_job_id == job_id)
+    )).scalar_one_or_none()
+    if not job:
+        raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
+
+    # ── Load university ───────────────────────────────────────────────────────
+    uni: University | None = await db.get(University, job.university_id) if job.university_id else None
+    uni_name    = uni.name if uni else "Unknown University"
+    scrape_url  = uni.scrape_url if uni else "unknown"
+
+    # ── Load staged course sample ─────────────────────────────────────────────
+    staged_rows = (await db.execute(
+        _sel(ScrapedCourse)
+        .where(ScrapedCourse.scrape_job_id == job_id)
+        .limit(8)
+    )).scalars().all()
+
+    staged_count = len(staged_rows)
+    avg_completeness = (
+        sum(r.completeness or 0 for r in staged_rows) / staged_count
+        if staged_count else 0
+    )
+    # Detect location chrome (nav/footer garbage)
+    _NAV_HINTS = re.compile(
+        r"\b(?:student\s+information|campus\s+life|current\s+students|new\s+students|"
+        r"term\s+dates?|open\s+days?|how\s+to\s+apply|apply\s+now|contact\s+us|"
+        r"student\s+services|clearing|accommodation)\b",
+        re.I,
+    )
+    bad_locations = [
+        r.course_location for r in staged_rows
+        if r.course_location and len(_NAV_HINTS.findall(r.course_location)) >= 2
+    ]
+    course_names = [r.course_name for r in staged_rows if r.course_name][:5]
+    blank_fields = {}
+    for r in staged_rows:
+        for field, val in [
+            ("international_fee", r.international_fee),
+            ("study_mode", r.study_mode),
+            ("course_location", r.course_location),
+            ("intake_months", r.intake_months),
+            ("duration", r.duration),
+            ("ielts_overall", r.ielts_overall),
+        ]:
+            if not val:
+                blank_fields[field] = blank_fields.get(field, 0) + 1
+
+    # ── Build prompt ──────────────────────────────────────────────────────────
+    prompt = f"""You are an expert web scraping engineer diagnosing why a university course scraper produced poor results.
+
+University: {uni_name}
+Scrape URL: {scrape_url}
+Job ID: {job_id}
+Job status: {job.status or 'unknown'}
+Total URLs discovered (raw): {job.total_found or 0}
+Courses staged: {job.imported or 0}
+Courses skipped: {job.skipped or 0}
+Errors: {job.errors or 0}
+Avg completeness: {avg_completeness * 100:.1f}%
+Sample course names: {course_names}
+Blank fields across sample ({staged_count} courses):
+{json.dumps(blank_fields, indent=2)}
+Bad location values detected (nav/footer text saved as location):
+{bad_locations[:3] if bad_locations else 'None detected'}
+
+Diagnose the scraping failure in plain English for a non-technical admin.
+Return your response as JSON with this exact structure:
+{{
+  "summary": "One-sentence plain English summary of what went wrong",
+  "root_causes": [
+    {{"issue": "Short label", "explanation": "2-3 sentence explanation for non-developer", "severity": "high|medium|low"}}
+  ],
+  "recommended_actions": [
+    {{"action": "Short action label", "detail": "What to do and why", "auto_fixable": true|false}}
+  ],
+  "discovery_verdict": "ok|low_count|api_driven|blocked_by_cloudflare|unknown",
+  "location_verdict": "ok|nav_text_contamination|missing|unknown"
+}}
+
+Be specific about UEL's Cloudflare protection and JavaScript-rendered course listings if relevant.
+Return only valid JSON, no markdown fences."""
+
+    try:
+        from app.services.ai import gemini_client as _gc
+        resp = await _gc.generate(prompt, max_output_tokens=1024)
+    except Exception as exc:
+        log.warning("diagnose_scrape_job: Gemini call failed for job %s: %s", job_id, exc)
+        return {
+            "ok": False,
+            "job_id": job_id,
+            "error": f"AI diagnosis unavailable: {exc}",
+            "fallback": {
+                "summary": f"Scrape found {job.total_found or 0} URLs, staged {job.imported or 0} courses.",
+                "root_causes": [],
+                "recommended_actions": [
+                    {"action": "Check scrape logs", "detail": "Review the full log in the job card for must_contain or XHR hints.", "auto_fixable": False}
+                ],
+            }
+        }
+
+    # Parse Gemini response (it should be JSON)
+    raw_text = (resp or "").strip()
+    try:
+        diagnosis = json.loads(raw_text)
+    except Exception:
+        # Gemini occasionally wraps in markdown — strip fences
+        import re as _re2
+        clean = _re2.sub(r"```(?:json)?|```", "", raw_text).strip()
+        try:
+            diagnosis = json.loads(clean)
+        except Exception:
+            diagnosis = {"summary": raw_text, "root_causes": [], "recommended_actions": []}
+
+    return {
+        "ok": True,
+        "job_id": job_id,
+        "university": uni_name,
+        "scrape_url": scrape_url,
+        "job_stats": {
+            "total_found": job.total_found or 0,
+            "imported": job.imported or 0,
+            "skipped": job.skipped or 0,
+            "errors": job.errors or 0,
+            "avg_completeness_pct": round(avg_completeness * 100, 1),
+        },
+        "bad_location_samples": bad_locations[:3],
+        "diagnosis": diagnosis,
+    }

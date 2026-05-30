@@ -68,6 +68,19 @@ _LOCATION_CHROME_RE = _re.compile(
     # guard rejects it while real UniSQ campus names (Ipswich, Toowoomba,
     # Springfield, Online, External) never match any of these phrases.
     r"|accommodation|unisq\s+events|contributing\s+to\s+our\s+communit(?:y|ies)"
+    # Generic university website nav/footer menu labels seen fleet-wide.
+    # UEL (uel.ac.uk) course pages scraped "STUDENT INFORMATION Campus life
+    # Current students New students Accommodation Term dates" as location —
+    # these are footer/nav column headings, not campus names.
+    # A string containing ≥2 of these tokens is almost certainly nav chrome.
+    r"|student\s+information|campus\s+life"
+    r"|current\s+students|new\s+students|prospective\s+students"
+    r"|term\s+dates?|open\s+days?|how\s+to\s+apply"
+    r"|student\s+portal|student\s+services|student\s+union"
+    r"|clearing|freshers|induction\s+week"
+    r"|apply\s+now|contact\s+us|get\s+in\s+touch"
+    r"|international\s+students|home\s+students"
+    r"|tuition\s+fees?|scholarships?\s+and\s+bursaries"
     r")\b",
     _re.IGNORECASE,
 )

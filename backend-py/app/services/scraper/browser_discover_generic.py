@@ -498,6 +498,9 @@ async def browser_discover_generic(
     # when the DOM link extractor returns nothing.
     _xhr_courses: list[dict] = []          # courses extracted from JSON responses
     _xhr_endpoints_seen: set[str] = set()  # endpoint URLs already processed
+    # Pagination metadata: list of {url, total, page_size} for endpoints where
+    # the response advertised more items than one page.  Fetched after BFS ends.
+    _xhr_pagination: list[dict] = []
 
     def _heap_push(url: str, anchor: str, score: int) -> None:
         nonlocal _nav_heap_ctr
@@ -656,6 +659,36 @@ async def browser_discover_generic(
                 await _emit(
                     f"[DISCOVER] XHR API hit: {ep_url} → +{len(added)} course(s)"
                 )
+                # ── Pagination detection ───────────────────────────────────
+                # If the API returned fewer items than the advertised total,
+                # remember this endpoint so we can fetch remaining pages after
+                # the BFS loop (using page.evaluate to stay in the browser
+                # context and bypass Cloudflare).
+                if isinstance(data, dict):
+                    _reported_total: int | None = None
+                    for _tk in ("total", "numFound", "count", "totalResults",
+                                "total_results", "totalCount", "totalItems",
+                                "total_count", "Total", "total_records"):
+                        _tv = data.get(_tk)
+                        if isinstance(_tv, int) and _tv > 0:
+                            _reported_total = _tv
+                            break
+                    if _reported_total and _reported_total > len(extracted):
+                        log.info(
+                            "browser_discover_generic: XHR pagination detected "
+                            "at %s — total=%d, page=%d; will fetch remaining pages",
+                            ep_url, _reported_total, len(extracted),
+                        )
+                        await _emit(
+                            f"[DISCOVER] Pagination detected: {ep_url} "
+                            f"total={_reported_total}, got={len(extracted)} — "
+                            f"fetching remaining pages"
+                        )
+                        _xhr_pagination.append({
+                            "url": ep_url,
+                            "total": _reported_total,
+                            "page_size": len(extracted),
+                        })
             else:
                 log.debug(
                     "browser_discover_generic: XHR JSON %s — no course links extracted",
@@ -969,6 +1002,79 @@ async def browser_discover_generic(
                     log.debug(
                         "browser_discover_generic: nav page %s (score=%d) failed — %s",
                         nav_url, nav_score, exc,
+                    )
+
+            # ── XHR pagination: fetch remaining pages via browser fetch() ─────
+            # For endpoints that reported more items than one page, use
+            # page.evaluate(fetch(...)) to load subsequent pages from inside
+            # the browser context so Cloudflare / cookie state is preserved.
+            if _xhr_pagination and page:
+                from urllib.parse import urlparse as _uparse, parse_qs as _pqs, urlencode as _uenc, urlunparse as _uunparse
+                _PAGINATION_SAFETY_CAP = 400  # never fetch more than this many extra courses
+                for _pg_info in _xhr_pagination:
+                    _base_url  = _pg_info["url"]
+                    _total     = _pg_info["total"]
+                    _page_size = _pg_info["page_size"]
+                    _fetched   = _page_size
+                    _parsed    = _uparse(_base_url)
+                    _params    = _pqs(_parsed.query, keep_blank_values=True)
+                    # Detect offset / page parameter name used in the URL
+                    _offset_key = next((k for k in _params if k in ("offset", "start", "from", "skip")), None)
+                    _page_key   = next((k for k in _params if k in ("page", "p", "pageNum", "page_number", "pg")), None)
+                    # If no pagination param in URL, assume offset-based and inject one
+                    if not _offset_key and not _page_key:
+                        _offset_key = "offset"
+                    _consecutive_empty = 0
+                    while _fetched < min(_total, _PAGINATION_SAFETY_CAP) and _consecutive_empty < 2:
+                        if _offset_key:
+                            _params[_offset_key] = [str(_fetched)]
+                            # Keep limit/size/rows consistent with what we already have
+                            for _sz_key in ("limit", "size", "rows", "per_page", "pageSize"):
+                                if _sz_key not in _params:
+                                    _params[_sz_key] = [str(_page_size)]
+                                break
+                        elif _page_key:
+                            _params[_page_key] = [str(_fetched // _page_size + 1)]
+                        _next_qs  = "&".join(f"{k}={_v}" for k, vs in _params.items() for _v in vs)
+                        _next_url = _uunparse(_parsed._replace(query=_next_qs))
+                        try:
+                            _page_text = await page.evaluate(
+                                """async (url) => {
+                                    try {
+                                        const r = await fetch(url, {credentials: 'include'});
+                                        if (!r.ok) return null;
+                                        const ct = r.headers.get('content-type') || '';
+                                        if (!ct.includes('json')) return null;
+                                        return await r.text();
+                                    } catch(e) { return null; }
+                                }""",
+                                _next_url,
+                            )
+                            if not _page_text:
+                                _consecutive_empty += 1
+                                _fetched += _page_size
+                                continue
+                            _page_data = _json.loads(_page_text)
+                            _page_items = _extract_courses_from_xhr_json(_page_data)
+                            if not _page_items:
+                                _consecutive_empty += 1
+                                _fetched += _page_size
+                                continue
+                            _consecutive_empty = 0
+                            _existing_urls = {c["url"] for c in _xhr_courses}
+                            _new_items = [c for c in _page_items if c["url"] not in _existing_urls]
+                            _xhr_courses.extend(_new_items)
+                            log.info(
+                                "browser_discover_generic: XHR paginate offset=%d → +%d course(s) (xhr_total=%d)",
+                                _fetched, len(_new_items), len(_xhr_courses),
+                            )
+                            _fetched += _page_size
+                        except Exception as _pe:
+                            log.debug("browser_discover_generic: XHR paginate error at offset=%d: %s", _fetched, _pe)
+                            break
+                if _xhr_pagination:
+                    await _emit(
+                        f"[DISCOVER] XHR pagination complete: {len(_xhr_courses)} total course(s) from API"
                     )
 
             # ── Merge XHR-captured courses into DOM results ────────────────
