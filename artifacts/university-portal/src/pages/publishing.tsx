@@ -355,11 +355,12 @@ export default function PublishingPage() {
               <button
                 key={f}
                 onClick={() => setDecisionFilter(f)}
-                className={`px-3 py-1 text-xs rounded-full border transition-colors whitespace-nowrap ${
+                className="px-3 py-1 text-xs rounded-full border transition-colors whitespace-nowrap"
+                style={
                   decisionFilter === f
-                    ? "bg-indigo-600 text-white border-indigo-600"
-                    : "bg-white text-slate-600 border-slate-200 hover:border-indigo-300"
-                }`}
+                    ? { backgroundColor: '#4f46e5', color: '#ffffff', borderColor: '#4f46e5' }
+                    : { backgroundColor: '#ffffff', color: '#475569', borderColor: '#e2e8f0' }
+                }
               >
                 {f === "all" && `All (${queueByDecision.all})`}
                 {f === "needs_review" && `Needs Review (${queueByDecision.needs_review})`}
