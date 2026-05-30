@@ -24,6 +24,7 @@ import Login from "@/pages/login";
 import ForgotPassword from "@/pages/forgot-password";
 import ResetPassword from "@/pages/reset-password";
 import UsersPage from "@/pages/users";
+import PerformancePage from "@/pages/performance";
 
 const queryClient = new QueryClient();
 
@@ -76,6 +77,7 @@ function Router() {
               <Route path="/compare" component={ComparePage} />
               <Route path="/courses/:id" component={CourseDetail} />
               <Route path="/users" component={UsersPage} />
+              <Route path="/performance" component={PerformancePage} />
               <Route component={NotFound} />
             </Switch>
           </Layout>

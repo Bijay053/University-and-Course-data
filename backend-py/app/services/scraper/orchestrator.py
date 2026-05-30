@@ -2924,6 +2924,21 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     runtime_job_id, _p7_exc,
                 )
 
+            # ── Phase 8: record performance metrics ────────────────────────
+            # Always fires after P7 (regardless of completeness level) so
+            # every completed job gets a ledger row for the dashboard.
+            try:
+                from app.tasks.scrape_tasks import record_job_performance as _p8_task
+                _p8_task.apply_async(
+                    kwargs={"university_id": uni_id, "job_id": runtime_job_id},
+                    countdown=30,  # wait 30 s so P7 inline changes are committed
+                )
+            except Exception as _p8_exc:  # noqa: BLE001
+                log.warning(
+                    "[P8] performance record dispatch failed for run %s: %s",
+                    runtime_job_id, _p8_exc,
+                )
+
         return {"ok": finished_cleanly, **summary}
     except Exception as exc:
         log.exception("Scrape job %s failed: %s", runtime_job_id, exc)

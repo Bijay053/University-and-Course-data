@@ -23,6 +23,7 @@ from app.routers import (
     dashboard,
     health,
     locations,
+    performance,
     per_course_resources,
     reviews,
     scrape,
@@ -94,4 +95,5 @@ app.include_router(_import_routes.router, prefix="/api")
 app.include_router(_backup.router, prefix="/api", tags=["backup"])
 app.include_router(assessment_notes.router, prefix="/api", tags=["assessment-notes"])
 app.include_router(users.router, prefix="/api", tags=["users"])
+app.include_router(performance.router, prefix="/api/performance", tags=["performance"])
 app.include_router(locations.router, prefix="/api", tags=["locations"])

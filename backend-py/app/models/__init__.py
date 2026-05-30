@@ -28,6 +28,7 @@ from app.models.gemini_call_log import GeminiCallLog
 from app.models.scrape_runtime import ScrapeRuntimeJob, ScrapeRuntimeLog
 from app.models.scraped_course import ScrapedCourse
 from app.models.scraping_change import ScrapingChange
+from app.models.performance_ledger import ScrapePerformanceLedger
 from app.models.scraper_config_history import ScraperConfigHistory
 from app.models.scraping_job import ScrapingJob
 from app.models.university import University
@@ -59,6 +60,7 @@ __all__ = [
     "ScrapeRuntimeJob",
     "ScrapeRuntimeLog",
     "ScrapedCourse",
+    "ScrapePerformanceLedger",
     "ScraperConfigHistory",
     "ScrapedFieldEvidence",
     "ScrapingChange",

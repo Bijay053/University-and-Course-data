@@ -1152,3 +1152,40 @@ def refresh_baselines_weekly(self) -> dict:  # type: ignore[override]
     except Exception as exc:
         log.exception("refresh_baselines_weekly failed: %s", exc)
         return {"ok": False, "reason": str(exc)}
+
+
+# ── Phase 8: Performance Intelligence ─────────────────────────────────────────
+
+@celery_app.task(name="scrape.record_job_performance", bind=True, max_retries=2,
+                 default_retry_delay=120)
+def record_job_performance(  # type: ignore[override]
+    self,
+    *,
+    university_id: int,
+    job_id: str,
+) -> dict:
+    """Record per-job performance metrics into scrape_performance_ledger.
+
+    Dispatched automatically by the orchestrator ~30 s after job completion
+    so all P7 inline updates are committed before aggregation.
+    """
+    async def _run() -> dict:
+        async with AsyncSessionLocal() as db:
+            from app.services.performance_intelligence import compute_job_performance
+            return await compute_job_performance(job_id, db)
+
+    _sync_dispose()
+    try:
+        result = asyncio.run(_run())
+        if not result.get("ok"):
+            log.warning(
+                "[P8] record_job_performance non-ok uni_id=%s job=%s: %s",
+                university_id, job_id, result.get("reason"),
+            )
+        return result
+    except Exception as exc:
+        log.exception(
+            "[P8] record_job_performance failed uni_id=%s job=%s: %s",
+            university_id, job_id, exc,
+        )
+        raise self.retry(exc=exc)
