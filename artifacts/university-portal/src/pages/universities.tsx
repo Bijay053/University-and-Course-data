@@ -12,7 +12,8 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Plus, Search, Globe, Building2, Trash2, Pencil, MoreHorizontal, ExternalLink, BookOpen, Star, Upload, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
+import { Plus, Search, Globe, Building2, Trash2, Pencil, MoreHorizontal, ExternalLink, BookOpen, Star, Upload, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Zap, Loader2 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Can, useCan } from "@/components/can";
 import { useToast } from "@/hooks/use-toast";
 
@@ -54,6 +55,8 @@ export default function Universities() {
   const [editSaving, setEditSaving] = useState(false);
   const [featuredSavingId, setFeaturedSavingId] = useState<number | null>(null);
   const [featuredConfirm, setFeaturedConfirm] = useState<{ id: number; name: string; current: boolean } | null>(null);
+  const [autoProbe, setAutoProbe] = useState(true);
+  const [probeQueued, setProbeQueued] = useState(false);
 
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
@@ -72,11 +75,40 @@ export default function Universities() {
 
   const onSubmit = (values: z.infer<typeof formSchema>) => {
     createUniversity.mutate({ data: { ...values, website: values.website || null } }, {
-      onSuccess: () => {
+      onSuccess: async (newUni) => {
         queryClient.invalidateQueries({ queryKey: getListUniversitiesQueryKey() });
         setOpen(false);
         form.reset();
         setPage(1);
+
+        const uniId: number | undefined = (newUni as { id?: number })?.id
+          ?? (newUni as { data?: { id?: number } })?.data?.id;
+
+        if (autoProbe && uniId) {
+          setProbeQueued(true);
+          try {
+            const res = await fetch(`${BASE}/api/universities/${uniId}/probe`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+            });
+            if (!res.ok) throw new Error(await res.text());
+            toast({
+              title: "Auto-configure started",
+              description: "The system is probing the site and generating a scrape config. Open the university to track progress.",
+            });
+            navigate(`/universities/${uniId}`);
+          } catch (err) {
+            toast({
+              title: "University created — probe failed",
+              description: String(err),
+              variant: "destructive",
+            });
+          } finally {
+            setProbeQueued(false);
+          }
+        } else if (uniId) {
+          navigate(`/universities/${uniId}`);
+        }
       },
     });
   };
@@ -206,8 +238,31 @@ export default function Universities() {
                     <FormField control={form.control} name="website" render={({ field }) => (
                       <FormItem><FormLabel>Website</FormLabel><FormControl><Input placeholder="https://..." {...field} /></FormControl><FormMessage /></FormItem>
                     )} />
-                    <Button type="submit" className="w-full" disabled={createUniversity.isPending}>
-                      {createUniversity.isPending ? "Creating..." : "Create University"}
+                    <div className="flex items-start gap-3 rounded-lg border border-blue-100 bg-blue-50 p-3">
+                      <Checkbox
+                        id="auto-probe"
+                        checked={autoProbe}
+                        onCheckedChange={(v) => setAutoProbe(!!v)}
+                        className="mt-0.5"
+                      />
+                      <div className="flex flex-col gap-0.5">
+                        <label htmlFor="auto-probe" className="flex items-center gap-1.5 text-sm font-medium cursor-pointer select-none">
+                          <Zap className="h-3.5 w-3.5 text-blue-600" />
+                          Auto-configure &amp; scrape immediately
+                        </label>
+                        <p className="text-xs text-muted-foreground">
+                          Probes the website, picks the best strategy, generates config and queues the first scrape — no YAML needed.
+                        </p>
+                      </div>
+                    </div>
+                    <Button type="submit" className="w-full" disabled={createUniversity.isPending || probeQueued}>
+                      {probeQueued
+                        ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Probing site…</>
+                        : createUniversity.isPending
+                          ? "Creating…"
+                          : autoProbe
+                            ? "Create & Auto-configure"
+                            : "Create University"}
                     </Button>
                   </form>
                 </Form>

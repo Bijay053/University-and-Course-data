@@ -56,6 +56,12 @@ def _base_config(profile: "SiteProfile") -> dict[str, Any]:  # type: ignore[name
         },
         "_auto_generated": True,
         "_strategy": strategy,
+        # Library situation computed by library_strategy.recommend_library_stack().
+        # Stored here so the UI and downstream tooling can read it from auto_config
+        # without re-computing it from the probe signals.
+        "_library_situation": (
+            profile.library_stack.situation if profile.library_stack else None
+        ),
         "_probe_summary": {
             "cloudflare": profile.is_cloudflare_blocked,
             "bot_protected": profile.is_bot_protected,

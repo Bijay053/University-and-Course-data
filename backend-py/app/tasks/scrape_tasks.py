@@ -632,24 +632,28 @@ def probe_and_configure(  # noqa: ANN001
     self,
     university_id: int,
     triggered_by: str = "manual",
+    exclude_strategies: list | None = None,
 ) -> dict:
     """Probe a university website and auto-generate a scraper config.
 
     1. Fetch the university's scrape_url from the DB.
     2. Run site_probe.probe_site() — detects Cloudflare, JS-SPA, search APIs,
        sitemap, Wayback — and picks the optimal strategy.
-    3. Fetch one sample course page to give Gemini richer context.
-    4. Run auto_config_generator.generate_config() — uses probe + Gemini to
+    3. If the recommended strategy is in ``exclude_strategies`` (strategies
+       already tried and found to produce poor results), advance to the next
+       rung in the escalation ladder so each cascade picks a different approach.
+    4. Fetch one sample course page to give Gemini richer context.
+    5. Run auto_config_generator.generate_config() — uses probe + Gemini to
        produce a UniConfig-compatible dict.
-    5. Persist: probe_result, probe_status='configured', and
+    6. Persist: probe_result, probe_status='configured', and
        scrape_config['auto_config'] = generated dict in the university row.
-    6. When triggered_by='cascade' (automatic self-healing after poor scrape),
+    7. When triggered_by='cascade' (automatic self-healing after poor scrape),
        create and dispatch a NEW scrape job so the auto_config is used
        immediately — operators don't need to manually re-trigger.
 
     This task is dispatched by:
       - POST /api/universities/{id}/probe  (manual operator trigger)
-      - Orchestrator CASCADE hook          (triggered_by='cascade')
+      - Orchestrator CASCADE hook          (triggered_by='cascade', exclude_strategies=[...])
     """
     async def _run() -> dict:
         import uuid
@@ -697,6 +701,32 @@ def probe_and_configure(  # noqa: ANN001
                 )
                 await db.commit()
                 return {"ok": False, "reason": f"probe_failed: {exc!s:.120}"}
+
+            # ── Stage 1b: Strategy-ladder advancement (cascade self-heal) ─────
+            # When triggered by the orchestrator's CASCADE hook the caller
+            # passes ``exclude_strategies`` — the strategy that already produced
+            # poor results.  If the probe picked the same strategy again, advance
+            # to the next rung so each cascade genuinely tries a different path.
+            _excluded = set(exclude_strategies or [])
+            if _excluded and profile.recommended_strategy in _excluded:
+                from app.services.scraper.site_probe import next_strategy
+                _next = next_strategy(profile.recommended_strategy, profile.strategy_ladder)
+                if _next:
+                    log.info(
+                        "[PROBE] CASCADE: strategy %r excluded — advancing to %r",
+                        profile.recommended_strategy, _next,
+                    )
+                    profile.recommended_strategy = _next
+                    profile.notes.append(
+                        f"CASCADE: skipped {', '.join(_excluded)} (already tried); "
+                        f"using {_next} instead"
+                    )
+                else:
+                    log.warning(
+                        "[PROBE] CASCADE: strategy %r excluded but no next rung found "
+                        "in ladder %s — keeping original recommendation",
+                        profile.recommended_strategy, profile.strategy_ladder,
+                    )
 
             # ── Stage 2: Fetch a sample course page for Gemini context ─────────
             sample_urls = (

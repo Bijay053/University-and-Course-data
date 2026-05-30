@@ -670,6 +670,8 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             _uni_cfg.discovery.always_sitemap_supplement,
         )
         # ── Log active auto_config so scrape runs are traceable ───────────────
+        _ac_strategy = "unknown"  # initialise before conditional so CASCADE can always read it
+        _ac_ladder: list[str] = []
         if uni_scrape_config and uni_scrape_config.get("auto_config"):
             _ac = uni_scrape_config["auto_config"]
             _ac_strategy = _ac.get("_strategy", "unknown")
@@ -804,6 +806,50 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 job.error_message = _failure_msg
                 await db.commit()
                 return
+
+        # ── Auto-config generic search API routing ────────────────────────────
+        # When the probe detected a hosted search API (SearchStax, Algolia…)
+        # it wrote _api_provider + _api_endpoint_hint into auto_config.
+        # Route to the generic provider here if no YAML override already
+        # handled it (the YAML searchstax block above sets links if non-empty).
+        # This is what makes "enter URL → autonomous scrape" work for any
+        # university whose site embeds a known search API — no YAML required.
+        if not links and uni_scrape_config:
+            _auto_cfg = uni_scrape_config.get("auto_config") or {}
+            _auto_provider = _auto_cfg.get("_api_provider", "")
+            _auto_endpoint = _auto_cfg.get("_api_endpoint_hint", "")
+            if _auto_provider and _auto_endpoint and _searchstax_cfg is None:
+                log.info(
+                    "[GENERIC_API] Auto-config detected provider=%r endpoint=%s — "
+                    "routing to generic_search_api (no YAML required)",
+                    _auto_provider, _auto_endpoint[:80],
+                )
+                try:
+                    from app.services.scraper.generic_search_api import fetch_generic_api_links
+                    _generic_links = await fetch_generic_api_links(
+                        provider=_auto_provider,
+                        endpoint_hint=_auto_endpoint,
+                        auto_config=_auto_cfg,
+                        emit=emit,
+                    )
+                    if _generic_links:
+                        links = _generic_links
+                        _always_browser = False  # API replaces discovery tiers
+                        log.info(
+                            "[GENERIC_API] %d links from %r provider",
+                            len(links), _auto_provider,
+                        )
+                    else:
+                        log.warning(
+                            "[GENERIC_API] provider=%r returned 0 links — "
+                            "falling through to BFS/browser discovery",
+                            _auto_provider,
+                        )
+                except Exception as _gap_exc:
+                    log.error(
+                        "[GENERIC_API] provider=%r failed: %s",
+                        _auto_provider, _gap_exc, exc_info=True,
+                    )
 
         # ── Scrapy spider provider ────────────────────────────────────────────
         # When a uni's YAML declares a discovery.scrapy block, run the named
@@ -2531,7 +2577,11 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     )
                 )).scalar()
                 _avg = float(_avg_row) if _avg_row is not None else 0.0
-                _poor = _staged_n < 5 or _avg < 50.0
+                # Threshold: 70 % aligns with "good enough to improve on"
+                # while leaving headroom below the 85 % auto-publish bar.
+                # Previously 50 % — too permissive; a 65 % result would never
+                # cascade even though it falls well short of the publish gate.
+                _poor = _staged_n < 5 or _avg < 70.0
                 if _poor and _has_yaml:
                     # Per-uni YAML exists and takes precedence over auto-config.
                     # Don't overwrite the operator's hand-tuned settings.
@@ -2543,18 +2593,21 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     )
                 elif _poor:
                     # No YAML + poor results → dispatch autonomous probe + config.
-                    # The probe runs as a separate Celery task so it doesn't block
-                    # the current scrape worker. The NEXT scrape for this university
-                    # will pick up the auto_config written to scrape_config.
+                    # Pass the strategy that just failed so the probe can skip it
+                    # and pick the next rung on the escalation ladder.
                     log.info(
                         "[CASCADE] poor result for uni_id=%s slug=%r "
                         "(staged=%d avg_completeness=%.1f no per-uni YAML) — "
-                        "dispatching auto-probe task",
-                        uni_id, _slug, _staged_n, _avg,
+                        "dispatching auto-probe (exclude_strategy=%r)",
+                        uni_id, _slug, _staged_n, _avg, _ac_strategy,
                     )
                     try:
                         from app.tasks.scrape_tasks import probe_and_configure as _probe_task
-                        _probe_task.delay(uni_id)
+                        _probe_task.delay(
+                            uni_id,
+                            triggered_by="cascade",
+                            exclude_strategies=[_ac_strategy] if _ac_strategy != "unknown" else [],
+                        )
                         log.info(
                             "[CASCADE] probe_and_configure dispatched for uni_id=%s", uni_id
                         )
