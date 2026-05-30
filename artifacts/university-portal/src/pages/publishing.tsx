@@ -190,10 +190,8 @@ export default function PublishingPage() {
   });
 
   const { data: queue = [], isLoading: queueLoading, refetch: refetchQueue } = useQuery<ReviewItem[]>({
-    queryKey: ["pub-queue", decisionFilter],
-    queryFn: () => apiFetch(
-      `/api/publishing/review-queue?limit=2000${decisionFilter !== "all" ? `&decision=${decisionFilter}` : ""}`
-    ),
+    queryKey: ["pub-queue"],
+    queryFn: () => apiFetch("/api/publishing/review-queue?limit=2000"),
     refetchInterval: 15000,
   });
 
@@ -260,12 +258,11 @@ export default function PublishingPage() {
   };
 
   const searchLower = search.toLowerCase();
-  const filteredQueue = searchLower
-    ? queue.filter(r =>
-        r.course_name.toLowerCase().includes(searchLower) ||
-        r.university_name.toLowerCase().includes(searchLower)
-      )
-    : queue;
+  const filteredQueue = queue.filter(r => {
+    if (decisionFilter !== "all" && r.pub_decision !== decisionFilter) return false;
+    if (searchLower && !r.course_name.toLowerCase().includes(searchLower) && !r.university_name.toLowerCase().includes(searchLower)) return false;
+    return true;
+  });
   const totalPages = Math.max(1, Math.ceil(filteredQueue.length / pageSize));
   const safePage = Math.min(page, totalPages);
   const paginatedQueue = filteredQueue.slice((safePage - 1) * pageSize, safePage * pageSize);
