@@ -86,11 +86,28 @@ def _normalise_csu_course_url(raw: str) -> str | None:
 
     return _CSU_ORIGIN + path
 
-# Maximum scroll attempts before giving up on pagination (fallback path only)
-_MAX_SCROLL_ITERS = 30
+# Maximum scroll attempts before giving up on pagination (fallback path only).
+# Reduced from 30: 10 × 1.5 s = 15 s max scroll time vs 75 s previously.
+_MAX_SCROLL_ITERS = 10
 
 # Seconds to wait after each scroll / button click for content to render
-_SCROLL_SETTLE_S = 2.5
+_SCROLL_SETTLE_S = 1.5
+
+# Hard cap on total time (seconds) for the entire browser discovery operation.
+# Prevents an indefinite hang when Cloudflare or the browser pool stalls.
+_BROWSER_TOTAL_TIMEOUT_S = 90.0
+
+# Cloudflare challenge page markers — any one of these in the <body> text means
+# we've landed on a Cloudflare interstitial that Playwright cannot bypass from a
+# datacenter IP.  Bail immediately rather than burning the scroll budget.
+_CF_CHALLENGE_MARKERS = (
+    "just a moment",
+    "checking your browser",
+    "enable javascript and cookies to continue",
+    "cf-mitigated",
+    "cloudflare ray id",
+    "attention required",
+)
 
 # Minimum number of entries in window.course_finder.resultsArr before we trust
 # it as a complete listing and skip the scroll fallback.  CSU currently returns
@@ -259,31 +276,48 @@ async def browser_discover_csu_international(
 
     links: list[dict] = []
 
-    try:
+    async def _browser_op() -> list[dict]:
+        """Inner coroutine so we can wrap the whole thing in wait_for()."""
+        nonlocal links
+
+        await _emit("[DISCOVER] CSU: acquiring browser page from pool…")
         async with _pool.page() as page:
+            await _emit("[DISCOVER] CSU: browser page acquired — navigating (load commit)…")
             await page.set_extra_http_headers({"Referer": "https://www.google.com/"})
 
-            # ── 2. Navigate ──────────────────────────────────────────────
+            # ── 2. Navigate — use "commit" so we don't wait forever on
+            # networkidle for a SPA that continuously fires XHR requests.
+            # A separate networkidle wait with a short timeout follows.
             try:
                 await page.goto(
                     _LISTING_URL,
-                    wait_until="networkidle",
-                    timeout=60_000,
+                    wait_until="commit",
+                    timeout=30_000,
                 )
+                await _emit("[DISCOVER] CSU: navigation committed — waiting for networkidle…")
+                try:
+                    await page.wait_for_load_state("networkidle", timeout=20_000)
+                    await _emit("[DISCOVER] CSU: page reached networkidle")
+                except _PwTimeout:
+                    await _emit(
+                        "[DISCOVER] CSU: networkidle timeout (20 s) — continuing with partial DOM"
+                    )
+                    log.warning(
+                        "csu_browser_discover: networkidle timed out — continuing with partial DOM"
+                    )
             except _PwTimeout:
-                log.warning(
-                    "csu_browser_discover: goto networkidle timed out — "
-                    "continuing with partial DOM"
-                )
+                log.warning("csu_browser_discover: goto commit timed out — aborting")
+                await _emit("[DISCOVER] CSU: goto timed out — falling back")
+                return []
             except Exception as exc:
                 log.warning("csu_browser_discover: goto failed — %s", exc)
                 await _emit(f"[DISCOVER] CSU: navigation failed ({exc}) — falling back")
                 return []
 
-            # ── 2b. Error-page sniff ─────────────────────────────────────
+            # ── 2b. Error-page sniff (Chromium errors + Cloudflare challenge)
             try:
                 partial = await asyncio.wait_for(page.content(), timeout=5.0)
-                lowered = (partial or "")[:4096].lower()
+                lowered = (partial or "")[:8192].lower()
                 if (
                     "neterror" in lowered
                     or "chrome-error://" in lowered
@@ -291,18 +325,31 @@ async def browser_discover_csu_international(
                     or "err_connection_" in lowered
                     or "err_cert_" in lowered
                 ):
+                    log.warning("csu_browser_discover: Chromium error page — falling back")
+                    await _emit("[DISCOVER] CSU: Chromium error page detected — falling back")
+                    return []
+                # Cloudflare challenge detection — bail immediately instead of
+                # burning 75 s of scroll budget on a page we can't read.
+                if any(m in lowered for m in _CF_CHALLENGE_MARKERS):
                     log.warning(
-                        "csu_browser_discover: Chromium error page detected — falling back"
+                        "csu_browser_discover: Cloudflare challenge detected — "
+                        "datacenter IP blocked; falling back to sitemap/BFS"
                     )
                     await _emit(
-                        "[DISCOVER] CSU: Chromium error page detected — falling back"
+                        "[DISCOVER] CSU: Cloudflare challenge page detected — "
+                        "browser discovery cannot bypass CF from this IP; "
+                        "falling back to sitemap/BFS discovery"
                     )
                     return []
+                await _emit(
+                    f"[DISCOVER] CSU: page loaded OK ({len(partial):,} bytes) — "
+                    "extracting course data…"
+                )
             except Exception:
                 pass
 
             # ── 3. Initial settle ────────────────────────────────────────
-            await asyncio.sleep(4.0)
+            await asyncio.sleep(3.0)
 
             # ── 4. Primary: extract from window.course_finder.resultsArr ─
             # The widget loads the full filtered dataset into resultsArr on
@@ -450,12 +497,27 @@ async def browser_discover_csu_international(
                 if len(links) >= max_courses:
                     break
 
+        return await _validate_and_return(links, emit_fn=_emit)
+
+    # ── Run _browser_op with a hard total timeout ─────────────────────────
+    try:
+        return await asyncio.wait_for(
+            _browser_op(), timeout=_BROWSER_TOTAL_TIMEOUT_S
+        )
+    except asyncio.TimeoutError:
+        log.warning(
+            "csu_browser_discover: hard timeout (%gs) exceeded — falling back",
+            _BROWSER_TOTAL_TIMEOUT_S,
+        )
+        await _emit(
+            f"[DISCOVER] CSU: browser discovery exceeded {_BROWSER_TOTAL_TIMEOUT_S:.0f}s "
+            "hard limit — falling back to sitemap/BFS"
+        )
+        return []
     except Exception as exc:
         log.warning("csu_browser_discover: unexpected error — %s", exc)
         await _emit(f"[DISCOVER] CSU: browser discovery error — {exc}")
         return []
-
-    return await _validate_and_return(links, emit_fn=_emit)
 
 
 async def _validate_and_return(links: list[dict], *, emit_fn) -> list[dict]:
