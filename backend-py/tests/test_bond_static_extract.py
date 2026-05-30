@@ -242,15 +242,28 @@ class TestBondDiscoveryNonCoursePatterns:
 # ─────────────────────────────────────────────────────────────────────────────
 
 class TestSiblingCacheMinQuorum:
-    """Verifies that min_quorum=2 suppresses backfill from a single source."""
+    """Verifies the sibling-cache backfill behaviour.
+
+    History:
+    - Week 1 Prompt 6: min_quorum raised from 1 → 2 (quorum gate).
+    - 2026-05-15: _SIBLING_BACKFILL_SLOTS emptied globally — IELTS (and all
+      English-test scores) are no longer propagated between sibling courses.
+
+    Concrete failure that prompted the global disable: Flinders' Master of
+    Science (Biology) and Master of Science (Environmental Science) staged with
+    ielts_overall=6.0 inherited from an 8-course postgrad consensus even though
+    those course pages publish no IELTS at all.  The user's stance:
+    "if there is no IELTS, leave blank — do not add from a sibling."
+
+    The min_quorum gate remains in place so it can be re-engaged immediately
+    when any slot is re-added to _SIBLING_BACKFILL_SLOTS in the future.
+    """
 
     def _make_result(self, course_name: str, ielts: float | None) -> dict:
         payload: dict = {"course_name": course_name, "degree_level": "Bachelor's"}
         evidence: list = []
         if ielts is not None:
             payload["ielts_overall"] = ielts
-            # Week 1 Prompt 4 — only "regex" / "css_selector" /
-            # "gemini_primary" methods at conf >= 0.7 may seed the cache.
             evidence.append({
                 "field_key": "ielts_overall",
                 "value": ielts,
@@ -260,8 +273,8 @@ class TestSiblingCacheMinQuorum:
             })
         return {"url": "https://bond.edu.au/program/test", "payload": payload, "evidence": evidence}
 
-    def test_single_source_blocked_by_quorum_2(self) -> None:
-        """Only one course has IELTS — quorum=2 should not backfill the others."""
+    def test_single_source_no_backfill(self) -> None:
+        """Only one course has IELTS — no backfill (slots globally disabled)."""
         from app.services.scraper.sibling_cache import _build_bucket_cache
         results = [
             self._make_result("Bachelor of Laws", 6.5),
@@ -269,12 +282,17 @@ class TestSiblingCacheMinQuorum:
             self._make_result("Bachelor of Business", None),
         ]
         cache, _origins, _prov = _build_bucket_cache(results, min_quorum=2)
-        # Undergraduate bucket should be empty — only 1 source for IELTS 6.5
         ug_cache = cache.get("undergraduate", {})
         assert "ielts_overall" not in ug_cache
 
-    def test_two_sources_meet_quorum_2(self) -> None:
-        """Two courses agree on IELTS 6.5 — quorum=2 allows backfill."""
+    def test_two_sources_no_backfill_slots_globally_disabled(self) -> None:
+        """Even when quorum=2 is met, no IELTS backfill occurs.
+
+        _SIBLING_BACKFILL_SLOTS is globally empty since 2026-05-15 — the
+        min_quorum check is never reached because no slots are accumulated
+        into the counter in the first place.  The cache is always empty for
+        English-test fields regardless of how many courses agree.
+        """
         from app.services.scraper.sibling_cache import _build_bucket_cache
         results = [
             self._make_result("Bachelor of Laws", 6.5),
@@ -283,21 +301,22 @@ class TestSiblingCacheMinQuorum:
         ]
         cache, _origins, _prov = _build_bucket_cache(results, min_quorum=2)
         ug_cache = cache.get("undergraduate", {})
-        assert ug_cache.get("ielts_overall") == 6.5
+        # ielts_overall is NOT backfilled — _SIBLING_BACKFILL_SLOTS = ()
+        assert ug_cache.get("ielts_overall") is None
 
-    def test_default_quorum_is_two_after_prompt_6(self) -> None:
-        """Week 1 Prompt 6 raised the default ``min_quorum`` from 1 → 2.
-        A single source no longer seeds the cache by default — the
-        caller must explicitly pass ``min_quorum=1`` to opt back into
-        the legacy behaviour."""
+    def test_cache_always_empty_regardless_of_quorum(self) -> None:
+        """With _SIBLING_BACKFILL_SLOTS empty, quorum setting has no effect.
+
+        Both min_quorum=2 (default) and min_quorum=1 produce an empty cache
+        because no slots are eligible for accumulation.
+        """
         from app.services.scraper.sibling_cache import _build_bucket_cache
         results = [
             self._make_result("Bachelor of Laws", 6.5),
             self._make_result("Bachelor of Commerce", None),
         ]
-        # Default = 2 → single source is suppressed.
         cache_default, _o, _p = _build_bucket_cache(results)
         assert cache_default.get("undergraduate", {}).get("ielts_overall") is None
-        # Explicit opt-in to legacy quorum=1 still works.
-        cache_legacy, _o, _p = _build_bucket_cache(results, min_quorum=1)
-        assert cache_legacy.get("undergraduate", {}).get("ielts_overall") == 6.5
+        # Even with quorum lowered to 1, slots are still globally disabled.
+        cache_q1, _o, _p = _build_bucket_cache(results, min_quorum=1)
+        assert cache_q1.get("undergraduate", {}).get("ielts_overall") is None
