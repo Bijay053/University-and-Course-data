@@ -295,17 +295,33 @@ export default function PublishingPage() {
           method: "POST",
           body: JSON.stringify({ reason }),
         }),
+      onMutate: async ({ id }) => {
+        // Cancel any in-flight refetches so they don't overwrite the optimistic removal
+        await qc.cancelQueries({ queryKey: ["pub-queue"] });
+        const previousQueue = qc.getQueryData<ReviewItem[]>(["pub-queue"]);
+        // Instantly remove the acted-on item from the visible queue
+        qc.setQueryData<ReviewItem[]>(["pub-queue"], old => (old ?? []).filter(item => item.id !== id));
+        return { previousQueue };
+      },
       onSuccess: (_d, { id }) => {
         const labels = { approve: "Approved ✓", reject: "Rejected", hold: "Held" };
-        toast({ title: labels[action], description: `Course action recorded` });
+        toast({ title: labels[action], description: "Course action recorded" });
+        setActionReason(r => { const n = { ...r }; delete n[id]; return n; });
+        setPendingItemId(null);
+      },
+      onError: (e, _vars, context) => {
+        // Roll back the optimistic removal
+        if (context?.previousQueue) qc.setQueryData(["pub-queue"], context.previousQueue);
+        toast({ title: "Action failed", description: String(e), variant: "destructive" });
+        setPendingItemId(null);
+      },
+      onSettled: () => {
+        // Background sync after server responds (success or failure)
         qc.invalidateQueries({ queryKey: ["pub-stats"] });
         qc.invalidateQueries({ queryKey: ["pub-queue"] });
         qc.invalidateQueries({ queryKey: ["pub-ledger"] });
         qc.invalidateQueries({ queryKey: ["pub-uni-summary"] });
-        setActionReason(r => { const n = { ...r }; delete n[id]; return n; });
-        setPendingItemId(null);
       },
-      onError: (e) => { toast({ title: "Action failed", description: String(e), variant: "destructive" }); setPendingItemId(null); },
     });
   }
 
