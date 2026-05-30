@@ -8,7 +8,9 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Body, Depends, File, HTTPException, Query, UploadFile, status
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
-from sqlalchemy import desc, func, or_, select
+import json
+
+from sqlalchemy import desc, func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies import get_current_user, get_db
@@ -629,6 +631,108 @@ async def get_probe_result(
         "probe_result": u.probe_result,
         "auto_config": auto_config,
     }
+
+
+# ── Scrape Fix Agent endpoints ────────────────────────────────────────────────
+
+@router.get("/universities/{uni_id}/agent-config")
+async def get_agent_config(
+    uni_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[dict, Depends(get_current_user)],
+) -> dict:
+    """Return the admin UI-writable config layer plus effective summary for the Scrape Fix Agent."""
+    u: University | None = await db.get(University, uni_id)
+    if not u:
+        raise HTTPException(status_code=404, detail="University not found")
+
+    sc: dict = u.scrape_config or {}
+    admin_cfg: dict = sc.get("admin_config") or {}
+
+    # Read the last job stats for health score
+    job_row = (await db.execute(
+        text("""
+            SELECT runtime_job_id, total_found, imported, skipped, errors,
+                   (SELECT ROUND(AVG(completeness), 1)
+                    FROM scraped_courses
+                    WHERE scrape_job_id = j.runtime_job_id
+                      AND completeness IS NOT NULL) AS avg_completeness
+            FROM scrape_runtime_jobs j
+            WHERE j.university_id = :uid
+            ORDER BY j.created_at DESC
+            LIMIT 1
+        """),
+        {"uid": uni_id},
+    )).mappings().first()
+
+    job_stats = dict(job_row) if job_row else {}
+
+    # Derive health score (0-100):
+    #   40 pts: found-to-expected ratio
+    #   30 pts: average completeness
+    #   30 pts: staged-to-found ratio (no errors/rejects)
+    min_expected = int((admin_cfg.get("_min_expected_courses") or 0))
+    found = int(job_stats.get("total_found") or 0)
+    imported = int(job_stats.get("imported") or 0)
+    avg_comp = float(job_stats.get("avg_completeness") or 0)
+
+    score_found = 40 * min(found / max(min_expected, 1), 1.0) if min_expected else (40 if found >= 10 else 40 * found / 10)
+    score_comp  = 30 * min(avg_comp / 100.0, 1.0)
+    score_stage = 30 * min(imported / max(found, 1), 1.0) if found else 0
+    health_score = round(score_found + score_comp + score_stage)
+
+    return {
+        "university_id": uni_id,
+        "university_name": u.name,
+        "scrape_url": u.scrape_url or "",
+        "admin_config": admin_cfg,
+        "health_score": health_score,
+        "latest_job_id": job_stats.get("runtime_job_id"),
+        "job_stats": {
+            "total_found": found,
+            "imported": imported,
+            "skipped": int(job_stats.get("skipped") or 0),
+            "errors": int(job_stats.get("errors") or 0),
+            "avg_completeness_pct": round(avg_comp, 1),
+            "min_expected_courses": min_expected,
+        },
+    }
+
+
+@router.put("/universities/{uni_id}/agent-config")
+async def put_agent_config(
+    uni_id: int,
+    body: dict,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[dict, Depends(get_current_user)],
+) -> dict:
+    """Write admin UI rules to DB scrape_config.admin_config (Scrape Fix Agent write layer).
+
+    The body is a partial config matching the UniConfig schema structure, e.g.::
+
+        {
+          "discovery": {"must_contain": ["/courses/"], "bfs_page_budget": 80},
+          "extraction": {"filters": {"online_only": {"enabled": true}}},
+          "_min_expected_courses": 100
+        }
+
+    Values are stored in ``scrape_config.admin_config`` and merged into the
+    scraper's config chain between auto_config and the per-uni YAML override.
+    """
+    u: University | None = await db.get(University, uni_id)
+    if not u:
+        raise HTTPException(status_code=404, detail="University not found")
+
+    sc: dict = dict(u.scrape_config or {})
+    sc["admin_config"] = body
+
+    await db.execute(
+        text("UPDATE universities SET scrape_config = :cfg::jsonb WHERE id = :id"),
+        {"cfg": json.dumps(sc), "id": uni_id},
+    )
+    await db.commit()
+
+    return {"ok": True, "university_id": uni_id, "admin_config": body}
 
 
 def _to_camel_uni(u) -> dict:

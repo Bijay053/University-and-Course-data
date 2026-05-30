@@ -16,7 +16,7 @@ import {
   Building2, MapPin, Globe, Search, ChevronLeft, ChevronRight, X,
   BookOpen, Languages, GraduationCap, Award, ExternalLink,
   Database, CheckCircle2, Clock, Trash2, Pencil, Upload, RefreshCw, GitMerge,
-  ChevronsUpDown, Check, AlertTriangle, ClipboardList, Plus, Star, Wrench, Loader2, XCircle, Zap,
+  ChevronsUpDown, Check, AlertTriangle, ClipboardList, Plus, Star, Wrench, Loader2, XCircle, Zap, Bot,
   GitCompareArrows,
   Network,
   ChevronDown,
@@ -1872,6 +1872,16 @@ export default function UniversityDetail() {
             >
               <Wrench className="h-3.5 w-3.5 mr-1" />
               Repair Scrape
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 px-2.5 border-blue-300 text-blue-700 hover:bg-blue-50 transition-colors"
+              onClick={() => window.location.href = `/universities/${id}/scrape-agent`}
+              title="Open Scrape Fix Agent — diagnose issues, edit rules, apply AI fixes without any code"
+            >
+              <Bot className="h-3.5 w-3.5 mr-1" />
+              Scrape Agent
             </Button>
             <Button
               variant="outline"

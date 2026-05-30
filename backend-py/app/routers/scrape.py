@@ -3156,7 +3156,7 @@ Bad location values detected (nav/footer text saved as location):
 {bad_locations[:3] if bad_locations else 'None detected'}
 
 Diagnose the scraping failure in plain English for a non-technical admin.
-Return your response as JSON with this exact structure:
+Return your response as JSON with this EXACT structure (no other keys):
 {{
   "summary": "One-sentence plain English summary of what went wrong",
   "root_causes": [
@@ -3166,10 +3166,35 @@ Return your response as JSON with this exact structure:
     {{"action": "Short action label", "detail": "What to do and why", "auto_fixable": true|false}}
   ],
   "discovery_verdict": "ok|low_count|api_driven|blocked_by_cloudflare|unknown",
-  "location_verdict": "ok|nav_text_contamination|missing|unknown"
+  "location_verdict": "ok|nav_text_contamination|missing|unknown",
+  "suggested_config": {{
+    "discovery": {{
+      "must_contain": [],
+      "block_url_patterns": [],
+      "allow_url_patterns": [],
+      "always_browser_discover": false,
+      "always_sitemap_supplement": false,
+      "bfs_page_budget": null,
+      "extra_course_urls": []
+    }},
+    "extraction": {{
+      "filters": {{
+        "online_only": {{"enabled": true}}
+      }}
+    }},
+    "_min_expected_courses": null
+  }}
 }}
 
-Be specific about UEL's Cloudflare protection and JavaScript-rendered course listings if relevant.
+Rules for suggested_config:
+- Only include keys that need to CHANGE from defaults. Remove null/empty values.
+- If discovery found very few courses (<10), suggest specific must_contain patterns or bfs_page_budget increases.
+- If the site uses JS rendering, set always_browser_discover to true.
+- If online-only courses should be excluded, set extraction.filters.online_only.enabled to true.
+- If you know listing page URLs, put them in extra_course_urls.
+- Set _min_expected_courses to your best estimate of total courses the university offers.
+- Return empty dict {{}} for suggested_config if you cannot determine any safe config changes.
+
 Return only valid JSON, no markdown fences."""
 
     try:
@@ -3203,10 +3228,26 @@ Return only valid JSON, no markdown fences."""
         except Exception:
             diagnosis = {"summary": raw_text, "root_causes": [], "recommended_actions": []}
 
+    # Extract suggested_config from diagnosis (may be {} if AI returned nothing)
+    suggested_config = diagnosis.pop("suggested_config", {}) or {}
+    # Strip null/empty values from suggested_config to reduce noise
+    def _clean_cfg(d: dict) -> dict:
+        out: dict = {}
+        for k, v in d.items():
+            if isinstance(v, dict):
+                cleaned = _clean_cfg(v)
+                if cleaned:
+                    out[k] = cleaned
+            elif v is not None and v != [] and v != "":
+                out[k] = v
+        return out
+    suggested_config = _clean_cfg(suggested_config)
+
     return {
         "ok": True,
         "job_id": job_id,
         "university": uni_name,
+        "university_id": job.university_id,
         "scrape_url": scrape_url,
         "job_stats": {
             "total_found": job.total_found or 0,
@@ -3217,4 +3258,76 @@ Return only valid JSON, no markdown fences."""
         },
         "bad_location_samples": bad_locations[:3],
         "diagnosis": diagnosis,
+        "suggested_config": suggested_config,
+    }
+
+
+@router.post("/jobs/{job_id}/apply-fix")
+async def apply_scrape_fix(
+    job_id: str,
+    body: dict,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[dict, Depends(get_current_user)],
+) -> dict:
+    """Apply an AI-suggested or manually-specified config patch to the university's admin_config.
+
+    Body::
+
+        {
+          "config_patch": {
+            "discovery": {"bfs_page_budget": 80, "must_contain": ["/courses/"]},
+            "extraction": {"filters": {"online_only": {"enabled": true}}},
+            "_min_expected_courses": 100
+          }
+        }
+
+    The patch is deep-merged into ``scrape_config.admin_config``.  Existing
+    admin_config keys not present in the patch are preserved.  Send an empty
+    patch ``{}`` to clear the admin_config entirely.
+    """
+    from sqlalchemy import text as _text
+
+    job = (await db.execute(
+        _text("SELECT university_id FROM scrape_runtime_jobs WHERE runtime_job_id = :j"),
+        {"j": job_id},
+    )).mappings().first()
+    if not job:
+        raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
+
+    uni_id = job["university_id"]
+    config_patch: dict = body.get("config_patch") or {}
+
+    row = (await db.execute(
+        _text("SELECT scrape_config FROM universities WHERE id = :id"),
+        {"id": uni_id},
+    )).mappings().first()
+    if not row:
+        raise HTTPException(status_code=404, detail="University not found")
+
+    sc: dict = dict(row.get("scrape_config") or {})
+    existing: dict = sc.get("admin_config") or {}
+
+    def _deep_merge_local(base: dict, override: dict) -> dict:
+        result = dict(base)
+        for k, v in override.items():
+            if k in result and isinstance(result[k], dict) and isinstance(v, dict):
+                result[k] = _deep_merge_local(result[k], v)
+            else:
+                result[k] = v
+        return result
+
+    sc["admin_config"] = _deep_merge_local(existing, config_patch)
+
+    await db.execute(
+        _text("UPDATE universities SET scrape_config = :cfg::jsonb WHERE id = :id"),
+        {"cfg": json.dumps(sc), "id": uni_id},
+    )
+    await db.commit()
+
+    return {
+        "ok": True,
+        "job_id": job_id,
+        "university_id": uni_id,
+        "applied_patch": config_patch,
+        "new_admin_config": sc["admin_config"],
     }

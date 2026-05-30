@@ -27,6 +27,7 @@ import UsersPage from "@/pages/users";
 import PerformancePage from "@/pages/performance";
 import MonitoringPage from "@/pages/monitoring";
 import PublishingPage from "@/pages/publishing";
+import ScrapeAgentPage from "@/pages/scrape-agent";
 
 const queryClient = new QueryClient();
 
@@ -82,6 +83,7 @@ function Router() {
               <Route path="/performance" component={PerformancePage} />
               <Route path="/monitoring" component={MonitoringPage} />
               <Route path="/publishing" component={PublishingPage} />
+              <Route path="/universities/:id/scrape-agent" component={ScrapeAgentPage} />
               <Route component={NotFound} />
             </Switch>
           </Layout>

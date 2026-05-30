@@ -66,10 +66,12 @@ type DiagnoseResult = {
   ok: boolean;
   job_id: string;
   university?: string;
+  university_id?: number;
   job_stats?: { total_found: number; imported: number; skipped: number; errors: number; avg_completeness_pct: number };
   bad_location_samples?: string[];
   diagnosis?: DiagnosisPayload;
   fallback?: DiagnosisPayload;
+  suggested_config?: Record<string, unknown>;
   error?: string;
 };
 
@@ -197,6 +199,8 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
   const [diagnoseResult, setDiagnoseResult] = useState<DiagnoseResult | null>(null);
   const [diagnoseLoading, setDiagnoseLoading] = useState(false);
   const [showDiagnosePanel, setShowDiagnosePanel] = useState(false);
+  const [applyingFix, setApplyingFix] = useState(false);
+  const [fixApplied, setFixApplied] = useState(false);
 
   const pollRef = useRef<number | null>(null);
   const logIndexRef = useRef(0);
@@ -280,6 +284,27 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
       setDiagnoseResult({ ok: false, job_id: jobId, error: String(e) });
     } finally {
       setDiagnoseLoading(false);
+    }
+  }, []);
+
+  const applyFix = useCallback(async (jobId: string, patch: Record<string, unknown>) => {
+    setApplyingFix(true);
+    try {
+      const res = await fetch(`/api/scrape/jobs/${jobId}/apply-fix`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ config_patch: patch }),
+      });
+      if (!res.ok) {
+        const msg = await getFetchErrorMessage(res);
+        console.error("apply-fix failed:", msg);
+        return;
+      }
+      setFixApplied(true);
+    } catch (e) {
+      console.error("apply-fix error:", e);
+    } finally {
+      setApplyingFix(false);
     }
   }, []);
 
@@ -1097,8 +1122,42 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
                             </div>
                           )}
 
-                          {/* Re-run diagnosis button */}
-                          <div className="flex items-center gap-2 pt-1 border-t border-gray-100">
+                          {/* AI suggested config fix */}
+                          {(() => {
+                            const sc = diagnoseResult?.suggested_config;
+                            const hasSc = sc && Object.keys(sc).length > 0;
+                            if (!hasSc) return null;
+                            return (
+                              <div className="rounded border border-green-200 bg-green-50 p-2 space-y-1.5">
+                                <p className="text-[10px] font-semibold text-green-800 flex items-center gap-1">
+                                  <Zap className="w-2.5 h-2.5" /> AI has suggested config changes
+                                </p>
+                                <pre className="text-[9px] bg-white border border-green-100 rounded p-1.5 overflow-auto max-h-[100px] text-gray-700 font-mono leading-relaxed">
+                                  {JSON.stringify(sc, null, 2)}
+                                </pre>
+                                <div className="flex items-center gap-1.5">
+                                  {fixApplied ? (
+                                    <span className="text-[10px] text-green-700 flex items-center gap-1">
+                                      <CheckCheck className="w-3 h-3" /> Fix applied — re-run scrape to see results
+                                    </span>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={() => applyFix(completedJobId, sc as Record<string, unknown>)}
+                                      disabled={applyingFix}
+                                      className="text-[10px] bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded flex items-center gap-1 disabled:opacity-50"
+                                    >
+                                      {applyingFix ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <CheckCheck className="w-2.5 h-2.5" />}
+                                      Apply AI Fix
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })()}
+
+                          {/* Re-run diagnosis + Open Scrape Agent */}
+                          <div className="flex items-center gap-2 pt-1 border-t border-gray-100 flex-wrap">
                             <button
                               type="button"
                               onClick={() => fetchDiagnose(completedJobId)}
@@ -1107,6 +1166,14 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
                             >
                               <Bot className="w-3 h-3" /> Re-run diagnosis
                             </button>
+                            {(diagnoseResult?.university_id || (selectedUni && selectedUni !== ALL)) && (
+                              <a
+                                href={`/universities/${diagnoseResult?.university_id || selectedUni}/scrape-agent`}
+                                className="text-[10px] text-purple-600 hover:text-purple-800 flex items-center gap-1 ml-auto"
+                              >
+                                <Bot className="w-3 h-3" /> Open Scrape Fix Agent →
+                              </a>
+                            )}
                           </div>
                         </>
                       );

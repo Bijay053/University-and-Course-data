@@ -178,6 +178,21 @@ def _extract_auto_config(db_cfg: dict[str, Any]) -> dict[str, Any]:
     return {k: v for k, v in auto_cfg.items() if k not in _AUTO_CONFIG_META_KEYS}
 
 
+def _extract_admin_config(db_cfg: dict[str, Any]) -> dict[str, Any]:
+    """Extract the admin UI-written config from DB scrape_config.
+
+    Written by the portal's Scrape Fix Agent under ``scrape_config["admin_config"]``.
+    Priority: above auto_config (probe), below per-uni YAML (emergency override).
+
+    Keys starting with ``_`` are metadata-only (e.g. ``_min_expected_courses``)
+    and are stripped before passing to Pydantic to avoid validation errors.
+    """
+    admin_cfg = db_cfg.get("admin_config")
+    if not admin_cfg or not isinstance(admin_cfg, dict):
+        return {}
+    return {k: v for k, v in admin_cfg.items() if not k.startswith("_")}
+
+
 def load_uni_config(
     *,
     slug: str,
@@ -229,6 +244,14 @@ def load_uni_config(
                 slug,
                 db_scrape_config.get("auto_config", {}).get("_strategy", "unknown"),
             )
+
+        # 3.5. Merge admin UI config (Scrape Fix Agent writes here).
+        #      Priority: above auto_config, below per-uni YAML.
+        #      YAML still wins as the emergency developer override.
+        admin_cfg = _extract_admin_config(db_scrape_config)
+        if admin_cfg:
+            merged = _deep_merge(merged, admin_cfg)
+            log.debug("Admin UI config applied for slug=%r", slug)
 
     # 4. Load and merge per-uni YAML (highest priority — emergency override only)
     #
