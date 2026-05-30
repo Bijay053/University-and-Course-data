@@ -4933,7 +4933,7 @@ export default function UniversityDetail() {
                             </td>
                             <td className="px-2 py-1.5 align-top">
                               <div className="flex flex-wrap gap-1">
-                                {c.missing.map((m) => (
+                                {(c.missing ?? []).map((m) => (
                                   <Badge key={m} variant="outline" className="text-[10px] border-amber-300 text-amber-700 bg-amber-50">
                                     {m}
                                   </Badge>
