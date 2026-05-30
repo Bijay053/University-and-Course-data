@@ -234,7 +234,7 @@ class TestGetAvgCompleteness:
     @pytest.mark.asyncio
     async def test_returns_float_from_scalar(self):
         db = AsyncMock()
-        db.execute.return_value = make_execute_result(scalar_val=0.76)
+        db.execute.return_value = make_execute_result(scalar_val=76)
         avg = await get_avg_completeness("job-1", db)
         assert avg == pytest.approx(0.76)
 
@@ -504,7 +504,7 @@ class TestOverallAvgHandling:
 
     @pytest.mark.asyncio
     async def test_re_queries_db_when_overall_avg_none(self):
-        db = make_db(avg=0.90)  # above threshold
+        db = make_db(avg=90)  # above threshold; DB stores 0-100 integers
         fill_rates = make_fill_rates()
         result = await dispatch_quality_actions(
             university_id=1, job_id="j-dbq", fill_rates=fill_rates,
@@ -548,7 +548,7 @@ class TestInlineImprovedRemeasure:
     @pytest.mark.asyncio
     async def test_overall_after_re_measured_when_improved(self):
         execute_calls: list = []
-        scalar_values = [0.78]  # re-measurement value
+        scalar_values = [78]  # re-measurement value; DB stores 0-100 integers
 
         class FakeExecute:
             def __init__(self, val: float) -> None:

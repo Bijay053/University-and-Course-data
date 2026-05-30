@@ -135,10 +135,13 @@ def _normalize_value(field_name: str, raw_value: Any) -> str | None:
 
 def compute_field_confidence(
     source_values: dict[str, set[str]],
+    source_evidence_conf: dict[str, float] | None = None,
 ) -> dict[str, Any]:
     """
     Args:
         source_values: {source_type → set of normalised values}
+        source_evidence_conf: optional {source_type → max extractor confidence
+            score (0-1) for that source}, used to tier single-source confidence.
 
     Returns dict with keys:
         verified_value, confidence (int 0-100), status, source_count,
@@ -184,16 +187,31 @@ def compute_field_confidence(
     elif len(source_values) == 1:
         # Single-source calibration — weighted sum only reaches 5–30 which
         # is misleading for otherwise valid single-extraction data.
-        # Use a per-source floor that reflects real extraction reliability.
-        _SINGLE_SOURCE_CONFIDENCE: dict[str, int] = {
-            "api": 80,      # SearchStax / JSON API — very reliable
-            "html": 65,     # regex / CSS / heuristic — reliable
-            "pdf": 65,      # PDF extraction — reliable
+        # Use a per-source table tiered by the extractor's own confidence:
+        #   HIGH (evidence_conf >= 0.70) → treated as verified-quality
+        #   BASE (evidence_conf <  0.70) → likely_correct / needs_review
+        _SINGLE_SOURCE_BASE: dict[str, int] = {
+            "api": 80,      # JSON API — very reliable
+            "html": 65,     # regex / CSS / heuristic
+            "pdf": 65,      # PDF extraction
             "ai": 45,       # Gemini / AI fallback — plausible, unverified
             "pattern": 40,  # sibling cache / inherited — low authority
         }
+        _SINGLE_SOURCE_HIGH: dict[str, int] = {
+            "api": 92,      # high-confidence API — authoritative
+            "html": 85,     # high-confidence HTML extractor
+            "pdf": 85,      # high-confidence PDF extractor
+            "ai": 65,       # high-confidence AI — still treat as plausible
+            "pattern": 55,  # high-confidence pattern — still low authority
+        }
         only_src = next(iter(source_values))
-        confidence = _SINGLE_SOURCE_CONFIDENCE.get(only_src, 40)
+        ev_conf = (source_evidence_conf or {}).get(only_src, 0.0)
+        # Threshold 0.69 (not 0.70) is float32-safe: PostgreSQL stores 0.7
+        # as float32 which retrieves as ~0.699999988, just below 0.70.
+        if ev_conf >= 0.69:
+            confidence = _SINGLE_SOURCE_HIGH.get(only_src, 55)
+        else:
+            confidence = _SINGLE_SOURCE_BASE.get(only_src, 40)
         if confidence >= 85:
             status = "verified"
         elif confidence >= 60:
@@ -260,7 +278,10 @@ async def run_field_verification(
         }
 
     # ── 2. Group by field → source_type → set of normalised values ─────────
+    #        Also track max extractor confidence per (field, source_type) so
+    #        compute_field_confidence can tier single-source results.
     field_sources: dict[str, dict[str, set[str]]] = defaultdict(lambda: defaultdict(set))
+    field_ev_conf: dict[str, dict[str, float]] = defaultdict(lambda: defaultdict(float))
 
     for row in evidence_rows:
         field_key = row.field_key
@@ -270,6 +291,9 @@ async def run_field_verification(
             continue
         src_type = classify_source_type(row.extraction_method)
         field_sources[field_key][src_type].add(norm)
+        ev_conf = float(row.confidence or 0.0)
+        if ev_conf > field_ev_conf[field_key][src_type]:
+            field_ev_conf[field_key][src_type] = ev_conf
 
     if not field_sources:
         return {
@@ -283,7 +307,10 @@ async def run_field_verification(
     # ── 3. Compute confidence per field ────────────────────────────────────
     results: list[dict[str, Any]] = []
     for field_name, src_values in field_sources.items():
-        outcome = compute_field_confidence(dict(src_values))
+        outcome = compute_field_confidence(
+            dict(src_values),
+            source_evidence_conf=dict(field_ev_conf.get(field_name, {})),
+        )
         results.append(
             {
                 "scraped_course_id": scraped_course_id,
