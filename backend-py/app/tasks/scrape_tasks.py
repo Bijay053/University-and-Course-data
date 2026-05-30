@@ -740,12 +740,39 @@ def probe_and_configure(  # noqa: ANN001
                 except Exception as _fetch_exc:
                     log.debug("[PROBE] sample fetch failed: %s", _fetch_exc)
 
+            # ── Stage 2b: Phase 3 — load learned patterns for this platform ──
+            # Compute platform type from the probe (mirrors _derive_platform_type
+            # in auto_config_generator so we don't import it here).
+            _platform_type: str = ""
+            if getattr(profile, "detected_apis", None):
+                _platform_type = (profile.detected_apis[0].provider or "").lower().strip()
+            elif getattr(profile, "library_stack", None) and getattr(
+                profile.library_stack, "situation", None
+            ):
+                _platform_type = profile.library_stack.situation.lower().strip()
+            else:
+                _platform_type = (getattr(profile, "recommended_strategy", None) or "").lower().strip()
+
+            _learned_patterns: dict = {}
+            if _platform_type:
+                try:
+                    from app.services.scraper.pattern_store import lookup_patterns
+                    _learned_patterns = await lookup_patterns(_platform_type, db)
+                    if _learned_patterns:
+                        log.info(
+                            "[PROBE] Phase 3: loaded %d learned patterns for platform=%r uni_id=%d",
+                            len(_learned_patterns), _platform_type, university_id,
+                        )
+                except Exception as _pex:
+                    log.debug("[PROBE] pattern lookup non-fatal: %s", _pex)
+
             # ── Stage 3: Generate the config ───────────────────────────────────
             try:
                 auto_cfg = await generate_config(
                     profile,
                     sample_html=sample_html,
                     sample_urls=sample_urls,
+                    learned_patterns=_learned_patterns or None,
                 )
             except Exception as exc:
                 log.error("[PROBE] generate_config failed for uni_id=%d: %s", university_id, exc)
@@ -916,13 +943,44 @@ def repair_extractor(
             )
 
             # 5. Persist repaired rules into auto_config in the DB
+            # NOTE: signature is (university_id, repaired_rules, db) — run_id first
             applied = await apply_repaired_rules_to_db(
-                db, university_id, new_rules
+                university_id, new_rules, db
             )
             log.info(
                 "[repair_extractor] uni_id=%s applied %d repaired rules: %s",
-                university_id, applied, list(new_rules.keys()),
+                university_id, len(new_rules) if applied else 0, list(new_rules.keys()),
             )
+
+            # Phase 3: promote successful repairs into the learning store so
+            # future universities on the same platform start with these rules.
+            if applied and new_rules:
+                try:
+                    from sqlalchemy import text as _t2
+                    from app.services.scraper.pattern_store import (
+                        promote_patterns,
+                        REPAIR_ESTIMATED_FILL_RATE,
+                    )
+                    _pt_row = await db.execute(
+                        _t2("SELECT scrape_config FROM universities WHERE id = :id"),
+                        {"id": university_id},
+                    )
+                    _pt_first = _pt_row.first()
+                    _pt_sc: dict = (_pt_first[0] if _pt_first else {}) or {}
+                    _repair_platform = _pt_sc.get("auto_config", {}).get("_platform_type", "")
+                    if _repair_platform:
+                        # Optimistic estimated fill rate — corrected by the rescrape
+                        # cascade which will call promote_patterns again with real rates.
+                        _est_rates = {fk: REPAIR_ESTIMATED_FILL_RATE for fk in new_rules}
+                        _n_promoted = await promote_patterns(
+                            _repair_platform, new_rules, _est_rates, db
+                        )
+                        log.info(
+                            "[repair_extractor] Phase 3: promoted %d rules for platform=%r",
+                            _n_promoted, _repair_platform,
+                        )
+                except Exception as _prom_exc:
+                    log.warning("[repair_extractor] promote_patterns non-fatal: %s", _prom_exc)
 
             # 6. Queue a fresh scrape so the repaired rules are exercised
             try:

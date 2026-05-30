@@ -28,6 +28,27 @@ from urllib.parse import urlparse
 log = logging.getLogger(__name__)
 
 
+# ── Platform type derivation ──────────────────────────────────────────────────
+
+def _derive_platform_type(profile: "SiteProfile") -> str:  # type: ignore[name-defined]
+    """Derive a reusable platform-type key from a SiteProfile.
+
+    Priority: explicit API provider > CMS/library situation > strategy fallback.
+    Used as the key in ``scraper_patterns`` so rules learned from one university
+    are applied to future universities on the same platform.
+    """
+    if getattr(profile, "detected_apis", None):
+        provider = profile.detected_apis[0].provider
+        if provider:
+            return provider.lower().strip()
+    ls = getattr(profile, "library_stack", None)
+    if ls:
+        situation = getattr(ls, "situation", None) or ""
+        if situation:
+            return situation.lower().strip()
+    return (getattr(profile, "recommended_strategy", None) or "").lower().strip()
+
+
 # ── Default config templates per strategy ────────────────────────────────────
 
 def _base_config(profile: "SiteProfile") -> dict[str, Any]:  # type: ignore[name-defined]
@@ -62,6 +83,8 @@ def _base_config(profile: "SiteProfile") -> dict[str, Any]:  # type: ignore[name
         "_library_situation": (
             profile.library_stack.situation if profile.library_stack else None
         ),
+        # Phase 3: platform type key used by pattern_store for learning/seeding
+        "_platform_type": _derive_platform_type(profile),
         "_probe_summary": {
             "cloudflare": profile.is_cloudflare_blocked,
             "bot_protected": profile.is_bot_protected,
@@ -134,6 +157,7 @@ async def generate_config(
     profile: "SiteProfile",  # type: ignore[name-defined]
     sample_html: str | None = None,
     sample_urls: list[str] | None = None,
+    learned_patterns: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Generate a UniConfig-compatible dict for this site profile.
 
@@ -177,7 +201,9 @@ async def generate_config(
     if sample_html:
         try:
             from app.services.scraper.ai_extractor_gen import generate_and_store_rules
-            config = await generate_and_store_rules(profile, sample_html, config)
+            config = await generate_and_store_rules(
+                profile, sample_html, config, learned_patterns=learned_patterns
+            )
         except Exception as _gen_exc:
             log.warning(
                 "[AUTO_CONFIG] extraction rule generation failed (non-fatal): %s", _gen_exc

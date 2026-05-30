@@ -2,3 +2,5 @@
 - [Phase 2 autonomous pipeline](phase2-pipeline.md) — Stage 0 CSS/XPath/regex rules injected before heuristics; evidence key is `field_key` not `field`; `attribute="text"` is inner-text sentinel in _apply_css
 - [CASCADE smart split](cascade-split.md) — staged<5 → discovery_failure (probe_and_configure); staged≥5+avg<70% → extraction_failure (repair_extractor); YAML always wins
 - [Repair module arg order](repair-arg-order.md) — `compute_field_fill_rates(scrape_run_id, db)` and `fetch_repair_samples(scrape_run_id, db, n=3)` — run_id first, db second
+- [Phase 3 learning layer](phase3-learning.md) — scraper_patterns table + pattern_store.py; derive_platform_type priority: API provider > library situation > strategy
+- [pytest asyncio isolation](pytest-asyncio-isolation.md) — use asyncio.new_event_loop() not get_event_loop() in sync test helpers; full suite has session-scoped loop that conflicts

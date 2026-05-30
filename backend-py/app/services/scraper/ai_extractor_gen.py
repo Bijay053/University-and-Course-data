@@ -234,10 +234,36 @@ async def generate_extraction_rules(
     return rules
 
 
+def _build_seeded_prompt(learned_patterns: dict[str, Any]) -> str:
+    """Return a prompt section listing proven patterns for this platform.
+
+    Injected between the system prompt and the user template so Gemini
+    starts from experience rather than from zero.  Rules are listed as
+    *suggestions* — Gemini must confirm each rule against the actual HTML.
+    """
+    if not learned_patterns:
+        return ""
+    lines = [
+        "\nPROVEN PATTERNS FROM SUCCESSFUL PAST SCRAPES ON THIS PLATFORM:",
+        "Use these as a starting point. Adopt them only if the HTML confirms they apply.",
+        "If a selector doesn't match the current page, generate a new one instead.",
+        json.dumps(
+            {
+                fk: {k: v for k, v in rule.items() if k in ("css", "xpath", "regex", "attribute", "transform")}
+                for fk, rule in learned_patterns.items()
+            },
+            indent=2,
+        ),
+        "",
+    ]
+    return "\n".join(lines)
+
+
 async def generate_and_store_rules(
     profile: Any,
     sample_html: str,
     auto_config: dict[str, Any],
+    learned_patterns: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Generate extraction rules and merge them into ``auto_config``.
 
@@ -253,29 +279,110 @@ async def generate_and_store_rules(
         HTML of one real course page fetched during probe.
     auto_config:
         The auto_config dict being built (modified in-place).
+    learned_patterns:
+        Phase 3 — rules from ``scraper_patterns`` for this platform type.
+        Injected into the Gemini prompt as proven examples; improves
+        first-probe quality and cuts token usage for well-known platforms.
     """
     if not sample_html:
         log.info("[EXTRACTOR_GEN] No sample HTML — skipping rule generation")
         return auto_config
 
-    try:
-        rules = await generate_extraction_rules(
-            html=sample_html,
+    platform_type = auto_config.get("_platform_type", "")
+    n_learned = len(learned_patterns) if learned_patterns else 0
+    if n_learned:
+        log.info(
+            "[EXTRACTOR_GEN] Seeding Gemini prompt with %d learned patterns "
+            "for platform=%r", n_learned, platform_type,
+        )
+
+    # Build the seeding section (empty string if no learned patterns)
+    seed_section = _build_seeded_prompt(learned_patterns or {})
+
+    html_excerpt = _clean_html_for_prompt(sample_html)
+    target_fields = EXTRACTION_FIELDS + BONUS_FIELDS
+
+    from app.services.ai import gemini_client  # type: ignore[attr-defined]
+
+    prompt = (
+        _SYSTEM_PROMPT
+        + seed_section
+        + "\n\n"
+        + _USER_TEMPLATE.format(
+            fields=json.dumps(target_fields),
             url=getattr(profile, "url", ""),
+            html_excerpt=html_excerpt,
+        )
+    )
+
+    try:
+        resp = await gemini_client.generate(
+            prompt=prompt,
+            call_type="extractor_gen",
         )
     except Exception as exc:
-        log.warning("[EXTRACTOR_GEN] Rule generation failed: %s", exc)
+        log.warning("[EXTRACTOR_GEN] Gemini call failed: %s", exc)
         return auto_config
+
+    if resp.skipped or not resp.text:
+        log.info("[EXTRACTOR_GEN] Gemini skipped (budget/quota) — no rules generated")
+        # Fall back to learned patterns as-is when Gemini is unavailable
+        if learned_patterns:
+            auto_config["extraction_rules"] = dict(learned_patterns)
+            auto_config["_extraction_rules_source"] = "learned_fallback"
+            log.info(
+                "[EXTRACTOR_GEN] Fell back to %d learned patterns for platform=%r",
+                n_learned, platform_type,
+            )
+        return auto_config
+
+    # ── Parse JSON response ──────────────────────────────────────────────────
+    raw = resp.text.strip()
+    raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw, flags=re.M).strip()
+    try:
+        parsed: dict = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        log.warning("[EXTRACTOR_GEN] Non-JSON response: %s — %r", exc, raw[:200])
+        return auto_config
+
+    if not isinstance(parsed, dict):
+        log.warning("[EXTRACTOR_GEN] Expected dict, got %s", type(parsed).__name__)
+        return auto_config
+
+    # ── Validate and filter rules ────────────────────────────────────────────
+    rules: dict[str, dict[str, Any]] = {}
+    for field, rule in parsed.items():
+        if not isinstance(rule, dict):
+            continue
+        conf = float(rule.get("confidence", 0.0))
+        if conf < 0.5:
+            log.debug("[EXTRACTOR_GEN] %s: confidence %.2f < 0.5 — skipped", field, conf)
+            continue
+        if not _validate_rule(field, rule, sample_html):
+            continue
+        rules[field] = {k: v for k, v in rule.items() if v is not None and v != ""}
+
+    # Merge: learned patterns fill in any fields Gemini didn't cover
+    if learned_patterns:
+        for fk, lr in learned_patterns.items():
+            if fk not in rules:
+                rules[fk] = lr
+
+    log.info(
+        "[EXTRACTOR_GEN] Generated %d/%d valid rules from %s "
+        "(%d from Gemini, %d backfilled from learned)",
+        len(rules), len(target_fields), getattr(profile, "url", "?"),
+        len([f for f in rules if f not in (learned_patterns or {})]),
+        len([f for f in rules if f in (learned_patterns or {})]),
+    )
 
     if rules:
         auto_config["extraction_rules"] = rules
         auto_config["_extraction_rules_generated_at"] = (
             __import__("datetime").datetime.utcnow().isoformat()
         )
-        log.info(
-            "[EXTRACTOR_GEN] %d rules stored in auto_config: %s",
-            len(rules), sorted(rules.keys()),
-        )
+        if n_learned:
+            auto_config["_extraction_rules_learned_count"] = n_learned
     else:
         log.info("[EXTRACTOR_GEN] No valid rules generated — auto_config unchanged")
 
