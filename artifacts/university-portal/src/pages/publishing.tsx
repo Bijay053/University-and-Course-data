@@ -310,7 +310,7 @@ export default function PublishingPage() {
               <span><strong>45%</strong> Completeness (13 review fields)</span>
               <span><strong>45%</strong> Verification Confidence</span>
               <span><strong>10%</strong> Conflict-free bonus</span>
-              <span className="text-indigo-500">−15 pts per critical conflict · −3 pts per open conflict (max −30)</span>
+              <span className="text-indigo-700">−15 pts per critical conflict · −3 pts per open conflict (max −30)</span>
             </div>
             <div className="text-xs text-indigo-700 mt-2 flex flex-wrap gap-x-6 gap-y-1">
               <span className="text-emerald-700 font-medium">Score ≥ 90 + 0 critical conflicts → <strong>Auto Publish</strong></span>
@@ -353,7 +353,7 @@ export default function PublishingPage() {
                 className={`px-3 py-1 text-xs rounded-full border transition-colors ${
                   decisionFilter === f
                     ? "bg-indigo-600 text-white border-indigo-600"
-                    : "bg-white text-muted-foreground border-border hover:border-indigo-300"
+                    : "bg-white text-slate-600 border-slate-200 hover:border-indigo-300"
                 }`}
               >
                 {f === "all" && `All (${queueByDecision.all})`}
