@@ -4,22 +4,31 @@ Takes the evidence rows already written to ``scraped_field_evidence`` and
 produces a per-field cross-source verification outcome stored in
 ``field_verification_results``.
 
-Confidence formula (spec §T003):
-  html_match   +30   (HTML extraction agrees with consensus)
-  pdf_match    +30   (PDF extraction agrees)
-  api_match    +30   (direct API agrees)
-  pattern_match +5   (sibling-cache / pattern store agrees)
-  ai_match     +5    (Gemini / AI-fallback agrees)
-  Maximum: 100
+Confidence formula (spec §T003, calibrated for real extraction mix):
 
-When any source CONFLICTS with the consensus value, the score is capped at 35
-and the status becomes "conflict".
+  Multi-source (agree):
+    html_match   +30   HTML extraction agrees with consensus
+    pdf_match    +30   PDF extraction agrees
+    api_match    +30   direct API / structured source agrees
+    pattern_match +5   sibling-cache / pattern store agrees
+    ai_match      +5   Gemini / AI-fallback agrees
+    Maximum: 100
 
-Field statuses (spec §T005):
+  Single-source (no conflict, single source type):
+    api     → 80  (structured / SearchStax — very reliable)
+    html    → 65  (regex / CSS / heuristic — reliable)
+    pdf     → 65  (PDF extraction — reliable)
+    pattern → 40  (inherited / sibling cache — low authority)
+    ai      → 45  (Gemini — plausible but unverified)
+
+  Conflict (any source disagrees with consensus):
+    Score capped at 35; status = "conflict".
+
+Field statuses:
   verified       confidence >= 85
-  likely_correct 60-84
-  needs_review   40-59 (or <40 with no conflict)
-  conflict       any source disagrees with consensus
+  likely_correct 60–84
+  needs_review   < 60 (no conflict)
+  conflict       any source disagrees
 """
 from __future__ import annotations
 
@@ -161,7 +170,27 @@ def compute_field_confidence(
         # Cap at 35 when any source disagrees (spec §T004)
         confidence = min(agree_score // 2, 35)
         status = "conflict"
+    elif len(source_values) == 1:
+        # Single-source calibration — weighted sum only reaches 5–30 which
+        # is misleading for otherwise valid single-extraction data.
+        # Use a per-source floor that reflects real extraction reliability.
+        _SINGLE_SOURCE_CONFIDENCE: dict[str, int] = {
+            "api": 80,      # SearchStax / JSON API — very reliable
+            "html": 65,     # regex / CSS / heuristic — reliable
+            "pdf": 65,      # PDF extraction — reliable
+            "ai": 45,       # Gemini / AI fallback — plausible, unverified
+            "pattern": 40,  # sibling cache / inherited — low authority
+        }
+        only_src = next(iter(source_values))
+        confidence = _SINGLE_SOURCE_CONFIDENCE.get(only_src, 40)
+        if confidence >= 85:
+            status = "verified"
+        elif confidence >= 60:
+            status = "likely_correct"
+        else:
+            status = "needs_review"
     else:
+        # Multi-source no conflict: sum weights (can reach verified at 85+)
         confidence = min(agree_score, 100)
         if confidence >= 85:
             status = "verified"

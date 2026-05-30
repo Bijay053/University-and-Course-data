@@ -2382,6 +2382,35 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                         evidence=r.get("evidence") or [],
                         source_url=r.get("url"),
                     )
+                    # ── Phase 9: Verification Engine ──────────────────────────
+                    # Runs inside the same session (already committed by
+                    # stage_course) so evidence rows are visible.  Soft-fail
+                    # only — a verification error must never abort the scrape.
+                    if res.saved and res.scraped_course_id:
+                        try:
+                            from app.services.scraper.verification_engine import (
+                                run_field_verification,
+                            )
+                            from app.models import ScrapedCourse as _VeSC
+
+                            _vr = await run_field_verification(
+                                stage_db, res.scraped_course_id
+                            )
+                            if _vr["avg_confidence"] > 0:
+                                _ve_sc = await stage_db.get(
+                                    _VeSC, res.scraped_course_id
+                                )
+                                if _ve_sc is not None:
+                                    _ve_sc.avg_verification_confidence = _vr[
+                                        "avg_confidence"
+                                    ]
+                                    await stage_db.commit()
+                        except Exception as _ve_exc:  # noqa: BLE001
+                            log.warning(
+                                "verification_engine: sc %s failed: %s",
+                                res.scraped_course_id,
+                                _ve_exc,
+                            )
                 if res.saved:
                     summary["staged"] += 1
                     await emit(
