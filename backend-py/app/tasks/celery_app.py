@@ -33,6 +33,7 @@ celery_app = Celery(
     include=[
         "app.tasks.scrape_tasks",
         "app.tasks.snapshot_tasks",
+        "app.tasks.monitoring_tasks",
     ],
 )
 
@@ -105,6 +106,16 @@ celery_app.conf.update(
         "nightly-sweep-and-drift-alert": {
             "task": "scrape.nightly_sweep",
             "schedule": crontab(hour=2, minute=0),
+            "args": (),
+            "options": {"queue": "scrape"},
+        },
+        # Phase 13 — Autonomous Monitoring Engine.
+        # Probes all enabled watchers whose next_check_at <= now().
+        # Runs every 30 minutes; smart scheduling inside the task means
+        # most universities are skipped (next_check_at in the future).
+        "monitoring-check-watchers": {
+            "task": "monitoring.check_watchers",
+            "schedule": 1800.0,  # every 30 minutes
             "args": (),
             "options": {"queue": "scrape"},
         },

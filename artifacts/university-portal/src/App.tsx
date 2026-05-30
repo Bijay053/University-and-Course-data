@@ -25,6 +25,7 @@ import ForgotPassword from "@/pages/forgot-password";
 import ResetPassword from "@/pages/reset-password";
 import UsersPage from "@/pages/users";
 import PerformancePage from "@/pages/performance";
+import MonitoringPage from "@/pages/monitoring";
 
 const queryClient = new QueryClient();
 
@@ -78,6 +79,7 @@ function Router() {
               <Route path="/courses/:id" component={CourseDetail} />
               <Route path="/users" component={UsersPage} />
               <Route path="/performance" component={PerformancePage} />
+              <Route path="/monitoring" component={MonitoringPage} />
               <Route component={NotFound} />
             </Switch>
           </Layout>

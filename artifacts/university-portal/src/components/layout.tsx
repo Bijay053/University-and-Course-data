@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Building2, HardDrive, UploadCloud, Menu, X, Shield, Settings, Search as SearchIcon, LogOut, Users as UsersIcon, BarChart2 } from "lucide-react";
+import { LayoutDashboard, Building2, HardDrive, UploadCloud, Menu, X, Shield, Settings, Search as SearchIcon, LogOut, Users as UsersIcon, BarChart2, Radio } from "lucide-react";
 import { cn } from "@/lib/utils";
 import brandLogo from "@assets/image_1776917782083.png";
 import { useAuth } from "@/context/auth";
@@ -14,6 +14,7 @@ const navigation: { name: string; href: string; icon: typeof LayoutDashboard; pe
   { name: "Data Backup", href: "/backup", icon: Shield, permission: "backup.view" },
   { name: "Settings", href: "/settings/academic-levels", icon: Settings, permission: "settings.view" },
   { name: "Performance", href: "/performance", icon: BarChart2, permission: "scraping.view" },
+  { name: "Monitoring", href: "/monitoring", icon: Radio, permission: "scraping.view" },
   { name: "Users & Permissions", href: "/users", icon: UsersIcon, permission: "users.manage" },
 ];
 

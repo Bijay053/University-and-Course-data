@@ -26,6 +26,7 @@ from app.routers import (
     health,
     knowledge_graph,
     locations,
+    monitoring,
     performance,
     per_course_resources,
     reviews,
@@ -105,3 +106,4 @@ app.include_router(verification.router, prefix="/api", tags=["verification"])
 app.include_router(changes.router, prefix="/api", tags=["changes"])
 app.include_router(knowledge_graph.router, prefix="/api", tags=["knowledge-graph"])
 app.include_router(country_intelligence.router, prefix="/api", tags=["country-intelligence"])
+app.include_router(monitoring.router, prefix="/api", tags=["monitoring"])

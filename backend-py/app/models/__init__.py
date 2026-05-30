@@ -41,6 +41,7 @@ from app.models.course_pathway import CoursePathway
 from app.models.course_accreditation import CourseAccreditation
 from app.models.university_location import UniversityLocation
 from app.models.country_pattern import CountryPattern
+from app.models.university_watcher import UniversityWatcher
 
 __all__ = [
     "AcademicLevelOption",
@@ -81,4 +82,5 @@ __all__ = [
     "CourseAccreditation",
     "UniversityLocation",
     "CountryPattern",
+    "UniversityWatcher",
 ]

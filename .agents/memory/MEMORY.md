@@ -6,3 +6,4 @@
 - [Phase 3 learning layer](phase3-learning.md) — scraper_patterns table + pattern_store.py; derive_platform_type priority: API provider > library situation > strategy
 - [pytest asyncio isolation](pytest-asyncio-isolation.md) — use asyncio.new_event_loop() not get_event_loop() in sync test helpers; full suite has session-scoped loop that conflicts
 - [Phase 9 verification engine](phase9-verification.md) — cross-source confidence: html/pdf/api=30, pattern/ai=5; conflict caps score at 35; None avg_confidence does NOT block auto-publish
+- [Phase 13 monitoring engine](phase13-monitoring.md) — university_watchers + lightweight probes; smart scheduling from change_frequency_days EMA; 30-min Celery beat; bulk-enable auto-creates watchers from scrape_url.
