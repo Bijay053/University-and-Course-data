@@ -27,6 +27,16 @@ class University(Base):
     scrape_config: Mapped[dict | None] = mapped_column(JSONB)
     featured: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     featured_priority: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+    # ── Autonomous-probe columns (migration: apply_migration_probe_columns.py) ──
+    # probe_result: full SiteProfile dict from site_probe.probe_site()
+    probe_result: Mapped[dict | None] = mapped_column(JSONB)
+    # probe_status: "none" | "probing" | "probed" | "configured" | "failed"
+    probe_status: Mapped[str] = mapped_column(
+        Text, nullable=False, server_default="none", default="none"
+    )
+    probe_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )

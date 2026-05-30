@@ -8,6 +8,7 @@ on the public Course Search page.
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
 
@@ -68,16 +69,6 @@ class UniversityUpdate(BaseModel):
     featured: bool | None = None
     featured_priority: int | None = None
 
-    @field_validator("country")
-    @classmethod
-    def _country(cls, v: str | None) -> str | None:
-        return _reject_unknown(v, "country") if v else v
-
-    @field_validator("city")
-    @classmethod
-    def _city(cls, v: str | None) -> str | None:
-        return _reject_unknown(v, "city") if v else v
-
 
 class UniversityRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -100,6 +91,11 @@ class UniversityRead(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+    # ── Autonomous-probe fields ─────────────────────────────────────────────
+    probe_status: str = "none"
+    probe_result: dict[str, Any] | None = None
+    probe_updated_at: datetime | None = None
+
     def model_dump(self, *args, **kwargs) -> dict:
         d = super().model_dump(*args, **kwargs)
         # camelCase aliases for UI compatibility
@@ -114,11 +110,13 @@ class UniversityRead(BaseModel):
             "featured_priority": "featuredPriority",
             "created_at": "createdAt",
             "updated_at": "updatedAt",
+            "probe_status": "probeStatus",
+            "probe_result": "probeResult",
+            "probe_updated_at": "probeUpdatedAt",
         }
         for snake, camel in aliases.items():
             if snake in d and camel not in d:
                 v = d[snake]
-                # JSON serialize datetime
                 if hasattr(v, "isoformat"):
                     v = v.isoformat()
                 d[camel] = v
@@ -136,5 +134,3 @@ class BulkImportResult(BaseModel):
     created: int = 0
     skipped: int = 0
     errors: list[str] = Field(default_factory=list)
-
-

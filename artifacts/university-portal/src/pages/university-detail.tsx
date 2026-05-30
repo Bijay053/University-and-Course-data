@@ -16,7 +16,7 @@ import {
   Building2, MapPin, Globe, Search, ChevronLeft, ChevronRight, X,
   BookOpen, Languages, GraduationCap, Award, ExternalLink,
   Database, CheckCircle2, Clock, Trash2, Pencil, Upload, RefreshCw, GitMerge,
-  ChevronsUpDown, Check, AlertTriangle, ClipboardList, Plus, Star, Wrench, Loader2, XCircle,
+  ChevronsUpDown, Check, AlertTriangle, ClipboardList, Plus, Star, Wrench, Loader2, XCircle, Zap,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -399,6 +399,75 @@ export default function UniversityDetail() {
   }, [id, toast]);
 
   const [tab, setTab] = useState<Tab>("courses");
+
+  // ── Auto-Configure / probe state ─────────────────────────────────────────
+  type ProbeStatus = "none" | "probing" | "configured" | "failed";
+  type ProbeResult = {
+    university_id: number;
+    probe_status: ProbeStatus;
+    probe_updated_at: string | null;
+    probe_result: {
+      recommended_strategy: string;
+      strategy_confidence: number;
+      strategy_ladder: string[];
+      is_cloudflare_blocked: boolean;
+      is_js_spa: boolean;
+      spa_framework: string | null;
+      has_sitemap: boolean;
+      sitemap_course_count: number;
+      wayback_available: boolean;
+      wayback_course_count: number;
+      detected_apis: { provider: string; label: string; endpoint_hint: string }[];
+      notes: string[];
+    } | null;
+    auto_config: Record<string, unknown> | null;
+  };
+  const [probeStatus, setProbeStatus] = useState<ProbeStatus>("none");
+  const [probeResult, setProbeResult] = useState<ProbeResult | null>(null);
+  const [probeLoading, setProbeLoading] = useState(false);
+  const [probeCardOpen, setProbeCardOpen] = useState(false);
+
+  const fetchProbeResult = useCallback(async () => {
+    if (!id) return;
+    try {
+      const res = await fetch(`${BASE}/api/universities/${id}/probe-result`);
+      if (!res.ok) return;
+      const data: ProbeResult = await res.json();
+      setProbeResult(data);
+      setProbeStatus(data.probe_status || "none");
+      if (data.probe_status === "configured" || data.probe_status === "failed") {
+        setProbeLoading(false);
+        if (data.probe_status === "configured") setProbeCardOpen(true);
+      }
+    } catch { /* silent */ }
+  }, [id]);
+
+  // Load probe result on mount
+  useEffect(() => { void fetchProbeResult(); }, [fetchProbeResult]);
+
+  // Poll while probing
+  useEffect(() => {
+    if (probeStatus !== "probing") return;
+    const interval = setInterval(() => { void fetchProbeResult(); }, 3000);
+    return () => clearInterval(interval);
+  }, [probeStatus, fetchProbeResult]);
+
+  const triggerProbe = useCallback(async () => {
+    if (!id) return;
+    setProbeLoading(true);
+    setProbeStatus("probing");
+    setProbeCardOpen(false);
+    try {
+      const res = await fetch(`${BASE}/api/universities/${id}/probe`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.detail || `HTTP ${res.status}`);
+      toast({ title: "Auto-Configure started", description: "Probing the site — this takes ~20s." });
+    } catch (err) {
+      setProbeLoading(false);
+      setProbeStatus("failed");
+      toast({ title: "Auto-Configure failed", description: (err as Error).message, variant: "destructive" });
+    }
+  }, [id, toast]);
 
   // ── Bulk edit state ──────────────────────────────────────────────
   type BulkMode = "english" | "academic" | "scholarships" | null;
@@ -1554,6 +1623,33 @@ export default function UniversityDetail() {
               <Wrench className="h-3.5 w-3.5 mr-1" />
               Repair Scrape
             </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className={`h-7 px-2.5 transition-colors ${
+                probeStatus === "configured"
+                  ? "border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                  : probeStatus === "failed"
+                  ? "border-red-300 text-red-700 hover:bg-red-50"
+                  : "border-violet-300 text-violet-700 hover:bg-violet-50"
+              }`}
+              onClick={probeStatus === "configured" ? () => setProbeCardOpen(v => !v) : triggerProbe}
+              disabled={probeLoading || probeStatus === "probing"}
+              title="Auto-detect the best scraping strategy and generate config from the site"
+              data-testid="button-auto-configure"
+            >
+              {probeLoading || probeStatus === "probing"
+                ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+                : <Zap className="h-3.5 w-3.5 mr-1" />
+              }
+              {probeStatus === "probing"
+                ? "Probing…"
+                : probeStatus === "configured"
+                ? "Auto-Config ✓"
+                : probeStatus === "failed"
+                ? "Probe Failed"
+                : "Auto-Configure"}
+            </Button>
             <button
               type="button"
               disabled={featuredSaving}
@@ -1587,6 +1683,128 @@ export default function UniversityDetail() {
           )}
         </div>
       </div>
+
+      {/* ── Probe Status Card ── */}
+      {probeCardOpen && probeResult?.probe_result && (
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 font-semibold text-emerald-800">
+              <Zap className="h-4 w-4 text-emerald-600" />
+              Site Intelligence Report
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-6 px-2 text-xs border-emerald-300 text-emerald-700 hover:bg-emerald-100"
+                onClick={triggerProbe}
+                disabled={probeLoading}
+              >
+                <RefreshCw className="h-3 w-3 mr-1" /> Re-probe
+              </Button>
+              <button onClick={() => setProbeCardOpen(false)} className="text-emerald-600 hover:text-emerald-900">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {/* Strategy */}
+            <div className="bg-white rounded-md border border-emerald-200 p-2.5">
+              <div className="text-xs text-muted-foreground mb-0.5">Strategy</div>
+              <div className="font-semibold text-emerald-700 capitalize">
+                {probeResult.probe_result.recommended_strategy.replace(/_/g, " ")}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {Math.round(probeResult.probe_result.strategy_confidence * 100)}% confidence
+              </div>
+            </div>
+            {/* Cloudflare / SPA */}
+            <div className="bg-white rounded-md border border-emerald-200 p-2.5">
+              <div className="text-xs text-muted-foreground mb-0.5">Site Type</div>
+              <div className="font-semibold">
+                {probeResult.probe_result.is_cloudflare_blocked
+                  ? <span className="text-red-600">Cloudflare blocked</span>
+                  : probeResult.probe_result.is_js_spa
+                  ? <span className="text-amber-600">JS SPA {probeResult.probe_result.spa_framework ? `(${probeResult.probe_result.spa_framework})` : ""}</span>
+                  : <span className="text-emerald-600">Static HTML</span>
+                }
+              </div>
+            </div>
+            {/* Sitemap */}
+            <div className="bg-white rounded-md border border-emerald-200 p-2.5">
+              <div className="text-xs text-muted-foreground mb-0.5">Sitemap</div>
+              <div className="font-semibold">
+                {probeResult.probe_result.has_sitemap
+                  ? <span className="text-emerald-600">{probeResult.probe_result.sitemap_course_count} course URLs</span>
+                  : <span className="text-muted-foreground">Not found</span>
+                }
+              </div>
+            </div>
+            {/* Wayback */}
+            <div className="bg-white rounded-md border border-emerald-200 p-2.5">
+              <div className="text-xs text-muted-foreground mb-0.5">Wayback Archive</div>
+              <div className="font-semibold">
+                {probeResult.probe_result.wayback_available
+                  ? <span className="text-emerald-600">{probeResult.probe_result.wayback_course_count} snapshots</span>
+                  : <span className="text-muted-foreground">None found</span>
+                }
+              </div>
+            </div>
+          </div>
+          {/* Search APIs */}
+          {probeResult.probe_result.detected_apis.length > 0 && (
+            <div className="bg-white rounded-md border border-violet-200 p-2.5">
+              <div className="text-xs text-muted-foreground mb-1">Search APIs Detected</div>
+              <div className="flex flex-wrap gap-1.5">
+                {probeResult.probe_result.detected_apis.map((api, i) => (
+                  <span key={i} className="inline-flex items-center gap-1 bg-violet-50 border border-violet-200 text-violet-700 text-xs px-2 py-0.5 rounded-full font-medium">
+                    <Zap className="h-3 w-3" />{api.label}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+          {/* Strategy ladder */}
+          {probeResult.probe_result.strategy_ladder.length > 1 && (
+            <div>
+              <div className="text-xs text-muted-foreground mb-1">Escalation Ladder</div>
+              <div className="flex items-center gap-1 flex-wrap">
+                {probeResult.probe_result.strategy_ladder.map((s, i) => (
+                  <React.Fragment key={s}>
+                    <span className={`text-xs px-2 py-0.5 rounded border font-medium ${
+                      i === 0
+                        ? "bg-emerald-100 border-emerald-300 text-emerald-800"
+                        : s === "blocked"
+                        ? "bg-red-50 border-red-200 text-red-600"
+                        : "bg-gray-50 border-gray-200 text-gray-500"
+                    }`}>
+                      {s.replace(/_/g, " ")}
+                    </span>
+                    {i < probeResult.probe_result!.strategy_ladder.length - 1 && (
+                      <span className="text-gray-300 text-xs">→</span>
+                    )}
+                  </React.Fragment>
+                ))}
+              </div>
+            </div>
+          )}
+          {/* Notes */}
+          {probeResult.probe_result.notes.length > 0 && (
+            <div className="text-xs text-muted-foreground space-y-0.5">
+              {probeResult.probe_result.notes.slice(0, 4).map((note, i) => (
+                <div key={i} className="flex items-start gap-1">
+                  <span className="mt-0.5 shrink-0">•</span>{note}
+                </div>
+              ))}
+            </div>
+          )}
+          {probeResult.probe_updated_at && (
+            <div className="text-xs text-muted-foreground text-right">
+              Last probed: {new Date(probeResult.probe_updated_at).toLocaleString()}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Tab Bar */}
       <div className="border-b flex gap-0 overflow-x-auto">

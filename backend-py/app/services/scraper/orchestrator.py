@@ -2517,12 +2517,43 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 )).scalar()
                 _avg = float(_avg_row) if _avg_row is not None else 0.0
                 _poor = _staged_n < 5 or _avg < 50.0
-                if not _has_yaml and _poor:
+                if _poor and _has_yaml:
+                    # Per-uni YAML exists and takes precedence over auto-config.
+                    # Don't overwrite the operator's hand-tuned settings.
+                    log.info(
+                        "[CASCADE] poor result but per-uni YAML exists — "
+                        "skipping auto-probe (YAML overrides auto_config); "
+                        "uni_id=%s slug=%r staged=%d avg=%.1f",
+                        uni_id, _slug, _staged_n, _avg,
+                    )
+                elif _poor:
+                    # No YAML + poor results → dispatch autonomous probe + config.
+                    # The probe runs as a separate Celery task so it doesn't block
+                    # the current scrape worker. The NEXT scrape for this university
+                    # will pick up the auto_config written to scrape_config.
                     log.info(
                         "[CASCADE] poor result for uni_id=%s slug=%r "
                         "(staged=%d avg_completeness=%.1f no per-uni YAML) — "
-                        "cascade task not available, skipping auto-trigger",
+                        "dispatching auto-probe task",
                         uni_id, _slug, _staged_n, _avg,
+                    )
+                    try:
+                        from app.tasks.scrape_tasks import probe_and_configure as _probe_task
+                        _probe_task.delay(uni_id)
+                        log.info(
+                            "[CASCADE] probe_and_configure dispatched for uni_id=%s", uni_id
+                        )
+                    except Exception as _dispatch_exc:
+                        log.warning(
+                            "[CASCADE] failed to dispatch probe task for uni_id=%s: %s",
+                            uni_id, _dispatch_exc,
+                        )
+                else:
+                    # Good results — nothing to do.
+                    log.debug(
+                        "[CASCADE] scrape result acceptable for uni_id=%s "
+                        "(staged=%d avg=%.1f) — no auto-probe needed",
+                        uni_id, _staged_n, _avg,
                     )
             except Exception as _cascade_exc:  # noqa: BLE001
                 log.warning(

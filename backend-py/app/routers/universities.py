@@ -373,6 +373,101 @@ async def invalidate_university_central_cache(
     return {"university_id": uni_id, "rows_deleted": deleted, "status": "invalidated"}
 
 
+@router.post(
+    "/universities/{uni_id}/probe",
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Trigger autonomous site probe + auto-config generation",
+)
+async def trigger_probe(
+    uni_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _user: Annotated[dict, Depends(get_current_user)],
+) -> dict[str, Any]:
+    """Dispatch a background Celery task that:
+
+    1. Probes the university website (Cloudflare detection, SPA detection,
+       search-API fingerprinting, sitemap check, Wayback CDX).
+    2. Calls Gemini to analyse the probe result + a sample course page.
+    3. Generates a UniConfig-compatible dict and stores it in
+       ``university.scrape_config["auto_config"]``.
+    4. Sets ``probe_status`` to ``"configured"`` (or ``"failed"``).
+
+    Returns immediately with ``status="probing"``.  Poll
+    ``GET /api/universities/{id}/probe-result`` to check completion.
+    """
+    from datetime import datetime, timezone
+
+    from sqlalchemy import update
+
+    u = await db.get(University, uni_id)
+    if not u:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="University not found")
+
+    probe_url = u.scrape_url or u.website
+    if not probe_url:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="University has no scrape_url or website configured",
+        )
+
+    # Mark as probing immediately so the UI can show a spinner
+    await db.execute(
+        update(University)
+        .where(University.id == uni_id)
+        .values(probe_status="probing", probe_updated_at=datetime.now(timezone.utc))
+    )
+    await db.commit()
+
+    # Dispatch async Celery task
+    from app.tasks.scrape_tasks import probe_and_configure
+
+    task = probe_and_configure.delay(uni_id)
+    return {
+        "status": "probing",
+        "university_id": uni_id,
+        "task_id": task.id,
+        "probe_url": str(probe_url),
+    }
+
+
+@router.get(
+    "/universities/{uni_id}/probe-result",
+    summary="Get probe status and site intelligence for a university",
+)
+async def get_probe_result(
+    uni_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _user: Annotated[dict, Depends(get_current_user)],
+) -> dict[str, Any]:
+    """Return the latest probe status, site profile, and auto-generated config.
+
+    ``probe_status`` values:
+    - ``"none"``        — never probed
+    - ``"probing"``     — Celery task dispatched, not yet complete
+    - ``"configured"``  — probe complete, auto_config written to scrape_config
+    - ``"failed"``      — probe or config generation failed
+    """
+    u = await db.get(University, uni_id)
+    if not u:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="University not found")
+
+    # Include the auto_config portion of scrape_config for inspection
+    auto_config: dict | None = None
+    if u.scrape_config and isinstance(u.scrape_config, dict):
+        raw = u.scrape_config.get("auto_config")
+        if raw:
+            # Strip internal metadata keys for cleaner response
+            auto_config = {k: v for k, v in raw.items() if not k.startswith("_")}
+
+    return {
+        "university_id": uni_id,
+        "probe_status": u.probe_status or "none",
+        "probe_updated_at": u.probe_updated_at.isoformat() if u.probe_updated_at else None,
+        "probe_result": u.probe_result,
+        "auto_config": auto_config,
+    }
+
+
 def _to_camel_uni(u) -> dict:
     """Add camelCase aliases UI expects: scrapeUrl, feePageUrl, etc."""
     if hasattr(u, '__table__'):

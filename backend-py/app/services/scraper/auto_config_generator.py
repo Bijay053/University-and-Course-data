@@ -233,7 +233,6 @@ RULES:
     resp = await gemini_client.generate(
         prompt=prompt,
         call_type="auto_config",
-        model="gemini-2.5-flash-lite",
     )
 
     if resp.skipped or not resp.text:

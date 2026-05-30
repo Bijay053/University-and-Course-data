@@ -627,6 +627,139 @@ def nightly_sweep_and_alert(self) -> dict:  # type: ignore[override]
     }
 
 
+@celery_app.task(name="scrape.probe_configure", bind=True, max_retries=0)
+def probe_and_configure(self, university_id: int) -> dict:  # noqa: ANN001
+    """Probe a university website and auto-generate a scraper config.
+
+    1. Fetch the university's scrape_url from the DB.
+    2. Run site_probe.probe_site() — detects Cloudflare, JS-SPA, search APIs,
+       sitemap, Wayback — and picks the optimal strategy.
+    3. Fetch one sample course page to give Gemini richer context.
+    4. Run auto_config_generator.generate_config() — uses probe + Gemini to
+       produce a UniConfig-compatible dict.
+    5. Persist: probe_result, probe_status='configured', and
+       scrape_config['auto_config'] = generated dict in the university row.
+
+    This task is dispatched by:
+      - POST /api/universities/{id}/probe   (manual operator trigger)
+      - Orchestrator CASCADE hook            (automatic post-scrape retry)
+    """
+    async def _run() -> dict:
+        from datetime import datetime, timezone
+
+        from sqlalchemy import update
+        from sqlalchemy.dialects.postgresql import JSONB
+
+        from app.models import University
+        from app.services.scraper.auto_config_generator import (
+            fetch_sample_course_html,
+            generate_config,
+        )
+        from app.services.scraper.site_probe import probe_site
+
+        async with AsyncSessionLocal() as db:
+            uni = await db.get(University, university_id)
+            if uni is None:
+                log.error("probe_and_configure: university %d not found", university_id)
+                return {"ok": False, "reason": "not_found"}
+
+            probe_url = uni.scrape_url or uni.website
+            if not probe_url:
+                log.error(
+                    "probe_and_configure: university %d has no scrape_url or website",
+                    university_id,
+                )
+                await db.execute(
+                    update(University)
+                    .where(University.id == university_id)
+                    .values(probe_status="failed", probe_updated_at=datetime.now(timezone.utc))
+                )
+                await db.commit()
+                return {"ok": False, "reason": "no_url"}
+
+            # ── Stage 1: Probe the site ────────────────────────────────────────
+            log.info("[PROBE] Starting probe for uni_id=%d url=%s", university_id, probe_url)
+            try:
+                profile = await probe_site(str(probe_url), timeout=20.0)
+            except Exception as exc:
+                log.error("[PROBE] probe_site failed for uni_id=%d: %s", university_id, exc)
+                await db.execute(
+                    update(University)
+                    .where(University.id == university_id)
+                    .values(probe_status="failed", probe_updated_at=datetime.now(timezone.utc))
+                )
+                await db.commit()
+                return {"ok": False, "reason": f"probe_failed: {exc!s:.120}"}
+
+            # ── Stage 2: Fetch a sample course page for Gemini context ─────────
+            sample_urls = (
+                profile.sample_course_urls[:3]
+                or profile.wayback_sample_urls[:3]
+            )
+            sample_html: str | None = None
+            if sample_urls:
+                try:
+                    sample_html = await fetch_sample_course_html(sample_urls[0])
+                except Exception as _fetch_exc:
+                    log.debug("[PROBE] sample fetch failed: %s", _fetch_exc)
+
+            # ── Stage 3: Generate the config ───────────────────────────────────
+            try:
+                auto_cfg = await generate_config(
+                    profile,
+                    sample_html=sample_html,
+                    sample_urls=sample_urls,
+                )
+            except Exception as exc:
+                log.error("[PROBE] generate_config failed for uni_id=%d: %s", university_id, exc)
+                auto_cfg = {}
+
+            # ── Stage 4: Persist to DB ─────────────────────────────────────────
+            import json
+
+            existing_cfg: dict = uni.scrape_config or {}
+            updated_cfg = {**existing_cfg, "auto_config": auto_cfg}
+
+            await db.execute(
+                update(University)
+                .where(University.id == university_id)
+                .values(
+                    probe_result=profile.to_dict(),
+                    probe_status="configured",
+                    probe_updated_at=datetime.now(timezone.utc),
+                    scrape_config=updated_cfg,
+                )
+            )
+            await db.commit()
+
+            log.info(
+                "[PROBE] Done uni_id=%d strategy=%s confidence=%.2f blocked=%s apis=%d",
+                university_id,
+                profile.recommended_strategy,
+                profile.strategy_confidence,
+                profile.is_cloudflare_blocked,
+                len(profile.detected_apis),
+            )
+            return {
+                "ok": True,
+                "university_id": university_id,
+                "strategy": profile.recommended_strategy,
+                "confidence": profile.strategy_confidence,
+                "cloudflare_blocked": profile.is_cloudflare_blocked,
+                "js_spa": profile.is_js_spa,
+                "detected_apis": [a.provider for a in profile.detected_apis],
+                "has_sitemap": profile.has_sitemap,
+                "wayback_count": profile.wayback_course_count,
+            }
+
+    _sync_dispose()
+    try:
+        return asyncio.run(_run())
+    except Exception as exc:
+        log.exception("probe_and_configure failed uni_id=%d: %s", university_id, exc)
+        return {"ok": False, "university_id": university_id, "error": str(exc)}
+
+
 @celery_app.task(name="scrape.refresh_baselines", bind=True, max_retries=0)
 def refresh_baselines_weekly(self) -> dict:  # type: ignore[override]
     """Celery beat task — recompute fill-rate baselines from the trailing 30 days.
