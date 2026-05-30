@@ -669,6 +669,21 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             f"scraper_config/unis/{_uni_cfg.slug}.yaml",
             _uni_cfg.discovery.always_sitemap_supplement,
         )
+        # ── Log active auto_config so scrape runs are traceable ───────────────
+        if uni_scrape_config and uni_scrape_config.get("auto_config"):
+            _ac = uni_scrape_config["auto_config"]
+            _ac_strategy = _ac.get("_strategy", "unknown")
+            _ac_disc = _ac.get("discovery") or {}
+            log.info(
+                "[AUTO_CONFIG] Active for uni_id=%s slug=%r strategy=%r "
+                "sitemap=%r patterns=%s stealth=%s always_sitemap=%s",
+                uni_id, _uni_cfg.slug, _ac_strategy,
+                str(_ac_disc.get("sitemap_url", ""))[:80] or None,
+                _ac_disc.get("allow_url_patterns", [])[:5],
+                _ac_disc.get("use_stealth_browser", False),
+                _ac_disc.get("always_sitemap_supplement", False),
+            )
+        # ─────────────────────────────────────────────────────────────────────
         if _uni_cfg.discovery.scrape_do_fallback:
             from app.services.scraper.http_fetcher import set_scrape_do_fallback
             set_scrape_do_fallback(True)

@@ -628,7 +628,11 @@ def nightly_sweep_and_alert(self) -> dict:  # type: ignore[override]
 
 
 @celery_app.task(name="scrape.probe_configure", bind=True, max_retries=0)
-def probe_and_configure(self, university_id: int) -> dict:  # noqa: ANN001
+def probe_and_configure(  # noqa: ANN001
+    self,
+    university_id: int,
+    triggered_by: str = "manual",
+) -> dict:
     """Probe a university website and auto-generate a scraper config.
 
     1. Fetch the university's scrape_url from the DB.
@@ -639,18 +643,21 @@ def probe_and_configure(self, university_id: int) -> dict:  # noqa: ANN001
        produce a UniConfig-compatible dict.
     5. Persist: probe_result, probe_status='configured', and
        scrape_config['auto_config'] = generated dict in the university row.
+    6. When triggered_by='cascade' (automatic self-healing after poor scrape),
+       create and dispatch a NEW scrape job so the auto_config is used
+       immediately — operators don't need to manually re-trigger.
 
     This task is dispatched by:
-      - POST /api/universities/{id}/probe   (manual operator trigger)
-      - Orchestrator CASCADE hook            (automatic post-scrape retry)
+      - POST /api/universities/{id}/probe  (manual operator trigger)
+      - Orchestrator CASCADE hook          (triggered_by='cascade')
     """
     async def _run() -> dict:
+        import uuid
         from datetime import datetime, timezone
 
         from sqlalchemy import update
-        from sqlalchemy.dialects.postgresql import JSONB
 
-        from app.models import University
+        from app.models import ScrapeRuntimeJob, University
         from app.services.scraper.auto_config_generator import (
             fetch_sample_course_html,
             generate_config,
@@ -740,7 +747,8 @@ def probe_and_configure(self, university_id: int) -> dict:  # noqa: ANN001
                 profile.is_cloudflare_blocked,
                 len(profile.detected_apis),
             )
-            return {
+
+            result = {
                 "ok": True,
                 "university_id": university_id,
                 "strategy": profile.recommended_strategy,
@@ -750,7 +758,53 @@ def probe_and_configure(self, university_id: int) -> dict:  # noqa: ANN001
                 "detected_apis": [a.provider for a in profile.detected_apis],
                 "has_sitemap": profile.has_sitemap,
                 "wayback_count": profile.wayback_course_count,
+                "triggered_by": triggered_by,
             }
+
+            # ── Stage 5: CASCADE self-heal — auto-queue a retry scrape ─────────
+            # When triggered by the orchestrator's poor-quality cascade, the
+            # auto_config we just wrote is live.  Queue a new scrape job so the
+            # operator doesn't have to manually re-trigger — the next run
+            # will use the newly-generated config automatically.
+            # Skip if the site is Cloudflare-blocked (retrying won't help yet).
+            if triggered_by == "cascade" and not profile.is_cloudflare_blocked:
+                try:
+                    new_job_id = f"job_{uuid.uuid4().hex[:12]}"
+                    retry_job = ScrapeRuntimeJob(
+                        runtime_job_id=new_job_id,
+                        university_id=university_id,
+                        university_name=uni.name,
+                        url=str(probe_url),
+                        job_type="single",
+                        status="queued",
+                        fast_mode=False,
+                        request_payload={
+                            "url": str(probe_url),
+                            "universityId": university_id,
+                            "universityName": uni.name,
+                            "triggeredBy": "cascade_self_heal",
+                            "autoConfig": True,
+                        },
+                    )
+                    async with AsyncSessionLocal() as db2:
+                        db2.add(retry_job)
+                        await db2.commit()
+                    # Dispatch AFTER commit so the row is visible to the worker.
+                    celery_app.send_task("scrape.university", args=[new_job_id])
+                    log.info(
+                        "[PROBE] CASCADE self-heal: queued retry scrape %s for "
+                        "uni_id=%d (strategy=%s)",
+                        new_job_id, university_id, profile.recommended_strategy,
+                    )
+                    result["retry_job_id"] = new_job_id
+                except Exception as _retry_exc:
+                    log.warning(
+                        "[PROBE] CASCADE self-heal: failed to queue retry scrape "
+                        "for uni_id=%d: %s",
+                        university_id, _retry_exc,
+                    )
+
+            return result
 
     _sync_dispose()
     try:

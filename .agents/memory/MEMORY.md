@@ -1,0 +1,1 @@
+- [HUD SearchStax provider](hud-searchstax.md) — Huddersfield scrapes Solr directly (SPA bypass); completeness hit 85.1% after adding academic_level + entry-req extractors.

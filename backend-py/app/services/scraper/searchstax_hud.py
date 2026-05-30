@@ -226,6 +226,74 @@ def _reformat_name(title: str, study_level: str) -> tuple[Optional[str], Optiona
     return None, None
 
 
+# ── Academic level (derived from degree_level) ──────────────────────────────
+_UG_LEVELS = frozenset({"Bachelor's", "Foundation Degree", "Diploma", "Certificate"})
+_PG_LEVELS = frozenset({
+    "Master's", "Postgraduate Certificate", "Postgraduate Diploma",
+    "Graduate Certificate", "Graduate Diploma",
+})
+
+
+def _academic_level(degree_level: Optional[str]) -> Optional[str]:
+    if not degree_level:
+        return None
+    if degree_level in _UG_LEVELS:
+        return "Undergraduate"
+    if degree_level in _PG_LEVELS:
+        return "Postgraduate"
+    if "Doctorate" in (degree_level or ""):
+        return "Doctorate"
+    return None
+
+
+# ── Other requirement (entry requirements from page content) ─────────────────
+# Match the first complete sentence that mentions an academic entry requirement.
+_ENTRY_REQ_RE = re.compile(
+    r"""(?:(?:entry\s+requirements?[:\s]+)|(?:normally\s+)|(?:you.{0,20}need\s+))
+        ([^.!?]{20,250}[.!?])""",
+    re.I | re.X,
+)
+_DEGREE_REQ_RE = re.compile(
+    r"""(
+        (?:(?:first|second|third)[- ]class|2:1|2:2|honors?|honours?|undergraduate\s+degree
+           |a\s+degree|bachelor|masters?|postgraduate|gpa\s+\d|grade\s+\w)
+        [^.!?]{0,200}[.!?]
+    )""",
+    re.I | re.X,
+)
+# Reject _ENTRY_REQ_RE matches that are really English-language / IELTS sentences.
+_LANG_REQ_RE = re.compile(
+    r"english\s+language|language\s+qualif|ielts|pte|toefl|language\s+requirement",
+    re.I,
+)
+
+
+def _extract_entry_requirement(content: str) -> Optional[str]:
+    """Return a short academic-entry-requirement sentence from page content.
+
+    Strategy:
+    1. Try the explicit degree-classification pattern first (most precise).
+    2. Fall back to the "entry requirements" / "normally" / "you need" anchor
+       only when the captured snippet does NOT look like an English-language or
+       IELTS requirement (which share similar sentence patterns).
+    """
+    if not content:
+        return None
+    # 1. Degree-classification anchor — highest precision
+    m = _DEGREE_REQ_RE.search(content)
+    if m:
+        snippet = _clean_spaces(m.group(1))
+        if len(snippet) > 15:
+            return snippet[:300]
+    # 2. Broad entry-requirements anchor — skip if it's an English/IELTS sentence
+    m2 = _ENTRY_REQ_RE.search(content)
+    if m2:
+        snippet = _clean_spaces(m2.group(1))
+        if len(snippet) > 15 and not _LANG_REQ_RE.search(snippet):
+            return snippet[:300]
+    return None
+
+
 # ── Duration / study-mode parsing ───────────────────────────────────────────
 _DUR_RE = re.compile(r"(\d+(?:\.\d+)?)\s*(year|month|week)", re.I)
 
@@ -382,6 +450,8 @@ def _map_doc(doc: dict, cfg: SearchStaxConfig) -> Optional[dict]:
     content = _first(doc.get("content")) or ""
     ielts_overall, ielts_band, ielts_snippet = _extract_ielts(content)
     fee, fee_subject = _fee_for(raw_title, study_level)
+    acad_level = _academic_level(degree_level)
+    entry_req = _extract_entry_requirement(content)
 
     payload: dict[str, Any] = {
         "course_name": name,
@@ -410,6 +480,10 @@ def _map_doc(doc: dict, cfg: SearchStaxConfig) -> Optional[dict]:
             payload["ielts_reading"] = ielts_band
             payload["ielts_writing"] = ielts_band
             payload["ielts_speaking"] = ielts_band
+    if acad_level is not None:
+        payload["academic_level"] = acad_level
+    if entry_req is not None:
+        payload["other_requirement"] = entry_req
 
     def _ev(field_key, value, method, source, page_type, snippet, confidence):
         return {
@@ -486,6 +560,20 @@ def _map_doc(doc: dict, cfg: SearchStaxConfig) -> Optional[dict]:
                     sub, ielts_band, "searchstax:content", url, "course",
                     f"No element lower than {ielts_band} (derived from IELTS band requirement)", 0.75,
                 ))
+
+    # Academic level derived from degree_level
+    if acad_level is not None:
+        evidence.append(_ev(
+            "academic_level", acad_level, "searchstax:degree_level_derived", url, "course",
+            f"Derived from degree level: {degree_level} → {acad_level}", 0.95,
+        ))
+
+    # Other/entry requirement extracted from page content
+    if entry_req is not None:
+        evidence.append(_ev(
+            "other_requirement", entry_req, "searchstax:content_entry_req", url, "course",
+            f"Entry requirement extracted from page content: {entry_req[:120]}", 0.7,
+        ))
 
     result = {"name": name, "url": url, "payload": payload, "evidence": evidence}
     return {"name": name, "url": url, "searchstax_result": result}
