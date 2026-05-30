@@ -1,11 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Activity, Eye, EyeOff, RefreshCw, Play, CheckCircle2, AlertTriangle,
   Clock, TrendingUp, Zap, Globe, Radio, BarChart3, ChevronDown, ChevronUp,
+  Search, Bell, X, BellOff,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -52,6 +54,21 @@ interface Watcher {
   last_triggered_at: string | null;
   next_check_at: string | null;
   last_scrape_job_id: string | null;
+}
+
+const DISMISSED_KEY = "monitoring_dismissed_change_notifications";
+
+function getDismissed(): Set<number> {
+  try {
+    const raw = localStorage.getItem(DISMISSED_KEY);
+    return new Set(raw ? JSON.parse(raw) : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function saveDismissed(ids: Set<number>) {
+  localStorage.setItem(DISMISSED_KEY, JSON.stringify([...ids]));
 }
 
 function fmtDate(iso: string | null) {
@@ -110,10 +127,12 @@ function StatCard({ label, value, sub, icon: Icon, color }: {
 export default function MonitoringPage() {
   const { toast } = useToast();
   const qc = useQueryClient();
-  const [filter, setFilter] = useState<"all" | "enabled" | "disabled">("all");
+  const [filter, setFilter] = useState<"all" | "enabled" | "disabled" | "changed">("all");
+  const [search, setSearch] = useState("");
   const [probing, setProbing] = useState<number | null>(null);
   const [sortBy, setSortBy] = useState<"name" | "last_checked" | "next_check">("name");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const [dismissed, setDismissed] = useState<Set<number>>(getDismissed);
 
   const { data: stats, isLoading: statsLoading } = useQuery<WatcherStats>({
     queryKey: ["monitoring-stats"],
@@ -156,7 +175,7 @@ export default function MonitoringPage() {
       qc.invalidateQueries({ queryKey: ["monitoring-watchers"] });
       qc.invalidateQueries({ queryKey: ["monitoring-stats"] });
       toast({
-        title: res.changed ? "Change detected!" : "No change",
+        title: res.changed ? "⚠ Change detected!" : "No change",
         description: res.changed
           ? `Change detected — scrape ${res.scrape_triggered ? "triggered" : "not triggered"}`
           : "Page fingerprint unchanged since last check",
@@ -173,8 +192,46 @@ export default function MonitoringPage() {
     else { setSortBy(col); setSortDir("asc"); }
   }
 
+  function dismissNotification(uniId: number) {
+    const next = new Set(dismissed);
+    next.add(uniId);
+    setDismissed(next);
+    saveDismissed(next);
+  }
+
+  function dismissAll() {
+    const next = new Set(changeNotifications.map(w => w.university_id));
+    setDismissed(next);
+    saveDismissed(next);
+  }
+
+  // Universities with a detected change that haven't been dismissed
+  const changeNotifications = useMemo(() =>
+    watchers.filter(w =>
+      w.last_probe_result === "changed" &&
+      !dismissed.has(w.university_id)
+    ),
+    [watchers, dismissed]
+  );
+
+  const changedCount = watchers.filter(w => w.total_changes_detected > 0).length;
+
+  const q = search.toLowerCase().trim();
   const filtered = watchers
-    .filter(w => filter === "all" || (filter === "enabled" ? w.enabled : !w.enabled))
+    .filter(w => {
+      if (filter === "enabled") return w.enabled;
+      if (filter === "disabled") return !w.enabled;
+      if (filter === "changed") return w.total_changes_detected > 0;
+      return true;
+    })
+    .filter(w => {
+      if (!q) return true;
+      return (
+        w.university_name.toLowerCase().includes(q) ||
+        (w.university_country ?? "").toLowerCase().includes(q) ||
+        (w.probe_url ?? "").toLowerCase().includes(q)
+      );
+    })
     .sort((a, b) => {
       let diff = 0;
       if (sortBy === "name") diff = a.university_name.localeCompare(b.university_name);
@@ -202,6 +259,11 @@ export default function MonitoringPage() {
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <Radio className="h-6 w-6 text-violet-600" />
             Autonomous Monitoring
+            {changeNotifications.length > 0 && (
+              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-500 text-white text-[10px] font-bold">
+                {changeNotifications.length}
+              </span>
+            )}
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             Lightweight change probes — scrapes only trigger when content actually changes
@@ -241,7 +303,75 @@ export default function MonitoringPage() {
         </div>
       )}
 
-      {/* How it works (collapsed info) */}
+      {/* Change notifications banner */}
+      {changeNotifications.length > 0 && (
+        <div className="border border-amber-300 bg-amber-50 rounded-lg overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-2.5 border-b border-amber-200 bg-amber-100/60">
+            <div className="flex items-center gap-2">
+              <Bell className="h-4 w-4 text-amber-700" />
+              <span className="text-sm font-semibold text-amber-900">
+                {changeNotifications.length === 1
+                  ? "1 university changed since last probe"
+                  : `${changeNotifications.length} universities changed since last probe`}
+              </span>
+            </div>
+            <button
+              onClick={dismissAll}
+              className="flex items-center gap-1 text-xs text-amber-700 hover:text-amber-900 transition-colors"
+              title="Dismiss all notifications"
+            >
+              <BellOff className="h-3.5 w-3.5" />
+              Dismiss all
+            </button>
+          </div>
+          <div className="divide-y divide-amber-200">
+            {changeNotifications.map(w => (
+              <div key={w.university_id} className="flex items-center justify-between px-4 py-2.5 hover:bg-amber-50/80 transition-colors">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <span className="text-sm font-medium text-amber-900">{w.university_name}</span>
+                    <span className="text-xs text-amber-700 ml-2">{w.university_country}</span>
+                    <div className="text-xs text-amber-700 mt-0.5">
+                      Change detected{w.last_changed_at ? ` · ${fmtDate(w.last_changed_at)}` : ""} ·{" "}
+                      {w.probe_url ? (
+                        <a
+                          href={w.probe_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="underline underline-offset-2 hover:text-amber-900"
+                        >
+                          {w.probe_url.replace(/^https?:\/\//, "").slice(0, 50)}
+                        </a>
+                      ) : "no URL"}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 ml-4 flex-shrink-0">
+                  <Button
+                    size="sm" variant="ghost"
+                    className="h-7 px-2 text-xs text-amber-800 hover:bg-amber-200"
+                    onClick={() => handleProbe(w.university_id)}
+                    disabled={probing === w.university_id || !w.probe_url}
+                  >
+                    {probing === w.university_id ? <RefreshCw className="h-3 w-3 animate-spin" /> : <BarChart3 className="h-3 w-3" />}
+                    <span className="ml-1">Re-probe</span>
+                  </Button>
+                  <button
+                    onClick={() => dismissNotification(w.university_id)}
+                    className="text-amber-600 hover:text-amber-900 transition-colors p-1 rounded hover:bg-amber-200"
+                    title="Dismiss this notification"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* How it works */}
       <div className="bg-violet-50 border border-violet-200 rounded-lg p-4">
         <div className="flex items-start gap-3">
           <Activity className="h-5 w-5 text-violet-600 mt-0.5 flex-shrink-0" />
@@ -252,36 +382,82 @@ export default function MonitoringPage() {
               <strong> Passive</strong> probes send a HEAD request (zero bandwidth) and compare ETag/Last-Modified.
               <strong> Active</strong> downloads the homepage and hashes the content.
               <strong> Deep</strong> also hashes the sitemap. A scrape is triggered only when a fingerprint changes.
-              Probe intervals adapt to each university's learned change frequency: fast-changing sites → every 6h; stable sites → weekly.
+              Probe intervals adapt to each university's learned change frequency: fast-changing sites → every 3d; stable sites → every 60–90 days.
             </p>
           </div>
         </div>
       </div>
 
-      {/* Filter tabs */}
-      <div className="flex gap-1 bg-muted rounded-md p-1 w-fit">
-        {(["all", "enabled", "disabled"] as const).map(f => (
-          <button
-            key={f}
-            onClick={() => setFilter(f)}
-            className={`px-3 py-1.5 text-sm rounded transition-colors ${
-              filter === f ? "bg-white shadow-sm font-medium" : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {f === "all" ? `All (${watchers.length})` : f === "enabled" ? `Enabled (${stats?.enabled ?? 0})` : `Disabled (${stats?.disabled ?? 0})`}
-          </button>
-        ))}
+      {/* Filter tabs + search bar */}
+      <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+        <div className="flex gap-1 bg-muted rounded-md p-1 w-fit">
+          {(["all", "enabled", "disabled", "changed"] as const).map(f => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`px-3 py-1.5 text-sm rounded transition-colors ${
+                filter === f ? "bg-white shadow-sm font-medium" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {f === "all" && `All (${watchers.length})`}
+              {f === "enabled" && `Enabled (${stats?.enabled ?? 0})`}
+              {f === "disabled" && `Disabled (${stats?.disabled ?? 0})`}
+              {f === "changed" && (
+                <span className="flex items-center gap-1.5">
+                  Changed
+                  {changedCount > 0 && (
+                    <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] rounded-full bg-amber-500 text-white text-[10px] font-bold px-1">
+                      {changedCount}
+                    </span>
+                  )}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+
+        <div className="relative w-full sm:w-72">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+          <Input
+            placeholder="Search university, country, or URL…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="pl-8 h-8 text-sm"
+          />
+          {search && (
+            <button
+              onClick={() => setSearch("")}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Watcher table */}
       {filtered.length === 0 ? (
         <div className="bg-white border rounded-lg p-12 text-center text-muted-foreground">
           <Radio className="h-12 w-12 mx-auto mb-4 text-muted-foreground/30" />
-          <p className="font-medium">No watchers yet</p>
-          <p className="text-sm mt-1">Click <strong>Enable All</strong> to start monitoring universities that have a scrape URL configured.</p>
+          {q ? (
+            <>
+              <p className="font-medium">No results for "{search}"</p>
+              <p className="text-sm mt-1">Try a different name, country, or URL.</p>
+            </>
+          ) : (
+            <>
+              <p className="font-medium">No watchers yet</p>
+              <p className="text-sm mt-1">Click <strong>Enable All</strong> to start monitoring universities that have a scrape URL configured.</p>
+            </>
+          )}
         </div>
       ) : (
         <div className="bg-white border rounded-lg overflow-hidden">
+          {q && (
+            <div className="px-4 py-2 bg-muted/30 border-b text-xs text-muted-foreground">
+              Showing {filtered.length} of {watchers.length} watchers
+            </div>
+          )}
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-muted/50 border-b">
@@ -304,7 +480,12 @@ export default function MonitoringPage() {
               </thead>
               <tbody className="divide-y">
                 {filtered.map(w => (
-                  <tr key={w.id} className={`hover:bg-muted/30 transition-colors ${!w.enabled ? "opacity-60" : ""}`}>
+                  <tr
+                    key={w.id}
+                    className={`hover:bg-muted/30 transition-colors ${!w.enabled ? "opacity-60" : ""} ${
+                      w.last_probe_result === "changed" ? "border-l-2 border-l-amber-400" : ""
+                    }`}
+                  >
                     <td className="px-4 py-3">
                       <div className="font-medium text-sm">{w.university_name}</div>
                       <div className="text-xs text-muted-foreground">{w.university_country}</div>
@@ -319,7 +500,7 @@ export default function MonitoringPage() {
                         {w.monitoring_strategy}
                       </span>
                       <div className="text-xs text-muted-foreground mt-0.5">
-                        every {w.check_interval_hours < 24 ? `${w.check_interval_hours}h` : `${w.check_interval_hours / 24}d`}
+                        every {w.check_interval_hours < 24 ? `${w.check_interval_hours}h` : `${Math.round(w.check_interval_hours / 24)}d`}
                       </div>
                     </td>
                     <td className="px-4 py-3">
