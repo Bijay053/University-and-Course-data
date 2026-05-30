@@ -104,6 +104,58 @@ _HTTP_TIMEOUT = 10.0
 _MAX_PROBE_PAGES = 3
 _MIN_SCORE_THRESHOLD = 0.15
 
+# ── Low-value PDF blocklist ───────────────────────────────────────────────────
+# PDFs that never contain course data (fee, requirements, English, intake).
+# When a URL or anchor matches these patterns AND has no high-value signal,
+# the link is suppressed (all scores set to 0.0) so it is never fed into
+# the PDF pipeline.
+_LOW_VALUE_URL_RE = re.compile(
+    r"privacy.?polic"
+    r"|terms.?(?:of.?service|and.?conditions?)"
+    r"|complaint.?(?:procedure|polic|handling|process)"
+    r"|annual.?report"
+    r"|feedback.?form"
+    r"|enquiry.?form"
+    r"|code.?of.?conduct"
+    r"|safety.?polic"
+    r"|whistleblow"
+    r"|governance.?report"
+    r"|board.?minutes"
+    r"|council.?minutes"
+    r"|newsletter"
+    r"|media.?release"
+    r"|press.?release"
+    r"|accessibilit.?statement"
+    r"|refund.?polic"
+    r"|financial.?statement"
+    r"|financial.?report"
+    r"|strategic.?plan"
+    r"|sustainability.?report",
+    re.I,
+)
+_LOW_VALUE_ANCHOR_RE = re.compile(
+    r"privacy\s+policy"
+    r"|terms\s+of\s+service"
+    r"|terms\s+and\s+conditions"
+    r"|complaints?\s+procedure"
+    r"|annual\s+report"
+    r"|feedback\s+form"
+    r"|enquiry\s+form"
+    r"|code\s+of\s+conduct"
+    r"|safety\s+policy"
+    r"|whistleblower"
+    r"|board\s+minutes"
+    r"|council\s+minutes"
+    r"|newsletter"
+    r"|media\s+release"
+    r"|press\s+release"
+    r"|accessibility\s+statement"
+    r"|refund\s+policy"
+    r"|financial\s+(?:statement|report)"
+    r"|strategic\s+plan",
+    re.I,
+)
+
 
 # ── Data class ────────────────────────────────────────────────────────────────
 
@@ -171,6 +223,30 @@ def _score_text_against(text: str, term_set: frozenset[str], url_re: re.Pattern)
     return (0.60 if exact else 0.0) + (0.40 if regex else 0.0)
 
 
+def is_low_value_link(href: str, anchor: str) -> bool:
+    """Return True when a PDF link is clearly low-value (privacy, forms, reports…).
+
+    A link is low-value when its URL or anchor matches the blocklist AND neither
+    matches any high-value fee / requirement / handbook / course signal.
+    This prevents privacy policies, annual reports, application forms, and
+    similar administrative PDFs from entering the classification pipeline.
+    """
+    url_blocked = bool(_LOW_VALUE_URL_RE.search(href))
+    anchor_blocked = bool(_LOW_VALUE_ANCHOR_RE.search(anchor))
+    if not (url_blocked or anchor_blocked):
+        return False
+    # Allow through if there is also a strong high-value signal.
+    # Use a word-boundary pattern so "rate" inside "strategic" does not
+    # falsely override the block.
+    combined = f"{href} {anchor}"
+    _hv_re = re.compile(
+        r"\b(fee|tuition|cost|requirement|admission|entry|english|ielts"
+        r"|handbook|course|programme|program|catalog|scholarship)\b",
+        re.I,
+    )
+    return not bool(_hv_re.search(combined))
+
+
 def _score_link(
     href: str,
     anchor: str,
@@ -178,6 +254,10 @@ def _score_link(
 ) -> PdfLink:
     """Build a PdfLink with scores derived from URL, anchor text, and context."""
     link = PdfLink(url=href, anchor_text=anchor, context_text=context)
+    # Suppress low-value PDFs early — return a zero-score link so the caller's
+    # threshold filter (_MIN_SCORE_THRESHOLD) drops it automatically.
+    if is_low_value_link(href, anchor):
+        return link
     combined = f"{href} {anchor} {context}"
 
     def _s(terms: frozenset, url_re: re.Pattern) -> float:

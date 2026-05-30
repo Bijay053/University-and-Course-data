@@ -247,6 +247,56 @@ async def _classify_via_gemini(url: str, first_page_text: str) -> PdfCategory:
     return "other"
 
 
+# ── Low-value PDF filter ──────────────────────────────────────────────────────
+# Mirrors the blocklist in pdf_link_discoverer._LOW_VALUE_URL_RE.
+# Kept separate so classify_pdf() can be called stand-alone without importing
+# the discoverer (which would pull in aiohttp).
+_LOW_VALUE_PDF_RE = re.compile(
+    r"privacy.?polic"
+    r"|terms.?(?:of.?service|and.?conditions?)"
+    r"|complaint.?(?:procedure|polic|handling|process)"
+    r"|annual.?report"
+    r"|feedback.?form"
+    r"|enquiry.?form"
+    r"|code.?of.?conduct"
+    r"|safety.?polic"
+    r"|whistleblow"
+    r"|governance.?report"
+    r"|board.?minutes"
+    r"|council.?minutes"
+    r"|newsletter"
+    r"|media.?release"
+    r"|press.?release"
+    r"|accessibilit.?statement"
+    r"|refund.?polic"
+    r"|financial.?statement"
+    r"|financial.?report"
+    r"|strategic.?plan"
+    r"|sustainability.?report",
+    re.I,
+)
+# High-value signals that override the low-value blocklist.
+_HV_OVERRIDE_RE = re.compile(
+    r"fee|tuition|cost|requirement|admission|entry|english|ielts|handbook|course|programme|catalog",
+    re.I,
+)
+
+
+def is_low_value_pdf(url: str, first_page_text: str = "") -> bool:
+    """Return True for PDFs that contain no useful course data.
+
+    Checks URL path and the first 300 chars of page text against a blocklist
+    of administrative document types (privacy policies, annual reports, forms,
+    etc.).  A strong high-value signal in the same text overrides the blocklist
+    so that edge cases like "international-students-fee-refund-policy.pdf" are
+    not wrongly suppressed.
+    """
+    sample = f"{url} {first_page_text[:300]}"
+    if not _LOW_VALUE_PDF_RE.search(sample):
+        return False
+    return not bool(_HV_OVERRIDE_RE.search(sample))
+
+
 # ── Public entry point ────────────────────────────────────────────────────────
 
 async def classify_pdf(
@@ -268,6 +318,19 @@ async def classify_pdf(
     ClassifiedPdf
         category + confidence + method used.
     """
+    # Fast low-value gate — return "other" immediately for administrative PDFs
+    # (privacy policies, annual reports, forms, etc.) so they never enter the
+    # Gemini fallback path.
+    if is_low_value_pdf(url, first_page_text):
+        log.debug("[PDF_CLS] low-value PDF suppressed: %s", url[:80])
+        return ClassifiedPdf(
+            url=url,
+            category="other",
+            confidence=0.95,
+            classification_method="keyword",
+            raw_scores={},
+        )
+
     result = classify_by_keywords(url, first_page_text)
 
     if result.confidence < _MIN_KEYWORD_CONFIDENCE:

@@ -110,6 +110,45 @@ URL entered  (UI "Add by URL" → POST /api/universities/add-by-url)
                  │
                  ▼
 ┌─────────────────────────────────────────────────┐
+│  Stage 6b — PDF Intelligence (Phase 6)          │
+│  pdf_link_discoverer + pdf_classifier +         │
+│  entry_req_extractor + university_pdfs.py       │
+│                                                 │
+│  Auto-discovery (no YAML required):             │
+│    • Probes /fees /admissions /entry-req paths  │
+│    • Scores PDF links by URL+anchor+context     │
+│    • Suppresses low-value PDFs (privacy policy, │
+│      annual reports, forms, complaints, etc.)   │
+│                                                 │
+│  Classification (8 categories):                 │
+│    fee_schedule · entry_requirements · handbook │
+│    prospectus · course_catalogue · intake_cal   │
+│    scholarship · other                          │
+│    Gemini fallback only when confidence < 0.50  │
+│                                                 │
+│  Extraction:                                    │
+│    Fees → international_fee                     │
+│    English → english_test / ielts_overall       │
+│    Entry requirements → ATAR, GPA, prior degree │
+│    work_exp, portfolio/interview, prerequisites │
+│    → merged into other_requirement              │
+│                                                 │
+│  Caching:                                       │
+│    Discovered PDFs stored in                    │
+│    auto_config["_discovered_pdfs"] — reused on  │
+│    subsequent scrapes without re-discovery      │
+│                                                 │
+│  Quality gate (post-loop):                      │
+│    After main extraction loop, checks fill      │
+│    rates.  If other_requirement < 30% OR        │
+│    international_fee < 50%, re-discovers PDFs   │
+│    and backfills affected staged courses.       │
+│    Gemini Vision used only when text extraction │
+│    fails (pdf_vision.py fallback).              │
+└────────────────┬────────────────────────────────┘
+                 │
+                 ▼
+┌─────────────────────────────────────────────────┐
 │  Stage 7 — Quality Analysis (Phase 5)           │
 │  quality_intelligence.build_quality_report()    │
 │                                                 │
@@ -232,6 +271,11 @@ URL entered  (UI "Add by URL" → POST /api/universities/add-by-url)
 | 3+9 Pattern lookup/promote | `pattern_store.py`, `scraper_patterns` table |
 | 6 Scrape + extract | `orchestrator.py`, `extract_course.py`, `per_course_browser.py` |
 | 6 Generic API routing | `generic_search_api.py`, `orchestrator.py` |
+| 6b PDF discovery | `pdf_link_discoverer.py` — scores + low-value filter |
+| 6b PDF classification | `pdf_classifier.py` — 8 categories + low-value gate + Gemini fallback |
+| 6b Entry req extraction | `entry_req_extractor.py` — ATAR/GPA/degree/work_exp/portfolio |
+| 6b PDF pipeline | `pipelines/university_pdfs.py`, `pipelines/single_course.py` |
+| 6b PDF quality gate | `orchestrator.py` (P6·QI block, post-loop backfill) |
 | 7 Quality report | `quality_intelligence.py`, `scrape.py:get_university_quality_report` |
 | 8 CASCADE | `orchestrator.py` (end of `run_scrape`), `scrape_tasks.py` |
 | Frontend onboarding | `universities.tsx` ("Add by URL" modal) |

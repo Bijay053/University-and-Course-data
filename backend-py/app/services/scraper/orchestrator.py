@@ -2433,6 +2433,115 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         except Exception as _dq_exc:  # noqa: BLE001
             log.warning("data_quality check raised: %s", _dq_exc)
 
+        # ── Phase 6: PDF quality intelligence gate ────────────────────────────
+        # After the main loop, measure field fill rates for entry requirements
+        # and international fees.  When either is below threshold AND the main
+        # PDF pass didn't already supply the data, auto-discover PDFs, extract,
+        # and backfill the staged courses — zero human intervention required.
+        #
+        # Thresholds:  other_requirement < 30 %  |  international_fee < 50 %
+        # Caching:     discovered PDFs stored in auto_config["_discovered_pdfs"]
+        #              so subsequent runs skip re-discovery.
+        try:
+            from sqlalchemy import text as _qi_sql
+            _qi_row = (await db.execute(
+                _qi_sql("""
+                    SELECT
+                        COUNT(*) AS total,
+                        SUM(CASE WHEN other_requirement IS NOT NULL
+                                  AND other_requirement <> '' THEN 1 ELSE 0 END) AS has_req,
+                        SUM(CASE WHEN international_fee IS NOT NULL THEN 1 ELSE 0 END) AS has_fee
+                    FROM scraped_courses
+                    WHERE scrape_job_id = :jid
+                """),
+                {"jid": runtime_job_id},
+            )).mappings().first()
+            _qi_total = int((_qi_row or {}).get("total") or 0)
+            if _qi_total > 0:
+                _qi_req_rate = int((_qi_row or {}).get("has_req") or 0) / _qi_total
+                _qi_fee_rate = int((_qi_row or {}).get("has_fee") or 0) / _qi_total
+                _qi_needs_req = _qi_req_rate < 0.30
+                _qi_needs_fee = _qi_fee_rate < 0.50 and not (uni_pdf_data or {}).get("fee")
+                if (_qi_needs_req or _qi_needs_fee) and scrape_url:
+                    await emit(
+                        "status",
+                        f"[P6·QI] fill-rate gate: entry_req={_qi_req_rate:.0%}"
+                        f" fee={_qi_fee_rate:.0%} — running PDF quality pass",
+                        phase="quality",
+                        kind="pdf_quality_gate",
+                        entry_req_fill=round(_qi_req_rate, 3),
+                        fee_fill=round(_qi_fee_rate, 3),
+                    )
+                    # Use cached PDFs (stored on a previous run) or re-discover
+                    _qi_ac = (uni_scrape_config or {}).get("auto_config") or {}
+                    _qi_pdfs = list(_qi_ac.get("_discovered_pdfs") or [])
+                    if not _qi_pdfs:
+                        from app.services.scraper.pdf_link_discoverer import (
+                            discover_pdf_links_for_university as _qi_discover,
+                        )
+                        _qi_raw = await _qi_discover(scrape_url, emit=emit)
+                        _qi_pdfs = [lnk.to_dict() for lnk in _qi_raw[:10]]
+                    # Inject the highest-scoring discovered PDF URLs into a temp config
+                    _qi_cfg = dict(uni_scrape_config or {})
+                    _qi_pages = dict(_qi_cfg.get("uniPages") or {})
+                    _qi_cfg["uniPages"] = _qi_pages
+                    for _qi_item in _qi_pdfs:
+                        _qi_cat = (_qi_item.get("best_category") or "").strip()
+                        _qi_url = (_qi_item.get("url") or "").strip()
+                        if not _qi_url:
+                            continue
+                        if _qi_cat == "fee_schedule" and not _qi_pages.get("feesPdf"):
+                            _qi_pages["feesPdf"] = _qi_url
+                        elif _qi_cat == "entry_requirements" and not _qi_pages.get("requirementsPdf"):
+                            _qi_pages["requirementsPdf"] = _qi_url
+                    _qi_pdf_data = await load_university_pdf_data(_qi_cfg, uni_country, emit=emit)
+                    _qi_backfilled = 0
+                    if _qi_pdf_data:
+                        _qi_er = _qi_pdf_data.get("entry_requirements") or {}
+                        _qi_fee_data = _qi_pdf_data.get("fee") or {}
+                        if _qi_er and _qi_needs_req:
+                            from app.services.scraper.entry_req_extractor import (
+                                EntryRequirement as _QI_ER,
+                            )
+                            _qi_summary = _QI_ER.from_dict(_qi_er).to_summary_text()
+                            if _qi_summary:
+                                _qi_upd = await db.execute(
+                                    _qi_sql("""
+                                        UPDATE scraped_courses
+                                           SET other_requirement = :s
+                                         WHERE scrape_job_id = :jid
+                                           AND (other_requirement IS NULL
+                                                OR other_requirement = '')
+                                    """),
+                                    {"s": _qi_summary[:500], "jid": runtime_job_id},
+                                )
+                                _qi_backfilled += getattr(_qi_upd, "rowcount", 0) or 0
+                        if _qi_fee_data.get("international_fee") and _qi_needs_fee:
+                            _qi_upd2 = await db.execute(
+                                _qi_sql("""
+                                    UPDATE scraped_courses
+                                       SET international_fee = :f
+                                     WHERE scrape_job_id = :jid
+                                       AND international_fee IS NULL
+                                """),
+                                {"f": _qi_fee_data["international_fee"], "jid": runtime_job_id},
+                            )
+                            _qi_backfilled += getattr(_qi_upd2, "rowcount", 0) or 0
+                        if _qi_backfilled:
+                            await db.commit()
+                    await emit(
+                        "status",
+                        f"[P6·QI] PDF quality pass done:"
+                        f" {_qi_backfilled} course(s) backfilled"
+                        f" (entry_req={'✓' if _qi_er else '✗'}"
+                        f" fee={'✓' if (_qi_pdf_data or {}).get('fee') else '✗'})",
+                        phase="quality",
+                        kind="pdf_quality_gate_result",
+                        backfilled=_qi_backfilled,
+                    )
+        except Exception as _qi_exc:  # noqa: BLE001
+            log.warning("[P6·QI] PDF quality gate failed: %s", _qi_exc)
+
         # T209: emit a single human-readable TIMING line + a typed DONE
         # event so the React log viewer can render the "══ DONE ══"
         # summary row. ``event="done"`` triggers the dedicated UI branch

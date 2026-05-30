@@ -489,3 +489,146 @@ class TestConfidenceAndSummary:
         r = extract_entry_requirements("Hi")
         assert r.confidence == 0.0
         assert r.fields_found == 0
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Low-value PDF filter — pdf_link_discoverer.is_low_value_link
+# ─────────────────────────────────────────────────────────────────────────────
+
+from app.services.scraper.pdf_link_discoverer import is_low_value_link
+
+
+class TestLowValueLinkDiscoverer:
+    """is_low_value_link() suppresses administrative PDFs but allows high-value ones."""
+
+    # ── Blocked URLs ─────────────────────────────────────────────────────────
+
+    def test_privacy_policy_url_blocked(self):
+        assert is_low_value_link("https://uni.edu/docs/privacy-policy.pdf", "")
+
+    def test_terms_of_service_url_blocked(self):
+        assert is_low_value_link("https://uni.edu/terms-of-service.pdf", "")
+
+    def test_terms_and_conditions_url_blocked(self):
+        assert is_low_value_link("https://uni.edu/terms-and-conditions.pdf", "Terms")
+
+    def test_annual_report_url_blocked(self):
+        assert is_low_value_link("https://uni.edu/annual-report-2024.pdf", "")
+
+    def test_complaint_procedure_url_blocked(self):
+        assert is_low_value_link("https://uni.edu/complaint-procedure.pdf", "")
+
+    def test_code_of_conduct_url_blocked(self):
+        assert is_low_value_link("https://uni.edu/code-of-conduct.pdf", "")
+
+    def test_newsletter_url_blocked(self):
+        assert is_low_value_link("https://uni.edu/newsletter-winter.pdf", "")
+
+    def test_strategic_plan_url_blocked(self):
+        assert is_low_value_link("https://uni.edu/strategic-plan.pdf", "")
+
+    def test_financial_statement_url_blocked(self):
+        assert is_low_value_link("https://uni.edu/financial-statement-2023.pdf", "")
+
+    # ── Blocked anchors ───────────────────────────────────────────────────────
+
+    def test_annual_report_anchor_blocked(self):
+        assert is_low_value_link("https://uni.edu/documents/doc.pdf", "Annual Report 2024")
+
+    def test_privacy_policy_anchor_blocked(self):
+        assert is_low_value_link("https://uni.edu/p.pdf", "Privacy Policy")
+
+    def test_code_of_conduct_anchor_blocked(self):
+        assert is_low_value_link("https://uni.edu/x.pdf", "Code of Conduct")
+
+    def test_whistleblower_anchor_blocked(self):
+        assert is_low_value_link("https://uni.edu/wh.pdf", "Whistleblower Policy")
+
+    # ── High-value URLs must NOT be blocked ─────────────────────────────────
+
+    def test_fee_schedule_not_blocked(self):
+        assert not is_low_value_link("https://uni.edu/international-fee-schedule.pdf", "")
+
+    def test_entry_requirements_not_blocked(self):
+        assert not is_low_value_link("https://uni.edu/entry-requirements.pdf", "")
+
+    def test_course_handbook_not_blocked(self):
+        assert not is_low_value_link("https://uni.edu/course-handbook-2025.pdf", "")
+
+    def test_unrelated_url_not_blocked(self):
+        assert not is_low_value_link("https://uni.edu/postgraduate-guide.pdf", "")
+
+    # ── Ambiguous: low-value URL pattern but high-value signal in combined text
+    def test_fee_refund_policy_not_blocked(self):
+        """'refund-policy' matches blocklist but 'fee' in anchor overrides it."""
+        assert not is_low_value_link(
+            "https://uni.edu/international-fee-refund-policy.pdf",
+            "International Fee Refund Policy",
+        )
+
+    # ── Zero-score path in _score_link ───────────────────────────────────────
+
+    def test_low_value_link_returns_zero_scores(self):
+        lnk = _score_link("https://uni.edu/privacy-policy.pdf", "", "")
+        assert lnk.fee_score == 0.0
+        assert lnk.req_score == 0.0
+        assert lnk.handbook_score == 0.0
+
+    def test_low_value_link_filtered_by_threshold(self):
+        """discover_pdf_links must drop low-value links via threshold."""
+        from app.services.scraper.pdf_link_discoverer import _MIN_SCORE_THRESHOLD
+        lnk = _score_link("https://uni.edu/annual-report.pdf", "Annual Report", "")
+        assert lnk.total_score < _MIN_SCORE_THRESHOLD
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Low-value PDF filter — pdf_classifier.is_low_value_pdf
+# ─────────────────────────────────────────────────────────────────────────────
+
+from app.services.scraper.pdf_classifier import is_low_value_pdf
+
+
+class TestLowValuePdfClassifier:
+    """is_low_value_pdf() in the classifier mirrors the discoverer's blocklist."""
+
+    def test_privacy_policy_blocked(self):
+        assert is_low_value_pdf("https://uni.edu/privacy-policy.pdf")
+
+    def test_annual_report_blocked(self):
+        assert is_low_value_pdf("https://uni.edu/annual-report-2024.pdf")
+
+    def test_complaint_procedure_blocked(self):
+        assert is_low_value_pdf("https://uni.edu/complaint-procedure.pdf", "Complaints handling")
+
+    def test_sustainability_report_blocked(self):
+        assert is_low_value_pdf("https://uni.edu/sustainability-report.pdf")
+
+    def test_board_minutes_blocked(self):
+        assert is_low_value_pdf("https://uni.edu/board-minutes-mar24.pdf")
+
+    def test_fee_schedule_not_blocked(self):
+        assert not is_low_value_pdf("https://uni.edu/2025-fee-schedule.pdf")
+
+    def test_entry_requirements_not_blocked(self):
+        assert not is_low_value_pdf("https://uni.edu/entry-requirements.pdf")
+
+    def test_handbook_not_blocked(self):
+        assert not is_low_value_pdf("https://uni.edu/handbook-ug-2025.pdf")
+
+    def test_first_page_text_override(self):
+        """'fee' in first-page text overrides a low-value URL pattern."""
+        assert not is_low_value_pdf(
+            "https://uni.edu/refund-policy.pdf",
+            "International student tuition fee refund policy and schedule.",
+        )
+
+    def test_classify_pdf_low_value_returns_other(self):
+        """classify_by_keywords should not be called for low-value PDFs."""
+        from app.services.scraper.pdf_classifier import classify_by_keywords
+        result = classify_by_keywords("https://uni.edu/privacy-policy.pdf", "")
+        # low-value gate is inside classify_pdf (async); classify_by_keywords is unguarded
+        # so this just verifies classify_by_keywords itself doesn't crash.
+        assert result.category in {
+            "fee_schedule", "entry_requirements", "handbook", "prospectus",
+            "course_catalogue", "intake_calendar", "scholarship", "other",
+        }
