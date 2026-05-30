@@ -37,6 +37,9 @@ from app.models.university_field_baseline import UniversityFieldBaseline
 from app.models.user import PasswordResetToken, User, UserPermission
 from app.models.course_snapshot import CourseSnapshot
 from app.models.course_change_event import CourseChangeEvent
+from app.models.course_pathway import CoursePathway
+from app.models.course_accreditation import CourseAccreditation
+from app.models.university_location import UniversityLocation
 
 __all__ = [
     "AcademicLevelOption",
@@ -73,4 +76,7 @@ __all__ = [
     "UniversityFieldBaseline",
     "CourseSnapshot",
     "CourseChangeEvent",
+    "CoursePathway",
+    "CourseAccreditation",
+    "UniversityLocation",
 ]

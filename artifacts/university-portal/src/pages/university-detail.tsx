@@ -18,6 +18,8 @@ import {
   Database, CheckCircle2, Clock, Trash2, Pencil, Upload, RefreshCw, GitMerge,
   ChevronsUpDown, Check, AlertTriangle, ClipboardList, Plus, Star, Wrench, Loader2, XCircle, Zap,
   GitCompareArrows,
+  Network,
+  ChevronDown,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -465,6 +467,8 @@ export default function UniversityDetail() {
       last_repair_at: string | null;
       top_unresolved_fields: { field: string; count: number }[];
       repair_ran: boolean;
+      conflict_resolution_rate: number | null;
+      resolution_breakdown: Array<{ method: string; count: number; avg_confidence: number }> | null;
     };
   };
   const [verifSummary, setVerifSummary] = useState<VerifSummary | null>(null);
@@ -529,6 +533,68 @@ export default function UniversityDetail() {
   }, [fetchChangeData]);
 
   useEffect(() => { void fetchChangeData(); }, [fetchChangeData]);
+
+  // ── Phase 11: Knowledge Graph panel ──────────────────────────────────────
+  type KgCampus = { id: number; display_name: string; city: string | null; state_region: string | null; country: string | null; is_verified: boolean; course_count: number };
+  type KgIntake = { id: number; intake_month: string; intake_year: number | null; is_open: boolean };
+  type KgFee = { id: number; international_fee: number | null; fee_term: string | null; fee_year: number | null; currency: string | null };
+  type KgEnglish = { id: number; test_type: string; overall: number | null; listening: number | null; speaking: number | null; writing: number | null; reading: number | null };
+  type KgAcademic = { id: number; academic_level: string | null; academic_score: number | null; score_type: string | null; academic_country: string | null };
+  type KgScholarship = { id: number; name: string; amount: number | null; percentage: number | null; currency: string | null };
+  type KgPathway = { id: number; source_course_id: number; target_course_id: number; pathway_type: string; notes: string | null };
+  type KgAccreditation = { id: number; accrediting_body: string; accreditation_type: string | null; valid_from: string | null; valid_until: string | null };
+  type KgEvidence = { total_evidence: number; fields_with_evidence: number; avg_confidence: number | null; last_scraped_at: string | null };
+  type KgVerification = { total_verified: number; avg_confidence: number | null; verified_count: number; conflict_count: number };
+  type KgChange = { id: number; field_name: string; old_value: string | null; new_value: string | null; change_type: string; severity: string; detected_at: string; status: string };
+  type KgCourse = {
+    id: number; name: string; degree_level: string | null; category: string | null; study_mode: string | null;
+    duration: number | null; duration_term: string | null; course_location: string | null; course_website: string | null;
+    status: string; approval_status: string; campus: KgCampus | null;
+    intakes: KgIntake[]; fees: KgFee[]; english_requirements: KgEnglish[];
+    academic_requirements: KgAcademic[]; scholarships: KgScholarship[];
+    pathways: KgPathway[]; accreditations: KgAccreditation[];
+    source_evidence: KgEvidence; verification_confidence: KgVerification; recent_changes: KgChange[];
+  };
+  type KgData = {
+    university: { id: number; name: string; country: string; city: string };
+    campuses: KgCampus[];
+    course_count: number;
+    page: number; per_page: number; total_pages: number;
+    courses: KgCourse[];
+  };
+
+  const [kgData, setKgData] = useState<KgData | null>(null);
+  const [kgLoading, setKgLoading] = useState(false);
+  const [kgError, setKgError] = useState<string | null>(null);
+  const [kgPage, setKgPage] = useState(1);
+  const [kgExpandedCourses, setKgExpandedCourses] = useState<Set<number>>(new Set());
+  const [kgCardOpen, setKgCardOpen] = useState(false);
+
+  const fetchKgData = useCallback(async (page = 1) => {
+    if (!id) return;
+    setKgLoading(true);
+    setKgError(null);
+    try {
+      const res = await fetch(`${BASE}/api/kg/university/${id}?page=${page}&per_page=20&include_evidence=true`);
+      if (!res.ok) { setKgError(`HTTP ${res.status}`); return; }
+      const data: KgData = await res.json();
+      setKgData(data);
+      setKgPage(page);
+      setKgCardOpen(true);
+    } catch (e) {
+      setKgError("Failed to load knowledge graph");
+    } finally {
+      setKgLoading(false);
+    }
+  }, [id]);
+
+  const toggleKgCourse = useCallback((courseId: number) => {
+    setKgExpandedCourses(prev => {
+      const next = new Set(prev);
+      if (next.has(courseId)) next.delete(courseId); else next.add(courseId);
+      return next;
+    });
+  }, []);
 
   // ── Phase 2: Extraction Rules card ────────────────────────────────────────
   const [rulesCardOpen, setRulesCardOpen] = useState(false);
@@ -2436,6 +2502,295 @@ export default function UniversityDetail() {
           )}
         </div>
       )}
+
+      {/* ── Knowledge Graph Panel (Phase 11) ────────────────────────────── */}
+      <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-4 text-sm space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 font-semibold text-indigo-800">
+            <Network className="h-4 w-4 text-indigo-600" />
+            Knowledge Graph
+            <span className="text-[10px] bg-indigo-100 border border-indigo-300 text-indigo-600 px-1.5 py-0.5 rounded font-mono">Phase 11</span>
+          </div>
+          <div className="flex items-center gap-2">
+            {kgData && (
+              <span className="text-[10px] text-indigo-600 font-mono">
+                {kgData.course_count} courses · {kgData.campuses.length} campus{kgData.campuses.length !== 1 ? "es" : ""}
+              </span>
+            )}
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-6 px-2 text-xs border-indigo-300 text-indigo-700 hover:bg-indigo-100"
+              disabled={kgLoading}
+              onClick={() => {
+                if (!kgData) void fetchKgData(1);
+                else setKgCardOpen(v => !v);
+              }}
+            >
+              {kgLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : kgData ? (kgCardOpen ? "Hide" : "Show") : "Load Graph"}
+            </Button>
+          </div>
+        </div>
+
+        {/* Summary pills */}
+        {kgData && (
+          <div className="flex flex-wrap gap-2">
+            <span className="inline-flex items-center gap-1 bg-white border border-indigo-200 text-indigo-700 text-[10px] px-2 py-0.5 rounded-full font-medium">
+              🏛 {kgData.campuses.length} Campus{kgData.campuses.length !== 1 ? "es" : ""}
+            </span>
+            <span className="inline-flex items-center gap-1 bg-white border border-indigo-200 text-indigo-700 text-[10px] px-2 py-0.5 rounded-full font-medium">
+              📚 {kgData.course_count} Courses
+            </span>
+            {kgData.campuses.filter(c => c.is_verified).length > 0 && (
+              <span className="inline-flex items-center gap-1 bg-green-50 border border-green-200 text-green-700 text-[10px] px-2 py-0.5 rounded-full font-medium">
+                ✓ {kgData.campuses.filter(c => c.is_verified).length} Verified
+              </span>
+            )}
+          </div>
+        )}
+
+        {kgError && (
+          <p className="text-xs text-red-600">⚠ {kgError}</p>
+        )}
+
+        {kgCardOpen && kgData && (
+          <div className="space-y-3">
+            {/* Campus list */}
+            {kgData.campuses.length > 0 && (
+              <div className="bg-white border border-indigo-100 rounded-md p-2.5 space-y-1">
+                <p className="text-[10px] font-semibold text-indigo-700 uppercase tracking-wide mb-1.5">Campuses</p>
+                {kgData.campuses.map(camp => (
+                  <div key={camp.id} className="flex items-center gap-2 text-[11px] text-gray-700">
+                    <MapPin className="h-3 w-3 text-indigo-400 shrink-0" />
+                    <span className="font-medium">{camp.display_name}</span>
+                    {camp.city && <span className="text-muted-foreground">· {camp.city}{camp.state_region ? `, ${camp.state_region}` : ""}</span>}
+                    {camp.is_verified && <span className="text-[9px] bg-green-100 text-green-700 px-1 py-0.5 rounded">verified</span>}
+                    <span className="ml-auto text-[9px] text-muted-foreground">{camp.course_count} courses</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Course nodes */}
+            <div className="space-y-1.5">
+              {kgData.courses.map(course => {
+                const expanded = kgExpandedCourses.has(course.id);
+                const hasCriticalChanges = course.recent_changes.some(c => c.severity === "critical" && c.status === "new");
+                return (
+                  <div key={course.id} className={`border rounded-md overflow-hidden ${hasCriticalChanges ? "border-red-300" : "border-indigo-100"}`}>
+                    {/* Course header row */}
+                    <button
+                      className="w-full flex items-center gap-2 px-2.5 py-1.5 bg-white hover:bg-indigo-50 transition-colors text-left"
+                      onClick={() => toggleKgCourse(course.id)}
+                    >
+                      {expanded ? <ChevronDown className="h-3 w-3 text-indigo-400 shrink-0" /> : <ChevronRight className="h-3 w-3 text-indigo-400 shrink-0" />}
+                      <span className="text-[11px] font-medium text-gray-800 flex-1 truncate">{course.name}</span>
+                      <div className="flex items-center gap-1 shrink-0">
+                        {course.degree_level && (
+                          <span className="text-[9px] bg-indigo-50 border border-indigo-200 text-indigo-600 px-1 py-0.5 rounded">{course.degree_level}</span>
+                        )}
+                        {course.campus && (
+                          <span className="text-[9px] bg-slate-50 border border-slate-200 text-slate-600 px-1 py-0.5 rounded truncate max-w-[80px]" title={course.campus.display_name}>{course.campus.city ?? course.campus.display_name}</span>
+                        )}
+                        {hasCriticalChanges && <span className="text-[9px] bg-red-100 text-red-700 px-1 py-0.5 rounded">⚡ change</span>}
+                        {course.accreditations.length > 0 && <span className="text-[9px] bg-amber-50 border border-amber-200 text-amber-700 px-1 py-0.5 rounded">★ accred</span>}
+                        {course.pathways.length > 0 && <span className="text-[9px] bg-purple-50 border border-purple-200 text-purple-700 px-1 py-0.5 rounded">→ pathway</span>}
+                      </div>
+                    </button>
+
+                    {/* Expanded course detail */}
+                    {expanded && (
+                      <div className="border-t border-indigo-100 bg-slate-50 p-2.5 space-y-2 text-[10px]">
+                        {/* Metadata row */}
+                        <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-muted-foreground">
+                          {course.study_mode && <span>Mode: <b className="text-gray-700">{course.study_mode}</b></span>}
+                          {course.duration && <span>Duration: <b className="text-gray-700">{course.duration} {course.duration_term ?? ""}</b></span>}
+                          {course.course_location && <span>Location: <b className="text-gray-700">{course.course_location}</b></span>}
+                          {course.category && <span>Category: <b className="text-gray-700">{course.category}</b></span>}
+                        </div>
+
+                        {/* Intakes */}
+                        {course.intakes.length > 0 && (
+                          <div>
+                            <p className="text-[9px] font-semibold text-indigo-700 uppercase tracking-wide mb-0.5">Intakes</p>
+                            <div className="flex flex-wrap gap-1">
+                              {course.intakes.map(i => (
+                                <span key={i.id} className={`px-1.5 py-0.5 rounded text-[9px] ${i.is_open ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+                                  {i.intake_month}{i.intake_year ? ` ${i.intake_year}` : ""}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Fees */}
+                        {course.fees.length > 0 && (
+                          <div>
+                            <p className="text-[9px] font-semibold text-indigo-700 uppercase tracking-wide mb-0.5">Fees</p>
+                            <div className="flex flex-wrap gap-1">
+                              {course.fees.map(f => (
+                                <span key={f.id} className="px-1.5 py-0.5 rounded bg-blue-50 border border-blue-200 text-blue-700 text-[9px]">
+                                  {f.international_fee != null ? `${f.currency ?? "AUD"} ${f.international_fee.toLocaleString()}` : "—"}{f.fee_term ? `/${f.fee_term}` : ""}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* English Requirements */}
+                        {course.english_requirements.length > 0 && (
+                          <div>
+                            <p className="text-[9px] font-semibold text-indigo-700 uppercase tracking-wide mb-0.5">English Requirements</p>
+                            <div className="flex flex-wrap gap-1">
+                              {course.english_requirements.map(e => (
+                                <span key={e.id} className="px-1.5 py-0.5 rounded bg-violet-50 border border-violet-200 text-violet-700 text-[9px]">
+                                  {e.test_type} {e.overall ?? "—"}
+                                  {e.listening != null && ` (L:${e.listening} S:${e.speaking} W:${e.writing} R:${e.reading})`}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Academic Requirements */}
+                        {course.academic_requirements.length > 0 && (
+                          <div>
+                            <p className="text-[9px] font-semibold text-indigo-700 uppercase tracking-wide mb-0.5">Academic Requirements</p>
+                            <div className="flex flex-wrap gap-1">
+                              {course.academic_requirements.map(a => (
+                                <span key={a.id} className="px-1.5 py-0.5 rounded bg-teal-50 border border-teal-200 text-teal-700 text-[9px]">
+                                  {a.academic_level ?? "—"}{a.academic_score != null ? ` · ${a.academic_score}${a.score_type ? ` ${a.score_type}` : ""}` : ""}
+                                  {a.academic_country ? ` (${a.academic_country})` : ""}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Scholarships */}
+                        {course.scholarships.length > 0 && (
+                          <div>
+                            <p className="text-[9px] font-semibold text-indigo-700 uppercase tracking-wide mb-0.5">Scholarships</p>
+                            <div className="flex flex-wrap gap-1">
+                              {course.scholarships.map(s => (
+                                <span key={s.id} className="px-1.5 py-0.5 rounded bg-amber-50 border border-amber-200 text-amber-700 text-[9px]">
+                                  {s.name}{s.amount != null ? ` · ${s.currency ?? ""} ${s.amount.toLocaleString()}` : ""}{s.percentage != null ? ` · ${s.percentage}%` : ""}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Pathways */}
+                        {course.pathways.length > 0 && (
+                          <div>
+                            <p className="text-[9px] font-semibold text-purple-700 uppercase tracking-wide mb-0.5">Pathways</p>
+                            <div className="flex flex-wrap gap-1">
+                              {course.pathways.map(p => (
+                                <span key={p.id} className="px-1.5 py-0.5 rounded bg-purple-50 border border-purple-200 text-purple-700 text-[9px]">
+                                  {p.pathway_type.replace(/_/g, " ")}
+                                  {p.source_course_id === course.id ? ` → #${p.target_course_id}` : ` ← #${p.source_course_id}`}
+                                  {p.notes ? ` · ${p.notes}` : ""}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Accreditations */}
+                        {course.accreditations.length > 0 && (
+                          <div>
+                            <p className="text-[9px] font-semibold text-amber-700 uppercase tracking-wide mb-0.5">Accreditations</p>
+                            <div className="flex flex-wrap gap-1">
+                              {course.accreditations.map(a => (
+                                <span key={a.id} className="px-1.5 py-0.5 rounded bg-amber-50 border border-amber-200 text-amber-700 text-[9px]">
+                                  {a.accrediting_body}{a.accreditation_type ? ` · ${a.accreditation_type}` : ""}
+                                  {a.valid_until ? ` (until ${a.valid_until})` : ""}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Source Evidence + Verification Confidence */}
+                        <div className="flex gap-3 flex-wrap">
+                          {course.source_evidence.total_evidence > 0 && (
+                            <div className="bg-white border border-indigo-100 rounded px-2 py-1">
+                              <p className="text-[9px] font-semibold text-indigo-600 mb-0.5">Source Evidence</p>
+                              <p className="text-[9px] text-gray-600">
+                                {course.source_evidence.total_evidence} items · {course.source_evidence.fields_with_evidence} fields
+                                {course.source_evidence.avg_confidence != null && ` · ~${course.source_evidence.avg_confidence}% conf`}
+                              </p>
+                            </div>
+                          )}
+                          {course.verification_confidence.total_verified > 0 && (
+                            <div className="bg-white border border-indigo-100 rounded px-2 py-1">
+                              <p className="text-[9px] font-semibold text-indigo-600 mb-0.5">Verification</p>
+                              <p className="text-[9px] text-gray-600">
+                                {course.verification_confidence.verified_count} verified
+                                {course.verification_confidence.conflict_count > 0 && ` · ${course.verification_confidence.conflict_count} conflicts`}
+                                {course.verification_confidence.avg_confidence != null && ` · ~${course.verification_confidence.avg_confidence}% conf`}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Recent Changes */}
+                        {course.recent_changes.length > 0 && (
+                          <div>
+                            <p className="text-[9px] font-semibold text-orange-700 uppercase tracking-wide mb-0.5">Recent Changes</p>
+                            <div className="space-y-0.5">
+                              {course.recent_changes.slice(0, 3).map(ch => (
+                                <div key={ch.id} className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] ${
+                                  ch.severity === "critical" ? "bg-red-50 text-red-700" :
+                                  ch.severity === "major" ? "bg-orange-50 text-orange-700" :
+                                  "bg-gray-50 text-gray-600"
+                                }`}>
+                                  <span className="font-semibold uppercase">{ch.severity.slice(0,4)}</span>
+                                  <span>{ch.field_name.replace(/_/g, " ")}</span>
+                                  {ch.old_value && ch.new_value && (
+                                    <span className="font-mono opacity-80">{ch.old_value} → {ch.new_value}</span>
+                                  )}
+                                  <span className="ml-auto opacity-60">{new Date(ch.detected_at).toLocaleDateString()}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Pagination */}
+            {kgData.total_pages > 1 && (
+              <div className="flex items-center justify-between pt-1">
+                <Button
+                  size="sm" variant="outline"
+                  className="h-6 px-2 text-xs border-indigo-300 text-indigo-700"
+                  disabled={kgPage <= 1 || kgLoading}
+                  onClick={() => void fetchKgData(kgPage - 1)}
+                >
+                  ← Prev
+                </Button>
+                <span className="text-[10px] text-muted-foreground">
+                  Page {kgData.page} of {kgData.total_pages}
+                </span>
+                <Button
+                  size="sm" variant="outline"
+                  className="h-6 px-2 text-xs border-indigo-300 text-indigo-700"
+                  disabled={kgPage >= kgData.total_pages || kgLoading}
+                  onClick={() => void fetchKgData(kgPage + 1)}
+                >
+                  Next →
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* ── Extraction Rules Card (Phase 2) ─────────────────────────────── */}
       {probeResult?.auto_config &&

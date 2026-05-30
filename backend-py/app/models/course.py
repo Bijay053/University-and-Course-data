@@ -46,6 +46,10 @@ class Course(Base):
     last_reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_edited_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_edited_by: Mapped[str | None] = mapped_column(Text)
+    # Phase 11: campus linkage (nullable FK; set by text-match backfill, never auto-overwritten)
+    campus_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("university_locations.id", ondelete="SET NULL"), index=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
@@ -54,3 +58,4 @@ class Course(Base):
     )
 
     university = relationship("University", back_populates="courses")
+    campus = relationship("UniversityLocation", foreign_keys=[campus_id])
