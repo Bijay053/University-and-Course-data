@@ -259,6 +259,9 @@ _DEGREE_QUALIFIER_RE = re.compile(
     r"doctor(?:ate)?|"
     r"graduate\s+(?:certificate|diploma)|"
     r"postgraduate\s+(?:certificate|diploma)|"  # UK PgCert / PgDip (Huddersfield)
+    r"pgce\b|"                                    # Postgraduate Certificate of Education (UK)
+    r"pgcert\b|"                                  # PgCert (abbreviated)
+    r"pgdip\b|"                                   # PgDip (abbreviated)
     r"foundation\s+degree|"                      # UK FdSc / FdA
     r"advanced\s+diploma|"
     r"associate\s+degree|"

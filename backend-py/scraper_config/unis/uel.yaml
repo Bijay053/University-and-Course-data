@@ -73,3 +73,13 @@ extraction:
   filters:
     domestic_only:
       enabled: true
+    # UEL is an on-campus London university. The study_mode rule fires "Online"
+    # at 0.70 confidence on any \bonline\b match (e.g. "apply online", "online
+    # resources") present on every UEL course page. Gemini correctly returns
+    # "On Campus" but the rule wins in the merge due to authority ordering.
+    # Disabling online_only rejection here prevents false positives while still
+    # allowing the domestic_only and no_international_fee guards to protect data
+    # quality. Genuine UEL online-only courses (if any) would need a separate
+    # allow-list approach.
+    online_only:
+      enabled: false
