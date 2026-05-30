@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Send, CheckCircle2, AlertTriangle, Clock, Zap, BarChart3,
   RefreshCw, ThumbsUp, ThumbsDown, Pause, FileText, TrendingUp,
-  ChevronDown, ChevronUp, Info, Play,
+  ChevronDown, ChevronUp, Info, Play, Search,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -174,6 +174,9 @@ export default function PublishingPage() {
   const qc = useQueryClient();
   const [tab, setTab] = useState<"queue" | "ledger">("queue");
   const [decisionFilter, setDecisionFilter] = useState<string>("all");
+  const [search, setSearch] = useState("");
+  const [pageSize, setPageSize] = useState(25);
+  const [page, setPage] = useState(1);
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const [actionReason, setActionReason] = useState<Record<number, string>>({});
 
@@ -186,7 +189,7 @@ export default function PublishingPage() {
   const { data: queue = [], isLoading: queueLoading, refetch: refetchQueue } = useQuery<ReviewItem[]>({
     queryKey: ["pub-queue", decisionFilter],
     queryFn: () => apiFetch(
-      `/api/publishing/review-queue?limit=100${decisionFilter !== "all" ? `&decision=${decisionFilter}` : ""}`
+      `/api/publishing/review-queue?limit=2000${decisionFilter !== "all" ? `&decision=${decisionFilter}` : ""}`
     ),
     refetchInterval: 15000,
   });
@@ -243,12 +246,25 @@ export default function PublishingPage() {
     });
   }
 
+  useEffect(() => { setPage(1); }, [search, decisionFilter, pageSize]);
+
   const queueByDecision = {
     all: queue.length,
     auto_publish: queue.filter(r => r.pub_decision === "auto_publish").length,
     needs_review: queue.filter(r => r.pub_decision === "needs_review").length,
     hold: queue.filter(r => r.pub_decision === "hold").length,
   };
+
+  const searchLower = search.toLowerCase();
+  const filteredQueue = searchLower
+    ? queue.filter(r =>
+        r.course_name.toLowerCase().includes(searchLower) ||
+        r.university_name.toLowerCase().includes(searchLower)
+      )
+    : queue;
+  const totalPages = Math.max(1, Math.ceil(filteredQueue.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const paginatedQueue = filteredQueue.slice((safePage - 1) * pageSize, safePage * pageSize);
 
   return (
     <div className="space-y-6">
@@ -349,25 +365,64 @@ export default function PublishingPage() {
       {/* Review Queue */}
       {tab === "queue" && (
         <div className="space-y-4">
-          {/* Decision filter sub-tabs */}
-          <div className="flex gap-1 flex-wrap">
-            {(["all", "needs_review", "hold", "auto_publish"] as const).map(f => (
-              <button
-                key={f}
-                onClick={() => setDecisionFilter(f)}
-                className="px-3 py-1 text-xs rounded-full border transition-colors whitespace-nowrap"
-                style={
-                  decisionFilter === f
-                    ? { backgroundColor: '#4f46e5', color: '#ffffff', borderColor: '#4f46e5' }
-                    : { backgroundColor: '#ffffff', color: '#475569', borderColor: '#e2e8f0' }
-                }
+          {/* Toolbar: decision pills + search + page size */}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Decision filter pills */}
+            <div className="flex gap-1 flex-wrap">
+              {(["all", "needs_review", "hold", "auto_publish"] as const).map(f => (
+                <button
+                  key={f}
+                  onClick={() => setDecisionFilter(f)}
+                  className="px-3 py-1 text-xs rounded-full border transition-colors whitespace-nowrap"
+                  style={
+                    decisionFilter === f
+                      ? { backgroundColor: '#4f46e5', color: '#ffffff', borderColor: '#4f46e5' }
+                      : { backgroundColor: '#ffffff', color: '#475569', borderColor: '#e2e8f0' }
+                  }
+                >
+                  {f === "all" && `All (${queueByDecision.all})`}
+                  {f === "needs_review" && `Needs Review (${queueByDecision.needs_review})`}
+                  {f === "hold" && `Hold (${queueByDecision.hold})`}
+                  {f === "auto_publish" && `Ready (${queueByDecision.auto_publish})`}
+                </button>
+              ))}
+            </div>
+
+            {/* Spacer */}
+            <div className="flex-1" />
+
+            {/* Search */}
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Search course or university…"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="pl-8 pr-3 py-1.5 text-xs border border-slate-200 rounded-md w-52 focus:outline-none focus:ring-1 focus:ring-indigo-400"
+              />
+              {search && (
+                <button
+                  onClick={() => setSearch("")}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs leading-none"
+                >✕</button>
+              )}
+            </div>
+
+            {/* Page size */}
+            <div className="flex items-center gap-1.5 text-xs text-slate-600">
+              <span>Show</span>
+              <select
+                value={pageSize}
+                onChange={e => setPageSize(Number(e.target.value))}
+                className="border border-slate-200 rounded px-1.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-400"
               >
-                {f === "all" && `All (${queueByDecision.all})`}
-                {f === "needs_review" && `Needs Review (${queueByDecision.needs_review})`}
-                {f === "hold" && `Hold (${queueByDecision.hold})`}
-                {f === "auto_publish" && `Ready (${queueByDecision.auto_publish})`}
-              </button>
-            ))}
+                {[10, 25, 50, 100].map(n => (
+                  <option key={n} value={n}>{n}</option>
+                ))}
+              </select>
+              <span>per page</span>
+            </div>
           </div>
 
           {queueLoading ? (
@@ -395,7 +450,7 @@ export default function PublishingPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y">
-                    {queue.map(item => (
+                    {paginatedQueue.map(item => (
                       <>
                         <tr
                           key={item.id}
@@ -565,6 +620,56 @@ export default function PublishingPage() {
                   </tbody>
                 </table>
               </div>
+
+              {/* Pagination footer */}
+              {filteredQueue.length > 0 && (
+                <div className="px-4 py-3 border-t flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600 bg-slate-50/60">
+                  <span>
+                    Showing {Math.min((safePage - 1) * pageSize + 1, filteredQueue.length)}–{Math.min(safePage * pageSize, filteredQueue.length)} of {filteredQueue.length}
+                    {search && ` (filtered from ${queue.length})`}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => setPage(1)}
+                      disabled={safePage === 1}
+                      className="px-2 py-1 border border-slate-200 rounded text-xs disabled:opacity-40 hover:bg-slate-100"
+                    >«</button>
+                    <button
+                      onClick={() => setPage(p => Math.max(1, p - 1))}
+                      disabled={safePage === 1}
+                      className="px-2 py-1 border border-slate-200 rounded text-xs disabled:opacity-40 hover:bg-slate-100"
+                    >‹</button>
+                    {Array.from({ length: Math.min(7, totalPages) }, (_, i) => {
+                      let p: number;
+                      if (totalPages <= 7) p = i + 1;
+                      else if (safePage <= 4) p = i + 1;
+                      else if (safePage >= totalPages - 3) p = totalPages - 6 + i;
+                      else p = safePage - 3 + i;
+                      return (
+                        <button
+                          key={p}
+                          onClick={() => setPage(p)}
+                          className="px-2 py-1 border rounded text-xs min-w-[28px]"
+                          style={safePage === p
+                            ? { backgroundColor: '#4f46e5', color: '#fff', borderColor: '#4f46e5' }
+                            : { borderColor: '#e2e8f0', color: '#475569' }
+                          }
+                        >{p}</button>
+                      );
+                    })}
+                    <button
+                      onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                      disabled={safePage === totalPages}
+                      className="px-2 py-1 border border-slate-200 rounded text-xs disabled:opacity-40 hover:bg-slate-100"
+                    >›</button>
+                    <button
+                      onClick={() => setPage(totalPages)}
+                      disabled={safePage === totalPages}
+                      className="px-2 py-1 border border-slate-200 rounded text-xs disabled:opacity-40 hover:bg-slate-100"
+                    >»</button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
