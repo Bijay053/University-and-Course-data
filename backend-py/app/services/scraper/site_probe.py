@@ -24,6 +24,8 @@ from datetime import datetime, timezone
 from typing import Any
 from urllib.parse import urljoin, urlparse
 
+from app.services.scraper.library_strategy import LibraryStack, recommend_library_stack
+
 log = logging.getLogger(__name__)
 
 # ── Strategy constants ───────────────────────────────────────────────────────
@@ -180,6 +182,9 @@ class SiteProfile:
     strategy_confidence: float = 0.5
     strategy_ladder: list[str] = field(default_factory=list)
 
+    # Recommended Python library stack (populated after _select_strategy)
+    library_stack: LibraryStack | None = None
+
     # Human-readable notes for logging / UI
     notes: list[str] = field(default_factory=list)
 
@@ -214,6 +219,7 @@ class SiteProfile:
             "recommended_strategy": self.recommended_strategy,
             "strategy_confidence": self.strategy_confidence,
             "strategy_ladder": self.strategy_ladder,
+            "library_stack": self.library_stack.to_dict() if self.library_stack else None,
             "notes": self.notes,
         }
 
@@ -258,6 +264,9 @@ async def probe_site(url: str, timeout: float = 15.0) -> SiteProfile:
 
     # Stage 7: Recommend strategy + build escalation ladder
     _select_strategy(profile)
+
+    # Stage 8: Recommend Python library stack based on site signals
+    profile.library_stack = recommend_library_stack(profile)
 
     log.info(
         "[PROBE] %s → strategy=%s confidence=%.2f blocked=%s spa=%s "

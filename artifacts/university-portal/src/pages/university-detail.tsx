@@ -418,6 +418,15 @@ export default function UniversityDetail() {
       wayback_available: boolean;
       wayback_course_count: number;
       detected_apis: { provider: string; label: string; endpoint_hint: string }[];
+      library_stack: {
+        situation: string;
+        fetch_library: string[];
+        parser: string[];
+        fallback: string[];
+        antibot: string[];
+        data_cleaning: string[];
+        reason: string;
+      } | null;
       notes: string[];
     } | null;
     auto_config: Record<string, unknown> | null;
@@ -1785,6 +1794,48 @@ export default function UniversityDetail() {
                     )}
                   </React.Fragment>
                 ))}
+              </div>
+            </div>
+          )}
+          {/* Library Stack */}
+          {probeResult.probe_result.library_stack && (
+            <div className="bg-white rounded-md border border-blue-200 p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="text-xs font-semibold text-blue-800">
+                  Recommended Library Stack
+                </div>
+                <span className="text-[10px] bg-blue-50 border border-blue-200 text-blue-600 px-1.5 py-0.5 rounded font-mono">
+                  {probeResult.probe_result.library_stack.situation.replace(/_/g, " ")}
+                </span>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-1.5 text-xs">
+                {(
+                  [
+                    { label: "Fetch", key: "fetch_library", color: "bg-blue-50 text-blue-700 border-blue-200" },
+                    { label: "Parser", key: "parser", color: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+                    { label: "Fallback", key: "fallback", color: "bg-amber-50 text-amber-700 border-amber-200" },
+                    { label: "Anti-bot", key: "antibot", color: "bg-red-50 text-red-700 border-red-200" },
+                    { label: "Data cleaning", key: "data_cleaning", color: "bg-violet-50 text-violet-700 border-violet-200" },
+                  ] as { label: string; key: keyof typeof probeResult.probe_result.library_stack; color: string }[]
+                ).map(({ label, key, color }) => {
+                  const libs = probeResult.probe_result!.library_stack![key] as string[];
+                  if (!libs || libs.length === 0) return null;
+                  return (
+                    <div key={key}>
+                      <div className="text-[10px] text-muted-foreground mb-0.5">{label}</div>
+                      <div className="flex flex-wrap gap-0.5">
+                        {libs.map((lib) => (
+                          <span key={lib} className={`inline-block border rounded px-1.5 py-0.5 text-[10px] font-mono ${color}`}>
+                            {lib}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="text-[11px] text-muted-foreground italic leading-relaxed border-t border-blue-100 pt-2">
+                {probeResult.probe_result.library_stack.reason}
               </div>
             </div>
           )}
