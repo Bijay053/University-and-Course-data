@@ -2835,6 +2835,35 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             except Exception as _cd_exc:  # noqa: BLE001
                 log.warning("[CHANGE_DETECT] hook failed for run %s: %s", runtime_job_id, _cd_exc)
 
+            # ── Phase 12: Country Intelligence — learning loop ─────────────
+            # After each successful scrape, update country_patterns with the
+            # rolling avg completeness and confidence so the system gets
+            # smarter per country over time. Completely soft-fail.
+            try:
+                from sqlalchemy import select as _p12sel, func as _p12func
+                from app.models import ScrapedCourse as _P12SC, FieldVerificationResult as _P12FVR
+                _p12_avg_row = (await db.execute(
+                    _p12sel(_p12func.avg(_P12SC.completeness)).where(
+                        _P12SC.scrape_job_id == runtime_job_id,
+                        _P12SC.completeness.isnot(None),
+                    )
+                )).scalar()
+                _p12_avg_conf_row = (await db.execute(
+                    _p12sel(_p12func.avg(_P12FVR.confidence)).where(
+                        _P12FVR.scrape_run_id == runtime_job_id,
+                    )
+                )).scalar()
+                if _p12_avg_row is not None:
+                    from app.services.country_intelligence import update_country_stats
+                    await update_country_stats(
+                        country=uni_country or "Unknown",
+                        completeness=float(_p12_avg_row),
+                        confidence=float(_p12_avg_conf_row) if _p12_avg_conf_row is not None else None,
+                        db=db,
+                    )
+            except Exception as _p12_exc:  # noqa: BLE001
+                log.warning("[COUNTRY_INTEL] learning loop failed for run %s: %s", runtime_job_id, _p12_exc)
+
             # ── Phase 4B: promote XHR-discovered API field mapping ─────────
             # If this job used an auto-discovered REST/ES/GraphQL API type
             # (stored as _api_type in auto_config), and the job staged enough

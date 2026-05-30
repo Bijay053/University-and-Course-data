@@ -214,6 +214,47 @@ async def generate_config(
     """
     config = _base_config(profile)
 
+    # ── Phase 12: inject country intelligence hints ───────────────────────────
+    # Pulls country-specific patterns (fee currency, intake months, PDF keywords,
+    # preferred strategy, known risks) and stores them under
+    # auto_config["_country_hints"] so extractors and the Gemini prompt can
+    # reference them without re-querying the DB per course.
+    try:
+        from app.services.country_intelligence import (
+            build_strategy_adjustments,
+            get_pattern,
+            normalise_country,
+        )
+        _raw_country = getattr(profile, "country", None) or ""
+        if _raw_country:
+            _canonical = normalise_country(_raw_country)
+            # Use a short-lived DB session for the country lookup
+            from app.database import AsyncSessionLocal as _DBSession
+            async with _DBSession() as _cdb:
+                _cpat = await get_pattern(_canonical, _cdb)
+            _hints = build_strategy_adjustments(_cpat)
+            if _hints:
+                config["_country_hints"] = _hints
+                # Boost preferred_strategy if country disagrees with heuristic
+                _cpref = _hints.get("preferred_strategy")
+                if _cpref and config.get("_strategy") in (None, "unknown", "bfs"):
+                    config["_strategy"] = _cpref
+                    log.info(
+                        "[AUTO_CONFIG] country=%r boosted strategy to %r",
+                        _canonical, _cpref,
+                    )
+                # Inject known intake months when not already derived
+                _intake_months = _hints.get("intake_months", [])
+                if _intake_months and not config.get("intake_months"):
+                    config["intake_months"] = _intake_months
+                log.info(
+                    "[AUTO_CONFIG] country=%r hints injected: strategy=%r intakes=%s pdf_kw=%d",
+                    _canonical, _cpref, _intake_months,
+                    len(_hints.get("pdf_keywords", [])),
+                )
+    except Exception as _ci_exc:
+        log.debug("[AUTO_CONFIG] country intelligence injection skipped: %s", _ci_exc)
+
     # Apply Gemini refinement (non-fatal if unavailable)
     if sample_html or sample_urls:
         try:

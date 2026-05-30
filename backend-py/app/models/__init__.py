@@ -40,6 +40,7 @@ from app.models.course_change_event import CourseChangeEvent
 from app.models.course_pathway import CoursePathway
 from app.models.course_accreditation import CourseAccreditation
 from app.models.university_location import UniversityLocation
+from app.models.country_pattern import CountryPattern
 
 __all__ = [
     "AcademicLevelOption",
@@ -79,4 +80,5 @@ __all__ = [
     "CoursePathway",
     "CourseAccreditation",
     "UniversityLocation",
+    "CountryPattern",
 ]

@@ -588,6 +588,59 @@ export default function UniversityDetail() {
     }
   }, [id]);
 
+  // ── Phase 12: Country Intelligence panel ──────────────────────────────────
+  type CiPattern = {
+    country: string;
+    common_platforms: string[];
+    common_fee_patterns: Record<string, unknown>;
+    common_intake_patterns: string[];
+    common_requirement_patterns: Record<string, unknown>;
+    common_pdf_patterns: string[];
+    preferred_strategy: string;
+    known_risks: string[];
+    success_count: number;
+    avg_completeness: number | null;
+    avg_confidence: number | null;
+    last_scrape_at: string | null;
+    updated_at: string;
+  };
+  type CiData = {
+    university_id: number;
+    raw_country: string;
+    canonical_country: string;
+    pattern: CiPattern | null;
+    strategy_adjustments: Record<string, unknown> | null;
+  };
+
+  const [ciData, setCiData] = useState<CiData | null>(null);
+  const [ciLoading, setCiLoading] = useState(false);
+  const [ciError, setCiError] = useState<string | null>(null);
+  const [ciOpen, setCiOpen] = useState(false);
+
+  const fetchCiData = useCallback(async () => {
+    if (!id) return;
+    setCiLoading(true);
+    setCiError(null);
+    try {
+      const res = await fetch(`${BASE}/api/universities/${id}/country-intelligence`);
+      if (!res.ok) {
+        if (res.status === 404) {
+          setCiError("Country intelligence not available — apply migration 031 to seed patterns.");
+        } else {
+          setCiError(`HTTP ${res.status}`);
+        }
+        return;
+      }
+      const data: CiData = await res.json();
+      setCiData(data);
+      setCiOpen(true);
+    } catch (e) {
+      setCiError("Failed to load country intelligence");
+    } finally {
+      setCiLoading(false);
+    }
+  }, [id]);
+
   const toggleKgCourse = useCallback((courseId: number) => {
     setKgExpandedCourses(prev => {
       const next = new Set(prev);
@@ -2786,6 +2839,298 @@ export default function UniversityDetail() {
                 >
                   Next →
                 </Button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ── Country Intelligence Panel (Phase 12) ────────────────────────── */}
+      <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 font-semibold text-emerald-800">
+            <Globe className="h-4 w-4 text-emerald-600" />
+            Country Intelligence
+            <span className="text-[10px] bg-emerald-100 border border-emerald-300 text-emerald-600 px-1.5 py-0.5 rounded font-mono">Phase 12</span>
+          </div>
+          <div className="flex items-center gap-2">
+            {ciData && (
+              <span className="text-[10px] text-emerald-600 font-mono">
+                {ciData.canonical_country}
+                {ciData.pattern && ciData.pattern.success_count > 0 && ` · ${ciData.pattern.success_count} runs`}
+              </span>
+            )}
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-6 px-2 text-xs border-emerald-300 text-emerald-700 hover:bg-emerald-100"
+              disabled={ciLoading}
+              onClick={() => {
+                if (!ciData) void fetchCiData();
+                else setCiOpen(v => !v);
+              }}
+            >
+              {ciLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : ciData ? (ciOpen ? "Hide" : "Show") : "Load Intelligence"}
+            </Button>
+          </div>
+        </div>
+
+        {ciError && (
+          <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1.5 flex items-start gap-1.5">
+            <AlertTriangle className="h-3 w-3 mt-0.5 flex-shrink-0" />
+            {ciError}
+          </div>
+        )}
+
+        {ciData && !ciOpen && !ciError && (
+          <div className="flex flex-wrap gap-2 text-[11px]">
+            <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">
+              🌏 {ciData.canonical_country}
+            </span>
+            {ciData.pattern && (
+              <>
+                <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">
+                  Strategy: {ciData.pattern.preferred_strategy}
+                </span>
+                {ciData.pattern.avg_completeness !== null && (
+                  <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">
+                    Avg completeness: {(ciData.pattern.avg_completeness * 100).toFixed(0)}%
+                  </span>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
+        {ciOpen && ciData && (
+          <div className="space-y-4">
+            {/* Header stats */}
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <div className="bg-white rounded border border-emerald-200 p-2 text-center">
+                <div className="text-[10px] text-gray-500 uppercase tracking-wide">Country</div>
+                <div className="font-semibold text-emerald-800 text-xs mt-0.5">{ciData.canonical_country}</div>
+              </div>
+              <div className="bg-white rounded border border-emerald-200 p-2 text-center">
+                <div className="text-[10px] text-gray-500 uppercase tracking-wide">Strategy</div>
+                <div className="font-semibold text-emerald-800 text-xs mt-0.5 capitalize">
+                  {ciData.pattern?.preferred_strategy ?? "—"}
+                </div>
+              </div>
+              <div className="bg-white rounded border border-emerald-200 p-2 text-center">
+                <div className="text-[10px] text-gray-500 uppercase tracking-wide">Scrapes Learned</div>
+                <div className="font-semibold text-emerald-800 text-xs mt-0.5">
+                  {ciData.pattern?.success_count ?? 0}
+                </div>
+              </div>
+              <div className="bg-white rounded border border-emerald-200 p-2 text-center">
+                <div className="text-[10px] text-gray-500 uppercase tracking-wide">Avg Completeness</div>
+                <div className="font-semibold text-emerald-800 text-xs mt-0.5">
+                  {ciData.pattern?.avg_completeness !== null && ciData.pattern?.avg_completeness !== undefined
+                    ? `${(ciData.pattern.avg_completeness * 100).toFixed(1)}%`
+                    : "—"}
+                </div>
+              </div>
+            </div>
+
+            {ciData.pattern && (
+              <>
+                {/* Fee & intake patterns */}
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div>
+                    <div className="text-[10px] font-semibold text-emerald-700 uppercase tracking-wide mb-1.5">
+                      💰 Fee Patterns
+                    </div>
+                    <div className="bg-white rounded border border-emerald-100 p-2 space-y-1">
+                      {Object.entries(ciData.pattern.common_fee_patterns).map(([k, v]) => (
+                        <div key={k} className="flex justify-between text-[11px]">
+                          <span className="text-gray-500 capitalize">{k.replace(/_/g, " ")}</span>
+                          <span className="font-medium text-gray-800">
+                            {typeof v === "boolean" ? (v ? "Yes" : "No") : String(v)}
+                          </span>
+                        </div>
+                      ))}
+                      {Object.keys(ciData.pattern.common_fee_patterns).length === 0 && (
+                        <span className="text-[11px] text-gray-400">No fee patterns configured</span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="text-[10px] font-semibold text-emerald-700 uppercase tracking-wide mb-1.5">
+                      📅 Intake Patterns
+                    </div>
+                    <div className="bg-white rounded border border-emerald-100 p-2">
+                      {ciData.pattern.common_intake_patterns.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {ciData.pattern.common_intake_patterns.map(m => (
+                            <span key={m} className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded capitalize">
+                              {m}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-[11px] text-gray-400">No intake patterns configured</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Requirement patterns */}
+                <div>
+                  <div className="text-[10px] font-semibold text-emerald-700 uppercase tracking-wide mb-1.5">
+                    📋 Requirement Patterns
+                  </div>
+                  <div className="bg-white rounded border border-emerald-100 p-2 space-y-1">
+                    {Object.entries(ciData.pattern.common_requirement_patterns).map(([k, v]) => (
+                      <div key={k} className="flex justify-between text-[11px]">
+                        <span className="text-gray-500 capitalize">{k.replace(/_/g, " ")}</span>
+                        <span className="font-medium text-gray-800">
+                          {Array.isArray(v) ? v.join(", ") : typeof v === "boolean" ? (v ? "Yes" : "No") : String(v)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Platforms & PDF keywords */}
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {ciData.pattern.common_platforms.length > 0 && (
+                    <div>
+                      <div className="text-[10px] font-semibold text-emerald-700 uppercase tracking-wide mb-1.5">
+                        🖥 Known Platforms
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {ciData.pattern.common_platforms.map(p => (
+                          <span key={p} className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">
+                            {p}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {ciData.pattern.common_pdf_patterns.length > 0 && (
+                    <div>
+                      <div className="text-[10px] font-semibold text-emerald-700 uppercase tracking-wide mb-1.5">
+                        📄 PDF Discovery Keywords
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {ciData.pattern.common_pdf_patterns.map(k => (
+                          <span key={k} className="text-[10px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded">
+                            {k}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Known risks */}
+                {ciData.pattern.known_risks.length > 0 && (
+                  <div>
+                    <div className="text-[10px] font-semibold text-amber-700 uppercase tracking-wide mb-1.5">
+                      ⚠ Known Risks
+                    </div>
+                    <div className="space-y-1">
+                      {ciData.pattern.known_risks.map((risk, i) => (
+                        <div key={i} className="flex items-start gap-1.5 text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+                          <AlertTriangle className="h-3 w-3 mt-0.5 flex-shrink-0 text-amber-500" />
+                          {risk}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Learning stats */}
+                {(ciData.pattern.avg_completeness !== null || ciData.pattern.avg_confidence !== null) && (
+                  <div>
+                    <div className="text-[10px] font-semibold text-emerald-700 uppercase tracking-wide mb-1.5">
+                      📈 Learned Performance
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      {ciData.pattern.avg_completeness !== null && (
+                        <div className="bg-white rounded border border-emerald-100 p-2">
+                          <div className="text-[10px] text-gray-500">Avg Completeness</div>
+                          <div className="mt-1">
+                            <div className="flex items-center gap-1.5">
+                              <div className="flex-1 bg-gray-200 rounded-full h-1.5">
+                                <div
+                                  className="bg-emerald-500 h-1.5 rounded-full"
+                                  style={{ width: `${Math.min(100, (ciData.pattern.avg_completeness) * 100)}%` }}
+                                />
+                              </div>
+                              <span className="text-[11px] font-semibold text-emerald-700">
+                                {(ciData.pattern.avg_completeness * 100).toFixed(1)}%
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      {ciData.pattern.avg_confidence !== null && (
+                        <div className="bg-white rounded border border-emerald-100 p-2">
+                          <div className="text-[10px] text-gray-500">Avg Confidence</div>
+                          <div className="mt-1">
+                            <div className="flex items-center gap-1.5">
+                              <div className="flex-1 bg-gray-200 rounded-full h-1.5">
+                                <div
+                                  className="bg-blue-500 h-1.5 rounded-full"
+                                  style={{ width: `${Math.min(100, (ciData.pattern.avg_confidence) * 100)}%` }}
+                                />
+                              </div>
+                              <span className="text-[11px] font-semibold text-blue-700">
+                                {(ciData.pattern.avg_confidence * 100).toFixed(1)}%
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    {ciData.pattern.last_scrape_at && (
+                      <div className="text-[10px] text-gray-400 mt-1.5">
+                        Last scrape: {new Date(ciData.pattern.last_scrape_at).toLocaleDateString()}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Strategy adjustments injected into auto_config */}
+                {ciData.strategy_adjustments && Object.keys(ciData.strategy_adjustments).length > 0 && (
+                  <div>
+                    <div className="text-[10px] font-semibold text-emerald-700 uppercase tracking-wide mb-1.5">
+                      ⚙ Auto-Config Injections
+                    </div>
+                    <div className="bg-white rounded border border-emerald-100 p-2 space-y-1">
+                      {[
+                        ["fee_currency", "Fee currency"],
+                        ["fee_term", "Fee term"],
+                        ["preferred_strategy", "Preferred strategy"],
+                        ["cricos_required", "CRICOS required"],
+                        ["ucas", "UCAS"],
+                        ["ects", "ECTS credits"],
+                        ["nzqa", "NZQA"],
+                        ["per_credit_fee", "Per-credit fee"],
+                      ].map(([k, label]) => {
+                        const v = ciData.strategy_adjustments![k as string];
+                        if (v === undefined || v === null || v === false) return null;
+                        return (
+                          <div key={k} className="flex justify-between text-[11px]">
+                            <span className="text-gray-500">{label}</span>
+                            <span className="font-medium text-gray-800">
+                              {typeof v === "boolean" ? "✓" : String(v)}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+
+            {!ciData.pattern && (
+              <div className="text-[11px] text-gray-500 italic">
+                No country pattern configured for <span className="font-medium">{ciData.canonical_country}</span>.
+                Apply migration 031 to seed country intelligence.
               </div>
             )}
           </div>
