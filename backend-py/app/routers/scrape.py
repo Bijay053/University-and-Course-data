@@ -2900,3 +2900,119 @@ async def get_university_quality_report(
     report["university_id"] = university_id
     report["job_id"] = latest_job.runtime_job_id
     return report
+
+
+# ── Phase 7 Quality Optimizer endpoints ──────────────────────────────────────
+
+@router.get("/jobs/{job_id}/quality-actions")
+async def get_job_quality_actions(
+    job_id: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[dict, Depends(get_current_user)],
+) -> dict:
+    """Return Phase 7 quality action log and performance stats for a scrape job."""
+    job = await db.get(ScrapeRuntimeJob, job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    row = (await db.execute(
+        text("SELECT scrape_config FROM universities WHERE id = :id"),
+        {"id": job.university_id},
+    )).mappings().first()
+
+    p7_last_run: dict | None = None
+    if row:
+        cfg = row.get("scrape_config") or {}
+        p7_last_run = cfg.get("_p7_last_run")
+
+    # Current avg completeness for this job
+    job_avg_scalar = (await db.execute(
+        text(
+            "SELECT AVG(completeness) FROM scraped_courses"
+            " WHERE scrape_job_id = :j AND completeness IS NOT NULL"
+        ),
+        {"j": job_id},
+    )).scalar()
+    current_avg = round(float(job_avg_scalar or 0), 3)
+
+    # Performance across all jobs for this university
+    perf_row = (await db.execute(
+        text("""
+            SELECT
+                COUNT(*) FILTER (WHERE avg_comp >= 0.70 AND avg_comp < 0.85) AS jobs_in_gap,
+                COUNT(*) FILTER (WHERE avg_comp >= 0.85)                      AS jobs_above_threshold
+            FROM (
+                SELECT scrape_job_id, AVG(completeness) AS avg_comp
+                FROM scraped_courses
+                WHERE university_id = :uni_id
+                  AND status != 'rejected'
+                  AND completeness IS NOT NULL
+                GROUP BY scrape_job_id
+            ) t
+        """),
+        {"uni_id": job.university_id},
+    )).mappings().first()
+
+    in_gap = int((perf_row or {}).get("jobs_in_gap") or 0)
+    above = int((perf_row or {}).get("jobs_above_threshold") or 0)
+
+    gain = 0.0
+    pushed = False
+    if p7_last_run:
+        before = float(p7_last_run.get("overall_before") or 0.0)
+        after = float(p7_last_run.get("overall_after") or 0.0)
+        gain = round((after - before) * 100, 1)
+        pushed = before < 0.85 and after >= 0.85
+
+    return {
+        "job_id": job_id,
+        "university_id": job.university_id,
+        "current_avg_completeness": current_avg,
+        "last_run": p7_last_run,
+        "performance": {
+            "jobs_in_gap": in_gap,
+            "jobs_above_threshold": above,
+            "pushed_above_threshold": pushed,
+            "completeness_gain_pct": gain,
+        },
+    }
+
+
+@router.post("/jobs/{job_id}/run-quality-optimizer", status_code=202)
+async def trigger_job_quality_optimizer(
+    job_id: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[dict, Depends(get_current_user)],
+) -> dict:
+    """Manually trigger Phase 7 quality optimizer for a completed scrape job.
+
+    All safety rules apply: Celery budget capped at 2, no field overwrites at
+    ≥80 % fill, repair_extractor idempotent per action type.
+    """
+    job = await db.get(ScrapeRuntimeJob, job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if job.status not in ("completed", "completed_with_errors"):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Job is not completed (status={job.status!r}) — optimizer only runs on completed jobs",
+        )
+
+    try:
+        from app.tasks.scrape_tasks import run_quality_actions as _qa_task
+        task = _qa_task.delay(
+            job.university_id,
+            job_id=job_id,
+            triggered_by="admin_manual",
+            cascade_repair_fired=False,
+        )
+    except Exception as exc:
+        log.warning("[quality-optimizer] dispatch failed for job %s: %s", job_id, exc)
+        raise HTTPException(status_code=503, detail=f"Dispatch failed: {exc}") from exc
+
+    return {
+        "ok": True,
+        "job_id": job_id,
+        "task_id": task.id,
+        "message": "Quality Optimizer queued — refresh in ~30 seconds to see results",
+    }

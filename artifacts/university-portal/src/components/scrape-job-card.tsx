@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Play, StopCircle, Loader2, Globe, CheckCircle2, AlertCircle,
-  ChevronsUpDown, Search, Eye, RefreshCw, ChevronDown, X,
+  ChevronsUpDown, Search, Eye, RefreshCw, ChevronDown, X, Zap, TrendingUp,
 } from "lucide-react";
 import { getFetchErrorMessage, readResponseJson } from "@/lib/readResponseJson";
 import { CountrySelect } from "@/components/country-select";
@@ -13,6 +13,43 @@ import { CountrySelect } from "@/components/country-select";
 // ── Types ────────────────────────────────────────────────────────────────────
 type UniOption = { id: number; name: string; scrapeUrl?: string | null; feePageUrl?: string | null; requirementsPageUrl?: string | null };
 type ScrapeLog = { event: string; message?: string; current?: number; total?: number; phase?: string; totalFound?: number; imported?: number; skipped?: number; errors?: number };
+
+type QualityAction = {
+  action_type: string;
+  target_fields: string[];
+  reason: string;
+  executed: boolean;
+  skipped_reason: string;
+  result: string;
+  courses_improved: number;
+};
+type QualityData = {
+  job_id: string;
+  current_avg_completeness: number;
+  last_run: {
+    timestamp: string;
+    job_id: string;
+    overall_before: number;
+    overall_after: number;
+    inline_improved: number;
+    celery_dispatched: string[];
+    actions: QualityAction[];
+  } | null;
+  performance: {
+    jobs_in_gap: number;
+    jobs_above_threshold: number;
+    pushed_above_threshold: boolean;
+    completeness_gain_pct: number;
+  };
+};
+
+const ACTION_LABELS: Record<string, string> = {
+  pdf_extraction: "PDF Backfill",
+  repair_extractor: "Repair Extractor",
+  browser_retry: "Browser Retry",
+  manual_review: "Manual Review",
+  api_promotion: "API Promotion",
+};
 
 export type ScrapeJobCardProps = {
   slotIndex: number;
@@ -125,6 +162,12 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
   const [now, setNow] = useState(Date.now());
   const [resultSummary, setResultSummary] = useState<{ imported: number; skipped: number; errors: number } | null>(null);
   const [completedJobId, setCompletedJobId] = useState<string | null>(null);
+  const [qualityData, setQualityData] = useState<QualityData | null>(null);
+  const [qualityLoading, setQualityLoading] = useState(false);
+  const [qualityError, setQualityError] = useState<string | null>(null);
+  const [qualityTriggering, setQualityTriggering] = useState(false);
+  const [qualityTriggered, setQualityTriggered] = useState(false);
+  const [showQualityPanel, setShowQualityPanel] = useState(true);
 
   const pollRef = useRef<number | null>(null);
   const logIndexRef = useRef(0);
@@ -181,8 +224,66 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
     setLogs([]);
     setResultSummary(null);
     setCompletedJobId(null);
+    setQualityData(null);
+    setQualityError(null);
+    setQualityTriggering(false);
+    setQualityTriggered(false);
     setUniName("");
   }, [slotKey, startTimeKey]);
+
+  const fetchQualityData = useCallback(async (jobId: string) => {
+    setQualityLoading(true);
+    setQualityError(null);
+    try {
+      const res = await fetch(`/api/scrape/jobs/${jobId}/quality-actions`, {
+        cache: "no-store", headers: { "Cache-Control": "no-cache" },
+      });
+      if (!res.ok) {
+        const msg = await getFetchErrorMessage(res);
+        setQualityError(msg || `Error ${res.status}`);
+        return;
+      }
+      const data = await readResponseJson<QualityData>(res);
+      if (data) setQualityData(data);
+    } catch (e) {
+      setQualityError(String(e));
+    } finally {
+      setQualityLoading(false);
+    }
+  }, []);
+
+  const handleRunOptimizer = useCallback(async () => {
+    if (!completedJobId || qualityTriggering) return;
+    setQualityTriggering(true);
+    setQualityTriggered(false);
+    try {
+      const res = await fetch(`/api/scrape/jobs/${completedJobId}/run-quality-optimizer`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (!res.ok) {
+        const msg = await getFetchErrorMessage(res);
+        setQualityError(msg || `Error ${res.status}`);
+        return;
+      }
+      setQualityTriggered(true);
+      // Re-fetch after 35s to show updated results
+      setTimeout(() => fetchQualityData(completedJobId), 35000);
+    } catch (e) {
+      setQualityError(String(e));
+    } finally {
+      setQualityTriggering(false);
+    }
+  }, [completedJobId, qualityTriggering, fetchQualityData]);
+
+  // Auto-fetch quality data when job completes
+  useEffect(() => {
+    if (completedJobId) {
+      // Small delay so the orchestrator has time to write _p7_last_run
+      const t = setTimeout(() => fetchQualityData(completedJobId), 3000);
+      return () => clearTimeout(t);
+    }
+  }, [completedJobId, fetchQualityData]);
 
   const pollJobStatus = useCallback((jobId: string) => {
     if (pollRef.current) clearTimeout(pollRef.current);
@@ -576,6 +677,174 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
                   <div className="text-lg font-bold text-red-700">{resultSummary.errors}</div>
                   <div className="text-xs text-red-600">Errors</div>
                 </div>
+              </div>
+            )}
+
+            {/* ── Quality Optimizer panel ─────────────────────────── */}
+            {completedJobId && (
+              <div className="border border-violet-200 rounded-lg overflow-hidden">
+                <button
+                  type="button"
+                  className="w-full flex items-center justify-between px-3 py-2 bg-violet-50 hover:bg-violet-100 transition-colors"
+                  onClick={() => setShowQualityPanel((v) => !v)}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <Zap className="w-3.5 h-3.5 text-violet-600" />
+                    <span className="text-xs font-semibold text-violet-800">Quality Optimizer</span>
+                    {qualityLoading && <Loader2 className="w-3 h-3 animate-spin text-violet-400" />}
+                    {qualityData?.performance.pushed_above_threshold && (
+                      <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-medium">
+                        ↑ Pushed to 85%+
+                      </span>
+                    )}
+                    {qualityTriggered && (
+                      <span className="text-[10px] bg-violet-100 text-violet-700 px-1.5 py-0.5 rounded-full font-medium">
+                        Queued — refreshing in 35s…
+                      </span>
+                    )}
+                  </div>
+                  <ChevronDown className={`w-3 h-3 text-violet-400 transition-transform ${showQualityPanel ? "rotate-180" : ""}`} />
+                </button>
+
+                {showQualityPanel && (
+                  <div className="p-3 space-y-2.5">
+                    {qualityError && (
+                      <div className="text-[10px] text-red-500 bg-red-50 rounded px-2 py-1">{qualityError}</div>
+                    )}
+
+                    {qualityData && !qualityLoading && (
+                      <>
+                        {/* Completeness bar */}
+                        <div className="flex items-center gap-3 text-[11px] flex-wrap">
+                          <div>
+                            <span className="text-gray-500">Completeness:</span>
+                            <span className={`font-mono font-semibold ml-1 ${qualityData.current_avg_completeness >= 0.85 ? "text-green-700" : "text-amber-700"}`}>
+                              {(qualityData.current_avg_completeness * 100).toFixed(1)}%
+                            </span>
+                          </div>
+                          {qualityData.last_run && qualityData.last_run.overall_before !== qualityData.last_run.overall_after && (
+                            <>
+                              <span className="text-gray-300">·</span>
+                              <div className="flex items-center gap-1">
+                                <span className="text-gray-400 font-mono">{(qualityData.last_run.overall_before * 100).toFixed(1)}%</span>
+                                <span className="text-gray-300">→</span>
+                                <span className={`font-mono font-semibold ${qualityData.last_run.overall_after >= 0.85 ? "text-green-700" : "text-amber-700"}`}>
+                                  {(qualityData.last_run.overall_after * 100).toFixed(1)}%
+                                </span>
+                                {qualityData.performance.completeness_gain_pct > 0 && (
+                                  <span className="text-green-600 text-[10px] font-medium">+{qualityData.performance.completeness_gain_pct}%</span>
+                                )}
+                              </div>
+                            </>
+                          )}
+                          {qualityData.last_run && qualityData.last_run.inline_improved > 0 && (
+                            <span className="text-green-600 text-[10px]">
+                              {qualityData.last_run.inline_improved} courses improved inline
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Action list */}
+                        {qualityData.last_run?.actions && qualityData.last_run.actions.length > 0 ? (
+                          <div className="space-y-1">
+                            {qualityData.last_run.actions.map((action, i) => (
+                              <div key={i} className="flex items-start gap-2 text-[10px] px-2 py-1.5 rounded bg-gray-50 border border-gray-100">
+                                <div className={`shrink-0 mt-1 w-1.5 h-1.5 rounded-full ${
+                                  action.executed ? "bg-green-500" : action.skipped_reason ? "bg-gray-300" : "bg-red-400"
+                                }`} />
+                                <div className="flex-1 min-w-0 space-y-0.5">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="font-semibold text-gray-700">
+                                      {ACTION_LABELS[action.action_type] ?? action.action_type}
+                                    </span>
+                                    <span className="text-gray-400">→</span>
+                                    <span className="text-violet-600 truncate max-w-[140px]">
+                                      {action.target_fields.join(", ")}
+                                    </span>
+                                    {action.courses_improved > 0 && (
+                                      <span className="bg-green-100 text-green-700 px-1 py-0.5 rounded font-medium shrink-0">
+                                        +{action.courses_improved} courses
+                                      </span>
+                                    )}
+                                    <span className={`px-1 py-0.5 rounded shrink-0 ${
+                                      action.executed
+                                        ? "bg-green-100 text-green-700"
+                                        : action.skipped_reason
+                                        ? "bg-gray-100 text-gray-500"
+                                        : "bg-red-50 text-red-600"
+                                    }`}>
+                                      {action.executed ? "✓ done" : action.skipped_reason ? "↷ skipped" : "✗ failed"}
+                                    </span>
+                                  </div>
+                                  <div className="text-gray-400 truncate">
+                                    {action.skipped_reason || action.reason}
+                                  </div>
+                                  {action.result && !action.skipped_reason && (
+                                    <div className="text-gray-500 truncate">{action.result}</div>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-[10px] text-gray-400 italic">
+                            {qualityData.last_run
+                              ? "No actions were evaluated."
+                              : qualityData.current_avg_completeness >= 0.85
+                              ? "Completeness already ≥85% — optimizer not triggered."
+                              : "No Phase 7 actions recorded yet for this job."}
+                          </div>
+                        )}
+
+                        {/* Celery tasks dispatched */}
+                        {qualityData.last_run?.celery_dispatched && qualityData.last_run.celery_dispatched.length > 0 && (
+                          <div className="flex items-center gap-1.5 flex-wrap text-[10px] text-gray-500">
+                            <span>Background tasks queued:</span>
+                            {qualityData.last_run.celery_dispatched.map((t) => (
+                              <span key={t} className="bg-violet-100 text-violet-700 px-1.5 py-0.5 rounded">
+                                {ACTION_LABELS[t] ?? t}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Performance stats */}
+                        {(qualityData.performance.jobs_in_gap > 0 || qualityData.performance.jobs_above_threshold > 0) && (
+                          <div className="flex items-center gap-1 text-[10px] text-gray-400 border-t border-gray-100 pt-2">
+                            <TrendingUp className="w-3 h-3 text-violet-400 shrink-0" />
+                            <span>
+                              {qualityData.performance.jobs_above_threshold} scrape run{qualityData.performance.jobs_above_threshold !== 1 ? "s" : ""} crossed 85%
+                              {qualityData.performance.jobs_in_gap > 0 && ` · ${qualityData.performance.jobs_in_gap} in the 70–84% gap`}
+                            </span>
+                          </div>
+                        )}
+                      </>
+                    )}
+
+                    {/* Actions row */}
+                    <div className="flex items-center gap-2 pt-1 border-t border-gray-100">
+                      <Button
+                        onClick={handleRunOptimizer}
+                        disabled={qualityTriggering || qualityLoading}
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs border-violet-300 text-violet-700 hover:bg-violet-50"
+                      >
+                        {qualityTriggering
+                          ? <><Loader2 className="w-3 h-3 animate-spin mr-1" />Queuing…</>
+                          : <><Zap className="w-3 h-3 mr-1" />Run Quality Optimizer</>}
+                      </Button>
+                      <button
+                        type="button"
+                        onClick={() => fetchQualityData(completedJobId)}
+                        disabled={qualityLoading}
+                        className="text-[10px] text-gray-400 hover:text-gray-600 disabled:opacity-50"
+                      >
+                        ↻ Refresh
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
