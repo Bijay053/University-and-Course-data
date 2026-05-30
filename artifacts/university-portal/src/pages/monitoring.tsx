@@ -133,6 +133,8 @@ export default function MonitoringPage() {
   const [sortBy, setSortBy] = useState<"name" | "last_checked" | "next_check">("name");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [dismissed, setDismissed] = useState<Set<number>>(getDismissed);
+  const [monPage, setMonPage] = useState(1);
+  const [monPageSize, setMonPageSize] = useState(25);
 
   const { data: stats, isLoading: statsLoading } = useQuery<WatcherStats>({
     queryKey: ["monitoring-stats"],
@@ -239,6 +241,12 @@ export default function MonitoringPage() {
       else if (sortBy === "next_check") diff = (a.next_check_at ?? "").localeCompare(b.next_check_at ?? "");
       return sortDir === "asc" ? diff : -diff;
     });
+
+  useEffect(() => { setMonPage(1); }, [filter, search, sortBy, sortDir]);
+
+  const monTotalPages = Math.max(1, Math.ceil(filtered.length / monPageSize));
+  const safeMonPage = Math.min(monPage, monTotalPages);
+  const paginatedFiltered = filtered.slice((safeMonPage - 1) * monPageSize, safeMonPage * monPageSize);
 
   const SortIcon = ({ col }: { col: typeof sortBy }) =>
     sortBy === col ? (sortDir === "asc" ? <ChevronUp className="h-3 w-3 inline" /> : <ChevronDown className="h-3 w-3 inline" />) : null;
@@ -416,22 +424,31 @@ export default function MonitoringPage() {
           ))}
         </div>
 
-        <div className="relative w-full sm:w-72">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
-          <Input
-            placeholder="Search university, country, or URL…"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="pl-8 h-8 text-sm"
-          />
-          {search && (
-            <button
-              onClick={() => setSearch("")}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          )}
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="relative flex-1 sm:w-72">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+            <Input
+              placeholder="Search university, country, or URL…"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="pl-8 h-8 text-sm"
+            />
+            {search && (
+              <button
+                onClick={() => setSearch("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+          <select
+            value={monPageSize}
+            onChange={e => setMonPageSize(Number(e.target.value))}
+            style={{ height: "2rem", fontSize: "0.875rem", border: "1px solid #e2e8f0", borderRadius: "0.375rem", padding: "0 0.5rem", color: "#374151", background: "white" }}
+          >
+            {[10, 25, 50, 100].map(n => <option key={n} value={n}>Show {n}</option>)}
+          </select>
         </div>
       </div>
 
@@ -479,7 +496,7 @@ export default function MonitoringPage() {
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {filtered.map(w => (
+                {paginatedFiltered.map(w => (
                   <tr
                     key={w.id}
                     className={`hover:bg-muted/30 transition-colors ${!w.enabled ? "opacity-60" : ""} ${
@@ -590,6 +607,28 @@ export default function MonitoringPage() {
               </tbody>
             </table>
           </div>
+          {/* Monitoring pagination footer */}
+          {filtered.length > monPageSize && (
+            <div className="px-4 py-3 border-t bg-muted/20 flex items-center justify-between text-xs text-muted-foreground">
+              <span>
+                Showing {(safeMonPage - 1) * monPageSize + 1}–{Math.min(safeMonPage * monPageSize, filtered.length)} of {filtered.length}
+                {q && ` (filtered from ${watchers.length})`}
+              </span>
+              <div className="flex items-center gap-1">
+                <button onClick={() => setMonPage(1)} disabled={safeMonPage === 1} style={{ padding: "2px 6px", border: "1px solid #e2e8f0", borderRadius: "4px", background: "white", cursor: safeMonPage === 1 ? "not-allowed" : "pointer", color: safeMonPage === 1 ? "#cbd5e1" : "#374151" }}>«</button>
+                <button onClick={() => setMonPage(p => Math.max(1, p - 1))} disabled={safeMonPage === 1} style={{ padding: "2px 6px", border: "1px solid #e2e8f0", borderRadius: "4px", background: "white", cursor: safeMonPage === 1 ? "not-allowed" : "pointer", color: safeMonPage === 1 ? "#cbd5e1" : "#374151" }}>‹</button>
+                {Array.from({ length: Math.min(7, monTotalPages) }, (_, i) => {
+                  const start = Math.max(1, Math.min(safeMonPage - 3, monTotalPages - 6));
+                  const p = start + i;
+                  return p <= monTotalPages ? (
+                    <button key={p} onClick={() => setMonPage(p)} style={{ padding: "2px 8px", border: "1px solid #e2e8f0", borderRadius: "4px", background: p === safeMonPage ? "#4f46e5" : "white", color: p === safeMonPage ? "white" : "#374151", cursor: "pointer", fontWeight: p === safeMonPage ? 600 : 400 }}>{p}</button>
+                  ) : null;
+                })}
+                <button onClick={() => setMonPage(p => Math.min(monTotalPages, p + 1))} disabled={safeMonPage === monTotalPages} style={{ padding: "2px 6px", border: "1px solid #e2e8f0", borderRadius: "4px", background: "white", cursor: safeMonPage === monTotalPages ? "not-allowed" : "pointer", color: safeMonPage === monTotalPages ? "#cbd5e1" : "#374151" }}>›</button>
+                <button onClick={() => setMonPage(monTotalPages)} disabled={safeMonPage === monTotalPages} style={{ padding: "2px 6px", border: "1px solid #e2e8f0", borderRadius: "4px", background: "white", cursor: safeMonPage === monTotalPages ? "not-allowed" : "pointer", color: safeMonPage === monTotalPages ? "#cbd5e1" : "#374151" }}>»</button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

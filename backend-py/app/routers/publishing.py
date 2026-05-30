@@ -107,7 +107,7 @@ async def hold(sc_id: int, body: ReviewAction, db: Annotated[AsyncSession, Depen
 async def ledger(
     db: Annotated[AsyncSession, Depends(get_db)],
     university_id: int | None = Query(None),
-    limit: int = Query(100, ge=1, le=500),
+    limit: int = Query(100, ge=1, le=5000),
     offset: int = Query(0, ge=0),
 ):
     return await get_ledger(db, university_id, limit, offset)

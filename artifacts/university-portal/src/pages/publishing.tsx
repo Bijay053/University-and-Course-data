@@ -179,6 +179,9 @@ export default function PublishingPage() {
   const [page, setPage] = useState(1);
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const [actionReason, setActionReason] = useState<Record<number, string>>({});
+  const [ledgerSearch, setLedgerSearch] = useState("");
+  const [ledgerPage, setLedgerPage] = useState(1);
+  const [ledgerPageSize, setLedgerPageSize] = useState(25);
 
   const { data: stats, isLoading: statsLoading } = useQuery<PubStats>({
     queryKey: ["pub-stats"],
@@ -196,7 +199,7 @@ export default function PublishingPage() {
 
   const { data: ledger = [], isLoading: ledgerLoading } = useQuery<LedgerEntry[]>({
     queryKey: ["pub-ledger"],
-    queryFn: () => apiFetch("/api/publishing/ledger?limit=200"),
+    queryFn: () => apiFetch("/api/publishing/ledger?limit=2000"),
     enabled: tab === "ledger",
     refetchInterval: 30000,
   });
@@ -247,6 +250,7 @@ export default function PublishingPage() {
   }
 
   useEffect(() => { setPage(1); }, [search, decisionFilter, pageSize]);
+  useEffect(() => { setLedgerPage(1); }, [ledgerSearch, ledgerPageSize]);
 
   const queueByDecision = {
     all: queue.length,
@@ -265,6 +269,17 @@ export default function PublishingPage() {
   const totalPages = Math.max(1, Math.ceil(filteredQueue.length / pageSize));
   const safePage = Math.min(page, totalPages);
   const paginatedQueue = filteredQueue.slice((safePage - 1) * pageSize, safePage * pageSize);
+
+  const ledgerSearchLower = ledgerSearch.toLowerCase();
+  const filteredLedger = ledgerSearchLower
+    ? ledger.filter(e =>
+        e.course_name.toLowerCase().includes(ledgerSearchLower) ||
+        e.university_name.toLowerCase().includes(ledgerSearchLower)
+      )
+    : ledger;
+  const ledgerTotalPages = Math.max(1, Math.ceil(filteredLedger.length / ledgerPageSize));
+  const safeLedgerPage = Math.min(ledgerPage, ledgerTotalPages);
+  const paginatedLedger = filteredLedger.slice((safeLedgerPage - 1) * ledgerPageSize, safeLedgerPage * ledgerPageSize);
 
   return (
     <div className="space-y-6">
@@ -687,61 +702,111 @@ export default function PublishingPage() {
               <p className="text-sm text-muted-foreground mt-1">Entries appear after running a Publishing Pass.</p>
             </div>
           ) : (
-            <div className="bg-white border rounded-lg overflow-hidden">
-              {/* Summary row */}
-              {stats && (
-                <div className="px-4 py-3 border-b bg-muted/30 flex flex-wrap gap-6 text-xs text-muted-foreground">
-                  <span>Auto published: <strong className="text-emerald-700">{stats.total_auto_published}</strong></span>
-                  <span>Manually published: <strong className="text-blue-700">{stats.total_manually_published}</strong></span>
-                  <span>Rejected: <strong className="text-rose-700">{stats.total_rejected}</strong></span>
-                  <span>Held: <strong className="text-slate-700">{stats.total_held}</strong></span>
-                  {stats.auto_publish_rate != null && (
-                    <span>Auto rate: <strong className="text-indigo-700">{stats.auto_publish_rate}%</strong></span>
+            <>
+              {/* Ledger toolbar */}
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="relative flex-1 min-w-[200px]">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+                  <input
+                    type="text"
+                    placeholder="Search course or university…"
+                    value={ledgerSearch}
+                    onChange={e => setLedgerSearch(e.target.value)}
+                    style={{ paddingLeft: "2rem", height: "2rem", fontSize: "0.875rem", border: "1px solid #e2e8f0", borderRadius: "0.375rem", width: "100%", outline: "none" }}
+                  />
+                  {ledgerSearch && (
+                    <button onClick={() => setLedgerSearch("")} style={{ position: "absolute", right: "0.625rem", top: "50%", transform: "translateY(-50%)", color: "#94a3b8", cursor: "pointer", background: "none", border: "none", padding: 0 }}>✕</button>
                   )}
                 </div>
-              )}
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted/50 border-b">
-                    <tr>
-                      <th className="text-left px-4 py-3 font-medium">Course</th>
-                      <th className="text-left px-4 py-3 font-medium">Action</th>
-                      <th className="text-left px-4 py-3 font-medium">Score</th>
-                      <th className="text-left px-4 py-3 font-medium">Actor</th>
-                      <th className="text-left px-4 py-3 font-medium">Reason</th>
-                      <th className="text-left px-4 py-3 font-medium">When</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {ledger.map(entry => (
-                      <tr key={entry.id} className="hover:bg-muted/20 transition-colors">
-                        <td className="px-4 py-3">
-                          <div className="font-medium text-sm leading-tight">{entry.course_name}</div>
-                          <div className="text-xs text-muted-foreground">{entry.university_name}</div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <ActionBadge action={entry.action} />
-                        </td>
-                        <td className="px-4 py-3">
-                          <ScoreBar score={entry.pub_score} />
-                        </td>
-                        <td className="px-4 py-3">
-                          <Badge variant="outline" className="text-xs">
-                            {entry.actor === "system" ? "🤖 System" : "👤 Human"}
-                          </Badge>
-                        </td>
-                        <td className="px-4 py-3 text-xs text-muted-foreground max-w-[200px] truncate" title={entry.reason || ""}>
-                          {entry.reason || "—"}
-                        </td>
-                        <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
-                          {fmtDate(entry.created_at)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <select
+                  value={ledgerPageSize}
+                  onChange={e => setLedgerPageSize(Number(e.target.value))}
+                  style={{ height: "2rem", fontSize: "0.875rem", border: "1px solid #e2e8f0", borderRadius: "0.375rem", padding: "0 0.5rem", color: "#374151", background: "white" }}
+                >
+                  {[10, 25, 50, 100].map(n => <option key={n} value={n}>Show {n}</option>)}
+                </select>
               </div>
-            </div>
+
+              <div className="bg-white border rounded-lg overflow-hidden">
+                {/* Summary row */}
+                {stats && (
+                  <div className="px-4 py-3 border-b bg-muted/30 flex flex-wrap gap-6 text-xs text-muted-foreground">
+                    <span>Auto published: <strong className="text-emerald-700">{stats.total_auto_published}</strong></span>
+                    <span>Manually published: <strong className="text-blue-700">{stats.total_manually_published}</strong></span>
+                    <span>Rejected: <strong className="text-rose-700">{stats.total_rejected}</strong></span>
+                    <span>Held: <strong className="text-slate-700">{stats.total_held}</strong></span>
+                    {stats.auto_publish_rate != null && (
+                      <span>Auto rate: <strong className="text-indigo-700">{stats.auto_publish_rate}%</strong></span>
+                    )}
+                    {ledgerSearchLower && (
+                      <span className="ml-auto text-indigo-600">{filteredLedger.length} of {ledger.length} entries</span>
+                    )}
+                  </div>
+                )}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted/50 border-b">
+                      <tr>
+                        <th className="text-left px-4 py-3 font-medium">Course</th>
+                        <th className="text-left px-4 py-3 font-medium">Action</th>
+                        <th className="text-left px-4 py-3 font-medium">Score</th>
+                        <th className="text-left px-4 py-3 font-medium">Actor</th>
+                        <th className="text-left px-4 py-3 font-medium">Reason</th>
+                        <th className="text-left px-4 py-3 font-medium">When</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {paginatedLedger.map(entry => (
+                        <tr key={entry.id} className="hover:bg-muted/20 transition-colors">
+                          <td className="px-4 py-3">
+                            <div className="font-medium text-sm leading-tight">{entry.course_name}</div>
+                            <div className="text-xs text-muted-foreground">{entry.university_name}</div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <ActionBadge action={entry.action} />
+                          </td>
+                          <td className="px-4 py-3">
+                            <ScoreBar score={entry.pub_score} />
+                          </td>
+                          <td className="px-4 py-3">
+                            <Badge variant="outline" className="text-xs">
+                              {entry.actor === "system" ? "🤖 System" : "👤 Human"}
+                            </Badge>
+                          </td>
+                          <td className="px-4 py-3 text-xs text-muted-foreground max-w-[200px] truncate" title={entry.reason || ""}>
+                            {entry.reason || "—"}
+                          </td>
+                          <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
+                            {fmtDate(entry.created_at)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {/* Ledger pagination footer */}
+                {filteredLedger.length > ledgerPageSize && (
+                  <div className="px-4 py-3 border-t bg-muted/20 flex items-center justify-between text-xs text-muted-foreground">
+                    <span>
+                      Showing {(safeLedgerPage - 1) * ledgerPageSize + 1}–{Math.min(safeLedgerPage * ledgerPageSize, filteredLedger.length)} of {filteredLedger.length}
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => setLedgerPage(1)} disabled={safeLedgerPage === 1} style={{ padding: "2px 6px", border: "1px solid #e2e8f0", borderRadius: "4px", background: "white", cursor: safeLedgerPage === 1 ? "not-allowed" : "pointer", color: safeLedgerPage === 1 ? "#cbd5e1" : "#374151" }}>«</button>
+                      <button onClick={() => setLedgerPage(p => Math.max(1, p - 1))} disabled={safeLedgerPage === 1} style={{ padding: "2px 6px", border: "1px solid #e2e8f0", borderRadius: "4px", background: "white", cursor: safeLedgerPage === 1 ? "not-allowed" : "pointer", color: safeLedgerPage === 1 ? "#cbd5e1" : "#374151" }}>‹</button>
+                      {Array.from({ length: Math.min(7, ledgerTotalPages) }, (_, i) => {
+                        const start = Math.max(1, Math.min(safeLedgerPage - 3, ledgerTotalPages - 6));
+                        const p = start + i;
+                        return p <= ledgerTotalPages ? (
+                          <button key={p} onClick={() => setLedgerPage(p)} style={{ padding: "2px 8px", border: "1px solid #e2e8f0", borderRadius: "4px", background: p === safeLedgerPage ? "#4f46e5" : "white", color: p === safeLedgerPage ? "white" : "#374151", cursor: "pointer", fontWeight: p === safeLedgerPage ? 600 : 400 }}>{p}</button>
+                        ) : null;
+                      })}
+                      <button onClick={() => setLedgerPage(p => Math.min(ledgerTotalPages, p + 1))} disabled={safeLedgerPage === ledgerTotalPages} style={{ padding: "2px 6px", border: "1px solid #e2e8f0", borderRadius: "4px", background: "white", cursor: safeLedgerPage === ledgerTotalPages ? "not-allowed" : "pointer", color: safeLedgerPage === ledgerTotalPages ? "#cbd5e1" : "#374151" }}>›</button>
+                      <button onClick={() => setLedgerPage(ledgerTotalPages)} disabled={safeLedgerPage === ledgerTotalPages} style={{ padding: "2px 6px", border: "1px solid #e2e8f0", borderRadius: "4px", background: "white", cursor: safeLedgerPage === ledgerTotalPages ? "not-allowed" : "pointer", color: safeLedgerPage === ledgerTotalPages ? "#cbd5e1" : "#374151" }}>»</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </>
           )}
         </>
       )}
