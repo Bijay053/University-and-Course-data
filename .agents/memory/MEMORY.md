@@ -1,3 +1,4 @@
+- [Phase 9B conflict resolution](phase9b-conflict-resolution.md) — T001-T004: repair order, confidence formula, field normalizer canon forms, schema (migration 028), KPI API shape, pre-existing test failures.
 - [HUD SearchStax provider](hud-searchstax.md) — Huddersfield scrapes Solr directly (SPA bypass); completeness hit 85.1% after adding academic_level + entry-req extractors.
 - [Phase 2 autonomous pipeline](phase2-pipeline.md) — Stage 0 CSS/XPath/regex rules injected before heuristics; evidence key is `field_key` not `field`; `attribute="text"` is inner-text sentinel in _apply_css
 - [CASCADE smart split](cascade-split.md) — staged<5 → discovery_failure (probe_and_configure); staged≥5+avg<70% → extraction_failure (repair_extractor); YAML always wins

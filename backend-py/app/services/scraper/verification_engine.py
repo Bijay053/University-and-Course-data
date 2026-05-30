@@ -103,6 +103,17 @@ def _normalize_value(field_name: str, raw_value: Any) -> str | None:
     if not val or val.lower() in ("none", "null", "n/a", "—", "-"):
         return None
 
+    # T002: Field-specific normalizers (Phase 9B) — resolve formatting-only conflicts
+    # before they reach the generic numeric strip.  Called lazily to avoid circular
+    # imports at module load time.
+    try:
+        from app.services.scraper.field_normalizers import normalize_for_conflict as _nfc
+        _specific = _nfc(field_name, val)
+        if _specific is not None:
+            return _specific
+    except Exception:  # noqa: BLE001
+        pass  # soft-fail — fall through to generic normalizer
+
     if field_name in _NUMERIC_FIELDS:
         cleaned = re.sub(r"[^\d.]", "", val)
         try:

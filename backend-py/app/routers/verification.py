@@ -229,14 +229,48 @@ async def get_university_verification_summary(
         for r in top_unresolved_q.fetchall()
     ]
 
+    # T004: Resolution breakdown by method (Phase 9B)
+    breakdown_q = await db.execute(
+        text("""
+            SELECT
+                COALESCE(resolution_method, action_taken, 'unresolved') AS method,
+                COUNT(*) AS cnt,
+                AVG(resolution_confidence)::int                         AS avg_conf
+            FROM conflict_repair_log
+            WHERE scraped_course_id = ANY(:sc_ids)
+              AND resolved = TRUE
+            GROUP BY 1
+            ORDER BY cnt DESC
+        """),
+        {"sc_ids": sc_ids},
+    )
+    resolution_breakdown = [
+        {
+            "method": r.method,
+            "count": int(r.cnt),
+            "avg_confidence": int(r.avg_conf or 0),
+        }
+        for r in breakdown_q.fetchall()
+    ]
+
+    # T004: Conflict Resolution Rate KPI
+    _attempted = int(repair_row.total_attempted or 0) if repair_row else 0
+    _repaired  = int(repair_row.total_resolved or 0) if repair_row else 0
+    conflict_resolution_rate = (
+        round(_repaired / _attempted * 100)
+        if _attempted > 0 else None
+    )
+
     repair_stats = {
         "conflicts_found": int(status_counts.get("conflict", 0)),
-        "repairs_attempted": int(repair_row.total_attempted or 0) if repair_row else 0,
-        "conflicts_repaired": int(repair_row.total_resolved or 0) if repair_row else 0,
+        "repairs_attempted": _attempted,
+        "conflicts_repaired": _repaired,
         "conflicts_unresolved": int(repair_row.total_unresolved or 0) if repair_row else 0,
         "last_repair_at": repair_row.last_repair_at.isoformat() if repair_row and repair_row.last_repair_at else None,
         "top_unresolved_fields": top_unresolved_fields,
         "repair_ran": bool(repair_row and repair_row.total_attempted),
+        "conflict_resolution_rate": conflict_resolution_rate,   # T004: 0-100 or null
+        "resolution_breakdown": resolution_breakdown,           # T004: by method
     }
 
     # ── Confidence Trend — last 5 completed jobs for this university ──────────

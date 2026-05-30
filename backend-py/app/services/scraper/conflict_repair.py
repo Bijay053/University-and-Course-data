@@ -73,12 +73,15 @@ class ConflictDiagnosis:
 class FieldRepairResult:
     field_name: str
     diagnosis_type: str
-    action_taken: str          # "drop_low_authority" | "unresolved" | "skipped"
+    action_taken: str          # "drop_low_authority" | "normalization_equivalence" | "source_revalidation" | "unresolved" | "skipped"
     resolved: bool
     confidence_before: int
     confidence_after: int | None
     resolved_value: str | None
     conflicting_sources: list[str]
+    resolution_method: str = "unresolved"    # T003: how the conflict was resolved
+    resolution_confidence: int = 0           # T003: 0-100 confidence in the resolution
+    resolved_by: list[str] = field(default_factory=list)  # T003: agreeing source types
 
 
 @dataclass
@@ -204,6 +207,130 @@ def attempt_repair(
 
 
 # ---------------------------------------------------------------------------
+# T003: Resolution confidence computation
+# ---------------------------------------------------------------------------
+
+def _compute_resolution_confidence(
+    action_taken: str,
+    resolved_by: list[str],
+) -> int:
+    """Compute 0–100 confidence score for a resolution decision.
+
+    Scores:
+      normalization_equivalence → 85+ (pure formatting, very reliable)
+      drop_low_authority with 2+ high-auth sources → 95
+      drop_low_authority with 1 high-auth source   → 80
+      source_revalidation                           → 88
+    """
+    if action_taken == "normalization_equivalence":
+        return min(100, 85 + len(resolved_by) * 3)
+    if action_taken == "drop_low_authority":
+        high_count = sum(1 for s in resolved_by if s in HIGH_AUTHORITY)
+        return 95 if high_count >= 2 else 80
+    if action_taken == "source_revalidation":
+        return 88
+    return 0
+
+
+# ---------------------------------------------------------------------------
+# T002: Normalization equivalence check (pre-repair)
+# ---------------------------------------------------------------------------
+
+async def _check_normalization_equivalence(
+    db: AsyncSession,
+    sc_id: int,
+    field_name: str,
+) -> tuple[str | None, dict[str, Any]]:
+    """Re-apply improved field normalizers to existing evidence rows.
+
+    If the improved normalizers make all sources agree on the same value,
+    the conflict was a formatting difference — not a real disagreement.
+    Returns (consensus_value, compute_field_confidence outcome) or (None, {}).
+    """
+    from app.models.evidence import ScrapedFieldEvidence
+    from app.services.scraper.field_normalizers import normalize_for_conflict
+
+    q = await db.execute(
+        select(
+            ScrapedFieldEvidence.candidate_value,
+            ScrapedFieldEvidence.extraction_method,
+        ).where(
+            ScrapedFieldEvidence.scraped_course_id == sc_id,
+            ScrapedFieldEvidence.field_key == field_name,
+        )
+    )
+    rows = q.fetchall()
+    if not rows:
+        return None, {}
+
+    source_values: dict[str, set[str]] = {}
+    for row in rows:
+        # Field-specific normalizer first; fall back to generic
+        raw = row.candidate_value
+        norm = normalize_for_conflict(field_name, raw) or _normalize_value(field_name, raw)
+        if norm is None:
+            continue
+        src = classify_source_type(row.extraction_method)
+        source_values.setdefault(src, set()).add(norm)
+
+    if not source_values:
+        return None, {}
+
+    all_vals = {v for vals in source_values.values() for v in vals}
+    if len(all_vals) == 1:
+        new_outcome = compute_field_confidence(source_values)
+        return next(iter(all_vals)), new_outcome
+    return None, {}
+
+
+# ---------------------------------------------------------------------------
+# T001: Source revalidation fallback
+# ---------------------------------------------------------------------------
+
+async def _try_source_revalidation(
+    db: AsyncSession,
+    sc_id: int,
+    field_name: str,
+    existing_values: set[str],
+) -> tuple[str | None, dict[str, Any]]:
+    """Re-fetch HTML source URLs to detect stale-data conflicts.
+
+    If the freshly fetched value matches another high-authority source,
+    the old stored value was stale and the conflict is resolvable.
+    Returns (consensus_value, revalidation_metadata) or (None, {}).
+    """
+    from app.models.evidence import ScrapedFieldEvidence
+    from app.services.scraper.source_revalidation import revalidate_field_from_html
+
+    q = await db.execute(
+        select(ScrapedFieldEvidence.source_url)
+        .where(
+            ScrapedFieldEvidence.scraped_course_id == sc_id,
+            ScrapedFieldEvidence.field_key == field_name,
+            ScrapedFieldEvidence.source_url.is_not(None),
+        )
+        .distinct()
+    )
+    urls = [r.source_url for r in q.fetchall() if r.source_url and r.source_url.startswith("http")]
+    if not urls:
+        return None, {}
+
+    result = await revalidate_field_from_html(urls, field_name, existing_values)
+    if result.get("revalidated"):
+        fresh = result["fresh_value"]
+        # Build a minimal outcome dict so _update_fvr has the expected shape
+        return fresh, {
+            "verified_value": fresh,
+            "confidence": 70,
+            "status": "likely_correct",
+            "source_count": 1,
+            "sources": ["html"],
+            "_revalidation_meta": result,
+        }
+    return None, {}
+
+
+# ---------------------------------------------------------------------------
 # DB helpers
 # ---------------------------------------------------------------------------
 
@@ -290,6 +417,9 @@ async def _persist_repair_log(
     confidence_after: int | None,
     conflicting_sources: list[str],
     resolved_value: str | None,
+    resolved_by: list[str] | None = None,
+    resolution_confidence: int | None = None,
+    resolution_method: str | None = None,
 ) -> None:
     """Upsert one row into conflict_repair_log (idempotent via ON CONFLICT DO UPDATE)."""
     import json
@@ -298,21 +428,26 @@ async def _persist_repair_log(
             INSERT INTO conflict_repair_log
                 (scraped_course_id, field_name, attempted_at, diagnosis,
                  action_taken, resolved, confidence_before, confidence_after,
-                 conflicting_sources, resolved_value)
+                 conflicting_sources, resolved_value,
+                 resolved_by, resolution_confidence, resolution_method)
             VALUES
                 (:sc_id, :fn, NOW(), :diag,
                  :action, :resolved, :cb, :ca,
-                 cast(:cs as jsonb), :rv)
+                 cast(:cs as jsonb), :rv,
+                 cast(:resolved_by as jsonb), :res_conf, :res_method)
             ON CONFLICT (scraped_course_id, field_name)
             DO UPDATE SET
-                attempted_at       = EXCLUDED.attempted_at,
-                diagnosis          = EXCLUDED.diagnosis,
-                action_taken       = EXCLUDED.action_taken,
-                resolved           = EXCLUDED.resolved,
-                confidence_before  = EXCLUDED.confidence_before,
-                confidence_after   = EXCLUDED.confidence_after,
-                conflicting_sources= EXCLUDED.conflicting_sources,
-                resolved_value     = EXCLUDED.resolved_value
+                attempted_at        = EXCLUDED.attempted_at,
+                diagnosis           = EXCLUDED.diagnosis,
+                action_taken        = EXCLUDED.action_taken,
+                resolved            = EXCLUDED.resolved,
+                confidence_before   = EXCLUDED.confidence_before,
+                confidence_after    = EXCLUDED.confidence_after,
+                conflicting_sources = EXCLUDED.conflicting_sources,
+                resolved_value      = EXCLUDED.resolved_value,
+                resolved_by         = EXCLUDED.resolved_by,
+                resolution_confidence = EXCLUDED.resolution_confidence,
+                resolution_method   = EXCLUDED.resolution_method
         """),
         {
             "sc_id": sc_id,
@@ -324,6 +459,9 @@ async def _persist_repair_log(
             "ca": confidence_after,
             "cs": json.dumps(conflicting_sources),
             "rv": resolved_value,
+            "resolved_by": json.dumps(resolved_by or []),
+            "res_conf": resolution_confidence,
+            "res_method": resolution_method or action_taken,
         },
     )
 
@@ -421,11 +559,46 @@ async def repair_course_conflicts(
         all_sources = list(source_values.keys())
         diagnosis = diagnose_conflict(conflict_sources, all_sources)
 
-        # Attempt repair
-        resolved_value, action_taken, new_outcome = attempt_repair(
-            source_values, diagnosis
+        # ── T002: Normalization equivalence check (cheapest, try first) ──────
+        ne_value, ne_outcome = await _check_normalization_equivalence(db, sc_id, fn)
+        if ne_value is not None:
+            resolved_value = ne_value
+            action_taken = "normalization_equivalence"
+            new_outcome = ne_outcome
+            resolved = True
+            log.info(
+                "[REPAIR] sc=%s field=%s resolved by normalization_equivalence → %s",
+                sc_id, fn, ne_value,
+            )
+        else:
+            # ── Source priority repair (existing logic) ────────────────────
+            resolved_value, action_taken, new_outcome = attempt_repair(
+                source_values, diagnosis
+            )
+            resolved = action_taken != "unresolved"
+
+            # ── T001: Source revalidation (async HTTP fallback) ────────────
+            if not resolved:
+                all_existing_vals = {v for vs in source_values.values() for v in vs}
+                rv_value, rv_outcome = await _try_source_revalidation(
+                    db, sc_id, fn, all_existing_vals
+                )
+                if rv_value is not None:
+                    resolved_value = rv_value
+                    action_taken = "source_revalidation"
+                    new_outcome = rv_outcome
+                    resolved = True
+                    log.info(
+                        "[REPAIR] sc=%s field=%s resolved by source_revalidation → %s",
+                        sc_id, fn, rv_value,
+                    )
+
+        # ── T003: Compute resolution confidence & resolved_by ─────────────
+        resolved_by_sources: list[str] = new_outcome.get("sources", []) if resolved else []
+        res_confidence = (
+            _compute_resolution_confidence(action_taken, resolved_by_sources)
+            if resolved else 0
         )
-        resolved = action_taken != "unresolved"
 
         # Persist repair log (idempotent)
         try:
@@ -440,6 +613,9 @@ async def repair_course_conflicts(
                 confidence_after=new_outcome.get("confidence") if resolved else None,
                 conflicting_sources=conflict_sources,
                 resolved_value=resolved_value,
+                resolved_by=resolved_by_sources,
+                resolution_confidence=res_confidence,
+                resolution_method=action_taken,
             )
         except Exception as _log_exc:  # noqa: BLE001
             log.warning("[REPAIR] log persist failed sc=%s field=%s: %s", sc_id, fn, _log_exc)
@@ -467,6 +643,9 @@ async def repair_course_conflicts(
                 confidence_after=new_outcome.get("confidence") if resolved else None,
                 resolved_value=resolved_value,
                 conflicting_sources=conflict_sources,
+                resolution_method=action_taken,
+                resolution_confidence=res_confidence,
+                resolved_by=resolved_by_sources,
             )
         )
 

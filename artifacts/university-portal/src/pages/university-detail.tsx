@@ -2116,28 +2116,88 @@ export default function UniversityDetail() {
             <p className="text-xs text-rose-700">No verification conflicts detected for this university.</p>
           ) : (
             <div className="space-y-3">
-              {/* Stat row */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {(
-                  [
-                    { label: "Conflicts Found", value: verifSummary.repair_stats.conflicts_found, color: "text-rose-700" },
-                    { label: "Repaired", value: verifSummary.repair_stats.conflicts_repaired, color: "text-emerald-700" },
-                    { label: "Unresolved", value: verifSummary.repair_stats.conflicts_unresolved, color: "text-amber-700" },
-                    {
-                      label: "Resolution Rate",
-                      value: verifSummary.repair_stats.repairs_attempted > 0
-                        ? `${Math.round((verifSummary.repair_stats.conflicts_repaired / verifSummary.repair_stats.repairs_attempted) * 100)}%`
-                        : "—",
-                      color: "text-sky-700",
-                    },
-                  ] as const
-                ).map(({ label, value, color }) => (
-                  <div key={label} className="rounded bg-white border border-rose-100 px-3 py-2 text-center">
-                    <div className={`text-xl font-bold ${color}`}>{value}</div>
-                    <div className="text-[10px] text-muted-foreground">{label}</div>
+
+              {/* T004: Hero KPI — Conflict Resolution Rate */}
+              {verifSummary.repair_stats.repair_ran && verifSummary.repair_stats.conflict_resolution_rate != null && (
+                <div className="rounded-lg bg-white border border-rose-200 p-3 flex items-center gap-4">
+                  {/* Big percentage */}
+                  <div className="text-center min-w-[72px]">
+                    <div className={`text-4xl font-extrabold tabular-nums ${
+                      verifSummary.repair_stats.conflict_resolution_rate >= 90 ? "text-emerald-600"
+                      : verifSummary.repair_stats.conflict_resolution_rate >= 70 ? "text-sky-600"
+                      : "text-amber-600"
+                    }`}>
+                      {verifSummary.repair_stats.conflict_resolution_rate}%
+                    </div>
+                    <div className="text-[10px] text-muted-foreground font-medium mt-0.5">Conflict Resolution Rate</div>
                   </div>
-                ))}
-              </div>
+                  {/* Mini breakdown */}
+                  <div className="flex-1 space-y-1">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">Found</span>
+                      <span className="font-semibold text-rose-700">{verifSummary.repair_stats.conflicts_found}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">Auto-Resolved</span>
+                      <span className="font-semibold text-emerald-700">{verifSummary.repair_stats.conflicts_repaired}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">Manual Review</span>
+                      <span className="font-semibold text-amber-700">{verifSummary.repair_stats.conflicts_unresolved}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Stat row — always visible */}
+              {!verifSummary.repair_stats.repair_ran && (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {([
+                    { label: "Conflicts Found", value: verifSummary.repair_stats.conflicts_found, color: "text-rose-700" },
+                    { label: "Repaired",        value: verifSummary.repair_stats.conflicts_repaired, color: "text-emerald-700" },
+                    { label: "Unresolved",      value: verifSummary.repair_stats.conflicts_unresolved, color: "text-amber-700" },
+                  ]).map(({ label, value, color }) => (
+                    <div key={label} className="rounded bg-white border border-rose-100 px-3 py-2 text-center">
+                      <div className={`text-xl font-bold ${color}`}>{value}</div>
+                      <div className="text-[10px] text-muted-foreground">{label}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* T004: Resolution breakdown by method */}
+              {(verifSummary.repair_stats.resolution_breakdown ?? []).length > 0 && (
+                <div>
+                  <div className="text-[10px] font-semibold text-rose-800 uppercase tracking-wider mb-1.5">
+                    Resolved By
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {(verifSummary.repair_stats.resolution_breakdown as Array<{method:string;count:number;avg_confidence:number}>).map(({ method, count, avg_confidence }) => {
+                      const label: Record<string, string> = {
+                        drop_low_authority: "Source Priority",
+                        normalization_equivalence: "Format Normalization",
+                        source_revalidation: "Source Re-fetch",
+                      };
+                      const color: Record<string, string> = {
+                        drop_low_authority: "bg-sky-100 border-sky-200 text-sky-700",
+                        normalization_equivalence: "bg-violet-100 border-violet-200 text-violet-700",
+                        source_revalidation: "bg-teal-100 border-teal-200 text-teal-700",
+                      };
+                      return (
+                        <span
+                          key={method}
+                          className={`inline-flex items-center gap-1 text-[10px] rounded px-2 py-0.5 border font-medium ${color[method] ?? "bg-gray-100 border-gray-200 text-gray-700"}`}
+                          title={`Avg confidence: ${avg_confidence}%`}
+                        >
+                          {label[method] ?? method}
+                          <span className="rounded-full px-1 font-bold opacity-75">{count}</span>
+                          <span className="opacity-50">· {avg_confidence}%</span>
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               {/* Status badge */}
               {!verifSummary.repair_stats.repair_ran ? (
