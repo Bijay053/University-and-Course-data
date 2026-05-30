@@ -4433,6 +4433,32 @@ async def extract_course(
                     }
                 )
 
+        # Phase 6: merge academic entry requirements (ATAR, GPA, prior degree,
+        # work experience, portfolio, interview) from the requirements PDF into
+        # the other_requirement field when it is currently empty.
+        # Provenance is tagged as "uni_pdf:entry_requirements" so reviewers can
+        # distinguish it from page-extracted or Gemini-extracted values.
+        _p6_er_data = uni_pdf_data.get("entry_requirements") or {}
+        if _p6_er_data and not (payload.get("other_requirement") or "").strip():
+            try:
+                from app.services.scraper.entry_req_extractor import EntryRequirement as _P6ER
+                _p6_er = _P6ER.from_dict(_p6_er_data)
+                _p6_summary = _p6_er.to_summary_text()
+                if _p6_summary:
+                    payload["other_requirement"] = _p6_summary
+                    evidence.append(
+                        {
+                            "field_key": "other_requirement",
+                            "value": _p6_summary,
+                            "confidence": min(0.80, _p6_er_data.get("confidence", 0.5)),
+                            "method": "uni_pdf:entry_requirements",
+                            "source_url": uni_pdf_data.get("requirements_pdf_url") or url,
+                            "snippet": f"entry_req PDF: {_p6_summary[:80]}",
+                        }
+                    )
+            except Exception as _p6_exc:  # noqa: BLE001
+                log.debug("[P6] entry_req merge failed: %s", _p6_exc)
+
     # ── Pathway program detection ─────────────────────────────────────────────
     # Pathway / preparatory programs (Foundation Studies, ELICOS, UniPrep,
     # bridging courses) have lower English admission requirements than standard

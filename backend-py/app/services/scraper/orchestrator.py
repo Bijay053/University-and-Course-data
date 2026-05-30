@@ -1322,6 +1322,64 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     "[YAML] injected english requirements_pdf_url into uni_scrape_config: %s",
                     _pdf_eng.requirements_pdf_url,
                 )
+
+        # Phase 6: Autonomous PDF discovery — when feesPdf or requirementsPdf
+        # is still unconfigured after YAML injection, crawl the university's
+        # main page and fee/admission sub-paths to discover and classify PDFs.
+        # Discovered URLs are cached in auto_config["_discovered_pdfs"] so
+        # subsequent scrapes reuse them without re-probing the site.
+        try:
+            _p6_pages = (uni_scrape_config or {}).setdefault("uniPages", {})
+            _p6_needs_fee = not _p6_pages.get("feesPdf")
+            _p6_needs_req = not _p6_pages.get("requirementsPdf")
+            if (_p6_needs_fee or _p6_needs_req) and scrape_url:
+                _p6_ac = (uni_scrape_config or {}).get("auto_config") or {}
+                _p6_cached: list[dict] = _p6_ac.get("_discovered_pdfs") or []
+                if not _p6_cached:
+                    from app.services.scraper.pdf_link_discoverer import (
+                        discover_pdf_links_for_university as _p6_discover,
+                    )
+                    _p6_links = await _p6_discover(scrape_url, emit=emit)
+                    _p6_cached = [lnk.to_dict() for lnk in _p6_links[:10]]
+                    if _p6_cached:
+                        # Persist into auto_config for reuse on next run
+                        if uni_scrape_config is None:
+                            uni_scrape_config = {}
+                        uni_scrape_config.setdefault("auto_config", {}).update(
+                            {"_discovered_pdfs": _p6_cached}
+                        )
+                        log.info(
+                            "[P6] Discovered %d PDF candidates for %s; cached in auto_config",
+                            len(_p6_cached), scrape_url[:60],
+                        )
+                for _p6_item in _p6_cached:
+                    _p6_cat = (_p6_item.get("best_category") or "").strip()
+                    _p6_url = (_p6_item.get("url") or "").strip()
+                    if not _p6_url:
+                        continue
+                    if _p6_cat == "fee_schedule" and _p6_needs_fee:
+                        _p6_pages["feesPdf"] = _p6_url
+                        _p6_needs_fee = False
+                        log.info("[P6] Auto-injected feesPdf: %s", _p6_url[:80])
+                        await emit(
+                            "status",
+                            f"[PDF] Auto-discovered fee schedule PDF: {_p6_url.split('/')[-1][:50]}",
+                            phase="discover",
+                            pdf_auto_fee=_p6_url,
+                        )
+                    elif _p6_cat == "entry_requirements" and _p6_needs_req:
+                        _p6_pages["requirementsPdf"] = _p6_url
+                        _p6_needs_req = False
+                        log.info("[P6] Auto-injected requirementsPdf: %s", _p6_url[:80])
+                        await emit(
+                            "status",
+                            f"[PDF] Auto-discovered requirements PDF: {_p6_url.split('/')[-1][:50]}",
+                            phase="discover",
+                            pdf_auto_req=_p6_url,
+                        )
+        except Exception as _p6_exc:  # noqa: BLE001
+            log.warning("[P6] PDF auto-discovery failed: %s", _p6_exc)
+
         try:
             uni_pdf_data = await load_university_pdf_data(uni_scrape_config, uni_country)
         except Exception as exc:  # noqa: BLE001
@@ -1330,7 +1388,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         if uni_pdf_data:
             await emit(
                 "status",
-                f"Loaded uni-level PDF data: fee={'yes' if uni_pdf_data.get('fee') else 'no'} english={'yes' if uni_pdf_data.get('english') else 'no'}",
+                f"Loaded uni-level PDF data: fee={'yes' if uni_pdf_data.get('fee') else 'no'} english={'yes' if uni_pdf_data.get('english') else 'no'} entry_req={'yes' if uni_pdf_data.get('entry_requirements') else 'no'}",
                 phase="discover",
                 pdf_fee=bool(uni_pdf_data.get("fee")),
                 pdf_english=bool(uni_pdf_data.get("english")),

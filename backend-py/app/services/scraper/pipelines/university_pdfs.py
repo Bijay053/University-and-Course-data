@@ -1243,6 +1243,29 @@ async def _parse_requirements_pdf(url: str, emit=None) -> dict[str, Any]:
                 log.warning("english extractor failed on vision text for %s: %s", url, exc)
     if out:
         log.info("requirements PDF %s yielded %s", url, sorted(out))
+
+    # Phase 6: extract academic entry requirements from the same PDF text
+    # (ATAR, GPA, prior degree, work experience, portfolio/interview).
+    # Rule-based — zero Gemini cost.  Stored as "_entry_req" so the caller
+    # (load_university_pdf_data) can surface it separately from english data.
+    _p6_text = text
+    try:
+        if not _p6_text and vision_text:  # vision_text defined inside 'if not out:' above
+            _p6_text = vision_text
+    except NameError:
+        pass
+    if _p6_text:
+        try:
+            from app.services.scraper.entry_req_extractor import extract_entry_requirements as _p6_ereq
+            _p6_er = _p6_ereq(_p6_text)
+            if _p6_er.confidence > 0.0:
+                out["_entry_req"] = _p6_er.to_dict()
+                log.info(
+                    "[P6] entry_req extracted from %s: %s",
+                    url.split("/")[-1][:40], _p6_er.to_summary_text()[:80],
+                )
+        except Exception as _p6_exc:  # noqa: BLE001
+            log.debug("[P6] entry_req extraction failed for %s: %s", url, _p6_exc)
     return out
 
 
@@ -1291,6 +1314,8 @@ async def load_university_pdf_data(
 
     fee_data = await _parse_fee_pdf(fees_pdf_url, country, emit=emit) if fees_pdf_url else {}
     english_data = await _parse_requirements_pdf(reqs_pdf_url, emit=emit) if reqs_pdf_url else {}
+    # Phase 6: pop entry requirements dict before writing english_data to output
+    _p6_entry_req: dict | None = english_data.pop("_entry_req", None)
 
     out: dict[str, Any] = {}
     if fee_data:
@@ -1307,4 +1332,11 @@ async def load_university_pdf_data(
     if english_data:
         out["english"] = english_data
         out["requirements_pdf_url"] = reqs_pdf_url
+    # Phase 6: attach entry requirements (ATAR, GPA, prior degree, …) from
+    # the same PDF even when no english data was extracted (requirements PDF
+    # may publish academic entry criteria without IELTS scores).
+    if _p6_entry_req:
+        out["entry_requirements"] = _p6_entry_req
+        if not out.get("requirements_pdf_url") and reqs_pdf_url:
+            out["requirements_pdf_url"] = reqs_pdf_url
     return out
