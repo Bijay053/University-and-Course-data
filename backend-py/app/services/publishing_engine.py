@@ -163,7 +163,7 @@ async def run_publishing_pass(
 
     Returns counts: scored, auto_published, needs_review, held.
     """
-    from app.services.scraper.approve_course import approve_course  # lazy import
+    from app.services.scraper.approve_course import approve_scraped_course  # lazy import
 
     query = select(ScrapedCourse).where(
         ScrapedCourse.status.in_(["pending", "review"]),
@@ -184,7 +184,7 @@ async def run_publishing_pass(
 
             if scored["decision"] == "auto_publish":
                 try:
-                    await approve_course(sc.id, db)
+                    await approve_scraped_course(sc.id, db)
                     db.add(_ledger_entry(sc, "auto_published", "system", scored["reason"]))
                     counts["auto_published"] += 1
                 except Exception as e:
@@ -212,14 +212,14 @@ async def run_publishing_pass(
 
 async def manually_approve(sc_id: int, reason: str, db: AsyncSession) -> dict:
     """Human approval — promote to live courses."""
-    from app.services.scraper.approve_course import approve_course
+    from app.services.scraper.approve_course import approve_scraped_course
 
     result = await db.execute(select(ScrapedCourse).where(ScrapedCourse.id == sc_id))
     sc = result.scalar_one_or_none()
     if not sc:
         raise ValueError(f"ScrapedCourse {sc_id} not found")
 
-    await approve_course(sc_id, db)
+    await approve_scraped_course(sc_id, db)
     db.add(_ledger_entry(sc, "manually_published", "human", reason or "Manual approval"))
     await db.commit()
     return {"ok": True, "action": "manually_published", "scraped_course_id": sc_id}
