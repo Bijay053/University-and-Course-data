@@ -54,29 +54,31 @@ def _make_watcher(**kwargs) -> MagicMock:
 # ── next_check_interval_hours ─────────────────────────────────────────────────
 
 class TestNextCheckInterval:
-    def test_none_returns_24h(self):
-        assert next_check_interval_hours(None) == 24.0
+    def test_none_returns_90_days(self):
+        # Default is 90 days — realistic for annual-cycle universities
+        assert next_check_interval_hours(None) == 90 * 24.0
 
-    def test_very_frequent_returns_6h(self):
-        assert next_check_interval_hours(1.0) == 6.0
+    def test_very_frequent_under_14d_returns_3d(self):
+        assert next_check_interval_hours(7.0) == 72.0
 
-    def test_frequent_returns_12h(self):
-        assert next_check_interval_hours(5.0) == 12.0
+    def test_frequent_under_30d_returns_7d(self):
+        assert next_check_interval_hours(20.0) == 168.0
 
-    def test_moderate_returns_24h(self):
-        assert next_check_interval_hours(10.0) == 24.0
+    def test_moderate_under_60d_returns_14d(self):
+        assert next_check_interval_hours(45.0) == 336.0
 
-    def test_slow_returns_72h(self):
-        assert next_check_interval_hours(20.0) == 72.0
+    def test_slow_under_120d_returns_30d(self):
+        assert next_check_interval_hours(90.0) == 720.0
 
-    def test_stable_returns_weekly(self):
-        assert next_check_interval_hours(90.0) == 168.0
+    def test_stable_over_120d_returns_60d(self):
+        assert next_check_interval_hours(200.0) == 1440.0
 
-    def test_boundary_exactly_3_returns_12h(self):
-        assert next_check_interval_hours(3.0) == 12.0
+    def test_very_fast_under_14d_boundary(self):
+        assert next_check_interval_hours(1.0) == 72.0
 
-    def test_boundary_exactly_14_returns_72h(self):
-        assert next_check_interval_hours(14.0) == 72.0
+    def test_boundary_exactly_14d_returns_weekly(self):
+        # < 14 → 3 days; ≥ 14 → 7 days
+        assert next_check_interval_hours(14.0) == 168.0
 
 
 # ── compute_next_check_at ─────────────────────────────────────────────────────
@@ -86,16 +88,28 @@ class TestComputeNextCheckAt:
         result = compute_next_check_at(None)
         assert result > datetime.now(timezone.utc)
 
-    def test_fast_change_sooner(self):
-        fast = compute_next_check_at(1.0)
-        slow = compute_next_check_at(60.0)
+    def test_default_is_90_days_from_now(self):
+        result = compute_next_check_at(None)
+        diff_days = (result - datetime.now(timezone.utc)).total_seconds() / 86400
+        assert abs(diff_days - 90) < 0.01
+
+    def test_fast_change_sooner_than_slow(self):
+        fast = compute_next_check_at(7.0)
+        slow = compute_next_check_at(200.0)
         assert fast < slow
 
-    def test_within_expected_window(self):
-        result = compute_next_check_at(5.0)
-        expected_hours = 12.0
-        diff = (result - datetime.now(timezone.utc)).total_seconds() / 3600
-        assert abs(diff - expected_hours) < 0.1
+    def test_from_dt_anchors_to_past_date(self):
+        base = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        result = compute_next_check_at(None, from_dt=base)
+        expected = base + timedelta(days=90)
+        assert result == expected
+
+    def test_from_dt_last_scrape_schedules_correctly(self):
+        # A university scraped 30 days ago → next probe in 60 more days (~90d from scrape)
+        last_scrape = datetime.now(timezone.utc) - timedelta(days=30)
+        result = compute_next_check_at(None, from_dt=last_scrape)
+        diff_days = (result - datetime.now(timezone.utc)).total_seconds() / 86400
+        assert abs(diff_days - 60) < 0.1
 
 
 # ── _sha256 ───────────────────────────────────────────────────────────────────
@@ -227,12 +241,13 @@ class TestGetOrCreateWatcher:
 
     def test_creates_new_when_missing(self):
         db = AsyncMock()
-        r1 = MagicMock(); r1.scalar_one_or_none.return_value = None
+        r1 = MagicMock(); r1.scalar_one_or_none.return_value = None  # watcher lookup
         uni = MagicMock()
         uni.scrape_url = "https://example.edu/courses"
         uni.website = ""
-        r2 = MagicMock(); r2.scalar_one_or_none.return_value = uni
-        db.execute.side_effect = [r1, r2]
+        r2 = MagicMock(); r2.scalar_one_or_none.return_value = uni   # university lookup
+        r3 = MagicMock(); r3.scalar_one_or_none.return_value = None  # last scrape lookup
+        db.execute.side_effect = [r1, r2, r3]
 
         from app.models.university_watcher import UniversityWatcher
         created = []

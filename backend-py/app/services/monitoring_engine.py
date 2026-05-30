@@ -27,25 +27,56 @@ _DEFAULT_TIMEOUT = 15.0
 _USER_AGENT = "StudyInfoCentre-Monitor/1.0 (+https://studyinfocentre.com)"
 
 # ── Smart scheduling ──────────────────────────────────────────────────────────
+#
+# Universities typically update course/fee/intake data 1–2 times per year,
+# so the default (unknown) interval is 90 days.  The ladder only compresses
+# when evidence shows the site changes much more frequently.
+#
+# Ladder (based on learned change_frequency_days EMA):
+#   unknown         → 90 days  (safe default — annual-cycle assumption)
+#   < 14 days       →  3 days  (genuinely fast-moving, e.g. news accidentally scraped)
+#   < 30 days       →  7 days
+#   < 60 days       → 14 days
+#   < 120 days      → 30 days
+#   ≥ 120 days      → 60 days  (slower than quarterly → bi-monthly ceiling)
+
+_DEFAULT_INTERVAL_DAYS = 90  # probe interval when change frequency is unknown
+
 
 def next_check_interval_hours(change_frequency_days: float | None) -> float:
-    """Return probe interval in hours based on learned change frequency."""
+    """Return probe interval in hours based on learned change frequency.
+
+    The default (None) is 90 days — realistic for university course pages
+    that update once or twice per academic year.
+    """
     if change_frequency_days is None:
-        return 24.0
-    if change_frequency_days < 3:
-        return 6.0
-    if change_frequency_days < 7:
-        return 12.0
+        return _DEFAULT_INTERVAL_DAYS * 24.0  # 2160 h
     if change_frequency_days < 14:
-        return 24.0
+        return 72.0    # 3 days — very frequent
     if change_frequency_days < 30:
-        return 72.0
-    return 168.0  # weekly
+        return 168.0   # 7 days
+    if change_frequency_days < 60:
+        return 336.0   # 14 days
+    if change_frequency_days < 120:
+        return 720.0   # 30 days
+    return 1440.0      # 60 days — anything slower than quarterly
 
 
-def compute_next_check_at(change_frequency_days: float | None) -> datetime:
+def compute_next_check_at(
+    change_frequency_days: float | None,
+    from_dt: datetime | None = None,
+) -> datetime:
+    """Compute next probe datetime.
+
+    Args:
+        change_frequency_days: learned EMA change interval (None = unknown).
+        from_dt: base datetime to add the interval to.  Defaults to now().
+                 Pass the last scrape completion time to anchor the schedule
+                 to the last real data refresh rather than the current wall clock.
+    """
     hours = next_check_interval_hours(change_frequency_days)
-    return datetime.now(timezone.utc) + timedelta(hours=hours)
+    base = from_dt if from_dt is not None else datetime.now(timezone.utc)
+    return base + timedelta(hours=hours)
 
 
 # ── Probe helpers ─────────────────────────────────────────────────────────────
@@ -253,8 +284,31 @@ async def trigger_scrape(watcher: UniversityWatcher, db: AsyncSession) -> str | 
 
 # ── CRUD helpers ──────────────────────────────────────────────────────────────
 
+async def _last_scrape_completed_at(university_id: int, db: AsyncSession) -> datetime | None:
+    """Return the completion timestamp of the most recent successful scrape for this university."""
+    from app.models.scrape_runtime import ScrapeRuntimeJob
+    result = await db.execute(
+        select(ScrapeRuntimeJob.completed_at)
+        .where(
+            ScrapeRuntimeJob.university_id == university_id,
+            ScrapeRuntimeJob.status == "completed",
+            ScrapeRuntimeJob.completed_at.isnot(None),
+        )
+        .order_by(ScrapeRuntimeJob.completed_at.desc())
+        .limit(1)
+    )
+    return result.scalar_one_or_none()
+
+
 async def get_or_create_watcher(university_id: int, db: AsyncSession) -> UniversityWatcher:
-    """Return existing watcher or create a new one with sensible defaults."""
+    """Return existing watcher or create a new one with sensible defaults.
+
+    When creating a new watcher, ``next_check_at`` is anchored to the
+    university's last successful scrape date + 90 days.  This means a
+    university that was scraped last month won't be probed again for ~3
+    months — consistent with the annual-update assumption.
+    If no scrape history exists, the anchor is now() + 90 days.
+    """
     result = await db.execute(
         select(UniversityWatcher).where(UniversityWatcher.university_id == university_id)
     )
@@ -269,12 +323,17 @@ async def get_or_create_watcher(university_id: int, db: AsyncSession) -> Univers
     if uni:
         probe_url = (uni.scrape_url or uni.website or "").strip()
 
+    # Anchor next_check_at to the last scrape date so we don't immediately
+    # re-probe a university that was scraped very recently.
+    last_scrape = await _last_scrape_completed_at(university_id, db)
+    next_check = compute_next_check_at(None, from_dt=last_scrape)
+
     watcher = UniversityWatcher(
         university_id=university_id,
         enabled=True,
         monitoring_strategy="passive",
         probe_url=probe_url,
-        next_check_at=datetime.now(timezone.utc) + timedelta(hours=24),
+        next_check_at=next_check,
     )
     db.add(watcher)
     await db.commit()
