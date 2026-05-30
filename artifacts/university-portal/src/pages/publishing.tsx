@@ -253,7 +253,7 @@ export default function PublishingPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <Send className="h-6 w-6 text-indigo-600" />
@@ -263,10 +263,15 @@ export default function PublishingPage() {
             AI-scored confidence engine — auto-publishes high-confidence courses, queues the rest for human review
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2 shrink-0">
           <Button
             variant="outline" size="sm"
-            onClick={() => { qc.invalidateQueries({ queryKey: ["pub-stats"] }); refetchQueue(); }}
+            onClick={() => {
+              qc.invalidateQueries({ queryKey: ["pub-stats"] });
+              qc.invalidateQueries({ queryKey: ["pub-queue"] });
+              qc.invalidateQueries({ queryKey: ["pub-ledger"] });
+              toast({ title: "Refreshed", description: "Stats and queue updated." });
+            }}
           >
             <RefreshCw className="h-4 w-4 mr-1" /> Refresh
           </Button>
