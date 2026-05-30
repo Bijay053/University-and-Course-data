@@ -219,9 +219,15 @@ async def manually_approve(sc_id: int, reason: str, db: AsyncSession) -> dict:
     if not sc:
         raise ValueError(f"ScrapedCourse {sc_id} not found")
 
-    await approve_scraped_course(sc_id, db)
+    # Build the ledger entry NOW while sc attributes are live in the session.
+    # approve_scraped_course commits internally, which expires all ORM objects —
+    # accessing sc.pub_score etc. after that commit would raise an async lazy-load error.
     db.add(_ledger_entry(sc, "manually_published", "human", reason or "Manual approval"))
-    await db.commit()
+
+    # Correct arg order: (db, sc) — approve_scraped_course commits everything, including
+    # the ledger entry added above, so no second commit is needed here.
+    await approve_scraped_course(db, sc, actor="human")
+
     return {"ok": True, "action": "manually_published", "scraped_course_id": sc_id}
 
 
