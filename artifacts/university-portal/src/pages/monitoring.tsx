@@ -135,6 +135,8 @@ export default function MonitoringPage() {
   const [dismissed, setDismissed] = useState<Set<number>>(getDismissed);
   const [monPage, setMonPage] = useState(1);
   const [monPageSize, setMonPageSize] = useState(25);
+  const [pendingEnableId, setPendingEnableId] = useState<number | null>(null);
+  const [pendingDisableId, setPendingDisableId] = useState<number | null>(null);
 
   const { data: stats, isLoading: statsLoading } = useQuery<WatcherStats>({
     queryKey: ["monitoring-stats"],
@@ -583,21 +585,35 @@ export default function MonitoringPage() {
                           <Button
                             size="sm" variant="ghost"
                             className="h-7 px-2 text-xs text-muted-foreground"
-                            onClick={() => disableMut.mutate(w.university_id)}
-                            disabled={disableMut.isPending}
+                            onClick={() => {
+                              setPendingDisableId(w.university_id);
+                              disableMut.mutate(w.university_id, { onSettled: () => setPendingDisableId(null) });
+                            }}
+                            disabled={pendingDisableId === w.university_id}
                           >
-                            <EyeOff className="h-3 w-3" />
-                            <span className="ml-1 hidden sm:inline">Pause</span>
+                            {pendingDisableId === w.university_id
+                              ? <RefreshCw className="h-3 w-3 animate-spin" />
+                              : <EyeOff className="h-3 w-3" />}
+                            <span className="ml-1 hidden sm:inline">
+                              {pendingDisableId === w.university_id ? "Pausing…" : "Pause"}
+                            </span>
                           </Button>
                         ) : (
                           <Button
                             size="sm" variant="ghost"
                             className="h-7 px-2 text-xs"
-                            onClick={() => enableMut.mutate(w.university_id)}
-                            disabled={enableMut.isPending}
+                            onClick={() => {
+                              setPendingEnableId(w.university_id);
+                              enableMut.mutate(w.university_id, { onSettled: () => setPendingEnableId(null) });
+                            }}
+                            disabled={pendingEnableId === w.university_id}
                           >
-                            <Eye className="h-3 w-3" />
-                            <span className="ml-1 hidden sm:inline">Watch</span>
+                            {pendingEnableId === w.university_id
+                              ? <RefreshCw className="h-3 w-3 animate-spin" />
+                              : <Eye className="h-3 w-3" />}
+                            <span className="ml-1 hidden sm:inline">
+                              {pendingEnableId === w.university_id ? "Enabling…" : "Watch"}
+                            </span>
                           </Button>
                         )}
                       </div>

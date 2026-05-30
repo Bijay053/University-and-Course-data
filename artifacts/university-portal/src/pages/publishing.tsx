@@ -182,6 +182,7 @@ export default function PublishingPage() {
   const [ledgerSearch, setLedgerSearch] = useState("");
   const [ledgerPage, setLedgerPage] = useState(1);
   const [ledgerPageSize, setLedgerPageSize] = useState(25);
+  const [pendingItemId, setPendingItemId] = useState<number | null>(null);
 
   const { data: stats, isLoading: statsLoading } = useQuery<PubStats>({
     queryKey: ["pub-stats"],
@@ -230,8 +231,9 @@ export default function PublishingPage() {
         qc.invalidateQueries({ queryKey: ["pub-queue"] });
         qc.invalidateQueries({ queryKey: ["pub-ledger"] });
         setActionReason(r => { const n = { ...r }; delete n[id]; return n; });
+        setPendingItemId(null);
       },
-      onError: (e) => toast({ title: "Action failed", description: String(e), variant: "destructive" }),
+      onError: (e) => { toast({ title: "Action failed", description: String(e), variant: "destructive" }); setPendingItemId(null); },
     });
   }
 
@@ -309,7 +311,9 @@ export default function PublishingPage() {
             style={{ backgroundColor: '#4f46e5', color: '#ffffff' }}
             className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded-md disabled:opacity-60 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
           >
-            <Play className="h-4 w-4" />
+            {runPassMut.isPending
+              ? <RefreshCw className="h-4 w-4 animate-spin" />
+              : <Play className="h-4 w-4" />}
             {runPassMut.isPending ? "Running…" : "Run Publishing Pass"}
           </button>
         </div>
@@ -525,29 +529,29 @@ export default function PublishingPage() {
                               <Button
                                 size="sm" variant="ghost"
                                 className="h-7 px-2 text-xs text-emerald-700 hover:bg-emerald-50"
-                                onClick={() => approveMut.mutate({ id: item.id, reason: actionReason[item.id] || "Manual approval" })}
-                                disabled={approveMut.isPending}
+                                onClick={() => { setPendingItemId(item.id); approveMut.mutate({ id: item.id, reason: actionReason[item.id] || "Manual approval" }); }}
+                                disabled={pendingItemId === item.id}
                                 title="Approve & publish"
                               >
-                                <ThumbsUp className="h-3 w-3" />
+                                {pendingItemId === item.id ? <RefreshCw className="h-3 w-3 animate-spin" /> : <ThumbsUp className="h-3 w-3" />}
                               </Button>
                               <Button
                                 size="sm" variant="ghost"
                                 className="h-7 px-2 text-xs text-slate-500 hover:bg-slate-50"
-                                onClick={() => holdMut.mutate({ id: item.id, reason: actionReason[item.id] || "Manual hold" })}
-                                disabled={holdMut.isPending}
+                                onClick={() => { setPendingItemId(item.id); holdMut.mutate({ id: item.id, reason: actionReason[item.id] || "Manual hold" }); }}
+                                disabled={pendingItemId === item.id}
                                 title="Hold"
                               >
-                                <Pause className="h-3 w-3" />
+                                {pendingItemId === item.id ? <RefreshCw className="h-3 w-3 animate-spin" /> : <Pause className="h-3 w-3" />}
                               </Button>
                               <Button
                                 size="sm" variant="ghost"
                                 className="h-7 px-2 text-xs text-rose-700 hover:bg-rose-50"
-                                onClick={() => rejectMut.mutate({ id: item.id, reason: actionReason[item.id] || "Manual rejection" })}
-                                disabled={rejectMut.isPending}
+                                onClick={() => { setPendingItemId(item.id); rejectMut.mutate({ id: item.id, reason: actionReason[item.id] || "Manual rejection" }); }}
+                                disabled={pendingItemId === item.id}
                                 title="Reject"
                               >
-                                <ThumbsDown className="h-3 w-3" />
+                                {pendingItemId === item.id ? <RefreshCw className="h-3 w-3 animate-spin" /> : <ThumbsDown className="h-3 w-3" />}
                               </Button>
                               {expanded.has(item.id) ? (
                                 <ChevronUp className="h-3 w-3 text-muted-foreground ml-1" />
