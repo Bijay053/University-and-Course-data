@@ -301,6 +301,10 @@ async def _extract_only(
 
     name = (link.get("name") or "").strip() or "Unknown course"
     url = link["url"]
+    # Extraction rules from auto_config (Phase 2) — passed to Stage 0 inside
+    # extract_course() so generated CSS/XPath/regex rules run before regex
+    # heuristics and before per-course Gemini, reducing per-course AI cost.
+    # _ac_ext_rules is set in the enclosing run_scrape() scope (closure).
     try:
         out = await extract_course(
             url,
@@ -309,6 +313,7 @@ async def _extract_only(
             emit=emit,
             vision_image_cache=vision_image_cache,
             central_data=central_data,
+            extraction_rules=_ac_ext_rules,
         )
     except Exception as exc:  # noqa: BLE001
         return {"name": name, "url": url, "error": f"extract: {exc}"}
@@ -672,9 +677,11 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # ── Log active auto_config so scrape runs are traceable ───────────────
         _ac_strategy = "unknown"  # initialise before conditional so CASCADE can always read it
         _ac_ladder: list[str] = []
+        _ac_ext_rules: dict | None = None  # Phase-2 extraction rules (Stage 0)
         if uni_scrape_config and uni_scrape_config.get("auto_config"):
             _ac = uni_scrape_config["auto_config"]
             _ac_strategy = _ac.get("_strategy", "unknown")
+            _ac_ext_rules = _ac.get("extraction_rules") or None
             _ac_disc = _ac.get("discovery") or {}
             log.info(
                 "[AUTO_CONFIG] Active for uni_id=%s slug=%r strategy=%r "
@@ -2581,25 +2588,33 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 # while leaving headroom below the 85 % auto-publish bar.
                 # Previously 50 % — too permissive; a 65 % result would never
                 # cascade even though it falls well short of the publish gate.
-                _poor = _staged_n < 5 or _avg < 70.0
-                if _poor and _has_yaml:
-                    # Per-uni YAML exists and takes precedence over auto-config.
-                    # Don't overwrite the operator's hand-tuned settings.
+                # ── Phase 2: smart CASCADE routing ─────────────────────────
+                # Two distinct failure modes need different repairs:
+                #
+                # [discovery_failure] staged < 5
+                #   Scraper didn't find enough course pages.
+                #   Fix: re-probe with a different discovery strategy.
+                #
+                # [extraction_failure] staged ≥ 5 but avg < 70%
+                #   Discovery worked; extraction rules produced incomplete data.
+                #   Fix: repair_extractor — regenerate CSS/XPath/regex rules and
+                #   queue a retry scrape (Phase 2 autonomous extraction).
+                #
+                # Per-uni YAML always wins — never overwrite hand-tuned files.
+
+                if _has_yaml:
                     log.info(
-                        "[CASCADE] poor result but per-uni YAML exists — "
-                        "skipping auto-probe (YAML overrides auto_config); "
+                        "[CASCADE] per-uni YAML exists — skipping self-heal; "
                         "uni_id=%s slug=%r staged=%d avg=%.1f",
                         uni_id, _slug, _staged_n, _avg,
                     )
-                elif _poor:
-                    # No YAML + poor results → dispatch autonomous probe + config.
-                    # Pass the strategy that just failed so the probe can skip it
-                    # and pick the next rung on the escalation ladder.
+                elif _staged_n < 5:
+                    # ── [CASCADE:discovery_failure] ────────────────────────────
                     log.info(
-                        "[CASCADE] poor result for uni_id=%s slug=%r "
-                        "(staged=%d avg_completeness=%.1f no per-uni YAML) — "
-                        "dispatching auto-probe (exclude_strategy=%r)",
-                        uni_id, _slug, _staged_n, _avg, _ac_strategy,
+                        "[CASCADE:discovery_failure] uni_id=%s slug=%r "
+                        "staged=%d (<5) — dispatching auto-probe "
+                        "(exclude_strategy=%r)",
+                        uni_id, _slug, _staged_n, _ac_strategy,
                     )
                     try:
                         from app.tasks.scrape_tasks import probe_and_configure as _probe_task
@@ -2609,19 +2624,43 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                             exclude_strategies=[_ac_strategy] if _ac_strategy != "unknown" else [],
                         )
                         log.info(
-                            "[CASCADE] probe_and_configure dispatched for uni_id=%s", uni_id
+                            "[CASCADE:discovery_failure] probe_and_configure "
+                            "dispatched for uni_id=%s", uni_id
                         )
                     except Exception as _dispatch_exc:
                         log.warning(
-                            "[CASCADE] failed to dispatch probe task for uni_id=%s: %s",
-                            uni_id, _dispatch_exc,
+                            "[CASCADE:discovery_failure] probe dispatch failed "
+                            "for uni_id=%s: %s", uni_id, _dispatch_exc,
+                        )
+                elif _avg < 70.0:
+                    # ── [CASCADE:extraction_failure] ───────────────────────────
+                    # Discovery was fine — repair the extraction rules.
+                    log.info(
+                        "[CASCADE:extraction_failure] uni_id=%s slug=%r "
+                        "staged=%d avg=%.1f (<70%%) — dispatching extractor repair",
+                        uni_id, _slug, _staged_n, _avg,
+                    )
+                    try:
+                        from app.tasks.scrape_tasks import repair_extractor as _repair_task
+                        _repair_task.delay(
+                            uni_id,
+                            scrape_run_id=runtime_job_id,
+                            triggered_by="cascade",
+                        )
+                        log.info(
+                            "[CASCADE:extraction_failure] repair_extractor "
+                            "dispatched for uni_id=%s run=%s", uni_id, runtime_job_id,
+                        )
+                    except Exception as _repair_exc:
+                        log.warning(
+                            "[CASCADE:extraction_failure] repair dispatch failed "
+                            "for uni_id=%s: %s", uni_id, _repair_exc,
                         )
                 else:
-                    # Good results — nothing to do.
                     log.debug(
-                        "[CASCADE] scrape result acceptable for uni_id=%s "
-                        "(staged=%d avg=%.1f) — no auto-probe needed",
-                        uni_id, _staged_n, _avg,
+                        "[CASCADE] result acceptable for uni_id=%s "
+                        "(staged=%d avg=%.1f) — no self-heal needed",
+                        uni_id, _slug, _staged_n, _avg,
                     )
             except Exception as _cascade_exc:  # noqa: BLE001
                 log.warning(

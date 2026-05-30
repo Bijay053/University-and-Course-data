@@ -436,6 +436,32 @@ export default function UniversityDetail() {
   const [probeLoading, setProbeLoading] = useState(false);
   const [probeCardOpen, setProbeCardOpen] = useState(false);
 
+  // ── Phase 2: Extraction Rules card ────────────────────────────────────────
+  const [rulesCardOpen, setRulesCardOpen] = useState(false);
+  type FillRate = { filled: number; total: number; rate: number };
+  type FillRatesResult = {
+    job_id: string | null;
+    fill_rates: Record<string, FillRate>;
+    overall_avg: number;
+    failing_fields: string[];
+    message?: string;
+  };
+  const [fillRates, setFillRates] = useState<FillRatesResult | null>(null);
+  const [fillRatesLoading, setFillRatesLoading] = useState(false);
+
+  const fetchFillRates = useCallback(async () => {
+    if (!id) return;
+    setFillRatesLoading(true);
+    try {
+      const res = await fetch(`${BASE}/api/scrape/universities/${id}/field-fill-rates`);
+      if (!res.ok) return;
+      const data: FillRatesResult = await res.json();
+      setFillRates(data);
+    } catch { /* silent */ } finally {
+      setFillRatesLoading(false);
+    }
+  }, [id]);
+
   const fetchProbeResult = useCallback(async () => {
     if (!id) return;
     try {
@@ -1852,6 +1878,148 @@ export default function UniversityDetail() {
           {probeResult.probe_updated_at && (
             <div className="text-xs text-muted-foreground text-right">
               Last probed: {new Date(probeResult.probe_updated_at).toLocaleString()}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Extraction Rules Card (Phase 2) ─────────────────────────────── */}
+      {probeResult?.auto_config &&
+        typeof probeResult.auto_config === "object" &&
+        probeResult.auto_config.extraction_rules &&
+        typeof probeResult.auto_config.extraction_rules === "object" && (
+        <div className="rounded-lg border border-violet-200 bg-violet-50 p-4 text-sm space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 font-semibold text-violet-800">
+              <Zap className="h-4 w-4 text-violet-600" />
+              AI Extraction Rules
+              <span className="text-[10px] bg-violet-100 border border-violet-300 text-violet-600 px-1.5 py-0.5 rounded font-mono">
+                Phase 2
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-6 px-2 text-xs border-violet-300 text-violet-700 hover:bg-violet-100"
+                onClick={() => {
+                  if (!rulesCardOpen) void fetchFillRates();
+                  setRulesCardOpen(v => !v);
+                }}
+              >
+                {rulesCardOpen ? "Hide" : "Show"} Details
+              </Button>
+            </div>
+          </div>
+
+          {/* Summary pill row */}
+          <div className="flex flex-wrap gap-2">
+            {Object.entries(
+              probeResult.auto_config.extraction_rules as Record<string, Record<string, unknown>>
+            ).map(([field, rule]) => {
+              const ruleType = rule.css ? "css" : rule.xpath ? "xpath" : rule.regex ? "regex" : "?";
+              const conf = typeof rule.confidence === "number" ? Math.round(rule.confidence * 100) : null;
+              return (
+                <span
+                  key={field}
+                  title={`${ruleType}: ${rule.css || rule.xpath || rule.regex || "—"}\nConfidence: ${conf ?? "?"}%`}
+                  className="inline-flex items-center gap-1 bg-white border border-violet-200 text-violet-700 text-xs px-2 py-0.5 rounded-full font-medium cursor-default"
+                >
+                  {field.replace(/_/g, " ")}
+                  <span className={`ml-0.5 text-[9px] px-1 rounded font-mono ${
+                    ruleType === "css" ? "bg-emerald-100 text-emerald-700" :
+                    ruleType === "xpath" ? "bg-blue-100 text-blue-700" :
+                    "bg-amber-100 text-amber-700"
+                  }`}>{ruleType}</span>
+                </span>
+              );
+            })}
+          </div>
+
+          {/* Expanded detail: fill rates */}
+          {rulesCardOpen && (
+            <div className="space-y-2">
+              {fillRatesLoading && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <RefreshCw className="h-3 w-3 animate-spin" /> Loading fill rates…
+                </div>
+              )}
+              {fillRates && !fillRatesLoading && (
+                <div className="space-y-1.5">
+                  {fillRates.message && !fillRates.job_id && (
+                    <div className="text-xs text-muted-foreground italic">{fillRates.message}</div>
+                  )}
+                  {fillRates.job_id && (
+                    <>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-semibold text-violet-800">
+                          Field Fill Rates — last scrape
+                        </span>
+                        <span className={`text-xs font-bold ${
+                          fillRates.overall_avg >= 0.85 ? "text-emerald-600" :
+                          fillRates.overall_avg >= 0.70 ? "text-amber-600" : "text-red-600"
+                        }`}>
+                          avg {Math.round(fillRates.overall_avg * 100)}%
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-1.5">
+                        {Object.entries(fillRates.fill_rates).map(([field, fr]) => {
+                          const pct = Math.round(fr.rate * 100);
+                          const isFailing = fillRates.failing_fields.includes(field);
+                          const hasRule = !!(
+                            probeResult?.auto_config?.extraction_rules &&
+                            (probeResult.auto_config.extraction_rules as Record<string, unknown>)[field]
+                          );
+                          return (
+                            <div
+                              key={field}
+                              className={`bg-white rounded border px-2 py-1.5 ${
+                                isFailing ? "border-red-200" : "border-violet-100"
+                              }`}
+                            >
+                              <div className="flex items-center justify-between gap-1">
+                                <span className="text-[10px] text-muted-foreground truncate flex-1">
+                                  {field.replace(/_/g, " ")}
+                                </span>
+                                <div className="flex items-center gap-1 shrink-0">
+                                  {hasRule && (
+                                    <span className="text-[9px] bg-violet-100 text-violet-600 px-1 rounded">rule</span>
+                                  )}
+                                  {isFailing
+                                    ? <AlertTriangle className="h-3 w-3 text-red-500" />
+                                    : <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+                                  }
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-1 mt-0.5">
+                                <div className="flex-1 bg-gray-100 rounded-full h-1.5">
+                                  <div
+                                    className={`h-1.5 rounded-full ${
+                                      pct >= 85 ? "bg-emerald-500" :
+                                      pct >= 50 ? "bg-amber-400" : "bg-red-400"
+                                    }`}
+                                    style={{ width: `${pct}%` }}
+                                  />
+                                </div>
+                                <span className={`text-[10px] font-semibold w-7 text-right ${
+                                  pct >= 85 ? "text-emerald-600" :
+                                  pct >= 50 ? "text-amber-600" : "text-red-600"
+                                }`}>{pct}%</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      {fillRates.failing_fields.length > 0 && (
+                        <div className="text-xs text-red-600 mt-1">
+                          <AlertTriangle className="inline h-3 w-3 mr-1" />
+                          {fillRates.failing_fields.length} field(s) below 50% — CASCADE will dispatch extractor repair on next scrape.
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>

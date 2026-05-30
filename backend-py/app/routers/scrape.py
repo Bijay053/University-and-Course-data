@@ -2677,3 +2677,138 @@ async def repair_start(
         "rejectedForeignIds": rejected,
         "message": f"Repair scrape queued for {len(targets)} course(s).",
     }
+
+
+# ─── Phase 2: per-field fill-rate API ────────────────────────────────────────
+
+@router.get("/universities/{university_id}/field-fill-rates")
+async def get_university_field_fill_rates(
+    university_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> dict:
+    """Fill rates for the most-recently-completed scrape of a university.
+
+    Convenience wrapper over the per-job endpoint — finds the latest completed
+    ``scrape_runtime_jobs`` row for this university and delegates to the same
+    aggregation logic.  The frontend can call this without tracking a job ID.
+    """
+    from sqlalchemy import select as _sel, desc as _desc
+    from app.models import ScrapeRuntimeJob
+
+    latest_job = (await db.execute(
+        _sel(ScrapeRuntimeJob)
+        .where(
+            ScrapeRuntimeJob.university_id == university_id,
+            ScrapeRuntimeJob.status == "completed",
+            ScrapeRuntimeJob.job_type == "scrape",
+        )
+        .order_by(_desc(ScrapeRuntimeJob.completed_at))
+        .limit(1)
+    )).scalar_one_or_none()
+
+    if latest_job is None:
+        return {
+            "job_id": None,
+            "university_id": university_id,
+            "fill_rates": {},
+            "overall_avg": 0.0,
+            "failing_fields": [],
+            "message": "No completed scrape jobs found",
+        }
+
+    # Delegate to the per-job aggregation (defined below)
+    return await get_field_fill_rates(latest_job.runtime_job_id, db)
+
+
+@router.get("/scraping-jobs/{job_id}/field-fill-rates")
+async def get_field_fill_rates(
+    job_id: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> dict:
+    """Return per-field fill rates for a completed scrape run.
+
+    Response shape::
+
+        {
+          "job_id": "...",
+          "university_id": 42,
+          "fill_rates": {
+            "course_name":       {"filled": 94, "total": 94, "rate": 1.0},
+            "international_fee": {"filled": 51, "total": 94, "rate": 0.54},
+            ...
+          },
+          "overall_avg": 0.73,
+          "failing_fields": ["international_fee", "academic_score"]
+        }
+
+    Used by the frontend Extraction Rules card and by the repair_extractor Celery task.
+    """
+    from sqlalchemy import select as _sel, func as _func, case as _case
+    from app.models.evidence import ScrapedFieldEvidence
+    from app.models import ScrapedCourse, ScrapeRuntimeJob
+
+    job = await db.get(ScrapeRuntimeJob, job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Scrape job not found")
+
+    # Aggregate selected evidence rows for this run
+    _REVIEW_FIELDS = [
+        "course_name", "degree_level", "category", "study_mode",
+        "course_location", "duration", "intake_months",
+        "international_fee", "description", "academic_level",
+        "academic_score", "english_test", "other_requirement",
+    ]
+
+    # Count scraped_courses for this job first
+    total_courses_row = (await db.execute(
+        _sel(_func.count()).where(ScrapedCourse.scrape_job_id == job_id)
+    )).scalar() or 0
+
+    if total_courses_row == 0:
+        return {
+            "job_id": job_id,
+            "university_id": job.university_id,
+            "fill_rates": {},
+            "overall_avg": 0.0,
+            "failing_fields": [],
+        }
+
+    # Per-field fill counts via ScrapedFieldEvidence.selected=True
+    rows = (await db.execute(
+        _sel(
+            ScrapedFieldEvidence.field_key,
+            _func.count(ScrapedFieldEvidence.id).label("filled"),
+        )
+        .join(ScrapedCourse, ScrapedFieldEvidence.scraped_course_id == ScrapedCourse.id)
+        .where(
+            ScrapedCourse.scrape_job_id == job_id,
+            ScrapedFieldEvidence.selected.is_(True),
+            ScrapedFieldEvidence.field_key.in_(_REVIEW_FIELDS),
+        )
+        .group_by(ScrapedFieldEvidence.field_key)
+    )).all()
+
+    field_filled: dict[str, int] = {r.field_key: r.filled for r in rows}
+    fill_rates: dict[str, dict] = {}
+    for field in _REVIEW_FIELDS:
+        filled = field_filled.get(field, 0)
+        rate = round(filled / total_courses_row, 3) if total_courses_row else 0.0
+        fill_rates[field] = {
+            "filled": filled,
+            "total": total_courses_row,
+            "rate": rate,
+        }
+
+    overall_avg = round(
+        sum(v["rate"] for v in fill_rates.values()) / len(fill_rates), 3
+    ) if fill_rates else 0.0
+
+    failing = [f for f, v in fill_rates.items() if v["rate"] < 0.50]
+
+    return {
+        "job_id": job_id,
+        "university_id": job.university_id,
+        "fill_rates": fill_rates,
+        "overall_avg": overall_avg,
+        "failing_fields": failing,
+    }

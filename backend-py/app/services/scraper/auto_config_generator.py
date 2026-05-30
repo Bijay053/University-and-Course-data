@@ -169,6 +169,20 @@ async def generate_config(
             config.setdefault("discovery", {})["allow_url_patterns"] = patterns
             log.info("[AUTO_CONFIG] derived allow_url_patterns: %s", patterns)
 
+    # ── Phase 2: generate per-field extraction rules from sample HTML ────────
+    # Asks Gemini to produce CSS/XPath/regex rules for each review field.
+    # Stored under auto_config["extraction_rules"] — applied as Stage 0
+    # inside extract_course() BEFORE any regex heuristics or per-course Gemini.
+    # This is how per-course Gemini cost drops to zero for well-configured sites.
+    if sample_html:
+        try:
+            from app.services.scraper.ai_extractor_gen import generate_and_store_rules
+            config = await generate_and_store_rules(profile, sample_html, config)
+        except Exception as _gen_exc:
+            log.warning(
+                "[AUTO_CONFIG] extraction rule generation failed (non-fatal): %s", _gen_exc
+            )
+
     return config
 
 

@@ -844,6 +844,113 @@ def probe_and_configure(  # noqa: ANN001
         return {"ok": False, "university_id": university_id, "error": str(exc)}
 
 
+@celery_app.task(name="scrape.repair_extractor", bind=True, max_retries=1)
+def repair_extractor(
+    self,
+    university_id: int,
+    *,
+    scrape_run_id: str | None = None,
+    triggered_by: str = "manual",
+) -> dict:  # type: ignore[override]
+    """Celery task — Phase 2 autonomous extraction repair.
+
+    Called by CASCADE when staged ≥ 5 but avg completeness < 70 %.
+    Computes per-field fill rates from the failed scrape run, identifies
+    the worst-performing fields, uses Gemini to regenerate CSS/XPath/regex
+    rules for those fields, persists repaired rules into ``auto_config``,
+    and re-queues a fresh scrape for the university.
+
+    Idempotent: re-running after a successful repair just sees ≥ 70 % fill
+    rates and returns ``{"ok": True, "fields_repaired": 0, "rescraped": False}``.
+    """
+    async def _run() -> dict:
+        from app.services.scraper.ai_extractor_repair import (
+            compute_field_fill_rates,
+            identify_failing_fields,
+            fetch_repair_samples,
+            repair_extraction_rules,
+            apply_repaired_rules_to_db,
+        )
+        from app.database import AsyncSessionLocal
+
+        async with AsyncSessionLocal() as db:
+            log.info(
+                "[repair_extractor] starting for uni_id=%s run=%s triggered_by=%r",
+                university_id, scrape_run_id, triggered_by,
+            )
+
+            # 1. Compute per-field fill rates for this run
+            # Signature: compute_field_fill_rates(scrape_run_id, db)
+            fill_rates = await compute_field_fill_rates(
+                scrape_run_id, db
+            )
+
+            # 2. Find fields < 50 % fill
+            failing = identify_failing_fields(fill_rates, threshold=0.50)
+            log.info(
+                "[repair_extractor] uni_id=%s failing fields (%d): %s",
+                university_id, len(failing), failing,
+            )
+            if not failing:
+                log.info(
+                    "[repair_extractor] no failing fields — skipping repair for uni_id=%s",
+                    university_id,
+                )
+                return {"ok": True, "fields_repaired": 0, "rescraped": False}
+
+            # 3. Fetch sample HTML pages from recent scraped_courses rows
+            # Signature: fetch_repair_samples(scrape_run_id, db, n=3)
+            samples = await fetch_repair_samples(
+                scrape_run_id, db, n=5
+            )
+            if not samples:
+                log.warning(
+                    "[repair_extractor] no sample pages available for uni_id=%s — cannot repair",
+                    university_id,
+                )
+                return {"ok": False, "reason": "no_samples", "fields_repaired": 0}
+
+            # 4. Ask Gemini to regenerate rules for each failing field
+            new_rules = await repair_extraction_rules(
+                failing_fields=failing, sample_pages=samples
+            )
+
+            # 5. Persist repaired rules into auto_config in the DB
+            applied = await apply_repaired_rules_to_db(
+                db, university_id, new_rules
+            )
+            log.info(
+                "[repair_extractor] uni_id=%s applied %d repaired rules: %s",
+                university_id, applied, list(new_rules.keys()),
+            )
+
+            # 6. Queue a fresh scrape so the repaired rules are exercised
+            try:
+                from app.tasks.scrape_tasks import run_scrape as _scrape_task
+                _scrape_task.delay(university_id, triggered_by="repair_extractor")
+                rescraped = True
+            except Exception as _qs_exc:
+                log.warning(
+                    "[repair_extractor] could not queue rescrape for uni_id=%s: %s",
+                    university_id, _qs_exc,
+                )
+                rescraped = False
+
+            return {
+                "ok": True,
+                "fields_repaired": applied,
+                "fields": list(new_rules.keys()),
+                "rescraped": rescraped,
+            }
+
+    _sync_dispose()
+    try:
+        return asyncio.run(_run())
+    except Exception as exc:
+        log.exception("repair_extractor failed for uni_id=%s: %s", university_id, exc)
+        raise self.retry(exc=exc, countdown=120)
+
+
 @celery_app.task(name="scrape.refresh_baselines", bind=True, max_retries=0)
 def refresh_baselines_weekly(self) -> dict:  # type: ignore[override]
     """Celery beat task — recompute fill-rate baselines from the trailing 30 days.

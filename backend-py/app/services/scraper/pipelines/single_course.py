@@ -1142,6 +1142,7 @@ async def extract_course(
     emit=None,
     vision_image_cache: "VisionImageCache | None" = None,
     central_data: dict[str, Any] | None = None,
+    extraction_rules: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Fetch (if needed) and run all extractors. Returns merged payload + raw evidence.
 
@@ -1859,6 +1860,55 @@ async def extract_course(
                 return {"url": url, "payload": payload, "evidence": evidence}
     except Exception as exc:  # noqa: BLE001 — never abort extraction
         log.warning("broken-cms-page check errored on %s: %s", url, exc)
+
+    # ── Stage 0: AI-generated extraction rules (Phase 2 autonomous pipeline) ──
+    # If probe_and_configure produced CSS/XPath/regex rules for this site, apply
+    # them FIRST — before any regex heuristic and before any per-course Gemini
+    # call.  When rules cover ≥ 85% of review fields, Gemini is skipped entirely
+    # for this course (per should_skip_gemini() below), reducing per-course cost
+    # to zero.  Results written with method "ai_rule:css/xpath/regex" so the
+    # Evidence panel tracks provenance correctly.
+    _stage0_covered: set[str] = set()
+    if extraction_rules:
+        try:
+            from app.services.scraper.ai_extractor_run import (
+                apply_extraction_rules as _apply_rules,
+                should_skip_gemini as _skip_gemini_check,
+            )
+            _stage0_results = _apply_rules(html or "", extraction_rules)
+            for _s0_field, (_s0_value, _s0_method) in _stage0_results.items():
+                if _s0_value is not None and _s0_field not in payload:
+                    payload[_s0_field] = _s0_value
+                    _stage0_covered.add(_s0_field)
+                    evidence.append({
+                        "field_key": _s0_field,
+                        "candidate_value": _s0_value,
+                        "extraction_method": _s0_method,
+                        "confidence": 0.80,
+                        "snippet": f"{_s0_method}: {_s0_value}",
+                        "source_url": url,
+                        "selected": True,
+                        "decision_status": "selected",
+                    })
+            if _stage0_covered:
+                log.debug(
+                    "[STAGE0] AI rules filled %d fields: %s",
+                    len(_stage0_covered), sorted(_stage0_covered),
+                )
+            # Check if coverage is high enough to skip per-course Gemini
+            _REVIEW_FIELDS_13 = [
+                "course_name", "degree_level", "category", "study_mode",
+                "course_location", "duration", "intake_months",
+                "international_fee", "description", "academic_level",
+                "academic_score", "english_test", "other_requirement",
+            ]
+            if _skip_gemini_check(_stage0_results, _REVIEW_FIELDS_13):
+                use_ai_fallback = False
+                log.info(
+                    "[STAGE0] Rule coverage ≥ 85%% — Gemini disabled for %s", url
+                )
+        except Exception as _s0_exc:
+            log.debug("[STAGE0] Rule application failed (non-fatal): %s", _s0_exc)
 
     # ── CSU pre-seed: runs BEFORE _EXTRACTORS ────────────────────────────────
     # CSU pages embed all course data as inline JS (fees, ocb_metadata,
