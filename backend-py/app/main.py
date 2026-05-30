@@ -19,6 +19,7 @@ from app.routers import (
     acronyms,
     assessment_notes,
     auth,
+    changes,
     courses,
     dashboard,
     health,
@@ -99,3 +100,4 @@ app.include_router(users.router, prefix="/api", tags=["users"])
 app.include_router(performance.router, prefix="/api/performance", tags=["performance"])
 app.include_router(locations.router, prefix="/api", tags=["locations"])
 app.include_router(verification.router, prefix="/api", tags=["verification"])
+app.include_router(changes.router, prefix="/api", tags=["changes"])

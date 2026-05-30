@@ -2820,6 +2820,21 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     runtime_job_id, _cr_exc,
                 )
 
+            # ── Phase 10: Change Detection — snapshot then diff ───────────
+            # Snapshot the staged courses for this run, then compare against
+            # the previous snapshot for the same university to emit
+            # course_change_events rows. Both calls are soft-fail.
+            try:
+                from app.services.scraper.change_snapshot import take_snapshot as _take_snap
+                from app.services.scraper.change_detector import detect_changes as _detect_chg
+                _n_snaps = await _take_snap(uni_id, runtime_job_id, db)
+                log.info("[CHANGE_DETECT] uni=%s run=%s: %d snapshots taken", uni_id, runtime_job_id, _n_snaps)
+                if _n_snaps > 0:
+                    _n_events = await _detect_chg(uni_id, runtime_job_id, db)
+                    log.info("[CHANGE_DETECT] uni=%s run=%s: %d change events", uni_id, runtime_job_id, _n_events)
+            except Exception as _cd_exc:  # noqa: BLE001
+                log.warning("[CHANGE_DETECT] hook failed for run %s: %s", runtime_job_id, _cd_exc)
+
             # ── Phase 4B: promote XHR-discovered API field mapping ─────────
             # If this job used an auto-discovered REST/ES/GraphQL API type
             # (stored as _api_type in auto_config), and the job staged enough

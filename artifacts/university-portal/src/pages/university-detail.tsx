@@ -17,6 +17,7 @@ import {
   BookOpen, Languages, GraduationCap, Award, ExternalLink,
   Database, CheckCircle2, Clock, Trash2, Pencil, Upload, RefreshCw, GitMerge,
   ChevronsUpDown, Check, AlertTriangle, ClipboardList, Plus, Star, Wrench, Loader2, XCircle, Zap,
+  GitCompareArrows,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -481,6 +482,53 @@ export default function UniversityDetail() {
   }, [id]);
 
   useEffect(() => { void fetchVerifSummary(); }, [fetchVerifSummary]);
+
+  // ── Phase 10: Change Detection panel ──────────────────────────────────────
+  type ChangeEvent = {
+    id: number;
+    course_name: string;
+    field_name: string;
+    old_value: string | null;
+    new_value: string | null;
+    change_type: "new_course" | "removed_course" | "field_change";
+    severity: "critical" | "major" | "minor" | "info";
+    confidence_before: number | null;
+    confidence_after: number | null;
+    detected_at: string;
+    status: "new" | "acknowledged" | "resolved";
+    scrape_job_id: string;
+  };
+  type ChangeSummary = {
+    total: number; critical: number; major: number; minor: number; info: number;
+    new_courses: number; removed_courses: number; field_changes: number;
+  };
+  const [changeData, setChangeData] = useState<{ summary: ChangeSummary; events: ChangeEvent[] } | null>(null);
+  const [changeCardOpen, setChangeCardOpen] = useState(false);
+  const [changeSeverityFilter, setChangeSeverityFilter] = useState<string>("all");
+
+  const fetchChangeData = useCallback(async () => {
+    if (!id) return;
+    try {
+      const res = await fetch(`${BASE}/api/universities/${id}/changes?limit=50`);
+      if (!res.ok) return;
+      const data = await res.json();
+      setChangeData(data);
+      if (data.summary.total > 0) setChangeCardOpen(true);
+    } catch { /* silent */ }
+  }, [id]);
+
+  const acknowledgeChange = useCallback(async (eventId: number) => {
+    try {
+      await fetch(`${BASE}/api/changes/${eventId}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "acknowledged" }),
+      });
+      void fetchChangeData();
+    } catch { /* silent */ }
+  }, [fetchChangeData]);
+
+  useEffect(() => { void fetchChangeData(); }, [fetchChangeData]);
 
   // ── Phase 2: Extraction Rules card ────────────────────────────────────────
   const [rulesCardOpen, setRulesCardOpen] = useState(false);
@@ -2235,6 +2283,155 @@ export default function UniversityDetail() {
                   </p>
                 </div>
               )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Change Detection Panel (Phase 10) ───────────────────────────── */}
+      {changeData && changeData.summary.total > 0 && (
+        <div className="rounded-lg border border-orange-200 bg-orange-50 p-4 text-sm space-y-3">
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 font-semibold text-orange-800">
+              <GitCompareArrows className="h-4 w-4 text-orange-600" />
+              Change Detection
+              <span className="text-[10px] bg-orange-100 border border-orange-300 text-orange-600 px-1.5 py-0.5 rounded font-mono">Phase 10</span>
+              {changeData.summary.critical > 0 && (
+                <span className="text-[10px] bg-red-100 border border-red-300 text-red-600 px-1.5 py-0.5 rounded font-semibold animate-pulse">
+                  {changeData.summary.critical} CRITICAL
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm" variant="outline"
+                className="h-6 px-2 text-xs border-orange-300 text-orange-700 hover:bg-orange-100"
+                onClick={() => { void fetchChangeData(); }}
+              >
+                <RefreshCw className="h-3 w-3 mr-1" /> Refresh
+              </Button>
+              <Button
+                size="sm" variant="outline"
+                className="h-6 px-2 text-xs border-orange-300 text-orange-700 hover:bg-orange-100"
+                onClick={() => setChangeCardOpen(v => !v)}
+              >
+                {changeCardOpen ? "Hide" : "Show"} Details
+              </Button>
+            </div>
+          </div>
+
+          {/* Summary pills */}
+          <div className="flex flex-wrap gap-2">
+            {[
+              { label: "Total", value: changeData.summary.total, cls: "bg-orange-100 text-orange-700 border-orange-200" },
+              { label: "Critical", value: changeData.summary.critical, cls: changeData.summary.critical > 0 ? "bg-red-100 text-red-700 border-red-200 font-bold" : "bg-gray-100 text-gray-500 border-gray-200" },
+              { label: "Major", value: changeData.summary.major, cls: "bg-amber-100 text-amber-700 border-amber-200" },
+              { label: "Minor", value: changeData.summary.minor, cls: "bg-yellow-100 text-yellow-700 border-yellow-200" },
+              { label: "New Courses", value: changeData.summary.new_courses, cls: "bg-emerald-100 text-emerald-700 border-emerald-200" },
+              { label: "Removed", value: changeData.summary.removed_courses, cls: changeData.summary.removed_courses > 0 ? "bg-red-100 text-red-700 border-red-200" : "bg-gray-100 text-gray-500 border-gray-200" },
+              { label: "Field Changes", value: changeData.summary.field_changes, cls: "bg-sky-100 text-sky-700 border-sky-200" },
+            ].map(({ label, value, cls }) => (
+              <span key={label} className={`inline-flex items-center gap-1 border text-xs px-2 py-0.5 rounded-full font-medium ${cls}`}>
+                {label}: <span className="font-bold">{value}</span>
+              </span>
+            ))}
+          </div>
+
+          {/* Severity filter + event list */}
+          {changeCardOpen && (
+            <div className="space-y-2">
+              {/* Filter bar */}
+              <div className="flex flex-wrap gap-1">
+                {["all", "critical", "major", "minor", "info"].map(sev => (
+                  <button
+                    key={sev}
+                    onClick={() => setChangeSeverityFilter(sev)}
+                    className={`text-[10px] px-2 py-0.5 rounded border font-medium transition-colors ${
+                      changeSeverityFilter === sev
+                        ? "bg-orange-600 text-white border-orange-600"
+                        : "bg-white text-orange-700 border-orange-300 hover:bg-orange-100"
+                    }`}
+                  >
+                    {sev === "all" ? "All" : sev.charAt(0).toUpperCase() + sev.slice(1)}
+                  </button>
+                ))}
+              </div>
+
+              {/* Event rows */}
+              <div className="space-y-1.5 max-h-80 overflow-y-auto pr-1">
+                {changeData.events
+                  .filter(e => changeSeverityFilter === "all" || e.severity === changeSeverityFilter)
+                  .slice(0, 30)
+                  .map(evt => {
+                    const sevCls = {
+                      critical: "border-l-red-500 bg-red-50",
+                      major:    "border-l-amber-500 bg-amber-50",
+                      minor:    "border-l-yellow-400 bg-yellow-50",
+                      info:     "border-l-sky-400 bg-sky-50",
+                    }[evt.severity] ?? "border-l-gray-300 bg-white";
+                    const sevBadge = {
+                      critical: "bg-red-100 text-red-700",
+                      major:    "bg-amber-100 text-amber-700",
+                      minor:    "bg-yellow-100 text-yellow-700",
+                      info:     "bg-sky-100 text-sky-700",
+                    }[evt.severity] ?? "bg-gray-100 text-gray-600";
+                    const typeBadge = {
+                      new_course:     "bg-emerald-100 text-emerald-700",
+                      removed_course: "bg-red-100 text-red-700",
+                      field_change:   "bg-sky-100 text-sky-700",
+                    }[evt.change_type] ?? "bg-gray-100 text-gray-600";
+                    const typeLabel = {
+                      new_course: "+ New",
+                      removed_course: "− Removed",
+                      field_change: "~ Changed",
+                    }[evt.change_type] ?? evt.change_type;
+
+                    return (
+                      <div key={evt.id} className={`border-l-4 rounded-r px-2.5 py-1.5 ${sevCls} ${evt.status === "acknowledged" ? "opacity-60" : ""}`}>
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1 flex-wrap">
+                              <span className={`text-[9px] px-1 py-0.5 rounded font-semibold ${sevBadge}`}>{evt.severity}</span>
+                              <span className={`text-[9px] px-1 py-0.5 rounded font-semibold ${typeBadge}`}>{typeLabel}</span>
+                              <span className="text-[10px] font-medium text-gray-800 truncate max-w-[200px]" title={evt.course_name}>{evt.course_name}</span>
+                              {evt.change_type === "field_change" && (
+                                <span className="text-[9px] text-muted-foreground font-mono">• {evt.field_name.replace(/_/g, " ")}</span>
+                              )}
+                            </div>
+                            {evt.change_type === "field_change" && (
+                              <div className="mt-0.5 flex items-center gap-1 text-[9px] font-mono">
+                                {evt.old_value && <span className="text-red-600 line-through truncate max-w-[120px]" title={evt.old_value}>{evt.old_value}</span>}
+                                {evt.old_value && evt.new_value && <span className="text-gray-400">→</span>}
+                                {evt.new_value && <span className="text-emerald-700 truncate max-w-[120px]" title={evt.new_value}>{evt.new_value}</span>}
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <span className="text-[9px] text-muted-foreground whitespace-nowrap">
+                              {new Date(evt.detected_at).toLocaleDateString()}
+                            </span>
+                            {evt.status === "new" && (
+                              <button
+                                onClick={() => acknowledgeChange(evt.id)}
+                                className="text-[9px] px-1.5 py-0.5 rounded border border-orange-300 text-orange-700 hover:bg-orange-100 whitespace-nowrap"
+                                title="Acknowledge this change"
+                              >
+                                ACK
+                              </button>
+                            )}
+                            {evt.status === "acknowledged" && (
+                              <span className="text-[9px] text-gray-400">acked</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                {changeData.events.filter(e => changeSeverityFilter === "all" || e.severity === changeSeverityFilter).length === 0 && (
+                  <p className="text-xs text-muted-foreground italic">No changes match this filter.</p>
+                )}
+              </div>
             </div>
           )}
         </div>

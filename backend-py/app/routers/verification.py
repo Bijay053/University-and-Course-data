@@ -15,7 +15,7 @@ import logging
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import case, func, select
+from sqlalchemy import case, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies import get_current_user, get_db
