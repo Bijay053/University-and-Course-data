@@ -358,6 +358,36 @@ def should_stage_course(
     just before the DB write in ``stage_course``) so Bug B and C have settled
     payloads to inspect.
     """
+    # ── Online-filter opt-out: resolve ONCE before any online-related check ──
+    # Distance-education-heavy universities (e.g. CSU, OUA) set
+    # ``extraction.filters.online_only.enabled: false`` in their per-uni YAML.
+    # We must compute this BEFORE the URL-slug "-online" check below AND before
+    # the study_mode check further down, so that both checks honour the override.
+    # Fail-safe: if the config is missing/broken we keep the historical reject.
+    try:
+        from app.services.scraper.config.context import (  # noqa: PLC0415
+            get_uni_config as _get_uni_config,
+        )
+        _oc_cfg = _get_uni_config()
+        if (
+            _oc_cfg is None
+            or _oc_cfg.extraction is None
+            or _oc_cfg.extraction.filters is None
+            or _oc_cfg.extraction.filters.online_only is None
+        ):
+            _online_filter_enabled = True
+        else:
+            _online_filter_enabled = bool(
+                _oc_cfg.extraction.filters.online_only.enabled
+            )
+    except Exception:  # noqa: BLE001 — never crash on config lookup
+        log.warning(
+            "online_only YAML lookup raised; falling back to historical "
+            "reject behaviour",
+            exc_info=True,
+        )
+        _online_filter_enabled = True  # fail safe: keep historical behaviour
+
     # URL-based category-page rejection — runs FIRST so that pages whose
     # title accidentally gains a degree-level prefix (e.g. "MBA – Two
     # Specialisations" from the MBA title extractor) are still rejected.
@@ -371,17 +401,24 @@ def should_stage_course(
         # URL-slug online detection: if the last path segment ends with
         # "-online" the university explicitly published this as an online-only
         # course (e.g. /course/graduate-certificate-in-business-administration-online).
-        # This is more reliable than study_mode detection when the page also
-        # shows the university's global campus list in the footer, which can
-        # incorrectly set study_mode to "On Campus" via location-derivation.
+        # Gated on _online_filter_enabled so that per-uni YAML overrides
+        # (online_only.enabled: false) are respected here too.
         _slug = _url_path.rstrip("/").rsplit("/", 1)[-1]
         if _slug.endswith("-online"):
+            if _online_filter_enabled:
+                log.info(
+                    "[REJECT CHECK] course=%r url_slug=%r "
+                    "decision=reject (url_slug_online) yaml_override=none",
+                    payload.get("course_name") or course_name,
+                    _slug,
+                )
+                return (False, "online_only")
             log.info(
-                "[REJECT CHECK] course=%r url_slug=%r decision=reject (url_slug_online)",
+                "[ONLINE-OK] course=%r url_slug=%r — accepted "
+                "(per-uni online_only filter disabled, url_slug_online suppressed)",
                 payload.get("course_name") or course_name,
                 _slug,
             )
-            return (False, "online_only")
 
     # Bug A: reject pages whose extracted title has no degree-level qualifier.
     # Prefer payload["course_name"] (from H1 via course_name extractor) over
@@ -405,6 +442,7 @@ def should_stage_course(
     # text does NOT mean the course is available on campus.
     # Courses that are genuinely mixed-mode have study_mode = "Blended" or
     # "On Campus, Online" and pass through because they contain campus keywords.
+    # _online_filter_enabled was computed above — reuse it here.
     _study_mode = (payload.get("study_mode") or "").strip().lower()
     _has_campus_component = any(
         kw in _study_mode
@@ -419,46 +457,11 @@ def should_stage_course(
     ).strip()
 
     if "online" in _study_mode and not _has_campus_component:
-        # Per-uni opt-out: distance-education-heavy universities (e.g. CSU,
-        # Open Universities Australia) legitimately publish many bachelors
-        # and masters as 100% online for international students.  When the
-        # uni's YAML sets ``extraction.filters.online_only.enabled: false``
-        # (the global default) we keep the row.  When set to true (the
-        # historical hard-coded behaviour) we reject as before.
-        try:
-            from app.services.scraper.config.context import (  # noqa: PLC0415
-                get_uni_config,
-            )
-            _uni_cfg = get_uni_config()
-            # Fail-safe: any missing layer (no context, no extraction block,
-            # no filters block, no online_only block) keeps the historical
-            # hard-coded reject.  Only an explicit ``enabled: false`` in the
-            # uni's loaded YAML can opt out — partial / hand-built UniConfig
-            # objects (e.g. test code, future migrations) cannot accidentally
-            # disable the gate.
-            if (
-                _uni_cfg is None
-                or _uni_cfg.extraction is None
-                or _uni_cfg.extraction.filters is None
-                or _uni_cfg.extraction.filters.online_only is None
-            ):
-                _online_filter_enabled = True
-            else:
-                _online_filter_enabled = bool(
-                    _uni_cfg.extraction.filters.online_only.enabled
-                )
-        except Exception:  # noqa: BLE001 — never crash on config lookup
-            log.warning(
-                "online_only YAML lookup raised; falling back to historical "
-                "reject behaviour",
-                exc_info=True,
-            )
-            _online_filter_enabled = True  # fail safe: keep historical behaviour
-
         if _online_filter_enabled:
             log.info(
                 "[REJECT CHECK] course=%r detected_modes=[%s] detected_locations=[%s] "
-                "decision=reject (online_only — study_mode is authoritative)",
+                "decision=reject (online_only — study_mode is authoritative) "
+                "yaml_override=none",
                 effective_name,
                 payload.get("study_mode", "Online"),
                 _physical_location or "none",

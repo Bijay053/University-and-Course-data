@@ -47,6 +47,16 @@ _TLD_TOKENS: frozenset[str] = frozenset(
     {"edu", "ac", "com", "net", "org", "gov", "au", "nz", "uk", "us", "ca"}
 )
 
+# Generic subdomain prefixes that do NOT represent an institution name.
+# These are stripped before picking the slug token so that e.g.
+# ``study.csu.edu.au`` → ``csu`` and ``courses.hud.ac.uk`` → ``hud``.
+_GENERIC_SUBDOMAINS: frozenset[str] = frozenset({
+    "www", "study", "international", "courses", "handbook",
+    "programs", "programsandcourses", "apply", "admissions",
+    "portal", "student", "students", "my", "secure", "web",
+    "info", "find", "explore", "future", "search",
+})
+
 # Keys injected by auto_config_generator that are metadata, not config fields.
 # Strip these before merging into UniConfig to avoid Pydantic validation errors.
 _AUTO_CONFIG_META_KEYS: frozenset[str] = frozenset(
@@ -58,6 +68,9 @@ _AUTO_CONFIG_META_KEYS: frozenset[str] = frozenset(
 def _hostname_to_slug(hostname: str) -> str:
     """Derive a short slug from a hostname.
 
+    Strips leading generic subdomain prefixes (www, study, international, …)
+    then returns the first label that is not a TLD token.
+
     >>> _hostname_to_slug("www.acu.edu.au")
     'acu'
     >>> _hostname_to_slug("www.aut.ac.nz")
@@ -66,9 +79,17 @@ def _hostname_to_slug(hostname: str) -> str:
     'bond'
     >>> _hostname_to_slug("www.uow.edu.au")
     'uow'
+    >>> _hostname_to_slug("study.csu.edu.au")
+    'csu'
+    >>> _hostname_to_slug("courses.hud.ac.uk")
+    'hud'
+    >>> _hostname_to_slug("international.uts.edu.au")
+    'uts'
     """
-    h = hostname.lower().removeprefix("www.")
-    parts = h.split(".")
+    parts = hostname.lower().split(".")
+    # Strip leading generic subdomain labels (keep at least 2 parts).
+    while len(parts) > 2 and parts[0] in _GENERIC_SUBDOMAINS:
+        parts = parts[1:]
     for part in parts:
         if part not in _TLD_TOKENS:
             return part

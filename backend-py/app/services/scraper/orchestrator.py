@@ -2295,6 +2295,28 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 if _clean_cn != _raw_cn:
                     payload["course_name"] = _clean_cn
 
+            # ── CSU name typo correction ──────────────────────────────────
+            # CSU's website HTML occasionally contains misspellings in link
+            # text and H1 elements that slip past the HTML extractor.
+            # Fix known typos for CSU (university_id=207) only so the
+            # correction is scoped and doesn't affect other unis.
+            if uni_id == 207:
+                _cn_now = (payload.get("course_name") or "").strip()
+                _cn_fixed = (
+                    _cn_now
+                    .replace("Busness", "Business")
+                    .replace("busness", "business")
+                    .replace("Proffessional", "Professional")
+                    .replace("proffessional", "professional")
+                )
+                if _cn_fixed != _cn_now:
+                    log.info(
+                        "[CSU-TYPO] fixed course name %r → %r",
+                        _cn_now,
+                        _cn_fixed,
+                    )
+                    payload["course_name"] = _cn_fixed
+
             # ── Bug 5: defaultStudyMode config override ───────────────────
             # When a university's scrape_config (or UI override) contains
             # "defaultStudyMode", use it as the authoritative mode whenever

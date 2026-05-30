@@ -7,3 +7,4 @@
 - [pytest asyncio isolation](pytest-asyncio-isolation.md) — use asyncio.new_event_loop() not get_event_loop() in sync test helpers; full suite has session-scoped loop that conflicts
 - [Phase 9 verification engine](phase9-verification.md) — cross-source confidence: html/pdf/api=30, pattern/ai=5; conflict caps score at 35; None avg_confidence does NOT block auto-publish
 - [Phase 13 monitoring engine](phase13-monitoring.md) — university_watchers + lightweight probes; smart scheduling from change_frequency_days EMA; 30-min Celery beat; bulk-enable auto-creates watchers from scrape_url.
+- [Slug derivation for non-www subdomains](slug-subdomain-fix.md) — study.csu.edu.au → slug 'study' not 'csu'; loader needs _GENERIC_SUBDOMAINS stripping.
