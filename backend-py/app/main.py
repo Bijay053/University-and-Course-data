@@ -29,6 +29,7 @@ from app.routers import (
     monitoring,
     performance,
     per_course_resources,
+    publishing,
     reviews,
     scrape,
     scrape_health,
@@ -107,3 +108,4 @@ app.include_router(changes.router, prefix="/api", tags=["changes"])
 app.include_router(knowledge_graph.router, prefix="/api", tags=["knowledge-graph"])
 app.include_router(country_intelligence.router, prefix="/api", tags=["country-intelligence"])
 app.include_router(monitoring.router, prefix="/api", tags=["monitoring"])
+app.include_router(publishing.router, prefix="/api", tags=["publishing"])

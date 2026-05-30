@@ -42,6 +42,7 @@ from app.models.course_accreditation import CourseAccreditation
 from app.models.university_location import UniversityLocation
 from app.models.country_pattern import CountryPattern
 from app.models.university_watcher import UniversityWatcher
+from app.models.publishing_ledger import PublishingLedger
 
 __all__ = [
     "AcademicLevelOption",

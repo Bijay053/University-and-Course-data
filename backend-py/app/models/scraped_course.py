@@ -84,6 +84,10 @@ class ScrapedCourse(Base):
     has_central_fee_page: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     cricos_code: Mapped[str | None] = mapped_column(Text, nullable=True)
     avg_verification_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    pub_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    pub_score_breakdown: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    pub_decision: Mapped[str | None] = mapped_column(Text, nullable=True)
+    pub_decision_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )

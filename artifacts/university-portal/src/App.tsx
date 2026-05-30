@@ -26,6 +26,7 @@ import ResetPassword from "@/pages/reset-password";
 import UsersPage from "@/pages/users";
 import PerformancePage from "@/pages/performance";
 import MonitoringPage from "@/pages/monitoring";
+import PublishingPage from "@/pages/publishing";
 
 const queryClient = new QueryClient();
 
@@ -80,6 +81,7 @@ function Router() {
               <Route path="/users" component={UsersPage} />
               <Route path="/performance" component={PerformancePage} />
               <Route path="/monitoring" component={MonitoringPage} />
+              <Route path="/publishing" component={PublishingPage} />
               <Route component={NotFound} />
             </Switch>
           </Layout>
