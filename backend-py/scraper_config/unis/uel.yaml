@@ -1,19 +1,72 @@
-# University of East London (UK partnership / Australian pathway)
+# University of East London (UEL)
 # Hostname: www.uel.ac.uk
 #
 # Bug history / rationale:
-#   - Cloudflare protection: site returns 403 to the scraper user-agent.
-#   - May require User-Agent rotation or Playwright stealth mode.
-#   - 403 means 0 courses staged in current runs.
+#   - Cloudflare protection: HTTP BFS/httpx returns 403 → 0 courses from
+#     plain HTTP tiers.  Browser discovery is mandatory.
+#   - Previous behaviour: always_browser_discover was unset, so browser ran
+#     only as a zero-result fallback.  Even then, it wasted 9+ minutes
+#     following low-value nav pages (apprenticeships, fees, pre-entry,
+#     student-life) before timing out with only ~38 links.
+#
+# Fix applied (2026-05-30):
+#   - always_browser_discover: true  → browser runs every time (not just fallback)
+#   - browser_time_budget_s: 90      → hard 90-second wall-clock cap on nav BFS
+#   - browser_early_stop_courses: 80 → stop nav BFS once 80 course links found
+#   - block_nav_patterns              → suppress the specific UEL low-value paths
+#     that the global blocklist doesn't already catch
+#   - Extra seeds pre-queued in _HOST_EXTRA_SEEDS (browser_discover_generic.py):
+#       /study/undergraduate, /study/postgraduate, /study/courses,
+#       /study/all-courses, /study/course-search
+#   - must_contain: ["/study/"]      → post-filter: only keep URLs with /study/
+#     in the path so nav-page fragments (help pages, staff profiles, etc.)
+#     that slip through _looks_like_course are discarded.
 #
 # NOTE: UEL may be delivered in Australia by a separate partner institution.
 # Verify whether the scrape_url points to the Australian delivery site or the
 # UK mother institution, as content structure differs significantly.
-#
-# TODO: investigate Cloudflare bypass.
-# TODO: confirm whether Australian delivery partner is the intended target.
+
+discovery:
+  always_browser_discover: true
+
+  # Hard wall-clock limit for the nav BFS loop (seconds).
+  # 90 s is generous for ~5 seed pages + a handful of sub-listing pages.
+  browser_time_budget_s: 90
+
+  # Stop following nav pages once this many course links are collected.
+  # UEL catalogue is ~200 courses; 80 is enough to confirm the seeding
+  # strategy is working and avoids burning time on duplicate listing pages.
+  browser_early_stop_courses: 80
+
+  # Per-UEL nav blocklist (extends the global blocklist in browser_discover_generic.py).
+  # These path segments appear in UEL site navigation but lead to info/support
+  # pages rather than course pages.
+  block_nav_patterns:
+    - "/apprenticeship"
+    - "/pre-entry"
+    - "/foundation"
+    - "/higher-national"
+    - "/short-course"
+    - "/cpd"
+    - "/professional-development"
+    - "/open-evenings"
+    - "/clearing"
+    - "/how-to-apply"
+    - "/student-support"
+    - "/placements"
+    - "/campus"
+    - "/partners"
+    - "/research"
+    - "/business"
+    - "/employer"
+
+  # Post-filter: only course URLs containing /study/ in the path are kept.
+  # This drops nav fragments and info pages that share UEL's /courses/ path
+  # but are not individual degree pages.
+  must_contain:
+    - "/study/"
 
 extraction:
   filters:
     domestic_only:
-      enabled: true   # Preserve current prod behaviour: filter runs for all unis.
+      enabled: true

@@ -24,6 +24,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
+import time
 from contextlib import asynccontextmanager
 from urllib.parse import urlparse
 
@@ -39,6 +40,39 @@ _NAV_SETTLE_S = 2.0
 # mathematics, social-work-and-human-services, communication), yielding
 # only 76 candidates from a ~200-course international catalogue.
 _MAX_NAV_PAGES = 50   # total nav pages to visit across all BFS levels
+
+# ── Discovery time budget ─────────────────────────────────────────────────────
+# Hard wall-clock limit for the nav BFS loop.  Overridable per-uni via
+# discovery.browser_time_budget_s in the university YAML.
+_DEFAULT_TIME_BUDGET_S: int = 90
+
+# ── Early-stop course threshold ───────────────────────────────────────────────
+# Stop following nav pages as soon as this many course links are found.
+# Overridable per-uni via discovery.browser_early_stop_courses in YAML.
+_DEFAULT_EARLY_STOP_COURSES: int = 100
+
+# ── Global nav blocklist ──────────────────────────────────────────────────────
+# Path-segment substrings for low-value navigation pages that are never
+# individual course pages and should not be crawled.  Applied to every
+# nav-candidate URL regardless of university.  Per-uni YAMLs can extend
+# this list via discovery.block_nav_patterns.
+_GLOBAL_NAV_BLOCKLIST: frozenset[str] = frozenset({
+    "/apprenticeship",
+    "/fees",       "/fee-",       "/funding",
+    "/scholarship",
+    "/pre-entry",  "/pre-sessional",
+    "/contact",    "/about",
+    "/news",       "/event",
+    "/accommodation",
+    "/student-life", "/studentlife",
+    "/open-day",   "/openday",    "/open-evening",
+    "/alumni",     "/staff",      "/governance",
+    "/accessibility", "/privacy", "/cookie",
+    "/sitemap",    "/search",
+    "/job",        "/career",     "/vacancy",
+    "/library",    "/sport",
+    "/international-pathways",   # pathway/foundation-level nav
+})
 # After page.goto on a nav page, wait this long for at least one
 # course-shaped link selector to appear before extracting links.
 # JS-rendered SPA discipline pages (QUT, Newcastle, UTAS, ECU) hydrate
@@ -184,6 +218,25 @@ _HOST_EXTRA_SEEDS: dict[str, list[str]] = {
         "https://www.newcastle.edu.au/degrees/postgraduate",
         "https://www.newcastle.edu.au/degrees/research",
     ],
+    # University of East London (UEL) — www.uel.ac.uk.
+    # Site is Cloudflare-protected so BFS returns 0.  Browser discovery falls
+    # into generic nav following, which wastes 9+ minutes on low-value pages
+    # (apprenticeships, fees, pre-entry, student-life).  Seeding the three
+    # known catalogue roots lets the BFS jump straight to course listing pages.
+    "www.uel.ac.uk": [
+        "https://www.uel.ac.uk/study/undergraduate",
+        "https://www.uel.ac.uk/study/postgraduate",
+        "https://www.uel.ac.uk/study/courses",
+        "https://www.uel.ac.uk/study/all-courses",
+        "https://www.uel.ac.uk/study/course-search",
+    ],
+    "uel.ac.uk": [
+        "https://www.uel.ac.uk/study/undergraduate",
+        "https://www.uel.ac.uk/study/postgraduate",
+        "https://www.uel.ac.uk/study/courses",
+        "https://www.uel.ac.uk/study/all-courses",
+        "https://www.uel.ac.uk/study/course-search",
+    ],
     # University of Huddersfield — uni_id 1166.
     # Both www.hud.ac.uk and courses.hud.ac.uk are React SPAs.  HTTP BFS on
     # www.hud.ac.uk finds only nav/research pages (no taught course links).
@@ -292,6 +345,21 @@ def _is_nav_url(url: str) -> bool:
     return any(h in lurl for h in _NAV_URL_HINTS)
 
 
+def _is_blocked_nav(url: str, extra_patterns: list[str] | None = None) -> bool:
+    """Return True if *url* matches the global nav blocklist or per-uni extras.
+
+    Checked against the URL path (lowercased).  Returns False quickly for
+    the common case where nothing matches.
+    """
+    lpath = urlparse(url).path.lower()
+    if any(token in lpath for token in _GLOBAL_NAV_BLOCKLIST):
+        return True
+    if extra_patterns:
+        if any(p.lower() in lpath for p in extra_patterns):
+            return True
+    return False
+
+
 async def browser_discover_generic(
     scrape_url: str,
     *,
@@ -322,14 +390,46 @@ async def browser_discover_generic(
     origin_str = f"{parsed.scheme}://{parsed.netloc}"
     host = parsed.netloc
 
-    await _emit(f"[DISCOVER] Browser: navigating to {scrape_url}")
-    log.info("browser_discover_generic: starting for %s", scrape_url)
+    # ── Per-uni config ────────────────────────────────────────────────────────
+    # Read time budget, early-stop threshold, and extra nav block patterns
+    # from the active UniConfig contextvar (set by the orchestrator).
+    # Falls back to module-level defaults when no config is active.
+    _time_budget_s: int = _DEFAULT_TIME_BUDGET_S
+    _early_stop_courses: int = _DEFAULT_EARLY_STOP_COURSES
+    _extra_block_patterns: list[str] = []
+    try:
+        from app.services.scraper.config.context import require_uni_config
+        _ucfg = require_uni_config()
+        _time_budget_s = getattr(_ucfg.discovery, "browser_time_budget_s", _DEFAULT_TIME_BUDGET_S)
+        _early_stop_courses = getattr(_ucfg.discovery, "browser_early_stop_courses", _DEFAULT_EARLY_STOP_COURSES)
+        _extra_block_patterns = list(getattr(_ucfg.discovery, "block_nav_patterns", []) or [])
+    except Exception:
+        pass  # contextvar not set (e.g. test / standalone call) — use defaults
+
+    _t_start = time.monotonic()
+
+    await _emit(
+        f"[DISCOVER] Browser: starting for {scrape_url} "
+        f"(time_budget={_time_budget_s}s, early_stop={_early_stop_courses} courses)"
+    )
+    log.info(
+        "browser_discover_generic: starting for %s (time_budget=%ds, early_stop=%d)",
+        scrape_url, _time_budget_s, _early_stop_courses,
+    )
 
     seen: set[str] = set()
     results: list[dict] = []
     nav_queue: list[str] = []
+    _blocked_count: int = 0
+    _stop_reason: str = "start_page_only"  # overwritten once the nav BFS begins
 
     _seed_urls = _HOST_EXTRA_SEEDS.get(host, [])
+    if _seed_urls:
+        log.info(
+            "browser_discover_generic: %d extra seed URLs for %s — "
+            "queuing as first nav targets",
+            len(_seed_urls), host,
+        )
     for seed_url in _seed_urls:
         if seed_url not in seen:
             nav_queue.append(seed_url)
@@ -358,6 +458,7 @@ async def browser_discover_generic(
         return []
 
     def _process_links(raw: list[dict]) -> None:
+        nonlocal _blocked_count
         for item in raw:
             url = (item.get("url") or "").strip()
             name = (item.get("name") or "").strip()
@@ -372,7 +473,13 @@ async def browser_discover_generic(
             if _looks_like_course(url, name):
                 results.append({"url": url, "name": name})
             elif _is_nav_url(url) and not _is_known_non_course_url(url):
-                nav_queue.append(url)
+                if _is_blocked_nav(url, _extra_block_patterns):
+                    _blocked_count += 1
+                    log.debug(
+                        "browser_discover_generic: blocked low-value nav %s", url
+                    )
+                else:
+                    nav_queue.append(url)
 
     # Stealth opt-in (Macquarie etc.): swap the regular browser pool for
     # patchright + Xvfb when the active uni config sets
@@ -488,14 +595,46 @@ async def browser_discover_generic(
             # ECU: homepage → study-area → individual course).
             nav_visited: set[str] = set()
             nav_i = 0
+            _stop_reason: str = "nav_queue_exhausted"
             while nav_i < len(nav_queue) and nav_i < _MAX_NAV_PAGES:
+                # ── Time budget check ─────────────────────────────────────
+                _elapsed = time.monotonic() - _t_start
+                if _elapsed >= _time_budget_s:
+                    _stop_reason = f"time_budget_exceeded ({_elapsed:.0f}s >= {_time_budget_s}s)"
+                    log.info(
+                        "browser_discover_generic: time budget %ds exceeded after %.0fs "
+                        "(%d courses, %d nav pages visited, %d blocked) — stopping",
+                        _time_budget_s, _elapsed, len(results), nav_i, _blocked_count,
+                    )
+                    await _emit(
+                        f"[DISCOVER] Browser: time budget {_time_budget_s}s reached "
+                        f"({_elapsed:.0f}s elapsed) — stopping with {len(results)} courses"
+                    )
+                    break
+
+                # ── Early-stop threshold ──────────────────────────────────
+                if len(results) >= _early_stop_courses:
+                    _stop_reason = f"early_stop_threshold ({len(results)} >= {_early_stop_courses})"
+                    log.info(
+                        "browser_discover_generic: early-stop threshold %d reached "
+                        "(%d courses found, %d nav pages visited) — stopping",
+                        _early_stop_courses, len(results), nav_i,
+                    )
+                    await _emit(
+                        f"[DISCOVER] Browser: {len(results)} course links found — "
+                        f"early-stop threshold reached, stopping discovery"
+                    )
+                    break
+
+                if len(results) >= max_courses:
+                    _stop_reason = f"max_courses_cap ({max_courses})"
+                    break
+
                 nav_url = nav_queue[nav_i]
                 nav_i += 1
                 if nav_url in nav_visited:
                     continue
                 nav_visited.add(nav_url)
-                if len(results) >= max_courses:
-                    break
                 try:
                     await page.goto(
                         nav_url, wait_until="domcontentloaded", timeout=30_000
@@ -569,11 +708,13 @@ async def browser_discover_generic(
         await _emit(f"[DISCOVER] Browser: unexpected error — {exc}")
         return []
 
+    _total_elapsed = time.monotonic() - _t_start
+
     if len(results) < 3:
         log.warning(
-            "browser_discover_generic: only %d course(s) found for %s — "
-            "site may be blocking browser too",
-            len(results), scrape_url,
+            "browser_discover_generic: only %d course(s) found for %s "
+            "(%.0fs elapsed, stop=%s, blocked=%d) — site may be blocking browser too",
+            len(results), scrape_url, _total_elapsed, _stop_reason, _blocked_count,
         )
         await _emit(
             f"[DISCOVER] Browser: only {len(results)} course(s) found — "
@@ -582,8 +723,12 @@ async def browser_discover_generic(
         return []
 
     log.info(
-        "browser_discover_generic: discovered %d courses for %s",
-        len(results), scrape_url,
+        "browser_discover_generic: discovered %d courses for %s "
+        "(%.0fs elapsed, stop=%s, blocked=%d)",
+        len(results), scrape_url, _total_elapsed, _stop_reason, _blocked_count,
     )
-    await _emit(f"[DISCOVER] Browser: discovered {len(results)} course links")
+    await _emit(
+        f"[DISCOVER] Browser: discovered {len(results)} course links "
+        f"({_total_elapsed:.0f}s, stop={_stop_reason}, blocked_nav={_blocked_count})"
+    )
     return results[:max_courses]

@@ -271,6 +271,34 @@ class DiscoveryConfig(BaseModel):
             "the SCRAPE_DO_TOKEN env variable/secret.  Default: False."
         ),
     )
+    browser_time_budget_s: int = Field(
+        default=90,
+        description=(
+            "Hard wall-clock time limit (seconds) for the browser-based discovery "
+            "pass.  When elapsed time exceeds this value the nav BFS loop stops "
+            "and returns whatever course links have been found so far.  Default 90 s. "
+            "Raise for sites with many listing pages; lower for sites with fast "
+            "JS hydration that rarely need more than a handful of nav visits."
+        ),
+    )
+    browser_early_stop_courses: int = Field(
+        default=100,
+        description=(
+            "Stop following nav pages once this many course links have been found. "
+            "Avoids spending minutes on low-value navigation after a catalogue-size "
+            "listing page has already been harvested.  Default 100.  Set higher "
+            "for large universities with 200+ courses split across many listing pages."
+        ),
+    )
+    block_nav_patterns: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Substring patterns (case-insensitive).  Any nav-candidate URL whose "
+            "path contains one of these strings is discarded without visiting.  "
+            "Extends the global blocklist of low-value paths (apprenticeships, fees, "
+            "news, events, accommodation, etc.).  E.g. ['/open-evenings', '/scholarships']."
+        ),
+    )
 
 
 # ── Extraction sub-configs ───────────────────────────────────────────────────
