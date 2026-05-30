@@ -1010,6 +1010,129 @@ def repair_extractor(
         raise self.retry(exc=exc, countdown=120)
 
 
+@celery_app.task(name="scrape.run_quality_actions", bind=True, max_retries=1)
+def run_quality_actions(
+    self,
+    university_id: int,
+    *,
+    job_id: str,
+    triggered_by: str = "orchestrator",
+    cascade_repair_fired: bool = False,
+) -> dict:  # type: ignore[override]
+    """Phase 7: Autonomous Quality Action Dispatcher.
+
+    Called by the orchestrator after a scrape completes with average
+    completeness in the 70–84 % gap (above CASCADE's repair floor but
+    below the 85 % auto-publish gate).
+
+    Actions taken, in priority order:
+    1. PDF extraction — backfills international_fee, other_requirement,
+       english_test (ielts_overall), academic_score from discovered PDFs.
+    2. repair_extractor — dispatches AI rule-regeneration for structural
+       fields (degree_level, study_mode, duration, etc.).
+    3. browser_retry — queues a new scrape with Playwright forced when
+       the site is identified as a JS SPA.
+
+    Idempotent: each ActionType dispatched at most once per run.  Celery
+    task budget capped at 2 downstream tasks.  repair_extractor skipped
+    when cascade_repair_fired=True to prevent duplicates.
+
+    Result stored in ``universities.scrape_config['_p7_last_run']`` for
+    audit / frontend display.
+    """
+    async def _run() -> dict:
+        from app.database import AsyncSessionLocal
+        from app.services.scraper.quality_action_dispatcher import dispatch_quality_actions
+        from app.services.scraper.ai_extractor_repair import compute_field_fill_rates
+        from sqlalchemy import text as _sql
+        import json as _json
+
+        async with AsyncSessionLocal() as db:
+            log.info(
+                "[run_quality_actions] start uni_id=%s job=%s triggered_by=%r "
+                "cascade_repair=%s",
+                university_id, job_id, triggered_by, cascade_repair_fired,
+            )
+
+            # 1. Fill rates for this job
+            fill_rates = await compute_field_fill_rates(job_id, db)
+            if not fill_rates:
+                log.info(
+                    "[run_quality_actions] no fill rate data for job %s — skipping", job_id,
+                )
+                return {"ok": True, "skipped": True, "reason": "no_fill_data"}
+
+            # 2. University config + metadata
+            uni_row = (await db.execute(
+                _sql("SELECT scrape_url, scrape_config, country"
+                     " FROM universities WHERE id = :id"),
+                {"id": university_id},
+            )).mappings().first()
+
+            if uni_row is None:
+                return {"ok": False, "reason": "university_not_found"}
+
+            scrape_url      = (uni_row.get("scrape_url") or "").strip()
+            uni_scrape_cfg  = uni_row.get("scrape_config") or {}
+            uni_country     = (uni_row.get("country") or "").upper()
+
+            # 3. Dispatch quality actions
+            result = await dispatch_quality_actions(
+                university_id=university_id,
+                job_id=job_id,
+                fill_rates=fill_rates,
+                scrape_url=scrape_url,
+                uni_country=uni_country,
+                uni_scrape_config=uni_scrape_cfg,
+                db=db,
+                emit=None,
+                cascade_repair_fired=cascade_repair_fired,
+            )
+
+            # 4. Persist action log into universities.scrape_config['_p7_last_run']
+            try:
+                from datetime import datetime, timezone as _tz
+                _payload = _json.dumps({
+                    "timestamp": datetime.now(_tz.utc).isoformat(),
+                    "job_id": job_id,
+                    **result.to_dict(),
+                })
+                await db.execute(
+                    _sql("""
+                        UPDATE universities
+                           SET scrape_config = jsonb_set(
+                                 COALESCE(scrape_config, '{}'::jsonb),
+                                 '{_p7_last_run}',
+                                 :payload::jsonb
+                               )
+                         WHERE id = :uni_id
+                    """),
+                    {"payload": _payload, "uni_id": university_id},
+                )
+                await db.commit()
+            except Exception as _log_exc:  # noqa: BLE001
+                log.warning(
+                    "[run_quality_actions] action log persist failed: %s", _log_exc,
+                )
+
+            return {
+                "ok": True,
+                "university_id": university_id,
+                "job_id": job_id,
+                **result.to_dict(),
+            }
+
+    _sync_dispose()
+    try:
+        return asyncio.run(_run())
+    except Exception as exc:
+        log.exception(
+            "run_quality_actions failed for uni_id=%s job=%s: %s",
+            university_id, job_id, exc,
+        )
+        raise self.retry(exc=exc, countdown=60)
+
+
 @celery_app.task(name="scrape.refresh_baselines", bind=True, max_retries=0)
 def refresh_baselines_weekly(self) -> dict:  # type: ignore[override]
     """Celery beat task — recompute fill-rate baselines from the trailing 30 days.

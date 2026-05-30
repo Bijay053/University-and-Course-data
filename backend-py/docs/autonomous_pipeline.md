@@ -164,6 +164,36 @@ URL entered  (UI "Add by URL" → POST /api/universities/add-by-url)
                  │
                  ▼
 ┌─────────────────────────────────────────────────┐
+│  Stage 7b — Quality Action Dispatcher (Phase 7) │
+│  quality_action_dispatcher.dispatch_quality_    │
+│  actions() + scrape_tasks.run_quality_actions   │
+│                                                 │
+│  Fires in the 70–84 % completeness gap —        │
+│  above CASCADE's repair floor but below the     │
+│  85 % auto-publish gate.                        │
+│                                                 │
+│  Actions (priority order):                      │
+│  1. PDF extraction (inline) — backfills         │
+│     international_fee, other_requirement,       │
+│     english_test (ielts_overall), academic_score│
+│  2. repair_extractor (Celery) — AI rule regen   │
+│     for degree_level, study_mode, duration …    │
+│  3. browser_retry (Celery) — Playwright re-run  │
+│     for JS-SPA sites                            │
+│                                                 │
+│  Safety guarantees:                             │
+│  • Never overwrites fill_rate ≥ 80 % fields     │
+│  • Each ActionType dispatched once per run      │
+│  • Max 2 Celery tasks per run                   │
+│  • Skips repair_extractor if CASCADE fired it   │
+│  • Entire block try/except — never kills job    │
+│                                                 │
+│  Action log persisted in universities           │
+│    .scrape_config['_p7_last_run']               │
+└────────────────┬────────────────────────────────┘
+                 │
+                 ▼
+┌─────────────────────────────────────────────────┐
 │  Stage 8 — Self-Heal CASCADE                    │
 │  orchestrator (end of run_scrape) +             │
 │  scrape_tasks.probe_and_configure               │
@@ -277,5 +307,6 @@ URL entered  (UI "Add by URL" → POST /api/universities/add-by-url)
 | 6b PDF pipeline | `pipelines/university_pdfs.py`, `pipelines/single_course.py` |
 | 6b PDF quality gate | `orchestrator.py` (P6·QI block, post-loop backfill) |
 | 7 Quality report | `quality_intelligence.py`, `scrape.py:get_university_quality_report` |
+| 7b Quality action dispatcher | `quality_action_dispatcher.py`, `scrape_tasks.run_quality_actions` |
 | 8 CASCADE | `orchestrator.py` (end of `run_scrape`), `scrape_tasks.py` |
 | Frontend onboarding | `universities.tsx` ("Add by URL" modal) |

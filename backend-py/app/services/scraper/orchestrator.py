@@ -2867,6 +2867,62 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     runtime_job_id, _cascade_exc,
                 )
 
+            # ── Phase 7: Autonomous Quality Action Dispatcher ──────────────
+            # Fires in the 70–84 % completeness gap — above CASCADE's repair
+            # floor (_avg < 70 %) but below the 85 % auto-publish gate.
+            # Dispatches run_quality_actions which runs inline PDF extraction
+            # and queues repair_extractor / browser_retry as needed.
+            #
+            # Safety: never fires when CASCADE dispatched repair_extractor
+            # (extraction_failure: _avg < 70 %).  Guarded by its own
+            # try/except so any failure is logged but never kills the job.
+            try:
+                from sqlalchemy import select as _p7sel, func as _p7func
+                from app.models import ScrapedCourse as _P7SC
+                _p7_avg_row = (await db.execute(
+                    _p7sel(_p7func.avg(_P7SC.completeness)).where(
+                        _P7SC.scrape_job_id == runtime_job_id,
+                        _P7SC.completeness.isnot(None),
+                    )
+                )).scalar()
+                _p7_avg = float(_p7_avg_row) if _p7_avg_row is not None else 0.0
+                _p7_staged = int(summary.get("staged") or 0)
+                # cascade_repair_fired = True when extraction_failure path ran
+                # (_avg < 70 % in the CASCADE block above).  We recompute from
+                # _p7_avg to avoid depending on a variable set deep in the try.
+                _p7_cascade_repair = bool(_p7_staged >= 5 and _p7_avg < 0.70)
+
+                if 0.70 <= _p7_avg < 0.85 and _p7_staged >= 5:
+                    from app.tasks.scrape_tasks import run_quality_actions as _p7_task
+                    _p7_task.delay(
+                        university_id=uni_id,
+                        job_id=runtime_job_id,
+                        triggered_by="orchestrator:post_scrape",
+                        cascade_repair_fired=_p7_cascade_repair,
+                    )
+                    log.info(
+                        "[P7] quality actions queued uni_id=%s job=%s avg=%.1f%%",
+                        uni_id, runtime_job_id, _p7_avg * 100,
+                    )
+                    await emit(
+                        "status",
+                        f"[P7] Quality action dispatcher queued "
+                        f"(avg={_p7_avg:.0%} → target ≥85 %)",
+                        phase="quality",
+                        kind="quality_action_queued",
+                        avg_completeness=round(_p7_avg, 3),
+                    )
+                else:
+                    log.debug(
+                        "[P7] skip uni_id=%s avg=%.1f%% staged=%d — not in 70-84 %% gap",
+                        uni_id, _p7_avg * 100, _p7_staged,
+                    )
+            except Exception as _p7_exc:  # noqa: BLE001
+                log.warning(
+                    "[P7] quality action dispatch failed for run %s: %s",
+                    runtime_job_id, _p7_exc,
+                )
+
         return {"ok": finished_cleanly, **summary}
     except Exception as exc:
         log.exception("Scrape job %s failed: %s", runtime_job_id, exc)
