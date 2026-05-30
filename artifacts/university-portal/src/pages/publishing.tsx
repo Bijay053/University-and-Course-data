@@ -246,6 +246,7 @@ export default function PublishingPage() {
   const [uniSearch, setUniSearch] = useState("");
   const [uniPage, setUniPage] = useState(1);
   const [uniPageSize, setUniPageSize] = useState(25);
+  const [refreshing, setRefreshing] = useState(false);
 
   const { data: stats, isLoading: statsLoading } = useQuery<PubStats>({
     queryKey: ["pub-stats"],
@@ -376,15 +377,23 @@ export default function PublishingPage() {
         <div className="flex flex-wrap gap-2 shrink-0">
           <Button
             variant="outline" size="sm"
-            onClick={() => {
-              qc.invalidateQueries({ queryKey: ["pub-stats"] });
-              qc.invalidateQueries({ queryKey: ["pub-queue"] });
-              qc.invalidateQueries({ queryKey: ["pub-ledger"] });
-              qc.invalidateQueries({ queryKey: ["pub-uni-summary"] });
-              toast({ title: "Refreshed", description: "Stats and queue updated." });
+            disabled={refreshing}
+            onClick={async () => {
+              setRefreshing(true);
+              try {
+                await Promise.all([
+                  qc.refetchQueries({ queryKey: ["pub-stats"] }),
+                  qc.refetchQueries({ queryKey: ["pub-queue"] }),
+                  qc.refetchQueries({ queryKey: ["pub-uni-summary"] }),
+                ]);
+                toast({ title: "Refreshed", description: "Stats and queue updated." });
+              } finally {
+                setRefreshing(false);
+              }
             }}
           >
-            <RefreshCw className="h-4 w-4 mr-1" /> Refresh
+            <RefreshCw className={`h-4 w-4 mr-1 ${refreshing ? "animate-spin" : ""}`} />
+            {refreshing ? "Refreshing…" : "Refresh"}
           </Button>
           <button
             onClick={() => runPassMut.mutate()}
