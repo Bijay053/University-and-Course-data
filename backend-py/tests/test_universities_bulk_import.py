@@ -57,7 +57,7 @@ def client_with_overrides():
         yield fake
 
     def _user_override():
-        return {"sub": "test", "role": "admin"}
+        return {"sub": "test", "role": "admin", "is_super_admin": True}
 
     app.dependency_overrides[get_db] = _db_override
     app.dependency_overrides[get_current_user] = _user_override

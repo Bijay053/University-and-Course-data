@@ -83,8 +83,8 @@ def test_unknown_host_uses_domcontentloaded():
     for url in (
         "https://www.usq.edu.au/courses/foo",
         "https://www.torrens.edu.au/courses/bar",
-        "https://www.csu.edu.au/courses/baz",
-        "https://www.utas.edu.au/courses/qux",
+        # csu.edu.au is in _SKIP_BROWSER_HOSTS; browser is skipped entirely.
+        # utas.edu.au is in _SLOW_HOSTS and gets networkidle, not listed here.
     ):
         wait_until, settle_ms, outer_sec, goto_ms = _browser_config_for(url)
         assert wait_until == "domcontentloaded", (

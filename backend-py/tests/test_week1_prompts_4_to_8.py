@@ -62,13 +62,14 @@ def test_p4_only_high_precision_methods_seed_cache():
         _make_result("https://u.edu/c5", "Bachelor of E", 8.0, "regex", 0.5),
     ]
     cache, _origins, prov = sc._build_bucket_cache(results, min_quorum=2)
-    assert cache.get("undergraduate", {}).get("ielts_overall") == 6.5, (
-        f"vision_ocr / ai_fallback / low-conf values should not have "
-        f"polluted the bucket — got {cache!r}"
+    # _SIBLING_BACKFILL_SLOTS is empty since 2026-05-15: no English scores
+    # propagate from sibling to sibling.  The cache is always empty regardless
+    # of source quality.  The source-type gate logic (_can_seed_cache) is
+    # tested independently by test_p4_can_seed_cache_helper.
+    assert cache == {}, (
+        f"_SIBLING_BACKFILL_SLOTS is empty — cache must be empty; got {cache!r}"
     )
-    # Provenance must point back to a high-precision source.
-    assert prov["undergraduate"]["ielts_overall"]["source_method"] == "regex"
-    assert prov["undergraduate"]["ielts_overall"]["consensus_count"] == 2
+    assert cache.get("undergraduate", {}).get("ielts_overall") is None
 
 
 def test_p4_can_seed_cache_helper():
@@ -153,8 +154,10 @@ def test_p6_two_source_consensus_does_propagate():
         },
     ]
     fills = asyncio.run(sc.backfill_english_from_siblings(results))
-    assert fills == 1
-    assert results[2]["payload"]["ielts_overall"] == 6.5
+    # _SIBLING_BACKFILL_SLOTS is empty since 2026-05-15: no English scores
+    # are backfilled regardless of consensus count.
+    assert fills == 0
+    assert results[2]["payload"].get("ielts_overall") is None
 
 
 # ────────────────────────────────────────────────────────────────────

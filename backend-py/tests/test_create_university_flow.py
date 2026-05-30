@@ -39,7 +39,7 @@ pytestmark = pytest.mark.asyncio(loop_scope="session")
 # ---------------------------------------------------------------------------
 # Auth override — bypass JWT validation in every route that needs it
 # ---------------------------------------------------------------------------
-_FAKE_USER = {"sub": "test-admin", "role": "admin"}
+_FAKE_USER = {"sub": "test-admin", "role": "admin", "is_super_admin": True}
 
 
 async def _override_auth() -> dict:

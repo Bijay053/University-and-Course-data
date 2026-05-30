@@ -751,7 +751,10 @@ _BLOCK_URL_SUBSTRINGS: tuple[tuple[str, str], ...] = (
     ("/study/sustainability",   "category_landing_page"),
     ("/study/parents-and-carers", "category_landing_page"),
     ("/study/starting-at-the-university", "category_landing_page"),
-    ("/study/postgraduate",     "category_landing_page"),
+    # Trailing slash enforces path-boundary semantics: this blocks
+    # /study/postgraduate/ (Flinders category hub) and any sub-pages but
+    # NEVER matches /study/postgraduate-diploma-of-counselling (a real degree).
+    ("/study/postgraduate/",    "category_landing_page"),
 )
 
 # URL query-string substring matches.  Real course-detail pages do not

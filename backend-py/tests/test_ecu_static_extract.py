@@ -119,11 +119,11 @@ class TestApplyEcuExtractionLocation:
     def test_no_campus_defaults_perth_australia(self):
         html = "<div>No campus information here.</div>"
         result = apply_ecu_extraction("https://www.ecu.edu.au/degrees/courses/cert-iv-business", html)
-        assert result["course_location"] == "Perth, Australia"
+        assert result["course_location"] == "Perth"
 
     def test_empty_html_defaults_perth_australia(self):
         result = apply_ecu_extraction("https://www.ecu.edu.au/degrees/courses/bachelor-of-science", "")
-        assert result["course_location"] == "Perth, Australia"
+        assert result["course_location"] == "Perth"
 
     def test_sri_lanka_noise_does_not_win(self):
         """International marketing text containing 'Sri Lanka' must not become the location."""
@@ -139,7 +139,7 @@ class TestApplyEcuExtractionLocation:
         """When only non-AU noise is present, must fall back to default."""
         html = "<div>Students from Sri Lanka may need to satisfy English requirements.</div>"
         result = apply_ecu_extraction("https://www.ecu.edu.au/degrees/courses/bachelor-of-science", html)
-        assert result["course_location"] == "Perth, Australia"
+        assert result["course_location"] == "Perth"
 
 
 # ---------------------------------------------------------------------------

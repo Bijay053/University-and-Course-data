@@ -183,11 +183,11 @@ def test_t206_sibling_cache_backfills_empty_postgrad_english_slot() -> None:
         },
     ]
     fills = _run(sibling_cache.backfill_english_from_siblings(results))
-    assert fills == 1, fills
+    # _SIBLING_BACKFILL_SLOTS is empty since 2026-05-15: no English scores backfilled.
+    assert fills == 0, fills
     # results[2] is the empty postgrad row; results[3] is the undergrad row.
-    assert results[2]["payload"]["ielts_overall"] == 6.5
-    # Undergraduate bucket has no donor — must remain empty, never inherit
-    # from the Postgraduate bucket.
+    # With empty slots, nothing is backfilled into either row.
+    assert "ielts_overall" not in results[2]["payload"]
     assert "ielts_overall" not in results[3]["payload"]
 
 

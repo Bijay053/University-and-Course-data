@@ -509,6 +509,7 @@ def nightly_sweep_and_alert(self) -> dict:  # type: ignore[override]
     import pathlib
     import re
     import subprocess
+    import sys
 
     _backend_py = pathlib.Path(__file__).resolve().parent.parent.parent
     # Use sys.executable so the correct interpreter is found in any environment

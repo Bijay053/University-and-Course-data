@@ -266,25 +266,17 @@ def test_t206_backfill_fills_empty_slot_from_same_degree_bucket():
         },
     ]
     n_filled = asyncio.run(backfill_english_from_siblings(results))
-    assert n_filled >= 1
-    # Master sibling B (results[2]) got back-filled for IELTS from
-    # Masters A + D (results[0] + results[1]).
-    # NOTE: PTE is intentionally excluded from _SIBLING_BACKFILL_SLOTS to
-    # prevent cross-level contamination (only IELTS is backfilled globally).
-    assert results[2]["payload"]["ielts_overall"] == 6.5
-    assert "pte_overall" not in results[2]["payload"]
+    # _SIBLING_BACKFILL_SLOTS is empty since 2026-05-15: no English scores
+    # propagate from sibling to sibling, regardless of consensus.
+    assert n_filled == 0
+    # No backfill means no English values injected into either sibling.
+    assert "ielts_overall" not in results[2]["payload"]
     # Bachelor row (results[3]) was NOT touched.
     assert "pte_overall" not in results[3]["payload"]
     assert "ielts_overall" not in results[3]["payload"]
-    # Evidence rows annotated as sibling_cache:* so the review modal
-    # can show provenance. Provenance fields must be present.
+    # No evidence rows added for backfill (nothing was filled).
     sc_evidence = [e for e in results[2]["evidence"] if e.get("field_key") == "ielts_overall"]
-    assert sc_evidence, "Backfilled course must have an ielts_overall evidence row"
-    ev = sc_evidence[0]
-    assert ev["method"].startswith("sibling_cache:"), f"Bad method: {ev['method']}"
-    assert ev.get("source_method"), "source_method must be set in evidence row"
-    assert ev.get("consensus_count", 0) >= 1, "consensus_count must be >= 1"
-    assert ev.get("bucket"), "bucket must be set in evidence row"
+    assert sc_evidence == [], "No backfill evidence expected when slots are empty"
 
 
 def test_t206_backfill_no_op_when_no_sibling_has_data():
