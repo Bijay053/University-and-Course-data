@@ -275,15 +275,15 @@ export default function PublishingPage() {
           >
             <RefreshCw className="h-4 w-4 mr-1" /> Refresh
           </Button>
-          <Button
-            size="sm"
-            className="bg-indigo-600 hover:bg-indigo-700 text-white"
+          <button
             onClick={() => runPassMut.mutate()}
             disabled={runPassMut.isPending}
+            style={{ backgroundColor: '#4f46e5', color: '#ffffff' }}
+            className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded-md disabled:opacity-60 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
           >
-            <Play className="h-4 w-4 mr-1" />
+            <Play className="h-4 w-4" />
             {runPassMut.isPending ? "Running…" : "Run Publishing Pass"}
-          </Button>
+          </button>
         </div>
       </div>
 
