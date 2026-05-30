@@ -694,6 +694,36 @@ async def stage_course(
                 sc.id, university_id, exc,
             )
 
+    # ----- Phase 9: field verification engine -----
+    # Runs after evidence is flushed; computes cross-source agreement-based
+    # confidence and writes to field_verification_results. Also sets
+    # avg_verification_confidence on the staged row so the auto-publish gate
+    # can use it without an extra join. Wrapped in try/except — never blocks staging.
+    if evidence_count:
+        try:
+            from app.services.scraper.verification_engine import run_field_verification
+
+            v_summary = await run_field_verification(db, sc.id)
+            avg_vc = v_summary.get("avg_confidence")
+            if avg_vc is not None:
+                sc.avg_verification_confidence = avg_vc
+                # Re-evaluate auto_publish with the new confidence gate
+                ap2 = should_auto_publish(sc)
+                sc.auto_publish_status = "ready" if ap2.auto_publish else "review"
+                log.info(
+                    "verification_engine sc=%s avg_confidence=%.1f fields=%d verified=%d conflicts=%d → auto_publish=%s",
+                    sc.id, avg_vc,
+                    v_summary.get("field_count", 0),
+                    v_summary.get("verified_count", 0),
+                    v_summary.get("conflict_count", 0),
+                    sc.auto_publish_status,
+                )
+        except Exception as exc:  # noqa: BLE001
+            log.warning(
+                "verification engine failed for sc %s (uni %s): %s",
+                sc.id, university_id, exc,
+            )
+
     try:
         await db.commit()
     except Exception as exc:  # noqa: BLE001

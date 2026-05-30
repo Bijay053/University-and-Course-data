@@ -81,4 +81,16 @@ def should_auto_publish(sc: ScrapedCourse) -> AutoPublishDecision:
             f"Eligibility confidence {conf:.0f} < {_PHASE_A_MIN_COMPLETENESS} (Phase A floor)",
             score,
         )
+
+    # Phase 9: cross-source verification confidence gate.
+    # avg_verification_confidence is set by the verification engine after staging.
+    # Only gate when it has been computed (None = not yet run, allow through).
+    avg_vc = getattr(sc, "avg_verification_confidence", None)
+    if avg_vc is not None and avg_vc < _PHASE_A_MIN_COMPLETENESS:
+        return AutoPublishDecision(
+            False,
+            f"Avg verification confidence {avg_vc:.0f}% < {_PHASE_A_MIN_COMPLETENESS}% (Phase 9)",
+            score,
+        )
+
     return AutoPublishDecision(True, "ok", score)

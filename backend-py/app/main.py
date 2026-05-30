@@ -32,6 +32,7 @@ from app.routers import (
     search,
     universities,
     users,
+    verification,
 )
 
 logging.basicConfig(level=getattr(logging, settings.log_level.upper(), logging.INFO))
@@ -97,3 +98,4 @@ app.include_router(assessment_notes.router, prefix="/api", tags=["assessment-not
 app.include_router(users.router, prefix="/api", tags=["users"])
 app.include_router(performance.router, prefix="/api/performance", tags=["performance"])
 app.include_router(locations.router, prefix="/api", tags=["locations"])
+app.include_router(verification.router, prefix="/api", tags=["verification"])

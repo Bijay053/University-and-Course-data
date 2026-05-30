@@ -310,3 +310,75 @@ URL entered  (UI "Add by URL" → POST /api/universities/add-by-url)
 | 7b Quality action dispatcher | `quality_action_dispatcher.py`, `scrape_tasks.run_quality_actions` |
 | 8 CASCADE | `orchestrator.py` (end of `run_scrape`), `scrape_tasks.py` |
 | Frontend onboarding | `universities.tsx` ("Add by URL" modal) |
+| 9 Verification | `verification_engine.py`, `field_verification_results` table |
+
+---
+
+## Phase 9 — Verification & Confidence Engine
+
+After every course is staged, the verification engine cross-checks the
+`scraped_field_evidence` rows to produce a per-field confidence score based on
+**source agreement**, not just presence.
+
+### Source weights
+
+| Source type | Weight | Extraction methods |
+|---|---|---|
+| html | 30 | regex, CSS, heuristic, direct |
+| pdf | 30 | uni_pdf:*, pdf:*, cricos_match |
+| api | 30 | searchstax, json_api, solr |
+| pattern | 5 | sibling_cache, approved_row, pattern |
+| ai | 5 | gemini, ai_fallback, ai_primary |
+
+### Confidence formula
+
+```
+score = Σ weight(source) for each source whose value matches consensus
+If any source CONFLICTS: score = min(score // 2, 35), status = "conflict"
+
+Status:
+  verified       ≥ 85
+  likely_correct 60–84
+  needs_review   < 60 (no conflict)
+  conflict       any source disagrees (score capped at 35)
+```
+
+### Auto-publish gate (Phase 9 addition)
+
+`auto_publish.should_auto_publish()` now checks `avg_verification_confidence`:
+- `None` (engine not run yet) → does NOT block
+- `< 85` → blocks with reason "Phase 9: Avg verification confidence N% < 85%"
+
+### New tables / columns
+
+| Object | Purpose |
+|---|---|
+| `field_verification_results` | Per-field verification outcomes; UNIQUE on (sc_id, field) |
+| `scraped_courses.avg_verification_confidence` | Pre-computed avg for fast querying |
+
+### API endpoints
+
+```
+GET /api/verification/course/{sc_id}           — per-field detail
+GET /api/verification/university/{uni_id}/summary — uni-level summary
+GET /api/verification/dashboard                — fleet-wide metrics
+```
+
+### Frontend
+
+`university-detail.tsx` shows a "Verification Intelligence" card (sky-blue,
+Phase 9 badge) when `total_fields_verified > 0`.  Displays avg confidence,
+status breakdown bar, and top conflict fields.
+
+---
+
+## Session plan closeout (2026-05-30)
+
+| Task | Status | Notes |
+|---|---|---|
+| T001: _library_situation in auto_config | ✅ Done | auto_config_generator.py line 99 |
+| T002: CASCADE 70% + strategy exclusion | ✅ Done | orchestrator.py:2835 + exclude_strategies |
+| T003: Generic search API routing | ✅ Done | orchestrator.py:824-860 + generic_search_api.py |
+| T004: Frontend Add by URL | ✅ Done | universities.tsx + /api/universities/add-by-url |
+| T005: Architecture doc | ✅ Done | this file (backend-py/docs/autonomous_pipeline.md) |
+| Phase 9: Verification Engine | ✅ Done | verification_engine.py + migration 025 + UI |

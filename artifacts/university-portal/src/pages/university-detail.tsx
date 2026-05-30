@@ -436,6 +436,35 @@ export default function UniversityDetail() {
   const [probeLoading, setProbeLoading] = useState(false);
   const [probeCardOpen, setProbeCardOpen] = useState(false);
 
+  // ── Phase 9: Verification Intelligence panel ──────────────────────────────
+  type VerifSummary = {
+    university_id: number;
+    course_count: number;
+    total_fields_verified: number;
+    avg_confidence: number;
+    verified_rate: number;
+    conflict_rate: number;
+    low_confidence_rate: number;
+    auto_publish_safe_rate: number;
+    status_breakdown: { verified: number; likely_correct: number; needs_review: number; conflict: number };
+    field_breakdown: { field: string; avg_confidence: number; verified_count: number; conflict_count: number; total_count: number }[];
+  };
+  const [verifSummary, setVerifSummary] = useState<VerifSummary | null>(null);
+  const [verifCardOpen, setVerifCardOpen] = useState(false);
+
+  const fetchVerifSummary = useCallback(async () => {
+    if (!id) return;
+    try {
+      const res = await fetch(`${BASE}/api/verification/university/${id}/summary`);
+      if (!res.ok) return;
+      const data: VerifSummary = await res.json();
+      setVerifSummary(data);
+      if (data.total_fields_verified > 0) setVerifCardOpen(true);
+    } catch { /* silent */ }
+  }, [id]);
+
+  useEffect(() => { void fetchVerifSummary(); }, [fetchVerifSummary]);
+
   // ── Phase 2: Extraction Rules card ────────────────────────────────────────
   const [rulesCardOpen, setRulesCardOpen] = useState(false);
   type FillRate = { filled: number; total: number; rate: number };
@@ -1880,6 +1909,92 @@ export default function UniversityDetail() {
           {probeResult.probe_updated_at && (
             <div className="text-xs text-muted-foreground text-right">
               Last probed: {new Date(probeResult.probe_updated_at).toLocaleString()}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Phase 9: Verification Intelligence Card ─────────────────────── */}
+      {verifCardOpen && verifSummary && verifSummary.total_fields_verified > 0 && (
+        <div className="rounded-lg border border-sky-200 bg-sky-50 p-4 text-sm space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 font-semibold text-sky-800">
+              <svg className="h-4 w-4 text-sky-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="10"/></svg>
+              Verification Intelligence
+              <span className="text-[10px] bg-sky-100 border border-sky-300 text-sky-600 px-1.5 py-0.5 rounded font-mono">Phase 9</span>
+            </div>
+            <button onClick={() => setVerifCardOpen(false)} className="text-sky-600 hover:text-sky-900">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          {/* Top-line metrics */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="bg-white rounded-md border border-sky-200 p-2.5">
+              <div className="text-xs text-muted-foreground mb-0.5">Avg Confidence</div>
+              <div className={`text-2xl font-bold ${verifSummary.avg_confidence >= 85 ? "text-emerald-600" : verifSummary.avg_confidence >= 60 ? "text-amber-600" : "text-red-600"}`}>
+                {verifSummary.avg_confidence.toFixed(0)}%
+              </div>
+              <div className="text-xs text-muted-foreground">{verifSummary.total_fields_verified} fields × {verifSummary.course_count} courses</div>
+            </div>
+            <div className="bg-white rounded-md border border-emerald-200 p-2.5">
+              <div className="text-xs text-muted-foreground mb-0.5">Verified</div>
+              <div className="font-semibold text-emerald-600">{verifSummary.verified_rate.toFixed(0)}%</div>
+              <div className="text-xs text-muted-foreground">{verifSummary.status_breakdown.verified} fields</div>
+            </div>
+            <div className="bg-white rounded-md border border-red-200 p-2.5">
+              <div className="text-xs text-muted-foreground mb-0.5">Conflicts</div>
+              <div className={`font-semibold ${verifSummary.conflict_rate > 5 ? "text-red-600" : "text-gray-600"}`}>
+                {verifSummary.conflict_rate.toFixed(0)}%
+              </div>
+              <div className="text-xs text-muted-foreground">{verifSummary.status_breakdown.conflict} fields</div>
+            </div>
+            <div className="bg-white rounded-md border border-sky-200 p-2.5">
+              <div className="text-xs text-muted-foreground mb-0.5">Auto-publish Safe</div>
+              <div className={`font-semibold ${verifSummary.auto_publish_safe_rate >= 70 ? "text-emerald-600" : "text-amber-600"}`}>
+                {verifSummary.auto_publish_safe_rate.toFixed(0)}%
+              </div>
+              <div className="text-xs text-muted-foreground">courses ≥ 85% conf</div>
+            </div>
+          </div>
+
+          {/* Status distribution bar */}
+          {(() => {
+            const total = verifSummary.total_fields_verified;
+            const v = verifSummary.status_breakdown;
+            if (!total) return null;
+            return (
+              <div className="space-y-1">
+                <div className="text-xs text-muted-foreground">Field confidence distribution</div>
+                <div className="flex h-2.5 rounded-full overflow-hidden gap-px bg-gray-100">
+                  <div className="bg-emerald-500" style={{ width: `${v.verified / total * 100}%` }} title={`Verified: ${v.verified}`} />
+                  <div className="bg-blue-400" style={{ width: `${v.likely_correct / total * 100}%` }} title={`Likely correct: ${v.likely_correct}`} />
+                  <div className="bg-amber-400" style={{ width: `${v.needs_review / total * 100}%` }} title={`Needs review: ${v.needs_review}`} />
+                  <div className="bg-red-500" style={{ width: `${v.conflict / total * 100}%` }} title={`Conflict: ${v.conflict}`} />
+                </div>
+                <div className="flex flex-wrap gap-x-3 text-[10px] text-muted-foreground">
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />Verified {v.verified}</span>
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-400 inline-block" />Likely {v.likely_correct}</span>
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-400 inline-block" />Review {v.needs_review}</span>
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500 inline-block" />Conflict {v.conflict}</span>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Top conflict fields */}
+          {verifSummary.field_breakdown.filter(f => f.conflict_count > 0).slice(0, 5).length > 0 && (
+            <div>
+              <div className="text-xs font-medium text-red-700 mb-1.5">Fields with source conflicts</div>
+              <div className="space-y-1">
+                {verifSummary.field_breakdown.filter(f => f.conflict_count > 0).slice(0, 5).map(f => (
+                  <div key={f.field} className="flex items-center gap-2 bg-white rounded border border-red-100 px-2 py-1">
+                    <span className="text-xs font-mono text-gray-700 flex-1">{f.field.replace(/_/g, " ")}</span>
+                    <span className="text-[10px] text-red-600 font-medium">{f.conflict_count} conflicts</span>
+                    <span className="text-[10px] text-muted-foreground">{f.avg_confidence.toFixed(0)}% conf</span>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>

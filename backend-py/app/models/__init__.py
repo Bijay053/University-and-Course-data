@@ -29,6 +29,7 @@ from app.models.scrape_runtime import ScrapeRuntimeJob, ScrapeRuntimeLog
 from app.models.scraped_course import ScrapedCourse
 from app.models.scraping_change import ScrapingChange
 from app.models.performance_ledger import ScrapePerformanceLedger
+from app.models.field_verification import FieldVerificationResult
 from app.models.scraper_config_history import ScraperConfigHistory
 from app.models.scraping_job import ScrapingJob
 from app.models.university import University
@@ -50,6 +51,7 @@ __all__ = [
     "EnglishRequirement",
     "Fee",
     "FieldConflict",
+    "FieldVerificationResult",
     "ImportJob",
     "Intake",
     "Scholarship",
