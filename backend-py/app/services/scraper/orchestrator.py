@@ -1199,10 +1199,23 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     _injected, _moved, _insert_pos, len(links), uni_name,
                 )
 
-        summary["discovered"] = len(links)
-        log.info("Discovered %d candidate course links for %s", len(links), uni_name)
-        await emit("status", f"Discovered {len(links)} candidate course links", phase="discover", count=len(links))
-        # Update progress counters so UI sees total_found
+        # ── Raw discovery count (before any post-filter like must_contain) ───────
+        # summary["discovered"] will be updated again after must_contain filtering
+        # so the DB and UI always reflect the *extractable* count, not the raw one.
+        summary["discovered_raw"] = len(links)
+        summary["discovered"] = len(links)   # placeholder — overwritten below
+        log.info(
+            "Discovered %d raw candidate course link(s) for %s",
+            len(links), uni_name,
+        )
+        await emit(
+            "status",
+            f"Discovered {len(links)} raw candidate course link(s)",
+            phase="discover",
+            count=len(links),
+        )
+        # Update progress counters so UI sees total_found (pre-filter for now;
+        # overwritten after must_contain below with the post-filter count).
         job.total_found = len(links)
         job.heartbeat_at = datetime.now(timezone.utc)
         await db.commit()
@@ -1775,6 +1788,30 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     kept=len(links),
                     dropped_sample=_dropped_urls[:5],
                 )
+
+        # ── Post-filter discovered count ──────────────────────────────────────────
+        # Now that must_contain (and any other post-discovery filters) have run,
+        # lock in the true extractable count.  This is what the UI and DB show
+        # as "total_found" so operators immediately see when filters drop everything.
+        _raw = summary["discovered_raw"]
+        summary["discovered"] = len(links)
+        if len(links) != _raw:
+            log.info(
+                "[EXTRACT] post-filter: %d raw → %d extractable link(s) for %s",
+                _raw, len(links), uni_name,
+            )
+            await emit(
+                "status",
+                f"[FILTER] {_raw} raw → {len(links)} extractable link(s) after URL filters",
+                phase="extract",
+                raw=_raw,
+                extractable=len(links),
+            )
+        # Overwrite job.total_found so the completed job row in the DB and UI
+        # reflects the post-filter count, not the inflated raw count.
+        job.total_found = len(links)
+        job.heartbeat_at = datetime.now(timezone.utc)
+        await db.commit()
 
         await emit("status", f"Extracting course details ({len(links)} pages)...", phase="extract")
 
