@@ -355,7 +355,7 @@ export default function PublishingPage() {
               <button
                 key={f}
                 onClick={() => setDecisionFilter(f)}
-                className={`px-3 py-1 text-xs rounded-full border transition-colors ${
+                className={`px-3 py-1 text-xs rounded-full border transition-colors whitespace-nowrap ${
                   decisionFilter === f
                     ? "bg-indigo-600 text-white border-indigo-600"
                     : "bg-white text-slate-600 border-slate-200 hover:border-indigo-300"
