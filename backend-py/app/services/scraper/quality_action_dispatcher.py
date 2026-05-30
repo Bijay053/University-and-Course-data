@@ -312,14 +312,20 @@ def _dispatch_browser_retry(university_id: int, job_id: str) -> bool:
 # ── Avg completeness helper ───────────────────────────────────────────────────
 
 async def get_avg_completeness(job_id: str, db: Any) -> float:
-    """Fast SQL average of completeness for staged courses of this job."""
+    """Fast SQL average of completeness for staged courses of this job.
+
+    Returns a value in the 0.0–1.0 range.  The ``scraped_courses.completeness``
+    column stores 0–100 integers (set by ``compute_completeness`` in
+    completeness.py), so we divide by 100 here so callers can compare against
+    the 0–1 thresholds used throughout this module (_ACT_THRESHOLD, _WEAK_FILL).
+    """
     from sqlalchemy import text as _sql
     row = (await db.execute(
         _sql("SELECT AVG(completeness) FROM scraped_courses"
              " WHERE scrape_job_id = :j AND completeness IS NOT NULL"),
         {"j": job_id},
     )).scalar()
-    return float(row) if row is not None else 0.0
+    return round(float(row) / 100, 4) if row is not None else 0.0
 
 
 # ── Public entry point ────────────────────────────────────────────────────────

@@ -2886,7 +2886,9 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                         _P7SC.completeness.isnot(None),
                     )
                 )).scalar()
-                _p7_avg = float(_p7_avg_row) if _p7_avg_row is not None else 0.0
+                # scraped_courses.completeness stores 0-100 integers; divide
+                # by 100 to get 0-1 fraction for comparison against _ACT_THRESHOLD.
+                _p7_avg = (float(_p7_avg_row) / 100.0) if _p7_avg_row is not None else 0.0
                 _p7_staged = int(summary.get("staged") or 0)
                 # cascade_repair_fired = True when extraction_failure path ran
                 # (_avg < 70 % in the CASCADE block above).  We recompute from

@@ -165,9 +165,11 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
   const [qualityData, setQualityData] = useState<QualityData | null>(null);
   const [qualityLoading, setQualityLoading] = useState(false);
   const [qualityError, setQualityError] = useState<string | null>(null);
-  const [qualityTriggering, setQualityTriggering] = useState(false);
-  const [qualityTriggered, setQualityTriggered] = useState(false);
+  // Optimizer run lifecycle: idle → queued → polling → done
+  const [qualityStatus, setQualityStatus] = useState<"idle" | "queued" | "polling" | "done">("idle");
   const [showQualityPanel, setShowQualityPanel] = useState(true);
+  const qualityPollRef = useRef<number | null>(null);
+  const qualityTriggerTimeRef = useRef<number>(0);
 
   const pollRef = useRef<number | null>(null);
   const logIndexRef = useRef(0);
@@ -226,8 +228,8 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
     setCompletedJobId(null);
     setQualityData(null);
     setQualityError(null);
-    setQualityTriggering(false);
-    setQualityTriggered(false);
+    setQualityStatus("idle");
+    if (qualityPollRef.current) { clearTimeout(qualityPollRef.current); qualityPollRef.current = null; }
     setUniName("");
   }, [slotKey, startTimeKey]);
 
@@ -253,9 +255,11 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
   }, []);
 
   const handleRunOptimizer = useCallback(async () => {
-    if (!completedJobId || qualityTriggering) return;
-    setQualityTriggering(true);
-    setQualityTriggered(false);
+    if (!completedJobId || qualityStatus === "queued" || qualityStatus === "polling") return;
+    setQualityStatus("queued");
+    setQualityError(null);
+    qualityTriggerTimeRef.current = Date.now();
+
     try {
       const res = await fetch(`/api/scrape/jobs/${completedJobId}/run-quality-optimizer`, {
         method: "POST",
@@ -264,17 +268,52 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
       if (!res.ok) {
         const msg = await getFetchErrorMessage(res);
         setQualityError(msg || `Error ${res.status}`);
+        setQualityStatus("idle");
         return;
       }
-      setQualityTriggered(true);
-      // Re-fetch after 35s to show updated results
-      setTimeout(() => fetchQualityData(completedJobId), 35000);
     } catch (e) {
       setQualityError(String(e));
-    } finally {
-      setQualityTriggering(false);
+      setQualityStatus("idle");
+      return;
     }
-  }, [completedJobId, qualityTriggering, fetchQualityData]);
+
+    // ── Polling loop: check every 5s for up to 2 minutes ─────────────────
+    setQualityStatus("polling");
+    const triggerTime = qualityTriggerTimeRef.current;
+    const POLL_INTERVAL = 5000;
+    const MAX_WAIT_MS = 2 * 60 * 1000;
+    let elapsed = 0;
+
+    const poll = async () => {
+      if (elapsed >= MAX_WAIT_MS) {
+        setQualityStatus("done");
+        setQualityError("Optimizer timed out — check back shortly or click Refresh.");
+        return;
+      }
+      try {
+        const r = await fetch(`/api/scrape/jobs/${completedJobId}/quality-actions`, {
+          cache: "no-store", headers: { "Cache-Control": "no-cache" },
+        });
+        if (r.ok) {
+          const data = await readResponseJson<QualityData>(r);
+          if (data) {
+            setQualityData(data);
+            // Stop polling once a last_run with a timestamp newer than trigger appears.
+            const ts = data.last_run?.timestamp;
+            if (ts && new Date(ts).getTime() >= triggerTime - 5000) {
+              setQualityStatus("done");
+              return;
+            }
+          }
+        }
+      } catch { /* network blip — keep polling */ }
+
+      elapsed += POLL_INTERVAL;
+      qualityPollRef.current = window.setTimeout(poll, POLL_INTERVAL);
+    };
+
+    qualityPollRef.current = window.setTimeout(poll, POLL_INTERVAL);
+  }, [completedJobId, qualityStatus, fetchQualityData]);
 
   // Auto-fetch quality data when job completes
   useEffect(() => {
@@ -691,14 +730,24 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
                     <Zap className="w-3.5 h-3.5 text-violet-600" />
                     <span className="text-xs font-semibold text-violet-800">Quality Optimizer</span>
                     {qualityLoading && <Loader2 className="w-3 h-3 animate-spin text-violet-400" />}
-                    {qualityData?.performance.pushed_above_threshold && (
+                    {qualityData?.performance.pushed_above_threshold && qualityStatus === "idle" && (
                       <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-medium">
                         ↑ Pushed to 85%+
                       </span>
                     )}
-                    {qualityTriggered && (
-                      <span className="text-[10px] bg-violet-100 text-violet-700 px-1.5 py-0.5 rounded-full font-medium">
-                        Queued — refreshing in 35s…
+                    {qualityStatus === "queued" && (
+                      <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-medium flex items-center gap-1">
+                        <Loader2 className="w-2.5 h-2.5 animate-spin" /> Queuing…
+                      </span>
+                    )}
+                    {qualityStatus === "polling" && (
+                      <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full font-medium flex items-center gap-1">
+                        <Loader2 className="w-2.5 h-2.5 animate-spin" /> Running…
+                      </span>
+                    )}
+                    {qualityStatus === "done" && !qualityError && (
+                      <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-medium">
+                        ✓ Complete
                       </span>
                     )}
                   </div>
@@ -788,10 +837,12 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
                         ) : (
                           <div className="text-[10px] text-gray-400 italic">
                             {qualityData.last_run
-                              ? "No actions were evaluated."
+                              ? "No actions taken — all fields already meet quality thresholds."
                               : qualityData.current_avg_completeness >= 0.85
-                              ? "Completeness already ≥85% — optimizer not triggered."
-                              : "No Phase 7 actions recorded yet for this job."}
+                              ? "Completeness already ≥85% — optimizer not required. You can still run it manually."
+                              : qualityStatus === "polling"
+                              ? "Optimizer running — results will appear here when complete."
+                              : "No quality actions recorded yet. Run the optimizer below."}
                           </div>
                         )}
 
@@ -821,23 +872,39 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
                     )}
 
                     {/* Actions row */}
-                    <div className="flex items-center gap-2 pt-1 border-t border-gray-100">
+                    <div className="flex items-center gap-2 pt-1 border-t border-gray-100 flex-wrap">
                       <Button
                         onClick={handleRunOptimizer}
-                        disabled={qualityTriggering || qualityLoading}
+                        disabled={qualityStatus === "queued" || qualityStatus === "polling" || qualityLoading}
                         size="sm"
                         variant="outline"
-                        className="h-7 text-xs border-violet-300 text-violet-700 hover:bg-violet-50"
+                        className={`h-7 text-xs ${
+                          qualityData && qualityData.current_avg_completeness >= 0.85
+                            ? "border-gray-300 text-gray-500 hover:bg-gray-50"
+                            : "border-violet-300 text-violet-700 hover:bg-violet-50"
+                        }`}
+                        title={qualityData && qualityData.current_avg_completeness >= 0.85
+                          ? "Completeness already ≥85% — optimizer not required, but you can still run it manually"
+                          : undefined}
                       >
-                        {qualityTriggering
+                        {qualityStatus === "queued"
                           ? <><Loader2 className="w-3 h-3 animate-spin mr-1" />Queuing…</>
+                          : qualityStatus === "polling"
+                          ? <><Loader2 className="w-3 h-3 animate-spin mr-1" />Running…</>
+                          : qualityData && qualityData.current_avg_completeness >= 0.85
+                          ? <><Zap className="w-3 h-3 mr-1" />Run Anyway</>
                           : <><Zap className="w-3 h-3 mr-1" />Run Quality Optimizer</>}
                       </Button>
+                      {qualityData && qualityData.current_avg_completeness >= 0.85 && qualityStatus === "idle" && (
+                        <span className="text-[10px] text-gray-400 italic">
+                          Optimizer not required — completeness already ≥85%
+                        </span>
+                      )}
                       <button
                         type="button"
-                        onClick={() => fetchQualityData(completedJobId)}
+                        onClick={() => completedJobId && fetchQualityData(completedJobId)}
                         disabled={qualityLoading}
-                        className="text-[10px] text-gray-400 hover:text-gray-600 disabled:opacity-50"
+                        className="text-[10px] text-gray-400 hover:text-gray-600 disabled:opacity-50 ml-auto"
                       >
                         ↻ Refresh
                       </button>

@@ -2925,7 +2925,9 @@ async def get_job_quality_actions(
         cfg = row.get("scrape_config") or {}
         p7_last_run = cfg.get("_p7_last_run")
 
-    # Current avg completeness for this job
+    # Current avg completeness for this job.
+    # scraped_courses.completeness stores 0-100 integers; divide by 100 so
+    # the response is always in 0.0-1.0 range (frontend multiplies by 100).
     job_avg_scalar = (await db.execute(
         text(
             "SELECT AVG(completeness) FROM scraped_courses"
@@ -2933,14 +2935,15 @@ async def get_job_quality_actions(
         ),
         {"j": job_id},
     )).scalar()
-    current_avg = round(float(job_avg_scalar or 0), 3)
+    current_avg = round(float(job_avg_scalar or 0) / 100.0, 4)
 
-    # Performance across all jobs for this university
+    # Performance across all jobs for this university.
+    # completeness is stored as 0-100, so thresholds are ×100.
     perf_row = (await db.execute(
         text("""
             SELECT
-                COUNT(*) FILTER (WHERE avg_comp >= 0.70 AND avg_comp < 0.85) AS jobs_in_gap,
-                COUNT(*) FILTER (WHERE avg_comp >= 0.85)                      AS jobs_above_threshold
+                COUNT(*) FILTER (WHERE avg_comp >= 70 AND avg_comp < 85) AS jobs_in_gap,
+                COUNT(*) FILTER (WHERE avg_comp >= 85)                    AS jobs_above_threshold
             FROM (
                 SELECT scrape_job_id, AVG(completeness) AS avg_comp
                 FROM scraped_courses
@@ -2961,6 +2964,18 @@ async def get_job_quality_actions(
     if p7_last_run:
         before = float(p7_last_run.get("overall_before") or 0.0)
         after = float(p7_last_run.get("overall_after") or 0.0)
+        # Backward compat: old entries stored 0-100 values before the fix.
+        # Normalise anything > 1.0 to 0-1 range.
+        if before > 1.0:
+            before = before / 100.0
+        if after > 1.0:
+            after = after / 100.0
+        # Patch the last_run dict so callers receive normalised values.
+        p7_last_run = {
+            **p7_last_run,
+            "overall_before": round(before, 4),
+            "overall_after": round(after, 4),
+        }
         gain = round((after - before) * 100, 1)
         pushed = before < 0.85 and after >= 0.85
 
