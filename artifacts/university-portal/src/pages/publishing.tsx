@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Send, CheckCircle2, AlertTriangle, Clock, Zap, BarChart3,
   RefreshCw, ThumbsUp, ThumbsDown, Pause, FileText, TrendingUp,
-  ChevronDown, ChevronUp, Info, Play, Search,
+  ChevronDown, ChevronUp, Info, Play, Search, Building2, X, ArrowRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -77,6 +77,65 @@ interface LedgerEntry {
   actor: string;
   reason: string | null;
   created_at: string | null;
+}
+
+interface UniSummary {
+  university_id: number;
+  university_name: string;
+  university_country: string;
+  total_courses: number;
+  auto_published: number;
+  needs_review: number;
+  held: number;
+  avg_pub_score: number;
+  avg_confidence: number;
+  avg_completeness: number;
+  total_open_conflicts: number;
+  total_critical_conflicts: number;
+  conflict_free_rate: number;
+  publish_health: number;
+  health_status: "Excellent" | "Good" | "Needs Attention" | "At Risk";
+}
+
+function HealthBar({ score }: { score: number }) {
+  const pct = Math.min(100, Math.max(0, score));
+  const color = score >= 90 ? "#10b981" : score >= 80 ? "#3b82f6" : score >= 70 ? "#f59e0b" : "#ef4444";
+  return (
+    <div className="flex items-center gap-2 min-w-[100px]">
+      <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+        <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: color }} />
+      </div>
+      <span className="text-xs font-bold tabular-nums w-10 text-right" style={{ color }}>{score}%</span>
+    </div>
+  );
+}
+
+function HealthStatusBadge({ status }: { status: UniSummary["health_status"] }) {
+  const cfg: Record<string, { bg: string; text: string }> = {
+    "Excellent":       { bg: "#d1fae5", text: "#065f46" },
+    "Good":            { bg: "#dbeafe", text: "#1e40af" },
+    "Needs Attention": { bg: "#fef3c7", text: "#92400e" },
+    "At Risk":         { bg: "#fee2e2", text: "#991b1b" },
+  };
+  const c = cfg[status] ?? { bg: "#f1f5f9", text: "#475569" };
+  return (
+    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold"
+      style={{ backgroundColor: c.bg, color: c.text }}>
+      {status}
+    </span>
+  );
+}
+
+function MiniBar({ value, max, color }: { value: number; max: number; color: string }) {
+  const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0;
+  return (
+    <div className="flex items-center gap-1.5">
+      <div className="w-14 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+        <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: color }} />
+      </div>
+      <span className="text-xs tabular-nums">{value}</span>
+    </div>
+  );
 }
 
 function ScoreBar({ score }: { score: number | null }) {
@@ -172,7 +231,7 @@ function fmtDate(iso: string | null) {
 export default function PublishingPage() {
   const { toast } = useToast();
   const qc = useQueryClient();
-  const [tab, setTab] = useState<"queue" | "ledger">("queue");
+  const [tab, setTab] = useState<"health" | "queue" | "ledger">("health");
   const [decisionFilter, setDecisionFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
   const [pageSize, setPageSize] = useState(25);
@@ -183,6 +242,7 @@ export default function PublishingPage() {
   const [ledgerPage, setLedgerPage] = useState(1);
   const [ledgerPageSize, setLedgerPageSize] = useState(25);
   const [pendingItemId, setPendingItemId] = useState<number | null>(null);
+  const [universityFilter, setUniversityFilter] = useState<{ id: number; name: string } | null>(null);
 
   const { data: stats, isLoading: statsLoading } = useQuery<PubStats>({
     queryKey: ["pub-stats"],
@@ -203,6 +263,12 @@ export default function PublishingPage() {
     refetchInterval: 30000,
   });
 
+  const { data: uniSummary = [], isLoading: uniSummaryLoading } = useQuery<UniSummary[]>({
+    queryKey: ["pub-uni-summary"],
+    queryFn: () => apiFetch("/api/publishing/university-summary"),
+    refetchInterval: 30000,
+  });
+
   const runPassMut = useMutation({
     mutationFn: () => apiFetch("/api/publishing/run", { method: "POST", body: JSON.stringify({}) }),
     onSuccess: (d) => {
@@ -213,6 +279,7 @@ export default function PublishingPage() {
       qc.invalidateQueries({ queryKey: ["pub-stats"] });
       qc.invalidateQueries({ queryKey: ["pub-queue"] });
       qc.invalidateQueries({ queryKey: ["pub-ledger"] });
+      qc.invalidateQueries({ queryKey: ["pub-uni-summary"] });
     },
     onError: (e) => toast({ title: "Run failed", description: String(e), variant: "destructive" }),
   });
@@ -230,6 +297,7 @@ export default function PublishingPage() {
         qc.invalidateQueries({ queryKey: ["pub-stats"] });
         qc.invalidateQueries({ queryKey: ["pub-queue"] });
         qc.invalidateQueries({ queryKey: ["pub-ledger"] });
+        qc.invalidateQueries({ queryKey: ["pub-uni-summary"] });
         setActionReason(r => { const n = { ...r }; delete n[id]; return n; });
         setPendingItemId(null);
       },
@@ -249,18 +317,19 @@ export default function PublishingPage() {
     });
   }
 
-  useEffect(() => { setPage(1); }, [search, decisionFilter, pageSize]);
+  useEffect(() => { setPage(1); }, [search, decisionFilter, pageSize, universityFilter]);
   useEffect(() => { setLedgerPage(1); }, [ledgerSearch, ledgerPageSize]);
 
   const queueByDecision = {
-    all: queue.length,
-    auto_publish: queue.filter(r => r.pub_decision === "auto_publish").length,
-    needs_review: queue.filter(r => r.pub_decision === "needs_review").length,
-    hold: queue.filter(r => r.pub_decision === "hold").length,
+    all: queue.filter(r => !universityFilter || r.university_id === universityFilter.id).length,
+    auto_publish: queue.filter(r => r.pub_decision === "auto_publish" && (!universityFilter || r.university_id === universityFilter.id)).length,
+    needs_review: queue.filter(r => r.pub_decision === "needs_review" && (!universityFilter || r.university_id === universityFilter.id)).length,
+    hold: queue.filter(r => r.pub_decision === "hold" && (!universityFilter || r.university_id === universityFilter.id)).length,
   };
 
   const searchLower = search.toLowerCase();
   const filteredQueue = queue.filter(r => {
+    if (universityFilter && r.university_id !== universityFilter.id) return false;
     if (decisionFilter !== "all" && r.pub_decision !== decisionFilter) return false;
     if (searchLower && !r.course_name.toLowerCase().includes(searchLower) && !r.university_name.toLowerCase().includes(searchLower)) return false;
     return true;
@@ -300,6 +369,7 @@ export default function PublishingPage() {
               qc.invalidateQueries({ queryKey: ["pub-stats"] });
               qc.invalidateQueries({ queryKey: ["pub-queue"] });
               qc.invalidateQueries({ queryKey: ["pub-ledger"] });
+              qc.invalidateQueries({ queryKey: ["pub-uni-summary"] });
               toast({ title: "Refreshed", description: "Stats and queue updated." });
             }}
           >
@@ -360,7 +430,7 @@ export default function PublishingPage() {
 
       {/* Tabs */}
       <div className="flex gap-1 bg-muted rounded-md p-1 w-fit">
-        {([["queue", "Review Queue"], ["ledger", "Publishing Ledger"]] as const).map(([t, label]) => (
+        {([["health", "University Health"], ["queue", "Review Queue"], ["ledger", "Publishing Ledger"]] as const).map(([t, label]) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -369,18 +439,165 @@ export default function PublishingPage() {
             }`}
           >
             {label}
-            {t === "queue" && queue.length > 0 && (
+            {t === "health" && uniSummary.length > 0 && (
               <span className="ml-2 inline-flex items-center justify-center min-w-[18px] h-[18px] rounded-full bg-indigo-600 text-white text-[10px] font-bold px-1">
-                {queue.length}
+                {uniSummary.length}
+              </span>
+            )}
+            {t === "queue" && queue.length > 0 && (
+              <span className="ml-2 inline-flex items-center justify-center min-w-[18px] h-[18px] rounded-full bg-amber-500 text-white text-[10px] font-bold px-1">
+                {queue.filter(r => r.pub_decision === "needs_review" || r.pub_decision === "hold").length}
               </span>
             )}
           </button>
         ))}
       </div>
 
+      {/* University Health Dashboard */}
+      {tab === "health" && (
+        <div className="space-y-4">
+          {uniSummaryLoading ? (
+            <div className="text-center py-16 text-muted-foreground text-sm">
+              <RefreshCw className="h-6 w-6 animate-spin mx-auto mb-2 text-indigo-400" />
+              Loading university health data…
+            </div>
+          ) : uniSummary.length === 0 ? (
+            <div className="bg-white border rounded-lg p-16 text-center">
+              <Building2 className="h-12 w-12 mx-auto mb-3 text-muted-foreground/30" />
+              <p className="font-medium text-muted-foreground">No scored courses yet</p>
+              <p className="text-sm text-muted-foreground mt-1">Run a Publishing Pass to score courses, then come back here.</p>
+            </div>
+          ) : (
+            <>
+              {/* Legend */}
+              <div className="bg-slate-50 border border-slate-200 rounded-lg px-4 py-3">
+                <p className="text-xs font-semibold text-slate-700 mb-1.5">Publish Health Formula</p>
+                <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-slate-600">
+                  <span><strong>40%</strong> Avg Publishing Score</span>
+                  <span><strong>30%</strong> Avg Verification Confidence</span>
+                  <span><strong>20%</strong> Avg Completeness</span>
+                  <span><strong>10%</strong> Conflict-Free Rate</span>
+                </div>
+                <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs">
+                  <span style={{ color: "#065f46" }}>● 90–100% Excellent</span>
+                  <span style={{ color: "#1e40af" }}>● 80–89% Good</span>
+                  <span style={{ color: "#92400e" }}>● 70–79% Needs Attention</span>
+                  <span style={{ color: "#991b1b" }}>● &lt;70% At Risk</span>
+                </div>
+              </div>
+
+              <div className="bg-white border rounded-lg overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b bg-slate-50">
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 whitespace-nowrap">University</th>
+                        <th className="px-3 py-3 text-center text-xs font-semibold text-slate-600 whitespace-nowrap">Total</th>
+                        <th className="px-3 py-3 text-center text-xs font-semibold text-emerald-700 whitespace-nowrap">Auto Published</th>
+                        <th className="px-3 py-3 text-center text-xs font-semibold text-amber-700 whitespace-nowrap">Needs Review</th>
+                        <th className="px-3 py-3 text-center text-xs font-semibold text-rose-700 whitespace-nowrap">Held</th>
+                        <th className="px-3 py-3 text-left text-xs font-semibold text-slate-600 whitespace-nowrap">Avg Score</th>
+                        <th className="px-3 py-3 text-left text-xs font-semibold text-slate-600 whitespace-nowrap">Avg Confidence</th>
+                        <th className="px-3 py-3 text-left text-xs font-semibold text-slate-600 whitespace-nowrap">Avg Completeness</th>
+                        <th className="px-3 py-3 text-center text-xs font-semibold text-slate-600 whitespace-nowrap">Conflicts</th>
+                        <th className="px-3 py-3 text-left text-xs font-semibold text-slate-600 whitespace-nowrap">Publish Health</th>
+                        <th className="px-3 py-3 text-center text-xs font-semibold text-slate-600 whitespace-nowrap">Status</th>
+                        <th className="px-3 py-3 text-center text-xs font-semibold text-slate-600 whitespace-nowrap"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {uniSummary.map(u => (
+                        <tr
+                          key={u.university_id}
+                          className="hover:bg-indigo-50/50 transition-colors cursor-pointer group"
+                          onClick={() => {
+                            setUniversityFilter({ id: u.university_id, name: u.university_name });
+                            setDecisionFilter("all");
+                            setSearch("");
+                            setTab("queue");
+                          }}
+                        >
+                          <td className="px-4 py-3">
+                            <div className="font-medium text-sm text-slate-900">{u.university_name}</div>
+                            {u.university_country && (
+                              <div className="text-xs text-muted-foreground">{u.university_country}</div>
+                            )}
+                          </td>
+                          <td className="px-3 py-3 text-center">
+                            <span className="text-sm font-semibold tabular-nums">{u.total_courses}</span>
+                          </td>
+                          <td className="px-3 py-3">
+                            <MiniBar value={u.auto_published} max={u.total_courses} color="#10b981" />
+                          </td>
+                          <td className="px-3 py-3">
+                            <MiniBar value={u.needs_review} max={u.total_courses} color="#f59e0b" />
+                          </td>
+                          <td className="px-3 py-3">
+                            <MiniBar value={u.held} max={u.total_courses} color="#ef4444" />
+                          </td>
+                          <td className="px-3 py-3">
+                            <ScoreBar score={u.avg_pub_score} />
+                          </td>
+                          <td className="px-3 py-3">
+                            <ScoreBar score={u.avg_confidence} />
+                          </td>
+                          <td className="px-3 py-3">
+                            <ScoreBar score={u.avg_completeness} />
+                          </td>
+                          <td className="px-3 py-3 text-center">
+                            {u.total_critical_conflicts > 0 ? (
+                              <div className="flex flex-col items-center gap-0.5">
+                                <span className="text-xs font-semibold text-rose-600">{u.total_critical_conflicts} critical</span>
+                                {u.total_open_conflicts > 0 && (
+                                  <span className="text-xs text-slate-400">{u.total_open_conflicts} open</span>
+                                )}
+                              </div>
+                            ) : u.total_open_conflicts > 0 ? (
+                              <span className="text-xs text-slate-500">{u.total_open_conflicts} open</span>
+                            ) : (
+                              <span className="text-xs text-emerald-600 font-medium">None</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-3">
+                            <HealthBar score={u.publish_health} />
+                          </td>
+                          <td className="px-3 py-3 text-center">
+                            <HealthStatusBadge status={u.health_status} />
+                          </td>
+                          <td className="px-3 py-3 text-center">
+                            <ArrowRight className="h-4 w-4 text-slate-300 group-hover:text-indigo-500 transition-colors" />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="px-4 py-2 border-t bg-slate-50 text-xs text-muted-foreground">
+                  {uniSummary.length} {uniSummary.length === 1 ? "university" : "universities"} with scored courses · Click any row to drill into its course queue
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
       {/* Review Queue */}
       {tab === "queue" && (
         <div className="space-y-4">
+          {/* University filter banner */}
+          {universityFilter && (
+            <div className="flex items-center gap-2 bg-indigo-50 border border-indigo-200 rounded-lg px-4 py-2.5">
+              <Building2 className="h-4 w-4 text-indigo-600 shrink-0" />
+              <span className="text-sm text-indigo-900 font-medium">Filtered: {universityFilter.name}</span>
+              <span className="text-xs text-indigo-600 ml-1">— showing courses from this university only</span>
+              <button
+                onClick={() => setUniversityFilter(null)}
+                className="ml-auto flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-800 font-medium"
+              >
+                <X className="h-3.5 w-3.5" /> Clear filter
+              </button>
+            </div>
+          )}
           {/* Toolbar: decision pills + search + page size */}
           <div className="flex flex-wrap items-center gap-2">
             {/* Decision filter pills */}

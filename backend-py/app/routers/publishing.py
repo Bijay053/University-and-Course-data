@@ -12,6 +12,7 @@ from app.services.publishing_engine import (
     get_ledger,
     get_publishing_stats,
     get_review_queue,
+    get_university_summary,
     manually_approve,
     manually_hold,
     manually_reject,
@@ -29,6 +30,11 @@ router = APIRouter()
 @router.get("/publishing/stats")
 async def publishing_stats(db: Annotated[AsyncSession, Depends(get_db)]):
     return await get_publishing_stats(db)
+
+
+@router.get("/publishing/university-summary")
+async def university_summary(db: Annotated[AsyncSession, Depends(get_db)]):
+    return await get_university_summary(db)
 
 
 # ── Review queue ───────────────────────────────────────────────────────────────

@@ -13,7 +13,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Any
 
-from sqlalchemy import and_, case, func, select
+from sqlalchemy import and_, case, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.field_conflict import FieldConflict
@@ -318,6 +318,128 @@ async def get_publishing_stats(db: AsyncSession) -> dict:
         "auto_publish_rate": auto_rate,
         "published_today": today.get("auto_published", 0) + today.get("manually_published", 0),
     }
+
+
+# ── University publishing summary ─────────────────────────────────────────────
+
+async def get_university_summary(db: AsyncSession) -> list[dict]:
+    """Aggregate per-university publishing health for the management dashboard."""
+    # Base aggregation — one row per university
+    base_result = await db.execute(
+        select(
+            ScrapedCourse.university_id,
+            University.name.label("university_name"),
+            University.country.label("university_country"),
+            func.count(ScrapedCourse.id).label("total_courses"),
+            func.count(ScrapedCourse.id).filter(
+                ScrapedCourse.pub_decision == "auto_publish"
+            ).label("auto_published"),
+            func.count(ScrapedCourse.id).filter(
+                ScrapedCourse.pub_decision == "needs_review"
+            ).label("needs_review"),
+            func.count(ScrapedCourse.id).filter(
+                ScrapedCourse.pub_decision == "hold"
+            ).label("held"),
+            func.avg(ScrapedCourse.pub_score).label("avg_pub_score"),
+            func.avg(
+                func.coalesce(
+                    ScrapedCourse.avg_verification_confidence,
+                    ScrapedCourse.eligibility_confidence,
+                )
+            ).label("avg_confidence"),
+            func.avg(ScrapedCourse.completeness).label("avg_completeness"),
+        )
+        .join(University, University.id == ScrapedCourse.university_id)
+        .where(
+            ScrapedCourse.status.in_(["pending", "review"]),
+            ScrapedCourse.pub_decision.isnot(None),
+        )
+        .group_by(ScrapedCourse.university_id, University.name, University.country)
+        .order_by(University.name)
+    )
+    base_rows = base_result.all()
+
+    if not base_rows:
+        return []
+
+    # JSONB conflict aggregation — single query for all universities
+    conflict_result = await db.execute(text("""
+        SELECT
+            sc.university_id,
+            SUM(COALESCE((sc.pub_score_breakdown->>'open_conflicts')::int, 0))
+                AS total_open,
+            SUM(COALESCE((sc.pub_score_breakdown->>'critical_conflicts')::int, 0))
+                AS total_critical,
+            SUM(CASE
+                WHEN COALESCE((sc.pub_score_breakdown->>'critical_conflicts')::int, 0) = 0
+                THEN 1 ELSE 0
+            END) AS conflict_free_count
+        FROM scraped_courses sc
+        WHERE sc.status IN ('pending', 'review')
+          AND sc.pub_decision IS NOT NULL
+          AND sc.pub_score_breakdown IS NOT NULL
+        GROUP BY sc.university_id
+    """))
+    conflict_map: dict[int, dict] = {
+        row.university_id: {
+            "open": int(row.total_open or 0),
+            "critical": int(row.total_critical or 0),
+            "conflict_free": int(row.conflict_free_count or 0),
+        }
+        for row in conflict_result.all()
+    }
+
+    out: list[dict] = []
+    for row in base_rows:
+        total = int(row.total_courses)
+        avg_score = round(float(row.avg_pub_score or 0), 1)
+        # Fallback: use avg_score when confidence not computed
+        avg_conf = round(float(row.avg_confidence or avg_score), 1)
+        avg_comp = round(float(row.avg_completeness or 0), 1)
+
+        c = conflict_map.get(row.university_id, {"open": 0, "critical": 0, "conflict_free": total})
+        conflict_free_rate = round(c["conflict_free"] / total * 100, 1) if total else 100.0
+
+        # Health = 40% pub_score + 30% confidence + 20% completeness + 10% conflict-free rate
+        health = round(
+            0.40 * avg_score
+            + 0.30 * avg_conf
+            + 0.20 * avg_comp
+            + 0.10 * conflict_free_rate,
+            1,
+        )
+        health = min(100.0, max(0.0, health))
+
+        if health >= 90:
+            health_status = "Excellent"
+        elif health >= 80:
+            health_status = "Good"
+        elif health >= 70:
+            health_status = "Needs Attention"
+        else:
+            health_status = "At Risk"
+
+        out.append({
+            "university_id": row.university_id,
+            "university_name": row.university_name,
+            "university_country": row.university_country or "",
+            "total_courses": total,
+            "auto_published": int(row.auto_published),
+            "needs_review": int(row.needs_review),
+            "held": int(row.held),
+            "avg_pub_score": avg_score,
+            "avg_confidence": avg_conf,
+            "avg_completeness": avg_comp,
+            "total_open_conflicts": c["open"],
+            "total_critical_conflicts": c["critical"],
+            "conflict_free_rate": conflict_free_rate,
+            "publish_health": health,
+            "health_status": health_status,
+        })
+
+    # Worst health first so At Risk universities surface to top
+    out.sort(key=lambda x: x["publish_health"])
+    return out
 
 
 # ── Review queue ───────────────────────────────────────────────────────────────
