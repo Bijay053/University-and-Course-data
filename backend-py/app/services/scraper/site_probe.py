@@ -163,6 +163,10 @@ class SiteProfile:
     is_js_spa: bool = False
     spa_framework: str | None = None
 
+    # Phase 4A: CMS/platform fingerprint (set by _detect_cms_platform)
+    # More specific than library_stack.situation — used as pattern_store key.
+    cms_platform: str | None = None
+
     # Search APIs embedded in the page source
     detected_apis: list[DetectedAPI] = field(default_factory=list)
 
@@ -199,6 +203,7 @@ class SiteProfile:
             "is_bot_protected": self.is_bot_protected,
             "is_js_spa": self.is_js_spa,
             "spa_framework": self.spa_framework,
+            "cms_platform": self.cms_platform,
             "detected_apis": [
                 {
                     "provider": a.provider,
@@ -251,6 +256,10 @@ async def probe_site(url: str, timeout: float = 15.0) -> SiteProfile:
     # Stage 3: JS SPA detection (only if site responded)
     if html and not profile.is_cloudflare_blocked:
         _detect_spa(html, profile)
+
+    # Stage 3.5: CMS/platform fingerprinting (Phase 4A)
+    if html and not profile.is_cloudflare_blocked:
+        _detect_cms_platform(html, profile)
 
     # Stage 4: Hidden search-API detection in page source
     if html:
@@ -347,6 +356,126 @@ def _detect_spa(html: str, profile: SiteProfile) -> None:
     elif _SPA_SCRIPT_PATTERNS.search(html) and profile.static_html_bytes < 30_000:
         profile.is_js_spa = True
         profile.notes.append("Chunked JS bundle pattern detected — likely SPA")
+
+
+# ── Phase 4A: CMS platform fingerprinting ────────────────────────────────────
+
+def _detect_cms_platform(html: str, profile: SiteProfile) -> None:  # noqa: PLR0912
+    """Detect CMS/platform from HTML source fingerprints (Phase 4A).
+
+    Runs after _detect_spa so spa_framework is already set.
+    Result stored in profile.cms_platform — used as the pattern_store key by
+    the Phase 3 learning layer (more specific than library_stack.situation).
+
+    Priority order:
+      WordPress variants → Drupal → TerminalFour → ModernCampus →
+      CourseLeaf → Sitecore → SharePoint → Joomla → SilverStripe
+    """
+    h = html[:60_000]  # first 60 KB contains all fingerprints
+
+    # ── WordPress and sub-variants ────────────────────────────────────────
+    is_wp = (
+        "/wp-content/" in h
+        or "/wp-includes/" in h
+        or 'content="WordPress' in h
+        or "/wp-json/" in h
+    )
+    if is_wp:
+        hl = h.lower()
+        if "elementor" in hl:
+            profile.cms_platform = "wordpress:elementor"
+        elif "et-divi" in h or "et_theme_builder" in h or '"divi"' in hl:
+            profile.cms_platform = "wordpress:divi"
+        elif "/wp-json/acf/" in h or "acf-field" in hl:
+            profile.cms_platform = "wordpress:acf"
+        else:
+            profile.cms_platform = "wordpress"
+        profile.notes.append(f"CMS fingerprint: {profile.cms_platform}")
+        return
+
+    # ── Drupal ────────────────────────────────────────────────────────────
+    if (
+        "Drupal.settings" in h
+        or "sites/default/files" in h
+        or 'content="Drupal' in h
+        or "drupal.org" in h
+        or "data-drupal-" in h
+    ):
+        profile.cms_platform = "drupal"
+        profile.notes.append("CMS fingerprint: drupal")
+        return
+
+    # ── TerminalFour ──────────────────────────────────────────────────────
+    hl = h.lower()
+    if (
+        "t4tag" in hl
+        or "t4:content" in h
+        or "/SiteManager/" in h
+        or "terminal four" in hl
+        or "terminalfour" in hl
+        or "mediasourcecms" in hl
+    ):
+        profile.cms_platform = "terminalfour"
+        profile.notes.append("CMS fingerprint: terminalfour")
+        return
+
+    # ── ModernCampus / Omni CMS ───────────────────────────────────────────
+    if (
+        "omni-cms" in hl
+        or "moderncampus" in hl
+        or "omnicampus" in hl
+        or "oucampus" in hl
+        or "ou-campus" in hl
+    ):
+        profile.cms_platform = "moderncampus"
+        profile.notes.append("CMS fingerprint: moderncampus")
+        return
+
+    # ── CourseLeaf ────────────────────────────────────────────────────────
+    if (
+        "courseleaf" in hl
+        or "leepfrog" in hl
+        or 'class="clf-' in h
+        or "/coursedog/" in h
+    ):
+        profile.cms_platform = "courseleaf"
+        profile.notes.append("CMS fingerprint: courseleaf")
+        return
+
+    # ── Sitecore ──────────────────────────────────────────────────────────
+    if (
+        "/-/jssmedia/" in h
+        or "/sitecore/shell/" in h
+        or "SitecoreContent" in h
+        or "Sitecore.Context" in h
+        or "data-sc-" in h
+    ):
+        profile.cms_platform = "sitecore"
+        profile.notes.append("CMS fingerprint: sitecore")
+        return
+
+    # ── SharePoint ────────────────────────────────────────────────────────
+    if (
+        "_layouts/15/" in h
+        or "sharepoint.com" in hl
+        or "sp.init.js" in h
+        or "MSOLayout" in h
+    ):
+        profile.cms_platform = "sharepoint"
+        profile.notes.append("CMS fingerprint: sharepoint")
+        return
+
+    # ── Joomla ───────────────────────────────────────────────────────────
+    if "/components/com_" in h or 'content="Joomla' in h or "Joomla!" in h:
+        profile.cms_platform = "joomla"
+        profile.notes.append("CMS fingerprint: joomla")
+        return
+
+    # ── SilverStripe ─────────────────────────────────────────────────────
+    if "SilverStripe" in h or "silverstripe" in hl:
+        profile.cms_platform = "silverstripe"
+        profile.notes.append("CMS fingerprint: silverstripe")
+        return
 
 
 def _detect_search_apis(html: str, profile: SiteProfile, origin: str) -> None:

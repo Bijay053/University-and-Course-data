@@ -10,237 +10,228 @@
 ## Pipeline Stages
 
 ```
-URL entered
+URL entered  (UI "Add by URL" → POST /api/universities/add-by-url)
     │
     ▼
-┌─────────────────────────────────────────┐
-│  Stage 1 — Site Probe                   │
-│  site_probe.probe_site()                │
-│                                         │
-│  Detects:                               │
-│  • Cloudflare / WAF block               │
-│  • JS SPA (React / Vue / Angular)       │
-│  • Hidden search APIs                   │
-│    (SearchStax, Algolia, Coveo …)       │
-│  • Sitemap + course URL count           │
-│  • Wayback archive availability         │
-│                                         │
-│  Outputs: SiteProfile                   │
-└────────────────┬────────────────────────┘
+┌─────────────────────────────────────────────────┐
+│  Stage 1 — Site Probe                           │
+│  site_probe.probe_site()                        │
+│                                                 │
+│  Detects:                                       │
+│  • Cloudflare / WAF block                       │
+│  • JS SPA (React / Vue / Angular)               │
+│  • Hidden search APIs (SearchStax, Algolia …)   │
+│  • CMS platform (Phase 4A)                      │
+│    wordpress / wordpress:elementor / drupal /   │
+│    terminalfour / moderncampus / courseleaf /   │
+│    sitecore / sharepoint / joomla / silverstripe│
+│  • Sitemap + course URL count                   │
+│  • Wayback archive availability                 │
+│                                                 │
+│  Outputs: SiteProfile (incl. cms_platform)      │
+└────────────────┬────────────────────────────────┘
                  │
                  ▼
-┌─────────────────────────────────────────┐
-│  Stage 2 — Strategy Selection           │
-│  site_probe._select_strategy()          │
-│                                         │
-│  Picks from escalation ladder:          │
-│    search_api → sitemap_first →         │
-│    static_html → wayback →              │
-│    browser → proxy → blocked            │
-│                                         │
-│  Confidence score 0.0 – 1.0            │
-└────────────────┬────────────────────────┘
+┌─────────────────────────────────────────────────┐
+│  Stage 2 — Strategy + Library Selection         │
+│  library_strategy.recommend_library_stack()     │
+│                                                 │
+│  Strategies:                                    │
+│    static_html  → requests + parsel             │
+│    browser      → Playwright                    │
+│    wayback      → httpx + Wayback CDX           │
+│    search_api   → generic_search_api provider   │
+│    proxy        → curl_cffi (TLS fingerprint)   │
+│    blocked      → Wayback fallback              │
+│                                                 │
+│  Outputs: LibraryStack (situation key)          │
+└────────────────┬────────────────────────────────┘
                  │
                  ▼
-┌─────────────────────────────────────────┐
-│  Stage 3 — Library Stack Selection      │
-│  library_strategy.recommend_library_stack()  │
-│                                         │
-│  Maps site signals → Python library     │
-│  recommendation:                        │
-│    fetch_library, parser, fallback,     │
-│    antibot, data_cleaning, reason       │
-│                                         │
-│  Situations:                            │
-│    hidden_api, cloudflare_stealth,      │
-│    browser_automation, large_structured,│
-│    sitemap_first, static_html,          │
-│    wayback_archive, blocked             │
-└────────────────┬────────────────────────┘
+┌─────────────────────────────────────────────────┐
+│  Stage 3 — Platform Fingerprinting (Phase 4A)   │
+│  auto_config_generator._derive_platform_type()  │
+│                                                 │
+│  Priority:                                      │
+│    1. API provider  (searchstax, algolia …)     │
+│    2. CMS fingerprint (wordpress:elementor …)   │
+│    3. library_stack.situation                   │
+│    4. recommended_strategy fallback             │
+│                                                 │
+│  Outputs: platform_type key                     │
+│  Used as pattern_store lookup key (Phase 3)     │
+└────────────────┬────────────────────────────────┘
                  │
                  ▼
-┌─────────────────────────────────────────┐
-│  Stage 4 — Auto Config Generation       │
-│  auto_config_generator.generate_config()│
-│                                         │
-│  Heuristic rules + Gemini refinement:   │
-│  • URL allow/block patterns             │
-│  • Fee page / IELTS page hints          │
-│  • Search API provider wiring           │
-│  • Currency, stealth flags              │
-│                                         │
-│  Written to: universities.scrape_config │
-│    ["auto_config"]                      │
-│                                         │
-│  Key fields persisted:                  │
-│    _strategy, _library_situation,       │
-│    _api_provider, _api_endpoint_hint,   │
-│    _probe_summary                       │
-└────────────────┬────────────────────────┘
+┌─────────────────────────────────────────────────┐
+│  Stage 4 — Pattern Lookup (Phase 3)             │
+│  pattern_store.get_patterns_for_platform()      │
+│                                                 │
+│  Checks scraper_patterns table for proven       │
+│  CSS/XPath/regex rules on this CMS.             │
+│  If found, seeds Gemini prompt with them.       │
+│  → Fewer Gemini tokens, faster, more accurate   │
+│                                                 │
+│  Outputs: seeded extraction rules               │
+└────────────────┬────────────────────────────────┘
                  │
                  ▼
-┌─────────────────────────────────────────┐
-│  Stage 5 — Scrape Execution             │
-│  orchestrator.run_scrape()              │
-│                                         │
-│  Discovery routing (priority order):   │
-│  1. YAML searchstax block (emergency   │
-│     per-uni override, e.g. HUD)        │
-│  2. auto_config._api_provider          │  ← NEW (generic_search_api.py)
-│     → generic_search_api.fetch_generic_api_links()
-│  3. BFS / sitemap / browser / Wayback  │
-│     (standard discovery tiers)         │
-│                                         │
-│  Extraction: single_course.extract()   │
-│  Staging:    stage_scraped_course()    │
-│  Completeness computed per-course      │
-│    (13 review fields)                  │
-└────────────────┬────────────────────────┘
+┌─────────────────────────────────────────────────┐
+│  Stage 5 — Auto-Config + AI Rule Generation     │
+│  auto_config_generator.generate_config()        │
+│  ai_extractor_gen.generate_extraction_rules()   │
+│                                                 │
+│  • Heuristic rules fill easy cases              │
+│  • Gemini analyses probe + sample HTML          │
+│  • Stored in universities.scrape_config         │
+│    ["auto_config"] (JSONB)                      │
+│  • Stored keys:                                 │
+│    _platform_type, _library_situation,          │
+│    _strategy, _probe_summary                    │
+│                                                 │
+│  Outputs: UniConfig (merged with per-uni YAML)  │
+└────────────────┬────────────────────────────────┘
                  │
                  ▼
-┌─────────────────────────────────────────┐
-│  Stage 6 — Quality Validation           │
-│                                         │
-│  Per-job metrics after scrape:          │
-│  • staged_n   = count of staged rows   │
-│  • avg_completeness over staged rows   │
-│                                         │
-│  Auto-publish gate: ≥ 85% completeness │
-│  Cascade gate:      staged < 5          │
-│                     OR avg < 70%       │  ← bumped from 50%
-└────────────────┬────────────────────────┘
+┌─────────────────────────────────────────────────┐
+│  Stage 6 — Scrape + Extract                     │
+│  orchestrator.run_scrape()                      │
+│                                                 │
+│  Discovery:                                     │
+│    BFS → sitemap → alt-paths → subdomain        │
+│    probes → browser → Wayback                   │
+│  API short-circuit if _api_provider set:        │
+│    generic_search_api.fetch_generic_api_links() │
+│  Extraction: per-course CSS/XPath/regex/AI      │
+│  Staging: scraped_courses + field evidence      │
+│                                                 │
+│  Outputs: staged courses in scraped_courses     │
+└────────────────┬────────────────────────────────┘
                  │
-          ┌──────┴───────┐
-          │              │
-      ≥ 70%            < 70%
-       good            poor
-          │              │
-          ▼              ▼
-    Done / auto-   ┌─────────────────────────────────┐
-    publish queue  │  Stage 7 — Self-Heal (CASCADE)  │
-                   │  orchestrator → probe_and_configure
-                   │  triggered_by="cascade"          │
-                   │  exclude_strategies=[failed_strat]│
-                   │                                   │
-                   │  probe_and_configure:            │
-                   │  • Re-probes site                │
-                   │  • If same strategy → advance    │
-                   │    to next ladder rung           │
-                   │  • Generates new auto_config     │
-                   │  • Queues a new scrape job       │
-                   │    automatically                 │
-                   └────────────┬────────────────────┘
-                                │
-                                └──→ back to Stage 5
+                 ▼
+┌─────────────────────────────────────────────────┐
+│  Stage 7 — Quality Analysis (Phase 5)           │
+│  quality_intelligence.build_quality_report()    │
+│                                                 │
+│  Per-field fill rates + root-cause diagnosis:   │
+│    other_requirement 0.18 → "Often in PDFs /   │
+│      behind JS" → "Enable browser pass"         │
+│    international_fee 0.95 → ✓ good              │
+│                                                 │
+│  API: GET /api/universities/{id}/quality-report │
+│  Outputs: issues[], platform_hints[],           │
+│           recommended_actions[]                 │
+└────────────────┬────────────────────────────────┘
+                 │
+                 ▼
+┌─────────────────────────────────────────────────┐
+│  Stage 8 — Self-Heal CASCADE                    │
+│  orchestrator (end of run_scrape) +             │
+│  scrape_tasks.probe_and_configure               │
+│                                                 │
+│  [discovery_failure]  staged < 5:               │
+│    → probe_and_configure.delay(                 │
+│        exclude_strategies=[current_strategy])   │
+│                                                 │
+│  [extraction_failure] avg < 70%:                │
+│    → repair_extractor.delay(uni_id)             │
+│                                                 │
+│  No cascade if per-uni YAML exists (safety)     │
+└────────────────┬────────────────────────────────┘
+                 │
+                 ▼
+┌─────────────────────────────────────────────────┐
+│  Stage 9 — Pattern Promotion (Phase 3)          │
+│  pattern_store.promote_patterns()               │
+│                                                 │
+│  After repair: successful CSS selectors stored  │
+│  in scraper_patterns keyed by platform_type.    │
+│  Running average of confidence across all       │
+│  universities on the same platform.             │
+│                                                 │
+│  THE FLYWHEEL:                                  │
+│    WordPress Uni A → repair → promote           │
+│    WordPress Uni B → starts with proven rules   │
+│    → higher completeness → less Gemini          │
+│    → fewer repairs                              │
+└─────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Key File Map
+## Key Design Invariants
 
-| Concern | File |
+1. **Per-uni YAML always wins** — auto_config sits between global defaults and
+   per-uni YAML in the merge order. A hand-tuned YAML file is never overwritten.
+
+2. **CASCADE never overwrites existing YAML** — safety check at cascade entry.
+   The 43+ hand-tuned files are untouched.
+
+3. **Pattern promotion is additive** — running average; never deletes existing
+   patterns. Confidence can only increase (with more evidence) or stay stable.
+
+4. **Gemini is optional at every stage** — heuristic rules run first; Gemini
+   is only called when heuristics can't fill the gap. The skip gate suppresses
+   Gemini calls entirely when other extractors achieve ≥ 90% fill at ≥ 0.70
+   confidence.
+
+5. **Platform_type key is stable** — once derived for a university, changing
+   the CMS/platform requires a re-probe, not a code change.
+
+6. **Quality threshold hierarchy**:
+   - CASCADE triggers at avg < 70%
+   - Auto-publish gate at 85%
+   - Quality report warns at < 80% per field, diagnoses at < 40%
+
+7. **Duplicate detection** — `add-by-url` checks for existing universities by
+   hostname match before creating a new record.
+
+---
+
+## Platform-Type Key Reference (Phase 4A)
+
+| Key | Detection source | Notes |
+|---|---|---|
+| `searchstax` | API provider | HUD, SearchStax-hosted |
+| `algolia` | API provider | Algolia search unis |
+| `wordpress:elementor` | CMS fingerprint | Most common AU/UK WP build |
+| `wordpress:acf` | CMS fingerprint | ACF-heavy WordPress |
+| `wordpress:divi` | CMS fingerprint | Divi / Elegant Themes |
+| `wordpress` | CMS fingerprint | Plain WordPress |
+| `drupal` | CMS fingerprint | Government, AU unis |
+| `terminalfour` | CMS fingerprint | UK/IE universities |
+| `moderncampus` | CMS fingerprint | US Omni CMS unis |
+| `courseleaf` | CMS fingerprint | US course catalog system |
+| `sitecore` | CMS fingerprint | Large enterprise sites |
+| `sharepoint` | CMS fingerprint | MS-stack institutions |
+| `joomla` | CMS fingerprint | Older university sites |
+| `silverstripe` | CMS fingerprint | NZ/AU universities |
+| `browser` | Strategy fallback | JS SPAs without detected CMS |
+| `static_html` | Strategy fallback | Plain server-rendered sites |
+
+---
+
+## KPIs
+
+| KPI | Target | Component |
+|---|---|---|
+| First-scrape completeness | ≥ 85% | auto_config + patterns |
+| Universities requiring YAML | < 5% | cascade + repair |
+| Gemini calls per course | Near zero | skip gate + patterns |
+| Repair reuse rate | Increasing monthly | pattern_store flywheel |
+
+---
+
+## Files by Stage
+
+| Stage | Primary files |
 |---|---|
-| Site probe | `backend-py/app/services/scraper/site_probe.py` |
-| Strategy selection | `site_probe._select_strategy()` |
-| Library stack advisor | `backend-py/app/services/scraper/library_strategy.py` |
-| Auto config generator | `backend-py/app/services/scraper/auto_config_generator.py` |
-| Generic search API provider | `backend-py/app/services/scraper/generic_search_api.py` |
-| HUD SearchStax (specific) | `backend-py/app/services/scraper/searchstax_hud.py` |
-| Orchestrator + CASCADE | `backend-py/app/services/scraper/orchestrator.py` |
-| Probe Celery task | `backend-py/app/tasks/scrape_tasks.probe_and_configure` |
-| Per-uni YAML (emergency override) | `backend-py/scraper_config/unis/<slug>.yaml` |
-| Frontend probe card | `artifacts/university-portal/src/pages/university-detail.tsx` |
-| Frontend add-by-URL | `artifacts/university-portal/src/pages/universities.tsx` |
-
----
-
-## Connection Points
-
-### Probe → Library Stack → auto_config
-```
-probe_site() → recommend_library_stack() → profile.library_stack
-                                              ↓
-                         auto_config_generator._base_config()
-                           writes _library_situation to auto_config
-                           writes _api_provider if search API detected
-                           writes _api_endpoint_hint
-```
-
-### auto_config → Scrape routing
-```
-orchestrator.run_scrape()
-  reads uni_scrape_config["auto_config"]
-    _api_provider → generic_search_api.fetch_generic_api_links()
-    use_stealth_browser → stealth browser pool
-    use_wayback → Wayback discovery tier
-    always_sitemap_supplement → sitemap BFS supplement
-    allow_url_patterns → BFS URL filter
-```
-
-### Scrape → CASCADE → re-probe
-```
-orchestrator.run_scrape() completes
-  computes avg_completeness
-  if avg < 70% and no per-uni YAML:
-    probe_and_configure.delay(
-      uni_id,
-      triggered_by="cascade",
-      exclude_strategies=[_ac_strategy]   ← strategy that just failed
-    )
-    → re-probe skips failed strategy
-    → picks next ladder rung
-    → generates new auto_config
-    → queues new scrape job automatically
-```
-
----
-
-## YAML as Emergency Override
-
-Per-university YAML files (`scraper_config/unis/<slug>.yaml`) exist for
-edge-cases that the autonomous system cannot yet handle automatically:
-
-- Custom Solr configurations requiring a specific token + field mapping
-- Per-host URL query parameter injection (e.g. `?international=true`)
-- Universities where BFS page budget needs manual tuning
-
-**Rule**: YAML overrides win over auto_config at every layer (loader deep-merge
-order: defaults → auto_config → per-uni YAML). The CASCADE self-heal skips
-universities that have a per-uni YAML file to avoid overwriting hand-tuned
-settings.
-
-When a YAML file is no longer needed (autonomous system handles the site well),
-delete it and re-run the probe — the system will re-configure itself.
-
----
-
-## Adding a New University (Zero-Config Flow)
-
-1. Click **Add University** in the portal, enter the name and URL, check
-   **Auto-configure & scrape immediately**.
-2. System creates the university record, immediately calls
-   `POST /api/universities/{id}/probe`.
-3. `probe_and_configure` Celery task runs:
-   - Probes the site (stages 1–3 above)
-   - Generates auto_config (stage 4)
-   - If `triggered_by="cascade"`: queues a scrape job automatically
-4. For manual trigger: operator clicks **Start Scrape** on the university detail
-   page (the probe result card shows the recommended strategy).
-5. Scrape runs with auto_config (stage 5).
-6. If completeness < 70%: CASCADE fires, re-probes with a different strategy,
-   auto-queues another scrape (stage 7).
-7. If completeness ≥ 70% but < 85%: courses land in `review` status for human
-   approval.
-8. If completeness ≥ 85%: courses auto-published immediately.
-
----
-
-## Anti-Patterns to Avoid
-
-| Don't | Do instead |
-|---|---|
-| Writing a per-uni YAML for a new university | Run the probe and let auto_config handle it |
-| Hardcoding provider logic for a specific university | Generalise in `generic_search_api.py` |
-| Lowering the CASCADE threshold below 70% | The 70% threshold is intentional — 50% was too permissive |
-| Setting `SHADOW_MODE_UNI_IDS` without a plan | Only use for migrations with a defined cutover criterion |
-| Committing tokens / API keys to YAML files | Always use `token_env: ENV_VAR_NAME` in YAML |
+| 1 Probe | `site_probe.py`, `library_strategy.py` |
+| 4A CMS fingerprint | `site_probe._detect_cms_platform`, `auto_config_generator._derive_platform_type` |
+| 5 Auto-config + AI rules | `auto_config_generator.py`, `ai_extractor_gen.py` |
+| 3+9 Pattern lookup/promote | `pattern_store.py`, `scraper_patterns` table |
+| 6 Scrape + extract | `orchestrator.py`, `extract_course.py`, `per_course_browser.py` |
+| 6 Generic API routing | `generic_search_api.py`, `orchestrator.py` |
+| 7 Quality report | `quality_intelligence.py`, `scrape.py:get_university_quality_report` |
+| 8 CASCADE | `orchestrator.py` (end of `run_scrape`), `scrape_tasks.py` |
+| Frontend onboarding | `universities.tsx` ("Add by URL" modal) |

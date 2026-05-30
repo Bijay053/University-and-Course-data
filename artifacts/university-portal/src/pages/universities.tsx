@@ -58,6 +58,11 @@ export default function Universities() {
   const [autoProbe, setAutoProbe] = useState(true);
   const [probeQueued, setProbeQueued] = useState(false);
 
+  // Add-by-URL modal state (T004)
+  const [urlOpen, setUrlOpen] = useState(false);
+  const [urlValue, setUrlValue] = useState("");
+  const [urlLoading, setUrlLoading] = useState(false);
+
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
 
@@ -111,6 +116,33 @@ export default function Universities() {
         }
       },
     });
+  };
+
+  const onAddByUrl = async () => {
+    const url = urlValue.trim();
+    if (!url) return;
+    setUrlLoading(true);
+    try {
+      const res = await fetch(`${BASE}/api/universities/add-by-url`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.detail ?? JSON.stringify(json));
+      queryClient.invalidateQueries({ queryKey: getListUniversitiesQueryKey() });
+      setUrlOpen(false);
+      setUrlValue("");
+      toast({
+        title: json.already_exists ? "University already exists" : "University added",
+        description: json.message,
+      });
+      if (json.university_id) navigate(`/universities/${json.university_id}`);
+    } catch (err) {
+      toast({ title: "Failed to add university", description: String(err), variant: "destructive" });
+    } finally {
+      setUrlLoading(false);
+    }
   };
 
   const openEdit = (uni: { id: number; name: string; city: string; country: string }) => {
@@ -212,6 +244,57 @@ export default function Universities() {
             </Link>
           </Can>
           <Can permission="universities.create">
+            {/* Add by URL — one-click onboarding (T004) */}
+            <Dialog open={urlOpen} onOpenChange={(o) => { setUrlOpen(o); if (!o) setUrlValue(""); }}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-1.5">
+                  <Globe className="h-4 w-4" /> Add by URL
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <Globe className="h-4 w-4 text-blue-600" /> Add University by URL
+                  </DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 pt-1">
+                  <p className="text-sm text-muted-foreground">
+                    Paste a university URL and the system will automatically detect the platform,
+                    create the record, generate a scrape config, and queue the first scrape — no YAML needed.
+                  </p>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="url-input">University website URL</Label>
+                    <Input
+                      id="url-input"
+                      placeholder="https://www.example.edu.au"
+                      value={urlValue}
+                      onChange={(e) => setUrlValue(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter" && !urlLoading) onAddByUrl(); }}
+                      disabled={urlLoading}
+                    />
+                  </div>
+                  <div className="rounded-lg border border-blue-100 bg-blue-50 p-3 text-xs text-blue-800 space-y-1">
+                    <p className="font-medium flex items-center gap-1.5"><Zap className="h-3 w-3" /> What happens next</p>
+                    <ol className="list-decimal list-inside space-y-0.5 text-blue-700">
+                      <li>Name, country and city extracted from the site</li>
+                      <li>CMS / platform fingerprinted (WordPress, Drupal, TerminalFour…)</li>
+                      <li>Optimal scraping strategy selected automatically</li>
+                      <li>First scrape queued — results appear in minutes</li>
+                    </ol>
+                  </div>
+                </div>
+                <DialogFooter className="pt-2">
+                  <Button variant="outline" onClick={() => setUrlOpen(false)} disabled={urlLoading}>Cancel</Button>
+                  <Button onClick={onAddByUrl} disabled={!urlValue.trim() || urlLoading} className="gap-1.5">
+                    {urlLoading
+                      ? <><Loader2 className="h-4 w-4 animate-spin" /> Probing site…</>
+                      : <><Zap className="h-4 w-4" /> Add &amp; Auto-configure</>
+                    }
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
             <Dialog open={open} onOpenChange={setOpen}>
               <DialogTrigger asChild>
                 <Button size="sm" className="gap-1.5">

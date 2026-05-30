@@ -50,6 +50,10 @@ def _make_profile(
     profile.sitemap_url = None
     profile.strategy_ladder = []
 
+    # Phase 4A: must be None so _derive_platform_type skips the CMS priority slot.
+    # MagicMock leaves any unset attribute as a truthy MagicMock — pin it explicitly.
+    profile.cms_platform = None
+
     if library_situation:
         ls = MagicMock()
         ls.situation = library_situation

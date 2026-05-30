@@ -2812,3 +2812,91 @@ async def get_field_fill_rates(
         "overall_avg": overall_avg,
         "failing_fields": failing,
     }
+
+
+# ─── Phase 5: Quality Intelligence report ─────────────────────────────────────
+
+@router.get("/universities/{university_id}/quality-report")
+async def get_university_quality_report(
+    university_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> dict:
+    """Quality intelligence report: per-field root-cause diagnosis.
+
+    Combines per-field fill rates (from the latest completed scrape) with the
+    university's probe result to generate actionable diagnoses — not just a
+    completeness number.
+
+    Response shape::
+
+        {
+          "university_id": 42,
+          "job_id": "...",
+          "overall_pct": 68,
+          "overall_status": "warning",
+          "fields": {
+            "international_fee": {
+              "label": "International Fee", "fill_rate": 0.95,
+              "status": "good", "critical": true
+            },
+            "other_requirement": {
+              "label": "Entry Requirements", "fill_rate": 0.18,
+              "status": "poor", "critical": true,
+              "diagnosis": "Requirements often require JavaScript rendering...",
+              "action": "Enable browser pass; check requirements_page_url"
+            },
+            ...
+          },
+          "issues": [ ... poorest critical fields first ... ],
+          "platform_hints": [ "JS SPA (react) — static HTML extraction will miss..." ],
+          "recommended_actions": [ ... deduplicated, ordered by severity ... ]
+        }
+    """
+    from sqlalchemy import select as _sel, desc as _desc
+    from app.models import ScrapeRuntimeJob, University as _Uni
+    from app.services.quality_intelligence import build_quality_report
+
+    # Find latest completed scrape
+    latest_job = (await db.execute(
+        _sel(ScrapeRuntimeJob)
+        .where(
+            ScrapeRuntimeJob.university_id == university_id,
+            ScrapeRuntimeJob.status == "completed",
+            ScrapeRuntimeJob.job_type == "scrape",
+        )
+        .order_by(_desc(ScrapeRuntimeJob.completed_at))
+        .limit(1)
+    )).scalar_one_or_none()
+
+    if latest_job is None:
+        return {
+            "university_id": university_id,
+            "job_id": None,
+            "overall_pct": 0,
+            "overall_status": "zero",
+            "fields": {},
+            "issues": [],
+            "platform_hints": [],
+            "recommended_actions": [],
+            "message": "No completed scrape jobs found — run a scrape first",
+        }
+
+    # Get fill rates (reuse existing aggregation)
+    fill_result = await get_field_fill_rates(latest_job.runtime_job_id, db)
+
+    # Load probe result for platform hints
+    uni = await db.get(_Uni, university_id)
+    probe_summary: dict | None = None
+    if uni and uni.probe_result:
+        raw = uni.probe_result
+        if isinstance(raw, dict):
+            probe_summary = raw
+
+    report = build_quality_report(
+        fill_rates=fill_result.get("fill_rates", {}),
+        probe_summary=probe_summary,
+        overall_avg=fill_result.get("overall_avg", 0.0),
+    )
+    report["university_id"] = university_id
+    report["job_id"] = latest_job.runtime_job_id
+    return report

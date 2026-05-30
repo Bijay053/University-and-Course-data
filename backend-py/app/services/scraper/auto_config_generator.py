@@ -33,19 +33,35 @@ log = logging.getLogger(__name__)
 def _derive_platform_type(profile: "SiteProfile") -> str:  # type: ignore[name-defined]
     """Derive a reusable platform-type key from a SiteProfile.
 
-    Priority: explicit API provider > CMS/library situation > strategy fallback.
+    Priority (highest → lowest):
+      1. Explicit API provider  (searchstax, algolia, solr, …)
+      2. CMS/platform fingerprint  (Phase 4A: wordpress:elementor, drupal, …)
+      3. Library-stack situation   (existing behaviour pre-Phase-4A)
+      4. Recommended strategy      (static_html, browser, wayback, …)
+
     Used as the key in ``scraper_patterns`` so rules learned from one university
-    are applied to future universities on the same platform.
+    are automatically seeded when a future university shares the same platform.
+    The more specific the key, the more targeted the pattern reuse.
     """
+    # 1 — Explicit API provider (most specific)
     if getattr(profile, "detected_apis", None):
         provider = profile.detected_apis[0].provider
         if provider:
             return provider.lower().strip()
+
+    # 2 — CMS/platform fingerprint (Phase 4A — more specific than situation)
+    cms = getattr(profile, "cms_platform", None)
+    if cms:
+        return cms.lower().strip()
+
+    # 3 — Library-stack situation (pre-Phase-4A behaviour)
     ls = getattr(profile, "library_stack", None)
     if ls:
         situation = getattr(ls, "situation", None) or ""
         if situation:
             return situation.lower().strip()
+
+    # 4 — Strategy fallback
     return (getattr(profile, "recommended_strategy", None) or "").lower().strip()
 
 

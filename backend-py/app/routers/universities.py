@@ -374,6 +374,169 @@ async def invalidate_university_central_cache(
 
 
 @router.post(
+    "/universities/add-by-url",
+    status_code=status.HTTP_201_CREATED,
+    summary="One-click pipeline: URL → probe → create university → queue scrape",
+)
+async def add_university_by_url(
+    payload: dict,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _user: Annotated[dict, Depends(get_current_user)],
+) -> dict[str, Any]:
+    """Accept a single URL and run the full autonomous onboarding pipeline.
+
+    Steps
+    -----
+    1. Quick HTTP fetch to extract university name from ``<title>`` tag.
+    2. Infer country and city from TLD / existing data.
+    3. Create the university record (or return existing if website matches).
+    4. Dispatch ``probe_and_configure`` Celery task.
+    5. Return ``{university_id, task_id, name, country, city, message}``.
+
+    The caller should navigate to ``/universities/{university_id}`` and poll
+    the probe status.  No YAML, no manual config — zero-touch onboarding.
+
+    Payload
+    -------
+    ``{"url": "https://www.example.edu.au"}``
+    """
+    from datetime import datetime, timezone
+    from urllib.parse import urlparse
+
+    import re as _re
+    import httpx as _httpx
+
+    url: str = (payload.get("url") or "").strip()
+    if not url:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="url is required",
+        )
+    if not url.startswith(("http://", "https://")):
+        url = "https://" + url
+
+    parsed = urlparse(url)
+    hostname = parsed.netloc.lower()
+    root_url = f"{parsed.scheme}://{parsed.netloc}"
+
+    # ── Step 1: Infer metadata from URL and HTML <title> ──────────────────
+    name: str = ""
+    country: str = "Unknown"
+    city: str = "Unknown"
+
+    # Country from TLD
+    tld_country: dict[str, str] = {
+        ".edu.au": "Australia", ".ac.au": "Australia",
+        ".ac.uk": "United Kingdom", ".co.uk": "United Kingdom",
+        ".edu.nz": "New Zealand", ".ac.nz": "New Zealand",
+        ".edu": "United States",
+        ".ca": "Canada",
+        ".ie": "Ireland",
+        ".de": "Germany",
+        ".nl": "Netherlands",
+        ".sg": "Singapore",
+        ".my": "Malaysia",
+        ".hk": "Hong Kong",
+    }
+    for suffix, cntry in tld_country.items():
+        if hostname.endswith(suffix):
+            country = cntry
+            break
+
+    # Name from <title> or hostname
+    try:
+        async with _httpx.AsyncClient(
+            follow_redirects=True, timeout=8.0, verify=False,
+            headers={"User-Agent": "Mozilla/5.0 (compatible; UniPortalBot/1.0)"},
+        ) as client:
+            resp = await client.get(root_url)
+            if resp.status_code < 400:
+                # Extract <title>
+                title_m = _re.search(r"<title[^>]*>([^<]+)</title>", resp.text, _re.I)
+                if title_m:
+                    raw_title = title_m.group(1).strip()
+                    # Take the first segment before | — or :
+                    name = _re.split(r"\s*[|–—:]\s*", raw_title)[0].strip()[:200]
+    except Exception:
+        pass  # Best-effort; we'll fall back to hostname-derived name
+
+    if not name:
+        # Fallback: capitalise hostname parts
+        parts = hostname.removeprefix("www.").split(".")
+        name = " ".join(p.capitalize() for p in parts[:2])
+
+    # ── Step 2: Check for existing university with same website ───────────
+    existing = (await db.execute(
+        select(University).where(University.website.ilike(f"%{hostname}%"))
+    )).scalar_one_or_none()
+
+    if existing:
+        # Return existing — don't duplicate
+        return {
+            "university_id": existing.id,
+            "task_id": None,
+            "name": existing.name,
+            "country": existing.country or country,
+            "city": existing.city or city,
+            "already_exists": True,
+            "message": (
+                f"University '{existing.name}' already exists "
+                f"(id={existing.id}). Navigate there to re-probe or scrape."
+            ),
+        }
+
+    # ── Step 3: Create university record ──────────────────────────────────
+    uni = University(
+        name=name,
+        country=country,
+        city=city,
+        website=root_url,
+        scrape_url=root_url,
+        probe_status="pending",
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
+    )
+    db.add(uni)
+    await db.commit()
+    await db.refresh(uni)
+
+    # ── Step 4: Dispatch probe_and_configure ──────────────────────────────
+    task_id: str | None = None
+    try:
+        from app.tasks.scrape_tasks import probe_and_configure
+        task = probe_and_configure.delay(uni.id)
+        task_id = task.id
+        # Mark as probing
+        from sqlalchemy import update as _upd
+        await db.execute(
+            _upd(University)
+            .where(University.id == uni.id)
+            .values(probe_status="probing", probe_updated_at=datetime.now(timezone.utc))
+        )
+        await db.commit()
+    except Exception as exc:
+        # Non-fatal: university is created; user can trigger probe manually
+        import logging as _log
+        _log.getLogger(__name__).warning(
+            "add-by-url: probe dispatch failed for uni_id=%d: %s", uni.id, exc
+        )
+
+    return {
+        "university_id": uni.id,
+        "task_id": task_id,
+        "name": name,
+        "country": country,
+        "city": city,
+        "already_exists": False,
+        "message": (
+            "University created and probe queued. "
+            "The system will detect the platform, generate a scrape config, "
+            "and queue the first scrape automatically."
+        ),
+    }
+
+
+@router.post(
     "/universities/{uni_id}/probe",
     status_code=status.HTTP_202_ACCEPTED,
     summary="Trigger autonomous site probe + auto-config generation",
