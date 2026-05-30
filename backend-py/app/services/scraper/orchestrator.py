@@ -1740,6 +1740,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         if _must_contain_raw and links:
             _pre_mc = len(links)
             _mc_lower = [_s.lower() for _s in _must_contain_raw if _s]
+            _links_before_mc = links  # snapshot before filter for dropped-URL logging
             links = [
                 _lk for _lk in links
                 if any(_sub in (_lk.get("url") or "").lower() for _sub in _mc_lower)
@@ -1747,17 +1748,32 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             _mc_dropped = _pre_mc - len(links)
             if _mc_dropped:
                 log.info(
-                    "[EXTRACT] must_contain: kept %d / %d (dropped %d URLs lacking required substring)",
-                    len(links), _pre_mc, _mc_dropped,
+                    "[EXTRACT] must_contain=%s: kept %d / %d (dropped %d URLs)",
+                    _mc_lower, len(links), _pre_mc, _mc_dropped,
                 )
+                # Log the actual dropped URLs so operators can tune the filter
+                _dropped_urls = [
+                    _lk.get("url", "")
+                    for _lk in _links_before_mc
+                    if not any(_sub in (_lk.get("url") or "").lower() for _sub in _mc_lower)
+                ]
+                for _du in _dropped_urls[:20]:
+                    log.info("[EXTRACT] must_contain drop: %s", _du)
+                if len(_dropped_urls) > 20:
+                    log.info(
+                        "[EXTRACT] must_contain: ... and %d more dropped URLs",
+                        len(_dropped_urls) - 20,
+                    )
                 await emit(
                     "status",
-                    f"[EXTRACT] must_contain: dropped {_mc_dropped} URL(s) "
-                    f"lacking required substring ({len(links)} remain)",
+                    f"[EXTRACT] must_contain={_mc_lower}: dropped {_mc_dropped} URL(s) "
+                    f"({len(links)} remain). First dropped: "
+                    f"{_dropped_urls[0] if _dropped_urls else 'n/a'}",
                     phase="extract",
                     kind="extract_must_contain_filter",
                     dropped=_mc_dropped,
                     kept=len(links),
+                    dropped_sample=_dropped_urls[:5],
                 )
 
         await emit("status", f"Extracting course details ({len(links)} pages)...", phase="extract")

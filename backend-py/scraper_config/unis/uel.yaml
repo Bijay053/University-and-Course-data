@@ -60,11 +60,14 @@ discovery:
     - "/business"
     - "/employer"
 
-  # Post-filter: only course URLs containing /study/ in the path are kept.
-  # This drops nav fragments and info pages that share UEL's /courses/ path
-  # but are not individual degree pages.
+  # Post-filter: only course URLs containing /courses/ in the path are kept.
+  # UEL individual course pages live at /courses/<level>/<slug> (e.g.
+  # /courses/undergraduate/ba-business-management). The listing/hub pages are
+  # at /study/*, but the individual degree pages do NOT contain /study/.
+  # Previous value was "/study/" which dropped all discovered URLs (Bug fix
+  # 2026-05-30: changed from "/study/" to "/courses/").
   must_contain:
-    - "/study/"
+    - "/courses/"
 
 extraction:
   filters:

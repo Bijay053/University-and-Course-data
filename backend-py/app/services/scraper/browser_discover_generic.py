@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import asyncio
 import heapq
+import json as _json
 import logging
 import re
 import time
@@ -490,6 +491,14 @@ async def browser_discover_generic(
     _blocked_count: int = 0
     _stop_reason: str = "start_page_only"  # overwritten once the nav BFS begins
 
+    # ── XHR / JSON-API capture state ──────────────────────────────────────────
+    # For sites that load course listings via fetch()/XHR rather than static
+    # anchor tags (e.g. UEL Drupal course-search, Solr-backed SPAs), we
+    # intercept network responses so we can harvest course URLs from JSON even
+    # when the DOM link extractor returns nothing.
+    _xhr_courses: list[dict] = []          # courses extracted from JSON responses
+    _xhr_endpoints_seen: set[str] = set()  # endpoint URLs already processed
+
     def _heap_push(url: str, anchor: str, score: int) -> None:
         nonlocal _nav_heap_ctr
         heapq.heappush(_nav_heap, (-score, _nav_heap_ctr, url, anchor))
@@ -535,6 +544,125 @@ async def browser_discover_generic(
     except Exception as exc:
         log.warning("browser_discover_generic: cannot import discovery helpers — %s", exc)
         return []
+
+    # ── XHR course extractor ──────────────────────────────────────────────────
+    def _extract_courses_from_xhr_json(data: object) -> list[dict]:
+        """Extract {url, name} pairs from an XHR/fetch JSON response.
+
+        Handles the most common API shapes seen on Drupal, Solr, and
+        generic REST course-search endpoints:
+          - Top-level array of objects with url/link/path fields
+          - {"results": [...], "data": [...], "courses": [...], ...}
+          - Drupal JSON:API: {"data": [{"attributes": {"path": {"alias": "..."}}}]}
+        """
+        candidates: list[dict] = []
+
+        def _from_item(item: object) -> None:
+            if not isinstance(item, dict):
+                return
+            url: str | None = None
+            name: str | None = None
+            # 1. Direct url/link/href/path/uri fields
+            for key in ("url", "link", "href", "path", "uri", "course_url",
+                        "courseUrl", "course_link"):
+                val = item.get(key)
+                if isinstance(val, str) and val:
+                    url = val
+                    break
+                if isinstance(val, dict):  # Drupal path object
+                    alias = val.get("alias") or val.get("href") or val.get("url")
+                    if isinstance(alias, str) and alias:
+                        url = alias
+                        break
+            # 2. Drupal JSON:API shape: {"attributes": {"path": {"alias": ...}}}
+            if not url:
+                attrs = item.get("attributes")
+                if isinstance(attrs, dict):
+                    path_obj = attrs.get("path") or {}
+                    url = (
+                        attrs.get("url") or attrs.get("link")
+                        or (path_obj.get("alias") if isinstance(path_obj, dict) else None)
+                    )
+                    name = attrs.get("title") or attrs.get("name") or attrs.get("label")
+            # 3. Name / title fields
+            if not name:
+                for key in ("title", "name", "label", "course_name",
+                            "courseTitle", "heading", "courseName"):
+                    val = item.get(key)
+                    if isinstance(val, str) and val:
+                        name = val
+                        break
+            if not url:
+                return
+            # Resolve relative URLs
+            if url.startswith("/"):
+                url = origin_str.rstrip("/") + url
+            elif not url.startswith("http"):
+                return
+            # Same-origin / allowed-host guard
+            p = urlparse(url)
+            if p.netloc and p.netloc not in _allowed_hosts:
+                return
+            # Must pass course heuristic
+            if _looks_like_course(url, name or ""):
+                candidates.append({"url": url, "name": name or ""})
+
+        if isinstance(data, list):
+            for item in data:
+                _from_item(item)
+        elif isinstance(data, dict):
+            for key in ("results", "data", "courses", "items", "programmes",
+                        "hits", "docs", "records", "content", "nodes",
+                        "courseList", "course_list"):
+                val = data.get(key)
+                if isinstance(val, list):
+                    for item in val:
+                        _from_item(item)
+        return candidates
+
+    # ── XHR response handler ──────────────────────────────────────────────────
+    async def _on_json_response(response) -> None:  # type: ignore[no-untyped-def]
+        """Playwright response listener: capture JSON course-data responses."""
+        try:
+            ct = (response.headers.get("content-type") or "").lower()
+            if "json" not in ct:
+                return
+            if response.status != 200:
+                return
+            ep_url = response.url
+            if ep_url in _xhr_endpoints_seen:
+                return
+            rp = urlparse(ep_url)
+            if rp.netloc and rp.netloc not in _allowed_hosts:
+                return
+            text = await response.text()
+            if len(text) < 80:
+                return
+            try:
+                data = _json.loads(text)
+            except Exception:
+                return
+            extracted = _extract_courses_from_xhr_json(data)
+            _xhr_endpoints_seen.add(ep_url)
+            if extracted:
+                new_urls = {c["url"] for c in _xhr_courses}
+                added = [c for c in extracted if c["url"] not in new_urls]
+                _xhr_courses.extend(added)
+                log.info(
+                    "browser_discover_generic: XHR JSON hit %s → +%d course(s) "
+                    "(xhr_total=%d)",
+                    ep_url, len(added), len(_xhr_courses),
+                )
+                await _emit(
+                    f"[DISCOVER] XHR API hit: {ep_url} → +{len(added)} course(s)"
+                )
+            else:
+                log.debug(
+                    "browser_discover_generic: XHR JSON %s — no course links extracted",
+                    ep_url,
+                )
+        except Exception as _xe:
+            log.debug("browser_discover_generic: XHR handler error — %s", _xe)
 
     def _process_links(raw: list[dict]) -> None:
         nonlocal _blocked_count
@@ -642,6 +770,11 @@ async def browser_discover_generic(
                 "Referer": "https://www.google.com/",
                 "Accept-Language": "en-US,en;q=0.9",
             })
+
+            # ── Register XHR response listener ────────────────────────────
+            # Must be attached before any page.goto so responses during the
+            # very first navigation (the start page) are captured too.
+            page.on("response", lambda r: asyncio.ensure_future(_on_json_response(r)))
 
             try:
                 await page.goto(
@@ -818,6 +951,13 @@ async def browser_discover_generic(
                             nav_pages_visited, nav_score, nav_url,
                             gained, len(results), len(_nav_heap),
                         )
+                        # Log the actual URLs found at this nav page (DEBUG)
+                        _new_urls = [r["url"] for r in results[-gained:]]
+                        for _u in _new_urls:
+                            log.debug(
+                                "browser_discover_generic: nav #%d found course %s",
+                                nav_pages_visited, _u,
+                            )
                     else:
                         log.debug(
                             "browser_discover_generic: nav #%d score=%d %s "
@@ -830,6 +970,37 @@ async def browser_discover_generic(
                         "browser_discover_generic: nav page %s (score=%d) failed — %s",
                         nav_url, nav_score, exc,
                     )
+
+            # ── Merge XHR-captured courses into DOM results ────────────────
+            # Give the event loop a moment to drain any in-flight response
+            # callbacks before we read _xhr_courses.
+            await asyncio.sleep(0.2)
+            if _xhr_courses:
+                _dom_urls = {r["url"] for r in results}
+                _xhr_new = [c for c in _xhr_courses if c["url"] not in _dom_urls]
+                if _xhr_new:
+                    log.info(
+                        "browser_discover_generic: merging %d XHR course(s) from "
+                        "%d JSON endpoint(s) — DOM found %d",
+                        len(_xhr_new), len(_xhr_endpoints_seen), len(results),
+                    )
+                    await _emit(
+                        f"[DISCOVER] XHR merge: +{len(_xhr_new)} course(s) from "
+                        f"{len(_xhr_endpoints_seen)} JSON API endpoint(s)"
+                    )
+                    results.extend(_xhr_new)
+                else:
+                    log.info(
+                        "browser_discover_generic: XHR captured %d endpoint(s) "
+                        "but all %d course(s) already in DOM results",
+                        len(_xhr_endpoints_seen), len(_xhr_courses),
+                    )
+            elif _xhr_endpoints_seen:
+                log.info(
+                    "browser_discover_generic: %d JSON endpoint(s) captured "
+                    "but none yielded recognisable course links",
+                    len(_xhr_endpoints_seen),
+                )
 
     except Exception as exc:
         log.warning("browser_discover_generic: unexpected error — %s", exc)
