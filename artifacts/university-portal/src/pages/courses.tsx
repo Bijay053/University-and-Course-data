@@ -231,6 +231,7 @@ export default function Courses() {
                       <th className={`${headClass} min-w-[80px]`}>Duration</th>
                       <th className={`${headClass} min-w-[90px]`}>Term</th>
                       <th className={`${headClass} min-w-[90px]`}>Study Mode</th>
+                      <th className={`${headClass} min-w-[80px] bg-red-50`}>Visa Eligible</th>
                       <th className={`${headClass} min-w-[140px]`}>Degree Level</th>
                       <th className={`${headClass} min-w-[120px]`}>City</th>
                       <th className={`${headClass} min-w-[120px] bg-blue-50`}>Intake Month</th>
@@ -298,6 +299,17 @@ export default function Courses() {
                           <td className={colClass}><Cell v={course.duration} /></td>
                           <td className={colClass}><Cell v={course.durationTerm} /></td>
                           <td className={colClass}><Cell v={course.studyMode} /></td>
+                          <td className={`${colClass} bg-red-50/30`}>
+                            {(() => {
+                              const sm = (course.studyMode || "").toLowerCase();
+                              const hasOnline = sm.includes("online") || sm.includes("distance") || sm.includes("remote") || sm.includes("virtual") || sm.includes("external");
+                              const hasCampus = sm.includes("campus") || sm.includes("blended") || sm.includes("in-person") || sm.includes("on site") || sm.includes("face-to-face");
+                              if (!sm) return <span className="text-gray-300 text-xs">—</span>;
+                              if (hasOnline && !hasCampus) return <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-red-100 text-red-700">✕ No</span>;
+                              if (hasCampus) return <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-green-100 text-green-700">✓ Yes</span>;
+                              return <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-yellow-100 text-yellow-700">? Mixed</span>;
+                            })()}
+                          </td>
                           <td className={colClass}>
                             {course.degreeLevel ? (
                               <span className={`inline-flex px-1.5 py-0.5 rounded text-xs font-medium ${DEGREE_COLORS[course.degreeLevel] ?? "bg-gray-100 text-gray-700"}`}>

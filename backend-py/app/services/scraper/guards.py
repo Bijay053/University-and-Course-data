@@ -436,6 +436,30 @@ def should_stage_course(
     if payload.get("domestic_only"):
         return (False, "domestic_only")
 
+    # Step 6 — Virtual-delivery location sanitisation.
+    # "Online", "Distance Learning", "Remote", "Virtual" are study modes,
+    # not physical campuses.  Clear course_location when it is purely a
+    # virtual delivery label so it is never stored as a campus name.
+    # This also prevents the online_only guard below from being confused by a
+    # physical-looking location that turns out to be "Online Study".
+    _VIRTUAL_LOCATION_RE = re.compile(
+        r"^\s*(?:online(?:\s+only|\s+study|\s+learning)?|"
+        r"distance(?:\s+education|\s+learning)?|"
+        r"remote(?:\s+learning)?|"
+        r"virtual(?:\s+campus)?|"
+        r"external)\s*$",
+        re.IGNORECASE,
+    )
+    _raw_loc = payload.get("course_location") or payload.get("location_text") or ""
+    if _VIRTUAL_LOCATION_RE.match(_raw_loc.strip()):
+        log.info(
+            "[LOCATION-SANITISE] course=%r — clearing virtual-only location %r "
+            "(value is a delivery mode, not a physical campus)",
+            effective_name, _raw_loc,
+        )
+        payload["course_location"] = None
+        payload["location_text"] = None
+
     # Online-only filter: study_mode is the authoritative signal.
     # Rule: if study_mode contains "online" but NO campus/blended keyword →
     # reject regardless of whether a city/campus name appears in

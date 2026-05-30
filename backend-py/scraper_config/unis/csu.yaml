@@ -26,12 +26,11 @@ extraction:
       enabled: true   # Preserve current prod behaviour: filter runs for all unis.
 
     online_only:
-      # CSU is a distance-education-heavy university — many of its
-      # bachelor/master programs (Computer Science, Criminology, Psychology,
-      # Business Studies, Border Management, …) are legitimately published as
-      # 100% online for international students.  The hard-coded global
-      # ``study_mode == 'Online'`` reject (guards.py) was dropping 127 of 181
-      # courses on every CSU scrape (job_31437dd88e6b: 181 found → 43 staged
-      # before this opt-out).  Disabling here keeps every legitimate online
-      # CSU offering and matches the April-2026 baseline of ~165–180 staged.
-      enabled: false
+      # POLICY CHANGE 2026-05-30: online-only courses are excluded from the
+      # international student recruitment catalogue by default.  International
+      # students on student visas require on-campus delivery.  CSU's distance-
+      # education offerings (Criminology, Cyber Security, Project Management,
+      # etc.) are online-only and therefore excluded from the portal.
+      # Re-enable (set to false) ONLY if CSU adds a verified on-shore campus
+      # delivery option and admin confirms it is visa-eligible.
+      enabled: true

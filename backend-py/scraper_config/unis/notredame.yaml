@@ -73,4 +73,6 @@ extraction:
     domestic_only:
       enabled: false
     online_only:
-      enabled: false
+      # POLICY CHANGE 2026-05-30: online-only filter re-enabled globally.
+      # International students on student visas require on-campus delivery.
+      enabled: true
