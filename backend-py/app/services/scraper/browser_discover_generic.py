@@ -69,7 +69,7 @@ _GLOBAL_NAV_BLOCKLIST: frozenset[str] = frozenset({
     "/open-day",   "/openday",    "/open-evening",
     "/alumni",     "/staff",      "/governance",
     "/accessibility", "/privacy", "/cookie",
-    "/sitemap",    "/search",
+    "/sitemap",    "/site-search", "/search-results", "/global-search",
     "/job",        "/career",     "/vacancy",
     "/library",    "/sport",
     "/international-pathways",   # pathway/foundation-level nav
@@ -548,19 +548,27 @@ async def browser_discover_generic(
                 continue
             if url in seen:
                 continue
+
+            # ── Block low-value URLs BEFORE course detection ──────────────
+            # Must come first so pages like /study/apprenticeships or
+            # /study/fees-funding are never accepted as course links even
+            # when _looks_like_course() would otherwise return True.
+            if _is_blocked_nav(url, _extra_block_patterns):
+                _blocked_count += 1
+                seen.add(url)   # mark seen so it is never re-evaluated
+                log.debug(
+                    "browser_discover_generic: blocked (blocklist) %s", url
+                )
+                continue
+
             seen.add(url)
+
             if _looks_like_course(url, name):
                 results.append({"url": url, "name": name})
             elif _is_nav_url(url) and not _is_known_non_course_url(url):
                 # Score the URL before deciding whether to queue it.
                 nav_score = _score_nav_url(url, name)
-                if _is_blocked_nav(url, _extra_block_patterns):
-                    _blocked_count += 1
-                    log.debug(
-                        "browser_discover_generic: blocked (blocklist) nav score=%d %s",
-                        nav_score, url,
-                    )
-                elif nav_score <= _NAV_SCORE_THRESHOLD:
+                if nav_score <= _NAV_SCORE_THRESHOLD:
                     _blocked_count += 1
                     log.debug(
                         "browser_discover_generic: blocked (low score=%d) nav %s",
