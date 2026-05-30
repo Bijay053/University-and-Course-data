@@ -1142,6 +1142,53 @@ def run_quality_actions(
         raise self.retry(exc=exc, countdown=60)
 
 
+# ── Phase 9: Conflict Repair Loop ─────────────────────────────────────────
+
+@celery_app.task(name="scrape.repair_conflicts", bind=True, max_retries=1)
+def repair_conflicts(
+    self,
+    *,
+    job_id: str,
+    triggered_by: str = "orchestrator",
+) -> dict:  # type: ignore[override]
+    """Phase 9: Conflict Repair Loop.
+
+    Attempts to automatically resolve field-level verification conflicts before
+    sending courses for human review.  Evidence-only — no live HTTP re-fetches.
+
+    Strategy:
+      If only low-authority sources (ai, pattern) disagree while high-authority
+      sources (api, html, pdf) agree → resolve to the high-auth consensus.
+      If high-authority sources disagree with each other → mark unresolved.
+
+    Safety:
+      At most one attempt per (course, field): ``conflict_repair_log`` has a
+      UNIQUE (scraped_course_id, field_name) constraint — re-running is a no-op.
+    """
+    async def _run() -> dict:
+        async with AsyncSessionLocal() as db:
+            from app.services.scraper.conflict_repair import repair_conflicts_for_job
+            result = await repair_conflicts_for_job(db, job_id)
+            return {
+                "ok": True,
+                "job_id": job_id,
+                "triggered_by": triggered_by,
+                "courses_attempted": result.courses_attempted,
+                "fields_attempted": result.fields_attempted,
+                "fields_resolved": result.fields_resolved,
+                "fields_unresolved": result.fields_unresolved,
+                "avg_confidence_before": result.avg_confidence_before,
+                "avg_confidence_after": result.avg_confidence_after,
+            }
+
+    _sync_dispose()
+    try:
+        return asyncio.run(_run())
+    except Exception as exc:
+        log.exception("[repair_conflicts] job=%s failed: %s", job_id, exc)
+        raise self.retry(exc=exc, countdown=60)
+
+
 @celery_app.task(name="scrape.refresh_baselines", bind=True, max_retries=0)
 def refresh_baselines_weekly(self) -> dict:  # type: ignore[override]
     """Celery beat task — recompute fill-rate baselines from the trailing 30 days.

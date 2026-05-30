@@ -2781,6 +2781,45 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             except Exception as _alert_exc:  # noqa: BLE001
                 log.warning("[ALERTS] failed for run %s: %s", runtime_job_id, _alert_exc)
 
+            # ── Phase 9: Conflict Repair Loop hook ────────────────────────
+            # If any staged courses have verification conflicts, queue the
+            # async repair task.  It runs evidence-only (no HTTP re-fetches)
+            # and is idempotent — won't re-repair already-logged fields.
+            try:
+                from app.models.field_verification import (
+                    FieldVerificationResult as _FVR,
+                )
+                from app.models import ScrapedCourse as _RepSC
+                from sqlalchemy import select as _r_sel, func as _r_func
+                _n_conflicts_q = await db.execute(
+                    _r_sel(_r_func.count(_FVR.id))
+                    .where(
+                        _FVR.scraped_course_id.in_(
+                            _r_sel(_RepSC.id).where(
+                                _RepSC.scrape_job_id == runtime_job_id
+                            )
+                        ),
+                        _FVR.status == "conflict",
+                    )
+                )
+                _n_conflicts = int(_n_conflicts_q.scalar_one_or_none() or 0)
+                if _n_conflicts > 0:
+                    from app.tasks.scrape_tasks import repair_conflicts as _rc_task
+                    _rc_task.delay(job_id=runtime_job_id, triggered_by="orchestrator")
+                    log.info(
+                        "[CONFLICT_REPAIR] queued: %d conflict fields in run=%s",
+                        _n_conflicts, runtime_job_id,
+                    )
+                else:
+                    log.info(
+                        "[CONFLICT_REPAIR] no conflicts in run=%s — skip", runtime_job_id
+                    )
+            except Exception as _cr_exc:  # noqa: BLE001
+                log.warning(
+                    "[CONFLICT_REPAIR] hook failed for run %s: %s",
+                    runtime_job_id, _cr_exc,
+                )
+
             # ── Phase 4B: promote XHR-discovered API field mapping ─────────
             # If this job used an auto-discovered REST/ES/GraphQL API type
             # (stored as _api_type in auto_config), and the job staged enough

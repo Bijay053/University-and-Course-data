@@ -456,6 +456,15 @@ export default function UniversityDetail() {
       latest_confidence: number | null;
       previous_confidence: number | null;
     };
+    repair_stats: {
+      conflicts_found: number;
+      repairs_attempted: number;
+      conflicts_repaired: number;
+      conflicts_unresolved: number;
+      last_repair_at: string | null;
+      top_unresolved_fields: { field: string; count: number }[];
+      repair_ran: boolean;
+    };
   };
   const [verifSummary, setVerifSummary] = useState<VerifSummary | null>(null);
   const [verifCardOpen, setVerifCardOpen] = useState(false);
@@ -2085,6 +2094,89 @@ export default function UniversityDetail() {
               </div>
             );
           })()}
+        </div>
+      )}
+
+      {/* ── Conflict Repair Panel (Phase 9) ──────────────────────────────── */}
+      {verifSummary?.repair_stats && (
+        <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 font-semibold text-rose-800">
+              <svg className="h-4 w-4 text-rose-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              Conflict Repair
+              <span className="text-[10px] bg-rose-100 border border-rose-300 text-rose-600 px-1.5 py-0.5 rounded font-mono">
+                Phase 9
+              </span>
+            </div>
+          </div>
+
+          {verifSummary.repair_stats.conflicts_found === 0 ? (
+            <p className="text-xs text-rose-700">No verification conflicts detected for this university.</p>
+          ) : (
+            <div className="space-y-3">
+              {/* Stat row */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {(
+                  [
+                    { label: "Conflicts Found", value: verifSummary.repair_stats.conflicts_found, color: "text-rose-700" },
+                    { label: "Repaired", value: verifSummary.repair_stats.conflicts_repaired, color: "text-emerald-700" },
+                    { label: "Unresolved", value: verifSummary.repair_stats.conflicts_unresolved, color: "text-amber-700" },
+                    {
+                      label: "Resolution Rate",
+                      value: verifSummary.repair_stats.repairs_attempted > 0
+                        ? `${Math.round((verifSummary.repair_stats.conflicts_repaired / verifSummary.repair_stats.repairs_attempted) * 100)}%`
+                        : "—",
+                      color: "text-sky-700",
+                    },
+                  ] as const
+                ).map(({ label, value, color }) => (
+                  <div key={label} className="rounded bg-white border border-rose-100 px-3 py-2 text-center">
+                    <div className={`text-xl font-bold ${color}`}>{value}</div>
+                    <div className="text-[10px] text-muted-foreground">{label}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Status badge */}
+              {!verifSummary.repair_stats.repair_ran ? (
+                <div className="flex items-center gap-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1 w-fit">
+                  <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.073 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                  Repair not yet run — will auto-queue on next scrape completion
+                </div>
+              ) : verifSummary.repair_stats.last_repair_at ? (
+                <div className="flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-2 py-1 w-fit">
+                  <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                  Last repaired {new Date(verifSummary.repair_stats.last_repair_at).toLocaleString()}
+                </div>
+              ) : null}
+
+              {/* Top unresolved fields */}
+              {verifSummary.repair_stats.top_unresolved_fields.length > 0 && (
+                <div>
+                  <div className="text-[10px] font-semibold text-rose-800 uppercase tracking-wider mb-1.5">
+                    Top Unresolved Fields
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {verifSummary.repair_stats.top_unresolved_fields.map(({ field, count }) => (
+                      <span key={field} className="inline-flex items-center gap-1 text-[10px] bg-rose-100 border border-rose-200 text-rose-700 rounded px-2 py-0.5 font-mono">
+                        {field}
+                        <span className="bg-rose-200 text-rose-800 rounded-full px-1 font-bold">{count}</span>
+                      </span>
+                    ))}
+                  </div>
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    These fields have high-authority source conflicts (e.g. HTML vs PDF) that require manual review.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 

@@ -2993,6 +2993,41 @@ async def get_job_quality_actions(
     }
 
 
+@router.post("/jobs/{job_id}/repair-conflicts", status_code=202)
+async def trigger_conflict_repair(
+    job_id: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[dict, Depends(get_current_user)],
+) -> dict:
+    """Manually trigger Phase 9 Conflict Repair Loop for a completed scrape job.
+
+    Evidence-only — no HTTP re-fetches.  Idempotent: already-repaired fields
+    are skipped.  Safe to re-run after new evidence rows are added.
+    """
+    job = await db.get(ScrapeRuntimeJob, job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if job.status not in ("completed", "completed_with_errors"):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Job is not completed (status={job.status!r})",
+        )
+
+    try:
+        from app.tasks.scrape_tasks import repair_conflicts as _rc_task
+        task = _rc_task.delay(job_id=job_id, triggered_by="admin_manual")
+    except Exception as exc:
+        log.warning("[conflict-repair] dispatch failed for job %s: %s", job_id, exc)
+        raise HTTPException(status_code=503, detail=f"Dispatch failed: {exc}") from exc
+
+    return {
+        "ok": True,
+        "job_id": job_id,
+        "task_id": task.id,
+        "message": "Conflict Repair queued — refresh in ~15 seconds to see results",
+    }
+
+
 @router.post("/jobs/{job_id}/run-quality-optimizer", status_code=202)
 async def trigger_job_quality_optimizer(
     job_id: str,

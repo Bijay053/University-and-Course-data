@@ -196,6 +196,49 @@ async def get_university_verification_summary(
         for r in field_rows
     ]
 
+    # ── Repair stats — from conflict_repair_log for this university's courses ──
+    repair_q = await db.execute(
+        text("""
+            SELECT
+                COUNT(*)                                          AS total_attempted,
+                SUM(CASE WHEN resolved THEN 1 ELSE 0 END)        AS total_resolved,
+                SUM(CASE WHEN NOT resolved THEN 1 ELSE 0 END)    AS total_unresolved,
+                MAX(attempted_at)                                 AS last_repair_at
+            FROM conflict_repair_log
+            WHERE scraped_course_id = ANY(:sc_ids)
+        """),
+        {"sc_ids": sc_ids},
+    )
+    repair_row = repair_q.fetchone()
+
+    # Top unresolved conflict fields
+    top_unresolved_q = await db.execute(
+        text("""
+            SELECT field_name, COUNT(*) AS cnt
+            FROM conflict_repair_log
+            WHERE scraped_course_id = ANY(:sc_ids)
+              AND resolved = FALSE
+            GROUP BY field_name
+            ORDER BY cnt DESC
+            LIMIT 5
+        """),
+        {"sc_ids": sc_ids},
+    )
+    top_unresolved_fields = [
+        {"field": r.field_name, "count": int(r.cnt)}
+        for r in top_unresolved_q.fetchall()
+    ]
+
+    repair_stats = {
+        "conflicts_found": int(status_counts.get("conflict", 0)),
+        "repairs_attempted": int(repair_row.total_attempted or 0) if repair_row else 0,
+        "conflicts_repaired": int(repair_row.total_resolved or 0) if repair_row else 0,
+        "conflicts_unresolved": int(repair_row.total_unresolved or 0) if repair_row else 0,
+        "last_repair_at": repair_row.last_repair_at.isoformat() if repair_row and repair_row.last_repair_at else None,
+        "top_unresolved_fields": top_unresolved_fields,
+        "repair_ran": bool(repair_row and repair_row.total_attempted),
+    }
+
     # ── Confidence Trend — last 5 completed jobs for this university ──────────
     trend_q = await db.execute(
         select(
@@ -263,6 +306,7 @@ async def get_university_verification_summary(
             "latest_confidence": round(float(trend_rows[0].avg_verification_confidence), 1) if trend_rows else None,
             "previous_confidence": round(float(trend_rows[1].avg_verification_confidence), 1) if len(trend_rows) >= 2 else None,
         },
+        "repair_stats": repair_stats,
     }
 
 
@@ -361,5 +405,14 @@ def _empty_summary(uni_id: int) -> dict[str, Any]:
             "trend_change_pct": None,
             "latest_confidence": None,
             "previous_confidence": None,
+        },
+        "repair_stats": {
+            "conflicts_found": 0,
+            "repairs_attempted": 0,
+            "conflicts_repaired": 0,
+            "conflicts_unresolved": 0,
+            "last_repair_at": None,
+            "top_unresolved_fields": [],
+            "repair_ran": False,
         },
     }
