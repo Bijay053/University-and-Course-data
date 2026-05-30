@@ -1045,6 +1045,7 @@ def run_quality_actions(
         from app.services.scraper.quality_action_dispatcher import dispatch_quality_actions
         from app.services.scraper.ai_extractor_repair import compute_field_fill_rates
         from sqlalchemy import text as _sql
+        from datetime import datetime, timezone as _tz
         import json as _json
 
         async with AsyncSessionLocal() as db:
@@ -1054,13 +1055,42 @@ def run_quality_actions(
                 university_id, job_id, triggered_by, cascade_repair_fired,
             )
 
-            # 1. Fill rates for this job
+            async def _persist_last_run(payload: dict) -> None:
+                """Write payload to universities.scrape_config['_p7_last_run'].
+
+                Called on EVERY exit path so the frontend polling can always
+                detect task completion via the freshly-written timestamp.
+                """
+                try:
+                    _p = _json.dumps({
+                        "timestamp": datetime.now(_tz.utc).isoformat(),
+                        "job_id": job_id,
+                        **payload,
+                    })
+                    await db.execute(
+                        _sql("""
+                            UPDATE universities
+                               SET scrape_config = jsonb_set(
+                                     COALESCE(scrape_config, '{}'::jsonb),
+                                     '{_p7_last_run}',
+                                     :payload::jsonb
+                                   )
+                             WHERE id = :uni_id
+                        """),
+                        {"payload": _p, "uni_id": university_id},
+                    )
+                    await db.commit()
+                except Exception as _pe:  # noqa: BLE001
+                    log.warning("[run_quality_actions] _persist_last_run failed: %s", _pe)
+
+            # 1. Fill rates for this job (may be empty if evidence rows lack
+            #    selected=TRUE — dispatcher still runs via get_avg_completeness).
             fill_rates = await compute_field_fill_rates(job_id, db)
             if not fill_rates:
                 log.info(
-                    "[run_quality_actions] no fill rate data for job %s — skipping", job_id,
+                    "[run_quality_actions] no fill rate data for job %s"
+                    " — proceeding without field-level rates", job_id,
                 )
-                return {"ok": True, "skipped": True, "reason": "no_fill_data"}
 
             # 2. University config + metadata
             uni_row = (await db.execute(
@@ -1070,6 +1100,7 @@ def run_quality_actions(
             )).mappings().first()
 
             if uni_row is None:
+                await _persist_last_run({"ok": False, "reason": "university_not_found"})
                 return {"ok": False, "reason": "university_not_found"}
 
             scrape_url      = (uni_row.get("scrape_url") or "").strip()
@@ -1089,31 +1120,9 @@ def run_quality_actions(
                 cascade_repair_fired=cascade_repair_fired,
             )
 
-            # 4. Persist action log into universities.scrape_config['_p7_last_run']
-            try:
-                from datetime import datetime, timezone as _tz
-                _payload = _json.dumps({
-                    "timestamp": datetime.now(_tz.utc).isoformat(),
-                    "job_id": job_id,
-                    **result.to_dict(),
-                })
-                await db.execute(
-                    _sql("""
-                        UPDATE universities
-                           SET scrape_config = jsonb_set(
-                                 COALESCE(scrape_config, '{}'::jsonb),
-                                 '{_p7_last_run}',
-                                 :payload::jsonb
-                               )
-                         WHERE id = :uni_id
-                    """),
-                    {"payload": _payload, "uni_id": university_id},
-                )
-                await db.commit()
-            except Exception as _log_exc:  # noqa: BLE001
-                log.warning(
-                    "[run_quality_actions] action log persist failed: %s", _log_exc,
-                )
+            # 4. Persist action log — always written on every exit path so
+            #    the frontend polling can detect completion via the timestamp.
+            await _persist_last_run({"ok": True, **result.to_dict()})
 
             return {
                 "ok": True,
