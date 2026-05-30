@@ -99,11 +99,11 @@ class TestSeverity:
     def test_location_is_major(self):
         assert self.sev("course_location", "field_change") == "major"
 
-    def test_new_course_is_major(self):
-        assert self.sev("", "new_course") == "major"
+    def test_new_course_is_critical(self):
+        assert self.sev("", "new_course") == "critical"
 
-    def test_removed_course_is_major(self):
-        assert self.sev("", "removed_course") == "major"
+    def test_removed_course_is_critical(self):
+        assert self.sev("", "removed_course") == "critical"
 
     def test_study_mode_is_minor(self):
         assert self.sev("study_mode", "field_change") == "minor"

@@ -61,7 +61,7 @@ _MIN_CONFIDENCE = 70.0
 
 def _severity(field_name: str, change_type: str) -> str:
     if change_type in ("new_course", "removed_course"):
-        return "major"
+        return "critical"
     if field_name in _CRITICAL_FIELDS:
         return "critical"
     if field_name in _MAJOR_FIELDS:
