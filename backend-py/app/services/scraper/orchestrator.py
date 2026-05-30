@@ -268,6 +268,7 @@ async def _extract_only(
     emit=None,
     vision_image_cache: VisionImageCache | None = None,
     central_data: dict | None = None,
+    extraction_rules: dict | None = None,
 ) -> dict:
     """Network-bound work — safe to parallelise across coroutines.
 
@@ -304,7 +305,6 @@ async def _extract_only(
     # Extraction rules from auto_config (Phase 2) — passed to Stage 0 inside
     # extract_course() so generated CSS/XPath/regex rules run before regex
     # heuristics and before per-course Gemini, reducing per-course AI cost.
-    # _ac_ext_rules is set in the enclosing run_scrape() scope (closure).
     try:
         out = await extract_course(
             url,
@@ -313,7 +313,7 @@ async def _extract_only(
             emit=emit,
             vision_image_cache=vision_image_cache,
             central_data=central_data,
-            extraction_rules=_ac_ext_rules,
+            extraction_rules=extraction_rules,
         )
     except Exception as exc:  # noqa: BLE001
         return {"name": name, "url": url, "error": f"extract: {exc}"}
@@ -1866,6 +1866,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                         emit=emit,
                         vision_image_cache=vision_image_cache,
                         central_data=central_data,
+                        extraction_rules=_ac_ext_rules,
                     )
                 # ── semaphore released here ──────────────────────────────────
                 # Check for 429-cooldown retry sentinel AFTER exiting `async
