@@ -22,6 +22,7 @@ Strategy
 from __future__ import annotations
 
 import asyncio
+import heapq
 import logging
 import re
 import time
@@ -73,6 +74,31 @@ _GLOBAL_NAV_BLOCKLIST: frozenset[str] = frozenset({
     "/library",    "/sport",
     "/international-pathways",   # pathway/foundation-level nav
 })
+
+# ── Nav URL priority scoring ──────────────────────────────────────────────────
+# URLs are scored before being added to the BFS heap.  High-score pages are
+# visited first; pages scoring ≤ 0 are skipped entirely.  Per-uni YAML can
+# extend the blocklist via discovery.block_nav_patterns; scoring thresholds
+# cannot be overridden (they apply fleet-wide).
+_HIGH_VALUE_WORDS: tuple[str, ...] = (
+    "course", "courses", "program", "programs",
+    "undergraduate", "postgraduate", "degree", "degrees",
+    "study", "find-courses", "course-search",
+)
+_LOW_VALUE_WORDS: tuple[str, ...] = (
+    "about", "contact", "news", "event",
+    "fees", "funding", "scholarship",
+    "accommodation", "student-life", "studentlife",
+    "apprenticeship", "privacy", "terms", "cookie",
+)
+# URL path patterns that strongly indicate a course-listing page.
+_HIGH_VALUE_PATH_RE: re.Pattern[str] = re.compile(
+    r"/(courses?|programs?|undergraduate|postgraduate|study|degrees?|"
+    r"find-courses?|course-search|international/courses)[/$?]?",
+    re.IGNORECASE,
+)
+# Minimum score for a nav URL to be queued at all (negative or zero → drop).
+_NAV_SCORE_THRESHOLD: int = 1
 # After page.goto on a nav page, wait this long for at least one
 # course-shaped link selector to appear before extracting links.
 # JS-rendered SPA discipline pages (QUT, Newcastle, UTAS, ECU) hydrate
@@ -360,6 +386,44 @@ def _is_blocked_nav(url: str, extra_patterns: list[str] | None = None) -> bool:
     return False
 
 
+def _score_nav_url(url: str, anchor_text: str = "") -> int:
+    """Return a priority score for a candidate nav URL.
+
+    Higher = visit sooner.  Scores ≤ 0 are dropped before queuing.
+
+    Scoring rules (additive):
+      +20 per high-value word in path or anchor text
+      -30 per low-value word in path or anchor text
+      +40 when the path matches _HIGH_VALUE_PATH_RE
+
+    Typical results:
+      /study/undergraduate         → 80  (+20 study, +20 undergraduate, +40 path)
+      /study/postgraduate          → 80
+      /courses/                    → 60  (+20 course, +20 courses, +40 path − dup)
+      /about/contact               → -60 (-30 about, -30 contact)
+      /news/events                 → -60 (-30 news, -30 event[s])
+    """
+    text = (urlparse(url).path + " " + anchor_text).lower()
+    score = 0
+    matched_high: list[str] = []
+    matched_low: list[str] = []
+
+    for word in _HIGH_VALUE_WORDS:
+        if word in text:
+            score += 20
+            matched_high.append(word)
+
+    for word in _LOW_VALUE_WORDS:
+        if word in text:
+            score -= 30
+            matched_low.append(word)
+
+    if _HIGH_VALUE_PATH_RE.search(url):
+        score += 40
+
+    return score
+
+
 async def browser_discover_generic(
     scrape_url: str,
     *,
@@ -419,21 +483,36 @@ async def browser_discover_generic(
 
     seen: set[str] = set()
     results: list[dict] = []
-    nav_queue: list[str] = []
+    # Priority max-heap: entries are (-score, tiebreak_counter, url, anchor_text).
+    # heapq is a min-heap, so we negate the score to get highest-score-first.
+    _nav_heap: list[tuple[int, int, str, str]] = []
+    _nav_heap_ctr: int = 0   # stable tiebreaker (insertion order within same score)
     _blocked_count: int = 0
     _stop_reason: str = "start_page_only"  # overwritten once the nav BFS begins
+
+    def _heap_push(url: str, anchor: str, score: int) -> None:
+        nonlocal _nav_heap_ctr
+        heapq.heappush(_nav_heap, (-score, _nav_heap_ctr, url, anchor))
+        _nav_heap_ctr += 1
 
     _seed_urls = _HOST_EXTRA_SEEDS.get(host, [])
     if _seed_urls:
         log.info(
             "browser_discover_generic: %d extra seed URLs for %s — "
-            "queuing as first nav targets",
+            "scoring and queuing as first nav targets",
             len(_seed_urls), host,
         )
     for seed_url in _seed_urls:
         if seed_url not in seen:
-            nav_queue.append(seed_url)
+            _seed_score = _score_nav_url(seed_url)
+            # Seeds always get queued regardless of score (they're hand-curated
+            # for this university); add a +200 bonus to guarantee they visit first.
+            _heap_push(seed_url, "", _seed_score + 200)
             seen.add(seed_url)
+            log.debug(
+                "browser_discover_generic: seed %s queued (score=%d+200)",
+                seed_url, _seed_score,
+            )
 
     # Build allowed-hosts set: the primary host + every host referenced in
     # extra seeds.  This lets seeds on a different subdomain/domain (e.g.
@@ -473,13 +552,26 @@ async def browser_discover_generic(
             if _looks_like_course(url, name):
                 results.append({"url": url, "name": name})
             elif _is_nav_url(url) and not _is_known_non_course_url(url):
+                # Score the URL before deciding whether to queue it.
+                nav_score = _score_nav_url(url, name)
                 if _is_blocked_nav(url, _extra_block_patterns):
                     _blocked_count += 1
                     log.debug(
-                        "browser_discover_generic: blocked low-value nav %s", url
+                        "browser_discover_generic: blocked (blocklist) nav score=%d %s",
+                        nav_score, url,
+                    )
+                elif nav_score <= _NAV_SCORE_THRESHOLD:
+                    _blocked_count += 1
+                    log.debug(
+                        "browser_discover_generic: blocked (low score=%d) nav %s",
+                        nav_score, url,
                     )
                 else:
-                    nav_queue.append(url)
+                    _heap_push(url, name, nav_score)
+                    log.debug(
+                        "browser_discover_generic: queued nav score=%d %s",
+                        nav_score, url,
+                    )
 
     # Stealth opt-in (Macquarie etc.): swap the regular browser pool for
     # patchright + Xvfb when the active uni config sets
@@ -582,21 +674,23 @@ async def browser_discover_generic(
             _process_links(raw or [])
             await _emit(
                 f"[DISCOVER] Browser: start page → {len(results)} course links, "
-                f"{len(nav_queue)} nav candidates to follow"
+                f"{len(_nav_heap)} nav candidates queued (priority-scored)"
             )
             log.info(
-                "browser_discover_generic: start page %s → %d courses, %d nav links",
-                scrape_url, len(results), len(nav_queue),
+                "browser_discover_generic: start page %s → %d courses, "
+                "%d priority-scored nav links queued",
+                scrape_url, len(results), len(_nav_heap),
             )
 
-            # BFS over nav links — newly discovered nav pages are appended
-            # to nav_queue inside _process_links, so the while-loop picks
-            # them up automatically (2+ level deep site hierarchies like
-            # ECU: homepage → study-area → individual course).
+            # ── Priority BFS over nav links ────────────────────────────────
+            # The heap is a max-heap by score (highest-scoring URL visited
+            # first).  _process_links scores and pushes newly discovered nav
+            # URLs so multi-level hierarchies (ECU: homepage → study-area →
+            # course) are handled automatically.
             nav_visited: set[str] = set()
-            nav_i = 0
-            _stop_reason: str = "nav_queue_exhausted"
-            while nav_i < len(nav_queue) and nav_i < _MAX_NAV_PAGES:
+            nav_pages_visited: int = 0
+            _stop_reason: str = "nav_heap_exhausted"
+            while _nav_heap and nav_pages_visited < _MAX_NAV_PAGES:
                 # ── Time budget check ─────────────────────────────────────
                 _elapsed = time.monotonic() - _t_start
                 if _elapsed >= _time_budget_s:
@@ -604,7 +698,8 @@ async def browser_discover_generic(
                     log.info(
                         "browser_discover_generic: time budget %ds exceeded after %.0fs "
                         "(%d courses, %d nav pages visited, %d blocked) — stopping",
-                        _time_budget_s, _elapsed, len(results), nav_i, _blocked_count,
+                        _time_budget_s, _elapsed, len(results),
+                        nav_pages_visited, _blocked_count,
                     )
                     await _emit(
                         f"[DISCOVER] Browser: time budget {_time_budget_s}s reached "
@@ -618,7 +713,7 @@ async def browser_discover_generic(
                     log.info(
                         "browser_discover_generic: early-stop threshold %d reached "
                         "(%d courses found, %d nav pages visited) — stopping",
-                        _early_stop_courses, len(results), nav_i,
+                        _early_stop_courses, len(results), nav_pages_visited,
                     )
                     await _emit(
                         f"[DISCOVER] Browser: {len(results)} course links found — "
@@ -630,11 +725,26 @@ async def browser_discover_generic(
                     _stop_reason = f"max_courses_cap ({max_courses})"
                     break
 
-                nav_url = nav_queue[nav_i]
-                nav_i += 1
+                # Pop the highest-scoring nav candidate.
+                neg_score, _ctr, nav_url, nav_anchor = heapq.heappop(_nav_heap)
+                nav_score = -neg_score
+                nav_pages_visited += 1
+
                 if nav_url in nav_visited:
                     continue
                 nav_visited.add(nav_url)
+
+                log.info(
+                    "browser_discover_generic: visiting nav page #%d "
+                    "score=%d courses_so_far=%d heap_remaining=%d url=%s",
+                    nav_pages_visited, nav_score, len(results),
+                    len(_nav_heap), nav_url,
+                )
+                await _emit(
+                    f"[DISCOVER] Browser: nav #{nav_pages_visited} "
+                    f"score={nav_score} → {nav_url} "
+                    f"(courses={len(results)}, heap={len(_nav_heap)})"
+                )
                 try:
                     await page.goto(
                         nav_url, wait_until="domcontentloaded", timeout=30_000
@@ -690,17 +800,27 @@ async def browser_discover_generic(
 
                     if gained:
                         await _emit(
-                            f"[DISCOVER] Browser: nav {nav_url} → +{gained} courses "
-                            f"(total {len(results)})"
+                            f"[DISCOVER] Browser: nav #{nav_pages_visited} "
+                            f"score={nav_score} → +{gained} course links "
+                            f"(total={len(results)}) {nav_url}"
                         )
                         log.info(
-                            "browser_discover_generic: nav %s → +%d courses",
-                            nav_url, gained,
+                            "browser_discover_generic: nav #%d score=%d %s "
+                            "→ +%d courses (total=%d, heap=%d)",
+                            nav_pages_visited, nav_score, nav_url,
+                            gained, len(results), len(_nav_heap),
+                        )
+                    else:
+                        log.debug(
+                            "browser_discover_generic: nav #%d score=%d %s "
+                            "→ 0 new courses (total=%d, heap=%d)",
+                            nav_pages_visited, nav_score, nav_url,
+                            len(results), len(_nav_heap),
                         )
                 except Exception as exc:
                     log.debug(
-                        "browser_discover_generic: nav page %s failed — %s",
-                        nav_url, exc,
+                        "browser_discover_generic: nav page %s (score=%d) failed — %s",
+                        nav_url, nav_score, exc,
                     )
 
     except Exception as exc:
