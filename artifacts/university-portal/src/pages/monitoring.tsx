@@ -137,6 +137,7 @@ export default function MonitoringPage() {
   const [monPageSize, setMonPageSize] = useState(25);
   const [pendingEnableId, setPendingEnableId] = useState<number | null>(null);
   const [pendingDisableId, setPendingDisableId] = useState<number | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   const { data: stats, isLoading: statsLoading } = useQuery<WatcherStats>({
     queryKey: ["monitoring-stats"],
@@ -282,9 +283,22 @@ export default function MonitoringPage() {
         <div className="flex gap-2">
           <Button
             variant="outline" size="sm"
-            onClick={() => { qc.invalidateQueries({ queryKey: ["monitoring-watchers"] }); qc.invalidateQueries({ queryKey: ["monitoring-stats"] }); }}
+            disabled={refreshing}
+            onClick={async () => {
+              setRefreshing(true);
+              try {
+                await Promise.all([
+                  qc.refetchQueries({ queryKey: ["monitoring-watchers"] }),
+                  qc.refetchQueries({ queryKey: ["monitoring-stats"] }),
+                ]);
+                toast({ title: "Refreshed", description: "Watcher data is up to date." });
+              } finally {
+                setRefreshing(false);
+              }
+            }}
           >
-            <RefreshCw className="h-4 w-4 mr-1" /> Refresh
+            <RefreshCw className={`h-4 w-4 mr-1 ${refreshing ? "animate-spin" : ""}`} />
+            {refreshing ? "Refreshing…" : "Refresh"}
           </Button>
           <Button
             size="sm" variant="outline"
