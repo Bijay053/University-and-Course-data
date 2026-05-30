@@ -805,12 +805,14 @@ export default function UniversityDetail() {
       page,
       limit,
     },
-    { query: { enabled: !!id && tab === "courses" } },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    { query: { enabled: !!id && tab === "courses" } as any },
   );
 
   const { data: allCoursesData } = useListCourses(
     { universityId: id, limit: 500 },
-    { query: { enabled: !!id && (tab === "english" || tab === "academic" || tab === "scholarships") } },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    { query: { enabled: !!id && (tab === "english" || tab === "academic" || tab === "scholarships") } as any },
   );
 
   const courses = coursesData?.data ?? [];
@@ -1720,7 +1722,7 @@ export default function UniversityDetail() {
       </div>
 
       {/* ── Probe Status Card ── */}
-      {probeCardOpen && probeResult?.probe_result && (
+      {probeCardOpen && !!probeResult?.probe_result && (
         <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 font-semibold text-emerald-800">
@@ -1886,7 +1888,7 @@ export default function UniversityDetail() {
       {/* ── Extraction Rules Card (Phase 2) ─────────────────────────────── */}
       {probeResult?.auto_config &&
         typeof probeResult.auto_config === "object" &&
-        probeResult.auto_config.extraction_rules &&
+        !!probeResult.auto_config.extraction_rules &&
         typeof probeResult.auto_config.extraction_rules === "object" && (
         <div className="rounded-lg border border-violet-200 bg-violet-50 p-4 text-sm space-y-3">
           <div className="flex items-center justify-between">
@@ -2241,7 +2243,7 @@ export default function UniversityDetail() {
                     <td className="px-2 py-2 text-gray-500">{txt(c.studyLoad)}</td>
                     <td className="px-2 py-2 text-gray-500 border-r">{txt(c.language)}</td>
                     <td className="px-2 py-2 text-blue-600">{txt(c.intakeMonths)}</td>
-                    <td className="px-2 py-2 text-blue-500">{num(c.intakeDays)}</td>
+                    <td className="px-2 py-2 text-blue-500">{txt(c.intakeDays)}</td>
                     <td className="px-2 py-2 text-blue-500 border-r">{txt(c.courseLocation)}</td>
                     <td className="px-2 py-2 text-amber-700 font-medium">{c.internationalFee ? c.internationalFee.toLocaleString() : "—"}</td>
                     <td className="px-2 py-2 text-amber-600">{txt(c.feeTerm)}</td>

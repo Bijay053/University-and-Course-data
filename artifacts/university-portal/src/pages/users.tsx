@@ -145,7 +145,7 @@ export default function UsersPage() {
                             {u.is_super_admin ? (
                               <Badge className="bg-violet-600 gap-1">
                                 <ShieldCheck className="h-3 w-3" /> Super admin
-                                {u.is_protected && <Lock className="h-3 w-3 ml-0.5" title="Protected admin account" />}
+                                {u.is_protected && <Lock className="h-3 w-3 ml-0.5" />}
                               </Badge>
                             ) : u.role_name ? (
                               <Badge variant="outline" className="gap-1">

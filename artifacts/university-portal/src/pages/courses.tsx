@@ -174,7 +174,7 @@ export default function Courses() {
               {/* ── Mobile card list ── */}
               <div className="md:hidden divide-y">
                 {courses.map((course) => {
-                  const row = course as Record<string, unknown>;
+                  const row = course as unknown as Record<string, unknown>;
                   const degreeColor = DEGREE_COLORS[course.degreeLevel ?? ""] ?? "bg-gray-100 text-gray-700";
                   return (
                     <Link key={course.id} href={`/courses/${course.id}`}>
@@ -196,19 +196,19 @@ export default function Courses() {
                             <span>{course.duration} {course.durationTerm}</span>
                           )}
                           {course.studyMode && <span>{course.studyMode}</span>}
-                          {row.internationalFee && (
+                          {!!row.internationalFee && (
                             <span className="flex items-center gap-0.5 text-green-700 font-medium">
                               <DollarSign className="h-3 w-3" />
                               {(row.internationalFee as number).toLocaleString()} {row.feeTerm ? `/ ${row.feeTerm}` : ""}
                             </span>
                           )}
-                          {row.ieltsOverall && (
+                          {!!row.ieltsOverall && (
                             <span className="text-amber-700">IELTS {row.ieltsOverall as number}</span>
                           )}
-                          {row.pteOverall && (
+                          {!!row.pteOverall && (
                             <span className="text-violet-700">PTE {row.pteOverall as number}</span>
                           )}
-                          {row.intakeMonths && Array.isArray(row.intakeMonths) && row.intakeMonths.length > 0 && (
+                          {!!row.intakeMonths && Array.isArray(row.intakeMonths) && row.intakeMonths.length > 0 && (
                             <span>{(row.intakeMonths as string[]).slice(0, 3).join(", ")}</span>
                           )}
                         </div>
@@ -274,7 +274,7 @@ export default function Courses() {
                   </thead>
                   <tbody>
                     {courses.map((course, i) => {
-                      const row = course as Record<string, unknown>;
+                      const row = course as unknown as Record<string, unknown>;
                       const rowBg = i % 2 === 0 ? "bg-white" : "bg-gray-50/50";
                       return (
                         <tr key={course.id} className={`${rowBg} hover:bg-blue-50/30 border-b border-gray-100 group`}>

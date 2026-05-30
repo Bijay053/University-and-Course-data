@@ -278,11 +278,10 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
 
   // Auto-fetch quality data when job completes
   useEffect(() => {
-    if (completedJobId) {
-      // Small delay so the orchestrator has time to write _p7_last_run
-      const t = setTimeout(() => fetchQualityData(completedJobId), 3000);
-      return () => clearTimeout(t);
-    }
+    if (!completedJobId) return;
+    // Small delay so the orchestrator has time to write _p7_last_run
+    const t = setTimeout(() => fetchQualityData(completedJobId), 3000);
+    return () => clearTimeout(t);
   }, [completedJobId, fetchQualityData]);
 
   const pollJobStatus = useCallback((jobId: string) => {

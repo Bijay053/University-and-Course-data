@@ -501,7 +501,7 @@ export default function Scraping() {
   const uniBodyRef = useRef<Record<string, unknown>>({});
   const logIndexRef = useRef(0);
   const logRef = useRef<HTMLDivElement>(null);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollRef = useRef<number | null>(null);
   const pollFailureCountRef = useRef(0);
   const pollInFlightRef = useRef(false);
   const pollWarningShownRef = useRef(false);
@@ -900,7 +900,7 @@ export default function Scraping() {
         }
 
         const fetchAlreadyStarted =
-          (data.current ?? 0) > 0 ||
+          ((data as Record<string, unknown>).current as number ?? 0) > 0 ||
           !!logs?.some((log) =>
             log.event === "progress" ||
             (log.event === "status" && (
