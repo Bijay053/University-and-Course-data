@@ -3324,7 +3324,7 @@ async def apply_scrape_fix(
     sc["admin_config"] = _deep_merge_local(existing, config_patch)
 
     await db.execute(
-        _text("UPDATE universities SET scrape_config = :cfg::jsonb WHERE id = :id"),
+        _text("UPDATE universities SET scrape_config = CAST(:cfg AS jsonb) WHERE id = :id"),
         {"cfg": json.dumps(sc), "id": uni_id},
     )
     await db.commit()

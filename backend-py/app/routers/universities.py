@@ -727,7 +727,7 @@ async def put_agent_config(
     sc["admin_config"] = body
 
     await db.execute(
-        text("UPDATE universities SET scrape_config = :cfg::jsonb WHERE id = :id"),
+        text("UPDATE universities SET scrape_config = CAST(:cfg AS jsonb) WHERE id = :id"),
         {"cfg": json.dumps(sc), "id": uni_id},
     )
     await db.commit()

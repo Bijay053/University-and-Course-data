@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { getFetchErrorMessage, readResponseJson } from "@/lib/readResponseJson";
 import { CountrySelect } from "@/components/country-select";
+import { useToast } from "@/hooks/use-toast";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 type UniOption = { id: number; name: string; scrapeUrl?: string | null; feePageUrl?: string | null; requirementsPageUrl?: string | null };
@@ -162,6 +163,7 @@ function UniPicker({ value, onChange, universities, disabled }: {
 
 // ── Main component ────────────────────────────────────────────────────────────
 export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove, canRemove, forceResetKey }: ScrapeJobCardProps) {
+  const { toast } = useToast();
   const slotKey = `scrape_slot_${slotIndex}_jobId`;
   const startTimeKey = `scrape_slot_${slotIndex}_startTime`;
   const [selectedUni, setSelectedUni] = useState("");
@@ -293,20 +295,33 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
       const res = await fetch(`/api/scrape/jobs/${jobId}/apply-fix`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ config_patch: patch }),
       });
       if (!res.ok) {
         const msg = await getFetchErrorMessage(res);
-        console.error("apply-fix failed:", msg);
+        toast({
+          title: "Apply fix failed",
+          description: msg || `HTTP ${res.status}`,
+          variant: "destructive",
+        });
         return;
       }
       setFixApplied(true);
+      toast({
+        title: "Fix applied!",
+        description: "Config saved — re-run the scrape to see results.",
+      });
     } catch (e) {
-      console.error("apply-fix error:", e);
+      toast({
+        title: "Apply fix failed",
+        description: String(e),
+        variant: "destructive",
+      });
     } finally {
       setApplyingFix(false);
     }
-  }, []);
+  }, [toast]);
 
   const fetchQualityData = useCallback(async (jobId: string) => {
     setQualityLoading(true);
