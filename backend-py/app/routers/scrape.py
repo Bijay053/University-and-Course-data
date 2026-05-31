@@ -14,7 +14,7 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import and_, case, desc, func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -1311,6 +1311,191 @@ async def clean_course_names(
         "cleaned": cleaned_count,
         "dryRun": body.dry_run,
         "examples": examples,
+    }
+
+
+class ReExtractBody(BaseModel):
+    """Request body for bulk AI re-extraction of specific staged courses."""
+
+    ids: list[int] = Field(..., description="scraped_course IDs to re-extract (max 50)")
+    university_id: int = Field(alias="universityId")
+
+    model_config = {"populate_by_name": True}
+
+    @field_validator("ids")
+    @classmethod
+    def _limit_ids(cls, v: list[int]) -> list[int]:
+        if len(v) > 50:
+            raise ValueError("Maximum 50 courses per re-extract call")
+        return v
+
+
+@router.post("/staged/re-extract")
+async def re_extract_staged(
+    body: ReExtractBody,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> dict:
+    """Re-run full AI extraction on specific staged courses in-place.
+
+    For each ``scraped_course`` ID supplied, re-fetches the course page and
+    re-runs the extraction pipeline (CSS/XPath/regex + Gemini fallback).
+    The staged row is updated in-place — status, scrape_job_id and other
+    identity fields are preserved.  Completeness and auto_publish_status are
+    recalculated after the update.
+
+    Returns ``{ total, updated, skipped, errors, results }``.
+    """
+    import math as _math
+
+    from app.models import ScrapedCourse, University
+    from app.services.auto_publish import should_auto_publish
+    from app.services.scraper.completeness import compute_completeness, decide_eligibility
+    from app.services.scraper.config.context import set_uni_config
+    from app.services.scraper.config.loader import get_config_for_host
+    from app.services.scraper.orchestrator import _extract_only
+
+    uni = await db.get(University, body.university_id)
+    if uni is None:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail=f"University {body.university_id} not found")
+
+    scrape_url = uni.scrape_url or uni.website or ""
+    country = getattr(uni, "country", None)
+
+    # Activate per-uni YAML config so the extraction pipeline has context.
+    try:
+        from urllib.parse import urlparse as _up
+        hostname = _up(scrape_url).netloc if scrape_url else ""
+        if hostname:
+            cfg = get_config_for_host(
+                hostname=hostname,
+                name=uni.name or "",
+                scrape_url=scrape_url,
+                university_id=body.university_id,
+            )
+            set_uni_config(cfg)
+    except Exception:
+        pass
+
+    # Load all requested rows in one query.
+    rows = (
+        await db.execute(
+            select(ScrapedCourse).where(
+                ScrapedCourse.university_id == body.university_id,
+                ScrapedCourse.id.in_(body.ids),
+            )
+        )
+    ).scalars().all()
+
+    rows_by_id = {r.id: r for r in rows}
+
+    # Fields that must never be overwritten by re-extraction.
+    _SKIP = frozenset({
+        "id", "scrape_job_id", "university_id", "course_id", "created_at",
+        "status", "rejection_reason", "reviewed_at",
+        # completeness/publish columns are re-derived below
+        "completeness", "auto_publish_status", "decision_score",
+        "eligibility_status", "eligibility_reason",
+        "avg_verification_confidence", "pub_score", "pub_score_breakdown",
+        "pub_decision", "pub_decision_reason",
+    })
+
+    def _clean(v):
+        return None if isinstance(v, float) and not _math.isfinite(v) else v
+
+    results: list[dict] = []
+    updated = 0
+    errors = 0
+    skipped = 0
+
+    for sc_id in body.ids:
+        row = rows_by_id.get(sc_id)
+        if row is None:
+            results.append({"id": sc_id, "ok": False, "error": "not found"})
+            errors += 1
+            continue
+
+        url = row.course_website
+        if not url:
+            results.append({"id": sc_id, "ok": False, "error": "no course_website URL — cannot re-extract"})
+            skipped += 1
+            continue
+
+        # Run extraction.
+        try:
+            out = await _extract_only(
+                {"url": url, "name": row.course_name or ""},
+                country=country,
+            )
+        except Exception as exc:  # noqa: BLE001
+            results.append({"id": sc_id, "ok": False, "error": f"extraction error: {exc}"})
+            errors += 1
+            continue
+
+        if out.get("error"):
+            results.append({"id": sc_id, "ok": False, "error": out["error"]})
+            errors += 1
+            continue
+
+        payload: dict = out.get("payload") or {}
+        if not payload:
+            results.append({"id": sc_id, "ok": False, "error": "extractor returned empty payload"})
+            errors += 1
+            continue
+
+        # Apply payload fields to the existing row.
+        changed_fields: list[str] = []
+        for field_key, val in payload.items():
+            if field_key in _SKIP:
+                continue
+            if not hasattr(ScrapedCourse, field_key):
+                continue
+            cleaned = _clean(val)
+            if getattr(row, field_key) != cleaned:
+                setattr(row, field_key, cleaned)
+                changed_fields.append(field_key)
+
+        # Always refresh completeness and publish decision.
+        try:
+            comp = compute_completeness(row)
+            row.completeness = comp.score
+            decision = decide_eligibility(row, comp)
+            row.eligibility_status = decision.status
+            row.eligibility_reason = decision.reason or None
+            ap = should_auto_publish(row)
+            row.auto_publish_status = "ready" if ap.auto_publish else "review"
+            row.decision_score = ap.score
+        except Exception as exc:  # noqa: BLE001
+            log.warning("re-extract: completeness scoring failed for sc %s: %s", sc_id, exc)
+
+        results.append({
+            "id": sc_id,
+            "ok": True,
+            "updated_fields": changed_fields,
+            "new_completeness": row.completeness,
+        })
+        updated += 1
+
+    if updated > 0:
+        try:
+            await db.commit()
+        except Exception as exc:  # noqa: BLE001
+            await db.rollback()
+            log.warning("re-extract: commit failed for uni %s: %s", body.university_id, exc)
+            return {
+                "total": len(body.ids),
+                "updated": 0,
+                "skipped": skipped,
+                "errors": len(body.ids),
+                "results": [{"id": r["id"], "ok": False, "error": "commit failed"} for r in results],
+            }
+
+    return {
+        "total": len(body.ids),
+        "updated": updated,
+        "skipped": skipped,
+        "errors": errors,
+        "results": results,
     }
 
 

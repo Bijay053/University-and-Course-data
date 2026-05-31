@@ -14,7 +14,7 @@ import {
   FileSpreadsheet, CheckCircle2, Clock, AlertCircle, RefreshCw,
   Globe, Zap, Loader2, X, ExternalLink, Bot, ArrowRight,
   Eye, Pencil, Trash2, Check, XCircle, CheckCheck, Save,
-  Square, StopCircle, Play, ShieldCheck, Info, PlusCircle, ChevronDown, AlertTriangle,
+  Square, StopCircle, Play, ShieldCheck, Info, PlusCircle, ChevronDown, AlertTriangle, Sparkles,
 } from "lucide-react";
 import { Link } from "wouter";
 import { getFetchErrorMessage, readResponseJson } from "@/lib/readResponseJson";
@@ -1441,6 +1441,7 @@ export default function Scraping() {
 
   const [clearingRejected, setClearingRejected] = useState(false);
   const [bulkRejecting, setBulkRejecting] = useState(false);
+  const [fixingSelected, setFixingSelected] = useState(false);
   const [showBulkRejectDialog, setShowBulkRejectDialog] = useState(false);
   const [cleaningNames, setCleaningNames] = useState(false);
 
@@ -1520,6 +1521,49 @@ export default function Scraping() {
       toast({ title: "Clean failed", description: "Network error", variant: "destructive" });
     }
     setCleaningNames(false);
+  };
+
+  const handleFixSelected = async () => {
+    if (!selectedUni || selectedUni === ALL || selectedIds.size === 0) return;
+    const uniId = parseInt(selectedUni);
+    if (isNaN(uniId)) return;
+    const ids = Array.from(selectedIds);
+    if (ids.length > 50) {
+      toast({ title: "Too many selected", description: "Select up to 50 courses at a time for AI fix.", variant: "destructive" });
+      return;
+    }
+    setFixingSelected(true);
+    try {
+      const res = await fetch("/api/scrape/staged/re-extract", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids, universityId: uniId }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const skippedMsg = data.skipped > 0 ? ` (${data.skipped} had no URL)` : "";
+        const errMsg = data.errors > 0 ? ` · ${data.errors} failed` : "";
+        toast({
+          title: `Re-extracted ${data.updated} of ${data.total} course(s)`,
+          description: `AI extraction re-ran on selected courses.${skippedMsg}${errMsg} Scores updated.`,
+        });
+        if (reviewJobId) {
+          await loadStagedCourses(reviewJobId);
+          const qRes = await fetch(`/api/scrape/universities/${uniId}/course-quality`);
+          if (qRes.ok) {
+            const qData = await qRes.json();
+            const map: Record<number, CourseQualityData> = {};
+            for (const entry of qData.courses ?? []) map[entry.id] = entry;
+            setCourseQualityMap(map);
+          }
+        }
+      } else {
+        toast({ title: "Fix failed", description: await getFetchErrorMessage(res), variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Fix failed", description: "Network error — check your connection.", variant: "destructive" });
+    }
+    setFixingSelected(false);
   };
 
   const handleDedupPending = async () => {
@@ -1848,6 +1892,17 @@ export default function Scraping() {
                     Reject all ({stagedCourses.length})
                   </Button>
                 )}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-blue-600 border-blue-200 hover:bg-blue-50"
+                  onClick={handleFixSelected}
+                  disabled={selectedIds.size === 0 || fixingSelected || approving}
+                  title="Re-run full AI extraction on selected courses to fill missing fields (IELTS, fees, location…)"
+                >
+                  {fixingSelected ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Sparkles className="w-4 h-4 mr-1" />}
+                  Fix selected ({selectedIds.size})
+                </Button>
                 <Button
                   size="sm"
                   variant="outline"
