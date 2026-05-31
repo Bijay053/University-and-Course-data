@@ -80,6 +80,17 @@ _COUNTRY_WORD_IN_RAW_RE = re.compile(
     r"\b(?:australia|new\s+zealand|united\s+kingdom|united\s+states)\b",
     re.I,
 )
+# JCU pages render "Course available at" as an uppercase header followed by
+# "Notes" and then space-separated "JCU {Campus}" tokens (no commas).
+# Example raw value: "COURSE AVAILABLE AT NOTES JCU Townsville JCU Cairns"
+# Clean this into a normal comma-separated campus list.
+_COURSE_AVAIL_NOTES_RE = re.compile(
+    r"^course\s+available\s+at\s+notes?\s*", re.IGNORECASE
+)
+_JCU_CAMPUS_TOKEN_RE = re.compile(
+    r"\bJCU\s+([A-Za-z][A-Za-z]+(?: [A-Za-z][A-Za-z]+)?)", re.IGNORECASE
+)
+
 _LOCATION_WINDOW = re.compile(
     r"\b(?:(?:campus\s+)?locations?|available\s+at)\s*[:\-]?\s*([^\n]{0,220}?)"
     r"(?=\b(?:intakes?|duration|fees?|student\s*type|learning\s*mode|study\s*modes?|delivery|attendance)\b|$)",
@@ -444,6 +455,13 @@ def _normalise(raw: str | None) -> str | None:
     # Expand campus short-codes (e.g. "SYD | MEL | BNE" → "Sydney, Melbourne, Brisbane")
     # before any marketing / junk checks so the expanded text can be validated normally.
     cleaned = _expand_campus_codes(cleaned)
+    # JCU "COURSE AVAILABLE AT NOTES JCU Townsville JCU Cairns" → "Townsville, Cairns"
+    if _COURSE_AVAIL_NOTES_RE.match(cleaned):
+        cities = _JCU_CAMPUS_TOKEN_RE.findall(cleaned)
+        cleaned = ", ".join(cities) if cities else _COURSE_AVAIL_NOTES_RE.sub("", cleaned).strip()
+    # Generic "JCU Townsville" → "Townsville" (e.g. when the full label isn't present
+    # but the campus is prefixed with the university short code).
+    cleaned = _JCU_CAMPUS_TOKEN_RE.sub(r"\1", cleaned).strip(", ")
     if _looks_marketing(cleaned):
         return None
     head = _TRAILING_KEYS.split(cleaned, maxsplit=1)[0].strip() or cleaned

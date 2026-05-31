@@ -28,6 +28,11 @@ discovery:
     - 'https://www.jcu.edu.au/courses'
     - 'https://www.jcu.edu.au/study/courses/find-a-course'
 
+  # Allow up to 300 course links before stopping browser discovery —
+  # the default 100 fired immediately after the first seed page (101 links)
+  # and prevented following any pagination or sub-listing pages.
+  browser_early_stop_courses: 300
+
   # Keep Wayback as a safety net — no useful CDX coverage exists today
   # but it may improve over time.
   use_wayback: true
