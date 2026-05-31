@@ -2978,6 +2978,227 @@ async def get_field_fill_rates(
     }
 
 
+# ─── Per-course quality scores ────────────────────────────────────────────────
+
+@router.get("/universities/{university_id}/course-quality")
+async def get_course_quality_scores(
+    university_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> dict:
+    """Per-course quality scores for all pending/review staged courses.
+
+    Uses the same rules as the AI Diagnostics system (data_quality._check_course).
+
+    Response::
+
+        {
+          "courses": [
+            {
+              "id": 42,
+              "course_name": "Master of Business",
+              "score": 72,
+              "tier": "review",   # "good" | "review" | "risky"
+              "label": "Needs Review",
+              "issues": [
+                {"code": "missing_english_requirement",
+                 "label": "Missing IELTS",
+                 "severity": "warning",
+                 "field": "ielts",
+                 "detail": "No English language test score found..."}
+              ],
+              "breakdown": {
+                "fee":          {"fill": true,  "quality": "low",  "issues": ["..."]},
+                "ielts":        {"fill": false, "quality": null,   "issues": ["..."]},
+                "location":     {"fill": true,  "quality": "good", "issues": []},
+                "study_mode":   {"fill": true,  "quality": "good", "issues": []},
+                "degree_level": {"fill": true,  "quality": "good", "issues": []},
+                "course_name":  {"fill": true,  "quality": "good", "issues": []}
+              }
+            },
+            ...
+          ]
+        }
+    """
+    from app.services.scraper.data_quality import _check_course
+
+    rows = (await db.execute(
+        text("""
+            SELECT
+                id, course_name, international_fee,
+                ielts_overall, ielts_reading, ielts_writing,
+                ielts_listening, ielts_speaking,
+                pte_overall, toefl_overall, cambridge_overall, duolingo_overall,
+                study_mode, degree_level, course_location, intake_months,
+                duration, duration_term, course_website
+            FROM scraped_courses
+            WHERE university_id = :uni_id
+              AND status IN ('pending', 'review')
+            ORDER BY id
+        """),
+        {"uni_id": university_id},
+    )).mappings().all()
+
+    # Issue code → short chip label shown in the table
+    _CHIP: dict[str, str] = {
+        "missing_international_fee":             "Missing Fee",
+        "domestic_fee_only_no_international":    "Domestic Fee Risk",
+        "fee_too_low":                           "Fee Too Low",
+        "fee_too_high":                          "Fee Too High",
+        "missing_international_fee_central_page":"Fee: Central Page",
+        "non_numeric_fee":                       "Bad Fee Value",
+        "missing_english_requirement":           "Missing IELTS",
+        "english_coherence_toefl":               "IELTS/TOEFL Mismatch",
+        "english_coherence_pte":                 "IELTS/PTE Mismatch",
+        "english_coherence_duolingo":            "IELTS/DET Mismatch",
+        "english_coherence_cambridge":           "IELTS/CAE Mismatch",
+        "university_name_in_course_title":       "Uni Name in Title",
+        "generic_course_title":                  "Generic Title",
+        "suspiciously_short_title":              "Short Title",
+        "missing_course_name":                   "Missing Name",
+        "nav_text_location":                     "Invalid Location",
+        "location_too_long":                     "Location Too Long",
+        "suspicious_location":                   "Suspicious Location",
+        "campus_not_in_allowlist":               "Invalid Campus",
+        "missing_study_mode":                    "No Study Mode",
+        "missing_degree_level":                  "No Degree Level",
+        "missing_duration":                      "No Duration",
+        "suspicious_duration":                   "Bad Duration",
+    }
+
+    # Issue code → which breakdown field it belongs to
+    _FIELD_CODES: dict[str, set[str]] = {
+        "fee": {
+            "missing_international_fee",
+            "domestic_fee_only_no_international",
+            "fee_too_low", "fee_too_high", "non_numeric_fee",
+            "missing_international_fee_central_page",
+        },
+        "ielts": {
+            "missing_english_requirement",
+            "english_coherence_toefl", "english_coherence_pte",
+            "english_coherence_duolingo", "english_coherence_cambridge",
+        },
+        "location": {
+            "nav_text_location", "location_too_long",
+            "suspicious_location", "missing_location", "campus_not_in_allowlist",
+        },
+        "study_mode":   {"missing_study_mode"},
+        "degree_level": {"missing_degree_level"},
+        "course_name":  {
+            "university_name_in_course_title", "generic_course_title",
+            "suspiciously_short_title", "missing_course_name",
+        },
+    }
+
+    _DEDUCTIONS = {"critical": 25, "warning": 10, "info": 2}
+
+    results = []
+    for row in rows:
+        payload: dict = {
+            "course_name":       row["course_name"],
+            "international_fee": row["international_fee"],
+            "domestic_fee":      None,
+            "ielts_overall":     row["ielts_overall"],
+            "ielts_reading":     row["ielts_reading"],
+            "ielts_writing":     row["ielts_writing"],
+            "ielts_listening":   row["ielts_listening"],
+            "ielts_speaking":    row["ielts_speaking"],
+            "pte_overall":       row["pte_overall"],
+            "toefl_overall":     row["toefl_overall"],
+            "cambridge_overall": row["cambridge_overall"],
+            "duolingo_overall":  row["duolingo_overall"],
+            "pte_accepted":      None,
+            "toefl_accepted":    None,
+            "cambridge_accepted":None,
+            "duolingo_accepted": None,
+            "study_mode":        row["study_mode"],
+            "degree_level":      row["degree_level"],
+            "course_location":   row["course_location"],
+            "intake_months":     row["intake_months"],
+            "duration":          row["duration"],
+            "duration_term":     row["duration_term"],
+            "has_central_fee_page": None,
+        }
+
+        issues = _check_course(payload, url=row["course_website"] or "")
+
+        score = max(0, 100 - sum(_DEDUCTIONS.get(i.severity, 0) for i in issues))
+
+        if score >= 85:
+            tier, label = "good", "Good"
+        elif score >= 60:
+            tier, label = "review", "Needs Review"
+        else:
+            tier, label = "risky", "Risky"
+
+        issue_chips = []
+        for issue in issues:
+            chip_label = _CHIP.get(issue.code)
+            if chip_label:
+                field = next(
+                    (f for f, codes in _FIELD_CODES.items() if issue.code in codes),
+                    "other",
+                )
+                issue_chips.append({
+                    "code":     issue.code,
+                    "label":    chip_label,
+                    "severity": issue.severity,
+                    "field":    field,
+                    "detail":   issue.message,
+                })
+
+        breakdown: dict = {}
+        for field_name, field_codes in _FIELD_CODES.items():
+            fi = [i for i in issues if i.code in field_codes]
+            has_crit = any(i.severity == "critical" for i in fi)
+            has_warn = any(i.severity == "warning" for i in fi)
+
+            if field_name == "fee":
+                fill = payload["international_fee"] is not None
+            elif field_name == "ielts":
+                fill = any(
+                    payload.get(k) is not None
+                    for k in ("ielts_overall", "pte_overall", "toefl_overall",
+                              "cambridge_overall", "duolingo_overall")
+                )
+            elif field_name == "location":
+                fill = bool((payload.get("course_location") or "").strip())
+            elif field_name == "study_mode":
+                fill = bool(payload.get("study_mode"))
+            elif field_name == "degree_level":
+                fill = bool(payload.get("degree_level"))
+            else:  # course_name
+                fill = bool(payload.get("course_name"))
+
+            quality: str | None
+            if not fill:
+                quality = None
+            elif has_crit:
+                quality = "low"
+            elif has_warn:
+                quality = "medium"
+            else:
+                quality = "good"
+
+            breakdown[field_name] = {
+                "fill":    fill,
+                "quality": quality,
+                "issues":  [i.message for i in fi],
+            }
+
+        results.append({
+            "id":          row["id"],
+            "course_name": row["course_name"],
+            "score":       score,
+            "tier":        tier,
+            "label":       label,
+            "issues":      issue_chips,
+            "breakdown":   breakdown,
+        })
+
+    return {"courses": results}
+
+
 # ─── Phase 5: Quality Intelligence report ─────────────────────────────────────
 
 @router.get("/universities/{university_id}/quality-report")

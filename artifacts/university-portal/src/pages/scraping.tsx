@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback, useMemo } from "react";
+import { Fragment, useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { useListUniversities } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
@@ -170,6 +170,30 @@ type ReviewConflict = {
   valueB: string | null;
   reason: string | null;
   status: string;
+};
+
+type CourseQualityIssue = {
+  code: string;
+  label: string;
+  severity: "critical" | "warning" | "info";
+  field: string;
+  detail: string;
+};
+
+type CourseQualityBreakdown = {
+  fill: boolean;
+  quality: "good" | "medium" | "low" | null;
+  issues: string[];
+};
+
+type CourseQualityData = {
+  id: number;
+  course_name: string;
+  score: number;
+  tier: "good" | "review" | "risky";
+  label: string;
+  issues: CourseQualityIssue[];
+  breakdown: Record<string, CourseQualityBreakdown>;
 };
 
 type CourseReviewPayload = {
@@ -535,6 +559,9 @@ export default function Scraping() {
   }, [slotIds]);
 
   const [stagedCourses, setStagedCourses] = useState<StagedCourse[]>([]);
+  const [courseQualityMap, setCourseQualityMap] = useState<Record<number, CourseQualityData>>({});
+  const [qualityExpanded, setQualityExpanded] = useState<Set<number>>(new Set());
+  const [qualitySortDesc, setQualitySortDesc] = useState(false);
   const [lastScrapeInfo, setLastScrapeInfo] = useState<{ jobId: string; startedAt: string | null; completedAt: string | null; durationMs: number | null; totalFound: number; staged: number; skipped: number; errors: number } | null>(null);
   const [showReview, setShowReview] = useState(false);
   const [reviewJobId, setReviewJobId] = useState<string | null>(null);
@@ -720,13 +747,20 @@ export default function Scraping() {
     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
   }, [scrapeLogs]);
 
+  const toggleQualityExpanded = useCallback((id: number) => {
+    setQualityExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }, []);
+
   const loadStagedCourses = useCallback(async (jobId: string) => {
     try {
       const res = await fetch(`/api/scrape/staged/${jobId}`);
       if (res.ok) {
         const payload = await readResponseJson<unknown>(res);
         if (!payload) return;
-        // Backward-compat: old endpoint returned Array<StagedCourse>; new endpoint returns { courses, lastScrape }
         const data: StagedCourse[] = Array.isArray(payload)
           ? (payload as StagedCourse[])
           : ((payload as { courses?: StagedCourse[] }).courses ?? []);
@@ -734,10 +768,25 @@ export default function Scraping() {
           ? null
           : ((payload as { lastScrape?: typeof lastScrapeInfo }).lastScrape ?? null);
         if (lastScrape) setLastScrapeInfo(lastScrape);
-        setStagedCourses(data.filter((c: StagedCourse) => c.status === "pending"));
+        const pending = data.filter((c: StagedCourse) => c.status === "pending");
+        setStagedCourses(pending);
         setReviewJobId(jobId);
         setShowReview(true);
-        setSelectedIds(new Set(data.filter((c: StagedCourse) => c.status === "pending").map((c: StagedCourse) => c.id)));
+        setSelectedIds(new Set(pending.map((c: StagedCourse) => c.id)));
+        // Fire quality fetch in background — uses universityId from first course
+        const uniId = pending[0]?.universityId;
+        if (uniId) {
+          fetch(`/api/scrape/universities/${uniId}/course-quality`, { credentials: "include" })
+            .then((r) => r.ok ? r.json() : null)
+            .then((qData: { courses?: CourseQualityData[] } | null) => {
+              if (!qData?.courses) return;
+              const map: Record<number, CourseQualityData> = {};
+              for (const q of qData.courses) map[q.id] = q;
+              setCourseQualityMap(map);
+              setQualityExpanded(new Set());
+            })
+            .catch(() => {});
+        }
       }
     } catch {}
   }, []);
@@ -1676,7 +1725,15 @@ export default function Scraping() {
         </Card>
       )}
 
-      {showReview && stagedCourses.length > 0 && (
+      {showReview && stagedCourses.length > 0 && (() => {
+        const displayedCourses = qualitySortDesc
+          ? [...stagedCourses].sort((a, b) => {
+              const qa = courseQualityMap[a.id]?.score ?? 100;
+              const qb = courseQualityMap[b.id]?.score ?? 100;
+              return qa - qb; // ascending = worst first
+            })
+          : stagedCourses;
+        return (
         <Card className="border-2 border-green-100">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
@@ -1788,6 +1845,13 @@ export default function Scraping() {
                       </th>
                       <th className="text-left p-2 font-medium text-gray-600 min-w-[200px]">Course Name</th>
                       <th className="text-center p-2 font-medium text-gray-600 w-16">Score</th>
+                      <th
+                        className="text-center p-2 font-medium text-indigo-600 w-[116px] cursor-pointer select-none hover:bg-gray-100 whitespace-nowrap"
+                        onClick={() => setQualitySortDesc((d) => !d)}
+                        title="Sort by worst quality first"
+                      >
+                        Data Quality {qualitySortDesc ? "↑ worst" : "↓"}
+                      </th>
                       <th className="text-left p-2 font-medium text-gray-600">Level</th>
                       <th className="text-left p-2 font-medium text-gray-600">Duration</th>
                       <th className="text-right p-2 font-medium text-gray-600">Intl. Fee</th>
@@ -1803,8 +1867,11 @@ export default function Scraping() {
                     </tr>
                   </thead>
                   <tbody className="divide-y">
-                    {stagedCourses.map((course) => (
-                      <tr key={course.id} className={`hover:bg-gray-50 ${selectedIds.has(course.id) ? "bg-blue-50/50" : ""}`}>
+                    {displayedCourses.map((course) => {
+                      const qData = courseQualityMap[course.id];
+                      const qExpanded = qualityExpanded.has(course.id);
+                      return (<Fragment key={course.id}>
+                      <tr className={`hover:bg-gray-50 ${selectedIds.has(course.id) ? "bg-blue-50/50" : ""}`}>
                         <td className="p-2">
                           <input
                             type="checkbox"
@@ -1869,6 +1936,21 @@ export default function Scraping() {
                           {course.notes && (
                             <div className="text-xs text-amber-600 truncate mt-0.5" title={course.notes}>⚠ {course.notes}</div>
                           )}
+                          {/* Quality issue chips */}
+                          {qData?.issues && qData.issues.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {qData.issues.slice(0, 4).map((issue, i) => (
+                                <span key={i} className={`inline-flex text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                                  issue.severity === "critical" ? "bg-red-100 text-red-800" :
+                                  issue.severity === "warning"  ? "bg-yellow-100 text-yellow-800" :
+                                  "bg-gray-100 text-gray-600"
+                                }`}>{issue.label}</span>
+                              ))}
+                              {qData.issues.length > 4 && (
+                                <span className="text-[10px] text-muted-foreground">+{qData.issues.length - 4} more</span>
+                              )}
+                            </div>
+                          )}
                         </td>
                         <td className="p-2 text-center">
                           {course.completeness != null ? (
@@ -1878,6 +1960,23 @@ export default function Scraping() {
                               "bg-red-100 text-red-700"
                             }`}>{course.completeness}%</span>
                           ) : <span className="text-gray-300">-</span>}
+                        </td>
+                        {/* Data Quality cell */}
+                        <td className="p-2 text-center align-top">
+                          {qData ? (
+                            <button
+                              onClick={() => toggleQualityExpanded(course.id)}
+                              title="Click to see quality breakdown"
+                              className={`inline-flex flex-col items-center px-2 py-1 rounded text-xs font-semibold cursor-pointer transition-colors w-full ${
+                                qData.tier === "good"   ? "bg-green-100 text-green-800 hover:bg-green-200" :
+                                qData.tier === "review" ? "bg-yellow-100 text-yellow-800 hover:bg-yellow-200" :
+                                                          "bg-red-100 text-red-800 hover:bg-red-200"
+                              }`}
+                            >
+                              <span className="text-sm font-bold leading-none">{qData.score}%</span>
+                              <span className="font-normal text-[10px] leading-none mt-0.5">{qData.label}</span>
+                            </button>
+                          ) : <span className="text-gray-300 text-xs">—</span>}
                         </td>
                         <td className="p-2">
                           {course.degreeLevel ? (
@@ -1976,14 +2075,64 @@ export default function Scraping() {
                           </div>
                         </td>
                       </tr>
-                    ))}
+                      {/* Quality breakdown expansion panel */}
+                      {qExpanded && qData?.breakdown && (
+                        <tr key={`q-${course.id}`}>
+                          <td colSpan={17} className="p-0 border-b border-indigo-100 bg-indigo-50/40">
+                            <div className="px-4 py-3">
+                              <p className="text-xs font-semibold text-indigo-700 uppercase tracking-wide mb-2">
+                                Quality Breakdown — {course.courseName}
+                              </p>
+                              <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+                                {(Object.entries(qData.breakdown) as [string, CourseQualityBreakdown][]).map(([field, bd]) => {
+                                  const fieldLabel: Record<string, string> = {
+                                    fee: "Fee", ielts: "IELTS / English",
+                                    location: "Location", study_mode: "Study Mode",
+                                    degree_level: "Degree Level", course_name: "Course Name",
+                                  };
+                                  const qualityColor =
+                                    !bd.fill           ? "text-gray-400" :
+                                    bd.quality === "good"   ? "text-green-700" :
+                                    bd.quality === "medium" ? "text-yellow-700" :
+                                                              "text-orange-700";
+                                  const qualityIcon =
+                                    !bd.fill           ? "—" :
+                                    bd.quality === "good"   ? "✓ Good" :
+                                    bd.quality === "medium" ? "⚠ Medium" :
+                                                              "✗ Low";
+                                  return (
+                                    <div key={field} className="rounded border border-gray-200 bg-white px-2.5 py-2">
+                                      <div className="flex items-center justify-between gap-1 mb-1">
+                                        <span className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide truncate">{fieldLabel[field] ?? field}</span>
+                                        <span className={`text-[10px] font-semibold shrink-0 ${qualityColor}`}>{qualityIcon}</span>
+                                      </div>
+                                      {bd.issues.length > 0 ? (
+                                        <ul className="space-y-0.5">
+                                          {bd.issues.map((msg, i) => (
+                                            <li key={i} className="text-[10px] text-gray-500 leading-snug">{msg}</li>
+                                          ))}
+                                        </ul>
+                                      ) : (
+                                        <p className="text-[10px] text-gray-300">{bd.fill ? "No issues" : "Not filled"}</p>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                      </Fragment>);
+                    })}
                   </tbody>
                 </table>
               </div>
             </div>
           </CardContent>
         </Card>
-      )}
+        );
+      })()}
 
       {showReview && stagedCourses.length === 0 && (
         <Card className="border-2 border-green-100">
