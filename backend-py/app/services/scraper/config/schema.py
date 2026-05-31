@@ -194,6 +194,19 @@ class DiscoveryConfig(BaseModel):
         default=False,
         description="Fall back to Wayback Machine CDX when all other discovery fails.",
     )
+    skip_browser_discovery: bool = Field(
+        default=False,
+        description=(
+            "Skip the generic Playwright browser-discovery fallback entirely, "
+            "even when BFS returns 0 links.  Enable for universities whose live "
+            "site is Cloudflare Enterprise-walled at the datacenter IP level so "
+            "the browser ALSO receives 403 / 'Just a moment…' — the 90-second "
+            "discovery timeout fires with zero results and only wastes time.  "
+            "JCU is the canonical example: set skip_browser_discovery=true and "
+            "use_wayback=true so the orchestrator goes BFS → 0 → Wayback CDX "
+            "instead of BFS → 0 → 90s browser hang → Wayback CDX."
+        ),
+    )
     bfs_page_budget: Optional[int] = Field(
         default=None,
         description=(

@@ -1062,7 +1062,8 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # match MQ's /study/find-a-course/<level>/<slug> URL shape, so the
         # tier would only re-harvest junk nav pages (the original symptom
         # of Task #85 before this fix).
-        if (not links or _always_browser) and not (_is_mq_host and links):
+        _skip_browser_discovery = getattr(_uni_cfg.discovery, "skip_browser_discovery", False)
+        if (not links or _always_browser) and not (_is_mq_host and links) and not _skip_browser_discovery:
             try:
                 from app.services.scraper.browser_discover_generic import (
                     browser_discover_generic,

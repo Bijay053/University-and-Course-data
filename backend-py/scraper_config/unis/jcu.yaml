@@ -23,6 +23,12 @@ discovery:
     - '/study/courses'
     - '/courses/'
 
+  # JCU's live site is Cloudflare Enterprise-walled — even the browser (Playwright)
+  # gets a 403 with a 90-second timeout.  Skip straight to Wayback CDX discovery
+  # which queries archive.org and cannot be blocked.
+  skip_browser_discovery: true
+  use_wayback: true
+
 extraction:
   # JCU per-course pages are Cloudflare WAF-blocked for all datacenter IPs.
   # The browser (Playwright) is also always blocked — guaranteed 60s timeout
