@@ -94,6 +94,20 @@ type CourseProbeSummary = {
   }>;
 };
 
+type DeterministicIssue = {
+  issue: string;
+  severity: "critical" | "high" | "warning";
+  check: string;
+  detail: string;
+  potential_causes?: string[];
+  fix?: {
+    type: string;
+    action: string;
+    yaml_keys?: Record<string, unknown>;
+    note?: string;
+  };
+};
+
 type DiagnoseResult = {
   ok: boolean;
   university?: string;
@@ -107,6 +121,7 @@ type DiagnoseResult = {
   error?: string;
   phase3_recommendations?: Phase3Rec[];
   course_probe_summary?: CourseProbeSummary;
+  deterministic_issues?: DeterministicIssue[];
 };
 
 type SimChange = { field: string; before: string | null; after: string | null };
@@ -1302,6 +1317,62 @@ export default function ScrapeAgentPage() {
               {diagnoseResult.error && (
                 <div className="p-3 bg-red-50 rounded-lg text-sm text-red-600 border border-red-200">
                   {diagnoseResult.error}
+                </div>
+              )}
+
+              {/* Deterministic issues — shown BEFORE AI summary, no LLM involved */}
+              {diagnoseResult.deterministic_issues && diagnoseResult.deterministic_issues.length > 0 && (
+                <div className="space-y-2">
+                  {diagnoseResult.deterministic_issues.map((di, i) => {
+                    const isZero = di.check === "zero_courses_discovered";
+                    const borderCls = di.severity === "critical"
+                      ? "border-red-500 bg-red-50"
+                      : di.severity === "high"
+                      ? "border-orange-400 bg-orange-50"
+                      : "border-amber-300 bg-amber-50";
+                    return (
+                      <div key={i} className={`rounded-lg border-l-4 px-3 py-2.5 ${borderCls}`}>
+                        <div className="flex items-center gap-2 mb-1">
+                          <AlertTriangle className={`w-3.5 h-3.5 shrink-0 ${di.severity === "critical" ? "text-red-500" : "text-orange-500"}`} />
+                          <span className="text-xs font-semibold text-gray-800">{di.issue}</span>
+                          <Badge variant="outline" className={`text-[9px] px-1.5 ml-auto ${di.severity === "critical" ? "border-red-300 text-red-600" : "border-orange-300 text-orange-600"}`}>
+                            {di.severity}
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-gray-600 leading-relaxed">{di.detail}</p>
+                        {di.potential_causes && di.potential_causes.length > 0 && (
+                          <ul className="mt-1.5 space-y-0.5">
+                            {di.potential_causes.map((c, j) => (
+                              <li key={j} className="text-[10px] text-gray-500 flex items-start gap-1">
+                                <span className="shrink-0 mt-0.5">•</span>{c}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                        {di.fix && (
+                          <div className={`mt-2 rounded px-2.5 py-2 border ${isZero ? "bg-blue-50 border-blue-200" : "bg-white border-gray-200"}`}>
+                            <p className={`text-[10px] font-semibold mb-1.5 ${isZero ? "text-blue-700" : "text-gray-700"}`}>
+                              {isZero ? "⚙️ Required YAML fix" : "🔧 Fix"}
+                            </p>
+                            <p className="text-[10px] text-gray-600 mb-1.5">{di.fix.action}</p>
+                            {di.fix.yaml_keys && (
+                              <div className="space-y-1">
+                                {Object.entries(di.fix.yaml_keys).map(([k, v]) => (
+                                  <div key={k} className="flex items-start gap-1.5 font-mono text-[10px]">
+                                    <span className="text-blue-700 shrink-0">{k}:</span>
+                                    <span className="text-gray-600">{typeof v === "object" ? JSON.stringify(v) : String(v)}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            {di.fix.note && (
+                              <p className="text-[10px] text-gray-500 mt-1.5 italic">{di.fix.note}</p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
 

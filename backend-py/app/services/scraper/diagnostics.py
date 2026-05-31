@@ -1056,9 +1056,41 @@ def _generate_recommendations(
             },
         })
 
-    # ── 5. Very low course count ────────────────────────────────────────────────
+    # ── 5. Zero / very low course count ─────────────────────────────────────────
     total_found = phase1.get("total_found", 0)
-    if total_found < 20:
+    if total_found == 0:
+        recs.append({
+            "severity": "critical",
+            "id": "zero_discovery",
+            "title": "Zero courses discovered — site requires browser discovery",
+            "description": (
+                "The scraper found 0 course links. Static BFS crawling returned nothing, "
+                "which almost always means the course catalogue is rendered by JavaScript "
+                "(React, Vue, Angular, or Squiz Matrix CMS). "
+                "No extraction-level recipe change can help until discovery is fixed first."
+            ),
+            "root_cause": (
+                "Extraction configuration issue — the university YAML is missing "
+                "'discovery.always_browser_discover: true'. "
+                "Enable this setting and add seed_urls pointing to the catalogue pages "
+                "so Playwright can follow JavaScript-rendered links."
+            ),
+            "confidence": 0.95,
+            "fix": {
+                "type": "config",
+                "description": (
+                    "Set 'always_browser_discover: true' in the university YAML config. "
+                    "Also add seed_urls pointing to the undergraduate, postgraduate, and "
+                    "courses listing pages so the browser knows where to start."
+                ),
+                "recipe_patch": {
+                    "discovery.always_browser_discover": "true",
+                    "discovery.seed_urls": "<list of course listing page URLs>",
+                    "discovery.allow_url_patterns": "<e.g. /study/courses/>",
+                },
+            },
+        })
+    elif total_found < 20:
         recs.append({
             "severity": "critical",
             "id": "low_course_count",
@@ -1070,14 +1102,17 @@ def _generate_recommendations(
                 "or URL filters that are too restrictive."
             ),
             "root_cause": (
-                "Discovery may be incomplete — the seed URLs or URL filters need adjustment, "
+                "Extraction configuration issue — the seed URLs or URL filters need adjustment, "
                 "or the site requires browser-based rendering."
             ),
             "confidence": 0.75,
             "fix": {
-                "type": "seed_urls",
+                "type": "config",
                 "description": "Review seed URLs and URL must-contain filters in the Discovery tab",
-                "recipe_patch": None,
+                "recipe_patch": {
+                    "discovery.always_browser_discover": "true",
+                    "discovery.seed_urls": "<list of course listing page URLs>",
+                },
             },
         })
 

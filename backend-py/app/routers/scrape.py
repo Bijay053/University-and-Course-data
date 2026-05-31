@@ -4039,6 +4039,41 @@ async def diagnose_scrape_job(
     # Rules that can be determined without AI based purely on course counts.
     # These are shown in the UI BEFORE the AI diagnosis (higher trust, no LLM).
     deterministic_issues: list[dict] = []
+
+    # Zero discovery — must be checked first, highest priority
+    if (job.total_found or 0) == 0:
+        deterministic_issues.append({
+            "issue": "Zero courses discovered — site is JavaScript-rendered",
+            "severity": "critical",
+            "check": "zero_courses_discovered",
+            "detail": (
+                "The scraper found 0 course links. Static (BFS) crawling returned nothing, "
+                "which means the site renders its course catalogue using JavaScript. "
+                "The fix is to enable browser-based discovery in the YAML config."
+            ),
+            "potential_causes": [
+                "Site is a JavaScript SPA (React, Vue, Angular, Squiz Matrix) — BFS always returns 0",
+                "Cloudflare or bot-protection blocking all requests",
+                "Wrong scrape URL (seed URL points to a page without course links)",
+            ],
+            "fix": {
+                "type": "config",
+                "action": "Enable browser discovery in this university's YAML config",
+                "yaml_keys": {
+                    "discovery.always_browser_discover": True,
+                    "discovery.seed_urls": [
+                        "https://<hostname>/study/undergraduate/",
+                        "https://<hostname>/study/postgraduate/",
+                        "https://<hostname>/study/courses/",
+                    ],
+                },
+                "note": (
+                    "Check robots.txt for the correct course URL pattern, then add "
+                    "allow_url_patterns to restrict discovered links to only course pages."
+                ),
+            },
+        })
+
     _pg_found = level_breakdown["postgraduate"] + level_breakdown["research"]
     if level_breakdown["undergraduate"] == 0 and _pg_found > 0:
         deterministic_issues.append({
