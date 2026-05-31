@@ -17,16 +17,49 @@
 #   sufficient for 85 %+ completeness without any browser call per course.
 
 discovery:
+  # ── allow_url_patterns ────────────────────────────────────────────────────
+  # Only keep discovered URLs whose path contains a degree-level qualifier
+  # immediately after /courses/.  This targets individual course detail pages
+  # (e.g. /courses/master-of-engineering-management) and filters out:
+  #   • category hubs  : /courses/postgraduate/linkassets/engineering
+  #   • level landings : /courses/postgraduate, /courses/undergraduate
+  #   • study-area nav : /courses/study/engineering-and-technology
+  #
+  # Pattern breakdown:
+  #   /courses/  — JCU course detail URLs always start with this prefix
+  #   (?:bachelor|master|…)  — the degree qualifier must follow immediately
+  #   [^/]  — one more char required so the qualifier is not the entire segment
+  #            (prevents /courses/master/ with a trailing slash from matching)
+  #
+  # If a legitimate JCU course URL does NOT match (e.g. a future course whose
+  # slug uses a non-standard prefix), remove allow_url_patterns and rely on
+  # block_url_patterns + the staging-gate name check instead.
   allow_url_patterns:
-    - '/courses'
-    - '/study/courses'
+    - '/courses/(?:bachelor|master|graduate|doctor|diploma|certificate|associate|honours|juris)[^/]'
+
+  # ── block_url_patterns ────────────────────────────────────────────────────
+  # Explicit deny-list for known-bad JCU URL patterns.  Applied BEFORE
+  # allow_url_patterns so these are always dropped regardless of whitelisting.
+  block_url_patterns:
+    - '/linkassets/'           # category hubs: /courses/postgraduate/linkassets/engineering
+    - '/courses/study/'        # subject-area pages: /courses/study/engineering-and-technology
+    - '/courses/undergraduate$'  # level landing (trailing $: exact segment)
+    - '/courses/postgraduate$'   # level landing
+    - '/courses/research$'       # level landing
 
   # Seed the browser crawler directly at the JCU course catalogue so it
-  # reaches course-detail pages immediately without navigating from the
-  # homepage (fewer Cloudflare-exposed requests, faster discovery).
+  # reaches individual course-detail pages via the full A–Z finder rather
+  # than navigating from the homepage category grid (fewer Cloudflare-exposed
+  # requests, directly lists every course with a clickable link).
+  #
+  # /study/courses/find-a-course  — the A–Z searchable catalogue (all levels);
+  #   individual course links on this page go directly to /courses/<degree-slug>
+  #   which the allow_url_patterns above will accept.
+  # /courses  — kept as fallback seed; BFS from here reaches category pages
+  #   that themselves contain links to individual course detail pages.
   seed_urls:
-    - 'https://www.jcu.edu.au/courses'
     - 'https://www.jcu.edu.au/study/courses/find-a-course'
+    - 'https://www.jcu.edu.au/courses'
 
   # Allow up to 300 course links before stopping browser discovery —
   # the default 100 fired immediately after the first seed page (101 links)

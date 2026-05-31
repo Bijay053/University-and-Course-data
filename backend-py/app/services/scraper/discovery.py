@@ -50,7 +50,7 @@ _NAV_URL_HINTS = (
     "/postgrad",
 )
 _COURSE_TEXT = re.compile(
-    r"\b(bachelor|master|phd|doctorate|diploma|certificate|associate|"
+    r"\b(bachelor|master|phd|doctor(?:ate)?|diploma|certificate|associate|"
     r"undergrad(?:uate)?|postgrad(?:uate)?|MBA|MSc|MA|BA|BSc|BEng|MEng)\b",
     re.I,
 )
@@ -140,6 +140,12 @@ _NON_COURSE_URL_PATTERNS: tuple[str, ...] = (
     "/discipline-areas/", "/discipline-area/",
     "/fields-of-study/", "/field-of-study/",
     "/areas-of-study/", "/area-of-study/",
+    # JCU-style "linkassets" pages: /courses/<level>/linkassets/<subject>
+    # These are subject-area category listing pages, not individual course detail
+    # pages.  Every URL containing /linkassets/ is a category hub — they list
+    # multiple courses ("Explore your study options in Engineering…") but carry
+    # no fee, IELTS, or degree-level data for any individual course.
+    "/linkassets/",
     # NOTE: "/our-courses/" and "/our-programs/" were removed from this list.
     # Some universities (e.g. ASA Institute) publish individual course detail
     # pages under /our-courses/<course-slug> — blocking the whole prefix
@@ -431,6 +437,12 @@ def _is_category_landing(url: str) -> bool:
     if len(parts) == 4 and parts[0] == "study":
         last = parts[3].replace("-", " ").replace("_", " ")
         return not _COURSE_TEXT.search(last)
+    # JCU-style linkassets pages: /courses/<level>/linkassets/<subject>
+    # e.g. /courses/postgraduate/linkassets/engineering — always a category hub,
+    # never an individual course page (these pages list many courses under a
+    # subject area heading like "Explore your study options in Engineering").
+    if len(parts) == 4 and parts[2] == "linkassets":
+        return True
     return False
 
 

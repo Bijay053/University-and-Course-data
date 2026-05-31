@@ -1760,18 +1760,31 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 ]
                 _allow_dropped = _pre_allow - len(links)
                 if _allow_dropped:
-                    log.info(
-                        "[EXTRACT] allow_url_patterns: kept %d / %d (dropped %d non-matching URLs)",
-                        len(links), _pre_allow, _allow_dropped,
+                    _drop_pct = (_allow_dropped / _pre_allow * 100) if _pre_allow else 0
+                    _log_fn = log.warning if _drop_pct > 50 else log.info
+                    _log_fn(
+                        "[EXTRACT] allow_url_patterns: kept %d / %d (dropped %d = %.0f%% of discovered URLs)%s",
+                        len(links), _pre_allow, _allow_dropped, _drop_pct,
+                        " — HIGH DROP RATE: the allow_url_patterns may be filtering out"
+                        " real course pages; check that the regex matches individual"
+                        " course detail URLs, not just category/listing pages."
+                        if _drop_pct > 50 else "",
                     )
                     await emit(
                         "status",
-                        f"[EXTRACT] allow_url_patterns: dropped {_allow_dropped} URL(s) "
-                        f"not matching per-uni whitelist ({len(links)} remain)",
+                        f"[EXTRACT] allow_url_patterns: dropped {_allow_dropped} / {_pre_allow}"
+                        f" URL(s) ({_drop_pct:.0f}%) not matching per-uni whitelist"
+                        f" ({len(links)} remain)"
+                        + (
+                            " ⚠ HIGH DROP RATE — verify allow_url_patterns matches"
+                            " individual course detail URLs, not just listing/category pages."
+                            if _drop_pct > 50 else ""
+                        ),
                         phase="extract",
                         kind="extract_allow_url_filter",
                         dropped=_allow_dropped,
                         kept=len(links),
+                        drop_pct=round(_drop_pct, 1),
                     )
 
         # Phase A.5b — per-uni YAML must_contain substring whitelist.

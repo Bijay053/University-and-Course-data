@@ -724,6 +724,12 @@ _BLOCK_URL_SUBSTRINGS: tuple[tuple[str, str], ...] = (
     ("/webinars",               "marketing_page"),
     ("/livestream",             "marketing_page"),
     ("/info-session",           "marketing_page"),
+    # JCU-style subject-area category hubs: /courses/<level>/linkassets/<subject>
+    # e.g. /courses/postgraduate/linkassets/engineering — these pages list many
+    # courses under a subject heading but carry no fee, IELTS, or degree-level
+    # data for any individual course.  The "/linkassets/" token is unique to
+    # JCU's URL scheme; it will never appear inside a real degree-course slug.
+    ("/linkassets/",            "category_landing_page"),
     # Specific Flinders nav paths.  IMPORTANT: each entry uses a path
     # boundary so it cannot accidentally match a real degree slug.
     # `/study/postgrad/` matches Flinders' postgrad landing page and
