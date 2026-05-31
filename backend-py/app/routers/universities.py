@@ -843,6 +843,7 @@ async def post_test_discovery(
     uni_id: int,
     db: Annotated[AsyncSession, Depends(get_db)],
     _: Annotated[dict, Depends(get_current_user)],
+    fast_only: bool = Query(False, description="Skip browser fallback even when HTTP fails"),
 ) -> dict:
     """Live seed-URL test: fetch each configured seed page, count course-link candidates,
     then apply current URL filters to those links.
@@ -1073,6 +1074,125 @@ async def post_test_discovery(
     else:
         seed_pts = 40
 
+    # ── Browser fallback ────────────────────────────────────────────────────
+    # If any seed returned 403 or < 5 candidates, automatically fall back to
+    # Playwright browser discovery (30 s time-budget, max 50 courses per seed)
+    # unless fast_only=True was requested.
+    browser_used = False
+    browser_total_raw: set[str] = set()
+    browser_total_pass: set[str] = set()
+
+    _needs_browser = (not fast_only) and any(
+        (not sr["ok"] or sr.get("raw_candidates", 0) < 5) for sr in seed_results
+    )
+
+    if _needs_browser:
+        try:
+            from app.services.scraper.config.schema import (
+                UniConfig as _UC_br,
+                DiscoveryConfig as _DC_br,
+            )
+            from app.services.scraper.config.context import set_uni_config as _set_cfg_br
+            from app.services.scraper.browser_discover_generic import (
+                browser_discover_generic as _bdg,
+            )
+            from urllib.parse import urlparse as _up_br
+
+            _br_host = (_up_br(u.scrape_url or "").hostname or "").replace("www.", "")
+            _test_cfg = _UC_br(
+                slug=_br_host.replace(".", "_") or "test",
+                name=u.name or "",
+                base_url=u.scrape_url or "",
+                scrape_url=u.scrape_url or "",
+                discovery=_DC_br(
+                    browser_time_budget_s=30,
+                    browser_early_stop_courses=50,
+                ),
+            )
+            _set_cfg_br(_test_cfg)
+
+            for _sr in seed_results:
+                if _sr.get("ok") and _sr.get("raw_candidates", 0) >= 5:
+                    _sr["browser_test"] = {"skipped": True, "reason": "HTTP test succeeded"}
+                    continue
+                try:
+                    _blinks = await _bdg(_sr["seed_url"], max_courses=50)
+                    _b_all = [item["url"] for item in _blinks]
+                    _b_pass = [_u2 for _u2 in _b_all if _passes(_u2)]
+                    _b_drop = [_u2 for _u2 in _b_all if not _passes(_u2)]
+                    _b_drop_r = len(_b_drop) / len(_b_all) if _b_all else 0
+
+                    browser_total_raw.update(_b_all)
+                    browser_total_pass.update(_b_pass)
+                    browser_used = True
+
+                    _bsr: dict = {
+                        "raw_candidates": len(_b_all),
+                        "after_filter": len(_b_pass),
+                        "dropped": len(_b_drop),
+                        "drop_rate_pct": round(_b_drop_r * 100),
+                        "sample_passing": _b_pass[:6],
+                        "sample_dropped": _b_drop[:6],
+                        "ok": True,
+                    }
+                    if len(_b_all) < 5:
+                        _bsr["warning"] = (
+                            f"Browser also found only {len(_b_all)} course link(s) from "
+                            f"'{_sr['seed_url']}' — this seed URL may be incorrect."
+                        )
+                    elif _b_drop_r >= 0.70:
+                        _bw = (
+                            f"Browser: '{_sr['seed_url']}' found {len(_b_all)} links but "
+                            f"filter dropped {len(_b_drop)} ({round(_b_drop_r * 100)}%)."
+                        )
+                        _bsr["warning"] = _bw
+                        if _bw not in warnings:
+                            warnings.append(_bw)
+                    _sr["browser_test"] = _bsr
+
+                    # Upgrade the "JS rendered" warning once browser succeeds
+                    if len(_b_all) >= 5:
+                        _real_diag = (
+                            f"'{_sr['seed_url']}' requires browser rendering "
+                            f"(HTTP {_sr.get('status_code', '?')}) — "
+                            f"browser found {len(_b_all)} course link(s)."
+                        )
+                        _sr["warning"] = _real_diag
+                        for _wi, _wv in enumerate(warnings):
+                            if _sr["seed_url"] in _wv:
+                                warnings[_wi] = _real_diag
+                                break
+
+                except Exception as _be:
+                    _sr["browser_test"] = {"ok": False, "error": str(_be)[:120]}
+
+        except Exception as _br_outer:
+            warnings.append(f"Browser test unavailable: {str(_br_outer)[:100]}")
+
+    # ── Final aggregates (prefer browser data where available) ──────────────
+    if browser_used and browser_total_raw:
+        _merged_raw = all_raw_set | browser_total_raw
+        _merged_pass = all_pass_set | browser_total_pass
+        total_raw = len(_merged_raw)
+        total_passing = len(_merged_pass)
+    else:
+        total_raw = len(all_raw_set)
+        total_passing = len(all_pass_set)
+    total_dropped = total_raw - total_passing
+    agg_drop = (total_raw - total_passing) / total_raw if total_raw > 0 else 0
+
+    # Seed pts (0-40)
+    if total_raw == 0:
+        seed_pts = 0
+    elif agg_drop >= 0.70:
+        seed_pts = 0
+    elif agg_drop >= 0.20:
+        seed_pts = int(40 * (1 - agg_drop))
+    elif total_raw < 5:
+        seed_pts = 15
+    else:
+        seed_pts = 40
+
     # Config pts (0-30)
     has_filters = bool(allow_pats or mc_patterns or block_pats)
     if not has_filters:
@@ -1095,6 +1215,8 @@ async def post_test_discovery(
         "agg_drop_rate_pct": round(agg_drop * 100),
         "warnings": warnings,
         "has_filters": has_filters,
+        "browser_fallback_used": browser_used,
+        "fast_only": fast_only,
         "safety_score": safety_score,
         "safety_score_breakdown": {
             "historical_pts": historical_pts,

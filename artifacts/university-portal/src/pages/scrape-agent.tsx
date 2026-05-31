@@ -88,6 +88,20 @@ type FilterImpact = {
   message?: string;
 };
 
+type BrowserSeedResult = {
+  raw_candidates: number;
+  after_filter: number;
+  dropped: number;
+  drop_rate_pct: number;
+  sample_passing: string[];
+  sample_dropped: string[];
+  ok: boolean;
+  skipped?: boolean;
+  reason?: string;
+  warning?: string;
+  error?: string;
+};
+
 type SeedResult = {
   seed_url: string;
   status_code: number;
@@ -100,6 +114,7 @@ type SeedResult = {
   ok: boolean;
   warning?: string;
   error?: string;
+  browser_test?: BrowserSeedResult;
 };
 
 type DiscoveryTest = {
@@ -111,6 +126,8 @@ type DiscoveryTest = {
   agg_drop_rate_pct: number;
   warnings: string[];
   has_filters: boolean;
+  browser_fallback_used: boolean;
+  fast_only: boolean;
   safety_score: number;
   safety_score_breakdown: { historical_pts: number; seed_pts: number; config_pts: number };
   safety_level: "safe" | "warning" | "dangerous";
@@ -263,6 +280,7 @@ export default function ScrapeAgentPage() {
   const [loadingImpact, setLoadingImpact] = useState(false);
   const [discoveryTest, setDiscoveryTest] = useState<DiscoveryTest | null>(null);
   const [testingDiscovery, setTestingDiscovery] = useState(false);
+  const [fastOnly, setFastOnly] = useState(false);
   const [checkingExtraction, setCheckingExtraction] = useState(false);
   const [extractionResult, setExtractionResult] = useState<ExtractionQualityResult | null>(null);
 
@@ -340,7 +358,7 @@ export default function ScrapeAgentPage() {
     setTestingDiscovery(true);
     setDiscoveryTest(null);
     try {
-      const res = await fetch(`${BASE}/api/universities/${uniId}/test-discovery`, { method: "POST" });
+      const res = await fetch(`${BASE}/api/universities/${uniId}/test-discovery?fast_only=${fastOnly}`, { method: "POST" });
       const data: DiscoveryTest = await res.json();
       setDiscoveryTest(data);
       // Refresh historical simulation too so scores stay in sync
@@ -759,9 +777,11 @@ export default function ScrapeAgentPage() {
           <div className="flex items-center gap-2 flex-1 min-w-0">
             <Target className="w-4 h-4 text-blue-600 shrink-0" />
             <h3 className="text-sm font-semibold text-gray-700">Test Discovery</h3>
-            <span className="text-[10px] text-gray-400 font-normal hidden sm:inline">
-              Fetch seed URLs live and simulate filter impact before scraping
-            </span>
+            {discoveryTest?.browser_fallback_used && (
+              <span className="text-[10px] bg-purple-100 text-purple-700 border border-purple-200 px-1.5 py-0.5 rounded font-medium">
+                Browser used
+              </span>
+            )}
           </div>
 
           {/* Safety score badge — shown once test has run */}
@@ -774,12 +794,23 @@ export default function ScrapeAgentPage() {
                 : "bg-red-50 border-red-300 text-red-800"
             }`}>
               <ShieldAlert className="w-3 h-3" />
-              AI Fix Safety: {discoveryTest.safety_score}/100
+              Safety: {discoveryTest.safety_score}/100
               {" · "}
               {discoveryTest.safety_level === "safe" ? "Safe" :
                discoveryTest.safety_level === "warning" ? "Warning" : "Dangerous"}
             </div>
           )}
+
+          {/* Fast-only toggle */}
+          <label className="flex items-center gap-1.5 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={fastOnly}
+              onChange={e => setFastOnly(e.target.checked)}
+              className="w-3.5 h-3.5 rounded accent-blue-600"
+            />
+            <span className="text-[11px] text-gray-500">Fast HTTP only</span>
+          </label>
 
           <button
             onClick={runDiscoveryTest}
@@ -787,10 +818,19 @@ export default function ScrapeAgentPage() {
             className="inline-flex items-center gap-1.5 text-xs font-medium bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-3 py-1.5 rounded-md transition-colors"
           >
             {testingDiscovery
-              ? <><Loader2 className="w-3 h-3 animate-spin" />Testing…</>
+              ? <><Loader2 className="w-3 h-3 animate-spin" />{fastOnly ? "Testing (HTTP)…" : "Testing (HTTP + Browser)…"}</>
               : <><Play className="w-3 h-3" />Test Discovery</>}
           </button>
         </div>
+
+        {/* Mode explanation */}
+        {!discoveryTest && !testingDiscovery && (
+          <p className="text-[11px] text-gray-400 -mt-1">
+            {fastOnly
+              ? "Fast HTTP mode: only httpx. Faster but may miss JS-rendered sites."
+              : "Auto mode: tries HTTP first, then automatically runs browser for sites that return 403 or fewer than 5 course links."}
+          </p>
+        )}
 
         {/* Score breakdown — shown after test */}
         {discoveryTest && (
@@ -862,64 +902,120 @@ export default function ScrapeAgentPage() {
 
             {/* Per-seed results */}
             <div className="space-y-2">
-              {discoveryTest.seed_results.map((sr, i) => (
-                <div key={i} className={`border rounded-lg p-3 space-y-2 ${
-                  sr.warning || !sr.ok ? "bg-amber-50 border-amber-200" :
-                  sr.drop_rate_pct >= 70 ? "bg-red-50 border-red-200" :
-                  "bg-gray-50 border-gray-200"
-                }`}>
-                  <div className="flex items-start gap-2">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[11px] font-mono text-gray-700 truncate">{sr.seed_url}</p>
-                      {sr.ok ? (
-                        <p className="text-[11px] text-gray-500 mt-0.5">
-                          {sr.raw_candidates} course links found
-                          {" · "}
-                          <span className={sr.after_filter > 0 ? "text-green-700 font-medium" : "text-red-700 font-medium"}>
-                            {sr.after_filter} pass filter
-                          </span>
-                          {sr.dropped > 0 && (
-                            <span className="text-red-700"> · {sr.dropped} dropped ({sr.drop_rate_pct}%)</span>
-                          )}
-                        </p>
-                      ) : (
-                        <p className="text-[11px] text-red-700 mt-0.5">
-                          {sr.error ?? `HTTP ${sr.status_code}`}
-                        </p>
-                      )}
-                    </div>
-                    <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded shrink-0 ${
-                      !sr.ok ? "bg-red-100 text-red-700" :
-                      sr.raw_candidates < 5 ? "bg-amber-100 text-amber-700" :
-                      sr.drop_rate_pct >= 70 ? "bg-red-100 text-red-700" :
-                      sr.drop_rate_pct >= 20 ? "bg-amber-100 text-amber-700" :
-                      "bg-green-100 text-green-700"
-                    }`}>
-                      {!sr.ok ? "Error" :
-                       sr.raw_candidates < 5 ? "Too few" :
-                       sr.drop_rate_pct >= 70 ? "Blocked" :
-                       sr.drop_rate_pct >= 20 ? "Warning" : "OK"}
-                    </span>
-                  </div>
+              {discoveryTest.seed_results.map((sr, i) => {
+                // Determine overall card health from best available source
+                const best = sr.browser_test && !sr.browser_test.skipped && sr.browser_test.ok
+                  ? sr.browser_test : null;
+                const effectiveOk = best ? best.raw_candidates >= 5 : (sr.ok && sr.raw_candidates >= 5);
+                const effectiveDrop = best ? best.drop_rate_pct : sr.drop_rate_pct;
+                const cardBg = !effectiveOk
+                  ? "bg-amber-50 border-amber-200"
+                  : effectiveDrop >= 70 ? "bg-red-50 border-red-200"
+                  : "bg-gray-50 border-gray-200";
 
-                  {sr.sample_dropped.length > 0 && (
-                    <div>
-                      <p className="text-[10px] font-semibold text-red-700 uppercase tracking-wide mb-0.5">Dropped</p>
-                      {sr.sample_dropped.slice(0, 4).map((u, j) => (
-                        <p key={j} className="text-[10px] font-mono text-red-700 truncate">{u}</p>
-                      ))}
+                return (
+                  <div key={i} className={`border rounded-lg p-3 space-y-2 ${cardBg}`}>
+                    {/* Seed URL */}
+                    <p className="text-[11px] font-mono text-gray-700 truncate font-medium">{sr.seed_url}</p>
+
+                    {/* HTTP phase row */}
+                    <div className="flex items-center gap-2">
+                      <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded shrink-0 ${
+                        !sr.ok || sr.raw_candidates < 5
+                          ? "bg-red-100 text-red-700"
+                          : sr.drop_rate_pct >= 70 ? "bg-red-100 text-red-700"
+                          : sr.drop_rate_pct >= 20 ? "bg-amber-100 text-amber-700"
+                          : "bg-green-100 text-green-700"
+                      }`}>HTTP</span>
+                      <p className="text-[11px] text-gray-600 flex-1">
+                        {!sr.ok
+                          ? <span className="text-red-700">{sr.error ?? `${sr.status_code} — blocked or JS-rendered`}</span>
+                          : sr.raw_candidates < 5
+                          ? <span className="text-amber-700">{sr.raw_candidates} links — too few (JS-rendered site?)</span>
+                          : <>
+                              <span className="text-green-700 font-medium">{sr.raw_candidates} links</span>
+                              {sr.dropped > 0 && <span className="text-red-700"> · {sr.dropped} dropped ({sr.drop_rate_pct}%)</span>}
+                              {sr.after_filter > 0 && <span className="text-green-700"> · {sr.after_filter} pass</span>}
+                            </>
+                        }
+                      </p>
                     </div>
-                  )}
-                  {sr.sample_passing.length > 0 && (
-                    <div>
-                      <p className="text-[10px] font-semibold text-green-700 uppercase tracking-wide mb-0.5">Passing</p>
-                      {sr.sample_passing.slice(0, 4).map((u, j) => (
-                        <p key={j} className="text-[10px] font-mono text-green-700 truncate">{u}</p>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))}
+
+                    {/* Browser phase row — only when browser was used for this seed */}
+                    {sr.browser_test && !sr.browser_test.skipped && (
+                      <div className="flex items-start gap-2">
+                        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded shrink-0 mt-0.5 ${
+                          !sr.browser_test.ok || (sr.browser_test.raw_candidates ?? 0) < 5
+                            ? "bg-red-100 text-red-700"
+                            : (sr.browser_test.drop_rate_pct ?? 0) >= 70 ? "bg-red-100 text-red-700"
+                            : (sr.browser_test.drop_rate_pct ?? 0) >= 20 ? "bg-amber-100 text-amber-700"
+                            : "bg-purple-100 text-purple-700"
+                        }`}>Browser</span>
+                        {sr.browser_test.ok ? (
+                          <div className="flex-1 space-y-1">
+                            <p className="text-[11px] text-gray-600">
+                              <span className={sr.browser_test.raw_candidates >= 5 ? "text-purple-700 font-medium" : "text-amber-700"}>
+                                {sr.browser_test.raw_candidates} links found
+                              </span>
+                              {(sr.browser_test.dropped ?? 0) > 0 && (
+                                <span className="text-red-700"> · {sr.browser_test.dropped} dropped ({sr.browser_test.drop_rate_pct}%)</span>
+                              )}
+                              {(sr.browser_test.after_filter ?? 0) > 0 && (
+                                <span className="text-green-700"> · {sr.browser_test.after_filter} pass filter</span>
+                              )}
+                            </p>
+                            {sr.browser_test.sample_dropped && sr.browser_test.sample_dropped.length > 0 && (
+                              <div>
+                                <p className="text-[10px] font-semibold text-red-700 uppercase tracking-wide mb-0.5">Dropped</p>
+                                {sr.browser_test.sample_dropped.slice(0, 3).map((u, j) => (
+                                  <p key={j} className="text-[10px] font-mono text-red-700 truncate">{u}</p>
+                                ))}
+                              </div>
+                            )}
+                            {sr.browser_test.sample_passing && sr.browser_test.sample_passing.length > 0 && (
+                              <div>
+                                <p className="text-[10px] font-semibold text-green-700 uppercase tracking-wide mb-0.5">Passing</p>
+                                {sr.browser_test.sample_passing.slice(0, 3).map((u, j) => (
+                                  <p key={j} className="text-[10px] font-mono text-green-700 truncate">{u}</p>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <p className="text-[11px] text-red-700 flex-1">{sr.browser_test.error ?? "Browser test failed"}</p>
+                        )}
+                      </div>
+                    )}
+
+                    {/* HTTP-only sample URLs (when no browser fallback) */}
+                    {(!sr.browser_test || sr.browser_test.skipped) && sr.ok && sr.raw_candidates >= 5 && (
+                      <>
+                        {sr.sample_dropped.length > 0 && (
+                          <div>
+                            <p className="text-[10px] font-semibold text-red-700 uppercase tracking-wide mb-0.5">Dropped</p>
+                            {sr.sample_dropped.slice(0, 3).map((u, j) => (
+                              <p key={j} className="text-[10px] font-mono text-red-700 truncate">{u}</p>
+                            ))}
+                          </div>
+                        )}
+                        {sr.sample_passing.length > 0 && (
+                          <div>
+                            <p className="text-[10px] font-semibold text-green-700 uppercase tracking-wide mb-0.5">Passing</p>
+                            {sr.sample_passing.slice(0, 3).map((u, j) => (
+                              <p key={j} className="text-[10px] font-mono text-green-700 truncate">{u}</p>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    )}
+
+                    {/* Warning for this seed */}
+                    {sr.warning && (
+                      <p className="text-[11px] text-amber-800 bg-amber-100 rounded px-2 py-1">{sr.warning}</p>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}

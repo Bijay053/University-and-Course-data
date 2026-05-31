@@ -822,6 +822,187 @@ async def history_list(
     return {"runs": runs, "total": int(total), "limit": limit, "offset": offset}
 
 
+@router.get("/history/compare")
+async def history_compare(
+    job_a: str,
+    job_b: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[dict, Depends(get_current_user)],
+) -> dict:
+    """Field-level diff between two scrape history runs.
+
+    Returns matched courses (by CI course name), field diffs, and run metadata.
+    Only compares fields that carry meaningful course data.
+    """
+    from app.models import ScrapedCourse
+
+    DIFF_FIELDS = [
+        "degree_level", "category", "study_mode",
+        "duration", "duration_term",
+        "international_fee", "fee_term", "currency",
+        "ielts_overall", "pte_overall", "toefl_overall",
+        "cambridge_overall", "duolingo_overall",
+        "course_location", "intake_months",
+        "academic_level", "academic_score", "score_type", "academic_country",
+        "other_requirement", "description", "course_website",
+    ]
+
+    job_a_row = await db.get(ScrapeRuntimeJob, job_a)
+    job_b_row = await db.get(ScrapeRuntimeJob, job_b)
+    if not job_a_row:
+        raise HTTPException(status_code=404, detail=f"Job {job_a} not found")
+    if not job_b_row:
+        raise HTTPException(status_code=404, detail=f"Job {job_b} not found")
+
+    sc_a = (await db.execute(
+        select(ScrapedCourse).where(ScrapedCourse.scrape_job_id == job_a)
+    )).scalars().all()
+    sc_b = (await db.execute(
+        select(ScrapedCourse).where(ScrapedCourse.scrape_job_id == job_b)
+    )).scalars().all()
+
+    def _to_dict(sc: "ScrapedCourse") -> dict:
+        d: dict = {f: getattr(sc, f, None) for f in DIFF_FIELDS}
+        d["course_name"] = sc.course_name
+        d["status"] = sc.status
+        d["completeness"] = sc.completeness
+        # Normalise numeric types so float(6.0) == int(6) doesn't show as a diff
+        for k, v in d.items():
+            if isinstance(v, float) and v == int(v):
+                d[k] = int(v)
+        return d
+
+    a_by_name: dict[str, dict] = {}
+    for s in sc_a:
+        if s.course_name:
+            key = s.course_name.lower().strip()
+            # Keep the approved row if there are duplicates
+            if key not in a_by_name or s.status == "approved":
+                a_by_name[key] = _to_dict(s)
+
+    b_by_name: dict[str, dict] = {}
+    for s in sc_b:
+        if s.course_name:
+            key = s.course_name.lower().strip()
+            if key not in b_by_name or s.status == "approved":
+                b_by_name[key] = _to_dict(s)
+
+    matched = []
+    for name_lower, a_data in a_by_name.items():
+        if name_lower not in b_by_name:
+            continue
+        b_data = b_by_name[name_lower]
+        diffs: dict[str, dict] = {}
+        for f in DIFF_FIELDS:
+            va = a_data.get(f)
+            vb = b_data.get(f)
+            if va != vb:
+                diffs[f] = {"a": va, "b": vb}
+        matched.append({
+            "course_name": a_data["course_name"],
+            "diffs": diffs,
+            "has_diff": bool(diffs),
+        })
+
+    def _job_meta(job: "ScrapeRuntimeJob", sc_list: list) -> dict:
+        return {
+            "runtimeJobId": job.runtime_job_id,
+            "universityId": job.university_id,
+            "universityName": job.university_name,
+            "status": job.status,
+            "startedAt": job.started_at.isoformat() if job.started_at else None,
+            "completedAt": job.completed_at.isoformat() if job.completed_at else None,
+            "totalFound": job.total_found or 0,
+            "staged": len(sc_list),
+            "approved": sum(1 for s in sc_list if s.status == "approved"),
+        }
+
+    # Sort: diffs-first, then alphabetical
+    matched.sort(key=lambda x: (-len(x["diffs"]), x["course_name"].lower()))
+
+    return {
+        "run_a": _job_meta(job_a_row, sc_a),
+        "run_b": _job_meta(job_b_row, sc_b),
+        "same_university": job_a_row.university_id == job_b_row.university_id,
+        "matched": matched,
+        "only_in_a": [a_by_name[n]["course_name"] for n in a_by_name if n not in b_by_name],
+        "only_in_b": [b_by_name[n]["course_name"] for n in b_by_name if n not in a_by_name],
+        "changed_count": sum(1 for m in matched if m["has_diff"]),
+        "unchanged_count": sum(1 for m in matched if not m["has_diff"]),
+    }
+
+
+@router.post("/history/{job_id}/restore")
+async def history_restore(
+    job_id: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[dict, Depends(get_current_user)],
+) -> dict:
+    """Re-promote all approved scraped courses from a historical run back to
+    the live courses table.
+
+    Only restores rows that were previously approved (status='approved').
+    Each call is idempotent — re-running on an already-current run is safe.
+    """
+    from app.models import ScrapedCourse
+    from app.services.scraper.approve_course import approve_scraped_course
+
+    job = await db.get(ScrapeRuntimeJob, job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    sc_rows = (await db.execute(
+        select(ScrapedCourse).where(
+            ScrapedCourse.scrape_job_id == job_id,
+            ScrapedCourse.status == "approved",
+        )
+    )).scalars().all()
+
+    if not sc_rows:
+        return {
+            "ok": True,
+            "job_id": job_id,
+            "university_name": job.university_name,
+            "restored": 0,
+            "skipped": 0,
+            "errors": 0,
+            "total": 0,
+            "message": "No approved courses in this run to restore.",
+            "error_details": [],
+        }
+
+    restored = 0
+    skipped = 0
+    errors = 0
+    error_details: list[dict] = []
+
+    for sc in sc_rows:
+        try:
+            await approve_scraped_course(db, sc, actor="history_restore")
+            restored += 1
+        except ValueError as exc:
+            skipped += 1
+            error_details.append({"course": sc.course_name, "error": str(exc)})
+        except Exception as exc:
+            errors += 1
+            error_details.append({"course": sc.course_name, "error": str(exc)[:120]})
+            try:
+                await db.rollback()
+            except Exception:
+                pass
+
+    return {
+        "ok": True,
+        "job_id": job_id,
+        "university_name": job.university_name,
+        "restored": restored,
+        "skipped": skipped,
+        "errors": errors,
+        "total": len(sc_rows),
+        "error_details": error_details[:10],
+    }
+
+
 @router.get("/history/{job_id}")
 async def history_one(job_id: str, db: Annotated[AsyncSession, Depends(get_db)]) -> dict:
     """Match Node: returns {job, logs, stagedCourses}."""

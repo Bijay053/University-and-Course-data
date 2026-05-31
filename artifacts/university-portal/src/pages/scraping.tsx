@@ -665,6 +665,36 @@ export default function Scraping() {
   // (matches the live Review table). Keep it loose here — the component
   // owns the strict typing.
   type HistoryStagedCourse = ReviewStagedCourse & { evidence: ReviewEvidenceItem[] };
+
+  // ── Compare / Restore types ───────────────────────────────────────────────
+  type CompareJobMeta = {
+    runtimeJobId: string;
+    universityName: string | null;
+    universityId: number | null;
+    status: string;
+    startedAt: string | null;
+    completedAt: string | null;
+    totalFound: number;
+    staged: number;
+    approved: number;
+  };
+  type DiffEntry = { a: unknown; b: unknown };
+  type MatchedCourse = {
+    course_name: string;
+    has_diff: boolean;
+    diffs: Record<string, DiffEntry>;
+  };
+  type CompareResult = {
+    run_a: CompareJobMeta;
+    run_b: CompareJobMeta;
+    same_university: boolean;
+    matched: MatchedCourse[];
+    only_in_a: string[];
+    only_in_b: string[];
+    changed_count: number;
+    unchanged_count: number;
+  };
+
   const [historyRuns, setHistoryRuns] = useState<HistoryRun[]>([]);
   const [historyTotal, setHistoryTotal] = useState(0);
   const [historyPage, setHistoryPage] = useState(1);
@@ -675,6 +705,11 @@ export default function Scraping() {
   const [historyDetail, setHistoryDetail] = useState<{ logs: HistoryLogEntry[]; stagedCourses: HistoryStagedCourse[] } | null>(null);
   const [historyView, setHistoryView] = useState<"logs" | "courses">("logs");
   const [historyLogFilter, setHistoryLogFilter] = useState("");
+  // Compare / Restore state
+  const [historySelected, setHistorySelected] = useState<Set<string>>(new Set());
+  const [comparing, setComparing] = useState(false);
+  const [compareResult, setCompareResult] = useState<CompareResult | null>(null);
+  const [restoring, setRestoring] = useState<string | null>(null);
 
   const fetchHistory = useCallback(async () => {
     setLoadingHistory(true);
@@ -715,6 +750,53 @@ export default function Scraping() {
   useEffect(() => {
     void fetchHistory();
   }, [fetchHistory]);
+
+  const toggleHistorySelect = useCallback((jobId: string) => {
+    setHistorySelected(prev => {
+      const next = new Set(prev);
+      if (next.has(jobId)) {
+        next.delete(jobId);
+      } else if (next.size < 2) {
+        next.add(jobId);
+      }
+      return next;
+    });
+    setCompareResult(null);
+  }, []);
+
+  const runCompare = useCallback(async () => {
+    const [jobA, jobB] = [...historySelected];
+    if (!jobA || !jobB) return;
+    setComparing(true);
+    setCompareResult(null);
+    try {
+      const res = await fetch(`/api/scrape/history/compare?job_a=${jobA}&job_b=${jobB}`);
+      const data = await readResponseJson<CompareResult>(res);
+      if (data) setCompareResult(data);
+    } catch {
+      // Non-fatal — empty state will render
+    } finally {
+      setComparing(false);
+    }
+  }, [historySelected]);
+
+  const restoreVersion = useCallback(async (jobId: string) => {
+    setRestoring(jobId);
+    try {
+      const res = await fetch(`/api/scrape/history/${jobId}/restore`, { method: "POST" });
+      const data = await readResponseJson<{ restored: number; skipped: number; errors: number; university_name?: string }>(res);
+      if (data) {
+        toast({
+          title: `Restored ${data.restored} course${data.restored === 1 ? "" : "s"}`,
+          description: `From: ${data.university_name ?? "this run"}${data.errors > 0 ? ` · ${data.errors} error(s)` : ""}`,
+        });
+      }
+    } catch {
+      toast({ title: "Restore failed", variant: "destructive" });
+    } finally {
+      setRestoring(null);
+    }
+  }, [toast]);
 
   const formatHistoryDuration = (ms: number | null): string => {
     if (!ms || ms < 0) return "—";
@@ -2978,6 +3060,28 @@ export default function Scraping() {
                 {((historyPage - 1) * historyPageSize) + 1}–{Math.min(historyPage * historyPageSize, historyTotal)} of {historyTotal}
               </span>
             ) : null}
+            {historySelected.size === 2 ? (
+              <Button
+                size="sm"
+                onClick={() => void runCompare()}
+                disabled={comparing}
+                className="h-7 px-3 text-xs bg-indigo-600 hover:bg-indigo-700 text-white"
+              >
+                {comparing
+                  ? <><Loader2 className="w-3 h-3 mr-1 animate-spin" />Comparing…</>
+                  : "⟺ Compare 2 selected"}
+              </Button>
+            ) : historySelected.size === 1 ? (
+              <span className="text-xs text-indigo-600">Select 1 more to compare</span>
+            ) : null}
+            {historySelected.size > 0 && (
+              <button
+                onClick={() => { setHistorySelected(new Set()); setCompareResult(null); }}
+                className="text-xs text-gray-400 hover:text-gray-600 underline"
+              >
+                Clear
+              </button>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <label className="text-xs text-gray-500">Per page:</label>
@@ -3031,8 +3135,17 @@ export default function Scraping() {
             {historyRuns.map((run) => {
               const isExpanded = expandedHistoryId === run.runtimeJobId;
               return (
-                <div key={run.runtimeJobId} className="border rounded-xl bg-white overflow-hidden">
+                <div key={run.runtimeJobId} className={`border rounded-xl bg-white overflow-hidden transition-shadow ${historySelected.has(run.runtimeJobId) ? "ring-2 ring-indigo-400" : ""}`}>
                   <div className="p-3 sm:p-4 flex flex-wrap items-center gap-x-4 gap-y-2">
+                    {/* Select checkbox */}
+                    <input
+                      type="checkbox"
+                      checked={historySelected.has(run.runtimeJobId)}
+                      onChange={() => toggleHistorySelect(run.runtimeJobId)}
+                      disabled={!historySelected.has(run.runtimeJobId) && historySelected.size >= 2}
+                      title={historySelected.size >= 2 && !historySelected.has(run.runtimeJobId) ? "Clear a selection first" : "Select to compare"}
+                      className="w-4 h-4 shrink-0 accent-indigo-600 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
+                    />
                     <div className="flex items-center gap-2 min-w-0 flex-1">
                       {historyStatusBadge(run.status)}
                       <div className="min-w-0">
@@ -3170,6 +3283,178 @@ export default function Scraping() {
             })}
           </div>
         )}
+
+        {/* ── Comparison Panel ─────────────────────────────────────────────── */}
+        {(comparing || compareResult) && (() => {
+          const FIELD_LABELS: Record<string, string> = {
+            degree_level: "Degree Level", category: "Category", study_mode: "Study Mode",
+            duration: "Duration", duration_term: "Duration Unit",
+            international_fee: "Intl Fee", fee_term: "Fee Term", currency: "Currency",
+            ielts_overall: "IELTS Overall", pte_overall: "PTE Overall",
+            toefl_overall: "TOEFL Overall", cambridge_overall: "Cambridge Overall",
+            duolingo_overall: "Duolingo Overall",
+            course_location: "Location", intake_months: "Intakes",
+            academic_level: "Academic Level", academic_score: "Academic Score",
+            score_type: "Score Type", academic_country: "Academic Country",
+            other_requirement: "Entry Requirement",
+            description: "Description", course_website: "Course URL",
+          };
+          const fmtVal = (v: unknown): string => {
+            if (v === null || v === undefined) return "—";
+            if (Array.isArray(v)) return v.join(", ") || "—";
+            const s = String(v);
+            return s.length > 80 ? s.slice(0, 80) + "…" : s;
+          };
+          const cr = compareResult;
+          return (
+            <div className="mt-4 border-2 border-indigo-200 rounded-xl bg-indigo-50/40 overflow-hidden">
+              {/* Header */}
+              <div className="px-4 py-3 bg-indigo-600 text-white flex items-center justify-between gap-3 flex-wrap">
+                <span className="font-semibold text-sm">⟺ Version Comparison</span>
+                {cr && (
+                  <div className="flex gap-3 text-xs opacity-90">
+                    <span className="bg-white/20 rounded px-2 py-0.5">{cr.changed_count} changed</span>
+                    <span className="bg-white/20 rounded px-2 py-0.5">{cr.unchanged_count} unchanged</span>
+                    {cr.only_in_a.length > 0 && <span className="bg-white/20 rounded px-2 py-0.5">+{cr.only_in_a.length} only in A</span>}
+                    {cr.only_in_b.length > 0 && <span className="bg-white/20 rounded px-2 py-0.5">+{cr.only_in_b.length} only in B</span>}
+                  </div>
+                )}
+                <button
+                  onClick={() => { setCompareResult(null); setHistorySelected(new Set()); }}
+                  className="text-white/80 hover:text-white text-lg leading-none"
+                >×</button>
+              </div>
+
+              {comparing ? (
+                <div className="p-8 text-center text-indigo-600 flex items-center justify-center gap-2">
+                  <Loader2 className="w-5 h-5 animate-spin" /> Comparing runs…
+                </div>
+              ) : cr ? (
+                <div className="p-4 space-y-4">
+                  {/* Version A / B metadata cards + restore buttons */}
+                  {!cr.same_university && (
+                    <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+                      ⚠ These runs are from different universities — comparison may mix unrelated courses.
+                    </div>
+                  )}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {([["A", cr.run_a], ["B", cr.run_b]] as const).map(([label, run]) => (
+                      <div key={label} className="bg-white border rounded-lg p-3 space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <span className={`text-xs font-bold px-2 py-0.5 rounded ${label === "A" ? "bg-indigo-100 text-indigo-700" : "bg-purple-100 text-purple-700"}`}>
+                              Version {label}
+                            </span>
+                            <span className="text-sm font-semibold text-gray-800 truncate">{run.universityName ?? "(unknown)"}</span>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={restoring === run.runtimeJobId}
+                            onClick={() => {
+                              if (window.confirm(`Restore ${run.approved} course(s) from Version ${label} (${run.universityName})?\n\nThis will overwrite the current live data for these courses.`)) {
+                                void restoreVersion(run.runtimeJobId);
+                              }
+                            }}
+                            className="text-xs h-7 shrink-0 border-orange-300 text-orange-700 hover:bg-orange-50"
+                          >
+                            {restoring === run.runtimeJobId
+                              ? <><Loader2 className="w-3 h-3 mr-1 animate-spin" />Restoring…</>
+                              : `↩ Restore to ${label}`}
+                          </Button>
+                        </div>
+                        <div className="text-xs text-gray-500 space-y-0.5">
+                          <div>{run.startedAt ? new Date(run.startedAt).toLocaleString() : "—"}</div>
+                          <div className="flex gap-3">
+                            <span>Found: <strong>{run.totalFound}</strong></span>
+                            <span>Staged: <strong>{run.staged}</strong></span>
+                            <span>Approved: <strong className="text-green-700">{run.approved}</strong></span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Changed courses table */}
+                  {cr.changed_count > 0 && (
+                    <div>
+                      <h4 className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">
+                        {cr.changed_count} course{cr.changed_count === 1 ? "" : "s"} with differences
+                      </h4>
+                      <div className="max-h-[480px] overflow-auto rounded-lg border bg-white">
+                        <table className="w-full text-xs min-w-[600px]">
+                          <thead className="sticky top-0 bg-gray-50 border-b z-10">
+                            <tr>
+                              <th className="text-left p-2 font-semibold text-gray-600 w-48">Course</th>
+                              <th className="text-left p-2 font-semibold text-gray-600 w-28">Field</th>
+                              <th className="text-left p-2 font-semibold text-indigo-600">Version A</th>
+                              <th className="text-left p-2 font-semibold text-purple-600">Version B</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y">
+                            {cr.matched.filter(m => m.has_diff).map((m) =>
+                              Object.entries(m.diffs).map(([field, diff], fi) => (
+                                <tr key={`${m.course_name}-${field}`} className="hover:bg-indigo-50/30">
+                                  <td className="p-2 align-top">
+                                    {fi === 0 ? (
+                                      <span className="font-medium text-gray-800 line-clamp-2">{m.course_name}</span>
+                                    ) : null}
+                                  </td>
+                                  <td className="p-2 align-top text-gray-500">
+                                    {FIELD_LABELS[field] ?? field}
+                                  </td>
+                                  <td className="p-2 align-top">
+                                    <span className={`font-mono ${diff.a !== null && diff.a !== undefined ? "text-indigo-700" : "text-gray-300"}`}>
+                                      {fmtVal(diff.a)}
+                                    </span>
+                                  </td>
+                                  <td className="p-2 align-top">
+                                    <span className={`font-mono ${diff.b !== null && diff.b !== undefined ? "text-purple-700" : "text-gray-300"}`}>
+                                      {fmtVal(diff.b)}
+                                    </span>
+                                  </td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Courses only in A / only in B */}
+                  {(cr.only_in_a.length > 0 || cr.only_in_b.length > 0) && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                      {cr.only_in_a.length > 0 && (
+                        <div>
+                          <p className="font-semibold text-indigo-700 mb-1">Only in Version A ({cr.only_in_a.length})</p>
+                          <div className="max-h-32 overflow-auto space-y-0.5">
+                            {cr.only_in_a.map(n => <div key={n} className="text-gray-600 truncate">{n}</div>)}
+                          </div>
+                        </div>
+                      )}
+                      {cr.only_in_b.length > 0 && (
+                        <div>
+                          <p className="font-semibold text-purple-700 mb-1">Only in Version B ({cr.only_in_b.length})</p>
+                          <div className="max-h-32 overflow-auto space-y-0.5">
+                            {cr.only_in_b.map(n => <div key={n} className="text-gray-600 truncate">{n}</div>)}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {cr.changed_count === 0 && cr.only_in_a.length === 0 && cr.only_in_b.length === 0 && (
+                    <div className="text-center py-6 text-gray-500">
+                      <p className="text-2xl mb-1">✓</p>
+                      <p className="text-sm">No differences found — both runs produced identical course data.</p>
+                    </div>
+                  )}
+                </div>
+              ) : null}
+            </div>
+          );
+        })()}
       </div>
 
       <div>
