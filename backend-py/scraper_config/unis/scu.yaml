@@ -1,6 +1,26 @@
-# Southern Cross University — stub created for Week 5 scale-up.
-# Hostname: www.scu.edu.au  (course catalogue under /study)
-discovery: {}
+# Southern Cross University — www.scu.edu.au
+# Site is a Squiz Matrix SPA — static BFS always returns 0 links.
+# All course content (fees, IELTS, intakes) is JavaScript-rendered.
+# Course URL pattern confirmed by robots.txt: /study/courses/{slug}/
+# robots.txt also lists: Sitemap: https://www.scu.edu.au/google-sitemap/index.xml
+# (sitemap XML is empty for static HTTP fetches — browser required)
+
+discovery:
+  always_browser_discover: true
+  always_sitemap_supplement: true
+  seed_urls:
+    - https://www.scu.edu.au/study/undergraduate/
+    - https://www.scu.edu.au/study/postgraduate/
+    - https://www.scu.edu.au/study/research/
+    - https://www.scu.edu.au/study/courses/
+  allow_url_patterns:
+    - /study/courses/
+  block_url_patterns:
+    - /study/units/
+    - /study/courses/search
+  bfs_page_budget: 60
+  _min_expected_courses: 120
+
 extraction:
   filters:
     domestic_only:
