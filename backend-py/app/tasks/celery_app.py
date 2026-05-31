@@ -191,9 +191,13 @@ async def _reset_ghost_running_jobs() -> int:
 
 @worker_ready.connect
 def on_worker_ready(**kwargs) -> None:  # noqa: ANN003
-    """Reset ghost 'running' scrape_runtime_jobs when the Celery worker comes online.
+    """Reset ghost 'running' scrape_runtime_jobs when the Celery worker comes online,
+    then immediately re-dispatch any jobs stuck in 'queued' state with no Celery task
+    in the broker (e.g. after Redis was restarted and cleared the task queue).
 
     Runs once per worker process start — harmless if there are no stuck rows.
+    The Redis NX lock in _immediate_requeue_hook makes this race-safe across all
+    4 worker processes that each fire this signal on startup.
     """
     # ── Shadow-mode startup log ───────────────────────────────────────────────
     # Emitted at boot so operators can confirm SHADOW_MODE_UNI_IDS /
@@ -226,3 +230,16 @@ def on_worker_ready(**kwargs) -> None:  # noqa: ANN003
             log.info("worker_ready: no ghost running jobs found — all slots clean")
     except Exception as exc:
         log.error("worker_ready: ghost-job reset failed: %s", exc)
+    # ── Orphaned queued-job recovery ──────────────────────────────────────────
+    # After a Redis restart the broker queue is cleared, but DB rows remain in
+    # status='queued' with no Celery task to claim them.  Re-dispatch them NOW
+    # so they start within seconds of the worker coming online rather than
+    # waiting up to STALE_QUEUED_MINUTES (5 min) for the next beat tick.
+    # _immediate_requeue_hook uses a Redis NX lock per job so only one of the
+    # 4 concurrent worker processes will dispatch each job — no duplicates.
+    try:
+        from app.tasks.scrape_tasks import _immediate_requeue_hook
+        _immediate_requeue_hook()
+        log.info("worker_ready: orphaned queued-job recovery sweep complete")
+    except Exception as exc:
+        log.error("worker_ready: orphaned queued-job recovery failed: %s", exc)
