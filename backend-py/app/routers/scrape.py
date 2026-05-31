@@ -1499,6 +1499,109 @@ async def re_extract_staged(
     }
 
 
+# Fields checked by /staged/analyze, in priority order.
+_ANALYZE_FIELDS: list[tuple[str, str]] = [
+    ("ielts_overall",       "Missing IELTS"),
+    ("international_fee",   "Missing International Fee"),
+    ("course_location",     "Missing Location"),
+    ("study_mode",          "Missing Study Mode"),
+    ("duration",            "Missing Duration"),
+    ("intake_months",       "Missing Intakes"),
+    ("academic_level",      "Missing Academic Level"),
+    ("other_requirement",   "Missing Entry Requirements"),
+]
+
+# Expected fill-rate improvement per field when re-extraction runs.
+# Derived from observed outcomes; deliberately conservative.
+_EXPECTED_FILL_RATE: dict[str, float] = {
+    "ielts_overall":      0.60,
+    "international_fee":  0.55,
+    "course_location":    0.70,
+    "study_mode":         0.75,
+    "duration":           0.70,
+    "intake_months":      0.65,
+    "academic_level":     0.80,
+    "other_requirement":  0.60,
+    "course_name":        0.75,
+}
+
+
+@router.post("/staged/analyze")
+async def analyze_staged(
+    body: ReExtractBody,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> dict:
+    """Analyse selected staged courses for missing/invalid fields.
+
+    Returns issue counts and expected-improvement estimates so the UI can
+    show a confirmation preview *before* the user triggers re-extraction.
+    No data is modified.
+    """
+    from app.models import ScrapedCourse, University
+
+    uni = await db.get(University, body.university_id)
+    rows = (
+        await db.execute(
+            select(ScrapedCourse).where(
+                ScrapedCourse.university_id == body.university_id,
+                ScrapedCourse.id.in_(body.ids),
+            )
+        )
+    ).scalars().all()
+
+    total = len(rows)
+    courses_with_url = sum(1 for r in rows if r.course_website)
+
+    issues: list[dict] = []
+    for field, label in _ANALYZE_FIELDS:
+        missing = sum(1 for r in rows if not getattr(r, field, None))
+        if missing == 0:
+            continue
+        current_pct = round((total - missing) / total * 100) if total else 0
+        fill_rate = _EXPECTED_FILL_RATE.get(field, 0.60)
+        # Estimate: courses_with_url fraction can be attempted; fill_rate of those succeed
+        fillable = round(missing * (courses_with_url / total if total else 1) * fill_rate)
+        expected_pct = round((total - missing + fillable) / total * 100) if total else current_pct
+        issues.append({
+            "field": field,
+            "label": label,
+            "missing": missing,
+            "total": total,
+            "pct_missing": 100 - current_pct,
+            "current_pct": current_pct,
+            "expected_fill_pct": min(99, expected_pct),
+        })
+
+    # Check university name embedded in course title
+    if uni and uni.name:
+        uni_lower = uni.name.lower()
+        name_in_title = sum(
+            1 for r in rows
+            if r.course_name and uni_lower in r.course_name.lower()
+        )
+        if name_in_title > 0:
+            current_pct = round((total - name_in_title) / total * 100) if total else 100
+            fill_rate = _EXPECTED_FILL_RATE["course_name"]
+            fillable = round(name_in_title * (courses_with_url / total if total else 1) * fill_rate)
+            expected_pct = round((total - name_in_title + fillable) / total * 100) if total else current_pct
+            issues.append({
+                "field": "course_name",
+                "label": "University Name in Course Title",
+                "missing": name_in_title,
+                "total": total,
+                "pct_missing": 100 - current_pct,
+                "current_pct": current_pct,
+                "expected_fill_pct": min(99, expected_pct),
+            })
+
+    issues.sort(key=lambda x: x["missing"], reverse=True)
+    return {
+        "total": total,
+        "courses_with_url": courses_with_url,
+        "issues": issues,
+    }
+
+
 @router.get("/staged")
 async def staged_list(
     db: Annotated[AsyncSession, Depends(get_db)],

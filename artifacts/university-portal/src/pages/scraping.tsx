@@ -233,6 +233,40 @@ function detectCountryFromUrl(url: string): string {
 
 type UniLite = { id: number; name: string; scrapeUrl?: string | null };
 
+interface FixIssue {
+  field: string;
+  label: string;
+  missing: number;
+  total: number;
+  current_pct: number;
+  expected_fill_pct: number;
+}
+interface FixAnalysis {
+  total: number;
+  courses_with_url: number;
+  issues: FixIssue[];
+}
+interface FixResults {
+  total: number;
+  updated: number;
+  skipped: number;
+  errors: number;
+  beforeIssues: FixIssue[];
+  afterIssues: FixIssue[];
+}
+
+const FIX_FIELD_LABELS: Record<string, string> = {
+  ielts_overall: "IELTS",
+  international_fee: "International Fee",
+  course_location: "Location",
+  study_mode: "Study Mode",
+  duration: "Duration",
+  intake_months: "Intakes",
+  academic_level: "Academic Level",
+  other_requirement: "Entry Requirements",
+  course_name: "University Name in Title",
+};
+
 function UniversityCombobox({
   value,
   onChange,
@@ -1442,7 +1476,12 @@ export default function Scraping() {
   const [clearingRejected, setClearingRejected] = useState(false);
   const [bulkRejecting, setBulkRejecting] = useState(false);
   const [fixingSelected, setFixingSelected] = useState(false);
+  const [analyzingFix, setAnalyzingFix] = useState(false);
   const [showBulkRejectDialog, setShowBulkRejectDialog] = useState(false);
+  const [showFixPreviewDialog, setShowFixPreviewDialog] = useState(false);
+  const [showFixResultsDialog, setShowFixResultsDialog] = useState(false);
+  const [fixAnalysis, setFixAnalysis] = useState<FixAnalysis | null>(null);
+  const [fixResults, setFixResults] = useState<FixResults | null>(null);
   const [cleaningNames, setCleaningNames] = useState(false);
 
   const handleBulkRejectAll = async () => {
@@ -1532,6 +1571,32 @@ export default function Scraping() {
       toast({ title: "Too many selected", description: "Select up to 50 courses at a time for AI fix.", variant: "destructive" });
       return;
     }
+    setAnalyzingFix(true);
+    try {
+      const res = await fetch("/api/scrape/staged/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids, universityId: uniId }),
+      });
+      if (res.ok) {
+        const analysis: FixAnalysis = await res.json();
+        setFixAnalysis(analysis);
+        setShowFixPreviewDialog(true);
+      } else {
+        toast({ title: "Analysis failed", description: await getFetchErrorMessage(res), variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Analysis failed", description: "Network error — check your connection.", variant: "destructive" });
+    }
+    setAnalyzingFix(false);
+  };
+
+  const handleConfirmFix = async () => {
+    if (!selectedUni || selectedUni === ALL || !fixAnalysis) return;
+    const uniId = parseInt(selectedUni);
+    if (isNaN(uniId)) return;
+    const ids = Array.from(selectedIds);
+    const beforeIssues = fixAnalysis.issues;
     setFixingSelected(true);
     try {
       const res = await fetch("/api/scrape/staged/re-extract", {
@@ -1539,27 +1604,39 @@ export default function Scraping() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ids, universityId: uniId }),
       });
-      if (res.ok) {
-        const data = await res.json();
-        const skippedMsg = data.skipped > 0 ? ` (${data.skipped} had no URL)` : "";
-        const errMsg = data.errors > 0 ? ` · ${data.errors} failed` : "";
-        toast({
-          title: `Re-extracted ${data.updated} of ${data.total} course(s)`,
-          description: `AI extraction re-ran on selected courses.${skippedMsg}${errMsg} Scores updated.`,
-        });
-        if (reviewJobId) {
-          await loadStagedCourses(reviewJobId);
-          const qRes = await fetch(`/api/scrape/universities/${uniId}/course-quality`);
-          if (qRes.ok) {
-            const qData = await qRes.json();
-            const map: Record<number, CourseQualityData> = {};
-            for (const entry of qData.courses ?? []) map[entry.id] = entry;
-            setCourseQualityMap(map);
-          }
-        }
-      } else {
+      if (!res.ok) {
         toast({ title: "Fix failed", description: await getFetchErrorMessage(res), variant: "destructive" });
+        setFixingSelected(false);
+        return;
       }
+      const data = await res.json();
+
+      // Reload staged courses then re-analyze to get accurate after counts.
+      if (reviewJobId) await loadStagedCourses(reviewJobId);
+      let afterIssues: FixIssue[] = [];
+      try {
+        const aRes = await fetch("/api/scrape/staged/analyze", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ids, universityId: uniId }),
+        });
+        if (aRes.ok) afterIssues = (await aRes.json()).issues ?? [];
+      } catch { /* after analysis optional */ }
+
+      // Reload quality map.
+      try {
+        const qRes = await fetch(`/api/scrape/universities/${uniId}/course-quality`);
+        if (qRes.ok) {
+          const qData = await qRes.json();
+          const map: Record<number, CourseQualityData> = {};
+          for (const entry of qData.courses ?? []) map[entry.id] = entry;
+          setCourseQualityMap(map);
+        }
+      } catch { /* quality reload optional */ }
+
+      setFixResults({ ...data, beforeIssues, afterIssues });
+      setShowFixPreviewDialog(false);
+      setShowFixResultsDialog(true);
     } catch {
       toast({ title: "Fix failed", description: "Network error — check your connection.", variant: "destructive" });
     }
@@ -1897,10 +1974,10 @@ export default function Scraping() {
                   variant="outline"
                   className="text-blue-600 border-blue-200 hover:bg-blue-50"
                   onClick={handleFixSelected}
-                  disabled={selectedIds.size === 0 || fixingSelected || approving}
-                  title="Re-run full AI extraction on selected courses to fill missing fields (IELTS, fees, location…)"
+                  disabled={selectedIds.size === 0 || fixingSelected || analyzingFix || approving}
+                  title="Analyse selected courses for missing fields, then confirm before re-running AI extraction"
                 >
-                  {fixingSelected ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Sparkles className="w-4 h-4 mr-1" />}
+                  {(fixingSelected || analyzingFix) ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Sparkles className="w-4 h-4 mr-1" />}
                   Fix selected ({selectedIds.size})
                 </Button>
                 <Button
@@ -2371,6 +2448,155 @@ export default function Scraping() {
               {bulkRejecting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <XCircle className="w-4 h-4 mr-2" />}
               Reject All
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Fix Selected: Preview Dialog ───────────────────────────────────── */}
+      <Dialog open={showFixPreviewDialog} onOpenChange={(o) => { if (!o && !fixingSelected) setShowFixPreviewDialog(false); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-blue-600" />
+              Review Before Fixing
+            </DialogTitle>
+          </DialogHeader>
+          {fixAnalysis && (
+            <div className="space-y-4">
+              <div className="bg-muted/50 rounded-lg p-3 flex items-center justify-between text-sm">
+                <span className="font-medium">{fixAnalysis.total} course{fixAnalysis.total !== 1 ? "s" : ""} selected</span>
+                {fixAnalysis.total - fixAnalysis.courses_with_url > 0 && (
+                  <span className="text-muted-foreground">{fixAnalysis.total - fixAnalysis.courses_with_url} will be skipped (no URL)</span>
+                )}
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Detected Issues</p>
+                {fixAnalysis.issues.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No missing fields detected — courses look complete.</p>
+                ) : (
+                  <div className="space-y-1.5">
+                    {fixAnalysis.issues.map(issue => (
+                      <div key={issue.field} className="flex items-center justify-between text-sm">
+                        <span>{issue.label}</span>
+                        <span className="font-medium text-orange-700 bg-orange-50 border border-orange-200 rounded px-2 py-0.5 text-xs">
+                          {issue.missing} course{issue.missing !== 1 ? "s" : ""}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="text-sm text-muted-foreground border-t pt-3">
+                <strong>Action:</strong> Re-extract {fixAnalysis.courses_with_url} of {fixAnalysis.total} courses using current recipe rules. Gemini AI will attempt to fill missing fields.
+              </div>
+
+              {fixAnalysis.issues.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Expected Improvement</p>
+                  <div className="space-y-2.5">
+                    {fixAnalysis.issues.slice(0, 4).map(issue => (
+                      <div key={issue.field} className="space-y-1">
+                        <div className="flex justify-between text-xs text-muted-foreground">
+                          <span>{issue.label.replace("Missing ", "")}</span>
+                          <span>{issue.current_pct}% → ~{issue.expected_fill_pct}% complete</span>
+                        </div>
+                        <div className="h-2 rounded-full bg-muted overflow-hidden flex">
+                          <div className="h-full bg-green-500 rounded-l-full transition-all" style={{ width: `${issue.current_pct}%` }} />
+                          <div className="h-full bg-green-200 transition-all" style={{ width: `${Math.max(0, issue.expected_fill_pct - issue.current_pct)}%` }} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2 italic">Estimates based on typical fill rates. Actual results vary by university.</p>
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setShowFixPreviewDialog(false)} disabled={fixingSelected}>
+              Cancel
+            </Button>
+            <Button onClick={handleConfirmFix} disabled={fixingSelected} className="bg-blue-600 hover:bg-blue-700 text-white">
+              {fixingSelected ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Sparkles className="w-4 h-4 mr-2" />}
+              Confirm Fix ({fixAnalysis?.total ?? 0})
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Fix Selected: Results Dialog ────────────────────────────────────── */}
+      <Dialog open={showFixResultsDialog} onOpenChange={(o) => { if (!o) setShowFixResultsDialog(false); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-blue-600" />
+              Fix Results
+            </DialogTitle>
+          </DialogHeader>
+          {fixResults && (
+            <div className="space-y-4">
+              <div className="bg-muted/50 rounded-lg p-3 flex items-center justify-between text-sm">
+                <div className="flex items-center gap-3">
+                  <span className="font-medium">Updated {fixResults.updated} of {fixResults.total}</span>
+                  {fixResults.skipped > 0 && <span className="text-muted-foreground">· {fixResults.skipped} skipped</span>}
+                  {fixResults.errors > 0 && <span className="text-red-600">· {fixResults.errors} failed</span>}
+                </div>
+                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${
+                  fixResults.errors === 0 && fixResults.updated > 0 ? "bg-green-50 text-green-700 border-green-200" :
+                  fixResults.updated > 0 ? "bg-orange-50 text-orange-700 border-orange-200" :
+                  "bg-red-50 text-red-700 border-red-200"
+                }`}>
+                  {fixResults.errors === 0 && fixResults.updated === fixResults.total - fixResults.skipped ? "Successful" :
+                   fixResults.updated > 0 ? "Partially successful" : "Failed"}
+                </span>
+              </div>
+
+              {fixResults.beforeIssues.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Before vs After</p>
+                  <div className="border rounded-lg overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-muted/50 border-b">
+                          <th className="text-left px-3 py-2 font-medium text-xs text-muted-foreground">Field</th>
+                          <th className="text-center px-3 py-2 font-medium text-xs text-muted-foreground">Before</th>
+                          <th className="text-center px-3 py-2 font-medium text-xs text-muted-foreground">After</th>
+                          <th className="text-center px-3 py-2 font-medium text-xs text-muted-foreground">Change</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {fixResults.beforeIssues.map((before, idx) => {
+                          const after = fixResults.afterIssues.find(a => a.field === before.field);
+                          const afterMissing = after?.missing ?? before.missing;
+                          const improvement = before.missing - afterMissing;
+                          return (
+                            <tr key={before.field} className={idx > 0 ? "border-t" : ""}>
+                              <td className="px-3 py-2 text-xs">{FIX_FIELD_LABELS[before.field] ?? before.label}</td>
+                              <td className="text-center px-3 py-2 text-xs text-red-600">{before.missing} missing</td>
+                              <td className="text-center px-3 py-2 text-xs text-green-700">{afterMissing} missing</td>
+                              <td className="text-center px-3 py-2 text-xs font-medium">
+                                {improvement > 0 ? (
+                                  <span className="text-green-600">−{improvement} ✓</span>
+                                ) : improvement < 0 ? (
+                                  <span className="text-red-600">+{Math.abs(improvement)}</span>
+                                ) : (
+                                  <span className="text-muted-foreground">—</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button onClick={() => setShowFixResultsDialog(false)}>Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
