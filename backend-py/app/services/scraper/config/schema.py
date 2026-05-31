@@ -516,6 +516,40 @@ class FeesConfig(BaseModel):
             "'fees for your course']``.  Empty by default — opt-in per university."
         ),
     )
+    # ── Fee calculation / sanity rules (mirrored into recipe_rules) ──────────
+    # These are YAML-side equivalents of the RecipeConfig fee fields so that
+    # per-university fee calculation behaviour can be configured in the uni YAML
+    # without needing a DB-stored recipe. The orchestrator merges them into the
+    # recipe dict at scrape time (YAML wins over DB recipe when both are set).
+    fee_calculation_mode: Optional[str] = Field(
+        default=None,
+        description=(
+            "How fee amounts are processed after extraction. "
+            "'use_source_value_only' — store as-is (default). "
+            "'full_course_to_annual' — divide a Full Course total by duration "
+            "to get the per-year figure (e.g. $166,500 / 3yr → $55,500). "
+            "For courses < 1 year, the full-course amount is kept as-is. "
+            "Set fee_prevent_full_course_rollup: false when using this mode."
+        ),
+    )
+    fee_prevent_full_course_rollup: Optional[bool] = Field(
+        default=None,
+        description=(
+            "Override the recipe-level fee_prevent_full_course_rollup flag. "
+            "Set false when fee_calculation_mode='full_course_to_annual' so the "
+            "Full Course → Annual conversion can see the original fee_term. "
+            "When None (default), the recipe setting or global default applies."
+        ),
+    )
+    max_annual_fee: Optional[int] = Field(
+        default=None,
+        description=(
+            "Discard any extracted Annual fee above this AUD threshold — these "
+            "are likely total-course amounts misidentified as per-year by Gemini "
+            "(e.g. returning a 3-year $117k total as 'Annual'). "
+            "Typical safe cap for Australian universities: 80000."
+        ),
+    )
 
 
 class BandSpec(BaseModel):
@@ -1306,7 +1340,18 @@ class RecipeConfig(BaseModel):
         description=(
             "Prevent the scraper from multiplying an annual fee by the course duration "
             "to produce a Full Course total. When True (default), the extracted value "
-            "is stored as-is and fee_term is set to 'Annual'."
+            "is stored as-is and fee_term is set to 'Annual'. "
+            "Set False when fee_calculation_mode='full_course_to_annual' so the "
+            "conversion can see the original 'Full Course' term."
+        ),
+    )
+    max_annual_fee: Optional[int] = Field(
+        default=None,
+        description=(
+            "If set, any extracted Annual fee above this threshold (AUD) is discarded "
+            "and treated as a likely total-course value misidentified as per-year "
+            "(e.g. Gemini returning a 3-year total as 'Annual'). "
+            "Typical safe cap for Australian universities: 80000."
         ),
     )
 

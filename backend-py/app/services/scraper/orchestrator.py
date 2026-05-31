@@ -2540,7 +2540,24 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 # Applied BEFORE staging so rule-cleaned values are stored
                 # with full provenance.  Soft-fail: a recipe rule error must
                 # never abort the scrape.
-                _recipe_rules_cfg = (uni_scrape_config or {}).get("recipe") or {}
+                _recipe_rules_cfg = dict((uni_scrape_config or {}).get("recipe") or {})
+                # Bridge YAML extraction.fees fee-calculation fields into the
+                # recipe dict so operators can configure them in per-uni YAMLs
+                # without needing a DB-stored recipe entry.  YAML wins when
+                # both YAML and DB recipe set the same key.
+                _yaml_fees_bridge_keys = (
+                    "fee_calculation_mode",
+                    "fee_prevent_full_course_rollup",
+                    "max_annual_fee",
+                )
+                from app.services.scraper.config.context import get_uni_config as _get_uc_fees
+                _yaml_uni_cfg = _get_uc_fees()
+                if _yaml_uni_cfg is not None:
+                    _yaml_fees = _yaml_uni_cfg.extraction.fees
+                    for _bk in _yaml_fees_bridge_keys:
+                        _bv = getattr(_yaml_fees, _bk, None)
+                        if _bv is not None:
+                            _recipe_rules_cfg[_bk] = _bv
                 if _recipe_rules_cfg:
                     try:
                         from app.services.scraper.recipe_rules import apply_recipe_rules

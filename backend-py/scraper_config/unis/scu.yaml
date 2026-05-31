@@ -4,6 +4,13 @@
 # Course URL pattern confirmed by robots.txt: /study/courses/{slug}/
 # robots.txt also lists: Sitemap: https://www.scu.edu.au/google-sitemap/index.xml
 # (sitemap XML is empty for static HTTP fetches — browser required)
+#
+# Fee note: SCU publishes fees ANNUALLY on
+#   https://www.scu.edu.au/study/international-courses-and-fees/
+# Every fee shown is a per-year amount.  fee_calculation_mode=full_course_to_annual
+# ensures that when Gemini/regex finds a Full Course total it is divided by
+# duration to yield the annual figure.  max_annual_fee discards any Annual fee
+# that exceeds A$80k — those are total-course costs misidentified as per-year.
 
 discovery:
   always_browser_discover: true
@@ -22,6 +29,16 @@ discovery:
   _min_expected_courses: 120
 
 extraction:
+  fees:
+    # SCU fees are per-year — when Gemini finds only a Full Course total,
+    # divide by duration to get the annual figure.
+    fee_calculation_mode: "full_course_to_annual"
+    # Must be False so the Full Course → Annual conversion in
+    # fee_calculation_mode can see the original 'Full Course' term.
+    fee_prevent_full_course_rollup: false
+    # Discard any 'Annual' fee above A$80k — these are total course costs
+    # that Gemini mistakenly returned as per-year (e.g. A$117k for Counselling).
+    max_annual_fee: 80000
   filters:
     domestic_only:
       enabled: false

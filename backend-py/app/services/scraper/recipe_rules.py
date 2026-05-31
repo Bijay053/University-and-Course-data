@@ -82,13 +82,19 @@ def _apply_course_name_cleanup(payload: dict, recipe: dict) -> None:
 def _apply_fee_term_override(payload: dict, recipe: dict) -> None:
     """Apply fee_term and fee_calculation_mode rules.
 
-    fee_prevent_full_course_rollup=True (default when fee_source_urls set):
-      If fee_term on the payload is 'Full Course' and duration is known,
-      revert to the raw amount but mark as 'Annual' — the operator wants
-      the source page value, not a computed total.
+    fee_prevent_full_course_rollup=True (default):
+      If fee_term on the payload is 'Full Course', mark it as 'Annual' and keep
+      the amount as-is (trust the source page value).
 
     fee_term override:
       Forces fee_term to the configured value regardless of what was extracted.
+      NOTE: do NOT combine with fee_calculation_mode='full_course_to_annual' —
+      the forced term replaces 'Full Course' before the conversion can run.
+
+    max_annual_fee:
+      If an extracted Annual fee exceeds this cap, it is discarded as a likely
+      total-course value misidentified as annual (e.g. Gemini returning the
+      3-year total instead of the per-year fee).
     """
     # Explicit fee_term override
     forced_term = recipe.get("fee_term")
@@ -97,17 +103,16 @@ def _apply_fee_term_override(payload: dict, recipe: dict) -> None:
             log.info("[RECIPE] fee_term forced %r → %r", payload["fee_term"], forced_term)
         payload["fee_term"] = forced_term
 
-    # Prevent Full Course rollup
+    # Prevent Full Course rollup (default True): relabel Full Course → Annual,
+    # amount kept as-is.  Set False when fee_calculation_mode=full_course_to_annual
+    # so the conversion can see the original 'Full Course' term.
     if recipe.get("fee_prevent_full_course_rollup", True):
         if payload.get("fee_term") == "Full Course":
-            # Revert: mark as Annual so the UI shows the right value
-            # The amount is already what the fee page shows (Annual or Total);
-            # since prevent_rollup=True, trust it as Annual.
             payload["fee_term"] = "Annual"
             log.info(
                 "[RECIPE] fee_prevent_full_course_rollup: fee_term Full Course → Annual "
                 "(amount %s kept as-is)",
-                payload.get("annual_tuition_fee"),
+                payload.get("international_fee"),
             )
 
     # fee_calculation_mode: use_source_value_only (default) — no conversion
@@ -119,29 +124,67 @@ def _apply_fee_term_override(payload: dict, recipe: dict) -> None:
     elif mode == "per_unit_to_annual":
         _convert_per_unit_to_annual(payload)
 
+    # max_annual_fee sanity cap: discard Annual fees that look like total course
+    # costs (e.g. Gemini returning 3-year total when page text is ambiguous).
+    max_fee = recipe.get("max_annual_fee")
+    if max_fee and payload.get("fee_term") == "Annual":
+        fee = payload.get("international_fee")
+        if isinstance(fee, (int, float)) and fee > max_fee:
+            log.warning(
+                "[RECIPE] max_annual_fee: %.0f > %.0f — discarding likely total-course "
+                "fee misidentified as Annual",
+                fee,
+                max_fee,
+            )
+            payload["international_fee"] = None
+            payload["fee_term"] = None
+
 
 def _convert_full_course_to_annual(payload: dict) -> None:
-    """Divide Full Course fee by duration to get annual equivalent."""
-    fee = payload.get("annual_tuition_fee")
+    """Divide a Full Course total fee by duration to get the annual equivalent.
+
+    Only fires when fee_term == 'Full Course'.  For courses shorter than 1 year
+    the full-course total IS effectively the per-period fee, so we just relabel
+    it Annual without dividing (dividing by e.g. 0.5 would double the number).
+    """
+    if payload.get("fee_term") != "Full Course":
+        return
+    fee = payload.get("international_fee")
     dur = payload.get("duration")
     dur_term = (payload.get("duration_term") or "").lower()
     if not fee or not dur:
         return
-    years = dur if "year" in dur_term else (dur / 12 if "month" in dur_term else None)
-    if years and years > 0:
-        annual = round(fee / years)
-        log.info("[RECIPE] full_course_to_annual: %s / %sy = %s", fee, years, annual)
-        payload["annual_tuition_fee"] = annual
+    years: float | None = None
+    if "year" in dur_term:
+        years = float(dur)
+    elif "month" in dur_term:
+        years = float(dur) / 12.0
+    elif "week" in dur_term:
+        years = float(dur) / 52.0
+    if years is None or years <= 0:
+        return
+    # Sub-annual course: full-course fee == annual/period fee — don't inflate
+    if years < 1.0:
         payload["fee_term"] = "Annual"
+        log.info(
+            "[RECIPE] full_course_to_annual: duration %.2f yr < 1 — keeping %s as Annual",
+            years,
+            fee,
+        )
+        return
+    annual = round(fee / years)
+    log.info("[RECIPE] full_course_to_annual: %s / %.2f yr = %s", fee, years, annual)
+    payload["international_fee"] = annual
+    payload["fee_term"] = "Annual"
 
 
 def _convert_per_unit_to_annual(payload: dict) -> None:
     """Multiply per-unit fee by 8 (default credit-point load) for an annual estimate."""
-    fee = payload.get("annual_tuition_fee")
+    fee = payload.get("international_fee")
     if fee and fee < 3000:  # Likely a per-unit amount
         annual = round(fee * 8)
         log.info("[RECIPE] per_unit_to_annual: %s × 8 units = %s", fee, annual)
-        payload["annual_tuition_fee"] = annual
+        payload["international_fee"] = annual
         payload["fee_term"] = "Annual"
 
 
