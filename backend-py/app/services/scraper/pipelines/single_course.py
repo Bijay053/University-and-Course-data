@@ -3104,6 +3104,7 @@ async def extract_course(
                     for _fee_fl_url in _fee_followed_urls:
                         if payload.get("international_fee") is not None:
                             break
+                        _fee_fl_html = None
                         try:
                             async with _httpx_fee.AsyncClient(
                                 follow_redirects=True, timeout=15
@@ -3112,11 +3113,31 @@ async def extract_course(
                                     _fee_fl_url,
                                     headers={"User-Agent": "Mozilla/5.0"},
                                 )
-                            _fee_fl_html = (
-                                _fee_fl_resp.text if _fee_fl_resp.status_code == 200 else None
-                            )
+                            if _fee_fl_resp.status_code == 200:
+                                _fee_fl_html = _fee_fl_resp.text
                         except Exception:  # noqa: BLE001
-                            _fee_fl_html = None
+                            pass
+                        # Browser fallback — Cloudflare/WAF (e.g. JCU) blocks
+                        # all datacenter httpx requests with 403.  Retry via
+                        # the Playwright browser pool so the follow-link page
+                        # can actually be read.
+                        if not _fee_fl_html:
+                            try:
+                                from app.services.scraper.browser_pool import (
+                                    pool as _bp_fee_fl,
+                                )
+                                from app.services.scraper.per_course_browser import (
+                                    _browser_config_for as _bcf_fee,
+                                )
+                                _bwu_f, _bsm_f, _, _bto_f = _bcf_fee(_fee_fl_url)
+                                _fee_fl_html = await _bp_fee_fl.fetch_html(
+                                    _fee_fl_url,
+                                    wait_until=_bwu_f,
+                                    timeout=_bto_f,
+                                    settle_ms=_bsm_f,
+                                ) or None
+                            except Exception:  # noqa: BLE001
+                                pass
                         if not _fee_fl_html:
                             continue
                         _fee_fl_results = await _fee_extractor.extract(
@@ -3187,6 +3208,7 @@ async def extract_course(
                             if len(_followed_urls) >= 3:
                                 break
                     for _fl_url in _followed_urls:
+                        _fl_html = None
                         try:
                             async with _httpx_en.AsyncClient(
                                 follow_redirects=True, timeout=15
@@ -3195,9 +3217,31 @@ async def extract_course(
                                     _fl_url,
                                     headers={"User-Agent": "Mozilla/5.0"},
                                 )
-                            _fl_html = _fl_resp.text if _fl_resp.status_code == 200 else None
+                            if _fl_resp.status_code == 200:
+                                _fl_html = _fl_resp.text
                         except Exception:  # noqa: BLE001
-                            _fl_html = None
+                            pass
+                        # Browser fallback — same reason as fee follow_links:
+                        # Cloudflare-protected hosts (e.g. JCU) block httpx
+                        # with 403; the IELTS/English requirements page is only
+                        # reachable via a real browser.
+                        if not _fl_html:
+                            try:
+                                from app.services.scraper.browser_pool import (
+                                    pool as _bp_en_fl,
+                                )
+                                from app.services.scraper.per_course_browser import (
+                                    _browser_config_for as _bcf_en,
+                                )
+                                _bwu_e, _bsm_e, _, _bto_e = _bcf_en(_fl_url)
+                                _fl_html = await _bp_en_fl.fetch_html(
+                                    _fl_url,
+                                    wait_until=_bwu_e,
+                                    timeout=_bto_e,
+                                    settle_ms=_bsm_e,
+                                ) or None
+                            except Exception:  # noqa: BLE001
+                                pass
                         if not _fl_html:
                             continue
                         _fl_text = html_to_text(_fl_html)
