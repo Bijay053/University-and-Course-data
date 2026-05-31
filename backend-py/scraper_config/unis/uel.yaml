@@ -29,6 +29,15 @@
 discovery:
   always_browser_discover: true
 
+  # Real course-listing pages — scraped directly as first nav targets (+300 priority).
+  # The generic BFS was guessing /study/courses and /study/all-courses (wrong);
+  # the actual catalogue pages are /study/undergraduate/courses and
+  # /study/postgraduate/courses.  Seeds bypass the homepage and go straight
+  # to the correct listing pages so all ~200 courses are discovered.
+  seed_urls:
+    - https://www.uel.ac.uk/study/undergraduate/courses
+    - https://www.uel.ac.uk/study/postgraduate/courses
+
   # Hard wall-clock limit for the nav BFS loop (seconds).
   # 90 s is generous for ~5 seed pages + a handful of sub-listing pages.
   browser_time_budget_s: 90

@@ -226,6 +226,20 @@ class DiscoveryConfig(BaseModel):
             "during this pass to sweep the full faculty A-Z catalogue."
         ),
     )
+    seed_urls: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Course-listing page URLs injected into the browser BFS queue with "
+            "the highest priority (+300 score bonus) BEFORE any generic nav "
+            "crawl begins.  Use when you know the exact listing pages (e.g. "
+            "/study/undergraduate/courses, /study/postgraduate/courses) and "
+            "want the crawler to visit them first rather than guessing from the "
+            "homepage.  Unlike extra_course_urls these are LISTING pages — the "
+            "crawler follows links from them to reach individual course pages.  "
+            "If enough course links are found from seeds, weak generic BFS pages "
+            "are skipped automatically."
+        ),
+    )
     extra_course_urls: list[str] = Field(
         default_factory=list,
         description=(

@@ -578,6 +578,41 @@ async def browser_discover_generic(
         except Exception:
             pass
 
+    # ── Per-uni config seed_urls (YAML / admin_config) ────────────────────────
+    # These come from the admin portal / YAML `discovery.seed_urls` and get a
+    # +300 bonus (higher than _HOST_EXTRA_SEEDS +200) so they always run first.
+    _cfg_seed_urls: list[str] = getattr(_cfg.discovery, "seed_urls", []) or []
+    if _cfg_seed_urls:
+        log.info(
+            "[SEED_URLS] %d configured seed URL(s) for %s — queuing with +300 priority",
+            len(_cfg_seed_urls), host,
+        )
+    for _raw_seed in _cfg_seed_urls:
+        # Expand relative paths against the origin
+        if _raw_seed.startswith("/"):
+            _full_seed = origin_str + _raw_seed
+        elif not _raw_seed.startswith("http"):
+            _full_seed = scrape_url.rstrip("/") + "/" + _raw_seed.lstrip("/")
+        else:
+            _full_seed = _raw_seed
+        if _full_seed not in seen:
+            _cfg_score = _score_nav_url(_full_seed)
+            _heap_push(_full_seed, "", _cfg_score + 300)
+            seen.add(_full_seed)
+            # Allow the seed's host (handles listing pages on a different subdomain)
+            try:
+                _sh = urlparse(_full_seed).netloc
+                if _sh:
+                    _allowed_hosts.add(_sh)
+            except Exception:
+                pass
+            log.info(
+                "[SEED_URLS] queued %s (score=%d+300)",
+                _full_seed, _cfg_score,
+            )
+        else:
+            log.debug("[SEED_URLS] seed %s already queued — skipping duplicate", _full_seed)
+
     try:
         from app.services.scraper.discovery import (
             _looks_like_course,

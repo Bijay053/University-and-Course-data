@@ -138,6 +138,7 @@ export default function ScrapeAgentPage() {
   const [alwaysBrowser, setAlwaysBrowser] = useState(false);
   const [alwaysSitemap, setAlwaysSitemap] = useState(false);
   const [bfsPageBudget, setBfsPageBudget] = useState<string>("");
+  const [seedUrls, setSeedUrls] = useState<string[]>([]);
   const [extraUrls, setExtraUrls] = useState<string[]>([]);
 
   const [saving, setSaving] = useState(false);
@@ -168,6 +169,7 @@ export default function ScrapeAgentPage() {
       setAlwaysBrowser(Boolean(disc.always_browser_discover));
       setAlwaysSitemap(Boolean(disc.always_sitemap_supplement));
       setBfsPageBudget(disc.bfs_page_budget != null ? String(disc.bfs_page_budget) : "");
+      setSeedUrls((disc.seed_urls as string[]) || []);
       setExtraUrls((disc.extra_course_urls as string[]) || []);
     } catch (e) {
       toast({ title: "Failed to load config", description: String(e), variant: "destructive" });
@@ -186,6 +188,7 @@ export default function ScrapeAgentPage() {
     if (alwaysBrowser) disc.always_browser_discover = true;
     if (alwaysSitemap) disc.always_sitemap_supplement = true;
     if (bfsPageBudget) disc.bfs_page_budget = parseInt(bfsPageBudget, 10) || null;
+    if (seedUrls.length) disc.seed_urls = seedUrls;
     if (extraUrls.length) disc.extra_course_urls = extraUrls;
 
     const cfg: Record<string, unknown> = {};
@@ -391,14 +394,34 @@ export default function ScrapeAgentPage() {
           </div>
         </FieldRow>
 
-        {/* Known course listing pages / seed URLs */}
-        <FieldRow label="Known Course Listing Pages" hint="Specific URLs to inject directly as course pages (bypass auto-discovery)">
+        {/* Discovery Seed URLs */}
+        <FieldRow
+          label="Discovery Seed URLs"
+          hint="Course listing pages the scraper visits FIRST (highest priority). Add the real /courses/undergraduate and /courses/postgraduate pages here."
+        >
+          <Textarea
+            value={seedUrls.join("\n")}
+            onChange={(e) => setSeedUrls(e.target.value.split("\n").map((s) => s.trim()).filter(Boolean))}
+            placeholder={"https://uni.edu/study/undergraduate/courses\nhttps://uni.edu/study/postgraduate/courses"}
+            className="text-xs mt-1 min-h-[80px] font-mono border-blue-200 focus-visible:ring-blue-400"
+            rows={3}
+          />
+          {seedUrls.length > 0 && (
+            <p className="text-[10px] text-blue-600 mt-1 flex items-center gap-1">
+              <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-500" />
+              {seedUrls.length} seed URL{seedUrls.length > 1 ? "s" : ""} — scraper will visit these first before generic discovery
+            </p>
+          )}
+        </FieldRow>
+
+        {/* Known individual course pages (post-discovery injection) */}
+        <FieldRow label="Known Individual Course Pages" hint="Direct course page URLs injected after discovery completes — for specific courses that discovery misses entirely">
           <Textarea
             value={extraUrls.join("\n")}
             onChange={(e) => setExtraUrls(e.target.value.split("\n").map((s) => s.trim()).filter(Boolean))}
-            placeholder={"https://uni.edu/courses/postgraduate\nhttps://uni.edu/courses/undergraduate"}
-            className="text-xs mt-1 min-h-[80px] font-mono"
-            rows={3}
+            placeholder={"https://uni.edu/courses/postgraduate/mba\nhttps://uni.edu/courses/undergraduate/bsc-computing"}
+            className="text-xs mt-1 min-h-[60px] font-mono"
+            rows={2}
           />
         </FieldRow>
 

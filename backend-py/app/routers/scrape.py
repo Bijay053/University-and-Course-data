@@ -3169,6 +3169,7 @@ Return your response as JSON with this EXACT structure (no other keys):
   "location_verdict": "ok|nav_text_contamination|missing|unknown",
   "suggested_config": {{
     "discovery": {{
+      "seed_urls": [],
       "must_contain": [],
       "block_url_patterns": [],
       "allow_url_patterns": [],
@@ -3188,10 +3189,14 @@ Return your response as JSON with this EXACT structure (no other keys):
 
 Rules for suggested_config:
 - Only include keys that need to CHANGE from defaults. Remove null/empty values.
-- If discovery found very few courses (<10), suggest specific must_contain patterns or bfs_page_budget increases.
-- If the site uses JS rendering, set always_browser_discover to true.
+- CRITICAL: If discovery found very few courses (<10), the most likely fix is wrong listing page URLs.
+  Suggest seed_urls with the university's real course catalogue pages (e.g. /study/undergraduate/courses,
+  /study/postgraduate/courses, /courses/search). seed_urls are LISTING pages (not individual courses) —
+  the scraper follows links FROM them. Always suggest seed_urls before increasing bfs_page_budget.
+- If the site uses JS rendering or Cloudflare protection, set always_browser_discover to true.
 - If online-only courses should be excluded, set extraction.filters.online_only.enabled to true.
-- If you know listing page URLs, put them in extra_course_urls.
+- If you know specific individual course page URLs that are always missed, put them in extra_course_urls.
+  Do NOT put listing/search pages in extra_course_urls — those belong in seed_urls.
 - Set _min_expected_courses to your best estimate of total courses the university offers.
 - Return empty dict {{}} for suggested_config if you cannot determine any safe config changes.
 
