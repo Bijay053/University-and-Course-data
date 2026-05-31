@@ -859,3 +859,209 @@ class UniConfig(BaseModel):
             discovery=self.discovery.model_copy(),
             # extraction intentionally omitted — ExtractionConfig() defaults apply.
         )
+
+
+# ── Advanced Scraping Recipe ─────────────────────────────────────────────────
+# Stored in scrape_config.recipe (JSONB).  Covers all 17 portal-configurable
+# features so operators can convert existing manual spiders into DB-stored
+# recipes without touching YAML or Python.
+
+class RecipeApiConfig(BaseModel):
+    """JSON / REST API endpoint that serves the full course catalogue."""
+    endpoint: str = Field(default="", description="Full URL of the JSON feed.")
+    method: str = Field(default="GET", description="HTTP method (GET or POST).")
+    headers: dict = Field(default_factory=dict, description="Extra request headers.")
+    root_path: Optional[str] = Field(
+        default=None,
+        description=(
+            "Dot-separated path into the JSON response to reach the course array. "
+            "E.g. 'courses', 'data.items', 'results'."
+        ),
+    )
+    course_url_template: Optional[str] = Field(
+        default=None,
+        description=(
+            "Python str.format_map template built from JSON field values. "
+            "E.g. 'https://courses.hud.ac.uk/2025-26/{study_mode}/{study_level}/{urltitle}'"
+        ),
+    )
+    fields: dict = Field(
+        default_factory=dict,
+        description=(
+            "Mapping of standard scraper field → JSON key name. "
+            "Standard keys: course_name, degree_level, study_mode_raw, "
+            "full_time, part_time, url_slug, duration, campus, description."
+        ),
+    )
+    pagination: Optional[dict] = Field(
+        default=None,
+        description=(
+            "Optional pagination config: {type: 'offset', page_param: 'page', "
+            "size_param: 'limit', page_size: 100, max_pages: 50}."
+        ),
+    )
+
+
+class RecipeFieldSelector(BaseModel):
+    """Extraction rule for a single field on the course detail page."""
+    xpath: Optional[str] = Field(default=None, description="XPath expression.")
+    css: Optional[str] = Field(default=None, description="CSS selector.")
+    regex: Optional[str] = Field(default=None, description="Regex (first capture group used).")
+    attribute: Optional[str] = Field(
+        default=None,
+        description="HTML attribute to extract (default: text content).",
+    )
+    transform: list = Field(
+        default_factory=list,
+        description="List of transforms: 'strip', 'lower', 'upper', {'regex_replace': {pattern, replacement}}.",
+    )
+
+
+class RecipeFeeRule(BaseModel):
+    """Fee band: apply this amount when course name contains one of the keywords."""
+    amount: float = Field(description="Annual fee in fee_currency.")
+    keywords: list[str] = Field(default_factory=list, description="Case-insensitive match substrings.")
+
+
+class RecipeIeltsConfig(BaseModel):
+    """Regex rules for extracting IELTS / English scores from page text."""
+    overall_regex: Optional[str] = Field(
+        default=None,
+        description="Regex with one capture group for the overall score. E.g. r'(\\d\\.?\\d*)\\s*overall'.",
+    )
+    band_regex: Optional[str] = Field(
+        default=None,
+        description="Regex for per-band / each-component minimum.",
+    )
+    source_xpath: Optional[str] = Field(
+        default=None,
+        description="XPath to limit the text region searched for IELTS scores.",
+    )
+
+
+class RecipeIntakeConfig(BaseModel):
+    """Rules for extracting intake / start-date months."""
+    xpath: Optional[str] = Field(default=None, description="XPath for start-date text.")
+    regex: Optional[str] = Field(default=None, description="Regex with month-name capture group.")
+    month_map: dict = Field(
+        default_factory=dict,
+        description="Map raw text → canonical month name. E.g. {'Autumn': 'March', 'Spring': 'July'}.",
+    )
+
+
+class RecipeCampusConfig(BaseModel):
+    """Campus / location normalization rules."""
+    default_city: Optional[str] = Field(default=None, description="Used when no campus is found.")
+    valid_campuses: list[str] = Field(
+        default_factory=list,
+        description="Allowlist — courses at other campuses are dropped when non-empty.",
+    )
+    online_only_reject: bool = Field(
+        default=False,
+        description="Drop courses whose only delivery is Online/Distance.",
+    )
+
+
+class RecipeConfig(BaseModel):
+    """Full advanced scraping recipe — admin-configurable without code.
+
+    Stored at scrape_config.recipe (JSONB).  The orchestrator reads this
+    block before all other discovery tiers and routes accordingly.
+
+    Covers the 17 features requested:
+      1  seed_urls                  8  regex extraction rules
+      2  api (JSON endpoint)        9  fee mapping rules
+      3  api.root_path             10  ielts / english rules
+      4  api.course_url_template   11  intake rules
+      5  api.fields                12  campus / location rules
+      6  selectors (detail page)   13  online_only_reject
+      7  XPath / CSS selectors     14  must_contain / block_url_patterns
+                                   15  expected_min_courses
+                                   16  fallback_strategy
+                                   17  minimum_completeness
+    """
+
+    # ── 1. Discovery strategy ──
+    discovery_strategy: str = Field(
+        default="auto",
+        description="auto | json_api | bfs | browser | sitemap",
+    )
+    seed_urls: list[str] = Field(
+        default_factory=list,
+        description="Course-listing page URLs fed to browser BFS with +300 priority.",
+    )
+    extra_course_urls: list[str] = Field(
+        default_factory=list,
+        description="Individual course URLs injected directly after discovery.",
+    )
+    expected_min_courses: Optional[int] = Field(
+        default=None, description="Alert threshold — raise a warning if fewer courses found."
+    )
+    expected_max_courses: Optional[int] = Field(
+        default=None, description="Sanity cap — flag if more courses found than expected."
+    )
+    fallback_strategy: str = Field(
+        default="bfs",
+        description="Strategy used when json_api returns 0 results: bfs | browser | sitemap | none.",
+    )
+
+    # ── 2-5. JSON API endpoint ──
+    api: Optional[RecipeApiConfig] = Field(
+        default=None, description="JSON API config (used when discovery_strategy=json_api).",
+    )
+
+    # ── 14. URL filters ──
+    must_contain: list[str] = Field(
+        default_factory=list,
+        description="Drop any discovered URL that does NOT contain one of these substrings.",
+    )
+    block_url_patterns: list[str] = Field(
+        default_factory=list,
+        description="Regex patterns — drop any discovered URL matching any of these.",
+    )
+
+    # ── 6-8. Course detail page selectors ──
+    fetch_detail_page: bool = Field(
+        default=True,
+        description="Fetch the individual course page for selector-based extraction.",
+    )
+    selectors: dict = Field(
+        default_factory=dict,
+        description=(
+            "Per-field extraction rules. Keys are standard field names "
+            "(course_name, degree_level, duration, intake_month, description, "
+            "international_fee, ielts_overall, study_mode, course_location, "
+            "entry_requirements, academic_level, other_requirement). "
+            "Values are RecipeFieldSelector dicts."
+        ),
+    )
+
+    # ── 10. IELTS / English ──
+    ielts: Optional[RecipeIeltsConfig] = Field(default=None)
+
+    # ── 11. Intake ──
+    intake: Optional[RecipeIntakeConfig] = Field(default=None)
+
+    # ── 9. Fee rules ──
+    fee_currency: str = Field(default="AUD", description="ISO currency code (GBP, AUD, NZD…).")
+    fee_year: Optional[int] = Field(default=None, description="Academic year for fee data.")
+    fee_rules_undergraduate: list[RecipeFeeRule] = Field(
+        default_factory=list,
+        description="UG fee bands, checked most-specific first.",
+    )
+    fee_rules_postgraduate: list[RecipeFeeRule] = Field(
+        default_factory=list,
+        description="PG fee bands, checked most-specific first.",
+    )
+
+    # ── 12-13. Campus ──
+    campus: Optional[RecipeCampusConfig] = Field(default=None)
+
+    # ── 15-17. Quality ──
+    minimum_completeness: int = Field(
+        default=85, description="Auto-publish threshold (0-100).",
+    )
+    required_fields: list[str] = Field(
+        default_factory=list,
+        description="Fields that must be non-empty for a course to be accepted.",
+    )

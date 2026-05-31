@@ -735,6 +735,56 @@ async def put_agent_config(
     return {"ok": True, "university_id": uni_id, "admin_config": body}
 
 
+@router.get("/universities/{uni_id}/recipe")
+async def get_recipe(
+    uni_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[dict, Depends(get_current_user)],
+) -> dict:
+    """Return the advanced scraping recipe for a university."""
+    u: University | None = await db.get(University, uni_id)
+    if not u:
+        raise HTTPException(status_code=404, detail="University not found")
+
+    sc: dict = u.scrape_config or {}
+    recipe: dict = sc.get("recipe") or {}
+
+    return {
+        "university_id": uni_id,
+        "university_name": u.name,
+        "scrape_url": u.scrape_url or "",
+        "recipe": recipe,
+    }
+
+
+@router.put("/universities/{uni_id}/recipe")
+async def put_recipe(
+    uni_id: int,
+    body: dict,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[dict, Depends(get_current_user)],
+) -> dict:
+    """Save the advanced scraping recipe for a university.
+
+    The body should be the full recipe dict.  It is stored at
+    scrape_config.recipe and read by the orchestrator at scrape-start time.
+    """
+    u: University | None = await db.get(University, uni_id)
+    if not u:
+        raise HTTPException(status_code=404, detail="University not found")
+
+    sc: dict = dict(u.scrape_config or {})
+    sc["recipe"] = body
+
+    await db.execute(
+        text("UPDATE universities SET scrape_config = CAST(:cfg AS jsonb) WHERE id = :id"),
+        {"cfg": json.dumps(sc), "id": uni_id},
+    )
+    await db.commit()
+
+    return {"ok": True, "university_id": uni_id, "recipe": body}
+
+
 def _to_camel_uni(u) -> dict:
     """Add camelCase aliases UI expects: scrapeUrl, feePageUrl, etc."""
     if hasattr(u, '__table__'):

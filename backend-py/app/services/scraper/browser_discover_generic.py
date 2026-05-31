@@ -581,7 +581,7 @@ async def browser_discover_generic(
     # ── Per-uni config seed_urls (YAML / admin_config) ────────────────────────
     # These come from the admin portal / YAML `discovery.seed_urls` and get a
     # +300 bonus (higher than _HOST_EXTRA_SEEDS +200) so they always run first.
-    _cfg_seed_urls: list[str] = getattr(_cfg.discovery, "seed_urls", []) or []
+    _cfg_seed_urls: list[str] = getattr(getattr(_ucfg, "discovery", None), "seed_urls", []) or []
     if _cfg_seed_urls:
         log.info(
             "[SEED_URLS] %d configured seed URL(s) for %s — queuing with +300 priority",

@@ -1886,6 +1886,16 @@ export default function UniversityDetail() {
             <Button
               variant="outline"
               size="sm"
+              className="h-7 px-2.5 border-violet-300 text-violet-700 hover:bg-violet-50 transition-colors"
+              onClick={() => window.location.href = `/universities/${id}/recipe`}
+              title="Advanced Recipe Editor — configure JSON API endpoints, field selectors, fee rules, and more"
+            >
+              <svg className="h-3.5 w-3.5 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18"/></svg>
+              Recipe Editor
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
               className={`h-7 px-2.5 transition-colors ${
                 probeStatus === "configured"
                   ? "border-emerald-300 text-emerald-700 hover:bg-emerald-50"

@@ -778,6 +778,52 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # browser discovery subsumes the BFS result set.
         _always_browser = getattr(_uni_cfg.discovery, "always_browser_discover", False)
 
+        # ── Advanced Recipe: JSON API discovery ───────────────────────────────
+        # When the operator stored a recipe with discovery_strategy=json_api
+        # (via the Advanced Recipe Editor in the portal) the orchestrator fetches
+        # courses straight from the configured JSON endpoint, skipping all
+        # BFS / browser / sitemap tiers.  On 0 results, falls through to
+        # fallback_strategy (default: bfs) unless fallback_strategy='none'.
+        _recipe: dict = (uni_scrape_config or {}).get("recipe") or {}
+        if _recipe.get("discovery_strategy") == "json_api" and _recipe.get("api"):
+            _api_endpoint = (_recipe.get("api") or {}).get("endpoint", "")
+            log.info(
+                "[RECIPE] discovery_strategy=json_api endpoint=%s — "
+                "routing to json_api_discovery provider",
+                _api_endpoint[:80],
+            )
+            _recipe_error: str | None = None
+            try:
+                from app.services.scraper.json_api_discovery import fetch_json_api_links
+                _recipe_links = await fetch_json_api_links(_recipe, emit=emit)
+            except Exception as _rexc:
+                log.error("[RECIPE] json_api provider failed: %s", _rexc, exc_info=True)
+                _recipe_links = []
+                _recipe_error = str(_rexc)
+
+            if _recipe_links:
+                links = _recipe_links
+                _always_browser = False
+                log.info("[RECIPE] %d links from json_api provider", len(links))
+            else:
+                _fallback = _recipe.get("fallback_strategy", "bfs")
+                if _fallback == "none":
+                    _failure_msg = (
+                        f"Advanced Recipe json_api provider returned 0 links and "
+                        f"fallback_strategy=none — aborting. "
+                        f"Error: {_recipe_error or 'check endpoint and root_path config'}."
+                    )
+                    log.error(_failure_msg)
+                    job.status = "failed"
+                    job.error_message = _failure_msg
+                    await db.commit()
+                    return
+                elif _fallback == "browser":
+                    _always_browser = True
+                    log.warning("[RECIPE] json_api returned 0 links — falling through to browser discovery")
+                else:
+                    log.warning("[RECIPE] json_api returned 0 links — falling through to BFS discovery")
+
         # ── SearchStax Solr provider (e.g. University of Huddersfield) ────────
         # When a uni's YAML declares a discovery.searchstax block, the course
         # catalogue is fetched straight from its SearchStax Solr core. Each doc
