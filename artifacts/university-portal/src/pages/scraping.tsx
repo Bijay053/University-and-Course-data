@@ -1354,6 +1354,24 @@ export default function Scraping() {
 
   const handleApproveSelected = async () => {
     if (!reviewJobId || selectedIds.size === 0) return;
+
+    // Quality gate — warn before approving risky courses
+    const blockedIds = Array.from(selectedIds).filter(
+      (id) => courseQualityMap[id] !== undefined && courseQualityMap[id].score < 60
+    );
+    if (blockedIds.length > 0) {
+      const names = blockedIds
+        .slice(0, 3)
+        .map((id) => stagedCourses.find((c) => c.id === id)?.courseName ?? `#${id}`)
+        .join(", ");
+      toast({
+        title: `⛔ ${blockedIds.length} course${blockedIds.length > 1 ? "s" : ""} flagged: Data Quality Failure`,
+        description: `Score < 60%. ${names}${blockedIds.length > 3 ? ` +${blockedIds.length - 3} more` : ""}. Fix issues or deselect before approving.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
     setApproving(true);
     const succeededIds = new Set<number>();
     const failedIds = new Set<number>();
@@ -1733,6 +1751,23 @@ export default function Scraping() {
               return qa - qb; // ascending = worst first
             })
           : stagedCourses;
+
+        // Root causes: aggregate issue labels across all scored courses
+        const qualityEntries = Object.values(courseQualityMap);
+        const causeCounts: Record<string, { count: number; severity: string }> = {};
+        for (const qd of qualityEntries) {
+          for (const issue of qd.issues) {
+            if (!causeCounts[issue.label]) causeCounts[issue.label] = { count: 0, severity: issue.severity };
+            causeCounts[issue.label].count++;
+          }
+        }
+        const topCauses = Object.entries(causeCounts)
+          .sort(([, a], [, b]) => b.count - a.count)
+          .slice(0, 6);
+        const blockedCount = qualityEntries.filter(q => q.score < 60).length;
+        const needsReviewCount = qualityEntries.filter(q => q.score >= 60 && q.score < 85).length;
+        const goodCount = qualityEntries.filter(q => q.score >= 85).length;
+
         return (
         <Card className="border-2 border-green-100">
           <CardHeader className="pb-3">
@@ -1830,6 +1865,44 @@ export default function Scraping() {
             </p>
           </CardHeader>
           <CardContent>
+            {/* Quality summary + root causes bar */}
+            {qualityEntries.length > 0 && (
+              <div className="mb-3 rounded-lg border border-gray-200 bg-gray-50 p-3 flex flex-wrap gap-4 items-start">
+                {/* Tier counts */}
+                <div className="flex gap-3 items-center shrink-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-green-500 inline-block" />
+                    <span className="text-xs text-gray-700 font-medium">Good: <strong>{goodCount}</strong></span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-yellow-400 inline-block" />
+                    <span className="text-xs text-gray-700 font-medium">Review: <strong>{needsReviewCount}</strong></span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-red-500 inline-block" />
+                    <span className="text-xs text-gray-700 font-medium">Blocked: <strong>{blockedCount}</strong></span>
+                  </div>
+                </div>
+                {/* Top root causes */}
+                {topCauses.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 items-center">
+                    <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide shrink-0">Top issues:</span>
+                    {topCauses.map(([label, { count, severity }]) => (
+                      <span
+                        key={label}
+                        className={`inline-flex items-center gap-1 text-[10px] font-medium rounded px-2 py-0.5 ${
+                          severity === "critical" ? "bg-red-100 text-red-800" :
+                          severity === "warning"  ? "bg-yellow-100 text-yellow-800" :
+                          "bg-gray-100 text-gray-600"
+                        }`}
+                      >
+                        <span className="font-bold">{count}</span> {label}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
             <div className="border rounded-lg overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -2044,34 +2117,44 @@ export default function Scraping() {
                           {course.studyMode || <span className="text-gray-300">-</span>}
                         </td>
                         <td className="p-2">
-                          <div className="flex gap-1 justify-center">
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              className="h-7 w-7 text-slate-600 hover:bg-slate-50"
-                              onClick={() => handleOpenReview(course.id)}
-                              title="Review evidence"
-                            >
-                              <Eye className="w-3.5 h-3.5" />
-                            </Button>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              className="h-7 w-7 text-blue-600 hover:bg-blue-50"
-                              onClick={() => setEditingCourse({ ...course })}
-                              title="Edit"
-                            >
-                              <Pencil className="w-3.5 h-3.5" />
-                            </Button>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              className="h-7 w-7 text-red-600 hover:bg-red-50"
-                              onClick={() => handleRejectSingle(course.id)}
-                              title="Reject"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </Button>
+                          <div className="flex flex-col items-center gap-1">
+                            <div className="flex gap-1 justify-center">
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-7 w-7 text-slate-600 hover:bg-slate-50"
+                                onClick={() => handleOpenReview(course.id)}
+                                title="Review evidence"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-7 w-7 text-blue-600 hover:bg-blue-50"
+                                onClick={() => setEditingCourse({ ...course })}
+                                title="Edit"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-7 w-7 text-red-600 hover:bg-red-50"
+                                onClick={() => handleRejectSingle(course.id)}
+                                title="Reject"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </Button>
+                            </div>
+                            {qData && qData.score < 60 && (
+                              <span
+                                className="text-[10px] font-semibold text-red-800 bg-red-50 border border-red-300 rounded px-1.5 py-0.5 whitespace-nowrap"
+                                title={`Data Quality Failure — score ${qData.score}%. Fix issues before approving.`}
+                              >
+                                ⛔ QF — blocked
+                              </span>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -2080,9 +2163,44 @@ export default function Scraping() {
                         <tr key={`q-${course.id}`}>
                           <td colSpan={17} className="p-0 border-b border-indigo-100 bg-indigo-50/40">
                             <div className="px-4 py-3">
-                              <p className="text-xs font-semibold text-indigo-700 uppercase tracking-wide mb-2">
-                                Quality Breakdown — {course.courseName}
-                              </p>
+                              <div className="flex items-start justify-between gap-4 mb-3">
+                                <p className="text-xs font-semibold text-indigo-700 uppercase tracking-wide">
+                                  Quality Breakdown — {course.courseName}
+                                </p>
+                                {/* Score deduction math */}
+                                <div className="shrink-0 bg-white rounded border border-indigo-100 px-3 py-2 min-w-[200px]">
+                                  <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Why this score?</p>
+                                  <div className="space-y-0.5">
+                                    <div className="flex justify-between text-[10px] text-gray-500">
+                                      <span>Base score</span>
+                                      <span className="font-semibold text-gray-700">100</span>
+                                    </div>
+                                    {qData.issues.map((issue, i) => {
+                                      const deduction = issue.severity === "critical" ? 25 : issue.severity === "warning" ? 10 : 2;
+                                      return (
+                                        <div key={i} className="flex justify-between text-[10px]">
+                                          <span className={
+                                            issue.severity === "critical" ? "text-red-700" :
+                                            issue.severity === "warning"  ? "text-yellow-700" :
+                                            "text-gray-500"
+                                          }>{issue.label}</span>
+                                          <span className={`font-semibold ${issue.severity === "critical" ? "text-red-700" : issue.severity === "warning" ? "text-yellow-700" : "text-gray-500"}`}>
+                                            −{deduction}
+                                          </span>
+                                        </div>
+                                      );
+                                    })}
+                                    <div className="flex justify-between text-[10px] font-bold border-t border-gray-200 pt-1 mt-1">
+                                      <span className="text-gray-700">Final score</span>
+                                      <span className={
+                                        qData.score >= 85 ? "text-green-700" :
+                                        qData.score >= 60 ? "text-yellow-700" :
+                                        "text-red-700"
+                                      }>{qData.score}%</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
                               <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
                                 {(Object.entries(qData.breakdown) as [string, CourseQualityBreakdown][]).map(([field, bd]) => {
                                   const fieldLabel: Record<string, string> = {
