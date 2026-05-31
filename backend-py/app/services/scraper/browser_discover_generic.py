@@ -883,59 +883,146 @@ async def browser_discover_generic(
             # very first navigation (the start page) are captured too.
             page.on("response", lambda r: asyncio.ensure_future(_on_json_response(r)))
 
-            try:
-                await page.goto(
-                    scrape_url,
-                    wait_until="domcontentloaded",
-                    timeout=60_000,
+            # ── Pre-seed direct navigation ──────────────────────────────────
+            # When course listing URLs are known (discovery.seed_urls from YAML
+            # or admin Recipe Editor), navigate DIRECTLY to each listing page
+            # BEFORE touching the homepage.  This guarantees the real catalogue
+            # pages are visited immediately, not discovered via fragile homepage
+            # nav-link crawling.
+            #
+            # Combines _seed_urls (hardcoded _HOST_EXTRA_SEEDS) with
+            # _cfg_seed_urls (YAML / admin_config discovery.seed_urls), deduped.
+            _pre_seeded: set[str] = set()
+            _all_configured_seeds = list(dict.fromkeys(
+                [u for u in _seed_urls if u] +
+                [u for u in _cfg_seed_urls if u]
+            ))
+            if _all_configured_seeds:
+                log.info(
+                    "[SEED] Pre-seed direct navigation: %d listing page(s) for %s",
+                    len(_all_configured_seeds), host,
                 )
-            except _PwTimeout:
-                log.warning(
-                    "browser_discover_generic: domcontentloaded timed out — "
-                    "continuing with partial DOM"
+                await _emit(
+                    f"[DISCOVER] Seed: navigating {len(_all_configured_seeds)} "
+                    f"course listing page(s) directly"
                 )
-                await _emit("[DISCOVER] Browser: page load timed out — using partial DOM")
-            except Exception as exc:
-                log.warning("browser_discover_generic: navigation failed — %s", exc)
-                await _emit(f"[DISCOVER] Browser: navigation failed — {exc}")
-                return []
+                for _sv_url in _all_configured_seeds:
+                    if time.monotonic() - _t_start >= _time_budget_s:
+                        break
+                    _before_seed = len(results)
+                    try:
+                        await page.goto(
+                            _sv_url,
+                            wait_until="domcontentloaded",
+                            timeout=30_000,
+                        )
+                        try:
+                            await page.wait_for_selector(
+                                _NAV_LINK_SELECTOR,
+                                state="attached",
+                                timeout=_NAV_LINK_WAIT_MS,
+                            )
+                        except Exception:
+                            pass
+                        await asyncio.sleep(_SETTLE_S)
+                        _sv_raw = await page.evaluate(_EXTRACT_LINKS_JS, origin_str)
+                        _process_links(_sv_raw or [])
+                        # Scroll-to-load for JS-rendered listing pages
+                        if _LISTING_URL_RE.search(_sv_url):
+                            try:
+                                await page.evaluate(_SCROLL_AND_LOAD_JS)
+                                _sv_raw2 = await page.evaluate(_EXTRACT_LINKS_JS, origin_str)
+                                _process_links(_sv_raw2 or [])
+                            except Exception:
+                                pass
+                        _pre_seeded.add(_sv_url)
+                    except Exception as _sv_exc:
+                        log.warning("[SEED] Failed to navigate %s: %s", _sv_url, _sv_exc)
+                    _sv_gained = len(results) - _before_seed
+                    log.info(
+                        "[SEED] Manual seed URL used: %s → +%d course links (total=%d)",
+                        _sv_url, _sv_gained, len(results),
+                    )
+                    await _emit(
+                        f"[DISCOVER] Seed: {_sv_url} → +{_sv_gained} courses "
+                        f"(total={len(results)})"
+                    )
 
-            await asyncio.sleep(_SETTLE_S)
-
-            try:
-                snippet = (await asyncio.wait_for(page.content(), timeout=5.0))[:2000].lower()
-                if any(k in snippet for k in (
-                    "neterror", "err_connection", "chrome-error://", "err_name_not_resolved"
-                )):
-                    await _emit("[DISCOVER] Browser: Chromium error page detected — aborting")
-                    return []
-            except Exception:
-                pass
-
-            try:
-                raw = await page.evaluate(_EXTRACT_LINKS_JS, origin_str)
-            except Exception as exc:
-                log.warning("browser_discover_generic: link extraction failed — %s", exc)
-                await _emit(f"[DISCOVER] Browser: link extraction failed — {exc}")
-                return []
-
-            _process_links(raw or [])
-            await _emit(
-                f"[DISCOVER] Browser: start page → {len(results)} course links, "
-                f"{len(_nav_heap)} nav candidates queued (priority-scored)"
+            # If seed pages already found enough courses, skip homepage + BFS
+            _seeds_filled = (
+                bool(_all_configured_seeds) and len(results) >= _early_stop_courses
             )
-            log.info(
-                "browser_discover_generic: start page %s → %d courses, "
-                "%d priority-scored nav links queued",
-                scrape_url, len(results), len(_nav_heap),
-            )
+            if _seeds_filled:
+                log.info(
+                    "[SEED] %d courses from listing pages ≥ early_stop=%d — "
+                    "skipping homepage BFS entirely",
+                    len(results), _early_stop_courses,
+                )
+                await _emit(
+                    f"[DISCOVER] Seed: {len(results)} courses found — "
+                    f"skipping homepage BFS (threshold={_early_stop_courses})"
+                )
+
+            if not _seeds_filled:
+                # ── Navigate the homepage (start URL) ────────────────────────
+                # Only when seed URLs did not supply enough course links.
+                try:
+                    await page.goto(
+                        scrape_url,
+                        wait_until="domcontentloaded",
+                        timeout=60_000,
+                    )
+                except _PwTimeout:
+                    log.warning(
+                        "browser_discover_generic: domcontentloaded timed out — "
+                        "continuing with partial DOM"
+                    )
+                    await _emit("[DISCOVER] Browser: page load timed out — using partial DOM")
+                except Exception as exc:
+                    log.warning("browser_discover_generic: navigation failed — %s", exc)
+                    await _emit(f"[DISCOVER] Browser: navigation failed — {exc}")
+                    if not results:
+                        return []
+
+                await asyncio.sleep(_SETTLE_S)
+
+                try:
+                    snippet = (await asyncio.wait_for(page.content(), timeout=5.0))[:2000].lower()
+                    if any(k in snippet for k in (
+                        "neterror", "err_connection", "chrome-error://", "err_name_not_resolved"
+                    )):
+                        await _emit("[DISCOVER] Browser: Chromium error page detected — aborting")
+                        if not results:
+                            return []
+                except Exception:
+                    pass
+
+                try:
+                    raw = await page.evaluate(_EXTRACT_LINKS_JS, origin_str)
+                except Exception as exc:
+                    log.warning("browser_discover_generic: link extraction failed — %s", exc)
+                    await _emit(f"[DISCOVER] Browser: link extraction failed — {exc}")
+                    if not results:
+                        return []
+                    raw = []
+
+                _process_links(raw or [])
+                await _emit(
+                    f"[DISCOVER] Browser: start page → {len(results)} course links, "
+                    f"{len(_nav_heap)} nav candidates queued (priority-scored)"
+                )
+                log.info(
+                    "browser_discover_generic: start page %s → %d courses, "
+                    "%d priority-scored nav links queued",
+                    scrape_url, len(results), len(_nav_heap),
+                )
 
             # ── Priority BFS over nav links ────────────────────────────────
             # The heap is a max-heap by score (highest-scoring URL visited
             # first).  _process_links scores and pushes newly discovered nav
             # URLs so multi-level hierarchies (ECU: homepage → study-area →
             # course) are handled automatically.
-            nav_visited: set[str] = set()
+            nav_visited: set[str] = set(_pre_seeded)  # skip URLs already visited in pre-seed phase
             nav_pages_visited: int = 0
             _stop_reason: str = "nav_heap_exhausted"
             while _nav_heap and nav_pages_visited < _MAX_NAV_PAGES:

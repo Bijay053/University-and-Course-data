@@ -29,23 +29,27 @@
 discovery:
   always_browser_discover: true
 
-  # Real course-listing pages — scraped directly as first nav targets (+300 priority).
-  # The generic BFS was guessing /study/courses and /study/all-courses (wrong);
-  # the actual catalogue pages are /study/undergraduate/courses and
-  # /study/postgraduate/courses.  Seeds bypass the homepage and go straight
-  # to the correct listing pages so all ~200 courses are discovered.
+  # Real course-listing pages — navigated DIRECTLY in the pre-seed phase
+  # BEFORE any homepage BFS.  The scraper opens each URL, extracts course
+  # links, and skips the homepage entirely if enough are found.
+  # UG: /study/undergraduate/courses  (~120 courses)
+  # PG: /study/postgraduate/courses   (~80 courses)
   seed_urls:
     - https://www.uel.ac.uk/study/undergraduate/courses
     - https://www.uel.ac.uk/study/postgraduate/courses
 
-  # Hard wall-clock limit for the nav BFS loop (seconds).
-  # 90 s is generous for ~5 seed pages + a handful of sub-listing pages.
-  browser_time_budget_s: 90
+  # Hard wall-clock limit for the browser nav BFS (seconds).
+  # 120 s — the pre-seed phase visits 2 listing pages (~20 s each);
+  # the remaining budget handles sub-listing pages if needed.
+  browser_time_budget_s: 120
 
-  # Stop following nav pages once this many course links are collected.
-  # UEL catalogue is ~200 courses; 80 is enough to confirm the seeding
-  # strategy is working and avoids burning time on duplicate listing pages.
-  browser_early_stop_courses: 80
+  # Stop nav BFS once this many course links are collected.
+  # UEL catalogue is ~200 courses total (UG ~120 + PG ~80).
+  browser_early_stop_courses: 120
+
+  # Warn if discovery returns fewer than this many courses.
+  # Orchestrator emits: "Discovery incomplete: expected 100+, found X."
+  expected_min_courses: 100
 
   # Per-UEL nav blocklist (extends the global blocklist in browser_discover_generic.py).
   # These path segments appear in UEL site navigation but lead to info/support

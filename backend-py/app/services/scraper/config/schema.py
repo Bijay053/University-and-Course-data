@@ -313,6 +313,16 @@ class DiscoveryConfig(BaseModel):
             "news, events, accommodation, etc.).  E.g. ['/open-evenings', '/scholarships']."
         ),
     )
+    expected_min_courses: Optional[int] = Field(
+        default=None,
+        description=(
+            "Minimum number of courses expected from discovery.  When set, the "
+            "orchestrator emits a WARNING if the discovered count falls below this "
+            "threshold (e.g. 'Discovery incomplete: expected 100+, found 12').  "
+            "Does not block the job — use it as an early-warning signal that "
+            "seed_urls or config changes are needed."
+        ),
+    )
 
 
 # ── Extraction sub-configs ───────────────────────────────────────────────────

@@ -1310,6 +1310,23 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             except Exception as _t7_exc:  # noqa: BLE001
                 log.error("[TIER7] Failed to persist/deliver discovery alert: %s", _t7_exc)
 
+        # ── Expected minimum courses warning ─────────────────────────────────
+        _expected_min = getattr(getattr(_uni_cfg, "discovery", None), "expected_min_courses", None)
+        if _expected_min and len(links) < _expected_min:
+            _min_warn = (
+                f"[WARN] Discovery incomplete: expected {_expected_min}+ courses, "
+                f"found {len(links)}.  "
+                f"Add course listing URLs as discovery.seed_urls in the YAML/Recipe Editor "
+                f"and rerun.  Suggested listing pages: /study/undergraduate/courses, "
+                f"/study/postgraduate/courses, /courses, /courses/search."
+            )
+            log.warning(
+                "[EXPECTED_MIN] University %s: expected≥%d found=%d — "
+                "discovery may be incomplete.  Consider adding seed_urls.",
+                uni_name, _expected_min, len(links),
+            )
+            await emit("status", _min_warn, phase="discover", kind="expected_min_warning", level="warning")
+
         # Zero-discovery = hard failure. The site is either blocking our
         # crawler (403/Cloudflare), misconfigured, or the URL changed.
         # Marking as "completed" with 0 found hides the real error and
