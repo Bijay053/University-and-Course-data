@@ -1972,13 +1972,17 @@ export default function Scraping() {
                 <Button
                   size="sm"
                   variant="outline"
-                  className="text-blue-600 border-blue-200 hover:bg-blue-50"
-                  onClick={handleFixSelected}
+                  className={`border-blue-200 ${stagedCourses.length === 0 ? "text-gray-400 hover:bg-gray-50 cursor-not-allowed" : "text-blue-600 hover:bg-blue-50"}`}
+                  onClick={stagedCourses.length === 0 ? undefined : handleFixSelected}
                   disabled={selectedIds.size === 0 || fixingSelected || analyzingFix || approving}
-                  title="Analyse selected courses for missing fields, then confirm before re-running AI extraction"
+                  title={stagedCourses.length === 0
+                    ? "Fix Selected is unavailable — discovery/filtering must succeed first (0 staged courses). Fix the URL filter or allow_url_patterns config, then re-run the scrape."
+                    : "Analyse selected courses for missing fields, then confirm before re-running AI extraction"
+                  }
                 >
                   {(fixingSelected || analyzingFix) ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Sparkles className="w-4 h-4 mr-1" />}
                   Fix selected ({selectedIds.size})
+                  {stagedCourses.length === 0 && <span className="ml-1 text-[10px] text-gray-400">(unavailable)</span>}
                 </Button>
                 <Button
                   size="sm"

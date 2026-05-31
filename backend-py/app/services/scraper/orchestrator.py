@@ -1754,13 +1754,21 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     )
             if _compiled_allow:
                 _pre_allow = len(links)
-                links = [
+                _kept_links = [
                     _lk for _lk in links
                     if any(_ap.search(_lk.get("url") or "") for _ap in _compiled_allow)
                 ]
+                _dropped_links = [
+                    _lk for _lk in links
+                    if not any(_ap.search(_lk.get("url") or "") for _ap in _compiled_allow)
+                ]
+                links = _kept_links
                 _allow_dropped = _pre_allow - len(links)
                 if _allow_dropped:
                     _drop_pct = (_allow_dropped / _pre_allow * 100) if _pre_allow else 0
+                    _dropped_sample_urls = [
+                        _lk.get("url", "") for _lk in _dropped_links[:10] if _lk.get("url")
+                    ]
                     _log_fn = log.warning if _drop_pct > 50 else log.info
                     _log_fn(
                         "[EXTRACT] allow_url_patterns: kept %d / %d (dropped %d = %.0f%% of discovered URLs)%s",
@@ -1770,21 +1778,26 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                         " course detail URLs, not just category/listing pages."
                         if _drop_pct > 50 else "",
                     )
+                    if _drop_pct > 50:
+                        for _ds_url in _dropped_sample_urls:
+                            log.warning("[EXTRACT] allow_url_patterns dropped: %s", _ds_url)
                     await emit(
                         "status",
-                        f"[EXTRACT] allow_url_patterns: dropped {_allow_dropped} / {_pre_allow}"
-                        f" URL(s) ({_drop_pct:.0f}%) not matching per-uni whitelist"
-                        f" ({len(links)} remain)"
-                        + (
-                            " ⚠ HIGH DROP RATE — verify allow_url_patterns matches"
-                            " individual course detail URLs, not just listing/category pages."
-                            if _drop_pct > 50 else ""
+                        (
+                            f"⚠ URL filter dropped {_allow_dropped} / {_pre_allow} URLs ({_drop_pct:.0f}%) — "
+                            f"this may be removing real course pages. "
+                            f"Sample dropped: {', '.join(_dropped_sample_urls[:3]) or 'n/a'}"
+                            if _drop_pct > 50 else
+                            f"[EXTRACT] allow_url_patterns: dropped {_allow_dropped} / {_pre_allow}"
+                            f" URL(s) ({_drop_pct:.0f}%) not matching per-uni whitelist"
+                            f" ({len(links)} remain)"
                         ),
                         phase="extract",
                         kind="extract_allow_url_filter",
                         dropped=_allow_dropped,
                         kept=len(links),
                         drop_pct=round(_drop_pct, 1),
+                        dropped_sample=_dropped_sample_urls,
                     )
 
         # Phase A.5b — per-uni YAML must_contain substring whitelist.
@@ -1860,6 +1873,37 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         job.total_found = len(links)
         job.heartbeat_at = datetime.now(timezone.utc)
         await db.commit()
+
+        # Post-filter category page detection — after all URL filters have run,
+        # check if the surviving links look like category/subject-area pages
+        # (names carry no degree qualifier) rather than individual course detail
+        # pages.  If >70% look like category pages and staged count is ≤ 30,
+        # emit a critical warning so operators see it in the live log immediately.
+        if links:
+            from app.services.scraper.guards import _name_has_degree_qualifier  # noqa: PLC0415
+            _cat_count = sum(
+                1 for _lk in links
+                if not _name_has_degree_qualifier((_lk.get("name") or _lk.get("url") or "").split("/")[-1].replace("-", " "))
+            )
+            _cat_pct = (_cat_count / len(links) * 100) if links else 0
+            if _cat_pct > 70 and len(links) <= 30:
+                log.warning(
+                    "[EXTRACT] %d / %d remaining URLs appear to be category/subject-area pages"
+                    " (no degree qualifier in name). Expected: individual course detail pages."
+                    " Check allow_url_patterns — category pages will stage 0 courses.",
+                    _cat_count, len(links),
+                )
+                await emit(
+                    "status",
+                    f"⚠ Wrong pages selected: {_cat_count} / {len(links)} remaining URLs look like "
+                    f"category listing pages, not individual course pages. "
+                    f"allow_url_patterns is keeping the wrong URLs. Staged courses will be 0.",
+                    phase="extract",
+                    kind="category_pages_detected",
+                    category_count=_cat_count,
+                    total_kept=len(links),
+                    category_pct=round(_cat_pct, 1),
+                )
 
         await emit("status", f"Extracting course details ({len(links)} pages)...", phase="extract")
 

@@ -14,7 +14,13 @@ import { useToast } from "@/hooks/use-toast";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 type UniOption = { id: number; name: string; scrapeUrl?: string | null; feePageUrl?: string | null; requirementsPageUrl?: string | null };
-type ScrapeLog = { event: string; message?: string; current?: number; total?: number; phase?: string; totalFound?: number; imported?: number; skipped?: number; errors?: number };
+type ScrapeLog = {
+  event: string; message?: string; current?: number; total?: number; phase?: string;
+  totalFound?: number; imported?: number; skipped?: number; errors?: number;
+  kind?: string; drop_pct?: number; dropped_sample?: string[];
+  dropped?: number; kept?: number;
+  category_count?: number; total_kept?: number; category_pct?: number;
+};
 
 type QualityAction = {
   action_type: string;
@@ -220,6 +226,23 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
   const [applyingFix, setApplyingFix] = useState(false);
   const [fixApplied, setFixApplied] = useState(false);
 
+  type UrlFilterWarning = {
+    kind: "high_drop_rate" | "category_pages";
+    dropPct?: number; dropped?: number; kept?: number;
+    droppedSample?: string[];
+    categoryPct?: number; categoryCount?: number; totalKept?: number;
+  };
+  const [urlFilterWarning, setUrlFilterWarning] = useState<UrlFilterWarning | null>(null);
+
+  // URL filter test tool state
+  type UrlTestResult = { url: string; passed: boolean; drop_reason?: string | null; matching_allow_pattern?: string | null; blocking_block_pattern?: string | null };
+  type UrlTestSummary = { total: number; kept_count: number; dropped_count: number; drop_pct: number };
+  const [urlTestInput, setUrlTestInput] = useState("");
+  const [urlTestResults, setUrlTestResults] = useState<{ results: UrlTestResult[]; summary: UrlTestSummary } | null>(null);
+  const [urlTestLoading, setUrlTestLoading] = useState(false);
+  const [urlTestError, setUrlTestError] = useState<string | null>(null);
+  const [showUrlTestPanel, setShowUrlTestPanel] = useState(false);
+
   const pollRef = useRef<number | null>(null);
   const logIndexRef = useRef(0);
   const pollInFlightRef = useRef(false);
@@ -280,7 +303,42 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
     setQualityStatus("idle");
     if (qualityPollRef.current) { clearTimeout(qualityPollRef.current); qualityPollRef.current = null; }
     setUniName("");
+    setUrlFilterWarning(null);
+    setUrlTestInput("");
+    setUrlTestResults(null);
+    setUrlTestError(null);
+    setShowUrlTestPanel(false);
   }, [slotKey, startTimeKey]);
+
+  const handleTestUrlFilter = useCallback(async (jobId: string) => {
+    const lines = urlTestInput.split("\n").map(l => l.trim()).filter(Boolean);
+    if (!lines.length) return;
+    setUrlTestLoading(true);
+    setUrlTestError(null);
+    setUrlTestResults(null);
+    try {
+      const res = await fetch(`/api/scrape/jobs/${jobId}/test-url-filter`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ urls: lines }),
+      });
+      if (!res.ok) {
+        const msg = await getFetchErrorMessage(res);
+        setUrlTestError(msg || `Error ${res.status}`);
+        return;
+      }
+      const data = await readResponseJson<{ ok: boolean; results: UrlTestResult[]; summary: UrlTestSummary; error?: string }>(res);
+      if (!data?.ok) {
+        setUrlTestError(data?.error || "Unknown error");
+      } else {
+        setUrlTestResults({ results: data.results, summary: data.summary });
+      }
+    } catch (e) {
+      setUrlTestError(String(e));
+    } finally {
+      setUrlTestLoading(false);
+    }
+  }, [urlTestInput]);
 
   const fetchDiagnose = useCallback(async (jobId: string) => {
     setDiagnoseLoading(true);
@@ -475,6 +533,29 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
               skipped: doneLog.skipped ?? 0,
               errors: doneLog.errors ?? 0,
             });
+          }
+
+          // Detect URL filter warnings in live log stream
+          for (const l of data.logs) {
+            if (l.kind === "category_pages_detected") {
+              setUrlFilterWarning({
+                kind: "category_pages",
+                categoryPct: l.category_pct,
+                categoryCount: l.category_count,
+                totalKept: l.total_kept,
+              });
+            } else if (l.kind === "extract_allow_url_filter" && (l.drop_pct ?? 0) > 50) {
+              setUrlFilterWarning((prev) => {
+                if (prev?.kind === "category_pages") return prev;
+                return {
+                  kind: "high_drop_rate",
+                  dropPct: l.drop_pct,
+                  dropped: l.dropped,
+                  kept: l.kept,
+                  droppedSample: l.dropped_sample,
+                };
+              });
+            }
           }
         }
 
@@ -767,6 +848,47 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
               );
             })() : null}
 
+            {/* ── URL filter warning banner (shown during run when filter drops too much) ── */}
+            {urlFilterWarning && (
+              <div className={`rounded-lg border p-2.5 space-y-1.5 text-[11px] ${
+                urlFilterWarning.kind === "category_pages"
+                  ? "bg-red-50 border-red-300"
+                  : "bg-amber-50 border-amber-300"
+              }`}>
+                <div className="flex items-center gap-1.5 font-semibold">
+                  <AlertTriangle className={`w-3.5 h-3.5 shrink-0 ${urlFilterWarning.kind === "category_pages" ? "text-red-500" : "text-amber-500"}`} />
+                  {urlFilterWarning.kind === "category_pages" ? (
+                    <span className="text-red-800">
+                      Wrong pages selected — category pages only ({urlFilterWarning.categoryCount}/{urlFilterWarning.totalKept} URLs have no degree qualifier)
+                    </span>
+                  ) : (
+                    <span className="text-amber-800">
+                      URL filter is too restrictive — dropped {urlFilterWarning.dropPct?.toFixed(0)}% of discovered URLs
+                    </span>
+                  )}
+                </div>
+                {urlFilterWarning.kind === "category_pages" ? (
+                  <p className="text-red-700 leading-relaxed">
+                    The <code className="font-mono bg-red-100 px-0.5 rounded">allow_url_patterns</code> filter is keeping subject/category listing pages instead of individual course detail pages. Staged course count will be 0. Fix the regex to match degree-level course URLs.
+                  </p>
+                ) : (
+                  <p className="text-amber-700 leading-relaxed">
+                    <code className="font-mono bg-amber-100 px-0.5 rounded">allow_url_patterns</code> dropped {urlFilterWarning.dropPct?.toFixed(0)}% of discovered URLs — this may be removing real course pages. Review the regex and ensure it matches individual course detail URLs, not just listing or category pages.
+                  </p>
+                )}
+                {urlFilterWarning.droppedSample && urlFilterWarning.droppedSample.length > 0 && (
+                  <div className="space-y-0.5">
+                    <p className="text-[10px] font-semibold text-amber-600 uppercase tracking-wide">Sample dropped URLs</p>
+                    <div className="bg-white border border-amber-200 rounded p-1.5 space-y-0.5 max-h-[90px] overflow-y-auto">
+                      {urlFilterWarning.droppedSample.map((u, i) => (
+                        <div key={i} className="font-mono text-[9px] text-gray-600 truncate" title={u}>{u}</div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Compact log stream */}
             <div ref={logContainerRef} className="flex-1 min-h-[160px] max-h-[420px] overflow-y-auto bg-gray-950 rounded-lg p-2 font-mono text-[10px] leading-relaxed">
               {logs.length === 0 ? (
@@ -811,6 +933,101 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
         {/* ── DONE: Result summary ──────────────────────────────────── */}
         {phase === "done" && (
           <>
+            {/* URL filter warning persists into done state */}
+            {urlFilterWarning && (
+              <div className={`rounded-lg border p-2.5 space-y-2 text-[11px] ${
+                urlFilterWarning.kind === "category_pages" ? "bg-red-50 border-red-300" : "bg-amber-50 border-amber-300"
+              }`}>
+                <div className="flex items-center gap-1.5 font-semibold">
+                  <AlertTriangle className={`w-3.5 h-3.5 shrink-0 ${urlFilterWarning.kind === "category_pages" ? "text-red-500" : "text-amber-500"}`} />
+                  {urlFilterWarning.kind === "category_pages" ? (
+                    <span className="text-red-800">Discovery issue: category pages were selected instead of course pages</span>
+                  ) : (
+                    <span className="text-amber-800">URL filter dropped {urlFilterWarning.dropPct?.toFixed(0)}% of discovered URLs — low staged count may result</span>
+                  )}
+                </div>
+                <p className={`leading-relaxed ${urlFilterWarning.kind === "category_pages" ? "text-red-700" : "text-amber-700"}`}>
+                  {urlFilterWarning.kind === "category_pages"
+                    ? "Fix the allow_url_patterns regex to match individual course detail pages, then re-run."
+                    : "Review allow_url_patterns — it may be over-filtering real course pages. Fix the regex and re-run."}
+                </p>
+                {urlFilterWarning.droppedSample && urlFilterWarning.droppedSample.length > 0 && (
+                  <div className="bg-white border border-amber-200 rounded p-1.5 space-y-0.5 max-h-[60px] overflow-y-auto">
+                    {urlFilterWarning.droppedSample.map((u, i) => (
+                      <div key={i} className="font-mono text-[9px] text-gray-600 truncate" title={u}>{u}</div>
+                    ))}
+                  </div>
+                )}
+                {/* URL filter test tool */}
+                {completedJobId && (
+                  <div className={`rounded border p-2 space-y-1.5 ${urlFilterWarning.kind === "category_pages" ? "border-red-200 bg-red-25" : "border-amber-200 bg-white"}`} style={{background: "rgba(255,255,255,0.6)"}}>
+                    <button
+                      type="button"
+                      onClick={() => setShowUrlTestPanel(v => !v)}
+                      className="flex items-center gap-1 text-[10px] font-semibold text-gray-600 hover:text-gray-800"
+                    >
+                      <ChevronDown className={`w-2.5 h-2.5 transition-transform ${showUrlTestPanel ? "rotate-180" : ""}`} />
+                      Test URL Filter — simulate which URLs pass/fail the current config
+                    </button>
+                    {showUrlTestPanel && (
+                      <div className="space-y-1.5 pt-1">
+                        <p className="text-[9px] text-gray-500 leading-relaxed">
+                          Paste candidate URLs below (one per line). The test uses this university's current allow_url_patterns, must_contain, and block_url_patterns config automatically.
+                        </p>
+                        <textarea
+                          value={urlTestInput}
+                          onChange={e => setUrlTestInput(e.target.value)}
+                          placeholder={"https://www.jcu.edu.au/courses/bachelor-of-science\nhttps://www.jcu.edu.au/courses/linkassets/science"}
+                          rows={3}
+                          className="w-full text-[9px] font-mono rounded border border-gray-200 p-1.5 resize-none focus:outline-none focus:ring-1 focus:ring-blue-300"
+                        />
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleTestUrlFilter(completedJobId)}
+                            disabled={urlTestLoading || !urlTestInput.trim()}
+                            className="text-[10px] bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded flex items-center gap-1 disabled:opacity-50"
+                          >
+                            {urlTestLoading ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <Eye className="w-2.5 h-2.5" />}
+                            Simulate
+                          </button>
+                          {urlTestResults && (
+                            <span className="text-[9px] text-gray-500">
+                              {urlTestResults.summary.kept_count}/{urlTestResults.summary.total} pass
+                              {urlTestResults.summary.dropped_count > 0 && (
+                                <span className="text-red-600 ml-1">· {urlTestResults.summary.dropped_count} dropped ({urlTestResults.summary.drop_pct}%)</span>
+                              )}
+                            </span>
+                          )}
+                        </div>
+                        {urlTestError && (
+                          <div className="text-[9px] text-red-600 bg-red-50 rounded px-1.5 py-1">{urlTestError}</div>
+                        )}
+                        {urlTestResults && urlTestResults.results.length > 0 && (
+                          <div className="space-y-0.5">
+                            {urlTestResults.results.map((r, i) => (
+                              <div key={i} className={`flex items-start gap-1.5 text-[9px] rounded px-1.5 py-1 ${r.passed ? "bg-green-50 border border-green-200" : "bg-red-50 border border-red-200"}`}>
+                                <span className="shrink-0 font-bold">{r.passed ? "✅" : "❌"}</span>
+                                <div className="min-w-0 flex-1">
+                                  <div className="font-mono truncate text-gray-700" title={r.url}>{r.url}</div>
+                                  {r.passed && r.matching_allow_pattern && (
+                                    <div className="text-green-600 truncate">matched: <code className="bg-green-100 px-0.5 rounded">{r.matching_allow_pattern}</code></div>
+                                  )}
+                                  {!r.passed && r.drop_reason && (
+                                    <div className="text-red-600 truncate">{r.drop_reason}</div>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
             {resultSummary && (
               <div className="grid grid-cols-3 gap-2 text-center">
                 <div className="bg-green-50 rounded-lg p-2">

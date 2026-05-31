@@ -3899,6 +3899,56 @@ async def diagnose_scrape_job(
             ],
         })
 
+    # ── allow_url_patterns over-restriction check ─────────────────────────────
+    # If allow_url_patterns is configured AND the staged/discovered ratio is
+    # low (< 20%), flag it — the regex is likely too strict and is eating course
+    # pages that should have been extracted.
+    try:
+        _effective_disc_tmp = {}
+        if uni and uni.scrape_url:
+            from app.services.scraper.config.loader import get_config_for_host as _gcfh2
+            from urllib.parse import urlparse as _up2
+            _h2 = _up2(uni.scrape_url).hostname or ""
+            _uc2 = _gcfh2(
+                hostname=_h2, name=uni.name or "",
+                scrape_url=uni.scrape_url,
+                university_id=uni.id,
+                db_scrape_config=dict(uni.scrape_config or {}),
+            )
+            _effective_disc_tmp = {
+                "allow_url_patterns": list(_uc2.discovery.allow_url_patterns or []),
+            }
+    except Exception:
+        pass
+
+    _allow_pats_configured = bool(_effective_disc_tmp.get("allow_url_patterns"))
+    _total = job.total_found or 0
+    _imported = job.imported or 0
+    if (
+        _allow_pats_configured
+        and _total > 10
+        and _imported < _total * 0.2
+        and not any(i["check"] == "all_filtered" for i in deterministic_issues)
+    ):
+        deterministic_issues.append({
+            "issue": "allow_url_patterns may be filtering out real course pages",
+            "severity": "critical",
+            "check": "allow_url_patterns_drop_high",
+            "detail": (
+                f"{_total} URLs were discovered but only {_imported} courses staged "
+                f"({100 * _imported // max(_total, 1)}% pass rate). "
+                "allow_url_patterns is configured and is likely too restrictive, "
+                "filtering out legitimate course detail pages. "
+                "Check the live log for '⚠ URL filter dropped' lines and review the sample dropped URLs."
+            ),
+            "potential_causes": [
+                "Regex anchored to a degree keyword that doesn't appear in actual course URL paths",
+                "Pattern accidentally matches only category/subject-area listing pages, not individual course detail URLs",
+                "Missing alternatives in the regex (e.g. 'bachelor' but not 'master' or 'doctor')",
+                "URL structure changed on the university site since the pattern was written",
+            ],
+        })
+
     # ── Load effective (fully-merged) config ─────────────────────────────────
     # Build the real UniConfig the scraper will use: defaults → YAML → admin_config.
     # Passing this to the AI prevents it from suggesting settings that are already
@@ -4556,6 +4606,172 @@ async def extraction_quality_report(
         "issues": issues,
         "extraction_score": extraction_score,
     }
+
+
+@router.post("/test-url-filter")
+async def test_url_filter(body: dict) -> dict:
+    """Simulate allow_url_patterns / must_contain / block_url_patterns against a list of test URLs.
+
+    Body::
+
+        {
+          "urls": ["https://…/courses/bachelor-of-science", …],
+          "allow_url_patterns": ["(?i)/courses/[^/]+-[^/]+$"],
+          "must_contain": [],
+          "block_url_patterns": []
+        }
+
+    Returns per-URL pass/fail with first matching pattern (or mismatch reason).
+    Also returns summary stats: kept_count, dropped_count, drop_pct.
+    """
+    import re as _re
+
+    urls: list[str] = body.get("urls") or []
+    allow_pats: list[str] = body.get("allow_url_patterns") or []
+    must_contain: list[str] = body.get("must_contain") or []
+    block_pats: list[str] = body.get("block_url_patterns") or []
+
+    # Compile patterns — skip invalid regexes
+    compiled_allow: list[tuple[str, _re.Pattern]] = []
+    for p in allow_pats:
+        try:
+            compiled_allow.append((p, _re.compile(p, _re.IGNORECASE)))
+        except _re.error as e:
+            return {"ok": False, "error": f"Invalid allow_url_patterns regex: {p!r} — {e}"}
+
+    compiled_block: list[tuple[str, _re.Pattern]] = []
+    for p in block_pats:
+        try:
+            compiled_block.append((p, _re.compile(p, _re.IGNORECASE)))
+        except _re.error as e:
+            return {"ok": False, "error": f"Invalid block_url_patterns regex: {p!r} — {e}"}
+
+    results: list[dict] = []
+    for url in urls[:50]:  # cap at 50 for safety
+        passed = True
+        drop_reason: str | None = None
+        matching_allow: str | None = None
+        blocking_block: str | None = None
+        failed_must: str | None = None
+
+        # 1. allow_url_patterns — URL must match at least one pattern
+        if compiled_allow:
+            matched_allow = None
+            for pat_str, pat_re in compiled_allow:
+                if pat_re.search(url):
+                    matched_allow = pat_str
+                    break
+            if matched_allow:
+                matching_allow = matched_allow
+            else:
+                passed = False
+                drop_reason = "allow_url_patterns: no pattern matched"
+
+        # 2. must_contain — URL must contain at least one substring
+        if passed and must_contain:
+            mc_lower = [m.lower() for m in must_contain if m]
+            matched_mc = next((m for m in mc_lower if m in url.lower()), None)
+            if matched_mc is None:
+                passed = False
+                drop_reason = f"must_contain: none of {must_contain!r} found in URL"
+            else:
+                failed_must = matched_mc  # reuse field as "matched_must"
+
+        # 3. block_url_patterns — URL must NOT match any blocking pattern
+        if passed and compiled_block:
+            for pat_str, pat_re in compiled_block:
+                if pat_re.search(url):
+                    passed = False
+                    blocking_block = pat_str
+                    drop_reason = f"block_url_patterns: matched {pat_str!r}"
+                    break
+
+        results.append({
+            "url": url,
+            "passed": passed,
+            "drop_reason": drop_reason,
+            "matching_allow_pattern": matching_allow,
+            "blocking_block_pattern": blocking_block,
+        })
+
+    kept = [r for r in results if r["passed"]]
+    dropped = [r for r in results if not r["passed"]]
+    drop_pct = round(len(dropped) / len(results) * 100, 1) if results else 0.0
+
+    return {
+        "ok": True,
+        "results": results,
+        "summary": {
+            "total": len(results),
+            "kept_count": len(kept),
+            "dropped_count": len(dropped),
+            "drop_pct": drop_pct,
+        },
+    }
+
+
+@router.post("/jobs/{job_id}/test-url-filter")
+async def test_url_filter_for_job(
+    job_id: str,
+    body: dict,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> dict:
+    """Test allow_url_patterns / must_contain / block_url_patterns from the job's university config.
+
+    Loads the university's fully-merged effective config automatically and
+    simulates filtering against the provided test URLs.
+
+    Body::
+
+        {"urls": ["https://…/courses/bachelor-science", "https://…/courses/linkassets/computer-science"]}
+    """
+    from app.models import ScrapeRuntimeJob, University
+    import re as _re
+
+    job = (await db.execute(
+        __import__("sqlalchemy", fromlist=["select"]).select(ScrapeRuntimeJob)
+        .where(ScrapeRuntimeJob.runtime_job_id == job_id)
+    )).scalar_one_or_none()
+    if not job:
+        raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
+
+    uni: University | None = await db.get(University, job.university_id) if job.university_id else None
+
+    allow_pats: list[str] = []
+    must_contain: list[str] = []
+    block_pats: list[str] = []
+
+    if uni and uni.scrape_url:
+        try:
+            from app.services.scraper.config.loader import get_config_for_host as _gcfh3
+            from urllib.parse import urlparse as _up3
+            _h3 = _up3(uni.scrape_url).hostname or ""
+            _uc3 = _gcfh3(
+                hostname=_h3, name=uni.name or "",
+                scrape_url=uni.scrape_url,
+                university_id=uni.id,
+                db_scrape_config=dict(uni.scrape_config or {}),
+            )
+            allow_pats = list(_uc3.discovery.allow_url_patterns or [])
+            must_contain = list(_uc3.discovery.must_contain or [])
+            block_pats = list(_uc3.discovery.block_url_patterns or [])
+        except Exception as _e:
+            log.debug("test_url_filter_for_job: config load failed: %s", _e)
+
+    # Delegate to the general endpoint logic
+    general_body = {
+        "urls": body.get("urls") or [],
+        "allow_url_patterns": allow_pats,
+        "must_contain": must_contain,
+        "block_url_patterns": block_pats,
+    }
+    result = await test_url_filter(general_body)
+    result["config_used"] = {
+        "allow_url_patterns": allow_pats,
+        "must_contain": must_contain,
+        "block_url_patterns": block_pats,
+    }
+    return result
 
 
 @router.post("/jobs/{job_id}/apply-fix")
