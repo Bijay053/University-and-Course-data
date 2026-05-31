@@ -35,8 +35,8 @@ discovery:
   # The /study/* hub pages are kept in _HOST_EXTRA_SEEDS as fallbacks;
   # these YAML seeds are prepended by the scraper and navigated first.
   seed_urls:
-    - https://www.uel.ac.uk/undergraduate/courses
-    - https://www.uel.ac.uk/postgraduate/courses
+    - https://www.uel.ac.uk/study/undergraduate/courses
+    - https://www.uel.ac.uk/study/postgraduate/courses
 
   # Hard wall-clock limit for the browser nav BFS (seconds).
   # Previous value (120 s) was exhausted entirely by 18 useless paginated

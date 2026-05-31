@@ -416,6 +416,22 @@ async def test_recipe(
             "(undergraduate, postgraduate, research, short courses separately)."
         )
 
+    # discovery_incomplete: True when found < expected_min_courses and the
+    # site is not Cloudflare-blocked.  The frontend uses this to surface a
+    # prominent "only X found, expected 100+" warning with the prompt
+    # "run extraction anyway?" so operators know to investigate seeds first.
+    _discovery_incomplete = bool(
+        expected_min_courses
+        and 0 < after_filter < expected_min_courses
+        and cloudflare_blocked == 0
+    )
+    _discovery_incomplete_message = (
+        f"Discovery incomplete: found {after_filter} courses but expected "
+        f"{expected_min_courses}+. Check that seed URLs point to the full "
+        "course listing pages, not hub/overview pages."
+        if _discovery_incomplete else None
+    )
+
     return {
         "status": verdict,
         "expected_min_courses": expected_min_courses,
@@ -423,7 +439,13 @@ async def test_recipe(
         "after_filter_count": after_filter,
         "dropped_count": len(dropped),
         "drop_pct": round(drop_pct, 1),
+        # Explicit list of the seed URLs that were submitted for testing.
+        # Shown in the UI as "Configured seed URLs" so the operator can
+        # verify the exact URLs tested match what they entered.
+        "configured_seed_urls": list(seed_urls),
         "seed_results": seed_results,
+        "discovery_incomplete": _discovery_incomplete,
+        "discovery_incomplete_message": _discovery_incomplete_message,
         "api_result": api_result,
         "dropped_samples": dropped[:10],
         "kept_samples": kept[:10],

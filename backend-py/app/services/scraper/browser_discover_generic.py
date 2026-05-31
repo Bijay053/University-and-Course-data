@@ -246,30 +246,17 @@ _HOST_EXTRA_SEEDS: dict[str, list[str]] = {
         "https://www.newcastle.edu.au/degrees/research",
     ],
     # University of East London (UEL) — www.uel.ac.uk.
-    # Site is Cloudflare-protected so BFS returns 0. Browser discovery is
-    # mandatory. Previous seed list had 18 paginated ?page=N URLs that all
-    # returned 0 links (UEL pagination is client-side JS — the URL doesn't
-    # change per page) and consumed the entire 120s budget before BFS could
-    # explore the 32 nav candidates queued from the homepage.
-    #
-    # Fix (2026-05-31): use the direct course catalogue pages instead.
-    # Individual course pages are at /(under|post)graduate/courses/{slug},
-    # so the listing pages are at /undergraduate/courses and /postgraduate/courses.
-    # Keep the /study/* hub pages as final fallbacks (they surface 1-4 featured
-    # courses each and are guaranteed to exist).
-    # Budget raised to 300s in the YAML to give BFS time to explore nav links.
-    "www.uel.ac.uk": [
-        "https://www.uel.ac.uk/undergraduate/courses",
-        "https://www.uel.ac.uk/postgraduate/courses",
-        "https://www.uel.ac.uk/study/undergraduate",
-        "https://www.uel.ac.uk/study/postgraduate",
-    ],
-    "uel.ac.uk": [
-        "https://www.uel.ac.uk/undergraduate/courses",
-        "https://www.uel.ac.uk/postgraduate/courses",
-        "https://www.uel.ac.uk/study/undergraduate",
-        "https://www.uel.ac.uk/study/postgraduate",
-    ],
+    # Entry intentionally empty: the YAML (uel.yaml seed_urls) is the sole
+    # source of seed URLs for UEL.  Previous entries had 18 paginated ?page=N
+    # seeds (all 0 links, JS pagination) and later hub pages (/study/undergraduate,
+    # /study/postgraduate) that surface only 1–4 featured courses rather than
+    # the full catalogue.  The correct listing pages are at
+    # /study/undergraduate/courses and /study/postgraduate/courses — those are
+    # configured exclusively in the YAML so the admin can change them without a
+    # code deploy.  Keeping this entry empty also ensures the hardcoded fallback
+    # never silently overrides the YAML-configured seeds.
+    "www.uel.ac.uk": [],
+    "uel.ac.uk": [],
     # University of Huddersfield — uni_id 1166.
     # Both www.hud.ac.uk and courses.hud.ac.uk are React SPAs.  HTTP BFS on
     # www.hud.ac.uk finds only nav/research pages (no taught course links).
@@ -857,21 +844,40 @@ async def browser_discover_generic(
             # pages are visited immediately, not discovered via fragile homepage
             # nav-link crawling.
             #
-            # Combines _seed_urls (hardcoded _HOST_EXTRA_SEEDS) with
-            # _cfg_seed_urls (YAML / admin_config discovery.seed_urls), deduped.
+            # Combines _cfg_seed_urls (YAML / admin_config discovery.seed_urls,
+            # higher priority — admin-configured, run FIRST) with _seed_urls
+            # (hardcoded _HOST_EXTRA_SEEDS fallback, run after YAML seeds).
+            # YAML seeds lead so that an admin can update uel.yaml without a
+            # code deploy and have those URLs take effect immediately.
             _pre_seeded: set[str] = set()
             _all_configured_seeds = list(dict.fromkeys(
-                [u for u in _seed_urls if u] +
-                [u for u in _cfg_seed_urls if u]
+                [u for u in _cfg_seed_urls if u] +   # YAML / admin seeds FIRST
+                [u for u in _seed_urls if u]           # hardcoded fallback after
             ))
+            if _cfg_seed_urls:
+                log.info(
+                    "[SEED] Configured seed URLs (from YAML/admin): %s",
+                    _cfg_seed_urls,
+                )
+            if _seed_urls:
+                log.info(
+                    "[SEED] Hardcoded extra seeds (HOST_EXTRA_SEEDS): %s",
+                    [u for u in _seed_urls if u],
+                )
             if _all_configured_seeds:
                 log.info(
-                    "[SEED] Pre-seed direct navigation: %d listing page(s) for %s",
+                    "[SEED] Pre-seed direct navigation: %d listing page(s) for %s "
+                    "— order: %s",
                     len(_all_configured_seeds), host,
+                    ", ".join(_all_configured_seeds),
                 )
                 await _emit(
                     f"[DISCOVER] Seed: navigating {len(_all_configured_seeds)} "
                     f"course listing page(s) directly"
+                )
+                await _emit(
+                    "[SEED] Configured seed URLs: "
+                    + ", ".join(_all_configured_seeds)
                 )
                 for _sv_url in _all_configured_seeds:
                     if time.monotonic() - _t_start >= _time_budget_s:
@@ -907,11 +913,11 @@ async def browser_discover_generic(
                         log.warning("[SEED] Failed to navigate %s: %s", _sv_url, _sv_exc)
                     _sv_gained = len(results) - _before_seed
                     log.info(
-                        "[SEED] Manual seed URL used: %s → +%d course links (total=%d)",
+                        "[SEED] Actually visited: %s → +%d course links (total=%d)",
                         _sv_url, _sv_gained, len(results),
                     )
                     await _emit(
-                        f"[DISCOVER] Seed: {_sv_url} → +{_sv_gained} courses "
+                        f"[DISCOVER] Seed visited: {_sv_url} → +{_sv_gained} courses "
                         f"(total={len(results)})"
                     )
 

@@ -505,22 +505,60 @@ export default function RecipeEditorPage() {
                 </div>
               </div>
 
-              {/* Per-seed URL breakdown */}
-              {r.seed_results?.length > 0 && (
+              {/* Discovery incomplete banner */}
+              {r.discovery_incomplete && (
+                <div className="rounded-lg border border-red-300 bg-red-50 p-3 flex gap-3 items-start">
+                  <XCircle className="h-5 w-5 text-red-500 mt-0.5 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-red-800 text-sm">Discovery incomplete</div>
+                    <div className="text-sm text-red-700 mt-0.5">{r.discovery_incomplete_message}</div>
+                    <div className="text-xs text-red-600 mt-1.5 font-medium">
+                      Fix the seed URLs before running a full scrape. If you want to run extraction anyway,
+                      lower <code>expected_min_courses</code> or add the correct course listing page URLs above.
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Configured seed URLs tested */}
+              {(r.configured_seed_urls?.length > 0 || r.seed_results?.length > 0) && (
                 <div>
-                  <div className="text-xs font-semibold text-muted-foreground mb-1 uppercase tracking-wide">Seed URLs</div>
+                  <div className="text-xs font-semibold text-muted-foreground mb-1 uppercase tracking-wide">
+                    Seed URLs tested ({r.configured_seed_urls?.length ?? r.seed_results?.length})
+                  </div>
+                  <div className="text-xs text-muted-foreground mb-2">
+                    These are the exact URLs submitted for testing. The scraper visits each one and counts course links found.
+                  </div>
                   <div className="space-y-1">
-                    {r.seed_results.map((sr: any, i: number) => (
+                    {(r.seed_results?.length > 0 ? r.seed_results : r.configured_seed_urls?.map((u: string) => ({ url: u, raw_found: 0, status: "pending" }))).map((sr: any, i: number) => (
                       <div key={i} className="flex items-center gap-2 bg-white rounded p-2 border text-sm">
-                        <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${sr.status === "ok" ? "bg-green-100 text-green-700" : sr.status === "blocked_403" ? "bg-orange-100 text-orange-700" : "bg-red-100 text-red-700"}`}>
-                          {sr.status === "ok" ? "OK" : sr.status === "blocked_403" ? "403" : sr.status.toUpperCase()}
+                        <span className={`text-xs font-bold px-1.5 py-0.5 rounded shrink-0 ${
+                          sr.status === "ok" ? "bg-green-100 text-green-700"
+                          : sr.status === "blocked_403" ? "bg-orange-100 text-orange-700"
+                          : sr.status === "pending" ? "bg-gray-100 text-gray-500"
+                          : "bg-red-100 text-red-700"
+                        }`}>
+                          {sr.status === "ok" ? "OK" : sr.status === "blocked_403" ? "403 (CF)" : sr.status === "pending" ? "–" : sr.status.toUpperCase()}
                         </span>
-                        <span className="font-mono text-xs flex-1 truncate">{sr.url}</span>
-                        <span className="font-bold text-sm">{sr.raw_found}</span>
-                        <span className="text-xs text-muted-foreground">links</span>
+                        <span className="font-mono text-xs flex-1 min-w-0 break-all">{sr.url}</span>
+                        {sr.status !== "pending" && (
+                          <span className={`font-bold text-sm shrink-0 ${sr.raw_found === 0 ? "text-red-600" : "text-green-700"}`}>
+                            {sr.raw_found}
+                          </span>
+                        )}
+                        <span className="text-xs text-muted-foreground shrink-0">
+                          {sr.status === "blocked_403" ? "blocked (browser scrape will bypass)" : sr.status !== "pending" ? "links" : ""}
+                        </span>
                       </div>
                     ))}
                   </div>
+                  {r.seed_results?.some((sr: any) => sr.raw_found === 0 && sr.status === "ok") && (
+                    <div className="mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
+                      ⚠ One or more seed URLs returned 0 links via HTTP.
+                      This often means the page is JS-rendered (links are loaded client-side) — the browser scrape will still work.
+                      If this is not a JS site, verify the URL is the correct course listing page, not a hub/overview page.
+                    </div>
+                  )}
                 </div>
               )}
 
