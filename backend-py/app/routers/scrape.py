@@ -4106,6 +4106,18 @@ Rules for suggested_config:
 - Return empty dict {{}} if no changes are needed OR if settings already look correct and a
   re-scrape is all that is needed — explain in root_causes instead.
 
+MUST_CONTAIN SAFETY RULES (CRITICAL — violating these will break scrapes):
+- NEVER suggest must_contain based on the seed_url paths. Seed URLs are LISTING pages;
+  individual course pages are usually at a DIFFERENT path structure.
+- Only suggest must_contain when you can infer the actual COURSE PAGE URL pattern from the
+  log data above (e.g. staged_sample_urls, or explicit evidence of course URL structure).
+- must_contain patterns must be substrings that appear in COURSE DETAIL page URLs, not
+  listing or hub pages. Example: if courses are at /undergraduate/courses/bsc-nursing,
+  use "/undergraduate/courses/" not "/undergraduate/" or "/study/".
+- If you are uncertain what the course page URL pattern is, do NOT suggest must_contain.
+  Suggest seed_urls or always_browser_discover instead.
+- A bad must_contain silently drops all discovered courses to 0. When in doubt, omit it.
+
 Return only valid JSON, no markdown fences."""
 
     try:
@@ -4968,14 +4980,18 @@ async def apply_scrape_fix(
             "discovery": {"bfs_page_budget": 80, "must_contain": ["/courses/"]},
             "extraction": {"filters": {"online_only": {"enabled": true}}},
             "_min_expected_courses": 100
-          }
+          },
+          "force": false   # set true to override the 30-70% drop-rate warning (not the 100% block)
         }
 
-    The patch is deep-merged into ``scrape_config.admin_config``.  Existing
-    admin_config keys not present in the patch are preserved.  Send an empty
-    patch ``{}`` to clear the admin_config entirely.
+    Safety: if the patch contains ``discovery.must_contain``, it is tested against
+    the last 200 known course URLs for this university before saving:
+      - 100% drop  → hard block (HTTP 422)
+      - ≥70% drop  → hard block (HTTP 422)
+      - ≥30% drop  → warning included in response; requires ``force: true`` to proceed
     """
     from sqlalchemy import text as _text
+    from app.models import ScrapedCourse as _SC
 
     job = (await db.execute(
         _text("SELECT university_id FROM scrape_runtime_jobs WHERE runtime_job_id = :j"),
@@ -4986,6 +5002,7 @@ async def apply_scrape_fix(
 
     uni_id = job["university_id"]
     config_patch: dict = body.get("config_patch") or {}
+    force: bool = bool(body.get("force", False))
 
     row = (await db.execute(
         _text("SELECT scrape_config FROM universities WHERE id = :id"),
@@ -4996,6 +5013,74 @@ async def apply_scrape_fix(
 
     sc: dict = dict(row.get("scrape_config") or {})
     existing: dict = sc.get("admin_config") or {}
+
+    # ── Safety guard: validate must_contain before saving ────────────────────
+    mc_patch: list[str] | None = (config_patch.get("discovery") or {}).get("must_contain")
+    url_warning: dict | None = None
+
+    if mc_patch:
+        url_rows = (await db.execute(
+            select(_SC.course_website)
+            .where(_SC.university_id == uni_id)
+            .where(_SC.course_website.isnot(None))
+            .limit(200)
+        )).scalars().all()
+
+        known_urls = [u for u in url_rows if u]
+
+        if known_urls:
+            mc_lower = [m.lower() for m in mc_patch if m]
+            passing = [u for u in known_urls if any(m in u.lower() for m in mc_lower)]
+            dropped = [u for u in known_urls if u not in set(passing)]
+            drop_rate = len(dropped) / len(known_urls)
+
+            if drop_rate >= 0.70:
+                # Hard block regardless of force flag
+                raise HTTPException(
+                    status_code=422,
+                    detail={
+                        "error": "must_contain_filter_too_destructive",
+                        "message": (
+                            f"This must_contain filter would drop {round(drop_rate * 100)}% of the "
+                            f"{len(known_urls)} known course URLs. Fix has been blocked."
+                        ),
+                        "total_urls": len(known_urls),
+                        "passing": len(passing),
+                        "dropped": len(dropped),
+                        "drop_rate_pct": round(drop_rate * 100),
+                        "dropped_samples": dropped[:10],
+                        "filter_applied": mc_patch,
+                    },
+                )
+            elif drop_rate >= 0.30:
+                url_warning = {
+                    "drop_rate_pct": round(drop_rate * 100),
+                    "total_urls": len(known_urls),
+                    "passing": len(passing),
+                    "dropped": len(dropped),
+                    "dropped_samples": dropped[:5],
+                }
+                if not force:
+                    raise HTTPException(
+                        status_code=422,
+                        detail={
+                            "error": "must_contain_filter_high_drop_rate",
+                            "message": (
+                                f"This must_contain filter would drop {round(drop_rate * 100)}% of the "
+                                f"{len(known_urls)} known course URLs. Send force=true to override."
+                            ),
+                            "total_urls": len(known_urls),
+                            "passing": len(passing),
+                            "dropped": len(dropped),
+                            "drop_rate_pct": round(drop_rate * 100),
+                            "dropped_samples": dropped[:10],
+                            "filter_applied": mc_patch,
+                        },
+                    )
+
+    # ── Store previous config for rollback before overwriting ─────────────────
+    if existing:
+        sc["_prev_admin_config"] = existing
 
     def _deep_merge_local(base: dict, override: dict) -> dict:
         result = dict(base)
@@ -5020,4 +5105,61 @@ async def apply_scrape_fix(
         "university_id": uni_id,
         "applied_patch": config_patch,
         "new_admin_config": sc["admin_config"],
+        "has_rollback": True,
+        "url_warning": url_warning,
+    }
+
+
+@router.post("/jobs/{job_id}/rollback-fix")
+async def rollback_scrape_fix(
+    job_id: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[dict, Depends(get_current_user)],
+) -> dict:
+    """Revert the last AI-applied config fix for this university.
+
+    Restores the ``admin_config`` snapshot that was saved before the last
+    ``apply-fix`` call.  Only one level of undo is supported.
+    """
+    from sqlalchemy import text as _text
+
+    job = (await db.execute(
+        _text("SELECT university_id FROM scrape_runtime_jobs WHERE runtime_job_id = :j"),
+        {"j": job_id},
+    )).mappings().first()
+    if not job:
+        raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
+
+    uni_id = job["university_id"]
+
+    row = (await db.execute(
+        _text("SELECT scrape_config FROM universities WHERE id = :id"),
+        {"id": uni_id},
+    )).mappings().first()
+    if not row:
+        raise HTTPException(status_code=404, detail="University not found")
+
+    sc: dict = dict(row.get("scrape_config") or {})
+    prev = sc.get("_prev_admin_config")
+
+    if prev is None:
+        raise HTTPException(
+            status_code=404,
+            detail="No previous config snapshot found — nothing to roll back to.",
+        )
+
+    sc["admin_config"] = prev
+    sc.pop("_prev_admin_config", None)
+
+    await db.execute(
+        _text("UPDATE universities SET scrape_config = CAST(:cfg AS jsonb) WHERE id = :id"),
+        {"cfg": json.dumps(sc), "id": uni_id},
+    )
+    await db.commit()
+
+    return {
+        "ok": True,
+        "job_id": job_id,
+        "university_id": uni_id,
+        "restored_admin_config": prev,
     }

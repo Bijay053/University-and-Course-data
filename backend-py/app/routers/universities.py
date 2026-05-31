@@ -709,6 +709,7 @@ async def get_agent_config(
         "recipe": recipe_cfg,
         "health_score": health_score,
         "latest_job_id": job_stats.get("runtime_job_id"),
+        "has_rollback": "_prev_admin_config" in sc,
         "job_stats": {
             "total_found": found,
             "imported": imported,

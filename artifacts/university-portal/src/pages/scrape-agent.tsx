@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   ArrowLeft, Bot, CheckCircle2, AlertTriangle, Loader2, Zap, RefreshCw,
   CheckCheck, X, Plus, Save, Settings2, Activity, Target, TrendingUp,
-  ShieldAlert, Play, ExternalLink, FlaskConical, BarChart3, Wrench,
+  ShieldAlert, Play, ExternalLink, FlaskConical, BarChart3, Wrench, RotateCcw,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -25,6 +25,7 @@ type AgentConfig = {
   recipe?: Record<string, unknown>;
   health_score: number;
   latest_job_id: string | null;
+  has_rollback?: boolean;
   job_stats: {
     total_found: number;
     imported: number;
@@ -33,6 +34,17 @@ type AgentConfig = {
     avg_completeness_pct: number;
     min_expected_courses: number;
   };
+};
+
+type FixBlock = {
+  error: string;
+  message: string;
+  total_urls: number;
+  passing: number;
+  dropped: number;
+  drop_rate_pct: number;
+  dropped_samples: string[];
+  filter_applied: string[];
 };
 
 type RootCause = { issue: string; explanation: string; severity: "high" | "medium" | "low" };
@@ -199,6 +211,8 @@ export default function ScrapeAgentPage() {
   const [diagnoseResult, setDiagnoseResult] = useState<DiagnoseResult | null>(null);
   const [applying, setApplying] = useState(false);
   const [appliedConfig, setAppliedConfig] = useState<Record<string, unknown> | null>(null);
+  const [fixBlock, setFixBlock] = useState<FixBlock | null>(null);
+  const [rollingBack, setRollingBack] = useState(false);
   const [checkingExtraction, setCheckingExtraction] = useState(false);
   const [extractionResult, setExtractionResult] = useState<ExtractionQualityResult | null>(null);
 
@@ -422,25 +436,62 @@ export default function ScrapeAgentPage() {
     }
   };
 
-  const applyFix = async (patch: Record<string, unknown>) => {
+  const applyFix = async (patch: Record<string, unknown>, force = false) => {
     const jobId = config?.latest_job_id;
     if (!jobId) return;
     setApplying(true);
+    setFixBlock(null);
     try {
       const res = await fetch(`${BASE}/api/scrape/jobs/${jobId}/apply-fix`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ config_patch: patch }),
+        body: JSON.stringify({ config_patch: patch, force }),
       });
+      if (res.status === 422) {
+        const errBody = await res.json();
+        const detail = errBody?.detail ?? errBody;
+        setFixBlock(detail as FixBlock);
+        return;
+      }
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setAppliedConfig(data.new_admin_config);
-      toast({ title: "Fix applied!", description: "Config updated — re-run the scrape to see results." });
+      setFixBlock(null);
+      if (data.url_warning) {
+        toast({
+          title: "Fix applied with warning",
+          description: `must_contain drops ${data.url_warning.drop_rate_pct}% of known course URLs — watch the next scrape closely.`,
+          variant: "destructive",
+        });
+      } else {
+        toast({ title: "Fix applied!", description: "Config updated — re-run the scrape to see results." });
+      }
       await loadConfig();
     } catch (e) {
       toast({ title: "Apply fix failed", description: String(e), variant: "destructive" });
     } finally {
       setApplying(false);
+    }
+  };
+
+  const rollbackFix = async () => {
+    const jobId = config?.latest_job_id;
+    if (!jobId) return;
+    setRollingBack(true);
+    try {
+      const res = await fetch(`${BASE}/api/scrape/jobs/${jobId}/rollback-fix`, { method: "POST" });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err?.detail || `HTTP ${res.status}`);
+      }
+      toast({ title: "Reverted!", description: "Config restored to before the last AI fix." });
+      setAppliedConfig(null);
+      setFixBlock(null);
+      await loadConfig();
+    } catch (e) {
+      toast({ title: "Rollback failed", description: String(e), variant: "destructive" });
+    } finally {
+      setRollingBack(false);
     }
   };
 
@@ -815,29 +866,93 @@ export default function ScrapeAgentPage() {
               )}
 
               {/* Suggested config + Apply Fix */}
-              {hasSuggestions && (
-                <div className="border border-green-200 rounded-lg p-3 bg-green-50 space-y-3">
-                  <div className="flex items-center gap-2">
-                    <Zap className="w-4 h-4 text-green-600" />
-                    <p className="text-xs font-semibold text-green-800">AI has suggested config changes</p>
+              {hasSuggestions && (() => {
+                const sugDisc = (suggestedConfig.discovery ?? {}) as Record<string, unknown>;
+                const hasMustContain = Array.isArray(sugDisc.must_contain) && (sugDisc.must_contain as string[]).length > 0;
+                return (
+                  <div className="border border-green-200 rounded-lg p-3 bg-green-50 space-y-3">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Zap className="w-4 h-4 text-green-600" />
+                      <p className="text-xs font-semibold text-green-800">AI has suggested config changes</p>
+                      {hasMustContain && (
+                        <span className="flex items-center gap-1 text-[9px] bg-amber-100 text-amber-800 border border-amber-300 rounded-full px-2 py-0.5 font-medium">
+                          <AlertTriangle className="w-3 h-3" /> contains must_contain filter — will be validated before saving
+                        </span>
+                      )}
+                    </div>
+                    <pre className="text-[10px] bg-white border border-green-100 rounded p-2 overflow-auto max-h-[200px] text-gray-700 font-mono leading-relaxed">
+                      {JSON.stringify(suggestedConfig, null, 2)}
+                    </pre>
+
+                    {/* FixBlock: shown when backend blocked the apply due to high drop rate */}
+                    {fixBlock && (
+                      <div className="rounded-lg border border-red-300 bg-red-50 p-3 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <ShieldAlert className="w-4 h-4 text-red-600 shrink-0" />
+                          <p className="text-xs font-bold text-red-800">Fix Blocked — AI Generated Bad Config</p>
+                        </div>
+                        <p className="text-xs text-red-700">{fixBlock.message}</p>
+                        <div className="grid grid-cols-3 gap-2 text-center text-[10px]">
+                          <div className="bg-white rounded border border-red-200 p-1.5">
+                            <div className="font-bold text-gray-800">{fixBlock.total_urls}</div>
+                            <div className="text-gray-500">Known URLs</div>
+                          </div>
+                          <div className="bg-white rounded border border-green-200 p-1.5">
+                            <div className="font-bold text-green-700">{fixBlock.passing}</div>
+                            <div className="text-gray-500">Would pass</div>
+                          </div>
+                          <div className="bg-white rounded border border-red-200 p-1.5">
+                            <div className="font-bold text-red-600">{fixBlock.dropped} ({fixBlock.drop_rate_pct}%)</div>
+                            <div className="text-gray-500">Dropped</div>
+                          </div>
+                        </div>
+                        {fixBlock.dropped_samples?.length > 0 && (
+                          <div>
+                            <p className="text-[9px] font-semibold text-red-700 mb-1">Sample dropped course URLs:</p>
+                            <ul className="text-[9px] text-red-800 font-mono space-y-0.5 max-h-[80px] overflow-auto">
+                              {fixBlock.dropped_samples.map((u, i) => <li key={i} className="truncate">✗ {u}</li>)}
+                            </ul>
+                          </div>
+                        )}
+                        {fixBlock.error === "must_contain_filter_high_drop_rate" && (
+                          <div className="flex items-center gap-2 pt-1">
+                            <Button
+                              size="sm"
+                              onClick={() => applyFix(suggestedConfig as Record<string, unknown>, true)}
+                              disabled={applying}
+                              className="bg-amber-600 hover:bg-amber-700 h-7 text-[10px] gap-1"
+                            >
+                              {applying ? <Loader2 className="w-3 h-3 animate-spin" /> : <AlertTriangle className="w-3 h-3" />}
+                              Force Apply Anyway ({fixBlock.drop_rate_pct}% drop)
+                            </Button>
+                            <span className="text-[9px] text-amber-700">Not recommended — verify URL patterns first.</span>
+                          </div>
+                        )}
+                        {fixBlock.error !== "must_contain_filter_high_drop_rate" && (
+                          <p className="text-[9px] text-red-600 font-medium">This fix cannot be applied. Edit the must_contain patterns in the Config Editor below and save manually instead.</p>
+                        )}
+                      </div>
+                    )}
+
+                    {!fixBlock && (
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          onClick={() => applyFix(suggestedConfig as Record<string, unknown>)}
+                          disabled={applying}
+                          className="bg-green-600 hover:bg-green-700 h-8 text-xs gap-1.5"
+                        >
+                          {applying ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCheck className="w-3.5 h-3.5" />}
+                          {applying ? "Validating & applying…" : "Apply AI Fix"}
+                        </Button>
+                        <span className="text-[10px] text-green-700">
+                          {hasMustContain ? "Filter will be safety-checked before saving." : "Review the changes above, then approve to update scrape rules."}
+                        </span>
+                      </div>
+                    )}
                   </div>
-                  <pre className="text-[10px] bg-white border border-green-100 rounded p-2 overflow-auto max-h-[200px] text-gray-700 font-mono leading-relaxed">
-                    {JSON.stringify(suggestedConfig, null, 2)}
-                  </pre>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      size="sm"
-                      onClick={() => applyFix(suggestedConfig as Record<string, unknown>)}
-                      disabled={applying}
-                      className="bg-green-600 hover:bg-green-700 h-8 text-xs gap-1.5"
-                    >
-                      {applying ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCheck className="w-3.5 h-3.5" />}
-                      {applying ? "Applying…" : "Apply AI Fix"}
-                    </Button>
-                    <span className="text-[10px] text-green-700">Review the changes above, then approve to update scrape rules.</span>
-                  </div>
-                </div>
-              )}
+                );
+              })()}
 
               {!hasSuggestions && diagnoseResult.already_applied && (
                 <div className="border border-blue-200 rounded-lg p-3 bg-blue-50 flex items-start gap-2">
@@ -855,8 +970,8 @@ export default function ScrapeAgentPage() {
                 <p className="text-xs text-gray-400 text-center py-2">AI found no config changes to suggest for this issue.</p>
               )}
 
-              {/* Re-run */}
-              <div className="flex items-center gap-2 pt-2 border-t">
+              {/* Re-run + Rollback */}
+              <div className="flex items-center gap-2 pt-2 border-t flex-wrap">
                 <button
                   type="button"
                   onClick={runDiagnosis}
@@ -865,6 +980,17 @@ export default function ScrapeAgentPage() {
                 >
                   <RefreshCw className="w-3 h-3" /> Re-run diagnosis
                 </button>
+                {config?.has_rollback && (
+                  <button
+                    type="button"
+                    onClick={rollbackFix}
+                    disabled={rollingBack}
+                    className="text-xs text-amber-600 hover:text-amber-800 flex items-center gap-1 border border-amber-300 rounded px-2 py-0.5 bg-amber-50 hover:bg-amber-100"
+                  >
+                    {rollingBack ? <Loader2 className="w-3 h-3 animate-spin" /> : <RotateCcw className="w-3 h-3" />}
+                    Revert Last AI Fix
+                  </button>
+                )}
                 {config?.latest_job_id && (
                   <a
                     href={`/scraping`}
