@@ -4035,10 +4035,13 @@ Diagnose the scraping failure in plain English for a non-technical admin.
 CRITICAL DISTINCTION you must apply:
 - "config" issues = operator can fix by adding a URL, CSS selector, or changing a setting in the portal.
   Examples: missing fee page URL, missing English requirements URL, wrong must_contain filter, seed URL not set.
-- "platform_bug" issues = something in the extraction logic itself is wrong.
-  Examples: wrong fee calculation, IELTS components not extracted, degree level keywords not recognised,
-  university name appearing in course titles, navigation text captured as campus location,
-  wrong fee amount extracted (domestic instead of international). These require a developer fix.
+- "recipe_fix" issues = operator can fix using the Recipe Editor (no code needed).
+  Examples: university name in course title (use remove_after), IELTS components missing (use ielts_component_mapping),
+  fee calculation wrong (use fee_calculation_mode), location nav text (use location_reject_values).
+  Always prefer recipe_fix over platform_bug when a recipe rule can solve it.
+- "platform_bug" issues = genuinely broken extraction that NO recipe rule can fix.
+  Examples: degree level keywords not in any recognised pattern, IELTS value is a completely wrong number.
+  Only use platform_bug as a last resort.
   DO NOT suggest YAML config changes for platform_bug issues.
 
 Return your response as JSON with this EXACT structure (no other keys):
@@ -4321,12 +4324,16 @@ async def extraction_quality_report(
                 "This makes titles incorrect for display and agent matching."
             ),
             "examples": _name_in_title[:3],
-            "fix_type": "platform_bug",
+            "fix_type": "recipe_fix",
             "suggested_fix": (
-                "This is a system-level extraction bug. The scraper is capturing the full page "
-                "title tag (which includes the site name) instead of the course heading. "
-                "No configuration change will fix this — it requires an update to the extraction logic."
+                "The scraper is capturing the browser page title (site name + course name) instead of just the course heading. "
+                "You can strip the suffix in the Recipe Editor → Course Name Cleanup → "
+                "\"Remove everything after\" and add the university name suffix "
+                f"(e.g. '| {uni_name}' or ' - {uni_name}')."
             ),
+            "suggested_recipe": {
+                "course_name_remove_after": [f"| {uni_name}", f" - {uni_name}", f"– {uni_name}"],
+            },
         })
 
     # 2. Course name too short
@@ -4455,13 +4462,17 @@ async def extraction_quality_report(
                 f"{name}: {fee:,.0f} total → {ae:,.0f}/yr ({dy:.1f}yr)"
                 for name, fee, dy, ae in _annual_equivs[:3]
             ],
-            "fix_type": "platform_bug",
+            "fix_type": "recipe_fix",
             "suggested_fix": (
-                "The scraper has captured the total programme cost instead of the annual tuition fee. "
-                "For example, a 4-year degree at A$26,000/year will be stored as A$104,000 — which is "
-                "not the fee a student would pay each year. This is an extraction calculation bug. "
-                "No configuration change will correct this — the fee calculation logic needs to be updated."
+                "In the Recipe Editor → Fee Rules, set 'Fee Calculation Mode' to "
+                "'Use source value only' and enable 'Prevent Full Course rollup'. "
+                "Then add the fee schedule page URL so the scraper reads the correct annual fee directly."
             ),
+            "suggested_recipe": {
+                "fee_calculation_mode": "use_source_value_only",
+                "fee_prevent_full_course_rollup": True,
+                "fee_term": "Annual",
+            },
         })
 
     # 5b. Fee suspiciously low (likely domestic AUD/GBP captured instead of international)
@@ -4484,12 +4495,16 @@ async def extraction_quality_report(
                 "a per-credit-point charge, or a partial payment — not the full international annual tuition."
             ),
             "examples": [f"{r.course_name}: {r.currency or ''}{r.international_fee}" for r in _low_fees[:3]],
-            "fix_type": "platform_bug",
+            "fix_type": "recipe_fix",
             "suggested_fix": (
-                "The scraper is reading the wrong fee value from the page — likely the domestic fee "
-                "or a per-unit charge is visible before the international fee section. "
-                "This is an extraction targeting bug that requires a logic update."
+                "In the Recipe Editor → Fee Rules, add the university's international fee schedule URL. "
+                "The scraper will read that page directly and match fees by course name — bypassing the "
+                "domestic fee section on course pages."
             ),
+            "suggested_recipe": {
+                "fee_calculation_mode": "use_source_value_only",
+                "fee_term": "Annual",
+            },
         })
 
     # 6. Location: nav text contamination
@@ -4512,12 +4527,15 @@ async def extraction_quality_report(
                 "The location extractor is reading the page sidebar or footer menu instead of the campus field."
             ),
             "examples": [v[:60] for v in _nav_locs[:3]],
-            "fix_type": "platform_bug",
+            "fix_type": "recipe_fix",
             "suggested_fix": (
-                "The location extractor is reading too broadly and capturing navigation menu items. "
-                "This is a platform-level extraction bug — the location field selector needs to be "
-                "tightened to target only the campus/location section of the course page."
+                "In the Recipe Editor → Location Cleanup, add the navigation phrases to 'Reject these values' "
+                "(e.g. 'How to Apply', 'Student Services'). Also add your real campus names to 'Only keep these values' "
+                "so only valid campus names are stored."
             ),
+            "suggested_recipe": {
+                "location_reject_values": list(_nav_locs[:3]),
+            },
         })
 
     # 7. Location: too long (multiple campuses concatenated without parsing)
@@ -4539,11 +4557,15 @@ async def extraction_quality_report(
                 "Multiple campus names or unrelated text are being concatenated into a single value."
             ),
             "examples": [v[:80] + "…" for v in _long_locs[:3]],
-            "fix_type": "platform_bug",
+            "fix_type": "recipe_fix",
             "suggested_fix": (
-                "The location extractor is capturing a larger container element rather than "
-                "individual campus name nodes. This requires an update to the location extraction logic."
+                "In the Recipe Editor → Location Cleanup, add your real campus names to 'Only keep these values'. "
+                "The scraper will then extract only the matching campus names from the raw location block, "
+                "discarding the extra text."
             ),
+            "suggested_recipe": {
+                "location_allowed_values": [],
+            },
         })
 
     # 8. English test entirely blank
@@ -4602,12 +4624,20 @@ async def extraction_quality_report(
                 for r in _ielts_no_components[:3]
                 if r.course_name
             ],
-            "fix_type": "platform_bug",
+            "fix_type": "recipe_fix",
             "suggested_fix": (
-                "The IELTS component scores (Reading, Writing, Listening, Speaking) are not being "
-                "extracted from the university's requirements page. This is an extraction logic bug — "
-                "the system needs to be updated to read individual band score rows."
+                "In the Recipe Editor → IELTS Component Mapping, add the university's per-band requirement. "
+                "For each IELTS overall score (e.g. 6.0, 6.5, 7.0), set the minimum each-band score. "
+                "The system will apply these automatically when overall is extracted but components are missing."
             ),
+            "suggested_recipe": {
+                "ielts_component_mapping": {
+                    "6.0": 5.5,
+                    "6.5": 6.0,
+                    "7.0": 6.5,
+                    "7.5": 7.0,
+                },
+            },
         })
 
     # 9. IELTS value out of plausible range

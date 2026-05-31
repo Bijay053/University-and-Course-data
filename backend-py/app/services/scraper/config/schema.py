@@ -1264,3 +1264,139 @@ class RecipeConfig(BaseModel):
         default_factory=list,
         description="Fields that must be non-empty for a course to be accepted.",
     )
+
+    # ── 18. Fee Rule Engine ──────────────────────────────────────────────────
+    fee_source_urls: list[str] = Field(
+        default_factory=list,
+        description=(
+            "URL(s) of the university's international fee schedule page(s). "
+            "The scraper fetches these pages and matches fees to each course. "
+            "E.g. ['https://www.scu.edu.au/study/international-courses-and-fees/']."
+        ),
+    )
+    fee_match_by: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Ordered list of strategies used to match fee rows to courses. "
+            "Options: 'course_name', 'cricos_code', 'degree_level', 'campus', 'duration'. "
+            "Default (empty) uses the global matching logic."
+        ),
+    )
+    fee_term: Optional[str] = Field(
+        default=None,
+        description=(
+            "Force the fee term for all courses at this university. "
+            "Options: 'Annual', 'Per Unit', 'Full Course'. "
+            "When set, overrides whatever term the extractor derives from the page."
+        ),
+    )
+    fee_calculation_mode: str = Field(
+        default="use_source_value_only",
+        description=(
+            "How fee amounts are calculated after extraction. "
+            "'use_source_value_only' — store the fee exactly as found on the fee page (default). "
+            "'full_course_to_annual' — divide by duration to get annual equivalent. "
+            "'per_unit_to_annual' — multiply per-unit fee by credit-point load. "
+            "'annual_to_full_course' — multiply annual fee by duration. "
+            "Default 'use_source_value_only' prevents the Full Course rollup bug."
+        ),
+    )
+    fee_prevent_full_course_rollup: bool = Field(
+        default=True,
+        description=(
+            "Prevent the scraper from multiplying an annual fee by the course duration "
+            "to produce a Full Course total. When True (default), the extracted value "
+            "is stored as-is and fee_term is set to 'Annual'."
+        ),
+    )
+
+    # ── 19. IELTS Component Mapping ──────────────────────────────────────────
+    ielts_component_mapping: dict = Field(
+        default_factory=dict,
+        description=(
+            "Maps IELTS overall band score → minimum component (each-band) score. "
+            "Used when the course page shows only an overall score but the university "
+            "requires minimum per-band scores. "
+            "E.g. {'6.0': 5.5, '6.5': 6.0, '7.0': 6.5, '7.5': 7.0}. "
+            "When matched, Reading/Writing/Listening/Speaking are all set to the mapped value."
+        ),
+    )
+
+    # ── 20. Course Name Cleanup ──────────────────────────────────────────────
+    course_name_remove_after: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Strip everything from the first occurrence of any of these strings "
+            "(inclusive) onwards. Applied left-to-right. "
+            "E.g. ['|', ' - Southern Cross University'] strips site name suffixes."
+        ),
+    )
+    course_name_remove_year_suffix: bool = Field(
+        default=False,
+        description="Remove a trailing 4-digit year (e.g. 'Master of Science 2025' → 'Master of Science').",
+    )
+    course_name_remove_patterns: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Regex patterns applied to the course name (case-insensitive). "
+            "Each match is replaced with an empty string. "
+            "E.g. [r'\\s*\\(.*?\\)\\s*$'] strips trailing parenthetical suffixes."
+        ),
+    )
+
+    # ── 21. Location Cleanup ─────────────────────────────────────────────────
+    location_allowed_values: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Allowlist of valid campus/location strings (case-insensitive substring match). "
+            "If non-empty, only location values that match at least one entry are kept; "
+            "non-matching locations are cleared. "
+            "E.g. ['Gold Coast', 'Lismore', 'Online', 'Brisbane']."
+        ),
+    )
+    location_reject_values: list[str] = Field(
+        default_factory=list,
+        description=(
+            "If any of these strings appears (case-insensitive) in the extracted location, "
+            "the location is cleared entirely. Used to reject nav/footer contamination. "
+            "E.g. ['How to Apply', 'Teaching period', 'Student Services']."
+        ),
+    )
+    location_replace: dict = Field(
+        default_factory=dict,
+        description=(
+            "String replacement map applied to location values before allow/reject filtering. "
+            "Keys are strings to replace, values are replacements (use '' to delete). "
+            "E.g. {'Teaching period': '', 'SCU Online': 'Online'}."
+        ),
+    )
+
+    # ── 22. Study Mode Rules ─────────────────────────────────────────────────
+    study_mode_from_location: bool = Field(
+        default=False,
+        description=(
+            "Derive study_mode from the cleaned location value when study_mode is blank. "
+            "Checks location for online keywords; if found with campus values → Blended, "
+            "only online → Online, only campus → On Campus."
+        ),
+    )
+    study_mode_online_keywords: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Keywords that indicate online delivery when found in the location string. "
+            "Default (empty) uses ['online', 'distance', 'virtual']. "
+            "Only used when study_mode_from_location=true."
+        ),
+    )
+
+    # ── 23. Validation Rules ─────────────────────────────────────────────────
+    block_publish_if: list[str] = Field(
+        default_factory=list,
+        description=(
+            "List of conditions that block a course from auto-publishing even if it "
+            "meets the completeness threshold. "
+            "Options: 'fee_missing', 'fee_term_wrong', 'ielts_component_missing', "
+            "'invalid_location', 'online_only', 'course_name_too_short', "
+            "'course_name_too_long', 'degree_level_missing'."
+        ),
+    )

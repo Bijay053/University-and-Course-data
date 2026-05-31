@@ -22,6 +22,7 @@ type AgentConfig = {
   university_name: string;
   scrape_url: string;
   admin_config: Record<string, unknown>;
+  recipe?: Record<string, unknown>;
   health_score: number;
   latest_job_id: string | null;
   job_stats: {
@@ -66,7 +67,8 @@ type ExtractionIssue = {
   detail: string;
   examples: string[];
   suggested_fix: string;
-  fix_type?: "config" | "platform_bug";
+  fix_type?: "config" | "platform_bug" | "recipe_fix";
+  suggested_recipe?: Record<string, unknown>;
 };
 type ExtractionQualityResult = {
   ok: boolean;
@@ -168,6 +170,21 @@ export default function ScrapeAgentPage() {
   const [seedUrls, setSeedUrls] = useState<string[]>([]);
   const [extraUrls, setExtraUrls] = useState<string[]>([]);
 
+  // Recipe state
+  const [feeSourceUrls, setFeeSourceUrls] = useState<string[]>([]);
+  const [feeTerm, setFeeTerm] = useState<string>("");
+  const [feeCalcMode, setFeeCalcMode] = useState<string>("use_source_value_only");
+  const [feePreventRollup, setFeePreventRollup] = useState(true);
+  const [ieltsMapping, setIeltsMapping] = useState<{ overall: string; band: string }[]>([]);
+  const [nameRemoveAfter, setNameRemoveAfter] = useState<string[]>([]);
+  const [nameRemoveYear, setNameRemoveYear] = useState(false);
+  const [locAllowed, setLocAllowed] = useState<string[]>([]);
+  const [locReject, setLocReject] = useState<string[]>([]);
+  const [locReplace, setLocReplace] = useState<{ from: string; to: string }[]>([]);
+  const [modeFromLoc, setModeFromLoc] = useState(false);
+  const [modeOnlineKws, setModeOnlineKws] = useState<string[]>([]);
+  const [savingRecipe, setSavingRecipe] = useState(false);
+
   const [saving, setSaving] = useState(false);
   const [diagnosing, setDiagnosing] = useState(false);
   const [diagnoseResult, setDiagnoseResult] = useState<DiagnoseResult | null>(null);
@@ -200,6 +217,23 @@ export default function ScrapeAgentPage() {
       setBfsPageBudget(disc.bfs_page_budget != null ? String(disc.bfs_page_budget) : "");
       setSeedUrls((disc.seed_urls as string[]) || []);
       setExtraUrls((disc.extra_course_urls as string[]) || []);
+
+      // Load recipe
+      const rec = (data.recipe || {}) as Record<string, unknown>;
+      setFeeSourceUrls((rec.fee_source_urls as string[]) || []);
+      setFeeTerm((rec.fee_term as string) || "");
+      setFeeCalcMode((rec.fee_calculation_mode as string) || "use_source_value_only");
+      setFeePreventRollup(rec.fee_prevent_full_course_rollup !== false);
+      const rawMap = (rec.ielts_component_mapping as Record<string, number>) || {};
+      setIeltsMapping(Object.entries(rawMap).map(([overall, band]) => ({ overall, band: String(band) })));
+      setNameRemoveAfter((rec.course_name_remove_after as string[]) || []);
+      setNameRemoveYear(Boolean(rec.course_name_remove_year_suffix));
+      setLocAllowed((rec.location_allowed_values as string[]) || []);
+      setLocReject((rec.location_reject_values as string[]) || []);
+      const rawReplace = (rec.location_replace as Record<string, string>) || {};
+      setLocReplace(Object.entries(rawReplace).map(([from, to]) => ({ from, to })));
+      setModeFromLoc(Boolean(rec.study_mode_from_location));
+      setModeOnlineKws((rec.study_mode_online_keywords as string[]) || []);
     } catch (e) {
       toast({ title: "Failed to load config", description: String(e), variant: "destructive" });
     } finally {
@@ -225,6 +259,72 @@ export default function ScrapeAgentPage() {
     cfg.extraction = { filters: { online_only: { enabled: rejectOnline } } };
     if (minExpected > 0) cfg._min_expected_courses = minExpected;
     return cfg;
+  };
+
+  const buildRecipe = () => {
+    const r: Record<string, unknown> = {};
+    if (feeSourceUrls.length) r.fee_source_urls = feeSourceUrls;
+    if (feeTerm) r.fee_term = feeTerm;
+    r.fee_calculation_mode = feeCalcMode;
+    r.fee_prevent_full_course_rollup = feePreventRollup;
+    if (ieltsMapping.length) {
+      const m: Record<string, number> = {};
+      ieltsMapping.forEach(({ overall, band }) => {
+        const v = parseFloat(band);
+        if (overall.trim() && !isNaN(v)) m[overall.trim()] = v;
+      });
+      if (Object.keys(m).length) r.ielts_component_mapping = m;
+    }
+    if (nameRemoveAfter.length) r.course_name_remove_after = nameRemoveAfter;
+    if (nameRemoveYear) r.course_name_remove_year_suffix = true;
+    if (locAllowed.length) r.location_allowed_values = locAllowed;
+    if (locReject.length) r.location_reject_values = locReject;
+    if (locReplace.length) {
+      const rr: Record<string, string> = {};
+      locReplace.forEach(({ from, to }) => { if (from.trim()) rr[from.trim()] = to; });
+      if (Object.keys(rr).length) r.location_replace = rr;
+    }
+    if (modeFromLoc) r.study_mode_from_location = true;
+    if (modeOnlineKws.length) r.study_mode_online_keywords = modeOnlineKws;
+    return r;
+  };
+
+  const saveRecipe = async () => {
+    setSavingRecipe(true);
+    try {
+      const body = buildRecipe();
+      const res = await fetch(`${BASE}/api/universities/${uniId}/recipe`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      toast({ title: "Recipe saved", description: "Cleaning rules will apply on the next scrape." });
+      await loadConfig();
+    } catch (e) {
+      toast({ title: "Save failed", description: String(e), variant: "destructive" });
+    } finally {
+      setSavingRecipe(false);
+    }
+  };
+
+  const applyRecipeFix = async (suggested: Record<string, unknown>) => {
+    setSavingRecipe(true);
+    try {
+      const merged = { ...buildRecipe(), ...suggested };
+      const res = await fetch(`${BASE}/api/universities/${uniId}/recipe`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(merged),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      toast({ title: "Recipe fix applied!", description: "Re-run the scrape to see the results." });
+      await loadConfig();
+    } catch (e) {
+      toast({ title: "Apply fix failed", description: String(e), variant: "destructive" });
+    } finally {
+      setSavingRecipe(false);
+    }
   };
 
   const saveConfig = async () => {
@@ -485,6 +585,23 @@ export default function ScrapeAgentPage() {
           )}
         </div>
       </div>
+
+      {/* ── Data Cleaning Recipe ──────────────────────────────────────────── */}
+      <RecipeEditor
+        feeSourceUrls={feeSourceUrls} setFeeSourceUrls={setFeeSourceUrls}
+        feeTerm={feeTerm} setFeeTerm={setFeeTerm}
+        feeCalcMode={feeCalcMode} setFeeCalcMode={setFeeCalcMode}
+        feePreventRollup={feePreventRollup} setFeePreventRollup={setFeePreventRollup}
+        ieltsMapping={ieltsMapping} setIeltsMapping={setIeltsMapping}
+        nameRemoveAfter={nameRemoveAfter} setNameRemoveAfter={setNameRemoveAfter}
+        nameRemoveYear={nameRemoveYear} setNameRemoveYear={setNameRemoveYear}
+        locAllowed={locAllowed} setLocAllowed={setLocAllowed}
+        locReject={locReject} setLocReject={setLocReject}
+        locReplace={locReplace} setLocReplace={setLocReplace}
+        modeFromLoc={modeFromLoc} setModeFromLoc={setModeFromLoc}
+        modeOnlineKws={modeOnlineKws} setModeOnlineKws={setModeOnlineKws}
+        saving={savingRecipe} onSave={saveRecipe}
+      />
 
       {/* ── AI Diagnosis ───────────────────────────────────────────────────── */}
       <div className="bg-white border rounded-xl p-4 space-y-4">
@@ -800,7 +917,7 @@ export default function ScrapeAgentPage() {
                       </p>
                       <div className="space-y-2">
                         {eq.issues.map((issue, i) => (
-                          <ExtractionIssueCard key={i} issue={issue} />
+                          <ExtractionIssueCard key={i} issue={issue} onApplyFix={applyRecipeFix} />
                         ))}
                       </div>
                     </div>
@@ -869,6 +986,294 @@ function FieldRow({ label, hint, children }: { label: string; hint?: string; chi
       <Label className="text-xs font-semibold text-gray-700">{label}</Label>
       {hint && <p className="text-[10px] text-gray-400 leading-tight">{hint}</p>}
       {children}
+    </div>
+  );
+}
+
+// ── Recipe Section accordion helper ──────────────────────────────────────────
+function RecipeSection({ title, icon, children, active }: {
+  title: string; icon: React.ReactNode; children: React.ReactNode; active?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className={`border rounded-lg overflow-hidden ${active ? "border-teal-400" : "border-gray-200"}`}>
+      <button
+        type="button"
+        className={`w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold text-left ${open ? "bg-teal-50" : "bg-gray-50 hover:bg-gray-100"}`}
+        onClick={() => setOpen(o => !o)}
+      >
+        {icon}
+        <span className="flex-1">{title}</span>
+        {active && <span className="text-[9px] font-medium text-teal-600 bg-teal-100 border border-teal-300 px-1.5 py-0.5 rounded-full">active</span>}
+        <span className="text-gray-400 text-[10px]">{open ? "▲" : "▼"}</span>
+      </button>
+      {open && <div className="px-3 py-3 space-y-3 bg-white">{children}</div>}
+    </div>
+  );
+}
+
+// ── RecipeEditor component ─────────────────────────────────────────────────────
+type IeltsRow = { overall: string; band: string };
+type ReplaceRow = { from: string; to: string };
+
+function RecipeEditor(props: {
+  feeSourceUrls: string[]; setFeeSourceUrls: (v: string[]) => void;
+  feeTerm: string; setFeeTerm: (v: string) => void;
+  feeCalcMode: string; setFeeCalcMode: (v: string) => void;
+  feePreventRollup: boolean; setFeePreventRollup: (v: boolean) => void;
+  ieltsMapping: IeltsRow[]; setIeltsMapping: (v: IeltsRow[]) => void;
+  nameRemoveAfter: string[]; setNameRemoveAfter: (v: string[]) => void;
+  nameRemoveYear: boolean; setNameRemoveYear: (v: boolean) => void;
+  locAllowed: string[]; setLocAllowed: (v: string[]) => void;
+  locReject: string[]; setLocReject: (v: string[]) => void;
+  locReplace: ReplaceRow[]; setLocReplace: (v: ReplaceRow[]) => void;
+  modeFromLoc: boolean; setModeFromLoc: (v: boolean) => void;
+  modeOnlineKws: string[]; setModeOnlineKws: (v: string[]) => void;
+  saving: boolean; onSave: () => void;
+}) {
+  const {
+    feeSourceUrls, setFeeSourceUrls, feeTerm, setFeeTerm,
+    feeCalcMode, setFeeCalcMode, feePreventRollup, setFeePreventRollup,
+    ieltsMapping, setIeltsMapping,
+    nameRemoveAfter, setNameRemoveAfter, nameRemoveYear, setNameRemoveYear,
+    locAllowed, setLocAllowed, locReject, setLocReject,
+    locReplace, setLocReplace, modeFromLoc, setModeFromLoc,
+    modeOnlineKws, setModeOnlineKws, saving, onSave,
+  } = props;
+
+  const hasFee = feeSourceUrls.length > 0 || feeTerm !== "" || feeCalcMode !== "use_source_value_only" || !feePreventRollup;
+  const hasIelts = ieltsMapping.length > 0;
+  const hasName = nameRemoveAfter.length > 0 || nameRemoveYear;
+  const hasLoc = locAllowed.length > 0 || locReject.length > 0 || locReplace.length > 0;
+  const hasMode = modeFromLoc;
+  const anyActive = hasFee || hasIelts || hasName || hasLoc || hasMode;
+
+  const updateIelts = (i: number, field: "overall" | "band", val: string) => {
+    const next = [...ieltsMapping];
+    next[i] = { ...next[i], [field]: val };
+    setIeltsMapping(next);
+  };
+  const removeIelts = (i: number) => setIeltsMapping(ieltsMapping.filter((_, idx) => idx !== i));
+  const addIelts = () => setIeltsMapping([...ieltsMapping, { overall: "", band: "" }]);
+
+  const updateReplace = (i: number, field: "from" | "to", val: string) => {
+    const next = [...locReplace];
+    next[i] = { ...next[i], [field]: val };
+    setLocReplace(next);
+  };
+  const removeReplace = (i: number) => setLocReplace(locReplace.filter((_, idx) => idx !== i));
+  const addReplace = () => setLocReplace([...locReplace, { from: "", to: "" }]);
+
+  return (
+    <div className="bg-white border rounded-xl p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+          <FlaskConical className="w-4 h-4 text-teal-600" />
+          Data Cleaning Recipe
+          {anyActive && (
+            <Badge variant="outline" className="text-[9px] px-1.5 border-teal-400 text-teal-700 bg-teal-50">
+              {[hasFee && "fee", hasIelts && "IELTS", hasName && "name", hasLoc && "location", hasMode && "mode"]
+                .filter(Boolean).join(" · ")} rules active
+            </Badge>
+          )}
+        </h2>
+        <Button onClick={onSave} disabled={saving} size="sm" variant="outline" className="h-7 text-xs gap-1 border-teal-400 text-teal-700 hover:bg-teal-50">
+          {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+          Save Recipe
+        </Button>
+      </div>
+
+      <p className="text-[11px] text-gray-500 leading-relaxed">
+        Rules applied to every extracted course <strong>before</strong> it is staged — no code required.
+        Changes take effect on the next scrape run. Open a section to configure it.
+      </p>
+
+      <div className="space-y-2">
+        {/* ── Fee Rules ── */}
+        <RecipeSection title="Fee Rules" icon={<span className="text-[13px]">💰</span>} active={hasFee}>
+          <FieldRow label="Fee Schedule Page URL(s)"
+            hint="The university's international fee list page. The scraper reads fees from here instead of each course page.">
+            <Textarea
+              value={feeSourceUrls.join("\n")}
+              onChange={e => setFeeSourceUrls(e.target.value.split("\n").map(s => s.trim()).filter(Boolean))}
+              placeholder="https://www.uni.edu.au/fees/international-students"
+              className="text-xs mt-1 min-h-[56px] font-mono"
+              rows={2}
+            />
+          </FieldRow>
+          <FieldRow label="Fee Term Override"
+            hint="Force a specific term label for all fees at this university. Leave blank to auto-detect.">
+            <select
+              value={feeTerm}
+              onChange={e => setFeeTerm(e.target.value)}
+              className="mt-1 h-8 text-xs border border-gray-200 rounded px-2 w-full bg-white"
+            >
+              <option value="">Auto-detect (default)</option>
+              <option value="Annual">Annual</option>
+              <option value="Per Unit">Per Unit</option>
+              <option value="Full Course">Full Course</option>
+            </select>
+          </FieldRow>
+          <FieldRow label="Fee Calculation Mode"
+            hint="'Use source value only' prevents the Full Course rollup bug (multiplying annual × duration).">
+            <select
+              value={feeCalcMode}
+              onChange={e => setFeeCalcMode(e.target.value)}
+              className="mt-1 h-8 text-xs border border-gray-200 rounded px-2 w-full bg-white"
+            >
+              <option value="use_source_value_only">Use source value only (default — no conversion)</option>
+              <option value="full_course_to_annual">Full Course ÷ duration = Annual equivalent</option>
+              <option value="per_unit_to_annual">Per Unit × 8 credit points = Annual estimate</option>
+            </select>
+          </FieldRow>
+          <div className="flex items-center gap-2">
+            <Switch
+              id="fee-prevent-rollup"
+              checked={feePreventRollup}
+              onCheckedChange={setFeePreventRollup}
+            />
+            <Label htmlFor="fee-prevent-rollup" className="text-xs text-gray-700 cursor-pointer">
+              Prevent Full Course rollup (mark as Annual if scraper returns Full Course term)
+            </Label>
+          </div>
+        </RecipeSection>
+
+        {/* ── IELTS Component Mapping ── */}
+        <RecipeSection title="IELTS Component Mapping" icon={<span className="text-[13px]">📝</span>} active={hasIelts}>
+          <p className="text-[11px] text-gray-500">
+            Maps IELTS overall score → minimum each-band score (Reading/Writing/Listening/Speaking).
+            Applied when the course page shows only an overall band but no per-component scores.
+          </p>
+          <div className="space-y-1.5">
+            <div className="grid grid-cols-[1fr_1fr_auto] gap-1.5 text-[10px] font-semibold text-gray-500 px-0.5">
+              <span>Overall (e.g. 6.0)</span>
+              <span>Each Band (e.g. 5.5)</span>
+              <span />
+            </div>
+            {ieltsMapping.map((row, i) => (
+              <div key={i} className="grid grid-cols-[1fr_1fr_auto] gap-1.5 items-center">
+                <Input
+                  value={row.overall}
+                  onChange={e => updateIelts(i, "overall", e.target.value)}
+                  placeholder="6.0"
+                  className="h-7 text-xs"
+                />
+                <Input
+                  value={row.band}
+                  onChange={e => updateIelts(i, "band", e.target.value)}
+                  placeholder="5.5"
+                  className="h-7 text-xs"
+                />
+                <button type="button" onClick={() => removeIelts(i)}
+                  className="p-1 rounded hover:bg-red-50 text-gray-400 hover:text-red-500">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ))}
+            <Button type="button" size="sm" variant="outline" onClick={addIelts}
+              className="h-7 text-xs gap-1">
+              <Plus className="w-3 h-3" /> Add row
+            </Button>
+          </div>
+        </RecipeSection>
+
+        {/* ── Course Name Cleanup ── */}
+        <RecipeSection title="Course Name Cleanup" icon={<span className="text-[13px]">✏️</span>} active={hasName}>
+          <FieldRow label="Remove everything after…"
+            hint="Strip the course name from the first occurrence of any of these strings. Useful for removing site name suffixes like '| University Name'.">
+            <div className="mt-1">
+              <TagInput
+                values={nameRemoveAfter}
+                onChange={setNameRemoveAfter}
+                placeholder='e.g. | Southern Cross University'
+              />
+            </div>
+          </FieldRow>
+          <div className="flex items-center gap-2 mt-1">
+            <Switch
+              id="name-remove-year"
+              checked={nameRemoveYear}
+              onCheckedChange={setNameRemoveYear}
+            />
+            <Label htmlFor="name-remove-year" className="text-xs text-gray-700 cursor-pointer">
+              Remove trailing year suffix (e.g. "Master of Science 2025" → "Master of Science")
+            </Label>
+          </div>
+        </RecipeSection>
+
+        {/* ── Location Cleanup ── */}
+        <RecipeSection title="Location Cleanup" icon={<span className="text-[13px]">📍</span>} active={hasLoc}>
+          <FieldRow label="Only keep these campus values"
+            hint="Allowlist — if non-empty, only location strings containing one of these entries are stored (case-insensitive). Others are cleared.">
+            <div className="mt-1">
+              <TagInput values={locAllowed} onChange={setLocAllowed} placeholder="e.g. Gold Coast" />
+            </div>
+          </FieldRow>
+          <FieldRow label="Reject if location contains…"
+            hint="If any of these strings appears in the extracted location, the location is cleared entirely. Use to remove nav text contamination.">
+            <div className="mt-1">
+              <TagInput values={locReject} onChange={setLocReject} placeholder="e.g. How to Apply" />
+            </div>
+          </FieldRow>
+          <FieldRow label="Replace text in location"
+            hint="String replacements applied before filtering. Useful for normalising abbreviations.">
+            <div className="mt-1.5 space-y-1.5">
+              {locReplace.length > 0 && (
+                <div className="grid grid-cols-[1fr_auto_1fr_auto] gap-1 text-[10px] font-semibold text-gray-500 px-0.5">
+                  <span>Find</span><span></span><span>Replace with</span><span />
+                </div>
+              )}
+              {locReplace.map((row, i) => (
+                <div key={i} className="grid grid-cols-[1fr_auto_1fr_auto] gap-1 items-center">
+                  <Input value={row.from} onChange={e => updateReplace(i, "from", e.target.value)}
+                    placeholder="SCU Online" className="h-7 text-xs" />
+                  <span className="text-[10px] text-gray-400 px-1">→</span>
+                  <Input value={row.to} onChange={e => updateReplace(i, "to", e.target.value)}
+                    placeholder="Online" className="h-7 text-xs" />
+                  <button type="button" onClick={() => removeReplace(i)}
+                    className="p-1 rounded hover:bg-red-50 text-gray-400 hover:text-red-500">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+              <Button type="button" size="sm" variant="outline" onClick={addReplace}
+                className="h-7 text-xs gap-1">
+                <Plus className="w-3 h-3" /> Add replacement
+              </Button>
+            </div>
+          </FieldRow>
+        </RecipeSection>
+
+        {/* ── Study Mode Rules ── */}
+        <RecipeSection title="Study Mode Rules" icon={<span className="text-[13px]">🎓</span>} active={hasMode}>
+          <div className="flex items-center gap-2">
+            <Switch
+              id="mode-from-loc"
+              checked={modeFromLoc}
+              onCheckedChange={setModeFromLoc}
+            />
+            <Label htmlFor="mode-from-loc" className="text-xs text-gray-700 cursor-pointer">
+              Derive Study Mode from Location (Online/Blended/On Campus) when study mode is blank
+            </Label>
+          </div>
+          {modeFromLoc && (
+            <FieldRow label="Online keywords"
+              hint="Keywords in the location string that indicate online delivery. Default: online, distance, virtual.">
+              <div className="mt-1">
+                <TagInput values={modeOnlineKws} onChange={setModeOnlineKws} placeholder="e.g. online" />
+              </div>
+            </FieldRow>
+          )}
+        </RecipeSection>
+      </div>
+
+      <div className="flex items-center gap-2 pt-1 border-t">
+        <Button onClick={onSave} disabled={saving} className="gap-1.5 h-8 text-xs bg-teal-600 hover:bg-teal-700">
+          {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+          Save Recipe
+        </Button>
+        <p className="text-[10px] text-gray-400">Rules apply on the next scrape run</p>
+      </div>
     </div>
   );
 }
@@ -947,12 +1352,24 @@ function FillRateBar({ label, pct, hasIssue }: { label: string; pct: number; has
   );
 }
 
-function ExtractionIssueCard({ issue }: { issue: ExtractionIssue }) {
+function ExtractionIssueCard({
+  issue,
+  onApplyFix,
+}: {
+  issue: ExtractionIssue;
+  onApplyFix?: (suggested: Record<string, unknown>) => void;
+}) {
   const [expanded, setExpanded] = useState(false);
+  const [applying, setApplying] = useState(false);
   const isPlatformBug = issue.fix_type === "platform_bug";
+  const isRecipeFix = issue.fix_type === "recipe_fix";
 
   const borderColor = isPlatformBug
     ? "border-slate-400 bg-slate-50"
+    : isRecipeFix
+    ? issue.severity === "critical" ? "border-teal-500 bg-teal-50"
+      : issue.severity === "high" ? "border-teal-400 bg-teal-50"
+      : "border-teal-300 bg-teal-50"
     : issue.severity === "critical" ? "border-red-500 bg-red-50"
     : issue.severity === "high" ? "border-orange-400 bg-orange-50"
     : "border-amber-300 bg-amber-50";
@@ -964,9 +1381,18 @@ function ExtractionIssueCard({ issue }: { issue: ExtractionIssue }) {
 
   const icon = isPlatformBug
     ? <Wrench className="w-3.5 h-3.5 text-slate-500 shrink-0 mt-0.5" />
+    : isRecipeFix
+    ? <FlaskConical className="w-3.5 h-3.5 text-teal-600 shrink-0 mt-0.5" />
     : issue.severity === "critical" ? <AlertTriangle className="w-3.5 h-3.5 text-red-500 shrink-0" />
     : issue.severity === "high" ? <AlertTriangle className="w-3.5 h-3.5 text-orange-500 shrink-0" />
     : <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0" />;
+
+  const handleApply = async () => {
+    if (!onApplyFix || !issue.suggested_recipe) return;
+    setApplying(true);
+    await onApplyFix(issue.suggested_recipe);
+    setApplying(false);
+  };
 
   return (
     <div className={`rounded-lg border-l-4 px-3 py-2.5 ${borderColor}`}>
@@ -979,6 +1405,10 @@ function ExtractionIssueCard({ issue }: { issue: ExtractionIssue }) {
             {isPlatformBug ? (
               <Badge variant="outline" className="text-[9px] px-1.5 border-slate-400 text-slate-600 bg-slate-100">
                 🔧 Platform bug
+              </Badge>
+            ) : isRecipeFix ? (
+              <Badge variant="outline" className="text-[9px] px-1.5 border-teal-400 text-teal-700 bg-teal-100">
+                🧪 Recipe fix
               </Badge>
             ) : (
               <Badge variant="outline" className={`text-[9px] px-1.5 ${severityBadgeColor}`}>
@@ -1012,6 +1442,34 @@ function ExtractionIssueCard({ issue }: { issue: ExtractionIssue }) {
                 <strong className="text-slate-800">Developer fix required.</strong>{" "}
                 This cannot be corrected through portal settings. The data extraction logic needs to be updated by the development team.
               </span>
+            </div>
+          ) : isRecipeFix ? (
+            <div className="mt-2 space-y-1.5">
+              <button
+                type="button"
+                onClick={() => setExpanded(e => !e)}
+                className="text-[10px] text-teal-600 hover:text-teal-800 flex items-center gap-0.5"
+              >
+                {expanded ? "Hide recipe fix ▲" : "Show recipe fix ▼"}
+              </button>
+              {expanded && (
+                <div className="p-2 bg-white border border-teal-200 rounded text-[11px] text-gray-700 leading-relaxed">
+                  <span className="font-semibold text-teal-700">Recipe Editor fix: </span>
+                  {issue.suggested_fix}
+                </div>
+              )}
+              {issue.suggested_recipe && onApplyFix && (
+                <button
+                  type="button"
+                  onClick={handleApply}
+                  disabled={applying}
+                  className="flex items-center gap-1 text-[10px] font-medium text-white bg-teal-600 hover:bg-teal-700 disabled:opacity-50 rounded px-2 py-0.5"
+                >
+                  {applying
+                    ? <><Loader2 className="w-3 h-3 animate-spin" /> Applying…</>
+                    : <><Zap className="w-3 h-3" /> Apply Recipe Fix</>}
+                </button>
+              )}
             </div>
           ) : (
             <>

@@ -2536,6 +2536,22 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     _trace_fields["study_mode"],
                 )
 
+                # ── Recipe rules (operator no-code transforms) ────────────
+                # Applied BEFORE staging so rule-cleaned values are stored
+                # with full provenance.  Soft-fail: a recipe rule error must
+                # never abort the scrape.
+                _recipe_rules_cfg = (uni_scrape_config or {}).get("recipe") or {}
+                if _recipe_rules_cfg:
+                    try:
+                        from app.services.scraper.recipe_rules import apply_recipe_rules
+                        payload = apply_recipe_rules(payload, _recipe_rules_cfg)
+                    except Exception as _rr_exc:  # noqa: BLE001
+                        log.warning(
+                            "[RECIPE] recipe_rules failed for %s: %s",
+                            r.get("name", "?"),
+                            _rr_exc,
+                        )
+
                 async with AsyncSessionLocal() as stage_db:
                     res = await stage_course(
                         stage_db,
