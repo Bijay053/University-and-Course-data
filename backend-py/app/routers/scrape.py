@@ -3137,6 +3137,95 @@ async def diagnose_scrape_job(
             if not val:
                 blank_fields[field] = blank_fields.get(field, 0) + 1
 
+    # ── Per-level course count (deterministic — no AI needed) ─────────────────
+    # Categorise staged courses into UG / PG / Research buckets by keyword
+    # matching degree_level.  Used for the Discovery Health panel and for
+    # injecting richer context into the Gemini diagnosis prompt.
+    _UG_KW  = frozenset({"bachelor", "undergraduate", "associate", "higher national",
+                          "hnd", "hnc", "foundation degree", "bsc", "ba ", "beng", "bmus"})
+    _PG_KW  = frozenset({"master", "postgraduate", "graduate certificate",
+                          "graduate diploma", "mba", "postgrad", "msc", "mres", "llm", "mpharm"})
+    _RES_KW = frozenset({"phd", "doctorate", "doctor of", "dphil",
+                          "research degree", "mphil", "edd"})
+
+    from sqlalchemy import select as _sel_lb, func as _func_lb
+    _level_rows = (await db.execute(
+        _sel_lb(ScrapedCourse.degree_level, _func_lb.count(ScrapedCourse.id).label("cnt"))
+        .where(ScrapedCourse.scrape_job_id == job_id)
+        .group_by(ScrapedCourse.degree_level)
+    )).all()
+
+    level_breakdown: dict[str, int] = {
+        "undergraduate": 0, "postgraduate": 0, "research": 0,
+        "other": 0, "unknown": 0,
+    }
+    for _lr in _level_rows:
+        _dl = (_lr.degree_level or "").lower()
+        if any(kw in _dl for kw in _UG_KW):
+            level_breakdown["undergraduate"] += _lr.cnt
+        elif any(kw in _dl for kw in _RES_KW):
+            level_breakdown["research"] += _lr.cnt
+        elif any(kw in _dl for kw in _PG_KW):
+            level_breakdown["postgraduate"] += _lr.cnt
+        elif _dl:
+            level_breakdown["other"] += _lr.cnt
+        else:
+            level_breakdown["unknown"] += _lr.cnt
+
+    # ── Deterministic issue detection ─────────────────────────────────────────
+    # Rules that can be determined without AI based purely on course counts.
+    # These are shown in the UI BEFORE the AI diagnosis (higher trust, no LLM).
+    deterministic_issues: list[dict] = []
+    _pg_found = level_breakdown["postgraduate"] + level_breakdown["research"]
+    if level_breakdown["undergraduate"] == 0 and _pg_found > 0:
+        deterministic_issues.append({
+            "issue": "Undergraduate catalogue missing",
+            "severity": "critical",
+            "check": "undergraduate_count_zero",
+            "detail": (
+                f"0 undergraduate courses were staged. "
+                f"{_pg_found} postgraduate/research courses were found. "
+                "The undergraduate listing page was not reached, or undergraduate "
+                "course URLs were silently dropped by a URL filter (must_contain)."
+            ),
+            "potential_causes": [
+                "Undergraduate course URLs filtered by must_contain pattern (e.g. requiring /courses/ in path when UG URLs don't have it)",
+                "Undergraduate seed URL returned 0 links (JS-rendered listing or Cloudflare block)",
+                "Browser page budget exhausted before reaching the undergraduate catalogue page",
+                "Undergraduate section lives on a different subdomain not yet configured",
+            ],
+        })
+    if level_breakdown["postgraduate"] == 0 and level_breakdown["undergraduate"] > 0:
+        deterministic_issues.append({
+            "issue": "Postgraduate catalogue missing",
+            "severity": "critical",
+            "check": "postgraduate_count_zero",
+            "detail": (
+                f"0 postgraduate courses were staged. "
+                f"{level_breakdown['undergraduate']} undergraduate courses were found. "
+                "The postgraduate listing page may not have been reached or its URLs were filtered."
+            ),
+            "potential_causes": [
+                "Postgraduate seed URL returned 0 course links",
+                "Postgraduate course URLs do not match the must_contain filter",
+            ],
+        })
+    if (job.total_found or 0) > 0 and (job.imported or 0) == 0:
+        deterministic_issues.append({
+            "issue": "All discovered URLs dropped by filter",
+            "severity": "critical",
+            "check": "all_filtered",
+            "detail": (
+                f"{job.total_found} URLs were discovered but 0 courses were staged. "
+                "A URL filter (must_contain or block_url_patterns) is likely too strict "
+                "and is dropping all candidate course links."
+            ),
+            "potential_causes": [
+                "must_contain pattern doesn't match actual course URL structure",
+                "block_url_patterns accidentally blocking all course pages",
+            ],
+        })
+
     # ── Load effective (fully-merged) config ─────────────────────────────────
     # Build the real UniConfig the scraper will use: defaults → YAML → admin_config.
     # Passing this to the AI prevents it from suggesting settings that are already
@@ -3192,6 +3281,14 @@ Courses skipped: {job.skipped or 0}
 Errors: {job.errors or 0}
 Avg completeness: {avg_completeness * 100:.1f}%
 Sample course names: {course_names}
+
+DISCOVERY HEALTH (per academic level — deterministic, pre-computed):
+Undergraduate courses staged: {level_breakdown['undergraduate']}
+Postgraduate courses staged:  {level_breakdown['postgraduate']}
+Research courses staged:      {level_breakdown['research']}
+Other/unknown level:          {level_breakdown['other'] + level_breakdown['unknown']}
+Deterministic issues already detected: {[i['issue'] for i in deterministic_issues] if deterministic_issues else 'None'}
+
 Blank fields across sample ({staged_count} courses):
 {json.dumps(blank_fields, indent=2)}
 Bad location values detected (nav/footer text saved as location):
@@ -3342,6 +3439,8 @@ Return only valid JSON, no markdown fences."""
             "avg_completeness_pct": round(avg_completeness * 100, 1),
         },
         "bad_location_samples": bad_locations[:3],
+        "level_breakdown": level_breakdown,
+        "deterministic_issues": deterministic_issues,
         "diagnosis": diagnosis,
         "suggested_config": suggested_config,
         "already_applied": already_applied,

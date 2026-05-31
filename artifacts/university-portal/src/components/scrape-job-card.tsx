@@ -63,6 +63,20 @@ type DiagnosisPayload  = {
   discovery_verdict?: string;
   location_verdict?: string;
 };
+type LevelBreakdown = {
+  undergraduate: number;
+  postgraduate: number;
+  research: number;
+  other: number;
+  unknown: number;
+};
+type DeterministicIssue = {
+  issue: string;
+  severity: "critical" | "warning";
+  check: string;
+  detail: string;
+  potential_causes?: string[];
+};
 type DiagnoseResult = {
   ok: boolean;
   job_id: string;
@@ -70,6 +84,8 @@ type DiagnoseResult = {
   university_id?: number;
   job_stats?: { total_found: number; imported: number; skipped: number; errors: number; avg_completeness_pct: number };
   bad_location_samples?: string[];
+  level_breakdown?: LevelBreakdown;
+  deterministic_issues?: DeterministicIssue[];
   diagnosis?: DiagnosisPayload;
   fallback?: DiagnosisPayload;
   suggested_config?: Record<string, unknown>;
@@ -1054,8 +1070,79 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
                     {diagnoseResult && !diagnoseLoading && (() => {
                       const d = diagnoseResult.diagnosis ?? diagnoseResult.fallback;
                       const stats = diagnoseResult.job_stats;
+                      const lb = diagnoseResult.level_breakdown;
+                      const di = diagnoseResult.deterministic_issues ?? [];
+                      const hasCritical = di.some(i => i.severity === "critical");
                       return (
                         <>
+                          {/* ── Discovery Health panel ─────────────────────── */}
+                          {lb && (
+                            <div className="rounded border border-gray-200 overflow-hidden">
+                              <div className={`px-2.5 py-1.5 text-[10px] font-semibold flex items-center gap-1.5 ${hasCritical ? "bg-red-50 text-red-800 border-b border-red-200" : "bg-gray-50 text-gray-700 border-b border-gray-200"}`}>
+                                {hasCritical
+                                  ? <><AlertTriangle className="w-3 h-3 text-red-500" /> Discovery Health — Issues Found</>
+                                  : <><CheckCheck className="w-3 h-3 text-green-500" /> Discovery Health</>
+                                }
+                              </div>
+                              {([
+                                { label: "Undergraduate courses", key: "undergraduate" as const },
+                                { label: "Postgraduate courses",  key: "postgraduate"  as const },
+                                { label: "Research programmes",   key: "research"      as const },
+                              ] as const).map(({ label, key }) => {
+                                const count = lb[key];
+                                const isMissing = di.some(i => i.check === `${key}_count_zero`);
+                                return (
+                                  <div key={key} className={`flex items-center justify-between px-2.5 py-1.5 text-[10px] border-b border-gray-100 last:border-0 ${isMissing ? "bg-red-50" : "bg-white"}`}>
+                                    <span className="text-gray-700">{label}</span>
+                                    {count === 0 ? (
+                                      <span className="font-semibold text-red-600 flex items-center gap-1">
+                                        <span>❌</span> Missing
+                                      </span>
+                                    ) : (
+                                      <span className="font-semibold text-green-700 flex items-center gap-1">
+                                        <span>✅</span> Found {count}
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                              {(lb.other + lb.unknown) > 0 && (
+                                <div className="flex items-center justify-between px-2.5 py-1.5 text-[10px] bg-white text-gray-500">
+                                  <span>Other / unclassified</span>
+                                  <span className="font-semibold">{lb.other + lb.unknown}</span>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* ── Deterministic critical issues ──────────────── */}
+                          {di.length > 0 && (
+                            <div className="space-y-1.5">
+                              <p className="text-[10px] font-semibold text-red-600 uppercase tracking-wide flex items-center gap-1">
+                                <AlertTriangle className="w-3 h-3" /> Critical Issues Found
+                              </p>
+                              {di.map((issue, i) => (
+                                <div key={i} className="rounded px-2.5 py-2 border-l-2 border-red-500 bg-red-50 space-y-1">
+                                  <div className="font-semibold text-red-800 text-[11px]">❌ {issue.issue}</div>
+                                  <div className="text-red-700 text-[10px] leading-relaxed">{issue.detail}</div>
+                                  {issue.potential_causes && issue.potential_causes.length > 0 && (
+                                    <div className="pt-0.5">
+                                      <p className="text-[9px] font-semibold text-red-500 uppercase tracking-wide mb-0.5">Potential causes</p>
+                                      <ul className="space-y-0.5">
+                                        {issue.potential_causes.map((c, j) => (
+                                          <li key={j} className="text-[10px] text-red-600 flex items-start gap-1">
+                                            <span className="shrink-0 mt-0.5">•</span>
+                                            <span>{c}</span>
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
                           {/* Stats row */}
                           {stats && (
                             <div className="flex items-center gap-3 flex-wrap text-[10px] text-gray-500 border-b border-gray-100 pb-2">
@@ -1072,7 +1159,7 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
                             </div>
                           )}
 
-                          {/* Summary */}
+                          {/* AI summary (shown below deterministic issues) */}
                           {d?.summary && (
                             <p className="text-[11px] text-gray-700 leading-relaxed">{d.summary}</p>
                           )}
