@@ -794,6 +794,8 @@ async def put_recipe(
         fee_patch["reject_keywords"] = body["fee_reject_keywords"]
     if body.get("fee_prefer_international") is not None:
         fee_patch["prefer_international"] = bool(body["fee_prefer_international"])
+    if body.get("fee_follow_links") is not None:
+        fee_patch["follow_links"] = body["fee_follow_links"]
     if body.get("actions"):
         extraction_patch["actions"] = body["actions"]
 

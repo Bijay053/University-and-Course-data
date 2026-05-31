@@ -98,6 +98,13 @@ extraction:
   #
   # prefer_international: when both a domestic and an international fee are
   #   detected on the same page, always keep the international value.
+  # prefer_blended_over_on_campus: JCU courses are offered simultaneously
+  # online AND on-campus (the page shows "Online: Jan, May" and
+  # "Townsville: Jan, May" side by side).  When the study-mode rule extractor
+  # fires with low confidence (≤0.50) and a physical campus is also detected,
+  # set study_mode="Blended" rather than the default "On Campus".
+  prefer_blended_over_on_campus: true
+
   fees:
     prefer_international: true
     reject_keywords:
@@ -107,3 +114,14 @@ extraction:
       - "HECS-HELP"
       - "Domestic students"
       - "Domestic fee"
+    # follow_links: when international_fee is blank after extraction and fee
+    # rejection (CSP amounts discarded), scan the course HTML for <a> tags
+    # whose text matches these phrases and fetch the linked fees page.
+    # JCU UG course pages show only CSP fees on the course page itself; the
+    # international fee is published on a separate "Fees and Scholarships"
+    # sub-page linked from within each course detail page.
+    follow_links:
+      - "fees and scholarships"
+      - "international student fees"
+      - "fees for your course"
+      - "view fees"

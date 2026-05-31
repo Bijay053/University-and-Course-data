@@ -2318,7 +2318,22 @@ async def extract_course(
     if _low_conf_online or _rule_only_online:
         from app.services.scraper.extractors.study_mode import derive_mode_from_location
 
-        _derived_mode = derive_mode_from_location(payload.get("course_location"))
+        # Per-uni flag: when the university genuinely offers courses both online
+        # AND on-campus (e.g. JCU: "Online: Jan, May" + "Townsville: Jan, May"
+        # on the same page), set Blended instead of On Campus.
+        try:
+            _uc_blended = get_uni_config()
+            _prefer_blended_oc = (
+                _uc_blended.extraction.prefer_blended_over_on_campus
+                if _uc_blended else False
+            )
+        except Exception:  # noqa: BLE001
+            _prefer_blended_oc = False
+
+        if _prefer_blended_oc and _has_physical_location:
+            _derived_mode = "Blended"
+        else:
+            _derived_mode = derive_mode_from_location(payload.get("course_location"))
         if _derived_mode:
             payload["study_mode"] = _derived_mode
             _upgrade_reason = "Low-confidence" if _low_conf_online else "Rule-only"
@@ -3055,6 +3070,91 @@ async def extract_course(
                         keyword=_kw_hit,
                     )
 
+        # ── YAML: Fee link-following (fees.follow_links) ──────────────────────
+        # When international_fee is still blank after all extractors and after
+        # fee rejection, scan the course HTML for <a> elements whose text
+        # matches any listed phrase (case-insensitive), fetch the linked page,
+        # and re-run the fee extractor.  Mirrors english.follow_links.  Any fee
+        # found on the linked page is also filtered through reject_keywords so
+        # domestic/CSP amounts on that page are discarded automatically.
+        if payload.get("international_fee") is None:
+            try:
+                _uc_fee_fl = get_uni_config()
+                _fee_follow_patterns: list[str] = (
+                    _uc_fee_fl.extraction.fees.follow_links if _uc_fee_fl else []
+                ) or []
+            except Exception:  # noqa: BLE001
+                _fee_follow_patterns = []
+            if _fee_follow_patterns and html:
+                try:
+                    from bs4 import BeautifulSoup as _BS4_fee
+                    from urllib.parse import urljoin as _urljoin_fee
+                    import httpx as _httpx_fee
+                    from app.services.scraper.extractors import fee as _fee_extractor
+                    _soup_fee_fl = _BS4_fee(html, "html.parser")
+                    _fee_followed_urls: list[str] = []
+                    for _a_fee in _soup_fee_fl.find_all("a", href=True)[:300]:
+                        _lt_fee = (_a_fee.get_text() or "").strip()
+                        if any(p.lower() in _lt_fee.lower() for p in _fee_follow_patterns):
+                            _href_fee = _urljoin_fee(url, str(_a_fee["href"]))
+                            if _href_fee != url and _href_fee not in _fee_followed_urls:
+                                _fee_followed_urls.append(_href_fee)
+                            if len(_fee_followed_urls) >= 3:
+                                break
+                    for _fee_fl_url in _fee_followed_urls:
+                        if payload.get("international_fee") is not None:
+                            break
+                        try:
+                            async with _httpx_fee.AsyncClient(
+                                follow_redirects=True, timeout=15
+                            ) as _cl_fee:
+                                _fee_fl_resp = await _cl_fee.get(
+                                    _fee_fl_url,
+                                    headers={"User-Agent": "Mozilla/5.0"},
+                                )
+                            _fee_fl_html = (
+                                _fee_fl_resp.text if _fee_fl_resp.status_code == 200 else None
+                            )
+                        except Exception:  # noqa: BLE001
+                            _fee_fl_html = None
+                        if not _fee_fl_html:
+                            continue
+                        _fee_fl_results = await _fee_extractor.extract(
+                            _fee_fl_html, _fee_fl_url
+                        )
+                        for _fee_fl_res in (_fee_fl_results or []):
+                            _fee_fl_val = _fee_fl_res.value
+                            if _fee_fl_val in (None, "", 0):
+                                continue
+                            # Apply reject_keywords to linked-page fee as well
+                            _fee_fl_snip = str(_fee_fl_res.snippet or "").lower()
+                            if _fee_reject_kws and any(
+                                kw.lower() in _fee_fl_snip for kw in _fee_reject_kws
+                            ):
+                                continue
+                            payload["international_fee"] = _fee_fl_val
+                            evidence.append({
+                                "field_key": "international_fee",
+                                "value": _fee_fl_val,
+                                "confidence": _fee_fl_res.confidence or 0.70,
+                                "method": "yaml_fee_follow_link",
+                                "snippet": f"Fee link followed: {_fee_fl_url}",
+                                "source_url": _fee_fl_url,
+                            })
+                            if emit:
+                                await emit(
+                                    "status",
+                                    f"[FEE_FOLLOW] {str(payload.get('course_name', url))[:35]} "
+                                    f"→ {_fee_fl_url[:50]}: fee={_fee_fl_val}",
+                                    phase="extract",
+                                    kind="fee_follow_link",
+                                    url=_fee_fl_url,
+                                    fee=_fee_fl_val,
+                                )
+                            break
+                except Exception as _fee_fl_exc:  # noqa: BLE001
+                    log.warning("fees follow_links error on %s: %s", url, _fee_fl_exc)
+
         # ── YAML: English link-following (follow_links) ───────────────────────
         # When IELTS / PTE / TOEFL are still missing after all course-page
         # extraction AND extraction.english.follow_links is configured, find
@@ -3157,6 +3257,11 @@ async def extract_course(
             except Exception:  # noqa: BLE001
                 _band_map = {}
                 _band_ref_url = None
+            if not _band_map:
+                log.debug(
+                    "[BAND_MAP] no band_mapping config for %s — skipping band label lookup",
+                    url,
+                )
             if _band_map and html:
                 import re as _re_bm
                 _bm_text = html_to_text(html)
@@ -3171,6 +3276,14 @@ async def extract_course(
                         _matched_band = _bname
                         _matched_spec = _bspec if isinstance(_bspec, dict) else {}
                         break
+                if not _matched_band:
+                    if _re_bm.search(r"\bBand\s+[1-9]\b", _bm_text, _re_bm.IGNORECASE):
+                        log.info(
+                            "[BAND_MAP_MISS] %s — 'Band N' found in page text but no "
+                            "band_mapping config entry matched; check "
+                            "extraction.english.band_mapping in the university YAML",
+                            url,
+                        )
                 if _matched_band and _matched_spec is not None:
                     _bm_filled: list[str] = []
                     _bm_snippet = (

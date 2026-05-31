@@ -483,7 +483,7 @@ class FeesConfig(BaseModel):
             "an extracted fee amount, indicate the fee is a *domestic* or "
             "CSP/HECS fee that must NOT be published as an international fee. "
             "Typical values: ``[\"Commonwealth Supported\", \"CSP\", \"HECS\", "
-            "\"Domestic\", \"HECS-HELP\", \"Indicative domestic\"]\`. "
+            "\"Domestic\", \"HECS-HELP\", \"Indicative domestic\"]``. "
             "When the winning fee amount's snippet matches ANY keyword, the fee "
             "is discarded and ``international_fee`` is left null (→ DQ warning). "
             "Empty by default — opt-in per university."
@@ -499,6 +499,21 @@ class FeesConfig(BaseModel):
             "that publish domestic fees first and international fees below (e.g. "
             "JCU tab pages, Newcastle right-sidebar, Murdoch toggle). "
             "Default False preserves the existing 'highest confidence wins' logic."
+        ),
+    )
+    follow_links: list[str] = Field(
+        default_factory=list,
+        description=(
+            "When ``international_fee`` is still blank after all extractors and "
+            "after fee rejection, scan the course HTML for ``<a>`` elements whose "
+            "link text matches any of these phrases (case-insensitive), fetch the "
+            "linked page, and re-run the fee extractor.  Mirrors the "
+            "``extraction.english.follow_links`` mechanism.  Any matched fee is "
+            "also filtered through ``reject_keywords`` so domestic/CSP amounts on "
+            "the linked page are discarded automatically.  "
+            "Typical values for JCU: "
+            "``['fees and scholarships', 'international student fees', "
+            "'fees for your course']``.  Empty by default — opt-in per university."
         ),
     )
 
@@ -915,6 +930,18 @@ class ExtractionConfig(BaseModel):
             "as a critical data-quality failure. Useful for universities with a "
             "fixed set of known campuses (e.g. JCU: Townsville, Cairns, Brisbane, "
             "Singapore). Leave empty (default) to disable allowlist checking."
+        ),
+    )
+    prefer_blended_over_on_campus: bool = Field(
+        default=False,
+        description=(
+            "When True, and the study-mode rule extractor emitted 'Online' at low "
+            "confidence (≤0.50) AND a physical campus was also found in "
+            "course_location, the pipeline sets study_mode='Blended' instead of "
+            "the default 'On Campus'.  Use for universities that genuinely offer "
+            "courses both online AND on-campus (e.g. JCU: 'Online: Jan, May' AND "
+            "'Townsville: Jan, May' on the same page).  Default False preserves "
+            "the original Bug-1 fix behaviour (low-conf online + campus → On Campus)."
         ),
     )
     skip_browser_rescue: bool = Field(

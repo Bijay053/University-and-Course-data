@@ -88,6 +88,7 @@ interface Recipe {
   fee_rules_postgraduate: FeeRule[];
   fee_reject_keywords: string[];
   fee_prefer_international: boolean;
+  fee_follow_links: string[];
   campus?: {
     default_city: string;
     valid_campuses: string[];
@@ -118,6 +119,7 @@ const EMPTY_RECIPE: Recipe = {
   fee_rules_postgraduate: [],
   fee_reject_keywords: [],
   fee_prefer_international: false,
+  fee_follow_links: [],
   minimum_completeness: 85,
   required_fields: [],
   follow_links: [],
@@ -1388,6 +1390,21 @@ export default function RecipeEditorPage() {
                   <div className="rounded-lg bg-blue-50 border border-blue-200 p-3 text-xs text-blue-700">
                     <strong>Tip for JCU:</strong> Add "Commonwealth Supported", "CSP", "HECS", "HECS-HELP",
                     "Domestic students", "Domestic fee" to reject domestic fees automatically.
+                  </div>
+                )}
+
+                <StringListEditor
+                  label="Fee Follow Links"
+                  values={recipe.fee_follow_links}
+                  onChange={v => patchRecipe({ fee_follow_links: v })}
+                  placeholder='e.g. "fees and scholarships" or "international student fees"'
+                  helpText="When international_fee is blank after extraction, the scraper follows any <a> links on the course page whose text matches these phrases and re-runs the fee extractor on the linked page. Useful for universities (e.g. JCU) where international fees are on a separate linked page, not the course page itself."
+                />
+                {recipe.fee_follow_links.length === 0 && (
+                  <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-xs text-amber-700">
+                    <strong>Tip for JCU:</strong> Add "fees and scholarships", "international student fees",
+                    "fees for your course" — the scraper will follow those links to find the international fee
+                    when only a CSP fee appears on the course page.
                   </div>
                 )}
               </div>
