@@ -15,7 +15,8 @@ import {
   ArrowLeft, Save, Plus, Trash2, Globe, Database, Filter,
   Code2, DollarSign, BookOpen, MapPin, ShieldCheck, Zap, RefreshCw,
   FlaskConical, CheckCircle2, XCircle, AlertTriangle, ChevronDown, ChevronUp, Info,
-  MousePointerClick, GripVertical, Link
+  MousePointerClick, GripVertical, Link, Stethoscope, Loader2, Wand2, WifiOff,
+  TrendingUp, ExternalLink
 } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -535,6 +536,8 @@ export default function RecipeEditorPage() {
   const [testingDiscovery, setTestingDiscovery] = useState(false);
   const [discoveryResult, setDiscoveryResult] = useState<any | null>(null);
   const [showDropped, setShowDropped] = useState(false);
+  const [diagnosing, setDiagnosing] = useState(false);
+  const [diagnoseResult, setDiagnoseResult] = useState<any | null>(null);
 
   // ── Load ──
   useEffect(() => {
@@ -601,6 +604,33 @@ export default function RecipeEditorPage() {
       setTesting(false);
     }
   }, [recipe.api]);
+
+  // ── Diagnose ──
+  const runDiagnose = useCallback(async () => {
+    setDiagnosing(true);
+    setDiagnoseResult(null);
+    try {
+      const resp = await fetch(`/api/universities/${id}/diagnose`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!resp.ok) throw new Error(await resp.text());
+      setDiagnoseResult(await resp.json());
+    } catch (e: any) {
+      toast({ title: "Diagnostics failed", description: e.message, variant: "destructive" });
+    } finally {
+      setDiagnosing(false);
+    }
+  }, [id]);
+
+  // ── Apply Fix from diagnostics ──
+  const applyFix = useCallback((patch: Record<string, any>) => {
+    patchRecipe(patch);
+    toast({
+      title: "Fix applied",
+      description: "Recipe updated — review the changes below then click Save Recipe.",
+    });
+  }, []);
 
   // ── Test Discovery ──
   const testDiscovery = useCallback(async () => {
@@ -682,6 +712,12 @@ export default function RecipeEditorPage() {
           <Badge variant={recipe.discovery_strategy === "json_api" ? "default" : "secondary"}>
             {recipe.discovery_strategy}
           </Badge>
+          <Button variant="outline" onClick={runDiagnose} disabled={diagnosing || saving}>
+            {diagnosing
+              ? <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              : <Stethoscope className="h-4 w-4 mr-2" />}
+            {diagnosing ? "Diagnosing…" : "Diagnose"}
+          </Button>
           <Button variant="outline" onClick={testDiscovery} disabled={testingDiscovery || saving}>
             <FlaskConical className="h-4 w-4 mr-2" />
             {testingDiscovery ? "Testing…" : "Test Discovery"}
@@ -926,6 +962,255 @@ export default function RecipeEditorPage() {
                   Dismiss
                 </button>
               </div>
+            </CardContent>
+          </Card>
+        );
+      })()}
+
+      {/* ── Diagnosing indicator ─────────────────────────────────────────── */}
+      {diagnosing && (
+        <Card className="border-purple-200 bg-purple-50">
+          <CardContent className="pt-4 pb-3">
+            <div className="flex items-center gap-2 text-purple-700 text-sm">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span>Running diagnostics — analysing last scrape job and probing live site…</span>
+              <span className="text-xs text-purple-500">(up to 20 s)</span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ── Diagnostic Report ───────────────────────────────────────────────── */}
+      {diagnoseResult && !diagnosing && (() => {
+        const dr = diagnoseResult;
+        const p1 = dr.phase1 || {};
+        const p2 = dr.phase2 || {};
+        const recs: any[] = dr.recommendations || [];
+        const summary = dr.summary || {};
+        const detected = p2.detected || {};
+
+        const FIELD_LABELS: Record<string, string> = {
+          international_fee: "International fee",
+          ielts_overall: "IELTS",
+          pte_overall: "PTE",
+          toefl_overall: "TOEFL",
+          study_mode: "Study mode",
+          degree_level: "Degree level",
+          duration: "Duration",
+          academic_level: "Academic level",
+          intake_months: "Intakes",
+        };
+
+        const SEVERITY_COLORS = {
+          critical: { border: "border-red-200", bg: "bg-red-50", badge: "bg-red-100 text-red-800", icon: <XCircle className="h-4 w-4 text-red-600 shrink-0 mt-0.5" /> },
+          warning:  { border: "border-yellow-200", bg: "bg-yellow-50", badge: "bg-yellow-100 text-yellow-800", icon: <AlertTriangle className="h-4 w-4 text-yellow-600 shrink-0 mt-0.5" /> },
+        };
+
+        return (
+          <Card className="border-purple-200">
+            <CardHeader className="pb-3 pt-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Stethoscope className="h-5 w-5 text-purple-600" />
+                  <CardTitle className="text-base">Diagnostic Report</CardTitle>
+                  {summary.critical_count > 0 && (
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-800">
+                      {summary.critical_count} critical
+                    </span>
+                  )}
+                  {summary.warning_count > 0 && (
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800">
+                      {summary.warning_count} warning
+                    </span>
+                  )}
+                  {summary.auto_fix_available > 0 && (
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-800">
+                      {summary.auto_fix_available} auto-fix available
+                    </span>
+                  )}
+                  {recs.length === 0 && (
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-800">
+                      No issues found
+                    </span>
+                  )}
+                </div>
+                <button
+                  onClick={() => setDiagnoseResult(null)}
+                  className="text-xs text-muted-foreground hover:text-foreground"
+                >
+                  Dismiss
+                </button>
+              </div>
+              {p1.completed_at && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Based on scrape completed {new Date(p1.completed_at).toLocaleDateString()} ·{" "}
+                  {p1.courses_analysed} courses analysed ({p1.total_found} discovered, {p1.imported} imported)
+                  {p2.cloudflare_blocked && (
+                    <span className="ml-2 inline-flex items-center gap-1 text-orange-600">
+                      <WifiOff className="h-3 w-3" /> Live probe blocked by Cloudflare
+                    </span>
+                  )}
+                </p>
+              )}
+            </CardHeader>
+
+            <CardContent className="space-y-5 pt-0">
+
+              {/* Phase 1 — Field Completion */}
+              {p1.status === "ok" && p1.field_completion && (
+                <div>
+                  <div className="flex items-center gap-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                    <TrendingUp className="h-3 w-3" /> Field Completion
+                  </div>
+                  <div className="grid grid-cols-2 gap-x-6 gap-y-1.5">
+                    {Object.entries(p1.field_completion as Record<string, any>).map(([field, stat]) => {
+                      const pct = Math.round((stat.pct || 0) * 100);
+                      const color = pct >= 80 ? "bg-green-500" : pct >= 50 ? "bg-yellow-500" : "bg-red-500";
+                      return (
+                        <div key={field}>
+                          <div className="flex justify-between text-xs mb-0.5">
+                            <span className="text-muted-foreground">{FIELD_LABELS[field] ?? field}</span>
+                            <span className={`font-medium ${pct >= 80 ? "text-green-700" : pct >= 50 ? "text-yellow-700" : "text-red-700"}`}>
+                              {pct}% <span className="font-normal text-muted-foreground">({stat.count}/{stat.count + stat.missing})</span>
+                            </span>
+                          </div>
+                          <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
+                            <div className={`h-full rounded-full ${color}`} style={{ width: `${pct}%` }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {/* Study mode breakdown */}
+                  {p1.study_mode_breakdown && (
+                    <div className="mt-2 flex gap-3 text-xs text-muted-foreground">
+                      <span>Study mode breakdown:</span>
+                      {Object.entries(p1.study_mode_breakdown as Record<string, number>).map(([mode, n]) => (
+                        <span key={mode} className="font-medium text-foreground">{mode}: {n}</span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {p1.status === "no_completed_job" && (
+                <p className="text-sm text-muted-foreground">
+                  No completed scrape job found. Run a scrape first, then click Diagnose.
+                </p>
+              )}
+
+              {/* Phase 2 — Live Probe */}
+              {p2.status === "ok" && (detected.fee_link_texts?.length > 0 || detected.english_link_texts?.length > 0 || detected.pdf_urls?.length > 0 || detected.has_tab_layout || detected.has_online_delivery) && (
+                <div>
+                  <div className="flex items-center gap-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                    <Globe className="h-3 w-3" /> Live Site Detected
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {detected.fee_link_texts?.length > 0 && (
+                      <span className="inline-flex items-center gap-1 text-xs bg-blue-50 border border-blue-200 text-blue-800 px-2 py-0.5 rounded-full">
+                        <DollarSign className="h-3 w-3" /> Fee pages: {detected.fee_link_texts.slice(0, 2).map((t: string) => `"${t}"`).join(", ")}
+                      </span>
+                    )}
+                    {detected.english_link_texts?.length > 0 && (
+                      <span className="inline-flex items-center gap-1 text-xs bg-blue-50 border border-blue-200 text-blue-800 px-2 py-0.5 rounded-full">
+                        <BookOpen className="h-3 w-3" /> English pages: {detected.english_link_texts.slice(0, 2).map((t: string) => `"${t}"`).join(", ")}
+                      </span>
+                    )}
+                    {detected.pdf_urls?.length > 0 && (
+                      <span className="inline-flex items-center gap-1 text-xs bg-blue-50 border border-blue-200 text-blue-800 px-2 py-0.5 rounded-full">
+                        <ExternalLink className="h-3 w-3" /> {detected.pdf_urls.length} PDFs detected
+                      </span>
+                    )}
+                    {detected.has_tab_layout && (
+                      <span className="inline-flex items-center gap-1 text-xs bg-orange-50 border border-orange-200 text-orange-800 px-2 py-0.5 rounded-full">
+                        <Database className="h-3 w-3" /> Tab-based layout
+                      </span>
+                    )}
+                    {detected.has_online_delivery && (
+                      <span className="inline-flex items-center gap-1 text-xs bg-blue-50 border border-blue-200 text-blue-800 px-2 py-0.5 rounded-full">
+                        <Globe className="h-3 w-3" /> Online delivery detected
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Phase 3 — Issues & Fixes */}
+              {recs.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                    <Wand2 className="h-3 w-3" /> Issues &amp; Suggested Fixes
+                  </div>
+                  <div className="space-y-3">
+                    {recs.map((rec: any) => {
+                      const sev = SEVERITY_COLORS[rec.severity as "critical" | "warning"] ?? SEVERITY_COLORS.warning;
+                      const hasFix = rec.fix && rec.fix.recipe_patch;
+                      const isGuidanceOnly = rec.fix && !rec.fix.recipe_patch;
+                      return (
+                        <div key={rec.id} className={`rounded-lg border p-3 ${sev.border} ${sev.bg}`}>
+                          <div className="flex items-start gap-2">
+                            {sev.icon}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-sm font-semibold">{rec.title}</span>
+                                <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${sev.badge}`}>
+                                  {rec.severity}
+                                </span>
+                                <span className="text-xs text-muted-foreground">
+                                  {Math.round((rec.confidence || 0) * 100)}% confidence
+                                </span>
+                              </div>
+                              <p className="text-xs text-muted-foreground mt-0.5">{rec.description}</p>
+                              {rec.root_cause && (
+                                <p className="text-xs mt-1">
+                                  <span className="font-medium">Root cause: </span>{rec.root_cause}
+                                </p>
+                              )}
+                              {rec.fix && (
+                                <div className="mt-2 flex items-center gap-2 flex-wrap">
+                                  <p className="text-xs">
+                                    <span className="font-medium">Suggested fix: </span>
+                                    {rec.fix.description}
+                                  </p>
+                                  {hasFix && (
+                                    <Button
+                                      size="sm"
+                                      variant="default"
+                                      className="h-6 text-xs px-2 py-0 bg-purple-600 hover:bg-purple-700"
+                                      onClick={() => applyFix(rec.fix.recipe_patch)}
+                                    >
+                                      <Wand2 className="h-3 w-3 mr-1" />
+                                      Apply Fix
+                                    </Button>
+                                  )}
+                                  {isGuidanceOnly && (
+                                    <span className="text-xs text-muted-foreground italic">
+                                      (manual configuration required — see {
+                                        rec.fix.type === "browser_action" ? "Browser Actions tab" :
+                                        rec.fix.type === "field_selector" ? "Field Selectors tab" :
+                                        rec.fix.type === "seed_urls" ? "Discovery tab" :
+                                        "relevant tab"
+                                      })
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {recs.length === 0 && p1.status === "ok" && (
+                <div className="flex items-center gap-2 text-green-700 text-sm">
+                  <CheckCircle2 className="h-4 w-4" />
+                  <span>No extraction issues detected. The recipe looks well-configured for this university.</span>
+                </div>
+              )}
+
             </CardContent>
           </Card>
         );

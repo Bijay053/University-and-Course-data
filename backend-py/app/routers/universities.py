@@ -633,6 +633,24 @@ async def get_probe_result(
     }
 
 
+# ── AI Diagnostics ────────────────────────────────────────────────────────────
+
+@router.post("/universities/{uni_id}/diagnose")
+async def diagnose_university(
+    uni_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _user: Annotated[dict, Depends(get_current_user)],
+) -> dict[str, Any]:
+    """Three-phase diagnostic analysis for a university's scraping config.
+
+    Phase 1 — Analyse the last completed scrape job (field completion, patterns).
+    Phase 2 — Probe the live site to detect available data sources.
+    Phase 3 — Cross-correlate to produce root-cause analysis and actionable fixes.
+    """
+    from app.services.scraper.diagnostics import run_diagnostics
+    return await run_diagnostics(uni_id, db)
+
+
 # ── Scrape Fix Agent endpoints ────────────────────────────────────────────────
 
 @router.get("/universities/{uni_id}/agent-config")
