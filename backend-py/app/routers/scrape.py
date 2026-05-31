@@ -5540,6 +5540,85 @@ async def preview_scrape_fix(
     except Exception:
         pass
 
+    # ── Fetch affected course names + evidence URLs + sample before/after ─────
+    affected_course_names: list[str] = []
+    evidence_urls_out: list[dict] = []
+    sample_before_after: dict | None = None
+
+    if field and field in field_col_map:
+        _db_col_af = field_col_map[field]
+        try:
+            _names_rows = await db.execute(
+                _text(f"""
+                    SELECT course_name
+                    FROM scraped_courses
+                    WHERE university_id = :uid
+                    AND status IN ('pending','approved','ready')
+                    AND ({_db_col_af} IS NULL
+                         OR {_db_col_af}::text = ''
+                         OR {_db_col_af}::text = '0')
+                    ORDER BY course_name
+                    LIMIT 50
+                """),
+                {"uid": uni_id},
+            )
+            affected_course_names = [r[0] for r in _names_rows.fetchall() if r[0]]
+        except Exception:
+            pass
+
+        # Sample before/after for the "Preview After Fix" panel
+        if affected_course_names:
+            import re as _re_af
+            _field_label_map = {
+                "ielts_overall": "IELTS Overall",
+                "international_fee": "International Fee",
+                "pte_overall": "PTE Score",
+                "toefl_overall": "TOEFL Score",
+                "course_location": "Location",
+                "degree_level": "Degree Level",
+                "study_mode": "Study Mode",
+                "duration": "Duration",
+            }
+            _after_val: str | None = None
+            for _snip in (evidence.get("detected_snippets") or [])[:3]:
+                _m = _re_af.search(r"\b(\d+(?:\.\d+)?)\b", str(_snip))
+                if _m:
+                    _after_val = _m.group(1)
+                    break
+            sample_before_after = {
+                "course_name": affected_course_names[0],
+                "field_label": _field_label_map.get(field, field.replace("_", " ").title()),
+                "before_value": None,
+                "after_value": _after_val,
+            }
+
+    # Evidence URLs from scraped_field_evidence (up to 5 distinct source URLs)
+    if field:
+        try:
+            _ev_rows = await db.execute(
+                _text("""
+                    SELECT DISTINCT ON (sfe.source_url)
+                        sfe.source_url, sfe.raw_text, sfe.value
+                    FROM scraped_field_evidence sfe
+                    JOIN scraped_courses sc ON sc.id = sfe.scraped_course_id
+                    WHERE sc.university_id = :uid
+                    AND sc.status IN ('pending','approved','ready')
+                    AND sfe.field_key = :fkey
+                    AND sfe.source_url IS NOT NULL
+                    ORDER BY sfe.source_url, sfe.created_at DESC
+                    LIMIT 5
+                """),
+                {"uid": uni_id, "fkey": field},
+            )
+            for _er in _ev_rows.mappings().fetchall():
+                _snip_text = _er.get("raw_text") or _er.get("value") or ""
+                evidence_urls_out.append({
+                    "url": _er["source_url"],
+                    "snippet": str(_snip_text)[:250] if _snip_text else "",
+                })
+        except Exception:
+            pass
+
     current_pct = round(field_filled / max(total_staged, 1) * 100, 1) if total_staged else 0.0
 
     # ── Compute confidence reasoning ──────────────────────────────────────────
@@ -5673,6 +5752,13 @@ async def preview_scrape_fix(
         except Exception:
             pass
 
+    # Add course-count projection to url_safety so the UI can show
+    # "Expected courses before: 273 → after: 12" on dangerous filter changes.
+    if url_safety:
+        url_safety["expected_courses_before"] = total_staged
+        _drop_f = url_safety.get("drop_rate_pct", 0) / 100.0
+        url_safety["expected_courses_after"] = round(total_staged * (1 - _drop_f))
+
     # ── Risk level ────────────────────────────────────────────────────────────
     risk_level = "low"
     risk_reason = "This fix adds a new rule without changing existing extraction behaviour."
@@ -5733,6 +5819,9 @@ async def preview_scrape_fix(
         "risk_reason": risk_reason,
         "url_safety": url_safety,
         "validations": validations,
+        "affected_course_names": affected_course_names,
+        "evidence_urls": evidence_urls_out,
+        "sample_before_after": sample_before_after,
     }
 
 

@@ -93,8 +93,12 @@ type FixPreviewResult = {
   url_safety?: {
     total_urls: number; passing: number; dropped: number; drop_rate_pct: number;
     dropped_samples: string[]; kept_samples: string[]; blocked: boolean; warning: boolean;
+    expected_courses_before?: number; expected_courses_after?: number;
   } | null;
   validations: FixPreviewValidation[];
+  affected_course_names?: string[];
+  evidence_urls?: Array<{ url: string; snippet: string }>;
+  sample_before_after?: { course_name: string; field_label: string; before_value: string | null; after_value: string | null } | null;
 };
 
 type Phase3Rec = {
@@ -1529,7 +1533,7 @@ export default function ScrapeAgentPage() {
                     </span>
                   </p>
                   {diagnoseResult.phase3_recommendations.map((rec) => (
-                    <Phase3RecCard key={rec.id} rec={rec} jobId={config?.latest_job_id ?? null} />
+                    <Phase3RecCard key={rec.id} rec={rec} jobId={config?.latest_job_id ?? null} uniId={uniId} />
                   ))}
                 </div>
               )}
@@ -2454,11 +2458,13 @@ function ExtractionIssueCard({
 function FixPreviewModal({
   rec,
   jobId,
+  uniId,
   onClose,
   onApplied,
 }: {
   rec: Phase3Rec;
   jobId: string;
+  uniId: number;
   onClose: () => void;
   onApplied: () => void;
 }) {
@@ -2467,6 +2473,10 @@ function FixPreviewModal({
   const [loading, setLoading] = useState(true);
   const [applying, setApplying] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [applied, setApplied] = useState(false);
+  const [validating, setValidating] = useState(false);
+  const [validationResult, setValidationResult] = useState<DiscoveryTest | null>(null);
+  const [showAllCourses, setShowAllCourses] = useState(false);
 
   // Derive primary field from rec id
   const fieldMap: Record<string, string> = {
@@ -2529,16 +2539,24 @@ function FixPreviewModal({
         const err = await res.json().catch(() => ({}));
         throw new Error(err?.detail?.message ?? err?.detail ?? `HTTP ${res.status}`);
       }
-      toast({ title: "Fix applied", description: "Config saved. Run a new scrape to see the results." });
+      toast({ title: "Fix applied", description: "Running discovery validation…" });
       onApplied();
-      onClose();
+      setApplied(true);
+      setApplying(false);
+      // Auto-run fast test discovery so the operator sees immediate validation
+      setValidating(true);
+      try {
+        const vRes = await fetch(`${BASE}/api/universities/${uniId}/test-discovery?fast_only=true`, { method: "POST" });
+        if (vRes.ok) setValidationResult(await vRes.json());
+      } catch { /* silent — user can run manually */ } finally {
+        setValidating(false);
+      }
     } catch (e: unknown) {
       toast({
         title: "Apply failed",
         description: e instanceof Error ? e.message : "Unknown error",
         variant: "destructive",
       });
-    } finally {
       setApplying(false);
     }
   };
@@ -2591,8 +2609,31 @@ function FixPreviewModal({
 
           {preview && !loading && (
             <>
-              {/* Evidence */}
-              {rec.evidence && (rec.evidence.detected_snippets?.length || rec.evidence.page_signals) && (
+              {/* Evidence URLs — from scraped field evidence with snippets */}
+              {preview && (preview.evidence_urls?.length ?? 0) > 0 && (
+                <div>
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Evidence Found On</p>
+                  <div className="space-y-1.5">
+                    {preview.evidence_urls!.map((ev, i) => (
+                      <div key={i} className="p-2 bg-teal-50 border border-teal-100 rounded">
+                        <a href={ev.url} target="_blank" rel="noreferrer"
+                          className="text-[9px] text-blue-600 hover:underline block truncate font-mono flex items-center gap-1">
+                          <ExternalLink className="w-2.5 h-2.5 shrink-0" />
+                          {ev.url}
+                        </a>
+                        {ev.snippet && (
+                          <p className="text-[10px] font-mono bg-white border border-teal-100 rounded px-1.5 py-0.5 text-gray-600 whitespace-pre-wrap break-words mt-1">
+                            …{ev.snippet.trim()}…
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Fallback evidence block (page signals from rec) */}
+              {(!preview?.evidence_urls?.length) && rec.evidence && (rec.evidence.detected_snippets?.length || rec.evidence.page_signals) && (
                 <div>
                   <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Evidence</p>
                   <div className="p-2 bg-teal-50 border border-teal-100 rounded space-y-1.5">
@@ -2662,21 +2703,78 @@ function FixPreviewModal({
                 </div>
               </div>
 
+              {/* Affected Courses — expandable list */}
+              {(preview.affected_course_names?.length ?? 0) > 0 && (
+                <div>
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">
+                    Affected Courses ({preview.affected_course_names!.length}{preview.affected_course_names!.length === 50 ? "+" : ""})
+                  </p>
+                  <div className="border border-gray-200 rounded overflow-hidden">
+                    <ul className="divide-y divide-gray-100 max-h-[160px] overflow-auto">
+                      {(showAllCourses ? preview.affected_course_names! : preview.affected_course_names!.slice(0, 8)).map((name, i) => (
+                        <li key={i} className="px-2.5 py-1.5 text-[10px] text-gray-700 hover:bg-gray-50">{name}</li>
+                      ))}
+                    </ul>
+                    {preview.affected_course_names!.length > 8 && (
+                      <button
+                        type="button"
+                        onClick={() => setShowAllCourses(s => !s)}
+                        className="w-full text-[9px] text-teal-600 hover:text-teal-800 py-1.5 bg-gray-50 border-t border-gray-200 font-medium"
+                      >
+                        {showAllCourses
+                          ? "Show fewer ▲"
+                          : `Show ${preview.affected_course_names!.length - 8} more ▼`}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Preview After Fix — before/after sample */}
+              {preview.sample_before_after && (
+                <div>
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Preview After Fix</p>
+                  <p className="text-[9px] text-gray-400 mb-1.5 truncate">Sample: {preview.sample_before_after.course_name}</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="p-2.5 bg-gray-50 border border-gray-200 rounded">
+                      <p className="text-[9px] font-semibold text-gray-400 mb-1">Before</p>
+                      <p className="text-xs font-semibold text-gray-500">{preview.sample_before_after.field_label}</p>
+                      <p className="text-[11px] text-gray-400 italic mt-0.5">blank</p>
+                    </div>
+                    <div className="p-2.5 bg-teal-50 border border-teal-200 rounded">
+                      <p className="text-[9px] font-semibold text-teal-500 mb-1">After</p>
+                      <p className="text-xs font-semibold text-teal-700">{preview.sample_before_after.field_label}</p>
+                      <p className="text-[11px] text-teal-800 font-mono mt-0.5">
+                        {preview.sample_before_after.after_value ?? "—"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Risk */}
               <div>
                 <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Risk</p>
                 <div className={`flex items-start gap-2 p-2 rounded border text-[11px] leading-relaxed ${riskColor[preview.risk_level]}`}>
                   <span className="mt-0.5 shrink-0">{riskIcon[preview.risk_level]}</span>
-                  <div>
+                  <div className="flex-1">
                     <span className="font-semibold capitalize">{preview.risk_level}</span>
                     {" — "}
                     {preview.risk_reason}
                   </div>
+                  <span className="shrink-0 flex items-center gap-0.5 text-[9px] font-semibold text-green-700 bg-green-100 border border-green-200 rounded-full px-1.5 py-0.5">
+                    <RotateCcw className="w-2.5 h-2.5" /> Rollback available
+                  </span>
                 </div>
                 {preview.url_safety && (
                   <div className="mt-1.5 p-2 bg-gray-50 border border-gray-200 rounded text-[10px] text-gray-600 space-y-0.5">
                     <p className="font-medium text-gray-700">URL Filter Check</p>
                     <p>{preview.url_safety.total_urls} known URLs tested · {preview.url_safety.passing} pass · {preview.url_safety.dropped} dropped ({preview.url_safety.drop_rate_pct}%)</p>
+                    {(preview.url_safety.expected_courses_before != null && preview.url_safety.expected_courses_after != null) && (
+                      <p className="text-amber-700 font-medium">
+                        Staged courses: {preview.url_safety.expected_courses_before} → {preview.url_safety.expected_courses_after} expected after filter
+                      </p>
+                    )}
                     {preview.url_safety.dropped_samples.length > 0 && (
                       <p className="font-mono text-red-600 truncate">Dropped: {preview.url_safety.dropped_samples[0]}</p>
                     )}
@@ -2719,9 +2817,56 @@ function FixPreviewModal({
 
               {/* Blocked message */}
               {preview.risk_level === "critical" && (
-                <div className="p-2.5 bg-red-50 border border-red-300 rounded text-[11px] text-red-800 leading-relaxed">
-                  <strong>Fix blocked automatically.</strong> {preview.risk_reason}
-                  {" "}This fix cannot be applied as-is — review the URL filter settings manually.
+                <div className="p-2.5 bg-red-50 border border-red-300 rounded text-[11px] text-red-800 leading-relaxed space-y-1">
+                  <p><strong>Fix blocked automatically.</strong> {preview.risk_reason}</p>
+                  {(preview.url_safety?.expected_courses_before != null && preview.url_safety?.expected_courses_after != null) && (
+                    <p>Course projection: <strong>{preview.url_safety.expected_courses_before}</strong> staged courses → <strong className="text-red-700">{preview.url_safety.expected_courses_after}</strong> remaining after this filter change.</p>
+                  )}
+                  <p>Review the URL filter settings manually before applying.</p>
+                </div>
+              )}
+
+              {/* Post-apply validation panel */}
+              {applied && (
+                <div className="border border-teal-200 rounded bg-teal-50 overflow-hidden">
+                  <div className="flex items-center gap-2 px-3 py-2 bg-teal-600">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-white shrink-0" />
+                    <span className="text-xs font-semibold text-white">Fix applied — Discovery Validation</span>
+                  </div>
+                  <div className="px-3 py-2.5 space-y-1.5">
+                    {validating && (
+                      <div className="flex items-center gap-2 text-[11px] text-teal-700">
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        Running fast discovery check…
+                      </div>
+                    )}
+                    {!validating && !validationResult && (
+                      <p className="text-[11px] text-teal-700">Discovery validation could not run — trigger a manual test discovery to verify.</p>
+                    )}
+                    {validationResult && (
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-3 flex-wrap">
+                          <span className={`text-[11px] font-semibold ${validationResult.total_passing > 0 ? "text-green-700" : "text-red-700"}`}>
+                            {validationResult.total_passing > 0 ? "✓" : "✗"} {validationResult.total_passing} URLs passing
+                          </span>
+                          {validationResult.total_dropped > 0 && (
+                            <span className="text-[11px] text-amber-700">{validationResult.total_dropped} dropped</span>
+                          )}
+                          <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium ${
+                            validationResult.agg_status === "ok" ? "bg-green-100 text-green-700 border border-green-200"
+                            : validationResult.agg_status === "warning" ? "bg-amber-100 text-amber-700 border border-amber-200"
+                            : "bg-red-100 text-red-700 border border-red-200"
+                          }`}>
+                            {validationResult.agg_status}
+                          </span>
+                        </div>
+                        {validationResult.warnings?.slice(0, 2).map((w, i) => (
+                          <p key={i} className="text-[10px] text-gray-600">• {w}</p>
+                        ))}
+                        <p className="text-[9px] text-teal-600 mt-1">Fast check complete. Run a full scrape to apply changes to staged courses.</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </>
@@ -2735,9 +2880,9 @@ function FixPreviewModal({
             onClick={onClose}
             className="text-xs text-gray-500 hover:text-gray-700 px-3 py-1.5 rounded border border-gray-200 hover:bg-gray-100"
           >
-            Cancel
+            {applied ? "Close" : "Cancel"}
           </button>
-          {preview && rec.fix?.recipe_patch && (
+          {!applied && preview && rec.fix?.recipe_patch && (
             <button
               type="button"
               onClick={handleApply}
@@ -2751,6 +2896,11 @@ function FixPreviewModal({
                   : <><Zap className="w-3.5 h-3.5" /> Apply Fix</>}
             </button>
           )}
+          {applied && validating && (
+            <span className="text-[11px] text-teal-600 flex items-center gap-1.5">
+              <Loader2 className="w-3 h-3 animate-spin" /> Validating…
+            </span>
+          )}
         </div>
       </div>
     </div>
@@ -2759,7 +2909,7 @@ function FixPreviewModal({
 
 // ── Phase 3 Recommendation Card ───────────────────────────────────────────────
 
-function Phase3RecCard({ rec, jobId }: { rec: Phase3Rec; jobId: string | null }) {
+function Phase3RecCard({ rec, jobId, uniId }: { rec: Phase3Rec; jobId: string | null; uniId: number }) {
   const [expanded, setExpanded] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const isCritical = rec.severity === "critical";
@@ -2777,8 +2927,9 @@ function Phase3RecCard({ rec, jobId }: { rec: Phase3Rec; jobId: string | null })
         <FixPreviewModal
           rec={rec}
           jobId={jobId}
+          uniId={uniId}
           onClose={() => setShowPreview(false)}
-          onApplied={() => setShowPreview(false)}
+          onApplied={() => { /* applied — keep modal open for validation */ }}
         />
       )}
       <div className={`rounded-lg border-l-4 px-3 py-2.5 ${borderCls}`}>
