@@ -693,6 +693,62 @@ async def _probe_sample_course_pages(
 
 # ── Phase 3: Cross-correlate and generate recommendations ─────────────────────
 
+def _confidence_reason(
+    confidence: float,
+    evidence: dict,
+    affected_count: int,
+    total: int,
+    page_probe: dict | None = None,
+) -> str:
+    """Generate a human-readable explanation for a confidence score.
+
+    Args:
+        confidence: 0.0–1.0 float as set on the rec
+        evidence: the rec's evidence dict (detected_snippets, page_signals, etc.)
+        affected_count: number of courses missing the field
+        total: total courses analysed
+        page_probe: optional per-page probe entry (is_ielts_url / is_fee_url page)
+    """
+    parts: list[str] = []
+    pct = int(confidence * 100)
+
+    snippets = evidence.get("detected_snippets") or []
+    page_signals: dict = evidence.get("page_signals") or {}
+    signal_count = sum(1 for v in page_signals.values() if v)
+    snippet_count = len(snippets)
+
+    # Affected courses
+    if affected_count and total:
+        parts.append(f"{affected_count}/{total} courses confirmed missing this field")
+
+    # Live page evidence
+    if snippet_count and signal_count:
+        sigs = [s.replace("_", " ") for s, v in page_signals.items() if v]
+        parts.append(
+            f"{snippet_count} text snippet(s) from sampled pages + {signal_count} page signal(s) "
+            f"({', '.join(sigs[:3])}) confirm the data exists"
+        )
+    elif snippet_count:
+        parts.append(f"{snippet_count} text snippet(s) from sampled pages confirm the data exists")
+    elif signal_count:
+        sigs = [s.replace("_", " ") for s, v in page_signals.items() if v]
+        parts.append(f"{signal_count} page signal(s) detected: {', '.join(sigs[:3])}")
+    else:
+        parts.append("Based on field-completion analysis of staged courses — no live page sample available")
+
+    # Calibration note
+    if pct >= 90:
+        parts.append("High confidence — multiple independent signals agree")
+    elif pct >= 75:
+        parts.append("Good confidence — primary signal present but limited page sampling")
+    elif pct >= 60:
+        parts.append("Moderate confidence — limited evidence; verify manually before applying")
+    else:
+        parts.append("Low confidence — no live page evidence; this is a best-guess recommendation")
+
+    return ". ".join(parts) + "."
+
+
 def _impact_estimate(
     phase1: dict,
     target_fields: list[str],
@@ -1386,6 +1442,17 @@ def _generate_recommendations(
 
     # Sort: critical first, then by confidence (descending)
     recs.sort(key=lambda r: (0 if r["severity"] == "critical" else 1, -r.get("confidence", 0)))
+
+    # Enrich each rec with confidence_reason (human-readable explanation for the score)
+    for r in recs:
+        if "confidence_reason" not in r:
+            r["confidence_reason"] = _confidence_reason(
+                confidence=r.get("confidence", 0.5),
+                evidence=r.get("evidence") or {},
+                affected_count=int((r.get("evidence") or {}).get("affected_count") or 0),
+                total=total,
+            )
+
     return recs
 
 

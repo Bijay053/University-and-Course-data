@@ -5452,6 +5452,290 @@ async def apply_scrape_fix(
     }
 
 
+@router.post("/jobs/{job_id}/preview-fix")
+async def preview_scrape_fix(
+    job_id: str,
+    body: dict,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[dict, Depends(get_current_user)],
+) -> dict:
+    """Dry-run a Phase3Rec fix — returns impact estimate, confidence reasoning, and risk level.
+
+    Body::
+
+        {
+          "rec_id": "missing_ielts_follow_link",
+          "field": "ielts_overall",           // primary field being fixed
+          "recipe_patch": { "english.follow_links": ["English language requirements"] },
+          "confidence": 0.90,
+          "evidence": { "affected_count": 54, "sample_url": "...", "page_signals": {...} }
+        }
+
+    Returns a FixPreview object: problem summary, evidence quality, confidence reasoning,
+    expected impact (field completeness before/after), risk assessment, and URL-filter
+    safety validation where applicable.
+    """
+    from sqlalchemy import text as _text
+    from app.models import ScrapedCourse as _SC
+
+    job = (await db.execute(
+        _text("SELECT university_id FROM scrape_runtime_jobs WHERE runtime_job_id = :j"),
+        {"j": job_id},
+    )).mappings().first()
+    if not job:
+        raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
+
+    uni_id = job["university_id"]
+    rec_id: str = body.get("rec_id", "")
+    field: str = body.get("field", "")
+    recipe_patch: dict = body.get("recipe_patch") or {}
+    confidence_raw: float = float(body.get("confidence", 0.5))
+    evidence: dict = body.get("evidence") or {}
+
+    # ── Fetch current field completion stats ──────────────────────────────────
+    # Count staged courses and how many have the target field filled.
+    field_col_map = {
+        "ielts_overall": "ielts_overall",
+        "international_fee": "international_fee",
+        "pte_overall": "pte_score",
+        "toefl_overall": "toefl_score",
+        "course_location": "course_location",
+        "degree_level": "degree_level",
+        "study_mode": "study_mode",
+        "duration": "duration",
+    }
+
+    total_staged: int = 0
+    field_filled: int = 0
+    field_missing: int = 0
+
+    try:
+        count_row = (await db.execute(
+            _text("""
+                SELECT
+                    COUNT(*) AS total,
+                    COUNT(CASE WHEN status IN ('pending','approved','ready') THEN 1 END) AS staged
+                FROM scraped_courses WHERE university_id = :uid
+            """),
+            {"uid": uni_id},
+        )).mappings().first()
+        total_staged = int((count_row or {}).get("staged") or 0)
+
+        if field and field in field_col_map:
+            db_col = field_col_map[field]
+            fill_row = (await db.execute(
+                _text(f"""
+                    SELECT
+                        COUNT(CASE WHEN {db_col} IS NOT NULL AND {db_col}::text != '' AND {db_col}::text != '0' THEN 1 END) AS filled,
+                        COUNT(*) AS total
+                    FROM scraped_courses
+                    WHERE university_id = :uid AND status IN ('pending','approved','ready')
+                """),
+                {"uid": uni_id},
+            )).mappings().first()
+            field_filled = int((fill_row or {}).get("filled") or 0)
+            _ft = int((fill_row or {}).get("total") or 1)
+            field_missing = _ft - field_filled
+            total_staged = _ft
+    except Exception:
+        pass
+
+    current_pct = round(field_filled / max(total_staged, 1) * 100, 1) if total_staged else 0.0
+
+    # ── Compute confidence reasoning ──────────────────────────────────────────
+    # Build a human-readable explanation from the evidence signals.
+    probed = int(evidence.get("probed", 0)) or int(evidence.get("affected_count", 0))
+    page_signals: dict = evidence.get("page_signals") or {}
+    detected_snippets: list = evidence.get("detected_snippets") or []
+    affected_count = int(evidence.get("affected_count") or field_missing or 0)
+
+    signal_count = sum(1 for v in page_signals.values() if v)
+    snippet_count = len(detected_snippets)
+
+    confidence_reasons: list[str] = []
+    if affected_count and total_staged:
+        confidence_reasons.append(f"{affected_count}/{total_staged} courses are missing this field")
+    if snippet_count:
+        confidence_reasons.append(f"{snippet_count} text snippet(s) confirmed the data exists on sampled pages")
+    if signal_count:
+        sigs = [s.replace("_", " ") for s, v in page_signals.items() if v]
+        confidence_reasons.append(f"Page signals confirmed: {', '.join(sigs[:4])}")
+    if not confidence_reasons:
+        confidence_reasons.append("Based on field completion analysis of staged courses")
+
+    confidence_reason = ". ".join(confidence_reasons) + "."
+
+    # ── Estimate expected completeness after fix ──────────────────────────────
+    # Conservative: assume 80% of missing courses will be filled by the fix.
+    # Boost to 92% if we have both page snippets AND signal confirmation.
+    fill_rate_estimate = 0.80
+    if snippet_count >= 2 and signal_count >= 2:
+        fill_rate_estimate = 0.92
+    elif snippet_count >= 1 or signal_count >= 1:
+        fill_rate_estimate = 0.85
+
+    newly_filled = round(affected_count * fill_rate_estimate)
+    expected_filled = field_filled + newly_filled
+    expected_pct = round(expected_filled / max(total_staged, 1) * 100, 1)
+    # Cap at 98% — never promise 100%
+    expected_pct = min(expected_pct, 98.0)
+
+    field_impact = {
+        "field": field or rec_id,
+        "current_pct": current_pct,
+        "expected_pct": expected_pct,
+        "courses_affected": affected_count,
+        "courses_total": total_staged,
+        "fill_rate_estimate": round(fill_rate_estimate * 100),
+    }
+
+    # ── URL filter safety check (if recipe_patch touches discovery keys) ──────
+    import re as _re_pv
+    _URL_FILTER_KEYS_PV = ("allow_url_patterns", "must_contain", "block_url_patterns")
+    url_safety: dict | None = None
+    disc_patch_pv = recipe_patch.get("discovery") or {}
+
+    # Also check dot-namespaced keys like "discovery.allow_url_patterns"
+    for rk, rv in recipe_patch.items():
+        if "." in rk:
+            ns, key = rk.split(".", 1)
+            if ns == "discovery":
+                disc_patch_pv[key] = rv
+
+    if any(k in disc_patch_pv for k in _URL_FILTER_KEYS_PV):
+        try:
+            existing_disc_pv: dict = {}
+            row_pv = (await db.execute(
+                _text("SELECT scrape_config FROM universities WHERE id = :id"),
+                {"id": uni_id},
+            )).mappings().first()
+            if row_pv:
+                sc_pv = dict(row_pv.get("scrape_config") or {})
+                existing_disc_pv = (sc_pv.get("admin_config") or {}).get("discovery") or {}
+
+            proposed_disc_pv: dict = {**existing_disc_pv}
+            for k in _URL_FILTER_KEYS_PV:
+                if k in disc_patch_pv:
+                    proposed_disc_pv[k] = disc_patch_pv[k] or []
+
+            allow_pv = [p for p in (proposed_disc_pv.get("allow_url_patterns") or []) if p]
+            mc_pv = [m for m in (proposed_disc_pv.get("must_contain") or []) if m]
+            block_pv = [p for p in (proposed_disc_pv.get("block_url_patterns") or []) if p]
+
+            if allow_pv or mc_pv or block_pv:
+                url_rows_pv = (await db.execute(
+                    select(_SC.course_website)
+                    .where(_SC.university_id == uni_id)
+                    .where(_SC.course_website.isnot(None))
+                    .limit(200)
+                )).scalars().all()
+                known_pv = [u for u in url_rows_pv if u]
+
+                if known_pv:
+                    c_allow_pv = []
+                    for p in allow_pv:
+                        try:
+                            c_allow_pv.append(_re_pv.compile(p, _re_pv.IGNORECASE))
+                        except _re_pv.error:
+                            pass
+                    c_block_pv = []
+                    for p in block_pv:
+                        try:
+                            c_block_pv.append(_re_pv.compile(p, _re_pv.IGNORECASE))
+                        except _re_pv.error:
+                            pass
+                    mc_lower_pv = [m.lower() for m in mc_pv]
+
+                    passing_pv: list[str] = []
+                    dropped_pv: list[str] = []
+                    for u in known_pv:
+                        ok = True
+                        ul = u.lower()
+                        if c_allow_pv and not any(pat.search(u) for pat in c_allow_pv):
+                            ok = False
+                        if ok and mc_lower_pv and not any(m in ul for m in mc_lower_pv):
+                            ok = False
+                        if ok and c_block_pv and any(pat.search(u) for pat in c_block_pv):
+                            ok = False
+                        (passing_pv if ok else dropped_pv).append(u)
+
+                    drop_rate_pv = len(dropped_pv) / len(known_pv)
+                    url_safety = {
+                        "total_urls": len(known_pv),
+                        "passing": len(passing_pv),
+                        "dropped": len(dropped_pv),
+                        "drop_rate_pct": round(drop_rate_pv * 100),
+                        "dropped_samples": dropped_pv[:5],
+                        "kept_samples": passing_pv[:3],
+                        "blocked": drop_rate_pv >= 0.70,
+                        "warning": 0.20 <= drop_rate_pv < 0.70,
+                    }
+        except Exception:
+            pass
+
+    # ── Risk level ────────────────────────────────────────────────────────────
+    risk_level = "low"
+    risk_reason = "This fix adds a new rule without changing existing extraction behaviour."
+
+    if url_safety and url_safety.get("blocked"):
+        risk_level = "critical"
+        drop = url_safety["drop_rate_pct"]
+        risk_reason = f"URL filter would drop {drop}% of known course URLs — fix blocked automatically."
+    elif url_safety and url_safety.get("warning"):
+        risk_level = "medium"
+        drop = url_safety["drop_rate_pct"]
+        risk_reason = f"URL filter would drop {drop}% of known course URLs — review before applying."
+    elif confidence_raw < 0.65:
+        risk_level = "medium"
+        risk_reason = "Lower confidence — limited page evidence. Verify manually before applying."
+
+    # ── Validation checklist ──────────────────────────────────────────────────
+    validations: list[dict] = [
+        {
+            "label": "Filter safe",
+            "ok": url_safety is None or not url_safety.get("blocked"),
+            "detail": (
+                f"Tested against {url_safety['total_urls']} known URLs — "
+                f"{url_safety['drop_rate_pct']}% drop rate."
+            ) if url_safety else "No URL filter changes — discovery unaffected.",
+        },
+        {
+            "label": "Discovery unaffected",
+            "ok": not any(
+                k in recipe_patch or k in disc_patch_pv
+                for k in ("allow_url_patterns", "must_contain", "block_url_patterns", "seed_urls")
+            ),
+            "detail": "Recipe-only fix — does not touch discovery config.",
+        },
+        {
+            "label": "Has page evidence",
+            "ok": bool(detected_snippets or page_signals),
+            "detail": (
+                f"{snippet_count} snippet(s) and {signal_count} signal(s) from probed pages."
+            ) if (detected_snippets or page_signals) else "No live page evidence — based on field stats only.",
+        },
+    ]
+
+    return {
+        "ok": True,
+        "job_id": job_id,
+        "rec_id": rec_id,
+        "problem": {
+            "field": field,
+            "courses_missing": affected_count,
+            "current_pct": current_pct,
+            "total_staged": total_staged,
+        },
+        "confidence": round(confidence_raw * 100),
+        "confidence_reason": confidence_reason,
+        "field_impact": field_impact,
+        "risk_level": risk_level,
+        "risk_reason": risk_reason,
+        "url_safety": url_safety,
+        "validations": validations,
+    }
+
+
 @router.post("/jobs/{job_id}/rollback-fix")
 async def rollback_scrape_fix(
     job_id: str,

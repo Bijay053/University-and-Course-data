@@ -71,6 +71,32 @@ type Phase3Fix = {
   recipe_patch?: Record<string, unknown>;
 };
 
+type FixPreviewValidation = { label: string; ok: boolean; detail: string };
+type FixPreviewFieldImpact = {
+  field: string;
+  current_pct: number;
+  expected_pct: number;
+  courses_affected: number;
+  courses_total: number;
+  fill_rate_estimate: number;
+};
+type FixPreviewResult = {
+  ok: boolean;
+  job_id: string;
+  rec_id: string;
+  problem: { field: string; courses_missing: number; current_pct: number; total_staged: number };
+  confidence: number;
+  confidence_reason: string;
+  field_impact: FixPreviewFieldImpact;
+  risk_level: "low" | "medium" | "critical";
+  risk_reason: string;
+  url_safety?: {
+    total_urls: number; passing: number; dropped: number; drop_rate_pct: number;
+    dropped_samples: string[]; kept_samples: string[]; blocked: boolean; warning: boolean;
+  } | null;
+  validations: FixPreviewValidation[];
+};
+
 type Phase3Rec = {
   id: string;
   severity: "critical" | "warning" | "info";
@@ -78,6 +104,7 @@ type Phase3Rec = {
   description: string;
   root_cause: string;
   confidence: number;
+  confidence_reason?: string;
   evidence?: Phase3Evidence;
   fix?: Phase3Fix | null;
 };
@@ -1502,7 +1529,7 @@ export default function ScrapeAgentPage() {
                     </span>
                   </p>
                   {diagnoseResult.phase3_recommendations.map((rec) => (
-                    <Phase3RecCard key={rec.id} rec={rec} />
+                    <Phase3RecCard key={rec.id} rec={rec} jobId={config?.latest_job_id ?? null} />
                   ))}
                 </div>
               )}
@@ -2422,84 +2449,265 @@ function ExtractionIssueCard({
   );
 }
 
-// ── Phase 3 Recommendation Card ───────────────────────────────────────────────
+// ── Fix Preview Modal ──────────────────────────────────────────────────────────
 
-function Phase3RecCard({ rec }: { rec: Phase3Rec }) {
-  const [expanded, setExpanded] = useState(false);
-  const isCritical = rec.severity === "critical";
-  const hasEvidence = Boolean(rec.evidence?.detected_snippets?.length || rec.evidence?.sample_url);
-  const hasRecipePatch = rec.fix?.recipe_patch && Object.keys(rec.fix.recipe_patch).length > 0;
+function FixPreviewModal({
+  rec,
+  jobId,
+  onClose,
+  onApplied,
+}: {
+  rec: Phase3Rec;
+  jobId: string;
+  onClose: () => void;
+  onApplied: () => void;
+}) {
+  const { toast } = useToast();
+  const [preview, setPreview] = useState<FixPreviewResult | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [applying, setApplying] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const borderCls = isCritical
-    ? "border-orange-400 bg-orange-50"
-    : "border-amber-300 bg-amber-50";
+  // Derive primary field from rec id
+  const fieldMap: Record<string, string> = {
+    missing_ielts_follow_link: "ielts_overall",
+    missing_ielts_page_has_data: "ielts_overall",
+    missing_ielts_no_link: "ielts_overall",
+    band_mapping_not_applied: "ielts_overall",
+    band_mapping_ielts_blank: "ielts_overall",
+    ielts_components_missing: "ielts_overall",
+    missing_fee_follow_link: "international_fee",
+    missing_fee_page_has_text: "international_fee",
+    missing_fee_tab: "international_fee",
+    missing_fee_unknown: "international_fee",
+    suspiciously_low_fee: "international_fee",
+    missing_degree_level: "degree_level",
+    garbage_location: "course_location",
+  };
+  const field = fieldMap[rec.id] || "";
+
+  useEffect(() => {
+    const run = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await fetch(`${BASE}/api/scrape/jobs/${jobId}/preview-fix`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            rec_id: rec.id,
+            field,
+            recipe_patch: rec.fix?.recipe_patch ?? {},
+            confidence: rec.confidence,
+            evidence: rec.evidence ?? {},
+          }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err?.detail?.message ?? err?.detail ?? `HTTP ${res.status}`);
+        }
+        setPreview(await res.json());
+      } catch (e: unknown) {
+        setError(e instanceof Error ? e.message : "Failed to load preview");
+      } finally {
+        setLoading(false);
+      }
+    };
+    run();
+  }, [jobId, rec.id, field]);
+
+  const handleApply = async () => {
+    if (!rec.fix?.recipe_patch) return;
+    setApplying(true);
+    try {
+      const res = await fetch(`${BASE}/api/scrape/jobs/${jobId}/apply-fix`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ config_patch: rec.fix.recipe_patch }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err?.detail?.message ?? err?.detail ?? `HTTP ${res.status}`);
+      }
+      toast({ title: "Fix applied", description: "Config saved. Run a new scrape to see the results." });
+      onApplied();
+      onClose();
+    } catch (e: unknown) {
+      toast({
+        title: "Apply failed",
+        description: e instanceof Error ? e.message : "Unknown error",
+        variant: "destructive",
+      });
+    } finally {
+      setApplying(false);
+    }
+  };
+
+  const riskColor = {
+    low: "text-green-700 bg-green-50 border-green-200",
+    medium: "text-amber-700 bg-amber-50 border-amber-300",
+    critical: "text-red-700 bg-red-50 border-red-300",
+  };
+  const riskIcon = {
+    low: <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />,
+    medium: <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />,
+    critical: <ShieldAlert className="w-3.5 h-3.5 text-red-500" />,
+  };
 
   return (
-    <div className={`rounded-lg border-l-4 px-3 py-2.5 ${borderCls}`}>
-      <div className="flex items-start gap-2">
-        <FlaskConical className={`w-3.5 h-3.5 shrink-0 mt-0.5 ${isCritical ? "text-orange-500" : "text-amber-500"}`} />
-        <div className="flex-1 min-w-0">
-          {/* Header */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs font-semibold text-gray-800">{rec.title}</span>
-            <Badge variant="outline" className={`text-[9px] px-1.5 ${isCritical ? "border-orange-300 text-orange-700 bg-orange-100" : "border-amber-300 text-amber-700 bg-amber-100"}`}>
-              {rec.severity}
-            </Badge>
-            <span className="text-[9px] text-gray-400 ml-auto">{Math.round(rec.confidence * 100)}% confidence</span>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 py-3 border-b bg-gray-50 shrink-0">
+          <div className="flex items-center gap-2">
+            <TrendingUp className="w-4 h-4 text-teal-600" />
+            <span className="text-sm font-semibold text-gray-800">Fix Preview</span>
+          </div>
+          <button onClick={onClose} className="p-1 rounded hover:bg-gray-200 text-gray-400">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="overflow-y-auto flex-1 px-4 py-3 space-y-3">
+          {/* Problem summary — always show from rec */}
+          <div>
+            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Problem</p>
+            <p className="text-sm font-medium text-gray-800">{rec.title}</p>
+            <p className="text-[11px] text-gray-500 mt-0.5">{rec.description}</p>
           </div>
 
-          {/* Description */}
-          <p className="text-xs text-gray-600 leading-relaxed mt-0.5">{rec.description}</p>
-
-          {/* Root cause */}
-          <p className="text-[10px] text-gray-500 italic mt-1">{rec.root_cause}</p>
-
-          {/* Evidence + recipe_patch toggle */}
-          {(hasEvidence || hasRecipePatch) && (
-            <button
-              type="button"
-              onClick={() => setExpanded(e => !e)}
-              className="text-[10px] text-teal-600 hover:text-teal-800 mt-1.5 flex items-center gap-0.5"
-            >
-              {expanded ? "Hide details ▲" : `Show ${[hasEvidence && "page evidence", hasRecipePatch && "recipe settings"].filter(Boolean).join(" + ")} ▼`}
-            </button>
+          {loading && (
+            <div className="flex items-center gap-2 py-6 justify-center text-gray-400">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span className="text-xs">Simulating fix…</span>
+            </div>
           )}
 
-          {expanded && (
-            <div className="mt-1.5 space-y-2">
-              {/* Page evidence snippets */}
-              {hasEvidence && (
-                <div className="p-2 bg-white border border-teal-100 rounded space-y-1">
-                  <p className="text-[10px] font-semibold text-teal-700 mb-1">Page evidence</p>
-                  {rec.evidence?.sample_url && (
-                    <a href={rec.evidence.sample_url} target="_blank" rel="noreferrer"
-                      className="text-[9px] text-blue-600 hover:underline block truncate font-mono">
-                      {rec.evidence.sample_url}
-                    </a>
-                  )}
-                  {rec.evidence?.detected_snippets?.map((snip, i) => (
-                    <p key={i} className="text-[10px] font-mono bg-gray-50 border border-gray-200 rounded px-1.5 py-0.5 text-gray-600 whitespace-pre-wrap break-words">
-                      {snip}
-                    </p>
-                  ))}
-                  {rec.evidence?.page_signals && Object.keys(rec.evidence.page_signals).length > 0 && (
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {Object.keys(rec.evidence.page_signals).map(sig => (
-                        <span key={sig} className="text-[9px] bg-green-50 border border-green-200 text-green-700 rounded-full px-1.5 py-0.5">
-                          ✓ {sig.replace(/_/g, " ")}
-                        </span>
-                      ))}
-                    </div>
-                  )}
+          {error && (
+            <div className="p-2 bg-red-50 border border-red-200 rounded text-[11px] text-red-700">
+              {error}
+            </div>
+          )}
+
+          {preview && !loading && (
+            <>
+              {/* Evidence */}
+              {rec.evidence && (rec.evidence.detected_snippets?.length || rec.evidence.page_signals) && (
+                <div>
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Evidence</p>
+                  <div className="p-2 bg-teal-50 border border-teal-100 rounded space-y-1.5">
+                    {rec.evidence.sample_url && (
+                      <a href={rec.evidence.sample_url} target="_blank" rel="noreferrer"
+                        className="text-[9px] text-blue-600 hover:underline block truncate font-mono">
+                        {rec.evidence.sample_url}
+                      </a>
+                    )}
+                    {rec.evidence.detected_snippets?.slice(0, 2).map((snip, i) => (
+                      <p key={i} className="text-[10px] font-mono bg-white border border-teal-100 rounded px-1.5 py-0.5 text-gray-600 whitespace-pre-wrap break-words">
+                        {snip}
+                      </p>
+                    ))}
+                    {rec.evidence.page_signals && Object.keys(rec.evidence.page_signals).length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {Object.keys(rec.evidence.page_signals).map(sig => (
+                          <span key={sig} className="text-[9px] bg-white border border-green-200 text-green-700 rounded-full px-1.5 py-0.5">
+                            ✓ {sig.replace(/_/g, " ")}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 
-              {/* Recipe patch */}
-              {hasRecipePatch && (
-                <div className="p-2 bg-white border border-orange-100 rounded">
-                  <p className="text-[10px] font-semibold text-orange-700 mb-1">Recipe Editor settings to configure</p>
-                  <div className="space-y-1">
-                    {Object.entries(rec.fix!.recipe_patch!).map(([key, val]) => (
+              {/* Confidence */}
+              <div>
+                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Confidence</p>
+                <div className="flex items-center gap-2 mb-1.5">
+                  <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+                    <div
+                      className={`h-2 rounded-full ${preview.confidence >= 85 ? "bg-green-500" : preview.confidence >= 65 ? "bg-amber-400" : "bg-red-400"}`}
+                      style={{ width: `${preview.confidence}%` }}
+                    />
+                  </div>
+                  <span className={`text-xs font-bold ${preview.confidence >= 85 ? "text-green-700" : preview.confidence >= 65 ? "text-amber-700" : "text-red-700"}`}>
+                    {preview.confidence}%
+                  </span>
+                </div>
+                <p className="text-[11px] text-gray-600 leading-relaxed">{preview.confidence_reason}</p>
+              </div>
+
+              {/* Expected Impact */}
+              <div>
+                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Expected Impact</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="p-2 bg-gray-50 border border-gray-200 rounded text-center">
+                    <p className="text-[9px] text-gray-400 mb-0.5">
+                      {preview.field_impact.field.replace(/_/g, " ")} now
+                    </p>
+                    <p className="text-lg font-bold text-gray-500">{preview.field_impact.current_pct}%</p>
+                  </div>
+                  <div className="p-2 bg-teal-50 border border-teal-200 rounded text-center">
+                    <p className="text-[9px] text-teal-500 mb-0.5">after fix (est.)</p>
+                    <p className="text-lg font-bold text-teal-700">{preview.field_impact.expected_pct}%</p>
+                  </div>
+                </div>
+                <div className="mt-1.5 flex items-center gap-1.5 text-[11px] text-gray-600">
+                  <TrendingUp className="w-3 h-3 text-teal-500 shrink-0" />
+                  <span>
+                    <strong className="text-teal-700">+{Math.round(preview.field_impact.expected_pct - preview.field_impact.current_pct)} pp</strong>
+                    {" "}gain · {preview.field_impact.courses_affected} courses affected
+                    {preview.field_impact.courses_total > 0 && ` of ${preview.field_impact.courses_total} total`}
+                  </span>
+                </div>
+              </div>
+
+              {/* Risk */}
+              <div>
+                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Risk</p>
+                <div className={`flex items-start gap-2 p-2 rounded border text-[11px] leading-relaxed ${riskColor[preview.risk_level]}`}>
+                  <span className="mt-0.5 shrink-0">{riskIcon[preview.risk_level]}</span>
+                  <div>
+                    <span className="font-semibold capitalize">{preview.risk_level}</span>
+                    {" — "}
+                    {preview.risk_reason}
+                  </div>
+                </div>
+                {preview.url_safety && (
+                  <div className="mt-1.5 p-2 bg-gray-50 border border-gray-200 rounded text-[10px] text-gray-600 space-y-0.5">
+                    <p className="font-medium text-gray-700">URL Filter Check</p>
+                    <p>{preview.url_safety.total_urls} known URLs tested · {preview.url_safety.passing} pass · {preview.url_safety.dropped} dropped ({preview.url_safety.drop_rate_pct}%)</p>
+                    {preview.url_safety.dropped_samples.length > 0 && (
+                      <p className="font-mono text-red-600 truncate">Dropped: {preview.url_safety.dropped_samples[0]}</p>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Validation checklist */}
+              <div>
+                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Validation</p>
+                <div className="space-y-1">
+                  {preview.validations.map((v, i) => (
+                    <div key={i} className="flex items-start gap-2">
+                      {v.ok
+                        ? <CheckCircle2 className="w-3 h-3 text-green-500 mt-0.5 shrink-0" />
+                        : <X className="w-3 h-3 text-red-500 mt-0.5 shrink-0" />}
+                      <div className="text-[11px]">
+                        <span className={`font-medium ${v.ok ? "text-green-700" : "text-red-700"}`}>{v.label}</span>
+                        <span className="text-gray-500 ml-1">{v.detail}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Recipe settings */}
+              {rec.fix?.recipe_patch && Object.keys(rec.fix.recipe_patch).length > 0 && (
+                <div>
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Recipe Settings</p>
+                  <div className="p-2 bg-white border border-orange-100 rounded space-y-1">
+                    {Object.entries(rec.fix.recipe_patch).map(([key, val]) => (
                       <div key={key} className="flex items-start gap-1.5">
                         <code className="text-[9px] bg-orange-50 border border-orange-200 text-orange-800 rounded px-1.5 py-0.5 font-mono shrink-0">{key}</code>
                         <span className="text-[10px] text-gray-600 break-words">{JSON.stringify(val)}</span>
@@ -2509,17 +2717,168 @@ function Phase3RecCard({ rec }: { rec: Phase3Rec }) {
                 </div>
               )}
 
-              {/* Fix description */}
-              {rec.fix?.description && (
-                <p className="text-[11px] text-gray-700 leading-relaxed p-2 bg-teal-50 border border-teal-100 rounded">
-                  <span className="font-semibold text-teal-700">How to fix: </span>
-                  {rec.fix.description}
-                </p>
+              {/* Blocked message */}
+              {preview.risk_level === "critical" && (
+                <div className="p-2.5 bg-red-50 border border-red-300 rounded text-[11px] text-red-800 leading-relaxed">
+                  <strong>Fix blocked automatically.</strong> {preview.risk_reason}
+                  {" "}This fix cannot be applied as-is — review the URL filter settings manually.
+                </div>
               )}
-            </div>
+            </>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-between px-4 py-3 border-t bg-gray-50 shrink-0 gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-xs text-gray-500 hover:text-gray-700 px-3 py-1.5 rounded border border-gray-200 hover:bg-gray-100"
+          >
+            Cancel
+          </button>
+          {preview && rec.fix?.recipe_patch && (
+            <button
+              type="button"
+              onClick={handleApply}
+              disabled={applying || preview.risk_level === "critical" || loading}
+              className="flex items-center gap-1.5 text-xs font-medium text-white bg-teal-600 hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed rounded px-3 py-1.5"
+            >
+              {applying
+                ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Applying…</>
+                : preview.risk_level === "critical"
+                  ? <><ShieldAlert className="w-3.5 h-3.5" /> Fix Blocked</>
+                  : <><Zap className="w-3.5 h-3.5" /> Apply Fix</>}
+            </button>
           )}
         </div>
       </div>
     </div>
+  );
+}
+
+// ── Phase 3 Recommendation Card ───────────────────────────────────────────────
+
+function Phase3RecCard({ rec, jobId }: { rec: Phase3Rec; jobId: string | null }) {
+  const [expanded, setExpanded] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  const isCritical = rec.severity === "critical";
+  const hasEvidence = Boolean(rec.evidence?.detected_snippets?.length || rec.evidence?.sample_url);
+  const hasRecipePatch = rec.fix?.recipe_patch && Object.keys(rec.fix.recipe_patch).length > 0;
+  const canPreview = Boolean(jobId && hasRecipePatch);
+
+  const borderCls = isCritical
+    ? "border-orange-400 bg-orange-50"
+    : "border-amber-300 bg-amber-50";
+
+  return (
+    <>
+      {showPreview && jobId && (
+        <FixPreviewModal
+          rec={rec}
+          jobId={jobId}
+          onClose={() => setShowPreview(false)}
+          onApplied={() => setShowPreview(false)}
+        />
+      )}
+      <div className={`rounded-lg border-l-4 px-3 py-2.5 ${borderCls}`}>
+        <div className="flex items-start gap-2">
+          <FlaskConical className={`w-3.5 h-3.5 shrink-0 mt-0.5 ${isCritical ? "text-orange-500" : "text-amber-500"}`} />
+          <div className="flex-1 min-w-0">
+            {/* Header */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-semibold text-gray-800">{rec.title}</span>
+              <Badge variant="outline" className={`text-[9px] px-1.5 ${isCritical ? "border-orange-300 text-orange-700 bg-orange-100" : "border-amber-300 text-amber-700 bg-amber-100"}`}>
+                {rec.severity}
+              </Badge>
+              <span className="text-[9px] text-gray-400 ml-auto">{Math.round(rec.confidence * 100)}% confidence</span>
+            </div>
+
+            {/* Description */}
+            <p className="text-xs text-gray-600 leading-relaxed mt-0.5">{rec.description}</p>
+
+            {/* Root cause */}
+            <p className="text-[10px] text-gray-500 italic mt-1">{rec.root_cause}</p>
+
+            {/* Action row: Preview Fix button + details toggle */}
+            <div className="flex items-center gap-3 mt-2 flex-wrap">
+              {canPreview && (
+                <button
+                  type="button"
+                  onClick={() => setShowPreview(true)}
+                  className="flex items-center gap-1 text-[10px] font-semibold text-white bg-teal-600 hover:bg-teal-700 rounded px-2.5 py-1"
+                >
+                  <TrendingUp className="w-3 h-3" />
+                  Preview Fix
+                </button>
+              )}
+              {(hasEvidence || hasRecipePatch) && (
+                <button
+                  type="button"
+                  onClick={() => setExpanded(e => !e)}
+                  className="text-[10px] text-teal-600 hover:text-teal-800 flex items-center gap-0.5"
+                >
+                  {expanded ? "Hide details ▲" : `Show ${[hasEvidence && "evidence", hasRecipePatch && "recipe"].filter(Boolean).join(" + ")} ▼`}
+                </button>
+              )}
+            </div>
+
+            {expanded && (
+              <div className="mt-1.5 space-y-2">
+                {/* Page evidence snippets */}
+                {hasEvidence && (
+                  <div className="p-2 bg-white border border-teal-100 rounded space-y-1">
+                    <p className="text-[10px] font-semibold text-teal-700 mb-1">Page evidence</p>
+                    {rec.evidence?.sample_url && (
+                      <a href={rec.evidence.sample_url} target="_blank" rel="noreferrer"
+                        className="text-[9px] text-blue-600 hover:underline block truncate font-mono">
+                        {rec.evidence.sample_url}
+                      </a>
+                    )}
+                    {rec.evidence?.detected_snippets?.map((snip, i) => (
+                      <p key={i} className="text-[10px] font-mono bg-gray-50 border border-gray-200 rounded px-1.5 py-0.5 text-gray-600 whitespace-pre-wrap break-words">
+                        {snip}
+                      </p>
+                    ))}
+                    {rec.evidence?.page_signals && Object.keys(rec.evidence.page_signals).length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {Object.keys(rec.evidence.page_signals).map(sig => (
+                          <span key={sig} className="text-[9px] bg-green-50 border border-green-200 text-green-700 rounded-full px-1.5 py-0.5">
+                            ✓ {sig.replace(/_/g, " ")}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Recipe patch */}
+                {hasRecipePatch && (
+                  <div className="p-2 bg-white border border-orange-100 rounded">
+                    <p className="text-[10px] font-semibold text-orange-700 mb-1">Recipe Editor settings to configure</p>
+                    <div className="space-y-1">
+                      {Object.entries(rec.fix!.recipe_patch!).map(([key, val]) => (
+                        <div key={key} className="flex items-start gap-1.5">
+                          <code className="text-[9px] bg-orange-50 border border-orange-200 text-orange-800 rounded px-1.5 py-0.5 font-mono shrink-0">{key}</code>
+                          <span className="text-[10px] text-gray-600 break-words">{JSON.stringify(val)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Fix description */}
+                {rec.fix?.description && (
+                  <p className="text-[11px] text-gray-700 leading-relaxed p-2 bg-teal-50 border border-teal-100 rounded">
+                    <span className="font-semibold text-teal-700">How to fix: </span>
+                    {rec.fix.description}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </>
   );
 }
