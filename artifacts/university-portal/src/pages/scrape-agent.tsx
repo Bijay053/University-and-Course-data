@@ -52,6 +52,7 @@ type DiagnoseResult = {
   diagnosis?: DiagnosisPayload;
   fallback?: DiagnosisPayload;
   suggested_config?: Record<string, unknown>;
+  already_applied?: boolean;
   error?: string;
 };
 
@@ -598,7 +599,19 @@ export default function ScrapeAgentPage() {
                 </div>
               )}
 
-              {!hasSuggestions && diagnoseResult.ok && (
+              {!hasSuggestions && diagnoseResult.already_applied && (
+                <div className="border border-blue-200 rounded-lg p-3 bg-blue-50 flex items-start gap-2">
+                  <CheckCheck className="w-4 h-4 text-blue-500 mt-0.5 shrink-0" />
+                  <div>
+                    <p className="text-xs font-semibold text-blue-800">Config already applied</p>
+                    <p className="text-xs text-blue-700 mt-0.5">
+                      The suggested fixes are already saved. Run a new scrape to see if the results improve.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {!hasSuggestions && !diagnoseResult.already_applied && diagnoseResult.ok && (
                 <p className="text-xs text-gray-400 text-center py-2">AI found no config changes to suggest for this issue.</p>
               )}
 

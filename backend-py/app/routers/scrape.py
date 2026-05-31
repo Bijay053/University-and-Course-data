@@ -3137,6 +3137,12 @@ async def diagnose_scrape_job(
             if not val:
                 blank_fields[field] = blank_fields.get(field, 0) + 1
 
+    # ── Load current admin_config ─────────────────────────────────────────────
+    # Pass the existing admin_config to the AI so it knows what has already been
+    # applied and does NOT re-suggest the same settings on repeated diagnoses.
+    _sc_raw: dict = dict(uni.scrape_config or {}) if uni else {}
+    _current_admin_cfg: dict = _sc_raw.get("admin_config") or {}
+
     # ── Build prompt ──────────────────────────────────────────────────────────
     prompt = f"""You are an expert web scraping engineer diagnosing why a university course scraper produced poor results.
 
@@ -3154,6 +3160,8 @@ Blank fields across sample ({staged_count} courses):
 {json.dumps(blank_fields, indent=2)}
 Bad location values detected (nav/footer text saved as location):
 {bad_locations[:3] if bad_locations else 'None detected'}
+ALREADY CONFIGURED (admin_config currently in database — do NOT re-suggest these unless the value needs to change):
+{json.dumps(_current_admin_cfg, indent=2) if _current_admin_cfg else "(empty — nothing configured yet)"}
 
 Diagnose the scraping failure in plain English for a non-technical admin.
 Return your response as JSON with this EXACT structure (no other keys):
@@ -3189,16 +3197,22 @@ Return your response as JSON with this EXACT structure (no other keys):
 
 Rules for suggested_config:
 - Only include keys that need to CHANGE from defaults. Remove null/empty values.
-- CRITICAL: If discovery found very few courses (<10), the most likely fix is wrong listing page URLs.
-  Suggest seed_urls with the university's real course catalogue pages (e.g. /study/undergraduate/courses,
-  /study/postgraduate/courses, /courses/search). seed_urls are LISTING pages (not individual courses) —
-  the scraper follows links FROM them. Always suggest seed_urls before increasing bfs_page_budget.
+- CRITICAL: Check the "ALREADY CONFIGURED" block above before suggesting anything.
+  If seed_urls are already set to reasonable listing pages, do NOT re-suggest them.
+  Only suggest a setting if its current value in admin_config is wrong or missing.
+  If the config looks correct but the scrape count is still low, the problem is that
+  a new scrape hasn't been run yet — say so in root_causes and return {{}} for suggested_config.
+- If discovery found very few courses (<10) AND no seed_urls are configured yet, suggest
+  seed_urls with the university's real course catalogue pages (e.g. /study/undergraduate/courses,
+  /study/postgraduate/courses, /courses/search). seed_urls are LISTING pages (not individual
+  courses) — the scraper follows links FROM them.
 - If the site uses JS rendering or Cloudflare protection, set always_browser_discover to true.
 - If online-only courses should be excluded, set extraction.filters.online_only.enabled to true.
 - If you know specific individual course page URLs that are always missed, put them in extra_course_urls.
   Do NOT put listing/search pages in extra_course_urls — those belong in seed_urls.
 - Set _min_expected_courses to your best estimate of total courses the university offers.
-- Return empty dict {{}} for suggested_config if you cannot determine any safe config changes.
+- Return empty dict {{}} for suggested_config if you cannot determine any safe config changes OR if
+  the current admin_config already contains the correct settings.
 
 Return only valid JSON, no markdown fences."""
 
@@ -3248,6 +3262,27 @@ Return only valid JSON, no markdown fences."""
         return out
     suggested_config = _clean_cfg(suggested_config)
 
+    # ── Diff suggested_config against what's already in admin_config ──────────
+    # Remove any key/value pairs from the suggestion that are already set
+    # identically in the current admin_config so we never re-show a fix that
+    # has already been applied.
+    def _diff_cfg(suggested: dict, current: dict) -> dict:
+        """Return only the keys in suggested whose values differ from current."""
+        out: dict = {}
+        for k, v in suggested.items():
+            cur_v = current.get(k)
+            if isinstance(v, dict) and isinstance(cur_v, dict):
+                nested = _diff_cfg(v, cur_v)
+                if nested:
+                    out[k] = nested
+            elif v != cur_v:
+                out[k] = v
+        return out
+
+    suggested_config = _diff_cfg(suggested_config, _current_admin_cfg)
+    # True when the AI's suggestions were all already applied and nothing is new
+    already_applied = bool(_current_admin_cfg) and not bool(suggested_config)
+
     return {
         "ok": True,
         "job_id": job_id,
@@ -3264,6 +3299,7 @@ Return only valid JSON, no markdown fences."""
         "bad_location_samples": bad_locations[:3],
         "diagnosis": diagnosis,
         "suggested_config": suggested_config,
+        "already_applied": already_applied,
     }
 
 
