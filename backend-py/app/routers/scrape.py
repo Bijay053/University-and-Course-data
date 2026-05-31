@@ -3137,11 +3137,47 @@ async def diagnose_scrape_job(
             if not val:
                 blank_fields[field] = blank_fields.get(field, 0) + 1
 
-    # ── Load current admin_config ─────────────────────────────────────────────
-    # Pass the existing admin_config to the AI so it knows what has already been
-    # applied and does NOT re-suggest the same settings on repeated diagnoses.
+    # ── Load effective (fully-merged) config ─────────────────────────────────
+    # Build the real UniConfig the scraper will use: defaults → YAML → admin_config.
+    # Passing this to the AI prevents it from suggesting settings that are already
+    # correct (e.g. always_browser_discover=true from YAML) or suggesting values
+    # that would conflict with YAML guardrails (e.g. disabling browser on a
+    # Cloudflare-protected site).
     _sc_raw: dict = dict(uni.scrape_config or {}) if uni else {}
     _current_admin_cfg: dict = _sc_raw.get("admin_config") or {}
+
+    _effective_disc: dict = {}
+    _effective_extr: dict = {}
+    if uni and uni.scrape_url:
+        try:
+            from app.services.scraper.config.loader import get_config_for_host
+            from urllib.parse import urlparse as _urlparse
+            _hostname = _urlparse(uni.scrape_url).hostname or ""
+            _uni_cfg = get_config_for_host(
+                hostname=_hostname,
+                name=uni.name or "",
+                scrape_url=uni.scrape_url,
+                university_id=uni.id,
+                db_scrape_config=_sc_raw,
+            )
+            # Expose only the discovery/extraction dicts for the prompt
+            _disc_obj = _uni_cfg.discovery
+            _effective_disc = {
+                "seed_urls": list(_disc_obj.seed_urls or []),
+                "must_contain": list(_disc_obj.must_contain or []),
+                "block_url_patterns": list(_disc_obj.block_url_patterns or []),
+                "always_browser_discover": _disc_obj.always_browser_discover,
+                "always_sitemap_supplement": _disc_obj.always_sitemap_supplement,
+                "bfs_page_budget": _disc_obj.bfs_page_budget,
+                "extra_course_urls": list(_disc_obj.extra_course_urls or []),
+                "expected_min_courses": _disc_obj.expected_min_courses,
+            }
+            # Strip None/empty so the prompt isn't cluttered
+            _effective_disc = {k: v for k, v in _effective_disc.items()
+                               if v is not None and v != [] and v is not False or k in (
+                                   "always_browser_discover", "always_sitemap_supplement")}
+        except Exception as _cfg_err:
+            log.debug("diagnose: could not load effective UniConfig: %s", _cfg_err)
 
     # ── Build prompt ──────────────────────────────────────────────────────────
     prompt = f"""You are an expert web scraping engineer diagnosing why a university course scraper produced poor results.
@@ -3160,8 +3196,10 @@ Blank fields across sample ({staged_count} courses):
 {json.dumps(blank_fields, indent=2)}
 Bad location values detected (nav/footer text saved as location):
 {bad_locations[:3] if bad_locations else 'None detected'}
-ALREADY CONFIGURED (admin_config currently in database — do NOT re-suggest these unless the value needs to change):
-{json.dumps(_current_admin_cfg, indent=2) if _current_admin_cfg else "(empty — nothing configured yet)"}
+EFFECTIVE DISCOVERY CONFIG (fully merged: defaults + YAML + admin_config — this is what the scraper actually uses):
+{json.dumps(_effective_disc, indent=2) if _effective_disc else "(using built-in defaults — nothing custom configured yet)"}
+ADMIN PANEL OVERRIDES (values the operator set via UI — already applied on top of YAML):
+{json.dumps({k: v for k, v in _current_admin_cfg.items() if not k.startswith("_")}, indent=2) if _current_admin_cfg else "(none)"}
 
 Diagnose the scraping failure in plain English for a non-technical admin.
 Return your response as JSON with this EXACT structure (no other keys):
@@ -3196,23 +3234,25 @@ Return your response as JSON with this EXACT structure (no other keys):
 }}
 
 Rules for suggested_config:
-- Only include keys that need to CHANGE from defaults. Remove null/empty values.
-- CRITICAL: Check the "ALREADY CONFIGURED" block above before suggesting anything.
-  If seed_urls are already set to reasonable listing pages, do NOT re-suggest them.
-  Only suggest a setting if its current value in admin_config is wrong or missing.
-  If the config looks correct but the scrape count is still low, the problem is that
-  a new scrape hasn't been run yet — say so in root_causes and return {{}} for suggested_config.
-- If discovery found very few courses (<10) AND no seed_urls are configured yet, suggest
-  seed_urls with the university's real course catalogue pages (e.g. /study/undergraduate/courses,
-  /study/postgraduate/courses, /courses/search). seed_urls are LISTING pages (not individual
-  courses) — the scraper follows links FROM them.
-- If the site uses JS rendering or Cloudflare protection, set always_browser_discover to true.
+- Only include keys that need to CHANGE. Remove null/empty values.
+- CRITICAL: Check "EFFECTIVE DISCOVERY CONFIG" above before suggesting ANYTHING.
+  That block shows exactly what config the scraper is already using. Do NOT suggest
+  a value that is already set correctly there.
+- NEVER suggest always_browser_discover: false if it is already true in the effective config.
+  Browser discovery is required for JavaScript-rendered or Cloudflare-protected sites.
+- NEVER suggest always_sitemap_supplement: false unless you are certain sitemaps are harmful.
+- If seed_urls are already set to listing pages in the effective config, do NOT re-suggest them.
+  If the scrape count is still low despite correct seed_urls, the problem may be a
+  must_contain filter that is too restrictive, or the site uses JS rendering
+  (suggest always_browser_discover: true) — say so in root_causes.
+- If discovery found very few courses (<10) AND no seed_urls are in the effective config,
+  suggest seed_urls pointing to the university's real course catalogue listing pages
+  (e.g. /study/undergraduate/courses). seed_urls are LISTING pages — the scraper follows
+  links FROM them. Do NOT put individual course pages in seed_urls.
 - If online-only courses should be excluded, set extraction.filters.online_only.enabled to true.
-- If you know specific individual course page URLs that are always missed, put them in extra_course_urls.
-  Do NOT put listing/search pages in extra_course_urls — those belong in seed_urls.
 - Set _min_expected_courses to your best estimate of total courses the university offers.
-- Return empty dict {{}} for suggested_config if you cannot determine any safe config changes OR if
-  the current admin_config already contains the correct settings.
+- Return empty dict {{}} if no changes are needed OR if settings already look correct and a
+  re-scrape is all that is needed — explain in root_causes instead.
 
 Return only valid JSON, no markdown fences."""
 
@@ -3279,9 +3319,14 @@ Return only valid JSON, no markdown fences."""
                 out[k] = v
         return out
 
-    suggested_config = _diff_cfg(suggested_config, _current_admin_cfg)
-    # True when the AI's suggestions were all already applied and nothing is new
-    already_applied = bool(_current_admin_cfg) and not bool(suggested_config)
+    # Diff against the EFFECTIVE merged config (YAML + admin_config) so that
+    # settings already active via YAML also count as "already applied".
+    _effective_full_cfg: dict = {}
+    if _effective_disc:
+        _effective_full_cfg["discovery"] = _effective_disc
+    suggested_config = _diff_cfg(suggested_config, _effective_full_cfg if _effective_full_cfg else _current_admin_cfg)
+    # True when something was configured and nothing new is being suggested
+    already_applied = bool(_current_admin_cfg or _effective_disc) and not bool(suggested_config)
 
     return {
         "ok": True,

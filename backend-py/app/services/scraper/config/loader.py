@@ -245,15 +245,7 @@ def load_uni_config(
                 db_scrape_config.get("auto_config", {}).get("_strategy", "unknown"),
             )
 
-        # 3.5. Merge admin UI config (Scrape Fix Agent writes here).
-        #      Priority: above auto_config, below per-uni YAML.
-        #      YAML still wins as the emergency developer override.
-        admin_cfg = _extract_admin_config(db_scrape_config)
-        if admin_cfg:
-            merged = _deep_merge(merged, admin_cfg)
-            log.debug("Admin UI config applied for slug=%r", slug)
-
-    # 4. Load and merge per-uni YAML (highest priority — emergency override only)
+    # 4. Load and merge per-uni YAML (developer baseline / emergency guardrails)
     #
     # Lookup order (most-specific wins):
     #   1. unis/{slug}_{university_id}.yaml — disambiguates two unis that share
@@ -280,6 +272,27 @@ def load_uni_config(
         merged = _deep_merge(merged, per_uni)
     else:
         log.debug("No per-uni YAML for slug=%r (will use defaults + DB config)", slug)
+
+    if db_scrape_config:
+        # 4.5. Merge admin UI config LAST so operator UI changes always win.
+        #
+        #      Priority: HIGHEST — above the per-uni YAML.
+        #
+        #      Rationale: the YAML is a developer-authored baseline that sets
+        #      safe defaults for universities with known quirks.  The admin UI
+        #      (Scrape Fix Agent "Apply AI Fix" / manual config panel) is how
+        #      operators tune discovery without a code deploy.  If YAML won,
+        #      every UI change would be silently discarded — the operator would
+        #      see "Config applied" but nothing would actually change.
+        #
+        #      The YAML remains the right place for deep structural guardrails
+        #      (block_nav_patterns, must_contain rules, always_browser_discover)
+        #      that the UI doesn't surface; those are untouched unless the
+        #      operator explicitly adds the same keys via the panel.
+        admin_cfg = _extract_admin_config(db_scrape_config)
+        if admin_cfg:
+            merged = _deep_merge(merged, admin_cfg)
+            log.debug("Admin UI config applied for slug=%r (highest priority)", slug)
 
     # 5. Inject identity fields (these are not in YAML, they come from the DB row)
     merged.pop("slug", None)
