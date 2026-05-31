@@ -73,6 +73,20 @@ type SimChange = { field: string; before: string | null; after: string | null };
 type SimSample = { id: number; name: string; changes: SimChange[] };
 type SimResult = { total: number; changed: number; samples: SimSample[]; message?: string };
 
+type FilterImpact = {
+  ok: boolean;
+  has_filters: boolean;
+  total_urls: number;
+  after_filter: number;
+  dropped: number;
+  drop_rate_pct: number;
+  kept_samples: string[];
+  dropped_samples: string[];
+  filter_config: { allow_url_patterns: string[]; must_contain: string[]; block_url_patterns: string[] };
+  status: "ok" | "warning" | "critical";
+  message?: string;
+};
+
 type ExtractionIssue = {
   field: string;
   issue_type: string;
@@ -213,6 +227,8 @@ export default function ScrapeAgentPage() {
   const [appliedConfig, setAppliedConfig] = useState<Record<string, unknown> | null>(null);
   const [fixBlock, setFixBlock] = useState<FixBlock | null>(null);
   const [rollingBack, setRollingBack] = useState(false);
+  const [filterImpact, setFilterImpact] = useState<FilterImpact | null>(null);
+  const [loadingImpact, setLoadingImpact] = useState(false);
   const [checkingExtraction, setCheckingExtraction] = useState(false);
   const [extractionResult, setExtractionResult] = useState<ExtractionQualityResult | null>(null);
 
@@ -269,6 +285,21 @@ export default function ScrapeAgentPage() {
   }, [uniId, toast]);
 
   useEffect(() => { loadConfig(); }, [loadConfig]);
+
+  const loadFilterImpact = useCallback(async () => {
+    if (!uniId) return;
+    setLoadingImpact(true);
+    try {
+      const res = await fetch(`${BASE}/api/universities/${uniId}/filter-impact`);
+      if (!res.ok) return;
+      const data: FilterImpact = await res.json();
+      setFilterImpact(data);
+    } catch { /* non-fatal */ } finally {
+      setLoadingImpact(false);
+    }
+  }, [uniId]);
+
+  useEffect(() => { loadFilterImpact(); }, [loadFilterImpact]);
 
   // Build admin_config dict from UI state
   const buildAdminConfig = () => {
@@ -552,6 +583,123 @@ export default function ScrapeAgentPage() {
           </div>
         )}
       </div>
+
+      {/* ── URL Filter Kill Banner ─────────────────────────────────────────── */}
+      {js && (js.total_found ?? 0) > 50 && (js.imported ?? 0) === 0 && (
+        <div className="bg-red-50 border border-red-300 rounded-xl p-4 flex gap-3">
+          <ShieldAlert className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+          <div className="space-y-1 min-w-0">
+            <p className="text-sm font-semibold text-red-800">URL filter likely blocked all courses</p>
+            <p className="text-xs text-red-700">
+              Discovery found <strong>{js.total_found}</strong> URLs but <strong>0 courses were staged</strong>.
+              This almost always means a URL filter (<code className="bg-red-100 px-0.5 rounded">must_contain</code>,{" "}
+              <code className="bg-red-100 px-0.5 rounded">allow_url_patterns</code>, or{" "}
+              <code className="bg-red-100 px-0.5 rounded">block_url_patterns</code>) dropped every course link.
+            </p>
+            {config?.has_rollback && (
+              <button
+                onClick={rollbackFix}
+                disabled={rollingBack}
+                className="mt-1 inline-flex items-center gap-1.5 text-xs font-medium bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-md transition-colors disabled:opacity-50"
+              >
+                {rollingBack ? <Loader2 className="w-3 h-3 animate-spin" /> : <RotateCcw className="w-3 h-3" />}
+                Revert Last AI Fix
+              </button>
+            )}
+            <p className="text-xs text-red-600 pt-1">
+              Check the URL Filter Impact panel below to see which URLs are being dropped.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* ── URL Filter Impact Panel ───────────────────────────────────────── */}
+      {(filterImpact?.has_filters || loadingImpact) && (
+        <div className={`border rounded-xl p-4 space-y-3 ${
+          filterImpact?.status === "critical" ? "bg-red-50 border-red-300" :
+          filterImpact?.status === "warning" ? "bg-amber-50 border-amber-300" :
+          "bg-white border-gray-200"
+        }`}>
+          <div className="flex items-center gap-2">
+            <ShieldAlert className={`w-4 h-4 ${
+              filterImpact?.status === "critical" ? "text-red-600" :
+              filterImpact?.status === "warning" ? "text-amber-600" :
+              "text-gray-400"
+            }`} />
+            <h3 className="text-sm font-semibold text-gray-700">URL Filter Impact</h3>
+            {loadingImpact && <Loader2 className="w-3.5 h-3.5 animate-spin text-gray-400" />}
+            {filterImpact && !loadingImpact && (
+              <span className={`ml-auto text-xs font-medium px-2 py-0.5 rounded-full ${
+                filterImpact.status === "critical" ? "bg-red-100 text-red-700" :
+                filterImpact.status === "warning" ? "bg-amber-100 text-amber-700" :
+                "bg-green-100 text-green-700"
+              }`}>
+                {filterImpact.status === "critical" ? "Critical — too restrictive" :
+                 filterImpact.status === "warning" ? "Warning — high drop rate" :
+                 "OK"}
+              </span>
+            )}
+          </div>
+
+          {filterImpact && (
+            <>
+              <p className="text-xs text-gray-600">
+                Simulated against <strong>{filterImpact.total_urls}</strong> historical course URLs.
+                {" "}<strong className={filterImpact.status !== "ok" ? "text-red-700" : "text-green-700"}>
+                  {filterImpact.dropped} dropped ({filterImpact.drop_rate_pct}%)
+                </strong>
+                {" · "}
+                <strong className="text-green-700">{filterImpact.after_filter} kept</strong>
+              </p>
+
+              {/* Active filter config */}
+              <div className="bg-white/70 rounded-lg p-2.5 text-xs space-y-1">
+                {filterImpact.filter_config.allow_url_patterns.length > 0 && (
+                  <div><span className="font-medium text-gray-700">allow_url_patterns: </span>
+                    <span className="text-gray-600 font-mono">{filterImpact.filter_config.allow_url_patterns.join(", ")}</span>
+                  </div>
+                )}
+                {filterImpact.filter_config.must_contain.length > 0 && (
+                  <div><span className="font-medium text-gray-700">must_contain: </span>
+                    <span className="text-gray-600 font-mono">{filterImpact.filter_config.must_contain.join(", ")}</span>
+                  </div>
+                )}
+                {filterImpact.filter_config.block_url_patterns.length > 0 && (
+                  <div><span className="font-medium text-gray-700">block_url_patterns: </span>
+                    <span className="text-gray-600 font-mono">{filterImpact.filter_config.block_url_patterns.join(", ")}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Sample URLs */}
+              {filterImpact.dropped_samples.length > 0 && (
+                <div className="space-y-1">
+                  <p className="text-[11px] font-semibold text-red-700 uppercase tracking-wide">Dropped samples</p>
+                  <div className="space-y-0.5">
+                    {filterImpact.dropped_samples.slice(0, 5).map((u, i) => (
+                      <p key={i} className="text-[11px] text-red-700 font-mono truncate">{u}</p>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {filterImpact.kept_samples.length > 0 && (
+                <div className="space-y-1">
+                  <p className="text-[11px] font-semibold text-green-700 uppercase tracking-wide">Kept samples</p>
+                  <div className="space-y-0.5">
+                    {filterImpact.kept_samples.slice(0, 5).map((u, i) => (
+                      <p key={i} className="text-[11px] text-green-700 font-mono truncate">{u}</p>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {filterImpact.message && (
+                <p className="text-xs text-gray-500 italic">{filterImpact.message}</p>
+              )}
+            </>
+          )}
+        </div>
+      )}
 
       {/* ── Scrape Rules Editor ───────────────────────────────────────────── */}
       <div className="bg-white border rounded-xl p-4 space-y-5">

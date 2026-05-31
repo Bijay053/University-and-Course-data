@@ -4032,6 +4032,20 @@ ADMIN PANEL OVERRIDES (values the operator set via UI — already applied on top
 
 Diagnose the scraping failure in plain English for a non-technical admin.
 
+URL FILTER KILL PATTERN — highest priority diagnosis rule:
+If "Total URLs discovered" > 50 AND "Courses staged" == 0:
+  - The root cause is ALWAYS a URL filter (must_contain / allow_url_patterns / block_url_patterns)
+    that is dropping all discovered course links before extraction can run.
+  - Do NOT say "Cloudflare is blocking".  Do NOT say "scrape failed".
+  - The correct root_causes entry is:
+    {{
+      "issue": "URL filter removed all valid course URLs",
+      "severity": "high",
+      "explanation": "Discovery found X course links but a URL filter (allow_url_patterns or must_contain) dropped all of them before extraction. Staged courses = 0."
+    }}
+  - The correct recommended_action is to remove or fix the URL filter.
+  - If "Total URLs discovered" == 0: THEN it may be a seed URL or Cloudflare issue.
+
 CRITICAL DISTINCTION you must apply:
 - "config" issues = operator can fix by adding a URL, CSS selector, or changing a setting in the portal.
   Examples: missing fee page URL, missing English requirements URL, wrong must_contain filter, seed URL not set.
@@ -5014,69 +5028,115 @@ async def apply_scrape_fix(
     sc: dict = dict(row.get("scrape_config") or {})
     existing: dict = sc.get("admin_config") or {}
 
-    # ── Safety guard: validate must_contain before saving ────────────────────
-    mc_patch: list[str] | None = (config_patch.get("discovery") or {}).get("must_contain")
+    # ── Safety guard: validate ALL URL filters before saving ─────────────────
+    # Tests allow_url_patterns + must_contain + block_url_patterns combined.
+    # Thresholds: ≥70% drop → hard block (even with force=true)
+    #             ≥20% drop → soft block (overridable with force=true)
+    import re as _re_guard
+
+    disc_patch = config_patch.get("discovery") or {}
+    _URL_FILTER_KEYS = ("allow_url_patterns", "must_contain", "block_url_patterns")
     url_warning: dict | None = None
 
-    if mc_patch:
-        url_rows = (await db.execute(
-            select(_SC.course_website)
-            .where(_SC.university_id == uni_id)
-            .where(_SC.course_website.isnot(None))
-            .limit(200)
-        )).scalars().all()
+    if any(k in disc_patch for k in _URL_FILTER_KEYS):
+        # Merge patch into existing discovery config to get the FULL proposed state
+        existing_disc = (existing.get("discovery") or {}) if isinstance(existing.get("discovery"), dict) else {}
+        proposed_disc: dict = {**existing_disc}
+        for k in _URL_FILTER_KEYS:
+            if k in disc_patch:
+                proposed_disc[k] = disc_patch[k] or []
 
-        known_urls = [u for u in url_rows if u]
+        allow_pats = [p for p in (proposed_disc.get("allow_url_patterns") or []) if p]
+        mc_patterns = [m for m in (proposed_disc.get("must_contain") or []) if m]
+        block_pats = [p for p in (proposed_disc.get("block_url_patterns") or []) if p]
 
-        if known_urls:
-            mc_lower = [m.lower() for m in mc_patch if m]
-            passing = [u for u in known_urls if any(m in u.lower() for m in mc_lower)]
-            dropped = [u for u in known_urls if u not in set(passing)]
-            drop_rate = len(dropped) / len(known_urls)
+        if allow_pats or mc_patterns or block_pats:
+            url_rows = (await db.execute(
+                select(_SC.course_website)
+                .where(_SC.university_id == uni_id)
+                .where(_SC.course_website.isnot(None))
+                .limit(200)
+            )).scalars().all()
 
-            if drop_rate >= 0.70:
-                # Hard block regardless of force flag
-                raise HTTPException(
-                    status_code=422,
-                    detail={
-                        "error": "must_contain_filter_too_destructive",
-                        "message": (
-                            f"This must_contain filter would drop {round(drop_rate * 100)}% of the "
-                            f"{len(known_urls)} known course URLs. Fix has been blocked."
-                        ),
-                        "total_urls": len(known_urls),
-                        "passing": len(passing),
-                        "dropped": len(dropped),
-                        "drop_rate_pct": round(drop_rate * 100),
-                        "dropped_samples": dropped[:10],
-                        "filter_applied": mc_patch,
-                    },
-                )
-            elif drop_rate >= 0.30:
-                url_warning = {
-                    "drop_rate_pct": round(drop_rate * 100),
-                    "total_urls": len(known_urls),
-                    "passing": len(passing),
-                    "dropped": len(dropped),
-                    "dropped_samples": dropped[:5],
-                }
-                if not force:
+            known_urls = [u for u in url_rows if u]
+
+            if known_urls:
+                compiled_allow = []
+                for p in allow_pats:
+                    try:
+                        compiled_allow.append(_re_guard.compile(p, _re_guard.IGNORECASE))
+                    except _re_guard.error:
+                        pass
+
+                compiled_block = []
+                for p in block_pats:
+                    try:
+                        compiled_block.append(_re_guard.compile(p, _re_guard.IGNORECASE))
+                    except _re_guard.error:
+                        pass
+
+                mc_lower = [m.lower() for m in mc_patterns]
+
+                passing: list[str] = []
+                dropped: list[str] = []
+                for u in known_urls:
+                    ok = True
+                    ul = u.lower()
+                    if compiled_allow and not any(pat.search(u) for pat in compiled_allow):
+                        ok = False
+                    if ok and mc_lower and not any(m in ul for m in mc_lower):
+                        ok = False
+                    if ok and compiled_block and any(pat.search(u) for pat in compiled_block):
+                        ok = False
+                    (passing if ok else dropped).append(u)
+
+                drop_rate = len(dropped) / len(known_urls)
+
+                if drop_rate >= 0.70:
                     raise HTTPException(
                         status_code=422,
                         detail={
-                            "error": "must_contain_filter_high_drop_rate",
+                            "error": "url_filter_too_destructive",
                             "message": (
-                                f"This must_contain filter would drop {round(drop_rate * 100)}% of the "
-                                f"{len(known_urls)} known course URLs. Send force=true to override."
+                                f"This URL filter would drop {round(drop_rate * 100)}% of the "
+                                f"{len(known_urls)} known course URLs. Fix has been blocked."
                             ),
                             "total_urls": len(known_urls),
                             "passing": len(passing),
                             "dropped": len(dropped),
                             "drop_rate_pct": round(drop_rate * 100),
                             "dropped_samples": dropped[:10],
-                            "filter_applied": mc_patch,
+                            "kept_samples": passing[:5],
+                            "filter_applied": {k: proposed_disc[k] for k in _URL_FILTER_KEYS if proposed_disc.get(k)},
                         },
                     )
+                elif drop_rate >= 0.20:
+                    url_warning = {
+                        "drop_rate_pct": round(drop_rate * 100),
+                        "total_urls": len(known_urls),
+                        "passing": len(passing),
+                        "dropped": len(dropped),
+                        "dropped_samples": dropped[:5],
+                        "kept_samples": passing[:5],
+                    }
+                    if not force:
+                        raise HTTPException(
+                            status_code=422,
+                            detail={
+                                "error": "url_filter_high_drop_rate",
+                                "message": (
+                                    f"This URL filter would drop {round(drop_rate * 100)}% of the "
+                                    f"{len(known_urls)} known course URLs. Send force=true to override."
+                                ),
+                                "total_urls": len(known_urls),
+                                "passing": len(passing),
+                                "dropped": len(dropped),
+                                "drop_rate_pct": round(drop_rate * 100),
+                                "dropped_samples": dropped[:10],
+                                "kept_samples": passing[:5],
+                                "filter_applied": {k: proposed_disc[k] for k in _URL_FILTER_KEYS if proposed_disc.get(k)},
+                            },
+                        )
 
     # ── Store previous config for rollback before overwriting ─────────────────
     if existing:

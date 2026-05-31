@@ -721,6 +721,116 @@ async def get_agent_config(
     }
 
 
+@router.get("/universities/{uni_id}/filter-impact")
+async def get_filter_impact(
+    uni_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[dict, Depends(get_current_user)],
+) -> dict:
+    """Simulate the university's current effective URL filter against known course URLs.
+
+    Uses the last 200 course_website values from scraped_courses as a proxy
+    for the URLs that will be discovered on the next scrape.  Returns drop
+    statistics and sample kept/dropped URLs so the operator can see whether
+    the current config is safe before triggering a scrape.
+    """
+    import re as _re_fi
+
+    u: University | None = await db.get(University, uni_id)
+    if not u:
+        raise HTTPException(status_code=404, detail="University not found")
+
+    # Load effective config (YAML + DB merged)
+    allow_pats: list[str] = []
+    mc_patterns: list[str] = []
+    block_pats: list[str] = []
+    try:
+        from app.services.scraper.config.loader import get_config_for_host as _gcfh
+        from urllib.parse import urlparse as _up
+        _h = _up(u.scrape_url or "").hostname or ""
+        _uc = _gcfh(
+            hostname=_h, name=u.name or "",
+            scrape_url=u.scrape_url or "",
+            university_id=u.id,
+            db_scrape_config=dict(u.scrape_config or {}),
+        )
+        allow_pats = list(_uc.discovery.allow_url_patterns or [])
+        mc_patterns = list(_uc.discovery.must_contain or [])
+        block_pats = list(_uc.discovery.block_url_patterns or [])
+    except Exception:
+        pass
+
+    has_filters = bool(allow_pats or mc_patterns or block_pats)
+
+    # Fetch known course URLs
+    from app.models import ScrapedCourse as _SC2
+    url_rows = (await db.execute(
+        select(_SC2.course_website)
+        .where(_SC2.university_id == uni_id)
+        .where(_SC2.course_website.isnot(None))
+        .limit(200)
+    )).scalars().all()
+    known_urls = [u2 for u2 in url_rows if u2]
+
+    if not known_urls:
+        return {
+            "ok": True,
+            "has_filters": has_filters,
+            "total_urls": 0,
+            "after_filter": 0,
+            "dropped": 0,
+            "drop_rate_pct": 0,
+            "kept_samples": [],
+            "dropped_samples": [],
+            "filter_config": {
+                "allow_url_patterns": allow_pats,
+                "must_contain": mc_patterns,
+                "block_url_patterns": block_pats,
+            },
+            "message": "No historical course URLs found — cannot simulate filter impact.",
+        }
+
+    compiled_allow = [_re_fi.compile(p, _re_fi.IGNORECASE) for p in allow_pats if p]
+    compiled_block = [_re_fi.compile(p, _re_fi.IGNORECASE) for p in block_pats if p]
+    mc_lower = [m.lower() for m in mc_patterns if m]
+
+    passing: list[str] = []
+    dropped_urls: list[str] = []
+    for url in known_urls:
+        ok = True
+        ul = url.lower()
+        if compiled_allow and not any(pat.search(url) for pat in compiled_allow):
+            ok = False
+        if ok and mc_lower and not any(m in ul for m in mc_lower):
+            ok = False
+        if ok and compiled_block and any(pat.search(url) for pat in compiled_block):
+            ok = False
+        (passing if ok else dropped_urls).append(url)
+
+    drop_rate = len(dropped_urls) / len(known_urls) if known_urls else 0
+
+    return {
+        "ok": True,
+        "has_filters": has_filters,
+        "total_urls": len(known_urls),
+        "after_filter": len(passing),
+        "dropped": len(dropped_urls),
+        "drop_rate_pct": round(drop_rate * 100),
+        "kept_samples": passing[:8],
+        "dropped_samples": dropped_urls[:8],
+        "filter_config": {
+            "allow_url_patterns": allow_pats,
+            "must_contain": mc_patterns,
+            "block_url_patterns": block_pats,
+        },
+        "status": (
+            "critical" if drop_rate >= 0.70 else
+            "warning" if drop_rate >= 0.20 else
+            "ok"
+        ),
+    }
+
+
 @router.put("/universities/{uni_id}/agent-config")
 async def put_agent_config(
     uni_id: int,
