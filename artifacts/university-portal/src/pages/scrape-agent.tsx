@@ -10,6 +10,7 @@ import {
   ArrowLeft, Bot, CheckCircle2, AlertTriangle, Loader2, Zap, RefreshCw,
   CheckCheck, X, Plus, Save, Settings2, Activity, Target, TrendingUp,
   ShieldAlert, Play, ExternalLink, FlaskConical, BarChart3, Wrench, RotateCcw,
+  Search,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -56,6 +57,43 @@ type DiagnosisPayload = {
   discovery_verdict?: string;
   location_verdict?: string;
 };
+
+type Phase3Evidence = {
+  affected_count?: number;
+  sample_url?: string;
+  detected_snippets?: string[];
+  page_signals?: Record<string, boolean>;
+};
+
+type Phase3Fix = {
+  type: string;
+  description: string;
+  recipe_patch?: Record<string, unknown>;
+};
+
+type Phase3Rec = {
+  id: string;
+  severity: "critical" | "warning" | "info";
+  title: string;
+  description: string;
+  root_cause: string;
+  confidence: number;
+  evidence?: Phase3Evidence;
+  fix?: Phase3Fix | null;
+};
+
+type CourseProbeSummary = {
+  probed: number;
+  flags: Record<string, boolean>;
+  per_page: Array<{
+    url: string;
+    is_ielts_url: boolean;
+    is_fee_url: boolean;
+    signals: Record<string, boolean>;
+    detected_snippets: string[];
+  }>;
+};
+
 type DiagnoseResult = {
   ok: boolean;
   university?: string;
@@ -67,6 +105,8 @@ type DiagnoseResult = {
   suggested_config?: Record<string, unknown>;
   already_applied?: boolean;
   error?: string;
+  phase3_recommendations?: Phase3Rec[];
+  course_probe_summary?: CourseProbeSummary;
 };
 
 type SimChange = { field: string; before: string | null; after: string | null };
@@ -1340,6 +1380,62 @@ export default function ScrapeAgentPage() {
                 </div>
               )}
 
+              {/* Course probe summary banner */}
+              {diagnoseResult.course_probe_summary && diagnoseResult.course_probe_summary.probed > 0 && (() => {
+                const probe = diagnoseResult.course_probe_summary!;
+                const flagLabels: Record<string, string> = {
+                  international_fee_text_found: "Intl fee text on page",
+                  csp_text_found: "Domestic/CSP fee on page",
+                  fee_text_in_blank_pages: "Fee in blank courses",
+                  english_section_found: "English section detected",
+                  english_link_found: "English link detected",
+                  band_text_found: "Band text detected",
+                  ielts_overall_text_found: "IELTS score on page",
+                  ielts_components_text_found: "IELTS components on page",
+                  cloudflare_blocked_courses: "Cloudflare blocking pages",
+                };
+                const activeFlags = Object.entries(probe.flags).filter(([, v]) => v);
+                return (
+                  <div className="border border-blue-200 rounded-lg p-3 bg-blue-50 space-y-2">
+                    <p className="text-[10px] font-semibold text-blue-800 uppercase tracking-wide flex items-center gap-1.5">
+                      <Search className="w-3 h-3" /> Live page probe — {probe.probed} pages checked
+                    </p>
+                    {activeFlags.length > 0 ? (
+                      <div className="flex flex-wrap gap-1.5">
+                        {activeFlags.map(([key]) => (
+                          <span key={key} className={`text-[9px] rounded-full px-2 py-0.5 border font-medium ${
+                            key === "cloudflare_blocked_courses"
+                              ? "bg-red-50 border-red-200 text-red-700"
+                              : key === "csp_text_found"
+                              ? "bg-amber-50 border-amber-200 text-amber-700"
+                              : "bg-green-50 border-green-200 text-green-700"
+                          }`}>
+                            {key === "cloudflare_blocked_courses" ? "⚠ " : "✓ "}{flagLabels[key] ?? key.replace(/_/g, " ")}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-[10px] text-blue-600">No notable signals detected in sampled pages.</p>
+                    )}
+                  </div>
+                );
+              })()}
+
+              {/* Phase 3 Recommendations */}
+              {diagnoseResult.phase3_recommendations && diagnoseResult.phase3_recommendations.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-1.5">
+                    <FlaskConical className="w-3.5 h-3.5 text-orange-500" /> Extraction Fix Opportunities
+                    <span className="text-[9px] bg-orange-50 border border-orange-200 text-orange-700 rounded-full px-1.5 py-0.5 normal-case font-medium tracking-normal">
+                      {diagnoseResult.phase3_recommendations.length} finding{diagnoseResult.phase3_recommendations.length !== 1 ? "s" : ""}
+                    </span>
+                  </p>
+                  {diagnoseResult.phase3_recommendations.map((rec) => (
+                    <Phase3RecCard key={rec.id} rec={rec} />
+                  ))}
+                </div>
+              )}
+
               {/* Suggested config + Apply Fix */}
               {hasSuggestions && (() => {
                 const sugDisc = (suggestedConfig.discovery ?? {}) as Record<string, unknown>;
@@ -2165,7 +2261,7 @@ function ExtractionIssueCard({
             <span className="text-xs font-semibold text-gray-800">{issue.label}</span>
             {isPlatformBug ? (
               <Badge variant="outline" className="text-[9px] px-1.5 border-slate-400 text-slate-600 bg-slate-100">
-                🔧 Platform bug
+                🔧 Rare edge case
               </Badge>
             ) : isRecipeFix ? (
               <Badge variant="outline" className="text-[9px] px-1.5 border-teal-400 text-teal-700 bg-teal-100">
@@ -2200,8 +2296,8 @@ function ExtractionIssueCard({
             <div className="mt-2 flex items-start gap-1.5 p-2 bg-slate-100 border border-slate-200 rounded text-[11px] text-slate-700 leading-relaxed">
               <Wrench className="w-3 h-3 shrink-0 mt-0.5 text-slate-500" />
               <span>
-                <strong className="text-slate-800">Developer fix required.</strong>{" "}
-                This cannot be corrected through portal settings. The data extraction logic needs to be updated by the development team.
+                <strong className="text-slate-800">Uncommon extraction pattern.</strong>{" "}
+                This issue was not resolved by standard Recipe Editor settings. Check whether a custom CSS/XPath field selector in the Recipe Editor can target this data, or contact support if the pattern is new.
               </span>
             </div>
           ) : isRecipeFix ? (
@@ -2248,6 +2344,108 @@ function ExtractionIssueCard({
                 </div>
               )}
             </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Phase 3 Recommendation Card ───────────────────────────────────────────────
+
+function Phase3RecCard({ rec }: { rec: Phase3Rec }) {
+  const [expanded, setExpanded] = useState(false);
+  const isCritical = rec.severity === "critical";
+  const hasEvidence = Boolean(rec.evidence?.detected_snippets?.length || rec.evidence?.sample_url);
+  const hasRecipePatch = rec.fix?.recipe_patch && Object.keys(rec.fix.recipe_patch).length > 0;
+
+  const borderCls = isCritical
+    ? "border-orange-400 bg-orange-50"
+    : "border-amber-300 bg-amber-50";
+
+  return (
+    <div className={`rounded-lg border-l-4 px-3 py-2.5 ${borderCls}`}>
+      <div className="flex items-start gap-2">
+        <FlaskConical className={`w-3.5 h-3.5 shrink-0 mt-0.5 ${isCritical ? "text-orange-500" : "text-amber-500"}`} />
+        <div className="flex-1 min-w-0">
+          {/* Header */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs font-semibold text-gray-800">{rec.title}</span>
+            <Badge variant="outline" className={`text-[9px] px-1.5 ${isCritical ? "border-orange-300 text-orange-700 bg-orange-100" : "border-amber-300 text-amber-700 bg-amber-100"}`}>
+              {rec.severity}
+            </Badge>
+            <span className="text-[9px] text-gray-400 ml-auto">{Math.round(rec.confidence * 100)}% confidence</span>
+          </div>
+
+          {/* Description */}
+          <p className="text-xs text-gray-600 leading-relaxed mt-0.5">{rec.description}</p>
+
+          {/* Root cause */}
+          <p className="text-[10px] text-gray-500 italic mt-1">{rec.root_cause}</p>
+
+          {/* Evidence + recipe_patch toggle */}
+          {(hasEvidence || hasRecipePatch) && (
+            <button
+              type="button"
+              onClick={() => setExpanded(e => !e)}
+              className="text-[10px] text-teal-600 hover:text-teal-800 mt-1.5 flex items-center gap-0.5"
+            >
+              {expanded ? "Hide details ▲" : `Show ${[hasEvidence && "page evidence", hasRecipePatch && "recipe settings"].filter(Boolean).join(" + ")} ▼`}
+            </button>
+          )}
+
+          {expanded && (
+            <div className="mt-1.5 space-y-2">
+              {/* Page evidence snippets */}
+              {hasEvidence && (
+                <div className="p-2 bg-white border border-teal-100 rounded space-y-1">
+                  <p className="text-[10px] font-semibold text-teal-700 mb-1">Page evidence</p>
+                  {rec.evidence?.sample_url && (
+                    <a href={rec.evidence.sample_url} target="_blank" rel="noreferrer"
+                      className="text-[9px] text-blue-600 hover:underline block truncate font-mono">
+                      {rec.evidence.sample_url}
+                    </a>
+                  )}
+                  {rec.evidence?.detected_snippets?.map((snip, i) => (
+                    <p key={i} className="text-[10px] font-mono bg-gray-50 border border-gray-200 rounded px-1.5 py-0.5 text-gray-600 whitespace-pre-wrap break-words">
+                      {snip}
+                    </p>
+                  ))}
+                  {rec.evidence?.page_signals && Object.keys(rec.evidence.page_signals).length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {Object.keys(rec.evidence.page_signals).map(sig => (
+                        <span key={sig} className="text-[9px] bg-green-50 border border-green-200 text-green-700 rounded-full px-1.5 py-0.5">
+                          ✓ {sig.replace(/_/g, " ")}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Recipe patch */}
+              {hasRecipePatch && (
+                <div className="p-2 bg-white border border-orange-100 rounded">
+                  <p className="text-[10px] font-semibold text-orange-700 mb-1">Recipe Editor settings to configure</p>
+                  <div className="space-y-1">
+                    {Object.entries(rec.fix!.recipe_patch!).map(([key, val]) => (
+                      <div key={key} className="flex items-start gap-1.5">
+                        <code className="text-[9px] bg-orange-50 border border-orange-200 text-orange-800 rounded px-1.5 py-0.5 font-mono shrink-0">{key}</code>
+                        <span className="text-[10px] text-gray-600 break-words">{JSON.stringify(val)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Fix description */}
+              {rec.fix?.description && (
+                <p className="text-[11px] text-gray-700 leading-relaxed p-2 bg-teal-50 border border-teal-100 rounded">
+                  <span className="font-semibold text-teal-700">How to fix: </span>
+                  {rec.fix.description}
+                </p>
+              )}
+            </div>
           )}
         </div>
       </div>

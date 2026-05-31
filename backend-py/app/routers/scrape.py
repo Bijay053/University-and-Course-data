@@ -4181,6 +4181,40 @@ async def diagnose_scrape_job(
         except Exception as _cfg_err:
             log.debug("diagnose: could not load effective UniConfig: %s", _cfg_err)
 
+    # ── Run diagnostics in parallel with Gemini ──────────────────────────────
+    _diag_result: dict = {}
+    try:
+        from app.services.scraper.diagnostics import run_diagnostics as _run_diag
+        _diag_result = await _run_diag(job.university_id, db)
+    except Exception as _diag_exc:
+        log.warning("diagnose_scrape_job: diagnostics pipeline failed for job %s: %s", job_id, _diag_exc)
+
+    _course_probe = _diag_result.get("course_probe", {})
+    _phase3_recs = _diag_result.get("phase3_recommendations", [])
+
+    # Build a concise course-probe summary for the Gemini prompt
+    _probe_lines: list[str] = []
+    if _course_probe.get("probed", 0) > 0:
+        _probe_lines.append(f"Pages probed: {_course_probe['probed']}")
+        for flag, label in [
+            ("international_fee_text_found", "International fee text found on page"),
+            ("csp_text_found", "Domestic/CSP fee text found on page"),
+            ("fee_text_in_blank_pages", "Fee amounts found on pages where fee is blank"),
+            ("english_section_found", "English requirements section detected"),
+            ("english_link_found", "English requirements link detected"),
+            ("band_text_found", "Band text (Band 1/2/3) detected"),
+            ("ielts_overall_text_found", "IELTS overall score text found"),
+            ("ielts_components_text_found", "IELTS component scores text found"),
+            ("cloudflare_blocked_courses", "Cloudflare blocked course pages"),
+        ]:
+            if _course_probe.get(flag):
+                _probe_lines.append(f"  ✓ {label}")
+        # Include sample snippets from first probed page
+        for pp in _course_probe.get("per_page", [])[:2]:
+            for snip in pp.get("detected_snippets", [])[:2]:
+                _probe_lines.append(f"  Evidence: {snip[:120]}")
+    _probe_summary_text = "\n".join(_probe_lines) if _probe_lines else "(no pages probed)"
+
     # ── Build prompt ──────────────────────────────────────────────────────────
     prompt = f"""You are an expert web scraping engineer diagnosing why a university course scraper produced poor results.
 
@@ -4211,6 +4245,9 @@ EFFECTIVE DISCOVERY CONFIG (fully merged: defaults + YAML + admin_config — thi
 ADMIN PANEL OVERRIDES (values the operator set via UI — already applied on top of YAML):
 {json.dumps({k: v for k, v in _current_admin_cfg.items() if not k.startswith("_")}, indent=2) if _current_admin_cfg else "(none)"}
 
+LIVE COURSE PAGE PROBE RESULTS (httpx fetch of {_course_probe.get("probed", 0)} real course pages):
+{_probe_summary_text}
+
 Diagnose the scraping failure in plain English for a non-technical admin.
 
 URL FILTER KILL PATTERN — highest priority diagnosis rule:
@@ -4227,17 +4264,20 @@ If "Total URLs discovered" > 50 AND "Courses staged" == 0:
   - The correct recommended_action is to remove or fix the URL filter.
   - If "Total URLs discovered" == 0: THEN it may be a seed URL or Cloudflare issue.
 
-CRITICAL DISTINCTION you must apply:
-- "config" issues = operator can fix by adding a URL, CSS selector, or changing a setting in the portal.
-  Examples: missing fee page URL, missing English requirements URL, wrong must_contain filter, seed URL not set.
-- "recipe_fix" issues = operator can fix using the Recipe Editor (no code needed).
-  Examples: university name in course title (use remove_after), IELTS components missing (use ielts_component_mapping),
-  fee calculation wrong (use fee_calculation_mode), location nav text (use location_reject_values).
-  Always prefer recipe_fix over platform_bug when a recipe rule can solve it.
-- "platform_bug" issues = genuinely broken extraction that NO recipe rule can fix.
-  Examples: degree level keywords not in any recognised pattern, IELTS value is a completely wrong number.
-  Only use platform_bug as a last resort.
-  DO NOT suggest YAML config changes for platform_bug issues.
+CRITICAL FIX-TYPE RULES — apply BEFORE choosing fix_type:
+1. "recipe_fix" = operator can fix using the Recipe Editor UI (no developer needed).
+   Use for: missing fee follow-link, missing English follow-link, CSP reject keywords,
+   band mapping, IELTS component mapping, location reject values, course name cleanup,
+   fee prefer-international toggle, CSS/XPath field selectors.
+   → If the LIVE COURSE PAGE PROBE shows the data IS on the page, always use "recipe_fix".
+2. "config" = operator fixes by changing a discovery/filter setting in the portal.
+   Use for: wrong must_contain filter, seed URL not set, URL block pattern too broad.
+3. "platform_bug" = genuinely broken extraction that NO recipe rule AND no config change can fix.
+   ONLY use when: the extractor produces a completely wrong value that no rule can correct,
+   AND the live page probe confirms data exists in a format no current rule covers.
+   NEVER use platform_bug when the data is simply missing from the page (that is "config")
+   or when a recipe rule in the Recipe Editor can fix it (that is "recipe_fix").
+   DO NOT suggest YAML config changes for platform_bug issues — those require a developer.
 
 Return your response as JSON with this EXACT structure (no other keys):
 {{
@@ -4247,7 +4287,7 @@ Return your response as JSON with this EXACT structure (no other keys):
       "issue": "Short label",
       "explanation": "2-3 sentence explanation for a non-technical admin — no jargon",
       "severity": "high|medium|low",
-      "fix_type": "config|platform_bug"
+      "fix_type": "config|recipe_fix|platform_bug"
     }}
   ],
   "recommended_actions": [
@@ -4255,7 +4295,8 @@ Return your response as JSON with this EXACT structure (no other keys):
       "action": "Short action label",
       "detail": "What to do and why",
       "auto_fixable": true|false,
-      "fix_type": "config|platform_bug"
+      "fix_type": "config|recipe_fix|platform_bug",
+      "recipe_patch": {{}}
     }}
   ],
   "discovery_verdict": "ok|low_count|api_driven|blocked_by_cloudflare|unknown",
@@ -4279,6 +4320,17 @@ Return your response as JSON with this EXACT structure (no other keys):
     "_min_expected_courses": null
   }}
 }}
+
+Rules for recipe_patch in recommended_actions:
+- When fix_type is "recipe_fix", populate recipe_patch with dot-namespaced keys showing what
+  to configure. Examples:
+  {{"fees.follow_links": ["Fees and Scholarships", "International Fees"]}}
+  {{"fees.reject_keywords": ["Commonwealth Supported", "CSP", "Domestic"], "fees.prefer_international": true}}
+  {{"english.follow_links": ["English language requirements"], "english.band_mapping": {{}}}}
+  {{"location.allowed_values": [], "location.reject_values": ["Not Available", "TBA"]}}
+  {{"cleanup.course_name.remove_after": ["|", " — "]}}
+  {{"english.component_mapping": {{"Listening": 0, "Reading": 0, "Writing": 0, "Speaking": 0}}}}
+- Leave recipe_patch as {{}} when fix_type is "config" or "platform_bug".
 
 Rules for suggested_config:
 - Only include keys that need to CHANGE. Remove null/empty values.
@@ -4317,7 +4369,7 @@ Return only valid JSON, no markdown fences."""
 
     try:
         from app.services.ai import gemini_client as _gc
-        resp = await _gc.generate(prompt, max_output_tokens=1024)
+        resp = await _gc.generate(prompt, max_output_tokens=1200)
     except Exception as exc:
         log.warning("diagnose_scrape_job: Gemini call failed for job %s: %s", job_id, exc)
         return {
@@ -4387,6 +4439,18 @@ Return only valid JSON, no markdown fences."""
     # True when something was configured and nothing new is being suggested
     already_applied = bool(_current_admin_cfg or _effective_disc) and not bool(suggested_config)
 
+    # Build a lightweight course_probe_summary for the frontend
+    _probe_summary_fe: dict = {}
+    if _course_probe.get("probed", 0) > 0:
+        _probe_summary_fe = {
+            "probed": _course_probe["probed"],
+            "flags": {
+                k: v for k, v in _course_probe.items()
+                if isinstance(v, bool) and v
+            },
+            "per_page": _course_probe.get("per_page", [])[:3],
+        }
+
     return {
         "ok": True,
         "job_id": job_id,
@@ -4406,6 +4470,8 @@ Return only valid JSON, no markdown fences."""
         "diagnosis": diagnosis,
         "suggested_config": suggested_config,
         "already_applied": already_applied,
+        "phase3_recommendations": _phase3_recs,
+        "course_probe_summary": _probe_summary_fe,
     }
 
 

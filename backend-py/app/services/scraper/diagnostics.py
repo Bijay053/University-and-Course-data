@@ -64,6 +64,44 @@ _PROBE_HEADERS = {
     "Accept-Language": "en-AU,en;q=0.9",
 }
 
+# ── Extended extraction-evidence patterns ──────────────────────────────────────
+
+_INTL_FEE_TEXT_RE = re.compile(
+    r"(international\s+(student\s+)?(tuition\s+)?fee"
+    r"|estimated\s+(annual\s+)?tuition"
+    r"|overseas\s+(student\s+)?fee"
+    r"|full\s+fee\s+paying"
+    r"|tuition\s+fee\s+for\s+international"
+    r"|annual\s+tuition\s*[:\-–]\s*\$\d)",
+    re.IGNORECASE,
+)
+
+_ENGLISH_SECTION_RE = re.compile(
+    r"(english\s+(language\s+)?(requirement|proficiency|entry|criteria|standard)"
+    r"|minimum\s+english"
+    r"|english\s+entry\s+requirement"
+    r"|ielts\s+(overall|score|minimum|requirement)"
+    r"|language\s+(proficiency\s+)?requirement)",
+    re.IGNORECASE,
+)
+
+_IELTS_COMPONENT_RE = re.compile(
+    r"\b(listening|reading|writing|speaking)\s*[:\-–]\s*\d",
+    re.IGNORECASE,
+)
+
+_IELTS_OVERALL_TEXT_RE = re.compile(
+    r"ielts\s*(overall|band)?\s*[:\-–]?\s*\d+\.\d",
+    re.IGNORECASE,
+)
+
+_ENGLISH_LINK_PAGE_RE = re.compile(
+    r"(english\s+(language\s+)?(requirements?|entry|proficiency)"
+    r"|ielts\s+requirements?"
+    r"|language\s+requirements?)",
+    re.IGNORECASE,
+)
+
 
 # ── Phase 1: DB analysis ───────────────────────────────────────────────────────
 
@@ -511,31 +549,62 @@ async def _analyse_course_patterns(
 
 # ── Phase 2b: Sample course page probing ──────────────────────────────────────
 
+def _extract_snippet(text: str, pattern: re.Pattern, window: int = 90) -> str | None:
+    """Return a short snippet of text around the first match of *pattern*."""
+    m = pattern.search(text)
+    if not m:
+        return None
+    start = max(0, m.start() - 20)
+    end = min(len(text), m.end() + window)
+    snippet = text[start:end].replace("\n", " ").strip()
+    return f"…{snippet}…"
+
+
 async def _probe_sample_course_pages(
     blank_ielts_urls: list[str],
     blank_fee_urls: list[str],
 ) -> dict[str, Any]:
-    """Probe a small sample of course pages to detect patterns in blank-field courses."""
+    """Probe up to 5 blank-IELTS + 5 blank-fee course pages for extraction signals.
 
+    Returns aggregated boolean flags (backwards-compatible) PLUS per-page evidence
+    so downstream code can cite specific page text in recommendations.
+    """
+    ielts_sample = blank_ielts_urls[:5]
+    fee_sample = blank_fee_urls[:5]
+    all_urls = list(dict.fromkeys(ielts_sample + fee_sample))
+
+    _empty: dict[str, Any] = {
+        "probed": 0,
+        "band_text_found": False,
+        "fee_text_in_blank_pages": False,
+        "csp_text_found": False,
+        "international_fee_text_found": False,
+        "english_section_found": False,
+        "english_link_found": False,
+        "ielts_overall_text_found": False,
+        "ielts_components_text_found": False,
+        "cloudflare_blocked_courses": False,
+        "per_page": [],
+    }
+    if not all_urls:
+        return _empty
+
+    cloudflare_blocked_courses = False
+    per_page: list[dict] = []
+
+    # Aggregated flags
     band_text_found = False
     fee_text_in_blank_pages = False
     csp_text_found = False
-
-    all_urls = list(dict.fromkeys(blank_ielts_urls[:2] + blank_fee_urls[:2]))
-
-    if not all_urls:
-        return {
-            "band_text_found": False,
-            "fee_text_in_blank_pages": False,
-            "csp_text_found": False,
-            "cloudflare_blocked_courses": False,
-        }
-
-    cloudflare_blocked_courses = False
+    international_fee_text_found = False
+    english_section_found = False
+    english_link_found = False
+    ielts_overall_text_found = False
+    ielts_components_text_found = False
 
     async with httpx.AsyncClient(
         follow_redirects=True,
-        timeout=10,
+        timeout=12,
         headers=_PROBE_HEADERS,
     ) as client:
         for url in all_urls:
@@ -547,25 +616,78 @@ async def _probe_sample_course_pages(
                 if resp.status_code != 200:
                     continue
 
-                text_content = BeautifulSoup(resp.text, "html.parser").get_text(" ", strip=True)[:8000]
+                soup = BeautifulSoup(resp.text, "html.parser")
+                text_content = soup.get_text(" ", strip=True)[:10000]
 
-                if _BAND_TEXT_RE.search(text_content) and url in blank_ielts_urls:
-                    band_text_found = True
+                is_ielts_url = url in ielts_sample
+                is_fee_url = url in fee_sample
 
-                if _FEE_AMOUNT_RE.search(text_content) and url in blank_fee_urls:
-                    fee_text_in_blank_pages = True
+                signals: dict[str, bool] = {}
+                snippets: list[str] = []
 
-                if _CSP_TEXT_RE.search(text_content):
+                def _check(pattern: re.Pattern, key: str) -> bool:
+                    snip = _extract_snippet(text_content, pattern)
+                    if snip:
+                        signals[key] = True
+                        snippets.append(f"[{key}] {snip}")
+                        return True
+                    return False
+
+                if _check(_BAND_TEXT_RE, "band_text"):
+                    if is_ielts_url:
+                        band_text_found = True
+
+                if _check(_FEE_AMOUNT_RE, "fee_amount"):
+                    if is_fee_url:
+                        fee_text_in_blank_pages = True
+
+                if _check(_CSP_TEXT_RE, "csp_domestic_fee"):
                     csp_text_found = True
+
+                if _check(_INTL_FEE_TEXT_RE, "international_fee"):
+                    international_fee_text_found = True
+
+                if _check(_ENGLISH_SECTION_RE, "english_section"):
+                    english_section_found = True
+
+                if _check(_IELTS_OVERALL_TEXT_RE, "ielts_overall"):
+                    ielts_overall_text_found = True
+
+                if _check(_IELTS_COMPONENT_RE, "ielts_components"):
+                    ielts_components_text_found = True
+
+                # Check for English follow-links on the page
+                for a in soup.find_all("a", href=True)[:300]:
+                    link_text = a.get_text(" ", strip=True)
+                    if _ENGLISH_LINK_PAGE_RE.search(link_text):
+                        signals["english_link"] = True
+                        snippets.append(f"[english_link] {link_text[:80]}")
+                        english_link_found = True
+                        break
+
+                per_page.append({
+                    "url": url,
+                    "is_ielts_url": is_ielts_url,
+                    "is_fee_url": is_fee_url,
+                    "signals": signals,
+                    "detected_snippets": snippets[:5],
+                })
 
             except Exception as exc:
                 log.debug("Sample course probe failed for %s: %s", url, exc)
 
     return {
+        "probed": len(per_page),
         "band_text_found": band_text_found,
         "fee_text_in_blank_pages": fee_text_in_blank_pages,
         "csp_text_found": csp_text_found,
+        "international_fee_text_found": international_fee_text_found,
+        "english_section_found": english_section_found,
+        "english_link_found": english_link_found,
+        "ielts_overall_text_found": ielts_overall_text_found,
+        "ielts_components_text_found": ielts_components_text_found,
         "cloudflare_blocked_courses": cloudflare_blocked_courses,
+        "per_page": per_page[:5],
     }
 
 
@@ -634,9 +756,34 @@ def _generate_recommendations(
     def _missing(field: str) -> int:
         return fc.get(field, {}).get("missing", 0)
 
+    # Helpers to pull evidence from course_probe
+    def _first_ielts_page() -> dict:
+        for p in course_probe.get("per_page", []):
+            if p.get("is_ielts_url"):
+                return p
+        return {}
+
+    def _first_fee_page() -> dict:
+        for p in course_probe.get("per_page", []):
+            if p.get("is_fee_url"):
+                return p
+        return {}
+
     # ── 1. Missing IELTS ───────────────────────────────────────────────────────
     if _pct("ielts_overall") < 0.5 and _missing("ielts_overall") > 0:
         english_links = detected.get("english_link_texts", [])
+        ielts_page = _first_ielts_page()
+        page_signals = ielts_page.get("signals", {})
+        page_snippets = ielts_page.get("detected_snippets", [])
+
+        # Build evidence block
+        evidence: dict[str, Any] = {
+            "affected_count": _missing("ielts_overall"),
+            "sample_url": ielts_page.get("url"),
+            "detected_snippets": page_snippets[:3],
+            "page_signals": {k: v for k, v in page_signals.items() if v},
+        }
+
         if english_links:
             best = _best_link_texts(english_links, [
                 "english language requirements",
@@ -645,6 +792,13 @@ def _generate_recommendations(
                 "admissions policy",
                 "ielts",
             ])
+            # Decide recipe: band mapping if band text on page, else follow-links
+            recipe_patch: dict[str, Any] = {"english.follow_links": best}
+            if page_signals.get("band_text"):
+                recipe_patch["english.band_mapping"] = {}
+            desc = f'Add English follow-links: {", ".join(repr(t) for t in best[:3])}'
+            if page_signals.get("band_text"):
+                desc += ". Band text detected on page — also configure Band Mapping."
             recs.append({
                 "severity": "critical",
                 "id": "missing_ielts_follow_link",
@@ -652,14 +806,46 @@ def _generate_recommendations(
                 "description": (
                     f"Only {int(_pct('ielts_overall') * 100)}% of courses have English requirements. "
                     "English requirement pages were detected on the live site but the scraper is not following them."
+                    + (f" Band text was found on sampled course pages — a Band Mapping rule may be needed." if page_signals.get("band_text") else "")
                 ),
-                "root_cause": "English requirements page exists but scraper is not following it",
+                "root_cause": "Extraction configuration issue — English page exists but scraper is not following it",
                 "confidence": 0.90,
                 "impact_estimate": _impact_estimate(phase1, ["ielts_overall"]),
+                "evidence": evidence,
                 "fix": {
-                    "type": "english_follow_links",
-                    "description": f'Add follow-links: {", ".join(repr(t) for t in best[:3])}',
-                    "recipe_patch": {"follow_links": best},
+                    "type": "recipe_fix",
+                    "description": desc,
+                    "recipe_patch": recipe_patch,
+                },
+            })
+        elif course_probe.get("english_section_found") or course_probe.get("band_text_found"):
+            recipe_patch = {}
+            if course_probe.get("band_text_found"):
+                recipe_patch["english.band_mapping"] = {}
+                recipe_patch["english.band_reference_url"] = ""
+            if course_probe.get("english_section_found"):
+                recipe_patch["english.follow_links"] = ["English language requirements"]
+            recs.append({
+                "severity": "critical",
+                "id": "missing_ielts_page_has_data",
+                "title": f"{_missing('ielts_overall')} courses missing IELTS",
+                "description": (
+                    f"Only {int(_pct('ielts_overall') * 100)}% of courses have English requirements. "
+                    + ("English section was detected in course page content. " if course_probe.get("english_section_found") else "")
+                    + ("Band text (e.g. Band 2) was found — a Band Mapping rule is needed to convert band levels to IELTS scores." if course_probe.get("band_text_found") else "")
+                ),
+                "root_cause": "Extraction configuration issue — English data exists on page but extraction rule is missing",
+                "confidence": 0.85,
+                "impact_estimate": _impact_estimate(phase1, ["ielts_overall"]),
+                "evidence": evidence,
+                "fix": {
+                    "type": "recipe_fix",
+                    "description": (
+                        "Configure Band Mapping in the IELTS & Intake tab, or add an English follow-link."
+                        if course_probe.get("band_text_found")
+                        else "Add English follow-links in the IELTS & Intake tab."
+                    ),
+                    "recipe_patch": recipe_patch,
                 },
             })
         elif _pct("ielts_overall") < 0.15:
@@ -672,15 +858,32 @@ def _generate_recommendations(
                     "No English requirements links were found during the live probe. "
                     "Requirements may be in a PDF, behind a band system, or hidden in an accordion."
                 ),
-                "root_cause": "English requirements not found in standard link positions",
+                "root_cause": "English requirements not found in standard link positions — may need manual inspection",
                 "confidence": 0.60,
                 "impact_estimate": _impact_estimate(phase1, ["ielts_overall"]),
-                "fix": None,
+                "evidence": evidence,
+                "fix": {
+                    "type": "recipe_fix",
+                    "description": (
+                        "Add English follow-links in the IELTS & Intake tab, or configure a Band Reference URL "
+                        "if English requirements are published as band levels (e.g. Band 1, Band 2)."
+                    ),
+                    "recipe_patch": {"english.follow_links": [], "english.band_mapping": {}},
+                },
             })
 
     # ── 2. Missing international fee ───────────────────────────────────────────
     if _pct("international_fee") < 0.5 and _missing("international_fee") > 0:
         fee_links = detected.get("fee_link_texts", [])
+        fee_page = _first_fee_page()
+        fee_signals = fee_page.get("signals", {})
+        fee_evidence: dict[str, Any] = {
+            "affected_count": _missing("international_fee"),
+            "sample_url": fee_page.get("url"),
+            "detected_snippets": fee_page.get("detected_snippets", [])[:3],
+            "page_signals": {k: v for k, v in fee_signals.items() if v},
+        }
+
         if fee_links:
             best = _best_link_texts(fee_links, [
                 "fees and scholarships",
@@ -690,6 +893,11 @@ def _generate_recommendations(
                 "tuition fees",
                 "view fees",
             ])
+            # Add CSP reject keywords if CSP text detected on page
+            recipe: dict[str, Any] = {"fees.follow_links": best}
+            if course_probe.get("csp_text_found"):
+                recipe["fees.reject_keywords"] = ["Commonwealth Supported", "CSP", "Domestic"]
+                recipe["fees.prefer_international"] = True
             recs.append({
                 "severity": "critical",
                 "id": "missing_fee_follow_link",
@@ -698,14 +906,45 @@ def _generate_recommendations(
                     f"Only {int(_pct('international_fee') * 100)}% of courses have an international fee. "
                     "Fee pages were detected on the live site but the scraper is not following them. "
                     "This typically means the international fee is on a linked page, not the course page."
+                    + (" Domestic/CSP fee text was also detected — reject keywords are needed." if course_probe.get("csp_text_found") else "")
                 ),
-                "root_cause": "International fee page detected but scraper is not following it",
+                "root_cause": "Extraction configuration issue — fee page detected but scraper is not following it",
                 "confidence": 0.90,
                 "impact_estimate": _impact_estimate(phase1, ["international_fee"]),
+                "evidence": fee_evidence,
                 "fix": {
-                    "type": "fee_follow_links",
-                    "description": f'Add fee follow-links: {", ".join(repr(t) for t in best[:3])}',
-                    "recipe_patch": {"fee_follow_links": best},
+                    "type": "recipe_fix",
+                    "description": (
+                        f'Add fee follow-links: {", ".join(repr(t) for t in best[:3])}'
+                        + (". Also add reject keywords: Commonwealth Supported, CSP, Domestic." if course_probe.get("csp_text_found") else "")
+                    ),
+                    "recipe_patch": recipe,
+                },
+            })
+        elif course_probe.get("international_fee_text_found") or course_probe.get("fee_text_in_blank_pages"):
+            recipe = {"fees.prefer_international": True}
+            if course_probe.get("csp_text_found"):
+                recipe["fees.reject_keywords"] = ["Commonwealth Supported", "CSP", "Domestic"]
+            recs.append({
+                "severity": "critical",
+                "id": "missing_fee_page_has_text",
+                "title": f"{_missing('international_fee')} courses missing international fee",
+                "description": (
+                    f"Only {int(_pct('international_fee') * 100)}% of courses have an international fee. "
+                    "Fee amount text was detected in sampled course pages, but the extractor is not capturing it. "
+                    + ("Domestic/CSP fee text was also found — reject keywords are needed to skip the domestic fee." if course_probe.get("csp_text_found") else "")
+                ),
+                "root_cause": "Extraction configuration issue — fee data is on the page but the extraction rule is not matching it",
+                "confidence": 0.85,
+                "impact_estimate": _impact_estimate(phase1, ["international_fee"]),
+                "evidence": fee_evidence,
+                "fix": {
+                    "type": "recipe_fix",
+                    "description": (
+                        "Enable 'Prefer International Fee' and add a CSS/XPath selector for the fee element. "
+                        + ("Add reject keywords to skip the domestic/CSP fee rows." if course_probe.get("csp_text_found") else "")
+                    ),
+                    "recipe_patch": recipe,
                 },
             })
         elif detected.get("has_tab_layout"):
@@ -721,10 +960,11 @@ def _generate_recommendations(
                 "root_cause": "International fee hidden behind a tab interaction",
                 "confidence": 0.75,
                 "impact_estimate": _impact_estimate(phase1, ["international_fee"]),
+                "evidence": fee_evidence,
                 "fix": {
-                    "type": "browser_action",
-                    "description": "Add a Browser Action to click the 'International' tab before extracting fees",
-                    "recipe_patch": None,
+                    "type": "recipe_fix",
+                    "description": "Enable 'Always use browser' in Discovery settings to reveal tab content, then add a fee follow-link",
+                    "recipe_patch": {"fees.prefer_international": True},
                 },
             })
         else:
@@ -734,36 +974,54 @@ def _generate_recommendations(
                 "title": f"{_missing('international_fee')} courses missing international fee",
                 "description": (
                     f"Only {int(_pct('international_fee') * 100)}% of courses have an international fee. "
-                    "No fee pages were detected during the live probe."
+                    "No fee pages were detected during the live probe. "
+                    "Check if fees are on a central fee schedule page and add it as a fee source URL."
                 ),
-                "root_cause": "International fee source not identified — may require manual inspection",
+                "root_cause": "Fee source not found — add the fee schedule URL to the Recipe Editor",
                 "confidence": 0.50,
                 "impact_estimate": _impact_estimate(phase1, ["international_fee"]),
-                "fix": None,
+                "evidence": fee_evidence,
+                "fix": {
+                    "type": "recipe_fix",
+                    "description": (
+                        "Add the international fee schedule page URL to Fee Source URLs in the Recipe Editor. "
+                        "If fees are not published per-course, they are usually on a central 'Fees and Scholarships' page."
+                    ),
+                    "recipe_patch": {"fees.source_urls": []},
+                },
             })
 
     # ── 3. Suspiciously low fee (possible domestic fee stored as international) ─
     low_fee = phase1.get("suspiciously_low_fee_count", 0)
     if low_fee > 3 and _pct("international_fee") > 0.3:
+        fee_page = _first_fee_page()
+        low_fee_evidence: dict[str, Any] = {
+            "affected_count": low_fee,
+            "sample_url": fee_page.get("url"),
+            "detected_snippets": fee_page.get("detected_snippets", [])[:3],
+            "page_signals": {k: v for k, v in fee_page.get("signals", {}).items() if v},
+        }
         recs.append({
             "severity": "warning",
             "id": "suspiciously_low_fee",
-            "title": f"{low_fee} courses may have domestic fee stored as international fee",
+            "title": f"{low_fee} courses have domestic fee stored as international fee",
             "description": (
                 f"{low_fee} courses have an international fee below $10,000, which is unusually low. "
-                "The scraper may have extracted a domestic / CSP fee amount instead of the international one."
+                "The scraper extracted a domestic / CSP fee amount instead of the international one. "
+                + ("Domestic fee text (Commonwealth Supported / CSP) was confirmed on sampled pages." if course_probe.get("csp_text_found") else "")
             ),
-            "root_cause": "Domestic fee (CSP / Commonwealth Supported) extracted instead of international tuition",
-            "confidence": 0.80,
+            "root_cause": "Extraction configuration issue — domestic fee (CSP / Commonwealth Supported) extracted instead of international tuition",
+            "confidence": 0.85,
             "impact_estimate": _impact_estimate(phase1, ["international_fee"],
                                                  estimated_fill_pct=0.95,
                                                  courses_affected_override=low_fee),
+            "evidence": low_fee_evidence,
             "fix": {
-                "type": "fee_reject_keywords",
-                "description": 'Add reject keywords: "Commonwealth Supported", "CSP", "Domestic"',
+                "type": "recipe_fix",
+                "description": 'Add reject keywords: "Commonwealth Supported", "CSP", "Domestic" and enable Prefer International Fee',
                 "recipe_patch": {
-                    "fee_reject_keywords": ["Commonwealth Supported", "CSP", "Domestic"],
-                    "fee_prefer_international": True,
+                    "fees.reject_keywords": ["Commonwealth Supported", "CSP", "Domestic"],
+                    "fees.prefer_international": True,
                 },
             },
         })
@@ -841,9 +1099,12 @@ def _generate_recommendations(
             "confidence": 0.65,
             "impact_estimate": _impact_estimate(phase1, ["degree_level"]),
             "fix": {
-                "type": "field_selector",
-                "description": "Add a Field Selector for degree_level in the Field Selectors tab",
-                "recipe_patch": None,
+                "type": "recipe_fix",
+                "description": (
+                    "Add a CSS/XPath Field Selector for degree_level in the Recipe Editor → Field Selectors tab, "
+                    "targeting the element that shows 'Undergraduate', 'Postgraduate', or equivalent labels."
+                ),
+                "recipe_patch": {"field_selectors.degree_level": ""},
             },
         })
 
@@ -876,12 +1137,14 @@ def _generate_recommendations(
                 "note": "Fixes course name quality — no completeness change",
             },
             "fix": {
-                "type": "field_selector",
+                "type": "recipe_fix",
                 "description": (
-                    "Add a CSS/XPath field selector for course_name that targets only the text "
-                    "before the pipe, or configure a strip_suffix rule in Field Selectors"
+                    "Add a strip suffix rule in the Recipe Editor → Course Name Cleanup: "
+                    "'Remove everything after |'. This strips the university brand label."
                 ),
-                "recipe_patch": None,
+                "recipe_patch": {
+                    "cleanup.course_name.remove_after": ["|"],
+                },
             },
         })
 
@@ -906,12 +1169,13 @@ def _generate_recommendations(
                 "confidence": 0.85,
                 "impact_estimate": _impact_estimate(phase1, ["ielts_overall"]),
                 "fix": {
-                    "type": "band_reference_url",
+                    "type": "recipe_fix",
                     "description": (
                         "Verify the Band Reference URL in the IELTS & Intake tab points to the page "
-                        "that lists 'Band 1', 'Band 2', etc. with their IELTS equivalents"
+                        "that lists 'Band 1', 'Band 2', etc. with their IELTS equivalents. "
+                        "Check that band key names in the recipe exactly match labels on that page."
                     ),
-                    "recipe_patch": None,
+                    "recipe_patch": {"english.band_reference_url": ""},
                 },
             })
         elif _pct("ielts_overall") < 0.15:
@@ -924,22 +1188,29 @@ def _generate_recommendations(
                     "Course pages were not accessible (possibly Cloudflare-blocked). "
                     "The band reference URL or key names may not match the live site."
                 ),
-                "root_cause": "Band mapping configured but IELTS still blank — verify band keys match site labels",
+                "root_cause": "Extraction configuration issue — band mapping configured but band keys may not match site labels",
                 "confidence": 0.70,
                 "impact_estimate": _impact_estimate(phase1, ["ielts_overall"]),
                 "fix": {
-                    "type": "band_reference_url",
+                    "type": "recipe_fix",
                     "description": (
                         "Verify the Band Reference URL and that band keys in the recipe "
                         "(e.g. 'Band 2') exactly match the labels on that page"
                     ),
-                    "recipe_patch": None,
+                    "recipe_patch": {"english.band_reference_url": "", "english.band_mapping": {}},
                 },
             })
 
     # ── 9. Fee amount visible in page text but fee is blank ────────────────────
     fee_text_in_blank = course_probe.get("fee_text_in_blank_pages", False)
     if _pct("international_fee") < 0.5 and fee_text_in_blank:
+        fee_vis_page = _first_fee_page()
+        fee_vis_evidence: dict[str, Any] = {
+            "affected_count": _missing("international_fee"),
+            "sample_url": fee_vis_page.get("url"),
+            "detected_snippets": fee_vis_page.get("detected_snippets", [])[:3],
+            "page_signals": {k: v for k, v in fee_vis_page.get("signals", {}).items() if v},
+        }
         recs.append({
             "severity": "critical",
             "id": "fee_visible_not_extracted",
@@ -948,19 +1219,17 @@ def _generate_recommendations(
                 f"Sample course pages where the fee is blank contain fee amount patterns "
                 f"(e.g. '$32,000 per year') in the page text. The fee extractor is not matching them."
             ),
-            "root_cause": (
-                "Fee amounts are present in the HTML but the fee extractor patterns are not matching. "
-                "Common causes: amounts in a table with unusual headers, or in a JS-rendered element."
-            ),
+            "root_cause": "Extraction configuration issue — fee data is on the page but extraction pattern is not matching",
             "confidence": 0.85,
             "impact_estimate": _impact_estimate(phase1, ["international_fee"]),
+            "evidence": fee_vis_evidence,
             "fix": {
-                "type": "fee_selector",
+                "type": "recipe_fix",
                 "description": (
-                    "Add a Field Selector for international_fee (CSS or XPath) targeting the specific "
-                    "fee element, or add a fee follow-link if the fee is on a linked page"
+                    "Add a fee follow-link to the Fees & Scholarships page, or enable Prefer International Fee. "
+                    "If fees are in a non-standard table, add a CSS/XPath selector for the fee element."
                 ),
-                "recipe_patch": None,
+                "recipe_patch": {"fees.prefer_international": True},
             },
         })
 
@@ -969,6 +1238,13 @@ def _generate_recommendations(
     existing_low_fee = phase1.get("suspiciously_low_fee_count", 0)
     already_has_low_fee_rec = any(r["id"] == "suspiciously_low_fee" for r in recs)
     if csp_found and existing_low_fee > 0 and not already_has_low_fee_rec:
+        fee_page_csp = _first_fee_page()
+        csp_evidence: dict[str, Any] = {
+            "affected_count": existing_low_fee,
+            "sample_url": fee_page_csp.get("url"),
+            "detected_snippets": fee_page_csp.get("detected_snippets", [])[:3],
+            "page_signals": {k: v for k, v in fee_page_csp.get("signals", {}).items() if v},
+        }
         recs.append({
             "severity": "critical",
             "id": "csp_domestic_fee_detected",
@@ -978,20 +1254,18 @@ def _generate_recommendations(
                 f"{existing_low_fee} courses have an unusually low fee (< $10,000), "
                 "suggesting a domestic fee was stored as the international fee."
             ),
-            "root_cause": (
-                "The fee extractor found a domestic / CSP fee before the international fee. "
-                "The international fee is typically higher and labelled differently on the page."
-            ),
+            "root_cause": "Extraction configuration issue — domestic CSP fee extracted instead of international tuition",
             "confidence": 0.90,
             "impact_estimate": _impact_estimate(phase1, ["international_fee"],
                                                  estimated_fill_pct=0.95,
                                                  courses_affected_override=existing_low_fee),
+            "evidence": csp_evidence,
             "fix": {
-                "type": "fee_reject_keywords",
-                "description": "Reject domestic fee keywords and prefer the higher international fee",
+                "type": "recipe_fix",
+                "description": "Reject domestic fee keywords and enable Prefer International Fee in the Recipe Editor",
                 "recipe_patch": {
-                    "fee_reject_keywords": ["Commonwealth Supported", "CSP", "HECS", "Domestic", "Local"],
-                    "fee_prefer_international": True,
+                    "fees.reject_keywords": ["Commonwealth Supported", "CSP", "HECS", "Domestic", "Local"],
+                    "fees.prefer_international": True,
                 },
             },
         })
@@ -1001,6 +1275,7 @@ def _generate_recommendations(
     sample_garbage = patterns.get("sample_garbage_locations", [])
     if garbage_loc > 0:
         sample_text = ", ".join(f'"{s}"' for s in sample_garbage[:3])
+        campus_allowlist = detected.get("campus_names", [])
         recs.append({
             "severity": "warning",
             "id": "garbage_location",
@@ -1009,11 +1284,7 @@ def _generate_recommendations(
                 f"{garbage_loc} location values contain delivery notes or non-campus text "
                 f"({sample_text}). These should be filtered to only show valid campus names."
             ),
-            "root_cause": (
-                "The location extractor is capturing surrounding text alongside campus names "
-                "(e.g. 'Brisbane Not Available', 'Townsville Not'). "
-                "A campus allowlist discards everything that isn't a known campus name."
-            ),
+            "root_cause": "Extraction configuration issue — location extractor is capturing surrounding text alongside campus names",
             "confidence": 0.88,
             "impact_estimate": {
                 "courses_affected": garbage_loc,
@@ -1023,12 +1294,58 @@ def _generate_recommendations(
                 "note": "Fixes location quality — no completeness change",
             },
             "fix": {
-                "type": "campus_allowlist",
+                "type": "recipe_fix",
                 "description": (
-                    "Add known campus names to the Campus tab (valid_campuses). "
-                    "Only values matching the allowlist will be kept."
+                    "Add known campus names to the Campus Allowlist in the Location tab. "
+                    "Add reject keywords for the invalid values seen above."
                 ),
-                "recipe_patch": None,
+                "recipe_patch": {
+                    "location.allowed_values": campus_allowlist if campus_allowlist else [],
+                    "location.reject_values": ["Not Available", "Not", "TBA", "TBD", "Mixed"],
+                },
+            },
+        })
+
+    # ── 12. IELTS overall exists but component scores blank ────────────────────
+    ielts_overall_count = fc.get("ielts_overall", {}).get("count", 0)
+    if ielts_overall_count > 5 and course_probe.get("ielts_components_text_found"):
+        ielts_page_comp = _first_ielts_page()
+        comp_snippets = [s for s in ielts_page_comp.get("detected_snippets", []) if "ielts_components" in s]
+        recs.append({
+            "severity": "warning",
+            "id": "ielts_components_missing",
+            "title": f"IELTS overall extracted but component scores missing",
+            "description": (
+                f"{ielts_overall_count} courses have an IELTS overall score, "
+                "but listening/reading/writing/speaking component scores are blank. "
+                "Component score text was detected on sampled course pages."
+            ),
+            "root_cause": "Extraction configuration issue — IELTS components exist on page but component mapping rule is missing",
+            "confidence": 0.85,
+            "impact_estimate": {
+                "courses_affected": ielts_overall_count,
+                "overall_completeness_before": None,
+                "overall_completeness_after": None,
+                "delta": None,
+                "note": "Adds component scores — improves data quality, no completeness change",
+            },
+            "evidence": {
+                "affected_count": ielts_overall_count,
+                "sample_url": ielts_page_comp.get("url"),
+                "detected_snippets": comp_snippets[:3],
+                "page_signals": {"ielts_components_text": True},
+            },
+            "fix": {
+                "type": "recipe_fix",
+                "description": "Configure IELTS Component Mapping in the IELTS & Intake tab to extract listening/reading/writing/speaking scores",
+                "recipe_patch": {
+                    "english.component_mapping": {
+                        "Listening": 0,
+                        "Reading": 0,
+                        "Writing": 0,
+                        "Speaking": 0,
+                    }
+                },
             },
         })
 
