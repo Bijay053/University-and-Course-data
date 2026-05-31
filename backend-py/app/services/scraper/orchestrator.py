@@ -38,67 +38,38 @@ def _strip_provider_name_from_title(
     uni_name: str,
     scrape_url: str = "",
 ) -> str:
-    """Remove trailing '- Provider' or '| Provider' suffixes that universities
-    embed in their course page H1 elements.
+    """Remove university-name suffixes from a course title.
+
+    Delegates to :func:`course_name_cleaner.clean_course_name_with_config`
+    which is the single authoritative implementation supporting all separator
+    patterns (``|``, ``-``, ``–``, ``—``, ``at``, ``@``, ``:``) and
+    YAML-configured aliases (e.g. "UEL" for University of East London).
 
     Example: "Bachelor of Business - Aibi" → "Bachelor of Business"
-
-    The course_name extractor in extractors/course_name.py strips well-known
-    suffixes ("- Charles Sturt University", "| USQ") but cannot catch every
-    custom short name. This function uses the actual university name and the
-    domain-derived short name to do a targeted, case-insensitive strip.
-
-    Safety: the stripped result must be at least 5 chars long so we never
-    silently delete the whole course name for a page that has an unusually
-    short title.
+             "Msc Artificial Intelligence | University of East London"
+             → "Msc Artificial Intelligence"
+             "BSc Psychology | UEL" → "BSc Psychology"
+             "BA Architecture at University of East London"
+             → "BA Architecture"
     """
-    import re
-    from urllib.parse import urlparse as _up
-
     if not course_name:
         return course_name
 
-    tokens: list[str] = []
+    from app.services.scraper.course_name_cleaner import clean_course_name_with_config
 
-    # Full university name (e.g. "AIBI" or "Aibi Institute")
-    if uni_name:
-        tokens.append(uni_name.strip())
-        # First word of the name — often the short identifier
-        first = uni_name.strip().split()[0]
-        if first and first != uni_name.strip() and len(first) >= 2:
-            tokens.append(first)
-
-    # Domain-derived short name (e.g. "aibi" from "aibi.edu.au")
-    if scrape_url:
-        try:
-            host = _up(scrape_url).netloc.lower().lstrip("www.")
-            short = host.split(".")[0]
-            if short and len(short) >= 2:
-                tokens.append(short)
-        except Exception:
-            pass
-
-    _sep_pat = r"\s*[\-\u2013\u2014|:•]\s*"
-    for token in tokens:
-        if not token or len(token) < 2:
-            continue
-        pat = re.compile(
-            _sep_pat + re.escape(token) + r"\s*$",
-            re.IGNORECASE,
+    cleaned, suffix = clean_course_name_with_config(
+        course_name,
+        university_name=uni_name,
+        scrape_url=scrape_url,
+    )
+    if suffix:
+        log.info(
+            "[COURSE NAME] stripped provider suffix %r from %r → %r",
+            suffix.strip(),
+            course_name,
+            cleaned,
         )
-        m = pat.search(course_name)
-        if m and m.start() > 0:
-            stripped = course_name[: m.start()].strip(" -–—|:•")
-            if stripped and len(stripped) >= 5:
-                log.info(
-                    "[COURSE NAME] stripped provider suffix %r from %r → %r",
-                    course_name[m.start() :].strip(),
-                    course_name,
-                    stripped,
-                )
-                return stripped
-
-    return course_name
+    return cleaned
 
 
 # Bug E: ordered (prefix-or-keyword, level) pairs the UI uses to colour

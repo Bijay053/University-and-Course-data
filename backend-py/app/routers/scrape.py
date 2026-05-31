@@ -1212,6 +1212,108 @@ async def rescrape_courses(
     return await start_scrape(scrape_body, db)
 
 
+class CleanCourseNamesBody(BaseModel):
+    """Request body for the clean-course-names backfill endpoint."""
+
+    university_id: int = Field(alias="universityId")
+    dry_run: bool = Field(
+        default=False,
+        alias="dryRun",
+        description=(
+            "When true, compute and return what would be cleaned without "
+            "writing to the database."
+        ),
+    )
+
+    model_config = {"populate_by_name": True}
+
+
+@router.post("/clean-course-names")
+async def clean_course_names(
+    body: CleanCourseNamesBody,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> dict:
+    """Apply the universal course-name cleanup layer to all staged rows.
+
+    Strips university-name suffixes (e.g. "| University of East London",
+    "- UEL", "at University of East London") from ``course_name`` on every
+    pending/review ``scraped_courses`` row for the given university.
+
+    This is a backfill operation — it does not trigger a new scrape.  Use it
+    after adding new ``university_aliases`` to the YAML config to clean
+    already-staged courses without re-running discovery.
+
+    Returns ``{ total, cleaned, dryRun }``.
+    """
+    from app.models import ScrapedCourse, University
+    from app.services.scraper.config.context import set_uni_config
+    from app.services.scraper.config.loader import get_config_for_host
+    from app.services.scraper.course_name_cleaner import clean_course_name_with_config
+
+    uni = await db.get(University, body.university_id)
+    if uni is None:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail=f"University {body.university_id} not found")
+
+    uni_name = uni.name or ""
+    scrape_url = uni.scrape_url or uni.website or ""
+
+    # Load and activate the per-uni YAML config so that YAML aliases are
+    # available inside clean_course_name_with_config() via the contextvar.
+    # FastAPI async tasks each have their own contextvar scope so no cleanup needed.
+    try:
+        from urllib.parse import urlparse as _up
+        hostname = _up(scrape_url).netloc if scrape_url else ""
+        if hostname:
+            cfg = get_config_for_host(
+                hostname=hostname,
+                name=uni_name,
+                scrape_url=scrape_url,
+                university_id=body.university_id,
+            )
+            set_uni_config(cfg)
+    except Exception:
+        pass
+
+    rows = (
+        await db.execute(
+            select(ScrapedCourse).where(
+                ScrapedCourse.university_id == body.university_id,
+                ScrapedCourse.status.in_(["pending", "review", "pending_review"]),
+            )
+        )
+    ).scalars().all()
+
+    total = len(rows)
+    cleaned_count = 0
+    examples: list[dict] = []
+
+    for row in rows:
+        if not row.course_name:
+            continue
+        cleaned, suffix = clean_course_name_with_config(
+            row.course_name,
+            university_name=uni_name,
+            scrape_url=scrape_url,
+        )
+        if cleaned != row.course_name:
+            cleaned_count += 1
+            if len(examples) < 10:
+                examples.append({"before": row.course_name, "after": cleaned})
+            if not body.dry_run:
+                row.course_name = cleaned
+
+    if not body.dry_run and cleaned_count > 0:
+        await db.commit()
+
+    return {
+        "total": total,
+        "cleaned": cleaned_count,
+        "dryRun": body.dry_run,
+        "examples": examples,
+    }
+
+
 @router.get("/staged")
 async def staged_list(
     db: Annotated[AsyncSession, Depends(get_db)],

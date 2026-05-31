@@ -92,6 +92,11 @@ discovery:
     - "/postgraduate/courses/"
 
 extraction:
+  course_name:
+    university_aliases:
+      - "University of East London"
+      - "UEL"
+
   filters:
     domestic_only:
       enabled: true

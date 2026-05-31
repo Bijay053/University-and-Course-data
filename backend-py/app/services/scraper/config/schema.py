@@ -762,6 +762,27 @@ class CourseNameConfig(BaseModel):
             "Example (UWA): [' : the University of Western Australia']"
         ),
     )
+    university_aliases: list[str] = Field(
+        default_factory=list,
+        description=(
+            "University name aliases that must be stripped from scraped course "
+            "titles.  The full university name from the DB is always tried; "
+            "these aliases add extra patterns (abbreviations, brand variants). "
+            "Example (UEL): ['University of East London', 'UEL']. "
+            "All aliases are matched case-insensitively against the separators "
+            "' | ', ' - ', ' – ', ' — ', ' at ', ' @ ', ' : ' at the END of "
+            "the course name."
+        ),
+    )
+    remove_separator_suffix: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Additional separator strings (e.g. ['|', ' - ', ' at ']) checked "
+            "before the default separator set.  Rarely needed — the default set "
+            "already covers pipe, dash, en/em-dash, colon, 'at', '@', bullet. "
+            "Provided for edge-case CMS variants."
+        ),
+    )
 
 
 class TextCleaningConfig(BaseModel):

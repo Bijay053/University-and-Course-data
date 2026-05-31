@@ -293,6 +293,24 @@ def _check_course(
     elif len(name) < 8:
         add("warning", "suspiciously_short_title",
             f"Course title is very short ({len(name)} chars): {name!r}")
+    if name and name != "?":
+        # Validate that the universal course-name cleanup layer successfully
+        # removed any university-name suffix.  If calling the cleaner here
+        # still strips something it means the suffix survived extraction and
+        # staging — the YAML aliases are likely incomplete.
+        try:
+            from app.services.scraper.course_name_cleaner import clean_course_name_with_config
+            _, _leftover = clean_course_name_with_config(name)
+            if _leftover:
+                add(
+                    "critical",
+                    "university_name_in_course_title",
+                    f"Course name still contains university suffix after cleanup: {name!r}. "
+                    f"Suffix detected: {_leftover.strip()!r}. "
+                    f"Add the alias to extraction.course_name.university_aliases in the uni's YAML.",
+                )
+        except Exception:
+            pass
 
     # ── 2. Fee ───────────────────────────────────────────────────────────
     intl_fee = payload.get("international_fee")

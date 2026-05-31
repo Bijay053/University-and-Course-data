@@ -292,6 +292,15 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:  # noqa: ARG00
             # name is missing the degree prefix, add it now.
             if mba_prefix_name and not cleaned.upper().startswith("MBA"):
                 cleaned = f"MBA \u2013 {cleaned}"
+            # Universal course-name cleanup — strip university-name suffixes
+            # using YAML aliases and separator patterns before staging.
+            try:
+                from app.services.scraper.course_name_cleaner import clean_course_name_with_config
+                _cn_cleaned, _ = clean_course_name_with_config(cleaned)
+                if _cn_cleaned != cleaned:
+                    cleaned = _cn_cleaned
+            except Exception:
+                pass
             return [
                 ExtractionResult(
                     field_key="course_name",

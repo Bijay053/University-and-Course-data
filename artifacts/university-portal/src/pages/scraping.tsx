@@ -1375,6 +1375,7 @@ export default function Scraping() {
   const [clearingRejected, setClearingRejected] = useState(false);
   const [bulkRejecting, setBulkRejecting] = useState(false);
   const [showBulkRejectDialog, setShowBulkRejectDialog] = useState(false);
+  const [cleaningNames, setCleaningNames] = useState(false);
 
   const handleBulkRejectAll = async () => {
     if (!selectedUni || selectedUni === ALL) return;
@@ -1421,6 +1422,37 @@ export default function Scraping() {
       toast({ title: "Failed to clear rejected courses", description: "Network error", variant: "destructive" });
     }
     setClearingRejected(false);
+  };
+
+  const handleCleanCourseNames = async () => {
+    if (!selectedUni || selectedUni === ALL) return;
+    const uniId = parseInt(selectedUni);
+    if (isNaN(uniId)) return;
+    setCleaningNames(true);
+    try {
+      const res = await fetch("/api/scrape/clean-course-names", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ universityId: uniId }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.cleaned > 0) {
+          toast({
+            title: `Cleaned ${data.cleaned} course name(s)`,
+            description: `University-name suffixes removed from ${data.cleaned} of ${data.total} staged courses.`,
+          });
+          if (reviewJobId) await loadStagedCourses(reviewJobId);
+        } else {
+          toast({ title: "No course names needed cleaning", description: `All ${data.total} course names are already clean.` });
+        }
+      } else {
+        toast({ title: "Clean failed", description: await getFetchErrorMessage(res), variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Clean failed", description: "Network error", variant: "destructive" });
+    }
+    setCleaningNames(false);
   };
 
   const handleDedupPending = async () => {
@@ -1674,6 +1706,19 @@ export default function Scraping() {
                 )}
               </div>
               <div className="flex gap-2">
+                {selectedUni && selectedUni !== ALL && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-teal-600 border-teal-200 hover:bg-teal-50"
+                    onClick={handleCleanCourseNames}
+                    disabled={cleaningNames}
+                    title="Strip university-name suffixes from course names (e.g. '| University of East London', '- UEL', 'at UEL')"
+                  >
+                    {cleaningNames ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : null}
+                    Clean course names
+                  </Button>
+                )}
                 {selectedUni && selectedUni !== ALL && (
                   <Button
                     size="sm"
