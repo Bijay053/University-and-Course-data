@@ -1,10 +1,26 @@
 """Celery entry point. Run worker with:
 
-    celery -A app.tasks.celery_app worker --concurrency=4 --loglevel=info
+    celery -A app.tasks.celery_app worker --concurrency=4 --loglevel=info -Q scrape,beat
 
 Run beat (daily snapshot scheduler + stale-job reaper) with:
 
     celery -A app.tasks.celery_app beat --loglevel=info
+
+Queue strategy
+--------------
+``scrape``  — user-triggered scrape/repair jobs (scrape.university,
+              scrape.repair, scrape.probe_configure, etc.).
+              High-priority; never blocked by maintenance work.
+
+``beat``    — periodic maintenance tasks (requeue_stale, monitoring,
+              nightly_sweep, refresh_baselines, daily snapshot).
+              Lower-priority; Beat injects here so maintenance work
+              cannot bury user-triggered scrapes in the same queue.
+
+The worker must subscribe to BOTH queues: ``-Q scrape,beat``.
+With Redis as broker and ``worker_prefetch_multiplier=1``, the worker
+checks ``scrape`` first on each poll cycle, so user-triggered tasks
+get a free worker before any pending beat work.
 
 If Redis isn't reachable, the FastAPI process still boots — only the
 ``.delay()`` call from the API will quietly fail (and the job stays in
@@ -46,12 +62,14 @@ celery_app.conf.update(
     enable_utc=True,
     broker_connection_retry_on_startup=True,
     # Hard ceiling so a single hung scrape can never block the worker
-    # indefinitely (prod incident: ASA job sat for 660+ minutes).
+    # indefinitely (prod incident: ASA job sat for 660+ minutes; Replit
+    # incident: UEL browser discovery hung for 45+ min blocking all 4 workers).
+    # 45 min soft limit covers all known real scrapes (longest: Bond ~30 min).
     # soft_time_limit raises SoftTimeLimitExceeded inside the task so the
     # orchestrator can mark the job failed cleanly; time_limit sends SIGKILL
     # after an extra 10 minutes if the soft signal is not handled.
-    task_soft_time_limit=7200,   # 2 hours → raises SoftTimeLimitExceeded
-    task_time_limit=7800,        # 2 h 10 m → SIGKILL fallback
+    task_soft_time_limit=2700,   # 45 min → raises SoftTimeLimitExceeded
+    task_time_limit=3000,        # 50 min → SIGKILL fallback
     # Diff item L (MIGRATION_AUDIT.md §6): daily snapshot at 03:00 UTC.
     # The Node ``daily-backup.ts`` ran hourly and short-circuited when
     # today's row already existed (catch-up safety net for missed
@@ -70,11 +88,16 @@ celery_app.conf.update(
     # ``backed_up_at``, not on the day), but it's not idempotent at
     # the day grain.
     beat_schedule={
+        # ── Maintenance tasks → ``beat`` queue ───────────────────────────
+        # All periodic/maintenance tasks go to the ``beat`` queue so they
+        # can never bury user-triggered scrape.university tasks that land
+        # in the higher-priority ``scrape`` queue.  The worker subscribes
+        # to both: ``-Q scrape,beat``.
         "snapshot-editable-tables-daily": {
             "task": "tasks.snapshot.editable",
             "schedule": crontab(hour=3, minute=0),
             "args": (),
-            "options": {"queue": "scrape"},
+            "options": {"queue": "beat"},
         },
         # Re-dispatch any scrape/repair jobs that are stuck in ``queued``
         # status with no Celery task in-flight (e.g. after a worker restart
@@ -87,7 +110,7 @@ celery_app.conf.update(
             "task": "scrape.requeue_stale",
             "schedule": 60.0,
             "args": (),
-            "options": {"queue": "scrape"},
+            "options": {"queue": "beat"},
         },
         # Recompute fill-rate baselines from the trailing 30 days of clean runs.
         # Runs once a week (Sunday 04:00 UTC) — baselines drift slowly so a
@@ -96,7 +119,7 @@ celery_app.conf.update(
             "task": "scrape.refresh_baselines",
             "schedule": crontab(hour=4, minute=0, day_of_week=0),
             "args": (),
-            "options": {"queue": "scrape"},
+            "options": {"queue": "beat"},
         },
         # Nightly regression sweep: capture a fresh baseline snapshot for all
         # universities, compare against the previous night's snapshot, and
@@ -107,7 +130,7 @@ celery_app.conf.update(
             "task": "scrape.nightly_sweep",
             "schedule": crontab(hour=2, minute=0),
             "args": (),
-            "options": {"queue": "scrape"},
+            "options": {"queue": "beat"},
         },
         # Phase 13 — Autonomous Monitoring Engine.
         # Probes all enabled watchers whose next_check_at <= now().
@@ -117,7 +140,7 @@ celery_app.conf.update(
             "task": "monitoring.check_watchers",
             "schedule": 1800.0,  # every 30 minutes
             "args": (),
-            "options": {"queue": "scrape"},
+            "options": {"queue": "beat"},
         },
     },
 )
@@ -189,6 +212,24 @@ async def _reset_ghost_running_jobs() -> int:
     return await _reset_via_asyncpg(fallback_url)
 
 
+async def _check_job_status_single(job_id: str) -> str | None:
+    """Return the DB status of a single scrape_runtime_jobs row, or None."""
+    from sqlalchemy import text as _text2
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+    _url = settings.database_url
+    _engine = create_async_engine(_url, pool_size=1, max_overflow=0, future=True)
+    try:
+        _Sess = async_sessionmaker(_engine, class_=AsyncSession, expire_on_commit=False)
+        async with _Sess() as _db:
+            row = await _db.execute(
+                _text2("SELECT status FROM scrape_runtime_jobs WHERE runtime_job_id = :jid"),
+                {"jid": job_id},
+            )
+            return row.scalar()
+    finally:
+        await _engine.dispose()
+
+
 @worker_ready.connect
 def on_worker_ready(**kwargs) -> None:  # noqa: ANN003
     """Reset ghost 'running' scrape_runtime_jobs when the Celery worker comes online,
@@ -230,6 +271,51 @@ def on_worker_ready(**kwargs) -> None:  # noqa: ANN003
             log.info("worker_ready: no ghost running jobs found — all slots clean")
     except Exception as exc:
         log.error("worker_ready: ghost-job reset failed: %s", exc)
+    # ── Stale uni_lock cleanup ────────────────────────────────────────────────
+    # When a Celery worker is SIGKILL'd (e.g. OOM or deployment restart), the
+    # orchestrator finally-block that releases scrape:uni_lock:<uni_id> never
+    # runs, leaving a lock with a 4-hour TTL in Redis.  Future scrapes of that
+    # university see the lock, check the DB, find the holder job is no longer
+    # "running"/"queued", and steal it — BUT only after a Celery task actually
+    # executes.  When the queue is saturated (workers stuck on long scrapes),
+    # new tasks pile up and steal-logic never fires, so the university appears
+    # permanently locked until the 4-hour TTL expires.
+    #
+    # Fix: on every worker restart, delete all uni_lock keys whose holder job
+    # is no longer "running" or "queued" in the DB.  This is idempotent and
+    # race-safe: the orchestrator re-acquires the lock at the start of each
+    # run_scrape call so a miss here only matters for the window between the
+    # delete and the next claim.
+    try:
+        import redis as _redis_lib
+        _r = _redis_lib.from_url(settings.redis_url, decode_responses=True)
+        _stale_keys: list[str] = []
+        for _key in _r.keys("scrape:uni_lock:*"):
+            _holder_jid = _r.get(_key)
+            if not _holder_jid:
+                _stale_keys.append(_key)
+                continue
+            # Use a short-lived DB check via asyncpg
+            try:
+                from sqlalchemy import text as _text2
+                _holder_status = asyncio.run(
+                    _check_job_status_single(_holder_jid)
+                )
+                if _holder_status not in (None, "running", "queued"):
+                    _stale_keys.append(_key)
+            except Exception:
+                pass  # leave the lock if we can't check — safe default
+        if _stale_keys:
+            _r.delete(*_stale_keys)
+            log.warning(
+                "worker_ready: deleted %d stale uni_lock key(s): %s",
+                len(_stale_keys), _stale_keys,
+            )
+        else:
+            log.info("worker_ready: no stale uni_lock keys found")
+    except Exception as exc:
+        log.warning("worker_ready: stale uni_lock cleanup failed (non-fatal): %s", exc)
+
     # ── Orphaned queued-job recovery ──────────────────────────────────────────
     # After a Redis restart the broker queue is cleared, but DB rows remain in
     # status='queued' with no Celery task to claim them.  Re-dispatch them NOW
