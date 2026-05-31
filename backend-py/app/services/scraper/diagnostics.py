@@ -303,9 +303,179 @@ async def _probe_live_site(uni_id: int, db: AsyncSession) -> dict[str, Any]:
     }
 
 
+# ── Phase 1b: Course-level pattern analysis ───────────────────────────────────
+
+_GARBAGE_LOCATION_RE = re.compile(
+    r"\b(not\s+available|not\b|this\b|internal\b|mixed\b|tba\b|tbd\b|n/?a\b|online\s+only\b)\b",
+    re.IGNORECASE,
+)
+_BAND_TEXT_RE = re.compile(r"\bband\s+\d\b", re.IGNORECASE)
+_FEE_AMOUNT_RE = re.compile(r"\$[\d,]+|\d[\d,]+\s*(AUD|USD|GBP|per\s+year|per\s+semester)", re.IGNORECASE)
+_CSP_TEXT_RE = re.compile(
+    r"(commonwealth\s+supported|CSP\b|HECS[-\s]HELP|domestic\s+fee|local\s+fee)", re.IGNORECASE
+)
+
+
+async def _analyse_course_patterns(
+    job_id: str, uni_id: int, db: AsyncSession
+) -> dict[str, Any]:
+    """Analyse course-level patterns: name pollution, location garbage, band gaps, etc."""
+
+    # Fetch university name and scrape_config for band_mapping check
+    uni_row = (await db.execute(text(
+        "SELECT name, scrape_config FROM universities WHERE id = :uid"
+    ), {"uid": uni_id})).fetchone()
+
+    uni_name = uni_row[0] if uni_row else ""
+    sc = (uni_row[1] or {}) if uni_row else {}
+    recipe = sc.get("recipe") or {}
+    admin_config = sc.get("admin_config") or {}
+
+    band_mapping_configured = bool(
+        recipe.get("band_mapping") or admin_config.get("band_mapping")
+    )
+
+    # ── Main pattern query ─────────────────────────────────────────────────────
+    pat = (await db.execute(text("""
+        SELECT
+            COUNT(*) FILTER (WHERE course_name LIKE '%|%')       AS pipe_suffix_count,
+            COUNT(*) FILTER (
+                WHERE course_location IS NOT NULL
+                  AND course_location ~* '\\y(not|this|internal|mixed|tba|tbd)\\y'
+            )                                                    AS garbage_location_count,
+            COUNT(*) FILTER (WHERE international_fee BETWEEN 1 AND 9999) AS low_fee_count
+        FROM scraped_courses
+        WHERE scrape_job_id = :jid
+    """), {"jid": job_id})).fetchone()
+
+    pipe_suffix_count = int(pat[0] or 0)
+    garbage_location_count = int(pat[1] or 0)
+    low_fee_count = int(pat[2] or 0)
+
+    # ── Sample garbage locations ───────────────────────────────────────────────
+    sample_garbage = []
+    if garbage_location_count > 0:
+        g_rows = (await db.execute(text("""
+            SELECT DISTINCT course_location FROM scraped_courses
+            WHERE scrape_job_id = :jid
+              AND course_location IS NOT NULL
+              AND course_location ~* '\\y(not|this|internal|mixed|tba|tbd)\\y'
+            LIMIT 5
+        """), {"jid": job_id})).fetchall()
+        sample_garbage = [r[0] for r in g_rows if r[0]]
+
+    # ── Sample course URLs where key fields are blank (for Phase 2 probing) ───
+    blank_ielts_urls: list[str] = []
+    blank_fee_urls: list[str] = []
+
+    ielts_urls_rows = (await db.execute(text("""
+        SELECT course_website FROM scraped_courses
+        WHERE scrape_job_id = :jid
+          AND ielts_overall IS NULL
+          AND course_website IS NOT NULL
+          AND course_website LIKE 'http%'
+        LIMIT 3
+    """), {"jid": job_id})).fetchall()
+    blank_ielts_urls = [r[0] for r in ielts_urls_rows if r[0]]
+
+    fee_urls_rows = (await db.execute(text("""
+        SELECT course_website FROM scraped_courses
+        WHERE scrape_job_id = :jid
+          AND international_fee IS NULL
+          AND course_website IS NOT NULL
+          AND course_website LIKE 'http%'
+        LIMIT 3
+    """), {"jid": job_id})).fetchall()
+    blank_fee_urls = [r[0] for r in fee_urls_rows if r[0]]
+
+    # ── Name pollution: extract a sample pipe-suffix name ─────────────────────
+    sample_pipe_names: list[str] = []
+    if pipe_suffix_count > 0:
+        pn_rows = (await db.execute(text("""
+            SELECT course_name FROM scraped_courses
+            WHERE scrape_job_id = :jid AND course_name LIKE '%|%'
+            LIMIT 3
+        """), {"jid": job_id})).fetchall()
+        sample_pipe_names = [r[0] for r in pn_rows if r[0]]
+
+    return {
+        "uni_name": uni_name,
+        "band_mapping_configured": band_mapping_configured,
+        "pipe_suffix_count": pipe_suffix_count,
+        "sample_pipe_names": sample_pipe_names,
+        "garbage_location_count": garbage_location_count,
+        "sample_garbage_locations": sample_garbage,
+        "low_fee_count": low_fee_count,
+        "blank_ielts_urls": blank_ielts_urls,
+        "blank_fee_urls": blank_fee_urls,
+    }
+
+
+# ── Phase 2b: Sample course page probing ──────────────────────────────────────
+
+async def _probe_sample_course_pages(
+    blank_ielts_urls: list[str],
+    blank_fee_urls: list[str],
+) -> dict[str, Any]:
+    """Probe a small sample of course pages to detect patterns in blank-field courses."""
+
+    band_text_found = False
+    fee_text_in_blank_pages = False
+    csp_text_found = False
+
+    all_urls = list(dict.fromkeys(blank_ielts_urls[:2] + blank_fee_urls[:2]))
+
+    if not all_urls:
+        return {
+            "band_text_found": False,
+            "fee_text_in_blank_pages": False,
+            "csp_text_found": False,
+            "cloudflare_blocked_courses": False,
+        }
+
+    cloudflare_blocked_courses = False
+
+    async with httpx.AsyncClient(
+        follow_redirects=True,
+        timeout=10,
+        headers=_PROBE_HEADERS,
+    ) as client:
+        for url in all_urls:
+            try:
+                resp = await client.get(url)
+                if resp.status_code in (403, 429, 503):
+                    cloudflare_blocked_courses = True
+                    continue
+                if resp.status_code != 200:
+                    continue
+
+                text_content = BeautifulSoup(resp.text, "html.parser").get_text(" ", strip=True)[:8000]
+
+                if _BAND_TEXT_RE.search(text_content) and url in blank_ielts_urls:
+                    band_text_found = True
+
+                if _FEE_AMOUNT_RE.search(text_content) and url in blank_fee_urls:
+                    fee_text_in_blank_pages = True
+
+                if _CSP_TEXT_RE.search(text_content):
+                    csp_text_found = True
+
+            except Exception as exc:
+                log.debug("Sample course probe failed for %s: %s", url, exc)
+
+    return {
+        "band_text_found": band_text_found,
+        "fee_text_in_blank_pages": fee_text_in_blank_pages,
+        "csp_text_found": csp_text_found,
+        "cloudflare_blocked_courses": cloudflare_blocked_courses,
+    }
+
+
 # ── Phase 3: Cross-correlate and generate recommendations ─────────────────────
 
-def _generate_recommendations(phase1: dict, phase2: dict) -> list[dict]:
+def _generate_recommendations(
+    phase1: dict, phase2: dict, patterns: dict, course_probe: dict
+) -> list[dict]:
     """Correlate Phase 1 issues with Phase 2 findings to produce actionable fix suggestions."""
 
     if phase1.get("status") != "ok":
@@ -526,6 +696,171 @@ def _generate_recommendations(phase1: dict, phase2: dict) -> list[dict]:
             },
         })
 
+    # ── 7. Course name pipe suffix ──────────────────────────────────────────────
+    pipe_count = patterns.get("pipe_suffix_count", 0)
+    sample_pipes = patterns.get("sample_pipe_names", [])
+    if pipe_count > 0:
+        example = ""
+        if sample_pipes:
+            suffix = sample_pipes[0].split("|")[-1].strip()[:60]
+            example = f' (e.g. "| {suffix}")'
+        recs.append({
+            "severity": "warning",
+            "id": "course_name_pipe_suffix",
+            "title": f"{pipe_count} course names contain a university label suffix",
+            "description": (
+                f"{pipe_count} courses have a pipe character in the course name{example}. "
+                "The university name or branding is appended to the degree title and needs to be stripped."
+            ),
+            "root_cause": (
+                "The course title element captures both the degree name and the university label "
+                "separated by '|'. The scraper is extracting the full element text."
+            ),
+            "confidence": 0.90,
+            "fix": {
+                "type": "field_selector",
+                "description": (
+                    "Add a CSS/XPath field selector for course_name that targets only the text "
+                    "before the pipe, or configure a strip_suffix rule in Field Selectors"
+                ),
+                "recipe_patch": None,
+            },
+        })
+
+    # ── 8. Band mapping configured but IELTS still blank ───────────────────────
+    band_configured = patterns.get("band_mapping_configured", False)
+    band_text_found = course_probe.get("band_text_found", False)
+    if _pct("ielts_overall") < 0.5 and band_configured:
+        if band_text_found:
+            recs.append({
+                "severity": "critical",
+                "id": "band_mapping_not_applied",
+                "title": f"{_missing('ielts_overall')} courses — band mapping configured but not applied",
+                "description": (
+                    f"Band mapping is configured but {_missing('ielts_overall')} courses have no IELTS. "
+                    "Band text (e.g. 'Band 2') was detected in sample course pages. "
+                    "The band mapping extractor is not matching or the band reference URL is not fetched."
+                ),
+                "root_cause": (
+                    "Band text exists in course pages but the extractor isn't mapping it to IELTS scores. "
+                    "The band reference URL or band key names may not match what the site publishes."
+                ),
+                "confidence": 0.85,
+                "fix": {
+                    "type": "band_reference_url",
+                    "description": (
+                        "Verify the Band Reference URL in the IELTS & Intake tab points to the page "
+                        "that lists 'Band 1', 'Band 2', etc. with their IELTS equivalents"
+                    ),
+                    "recipe_patch": None,
+                },
+            })
+        elif _pct("ielts_overall") < 0.15:
+            recs.append({
+                "severity": "critical",
+                "id": "band_mapping_ielts_blank",
+                "title": f"{_missing('ielts_overall')} courses — band mapping may need tuning",
+                "description": (
+                    f"Band mapping is configured but {_missing('ielts_overall')} courses have no IELTS. "
+                    "Course pages were not accessible (possibly Cloudflare-blocked). "
+                    "The band reference URL or key names may not match the live site."
+                ),
+                "root_cause": "Band mapping configured but IELTS still blank — verify band keys match site labels",
+                "confidence": 0.70,
+                "fix": {
+                    "type": "band_reference_url",
+                    "description": (
+                        "Verify the Band Reference URL and that band keys in the recipe "
+                        "(e.g. 'Band 2') exactly match the labels on that page"
+                    ),
+                    "recipe_patch": None,
+                },
+            })
+
+    # ── 9. Fee amount visible in page text but fee is blank ────────────────────
+    fee_text_in_blank = course_probe.get("fee_text_in_blank_pages", False)
+    if _pct("international_fee") < 0.5 and fee_text_in_blank:
+        recs.append({
+            "severity": "critical",
+            "id": "fee_visible_not_extracted",
+            "title": f"{_missing('international_fee')} courses — fee visible in page text but not extracted",
+            "description": (
+                f"Sample course pages where the fee is blank contain fee amount patterns "
+                f"(e.g. '$32,000 per year') in the page text. The fee extractor is not matching them."
+            ),
+            "root_cause": (
+                "Fee amounts are present in the HTML but the fee extractor patterns are not matching. "
+                "Common causes: amounts in a table with unusual headers, or in a JS-rendered element."
+            ),
+            "confidence": 0.85,
+            "fix": {
+                "type": "fee_selector",
+                "description": (
+                    "Add a Field Selector for international_fee (CSS or XPath) targeting the specific "
+                    "fee element, or add a fee follow-link if the fee is on a linked page"
+                ),
+                "recipe_patch": None,
+            },
+        })
+
+    # ── 10. CSP / domestic fee text found in course pages ─────────────────────
+    csp_found = course_probe.get("csp_text_found", False)
+    existing_low_fee = phase1.get("suspiciously_low_fee_count", 0)
+    already_has_low_fee_rec = any(r["id"] == "suspiciously_low_fee" for r in recs)
+    if csp_found and existing_low_fee > 0 and not already_has_low_fee_rec:
+        recs.append({
+            "severity": "critical",
+            "id": "csp_domestic_fee_detected",
+            "title": f"Domestic fee text detected — {existing_low_fee} courses may have wrong fee",
+            "description": (
+                f"Course pages contain domestic fee terms ('Commonwealth Supported', 'CSP', 'HECS-HELP'). "
+                f"{existing_low_fee} courses have an unusually low fee (< $10,000), "
+                "suggesting a domestic fee was stored as the international fee."
+            ),
+            "root_cause": (
+                "The fee extractor found a domestic / CSP fee before the international fee. "
+                "The international fee is typically higher and labelled differently on the page."
+            ),
+            "confidence": 0.90,
+            "fix": {
+                "type": "fee_reject_keywords",
+                "description": "Reject domestic fee keywords and prefer the higher international fee",
+                "recipe_patch": {
+                    "fee_reject_keywords": ["Commonwealth Supported", "CSP", "HECS", "Domestic", "Local"],
+                    "fee_prefer_international": True,
+                },
+            },
+        })
+
+    # ── 11. Garbage location values ────────────────────────────────────────────
+    garbage_loc = patterns.get("garbage_location_count", 0)
+    sample_garbage = patterns.get("sample_garbage_locations", [])
+    if garbage_loc > 0:
+        sample_text = ", ".join(f'"{s}"' for s in sample_garbage[:3])
+        recs.append({
+            "severity": "warning",
+            "id": "garbage_location",
+            "title": f"{garbage_loc} courses have invalid location values",
+            "description": (
+                f"{garbage_loc} location values contain delivery notes or non-campus text "
+                f"({sample_text}). These should be filtered to only show valid campus names."
+            ),
+            "root_cause": (
+                "The location extractor is capturing surrounding text alongside campus names "
+                "(e.g. 'Brisbane Not Available', 'Townsville Not'). "
+                "A campus allowlist discards everything that isn't a known campus name."
+            ),
+            "confidence": 0.88,
+            "fix": {
+                "type": "campus_allowlist",
+                "description": (
+                    "Add known campus names to the Campus tab (valid_campuses). "
+                    "Only values matching the allowlist will be kept."
+                ),
+                "recipe_patch": None,
+            },
+        })
+
     # Sort: critical first, then by confidence (descending)
     recs.sort(key=lambda r: (0 if r["severity"] == "critical" else 1, -r.get("confidence", 0)))
     return recs
@@ -552,23 +887,60 @@ def _best_link_texts(detected: list[str], preferred_phrases: list[str]) -> list[
 # ── Public entry point ─────────────────────────────────────────────────────────
 
 async def run_diagnostics(uni_id: int, db: AsyncSession) -> dict[str, Any]:
-    """Run the full three-phase diagnostic and return a structured report."""
+    """Run the full diagnostic pipeline and return a structured report.
 
+    Phase 1  — DB analysis of the last completed scrape job.
+    Phase 1b — Course-level pattern analysis (name pollution, location garbage, band gaps).
+    Phase 2  — Live httpx probe of seed URLs.
+    Phase 2b — Sample course-page probe (band text, fee text, CSP text).
+    Phase 3  — Cross-correlate everything → actionable recommendations.
+    """
     log.info("[DIAGNOSE] Starting diagnostics for uni_id=%s", uni_id)
 
     phase1 = await _analyse_last_job(uni_id, db)
     log.info("[DIAGNOSE] Phase 1 done: status=%s", phase1.get("status"))
 
-    phase2 = await _probe_live_site(uni_id, db)
-    log.info("[DIAGNOSE] Phase 2 done: status=%s, urls_probed=%s",
-             phase2.get("status"), len(phase2.get("urls_probed", [])))
+    # Phase 1b — only runs when we have a completed job
+    patterns: dict[str, Any] = {
+        "uni_name": "",
+        "band_mapping_configured": False,
+        "pipe_suffix_count": 0,
+        "sample_pipe_names": [],
+        "garbage_location_count": 0,
+        "sample_garbage_locations": [],
+        "low_fee_count": 0,
+        "blank_ielts_urls": [],
+        "blank_fee_urls": [],
+    }
+    if phase1.get("status") == "ok":
+        patterns = await _analyse_course_patterns(phase1["job_id"], uni_id, db)
+        log.info("[DIAGNOSE] Phase 1b done: pipe=%d garbage_loc=%d band_configured=%s",
+                 patterns["pipe_suffix_count"],
+                 patterns["garbage_location_count"],
+                 patterns["band_mapping_configured"])
 
-    recommendations = _generate_recommendations(phase1, phase2)
+    # Phase 2 + 2b run concurrently
+    import asyncio as _asyncio
+    phase2_task = _asyncio.create_task(_probe_live_site(uni_id, db))
+    course_probe_task = _asyncio.create_task(_probe_sample_course_pages(
+        patterns.get("blank_ielts_urls", []),
+        patterns.get("blank_fee_urls", []),
+    ))
+    phase2, course_probe = await _asyncio.gather(phase2_task, course_probe_task)
+    log.info("[DIAGNOSE] Phase 2 done: status=%s urls=%s | course_probe: band=%s fee=%s csp=%s",
+             phase2.get("status"), len(phase2.get("urls_probed", [])),
+             course_probe.get("band_text_found"),
+             course_probe.get("fee_text_in_blank_pages"),
+             course_probe.get("csp_text_found"))
+
+    recommendations = _generate_recommendations(phase1, phase2, patterns, course_probe)
     log.info("[DIAGNOSE] Phase 3 done: %d recommendations", len(recommendations))
 
     return {
         "phase1": phase1,
+        "phase1b_patterns": patterns,
         "phase2": phase2,
+        "phase2b_course_probe": course_probe,
         "recommendations": recommendations,
         "summary": {
             "critical_count": sum(1 for r in recommendations if r["severity"] == "critical"),

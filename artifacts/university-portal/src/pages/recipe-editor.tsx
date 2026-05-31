@@ -16,7 +16,7 @@ import {
   Code2, DollarSign, BookOpen, MapPin, ShieldCheck, Zap, RefreshCw,
   FlaskConical, CheckCircle2, XCircle, AlertTriangle, ChevronDown, ChevronUp, Info,
   MousePointerClick, GripVertical, Link, Stethoscope, Loader2, Wand2, WifiOff,
-  TrendingUp, ExternalLink
+  TrendingUp, ExternalLink, Play
 } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -538,6 +538,7 @@ export default function RecipeEditorPage() {
   const [showDropped, setShowDropped] = useState(false);
   const [diagnosing, setDiagnosing] = useState(false);
   const [diagnoseResult, setDiagnoseResult] = useState<any | null>(null);
+  const [beforeSnapshot, setBeforeSnapshot] = useState<Record<string, { count: number; missing: number; pct: number }> | null>(null);
 
   // ── Load ──
   useEffect(() => {
@@ -625,12 +626,16 @@ export default function RecipeEditorPage() {
 
   // ── Apply Fix from diagnostics ──
   const applyFix = useCallback((patch: Record<string, any>) => {
+    // Capture before-state so we can show a before/after comparison after next Diagnose
+    if (diagnoseResult?.phase1?.field_completion) {
+      setBeforeSnapshot(diagnoseResult.phase1.field_completion);
+    }
     patchRecipe(patch);
     toast({
       title: "Fix applied",
-      description: "Recipe updated — review the changes below then click Save Recipe.",
+      description: "Recipe updated — save it, run a new scrape, then click Diagnose to verify improvement.",
     });
-  }, []);
+  }, [diagnoseResult]);
 
   // ── Test Discovery ──
   const testDiscovery = useCallback(async () => {
@@ -1185,10 +1190,14 @@ export default function RecipeEditorPage() {
                                   )}
                                   {isGuidanceOnly && (
                                     <span className="text-xs text-muted-foreground italic">
-                                      (manual configuration required — see {
+                                      (manual — see {
                                         rec.fix.type === "browser_action" ? "Browser Actions tab" :
                                         rec.fix.type === "field_selector" ? "Field Selectors tab" :
                                         rec.fix.type === "seed_urls" ? "Discovery tab" :
+                                        rec.fix.type === "campus_allowlist" ? "Campus tab" :
+                                        rec.fix.type === "band_reference_url" ? "IELTS & Intake tab" :
+                                        rec.fix.type === "fee_selector" ? "Field Selectors or Fee Rules tab" :
+                                        rec.fix.type === "prefer_blended_over_on_campus" ? "Field Selectors tab" :
                                         "relevant tab"
                                       })
                                     </span>
@@ -1208,6 +1217,115 @@ export default function RecipeEditorPage() {
                 <div className="flex items-center gap-2 text-green-700 text-sm">
                   <CheckCircle2 className="h-4 w-4" />
                   <span>No extraction issues detected. The recipe looks well-configured for this university.</span>
+                </div>
+              )}
+
+              {/* ── Before / After Verification ──────────────────────────────── */}
+              {beforeSnapshot && p1.status === "ok" && p1.field_completion && (() => {
+                const before = beforeSnapshot;
+                const after = p1.field_completion as Record<string, any>;
+                const allFields = Array.from(new Set([...Object.keys(before), ...Object.keys(after)]));
+                const improved = allFields.filter(f => (after[f]?.pct ?? 0) > (before[f]?.pct ?? 0) + 0.04);
+                const worsened = allFields.filter(f => (after[f]?.pct ?? 0) < (before[f]?.pct ?? 0) - 0.04);
+
+                const verdict =
+                  improved.length >= allFields.length * 0.5
+                    ? { label: "Successful", icon: "✅", className: "bg-green-50 border-green-200 text-green-800" }
+                    : improved.length > 0
+                    ? { label: "Partially Successful", icon: "⚠️", className: "bg-yellow-50 border-yellow-200 text-yellow-800" }
+                    : { label: "No Improvement Detected", icon: "❌", className: "bg-red-50 border-red-200 text-red-800" };
+
+                const FIELD_LABELS2: Record<string, string> = {
+                  international_fee: "International fee", ielts_overall: "IELTS",
+                  pte_overall: "PTE", toefl_overall: "TOEFL", study_mode: "Study mode",
+                  degree_level: "Degree level", duration: "Duration",
+                  academic_level: "Academic level", intake_months: "Intakes",
+                };
+
+                return (
+                  <div>
+                    <div className="flex items-center gap-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                      <TrendingUp className="h-3 w-3" /> Fix Verification — Before vs After
+                    </div>
+                    <div className={`rounded-lg border px-3 py-2 mb-3 flex items-center gap-2 text-sm font-medium ${verdict.className}`}>
+                      <span>{verdict.icon}</span>
+                      <span>{verdict.label}</span>
+                      {improved.length > 0 && (
+                        <span className="ml-1 font-normal text-xs">
+                          {improved.length} field{improved.length !== 1 ? "s" : ""} improved
+                          {worsened.length > 0 ? `, ${worsened.length} worsened` : ""}
+                        </span>
+                      )}
+                    </div>
+                    <div className="overflow-x-auto rounded-lg border border-gray-200">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="bg-gray-50 border-b border-gray-200">
+                            <th className="text-left px-3 py-2 text-muted-foreground font-medium">Field</th>
+                            <th className="text-right px-3 py-2 text-muted-foreground font-medium">Before</th>
+                            <th className="text-right px-3 py-2 text-muted-foreground font-medium">After</th>
+                            <th className="text-right px-3 py-2 text-muted-foreground font-medium">Δ</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {allFields.map(f => {
+                            const bPct = Math.round((before[f]?.pct ?? 0) * 100);
+                            const aPct = Math.round((after[f]?.pct ?? 0) * 100);
+                            const delta = aPct - bPct;
+                            const isImproved = improved.includes(f);
+                            const isWorsened = worsened.includes(f);
+                            return (
+                              <tr key={f} className={`border-b border-gray-100 last:border-0 ${isImproved ? "bg-green-50" : isWorsened ? "bg-red-50" : ""}`}>
+                                <td className="px-3 py-1.5 text-muted-foreground">{FIELD_LABELS2[f] ?? f}</td>
+                                <td className="px-3 py-1.5 text-right">{bPct}%</td>
+                                <td className="px-3 py-1.5 text-right font-medium">{aPct}%</td>
+                                <td className={`px-3 py-1.5 text-right font-bold ${delta > 0 ? "text-green-700" : delta < 0 ? "text-red-700" : "text-muted-foreground"}`}>
+                                  {delta > 0 ? `+${delta}` : delta === 0 ? "—" : delta}%
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                    <button
+                      onClick={() => setBeforeSnapshot(null)}
+                      className="mt-2 text-xs text-muted-foreground hover:text-foreground"
+                    >
+                      Clear comparison
+                    </button>
+                  </div>
+                );
+              })()}
+
+              {/* ── Run New Scrape shortcut ───────────────────────────────────── */}
+              {p1.status === "ok" && (
+                <div className="pt-1 border-t border-gray-100 flex items-center gap-3">
+                  <span className="text-xs text-muted-foreground flex-1">
+                    After applying fixes, save the recipe then run a fast scrape to verify improvement.
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-xs border-purple-300 text-purple-700 hover:bg-purple-50"
+                    onClick={async () => {
+                      try {
+                        const resp = await fetch(`/api/scrape/start`, {
+                          method: "POST",
+                          credentials: "include",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ university_id: Number(id), fast_mode: true }),
+                        });
+                        if (!resp.ok) throw new Error(await resp.text());
+                        toast({ title: "Scrape started", description: "Fast scrape queued — check the Scraping Jobs page for progress." });
+                      } catch (e: any) {
+                        toast({ title: "Scrape failed to start", description: e.message, variant: "destructive" });
+                      }
+                    }}
+                  >
+                    <Play className="h-3 w-3 mr-1" />
+                    Run New Scrape
+                  </Button>
                 </div>
               )}
 
