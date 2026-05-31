@@ -36,10 +36,31 @@ _NAME_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"\b(doctor(ate)?|ph\.?d|d\.?phil)\b", re.IGNORECASE), "Doctorate"),
     (re.compile(r"\bgraduate\s+diploma\b", re.IGNORECASE), "Graduate Diploma"),
     (re.compile(r"\bgraduate\s+certificate\b", re.IGNORECASE), "Graduate Certificate"),
-    (re.compile(r"\bpostgraduate\s+diploma\b", re.IGNORECASE), "Graduate Certificate"),
+    # BUG FIX: "Postgraduate Diploma" is NOT a "Graduate Certificate".
+    # A Postgraduate Diploma (AQF 8, 1 year) ≠ Graduate Certificate (AQF 8, 6 months).
+    # The two are distinct qualifications — the diploma is the longer award.
+    (re.compile(r"\bpostgraduate\s+diploma\b", re.IGNORECASE), "Graduate Diploma"),
     (re.compile(r"\bpostgraduate\s+certificate\b", re.IGNORECASE), "Graduate Certificate"),
-    (re.compile(r"\b(master('?s)?|mba|m\.?sc|m\.?eng|m\.?ed|m\.?phil)\b", re.IGNORECASE), "Master's"),
+    # UK-specific abbreviations — must precede the bare "\bdiploma\b" and
+    # "\bcertificate\b" catch-alls below so "PGDip Business" is not mis-classified
+    # as a plain "Diploma" and "PGCE Primary" is not left unclassified.
+    #   PGCE  = Postgraduate Certificate in Education (UK teacher training)
+    #   PGDip = Postgraduate Diploma
+    #   PGCert = Postgraduate Certificate
+    (re.compile(r"\bPGCE\b", re.IGNORECASE), "Graduate Certificate"),
+    (re.compile(r"\bPG\s*Dip\b|\bPGDip\b", re.IGNORECASE), "Graduate Diploma"),
+    (re.compile(r"\bPG\s*Cert\b|\bPGCert\b", re.IGNORECASE), "Graduate Certificate"),
+    # Master-level patterns — m\.?res (MRes) and m\.?arch (MArch) added; integrated
+    # masters (e.g. "Integrated Master of Engineering") mapped here too.
+    (re.compile(
+        r"\b(master('?s)?|mba|m\.?sc|m\.?eng|m\.?ed|m\.?phil|m\.?res|m\.?arch)\b",
+        re.IGNORECASE,
+    ), "Master's"),
+    (re.compile(r"\bintegrated\s+masters?\b", re.IGNORECASE), "Master's"),
+    # Bachelor patterns — BSc (Hons) style UK names covered by existing b\.?sc rule;
+    # BHons added explicitly for courses whose title leads with the honours tag.
     (re.compile(r"\b(bachelor('?s)?|b\.?sc|b\.?eng|b\.?ed|b\.?a|b\.?bus)\b", re.IGNORECASE), "Bachelor's"),
+    (re.compile(r"\bb\.?hons?\b", re.IGNORECASE), "Bachelor's"),
     (re.compile(r"\bassociate\s+degree\b", re.IGNORECASE), "Associate Degree"),
     (re.compile(r"\badvanced\s+diploma\b", re.IGNORECASE), "Advanced Diploma"),
     (re.compile(r"\bdiploma\b", re.IGNORECASE), "Diploma"),

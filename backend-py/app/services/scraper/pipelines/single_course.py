@@ -2742,6 +2742,15 @@ async def extract_course(
             for _gp_k, _gp_v in _gp_filled.items():
                 if _gp_k in ("duration_value", "duration_unit"):
                     continue  # consumed by the mapped keys above
+                # Remap Gemini's "mode" JSON key to the canonical payload key.
+                # The Gemini prompt asks for "mode" (shorter, less verbose) but
+                # the rest of the pipeline — evidence lookup, FIELD TRACE, staging
+                # — all use "study_mode".  Without this remap, Gemini's extracted
+                # study mode goes into payload["mode"] and payload["study_mode"]
+                # stays None, causing the UI to show "-" even when Gemini clearly
+                # returned "On Campus" or "Online".
+                if _gp_k == "mode":
+                    _gp_k = "study_mode"
 
                 # Bug A.2 (KBS grad certs — atomic duration tuple guard):
                 # `duration` and `duration_term` are an atomic pair — they must

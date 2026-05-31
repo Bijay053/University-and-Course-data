@@ -351,8 +351,33 @@ def _check_course(
         )
     )
     if not has_any_english:
-        add("warning", "missing_english_requirement",
-            "No English language test score found (IELTS / PTE / TOEFL / CAE).")
+        # Postgraduate courses without any English requirement are a definite
+        # data-quality failure: every AU/UK/NZ postgrad programme requires
+        # international students to supply IELTS / PTE / TOEFL / CAE scores.
+        # Leaving it as a mere warning means these courses pass the auto-publish
+        # gate and appear live with no English entry requirement — misleading for
+        # agents and students.  Escalate to critical so the course lands in
+        # data_quality_failure and requires human review.
+        _dl = (payload.get("degree_level") or "").lower()
+        _is_postgrad = any(
+            kw in _dl
+            for kw in (
+                "master", "graduate diploma", "graduate certificate",
+                "doctorate", "ph", "pgce", "pgdip", "pgcert",
+                "postgraduate",
+            )
+        )
+        if _is_postgrad:
+            add(
+                "critical",
+                "missing_english_requirement",
+                "Postgraduate course has no English language test score "
+                "(IELTS / PTE / TOEFL / CAE). International students cannot "
+                "be assessed for admission — manual review required.",
+            )
+        else:
+            add("warning", "missing_english_requirement",
+                "No English language test score found (IELTS / PTE / TOEFL / CAE).")
 
     # ── 3a. Test-accepted flag violations ────────────────────────────────
     # If a university explicitly does not accept a test (*_accepted=False)
