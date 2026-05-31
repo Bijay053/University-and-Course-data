@@ -4031,14 +4031,34 @@ ADMIN PANEL OVERRIDES (values the operator set via UI — already applied on top
 {json.dumps({k: v for k, v in _current_admin_cfg.items() if not k.startswith("_")}, indent=2) if _current_admin_cfg else "(none)"}
 
 Diagnose the scraping failure in plain English for a non-technical admin.
+
+CRITICAL DISTINCTION you must apply:
+- "config" issues = operator can fix by adding a URL, CSS selector, or changing a setting in the portal.
+  Examples: missing fee page URL, missing English requirements URL, wrong must_contain filter, seed URL not set.
+- "platform_bug" issues = something in the extraction logic itself is wrong.
+  Examples: wrong fee calculation, IELTS components not extracted, degree level keywords not recognised,
+  university name appearing in course titles, navigation text captured as campus location,
+  wrong fee amount extracted (domestic instead of international). These require a developer fix.
+  DO NOT suggest YAML config changes for platform_bug issues.
+
 Return your response as JSON with this EXACT structure (no other keys):
 {{
   "summary": "One-sentence plain English summary of what went wrong",
   "root_causes": [
-    {{"issue": "Short label", "explanation": "2-3 sentence explanation for non-developer", "severity": "high|medium|low"}}
+    {{
+      "issue": "Short label",
+      "explanation": "2-3 sentence explanation for a non-technical admin — no jargon",
+      "severity": "high|medium|low",
+      "fix_type": "config|platform_bug"
+    }}
   ],
   "recommended_actions": [
-    {{"action": "Short action label", "detail": "What to do and why", "auto_fixable": true|false}}
+    {{
+      "action": "Short action label",
+      "detail": "What to do and why",
+      "auto_fixable": true|false,
+      "fix_type": "config|platform_bug"
+    }}
   ],
   "discovery_verdict": "ok|low_count|api_driven|blocked_by_cloudflare|unknown",
   "location_verdict": "ok|nav_text_contamination|missing|unknown",
@@ -4294,16 +4314,18 @@ async def extraction_quality_report(
             "severity": "critical",
             "count": cnt,
             "pct": round(cnt / n * 100, 1),
-            "label": "University name inside course title",
+            "label": "University name appearing inside course titles",
             "detail": (
                 f"{cnt} of {n} courses ({cnt/n*100:.0f}%) have the university name embedded in "
-                f"the title after a separator (e.g. '| {uni_name}', 'at {uni_name}')."
+                f"the course title (e.g. 'Bachelor of Laws | {uni_name}'). "
+                "This makes titles incorrect for display and agent matching."
             ),
             "examples": _name_in_title[:3],
+            "fix_type": "platform_bug",
             "suggested_fix": (
-                f"Add '{uni_name}' and any short aliases to "
-                f"extraction.course_name.university_aliases in the university's YAML config, "
-                f"or click 'Clean course names' on the staged courses panel."
+                "This is a system-level extraction bug. The scraper is capturing the full page "
+                "title tag (which includes the site name) instead of the course heading. "
+                "No configuration change will fix this — it requires an update to the extraction logic."
             ),
         })
 
@@ -4317,16 +4339,18 @@ async def extraction_quality_report(
             "severity": "high",
             "count": cnt,
             "pct": round(cnt / n * 100, 1),
-            "label": "Course name too short",
+            "label": "Course name too short (abbreviation or code extracted)",
             "detail": (
-                f"{cnt} courses have a name under 10 characters. "
-                "This usually means an abbreviation, code, or nav element was extracted instead of the full title."
+                f"{cnt} courses have a title under 10 characters. "
+                "The scraper is likely reading a course code, breadcrumb label, or collapsed heading "
+                "instead of the full course title."
             ),
             "examples": _too_short[:3],
+            "fix_type": "config",
             "suggested_fix": (
-                "Check the course page HTML. The scraper may be reading a breadcrumb, "
-                "a course code field, or a collapsed heading element. "
-                "Try adding a CSS selector for the main h1 heading."
+                "Add a CSS selector for the course's main heading (h1 or h2) in the "
+                "extraction settings. Look for the element that contains the full course name "
+                "on the course detail page."
             ),
         })
 
@@ -4340,15 +4364,17 @@ async def extraction_quality_report(
             "severity": "medium",
             "count": cnt,
             "pct": round(cnt / n * 100, 1),
-            "label": "Course name suspiciously long",
+            "label": "Course name very long (page title capturing site name)",
             "detail": (
-                f"{cnt} courses have a name over 200 characters. "
-                "The scraper may be capturing the page title + site name, or concatenating multiple elements."
+                f"{cnt} courses have a title over 200 characters. "
+                "The scraper is capturing the browser page title (which includes the site name) "
+                "rather than the heading element inside the page."
             ),
             "examples": [n[:80] + "…" for n in _too_long[:3]],
+            "fix_type": "config",
             "suggested_fix": (
-                "Inspect the extracted HTML element. The course title selector is likely "
-                "matching a container element rather than the specific h1/h2 heading."
+                "Add a CSS selector targeting the h1 or main heading element on the course page, "
+                "rather than the page <title> tag. The heading is usually inside a .hero or .page-header section."
             ),
         })
 
@@ -4365,14 +4391,16 @@ async def extraction_quality_report(
             "pct": round(pct, 1),
             "label": "International fee missing",
             "detail": (
-                f"{_fee_blank_cnt} of {n} courses ({pct:.0f}%) have no international fee. "
-                "This is the most important field for agents comparing universities."
+                f"{_fee_blank_cnt} of {n} courses ({pct:.0f}%) are missing an international fee. "
+                "This is the most important field for students and agents comparing universities. "
+                "Fees are often published on a separate central fee schedule page rather than on each individual course page."
             ),
             "examples": [],
+            "fix_type": "config",
             "suggested_fix": (
-                "Check whether fees are on a separate fee schedule page (add its URL to "
-                "extraction.fee_page_urls in the YAML). If fees are behind an 'International' tab, "
-                "enable the international tab click in extraction config."
+                "Add the URL of the university's international fee schedule page to the fee page settings. "
+                "The scraper will automatically read that page and match fees to each course. "
+                "If fees are behind a tab labelled 'International Students', enable the international tab setting."
             ),
         })
 
@@ -4421,17 +4449,18 @@ async def extraction_quality_report(
             "severity": "high" if fc_pct > 50 else "medium",
             "count": fc_cnt,
             "pct": round(fc_pct, 1),
-            "label": "Full Course fee total (not annual)",
+            "label": "Fee calculation error — full course total stored instead of annual fee",
             "detail": " ".join(detail_parts),
             "examples": [
                 f"{name}: {fee:,.0f} total → {ae:,.0f}/yr ({dy:.1f}yr)"
                 for name, fee, dy, ae in _annual_equivs[:3]
             ],
+            "fix_type": "platform_bug",
             "suggested_fix": (
-                "Check whether the extractor is capturing the total programme cost. "
-                "If the page lists an annual fee, update fee_term to 'Year' in the YAML. "
-                "If it is genuinely a full-course total, the quality gate will require duration "
-                "to be set so the annual equivalent can be validated."
+                "The scraper has captured the total programme cost instead of the annual tuition fee. "
+                "For example, a 4-year degree at A$26,000/year will be stored as A$104,000 — which is "
+                "not the fee a student would pay each year. This is an extraction calculation bug. "
+                "No configuration change will correct this — the fee calculation logic needs to be updated."
             ),
         })
 
@@ -4448,17 +4477,18 @@ async def extraction_quality_report(
             "severity": "high",
             "count": cnt,
             "pct": round(cnt / n * 100, 1),
-            "label": "Fee value suspiciously low (< 2000)",
+            "label": "Fee value too low — domestic or per-unit fee captured instead of international annual fee",
             "detail": (
                 f"{cnt} courses have an international fee below 2,000. "
-                "This typically means a domestic/HECS fee was extracted, a per-unit fee was captured "
-                "instead of the annual total, or the page lists a partial fee."
+                "This almost always means the scraper captured a domestic (local student) fee, "
+                "a per-credit-point charge, or a partial payment — not the full international annual tuition."
             ),
             "examples": [f"{r.course_name}: {r.currency or ''}{r.international_fee}" for r in _low_fees[:3]],
+            "fix_type": "platform_bug",
             "suggested_fix": (
-                "Inspect the fee element on the course page. Ensure the scraper targets "
-                "the international annual total, not per-credit-point or domestic amounts. "
-                "If the page has an 'International students' tab, the scraper needs to click it first."
+                "The scraper is reading the wrong fee value from the page — likely the domestic fee "
+                "or a per-unit charge is visible before the international fee section. "
+                "This is an extraction targeting bug that requires a logic update."
             ),
         })
 
@@ -4475,17 +4505,18 @@ async def extraction_quality_report(
             "severity": "high",
             "count": cnt,
             "pct": round(cnt / n * 100, 1),
-            "label": "Navigation text extracted as campus location",
+            "label": "Navigation menu text stored as campus location",
             "detail": (
-                f"{cnt} courses have nav/footer text saved as the campus location "
+                f"{cnt} courses have website navigation text saved as the campus location "
                 "(e.g. 'How to Apply', 'Scholarships', 'Student Services'). "
-                "The location selector is matching the page sidebar or footer."
+                "The location extractor is reading the page sidebar or footer menu instead of the campus field."
             ),
             "examples": [v[:60] for v in _nav_locs[:3]],
+            "fix_type": "platform_bug",
             "suggested_fix": (
-                "Add a CSS selector for the 'Fast Facts → Location' or 'Study Locations' section "
-                "to extraction.css_selectors.location in the YAML. "
-                "The current selector is too broad and matches navigation menus."
+                "The location extractor is reading too broadly and capturing navigation menu items. "
+                "This is a platform-level extraction bug — the location field selector needs to be "
+                "tightened to target only the campus/location section of the course page."
             ),
         })
 
@@ -4502,15 +4533,16 @@ async def extraction_quality_report(
             "severity": "medium",
             "count": cnt,
             "pct": round(cnt / n * 100, 1),
-            "label": "Location value very long (multiple campuses joined)",
+            "label": "Campus location value too long — multiple items joined together",
             "detail": (
                 f"{cnt} courses have a location string over 150 characters. "
-                "Multiple campus names may be concatenated into a single text block."
+                "Multiple campus names or unrelated text are being concatenated into a single value."
             ),
             "examples": [v[:80] + "…" for v in _long_locs[:3]],
+            "fix_type": "platform_bug",
             "suggested_fix": (
-                "Parse the location container and join only the campus name text nodes, "
-                "not the full surrounding block. Limit to the first 3 campus entries."
+                "The location extractor is capturing a larger container element rather than "
+                "individual campus name nodes. This requires an update to the location extraction logic."
             ),
         })
 
@@ -4525,17 +4557,56 @@ async def extraction_quality_report(
             "severity": sev,
             "count": _eng_blank_cnt,
             "pct": round(pct, 1),
-            "label": "English requirement missing (IELTS/PTE/TOEFL all blank)",
+            "label": "English language requirements missing (IELTS / PTE / TOEFL all blank)",
             "detail": (
-                f"{_eng_blank_cnt} of {n} courses ({pct:.0f}%) have no English test scores. "
-                "If the university publishes IELTS requirements, the scraper is not following "
-                "the English requirements link or is not reading the correct section."
+                f"{_eng_blank_cnt} of {n} courses ({pct:.0f}%) have no English test scores recorded. "
+                "Most universities publish IELTS and PTE requirements, but they are often on a separate "
+                "English requirements page rather than on each individual course page."
             ),
             "examples": [],
+            "fix_type": "config",
             "suggested_fix": (
-                "Check whether the university has a central 'English Language Requirements' page. "
-                "Add its URL to extraction.english_requirements_page_url in the YAML, or enable "
-                "extraction.follow_english_links to auto-follow requirement links on each course page."
+                "Add the URL of the university's English Language Requirements page to the configuration. "
+                "This is usually a single page listing IELTS, PTE, and TOEFL bands for all courses. "
+                "The scraper will automatically read it and apply the scores to matching courses."
+            ),
+        })
+
+    # 8b. IELTS overall set but no component scores (Reading/Writing/Listening/Speaking)
+    _ielts_no_components = [
+        r for r in rows
+        if r.ielts_overall is not None
+        and not any([r.ielts_reading, r.ielts_writing, r.ielts_listening, r.ielts_speaking])
+    ]
+    if _ielts_no_components:
+        cnt = len(_ielts_no_components)
+        pct = cnt / n * 100
+        # Collect unique IELTS overall values for the example
+        _ielts_ex = list({r.ielts_overall for r in _ielts_no_components if r.ielts_overall})
+        issues.append({
+            "field": "ielts_overall",
+            "issue_type": "ielts_components_missing",
+            "severity": "high",
+            "count": cnt,
+            "pct": round(pct, 1),
+            "label": "IELTS overall score found — component scores missing",
+            "detail": (
+                f"{cnt} of {n} courses ({pct:.0f}%) have an IELTS overall band score "
+                f"(e.g. IELTS {_ielts_ex[0] if _ielts_ex else '?'}) but no component scores "
+                "(Reading, Writing, Listening, Speaking). "
+                "Many universities require students to meet a minimum in each component, "
+                "not just the overall band — so missing components means incomplete eligibility data."
+            ),
+            "examples": [
+                f"{r.course_name}: IELTS {r.ielts_overall} overall (no components)"
+                for r in _ielts_no_components[:3]
+                if r.course_name
+            ],
+            "fix_type": "platform_bug",
+            "suggested_fix": (
+                "The IELTS component scores (Reading, Writing, Listening, Speaking) are not being "
+                "extracted from the university's requirements page. This is an extraction logic bug — "
+                "the system needs to be updated to read individual band score rows."
             ),
         })
 
@@ -4552,15 +4623,17 @@ async def extraction_quality_report(
             "severity": "high",
             "count": cnt,
             "pct": round(cnt / n * 100, 1),
-            "label": "IELTS score outside valid range (4.0–9.5)",
+            "label": "IELTS score outside valid range — wrong number extracted",
             "detail": (
-                f"{cnt} courses have an IELTS value outside the plausible 4.0–9.5 band. "
-                "The scraper may be capturing a wrong number (e.g. a year, phone number suffix, or credit value)."
+                f"{cnt} courses have an IELTS value outside the valid 4.0–9.5 band. "
+                "The scraper has captured the wrong number — possibly a year, credit value, "
+                "or phone number suffix from near the IELTS section."
             ),
             "examples": [f"{r.course_name}: IELTS {r.ielts_overall}" for r in _bad_ielts[:3]],
+            "fix_type": "platform_bug",
             "suggested_fix": (
-                "Inspect the text node around the IELTS score. Add a tighter CSS selector or "
-                "regex anchor so only the band score number is extracted."
+                "The extractor is picking up the wrong number from near the IELTS section. "
+                "This requires tightening the extraction pattern — it cannot be fixed through configuration."
             ),
         })
 
@@ -4575,16 +4648,18 @@ async def extraction_quality_report(
             "severity": sev,
             "count": _mode_blank_cnt,
             "pct": round(pct, 1),
-            "label": "Study mode missing",
+            "label": "Study mode missing (On-Campus / Online / Hybrid)",
             "detail": (
-                f"{_mode_blank_cnt} of {n} courses ({pct:.0f}%) have no study mode (On-Campus / Online / Hybrid). "
-                "Agents use this to filter courses for visa eligibility."
+                f"{_mode_blank_cnt} of {n} courses ({pct:.0f}%) have no study mode recorded. "
+                "Students and agents use this field to filter courses by visa eligibility "
+                "(overseas students typically cannot enrol in fully online programmes)."
             ),
             "examples": [],
+            "fix_type": "config",
             "suggested_fix": (
-                "Add 'On-Campus', 'Online', or 'Blended' keywords to the study mode extraction rules. "
-                "The delivery mode is often in a 'Fast Facts' sidebar, a 'How you'll study' section, "
-                "or tagged as a structured data property."
+                "Add a CSS selector pointing to the delivery mode section on course pages "
+                "(often called 'How you'll study', 'Delivery mode', or part of a 'Fast Facts' panel). "
+                "The system will detect On-Campus, Online, and Blended/Hybrid keywords automatically."
             ),
         })
 
@@ -4599,16 +4674,18 @@ async def extraction_quality_report(
             "severity": sev,
             "count": _intake_blank_cnt,
             "pct": round(pct, 1),
-            "label": "Intake months missing",
+            "label": "Intake months / start dates missing",
             "detail": (
-                f"{_intake_blank_cnt} of {n} courses ({pct:.0f}%) have no intake months. "
-                "Intake data is typically in a 'Start dates', 'Intake', or 'Application deadline' section."
+                f"{_intake_blank_cnt} of {n} courses ({pct:.0f}%) have no start dates recorded. "
+                "Start dates let students know when they can apply. They are typically listed "
+                "as 'Semester 1 / Semester 2', month names, or an academic calendar."
             ),
             "examples": [],
+            "fix_type": "config",
             "suggested_fix": (
-                "Look for 'Start dates', 'Semester 1 / Semester 2', 'January/February/July' on "
-                "course pages. If intakes are listed on a central academic calendar, add that URL "
-                "to extraction.intake_page_url in the YAML."
+                "If the university publishes start dates on a central academic calendar page, "
+                "add that page URL to the intake page settings. Otherwise, add a CSS selector "
+                "for the 'Start dates' or 'Intakes' section on individual course pages."
             ),
         })
 
@@ -4623,16 +4700,19 @@ async def extraction_quality_report(
             "severity": sev,
             "count": _degree_blank_cnt,
             "pct": round(pct, 1),
-            "label": "Degree level missing",
+            "label": "Degree level not recognised — mapping bug",
             "detail": (
-                f"{_degree_blank_cnt} of {n} courses ({pct:.0f}%) have no degree level. "
-                "Degree level is inferred from the title keywords (Bachelor, Master, PhD, etc.)."
+                f"{_degree_blank_cnt} of {n} courses ({pct:.0f}%) have no degree level set. "
+                "Degree level is detected from keywords in the course title "
+                "(Bachelor, Master, PhD, Graduate Certificate, etc.). "
+                "A blank value means the title does not match any recognised pattern."
             ),
             "examples": [],
+            "fix_type": "platform_bug",
             "suggested_fix": (
-                "Check whether course names follow a standard pattern. "
-                "If the university uses non-standard degree names, add keyword mappings "
-                "to extraction.degree_level_map in the YAML."
+                "The degree title format used by this university does not match the system's "
+                "keyword patterns. This is a platform-level mapping gap — the degree level "
+                "detection logic needs to be extended to recognise this university's naming conventions."
             ),
         })
 

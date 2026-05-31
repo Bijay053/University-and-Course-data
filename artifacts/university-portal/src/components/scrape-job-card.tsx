@@ -61,7 +61,7 @@ const ACTION_LABELS: Record<string, string> = {
 
 // ── AI Diagnostic types ───────────────────────────────────────────────────────
 type DiagnoseRootCause = { issue: string; explanation: string; severity: "high" | "medium" | "low" };
-type DiagnoseAction    = { action: string; detail: string; auto_fixable: boolean };
+type DiagnoseAction    = { action: string; detail: string; auto_fixable: boolean; fix_type?: "config" | "platform_bug" };
 type DiagnosisPayload  = {
   summary: string;
   root_causes: DiagnoseRootCause[];
@@ -1406,22 +1406,28 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
                           {d?.recommended_actions && d.recommended_actions.length > 0 && (
                             <div className="space-y-1">
                               <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Recommended Actions</p>
-                              {d.recommended_actions.map((a, i) => (
-                                <div key={i} className="flex items-start gap-2 text-[10px] px-2 py-1.5 rounded bg-gray-50 border border-gray-100">
-                                  <div className={`shrink-0 mt-0.5 ${a.auto_fixable ? "text-green-500" : "text-gray-400"}`}>
-                                    {a.auto_fixable ? <CheckCheck className="w-3 h-3" /> : <AlertTriangle className="w-3 h-3" />}
-                                  </div>
-                                  <div className="flex-1 min-w-0">
-                                    <div className="font-semibold text-gray-700 mb-0.5 flex items-center gap-1">
-                                      {a.action}
-                                      {a.auto_fixable && (
-                                        <span className="text-[9px] bg-green-100 text-green-700 px-1 py-0.5 rounded">auto-fixable</span>
-                                      )}
+                              {d.recommended_actions.map((a, i) => {
+                                const isPlatformBug = a.fix_type === "platform_bug";
+                                return (
+                                  <div key={i} className={`flex items-start gap-2 text-[10px] px-2 py-1.5 rounded border ${isPlatformBug ? "bg-slate-50 border-slate-200" : "bg-gray-50 border-gray-100"}`}>
+                                    <div className={`shrink-0 mt-0.5 ${isPlatformBug ? "text-slate-400" : a.auto_fixable ? "text-green-500" : "text-gray-400"}`}>
+                                      {isPlatformBug ? <span className="text-[10px]">🔧</span> : a.auto_fixable ? <CheckCheck className="w-3 h-3" /> : <AlertTriangle className="w-3 h-3" />}
                                     </div>
-                                    <div className="text-gray-500 leading-relaxed">{a.detail}</div>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="font-semibold text-gray-700 mb-0.5 flex items-center gap-1">
+                                        {a.action}
+                                        {isPlatformBug && (
+                                          <span className="text-[9px] bg-slate-200 text-slate-600 px-1 py-0.5 rounded">Developer fix required</span>
+                                        )}
+                                        {!isPlatformBug && a.auto_fixable && (
+                                          <span className="text-[9px] bg-green-100 text-green-700 px-1 py-0.5 rounded">config fix</span>
+                                        )}
+                                      </div>
+                                      <div className="text-gray-500 leading-relaxed">{a.detail}</div>
+                                    </div>
                                   </div>
-                                </div>
-                              ))}
+                                );
+                              })}
                             </div>
                           )}
 
