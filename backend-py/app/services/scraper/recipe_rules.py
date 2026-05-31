@@ -35,6 +35,7 @@ def apply_recipe_rules(payload: dict[str, Any], recipe: dict) -> dict[str, Any]:
     _apply_ielts_component_mapping(payload, recipe)
     _apply_location_rules(payload, recipe)
     _apply_study_mode_from_location(payload, recipe)
+    _apply_degree_mapping(payload, recipe)
     return payload
 
 
@@ -274,3 +275,42 @@ def _apply_study_mode_from_location(payload: dict, recipe: dict) -> None:
         payload["study_mode"] = "On Campus"
 
     log.info("[RECIPE] study_mode_from_location: loc=%r → mode=%r", loc, payload["study_mode"])
+
+
+# ── Degree level mapping ───────────────────────────────────────────────────────
+
+def _apply_degree_mapping(payload: dict, recipe: dict) -> None:
+    """Normalise degree_level using operator-configured keyword mapping.
+
+    Recipe key: ``degree_mapping`` — dict of canonical_level → [keyword, ...]
+
+    Example::
+
+        degree_mapping:
+          Bachelor:
+            - Bachelor
+            - BSc
+            - BA
+            - BBus
+          Master:
+            - Master
+            - MSc
+            - MBA
+
+    The first canonical whose keyword list contains a case-insensitive
+    substring match against the extracted degree_level is applied.
+    Subsequent canonicals are not checked (first-match wins).
+    No-op when degree_level is already blank.
+    """
+    mapping = recipe.get("degree_mapping") or {}
+    if not mapping:
+        return
+    current = (payload.get("degree_level") or "").strip()
+    if not current:
+        return
+    for canonical, keywords in mapping.items():
+        if any(kw.lower() in current.lower() for kw in (keywords or [])):
+            if current != canonical:
+                log.info("[RECIPE] degree_mapping: %r → %r", current, canonical)
+                payload["degree_level"] = canonical
+            return  # first match wins

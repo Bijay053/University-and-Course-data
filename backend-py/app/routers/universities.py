@@ -889,6 +889,109 @@ async def put_recipe(
     return {"ok": True, "university_id": uni_id, "recipe": body}
 
 
+@router.post("/universities/{uni_id}/recipe/simulate")
+async def simulate_recipe(
+    uni_id: int,
+    body: dict,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[dict, Depends(get_current_user)],
+) -> dict:
+    """Preview how a recipe would transform recent staged courses — no re-scrape.
+
+    Applies the supplied recipe rules in-memory against the most recent staged
+    courses for this university and returns per-course before/after diffs so
+    operators can validate their config before saving and re-scraping.
+
+    Body: ``{"recipe": { ... }}``
+    """
+    import copy
+
+    from app.models.scraped_course import ScrapedCourse
+    from app.services.scraper.recipe_rules import apply_recipe_rules
+
+    u: University | None = await db.get(University, uni_id)
+    if not u:
+        raise HTTPException(status_code=404, detail="University not found")
+
+    recipe: dict = body.get("recipe") or {}
+
+    rows = (
+        await db.execute(
+            select(ScrapedCourse)
+            .where(ScrapedCourse.university_id == uni_id)
+            .order_by(ScrapedCourse.id.desc())
+            .limit(15)
+        )
+    ).scalars().all()
+
+    if not rows:
+        return {
+            "total": 0,
+            "changed": 0,
+            "samples": [],
+            "message": "No staged courses found for this university.",
+        }
+
+    # Fields that recipe rules can transform — (payload_key, display_label)
+    WATCH: list[tuple[str, str]] = [
+        ("course_name", "Course Name"),
+        ("degree_level", "Degree Level"),
+        ("annual_tuition_fee", "Fee Amount"),
+        ("fee_term", "Fee Term"),
+        ("ielts_overall", "IELTS Overall"),
+        ("ielts_reading", "IELTS Reading"),
+        ("ielts_writing", "IELTS Writing"),
+        ("ielts_listening", "IELTS Listening"),
+        ("ielts_speaking", "IELTS Speaking"),
+        ("course_location", "Location"),
+        ("study_mode", "Study Mode"),
+    ]
+
+    samples = []
+    changed_count = 0
+
+    for sc in rows:
+        before: dict = {
+            "course_name": sc.course_name,
+            "name": sc.course_name,
+            "degree_level": sc.degree_level,
+            "annual_tuition_fee": float(sc.international_fee) if sc.international_fee is not None else None,
+            "fee_term": sc.fee_term,
+            "ielts_overall": sc.ielts_overall,
+            "ielts_reading": sc.ielts_reading,
+            "ielts_writing": sc.ielts_writing,
+            "ielts_listening": sc.ielts_listening,
+            "ielts_speaking": sc.ielts_speaking,
+            "location": sc.course_location,
+            "course_location": sc.course_location,
+            "study_mode": sc.study_mode,
+            "duration": float(sc.duration) if sc.duration is not None else None,
+            "duration_term": sc.duration_term,
+        }
+
+        after = copy.deepcopy(before)
+        apply_recipe_rules(after, recipe)
+
+        changes = []
+        for field_key, field_label in WATCH:
+            b_val = before.get(field_key)
+            a_val = after.get(field_key)
+            if b_val != a_val:
+                changes.append(
+                    {
+                        "field": field_label,
+                        "before": str(b_val) if b_val is not None else None,
+                        "after": str(a_val) if a_val is not None else None,
+                    }
+                )
+
+        if changes:
+            changed_count += 1
+            samples.append({"id": sc.id, "name": sc.course_name, "changes": changes})
+
+    return {"total": len(rows), "changed": changed_count, "samples": samples}
+
+
 @router.post("/universities/{uni_id}/recipe/test")
 async def test_recipe(
     uni_id: int,

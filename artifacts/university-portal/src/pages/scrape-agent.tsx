@@ -57,6 +57,10 @@ type DiagnoseResult = {
   error?: string;
 };
 
+type SimChange = { field: string; before: string | null; after: string | null };
+type SimSample = { id: number; name: string; changes: SimChange[] };
+type SimResult = { total: number; changed: number; samples: SimSample[]; message?: string };
+
 type ExtractionIssue = {
   field: string;
   issue_type: string;
@@ -183,7 +187,12 @@ export default function ScrapeAgentPage() {
   const [locReplace, setLocReplace] = useState<{ from: string; to: string }[]>([]);
   const [modeFromLoc, setModeFromLoc] = useState(false);
   const [modeOnlineKws, setModeOnlineKws] = useState<string[]>([]);
+  const [degreeMapping, setDegreeMapping] = useState<{ level: string; keywords: string[] }[]>([]);
+  const [followLinksFee, setFollowLinksFee] = useState<string[]>([]);
+  const [followLinksEnglish, setFollowLinksEnglish] = useState<string[]>([]);
   const [savingRecipe, setSavingRecipe] = useState(false);
+  const [simResult, setSimResult] = useState<SimResult | null>(null);
+  const [simulating, setSimulating] = useState(false);
 
   const [saving, setSaving] = useState(false);
   const [diagnosing, setDiagnosing] = useState(false);
@@ -234,6 +243,10 @@ export default function ScrapeAgentPage() {
       setLocReplace(Object.entries(rawReplace).map(([from, to]) => ({ from, to })));
       setModeFromLoc(Boolean(rec.study_mode_from_location));
       setModeOnlineKws((rec.study_mode_online_keywords as string[]) || []);
+      const rawDM = (rec.degree_mapping as Record<string, string[]>) || {};
+      setDegreeMapping(Object.entries(rawDM).map(([level, keywords]) => ({ level, keywords: keywords || [] })));
+      setFollowLinksFee((rec.fee_follow_links as string[]) || []);
+      setFollowLinksEnglish((rec.follow_links as string[]) || []);
     } catch (e) {
       toast({ title: "Failed to load config", description: String(e), variant: "destructive" });
     } finally {
@@ -286,6 +299,13 @@ export default function ScrapeAgentPage() {
     }
     if (modeFromLoc) r.study_mode_from_location = true;
     if (modeOnlineKws.length) r.study_mode_online_keywords = modeOnlineKws;
+    if (degreeMapping.length) {
+      const dm: Record<string, string[]> = {};
+      degreeMapping.forEach(({ level, keywords }) => { if (level.trim() && keywords.length) dm[level.trim()] = keywords; });
+      if (Object.keys(dm).length) r.degree_mapping = dm;
+    }
+    if (followLinksFee.length) r.fee_follow_links = followLinksFee;
+    if (followLinksEnglish.length) r.follow_links = followLinksEnglish;
     return r;
   };
 
@@ -305,6 +325,24 @@ export default function ScrapeAgentPage() {
       toast({ title: "Save failed", description: String(e), variant: "destructive" });
     } finally {
       setSavingRecipe(false);
+    }
+  };
+
+  const simulateRecipe = async () => {
+    setSimulating(true);
+    setSimResult(null);
+    try {
+      const res = await fetch(`${BASE}/api/universities/${uniId}/recipe/simulate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ recipe: buildRecipe() }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setSimResult(await res.json());
+    } catch (e) {
+      toast({ title: "Simulation failed", description: String(e), variant: "destructive" });
+    } finally {
+      setSimulating(false);
     }
   };
 
@@ -600,8 +638,46 @@ export default function ScrapeAgentPage() {
         locReplace={locReplace} setLocReplace={setLocReplace}
         modeFromLoc={modeFromLoc} setModeFromLoc={setModeFromLoc}
         modeOnlineKws={modeOnlineKws} setModeOnlineKws={setModeOnlineKws}
+        degreeMapping={degreeMapping} setDegreeMapping={setDegreeMapping}
+        followLinksFee={followLinksFee} setFollowLinksFee={setFollowLinksFee}
+        followLinksEnglish={followLinksEnglish} setFollowLinksEnglish={setFollowLinksEnglish}
         saving={savingRecipe} onSave={saveRecipe}
+        onSimulate={simulateRecipe} simulating={simulating}
       />
+
+      {/* ── Recipe Simulation Result ─────────────────────────────────────── */}
+      {simResult && (
+        <div className="bg-white border rounded-xl p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+              <span className="text-base">🧪</span> Recipe Simulation
+              <Badge variant="outline" className={`text-[9px] px-1.5 ${simResult.changed > 0 ? "border-amber-400 text-amber-700 bg-amber-50" : "border-green-400 text-green-700 bg-green-50"}`}>
+                {simResult.changed}/{simResult.total} courses affected
+              </Badge>
+            </h2>
+            <button onClick={() => setSimResult(null)} className="p-1 rounded hover:bg-gray-100 text-gray-400"><X className="w-3.5 h-3.5" /></button>
+          </div>
+          {simResult.message && <p className="text-xs text-gray-500">{simResult.message}</p>}
+          {simResult.samples.length === 0 && simResult.total > 0 && (
+            <p className="text-xs text-green-700 flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5" /> No changes — recipe has no effect on the {simResult.total} most recent staged courses.</p>
+          )}
+          {simResult.samples.map(sample => (
+            <div key={sample.id} className="border rounded-lg p-3 space-y-2 bg-gray-50">
+              <p className="text-xs font-semibold text-gray-700 truncate">{sample.name}</p>
+              <div className="space-y-1">
+                {sample.changes.map((ch, i) => (
+                  <div key={i} className="grid grid-cols-[80px_1fr_auto_1fr] gap-1.5 items-start text-[11px]">
+                    <span className="text-gray-500 font-medium truncate">{ch.field}</span>
+                    <span className="font-mono text-red-600 bg-red-50 rounded px-1 py-0.5 break-all line-through">{ch.before ?? "—"}</span>
+                    <span className="text-gray-400 self-center">→</span>
+                    <span className="font-mono text-green-700 bg-green-50 rounded px-1 py-0.5 break-all">{ch.after ?? "—"}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* ── AI Diagnosis ───────────────────────────────────────────────────── */}
       <div className="bg-white border rounded-xl p-4 space-y-4">
@@ -1016,6 +1092,8 @@ function RecipeSection({ title, icon, children, active }: {
 type IeltsRow = { overall: string; band: string };
 type ReplaceRow = { from: string; to: string };
 
+type DegreeMappingRow = { level: string; keywords: string[] };
+
 function RecipeEditor(props: {
   feeSourceUrls: string[]; setFeeSourceUrls: (v: string[]) => void;
   feeTerm: string; setFeeTerm: (v: string) => void;
@@ -1029,7 +1107,11 @@ function RecipeEditor(props: {
   locReplace: ReplaceRow[]; setLocReplace: (v: ReplaceRow[]) => void;
   modeFromLoc: boolean; setModeFromLoc: (v: boolean) => void;
   modeOnlineKws: string[]; setModeOnlineKws: (v: string[]) => void;
+  degreeMapping: DegreeMappingRow[]; setDegreeMapping: (v: DegreeMappingRow[]) => void;
+  followLinksFee: string[]; setFollowLinksFee: (v: string[]) => void;
+  followLinksEnglish: string[]; setFollowLinksEnglish: (v: string[]) => void;
   saving: boolean; onSave: () => void;
+  onSimulate: () => void; simulating: boolean;
 }) {
   const {
     feeSourceUrls, setFeeSourceUrls, feeTerm, setFeeTerm,
@@ -1038,7 +1120,10 @@ function RecipeEditor(props: {
     nameRemoveAfter, setNameRemoveAfter, nameRemoveYear, setNameRemoveYear,
     locAllowed, setLocAllowed, locReject, setLocReject,
     locReplace, setLocReplace, modeFromLoc, setModeFromLoc,
-    modeOnlineKws, setModeOnlineKws, saving, onSave,
+    modeOnlineKws, setModeOnlineKws,
+    degreeMapping, setDegreeMapping,
+    followLinksFee, setFollowLinksFee, followLinksEnglish, setFollowLinksEnglish,
+    saving, onSave, onSimulate, simulating,
   } = props;
 
   const hasFee = feeSourceUrls.length > 0 || feeTerm !== "" || feeCalcMode !== "use_source_value_only" || !feePreventRollup;
@@ -1046,7 +1131,9 @@ function RecipeEditor(props: {
   const hasName = nameRemoveAfter.length > 0 || nameRemoveYear;
   const hasLoc = locAllowed.length > 0 || locReject.length > 0 || locReplace.length > 0;
   const hasMode = modeFromLoc;
-  const anyActive = hasFee || hasIelts || hasName || hasLoc || hasMode;
+  const hasDegree = degreeMapping.length > 0;
+  const hasLinks = followLinksFee.length > 0 || followLinksEnglish.length > 0;
+  const anyActive = hasFee || hasIelts || hasName || hasLoc || hasMode || hasDegree || hasLinks;
 
   const updateIelts = (i: number, field: "overall" | "band", val: string) => {
     const next = [...ieltsMapping];
@@ -1072,7 +1159,7 @@ function RecipeEditor(props: {
           Data Cleaning Recipe
           {anyActive && (
             <Badge variant="outline" className="text-[9px] px-1.5 border-teal-400 text-teal-700 bg-teal-50">
-              {[hasFee && "fee", hasIelts && "IELTS", hasName && "name", hasLoc && "location", hasMode && "mode"]
+              {[hasFee && "fee", hasIelts && "IELTS", hasName && "name", hasLoc && "location", hasMode && "mode", hasDegree && "degree", hasLinks && "links"]
                 .filter(Boolean).join(" · ")} rules active
             </Badge>
           )}
@@ -1265,14 +1352,87 @@ function RecipeEditor(props: {
             </FieldRow>
           )}
         </RecipeSection>
+
+        {/* ── Degree Level Mapping ── */}
+        <RecipeSection title="Degree Level Mapping" icon={<span className="text-[13px]">🎓</span>} active={hasDegree}>
+          <p className="text-[11px] text-gray-500">
+            Map unusual or abbreviated degree names to a canonical level. The first matching row wins.
+          </p>
+          <div className="space-y-2">
+            {degreeMapping.map((row, i) => (
+              <div key={i} className="border rounded-lg p-2.5 space-y-1.5 bg-gray-50">
+                <div className="flex items-center gap-2">
+                  <select
+                    value={row.level}
+                    onChange={e => {
+                      const next = [...degreeMapping];
+                      next[i] = { ...next[i], level: e.target.value };
+                      setDegreeMapping(next);
+                    }}
+                    className="h-7 text-xs border border-gray-200 rounded px-2 bg-white flex-1"
+                  >
+                    <option value="">— select canonical level —</option>
+                    {["Bachelor", "Master", "Doctorate", "Associate Degree", "Graduate Certificate", "Graduate Diploma", "Certificate", "Diploma", "Other"].map(l => (
+                      <option key={l} value={l}>{l}</option>
+                    ))}
+                  </select>
+                  <button type="button" onClick={() => setDegreeMapping(degreeMapping.filter((_, idx) => idx !== i))}
+                    className="p-1 rounded hover:bg-red-50 text-gray-400 hover:text-red-500">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                <div>
+                  <p className="text-[10px] text-gray-500 mb-1">Matches if the extracted degree name contains any of these keywords (case-insensitive):</p>
+                  <TagInput
+                    values={row.keywords}
+                    onChange={kws => {
+                      const next = [...degreeMapping];
+                      next[i] = { ...next[i], keywords: kws };
+                      setDegreeMapping(next);
+                    }}
+                    placeholder="e.g. BSc, BA, BBus"
+                  />
+                </div>
+              </div>
+            ))}
+            <Button type="button" size="sm" variant="outline" onClick={() => setDegreeMapping([...degreeMapping, { level: "", keywords: [] }])}
+              className="h-7 text-xs gap-1">
+              <Plus className="w-3 h-3" /> Add mapping
+            </Button>
+          </div>
+        </RecipeSection>
+
+        {/* ── Link Following Rules ── */}
+        <RecipeSection title="Link Following Rules" icon={<span className="text-[13px]">🔗</span>} active={hasLinks}>
+          <p className="text-[11px] text-gray-500">
+            When the scraper finds these link texts on a page, it follows those links to extract fees or English requirements.
+            Useful when fee tables or IELTS requirements live on a separate linked page.
+          </p>
+          <FieldRow label="Fee page link texts"
+            hint="Follow links with these labels to reach the international fee page. e.g. 'International Fees', 'Tuition Fees'.">
+            <div className="mt-1">
+              <TagInput values={followLinksFee} onChange={setFollowLinksFee} placeholder="e.g. International Fees" />
+            </div>
+          </FieldRow>
+          <FieldRow label="English requirements link texts"
+            hint="Follow links with these labels to reach English entry requirements. e.g. 'English Requirements', 'Entry Requirements'.">
+            <div className="mt-1">
+              <TagInput values={followLinksEnglish} onChange={setFollowLinksEnglish} placeholder="e.g. English Requirements" />
+            </div>
+          </FieldRow>
+        </RecipeSection>
       </div>
 
-      <div className="flex items-center gap-2 pt-1 border-t">
-        <Button onClick={onSave} disabled={saving} className="gap-1.5 h-8 text-xs bg-teal-600 hover:bg-teal-700">
+      <div className="flex items-center gap-2 pt-1 border-t flex-wrap">
+        <Button onClick={onSave} disabled={saving || simulating} className="gap-1.5 h-8 text-xs bg-teal-600 hover:bg-teal-700">
           {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
           Save Recipe
         </Button>
-        <p className="text-[10px] text-gray-400">Rules apply on the next scrape run</p>
+        <Button onClick={onSimulate} disabled={saving || simulating} variant="outline" className="gap-1.5 h-8 text-xs border-violet-400 text-violet-700 hover:bg-violet-50">
+          {simulating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <span className="text-sm">🧪</span>}
+          Preview Changes
+        </Button>
+        <p className="text-[10px] text-gray-400">Preview shows before/after on real staged data · Save to apply on next scrape</p>
       </div>
     </div>
   );
