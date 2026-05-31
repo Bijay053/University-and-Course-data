@@ -776,6 +776,43 @@ async def put_recipe(
     sc: dict = dict(u.scrape_config or {})
     sc["recipe"] = body
 
+    # ── Translate Recipe Editor extraction fields → admin_config ──────────────
+    # These fields are stored in scrape_config.admin_config so the loader merges
+    # them into UniConfig at scrape time (highest priority, above per-uni YAML).
+    # This lets operators configure extraction behaviour without a code deploy.
+    english_patch: dict = {}
+    fee_patch: dict = {}
+    extraction_patch: dict = {}
+
+    if body.get("follow_links"):
+        english_patch["follow_links"] = body["follow_links"]
+    if body.get("band_mapping"):
+        english_patch["band_mapping"] = body["band_mapping"]
+    if body.get("band_reference_url"):
+        english_patch["band_reference_url"] = body["band_reference_url"]
+    if body.get("fee_reject_keywords"):
+        fee_patch["reject_keywords"] = body["fee_reject_keywords"]
+    if body.get("fee_prefer_international") is not None:
+        fee_patch["prefer_international"] = bool(body["fee_prefer_international"])
+    if body.get("actions"):
+        extraction_patch["actions"] = body["actions"]
+
+    if english_patch:
+        extraction_patch["english"] = english_patch
+    if fee_patch:
+        extraction_patch["fees"] = fee_patch
+
+    if extraction_patch:
+        admin_cfg: dict = dict(sc.get("admin_config") or {})
+        existing_extraction = dict(admin_cfg.get("extraction") or {})
+        for k, v in extraction_patch.items():
+            if isinstance(v, dict) and isinstance(existing_extraction.get(k), dict):
+                existing_extraction[k] = {**existing_extraction[k], **v}
+            else:
+                existing_extraction[k] = v
+        admin_cfg["extraction"] = existing_extraction
+        sc["admin_config"] = admin_cfg
+
     await db.execute(
         text("UPDATE universities SET scrape_config = CAST(:cfg AS jsonb) WHERE id = :id"),
         {"cfg": json.dumps(sc), "id": uni_id},

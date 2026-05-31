@@ -14,7 +14,8 @@ import { useToast } from "@/hooks/use-toast";
 import {
   ArrowLeft, Save, Plus, Trash2, Globe, Database, Filter,
   Code2, DollarSign, BookOpen, MapPin, ShieldCheck, Zap, RefreshCw,
-  FlaskConical, CheckCircle2, XCircle, AlertTriangle, ChevronDown, ChevronUp, Info
+  FlaskConical, CheckCircle2, XCircle, AlertTriangle, ChevronDown, ChevronUp, Info,
+  MousePointerClick, GripVertical, Link
 } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -47,6 +48,18 @@ interface ApiConfig {
   };
 }
 
+interface BandSpecUI {
+  ielts_overall?: number | string;
+  ielts_each?: number | string;
+  pte_overall?: number | string;
+  toefl_overall?: number | string;
+}
+
+interface BrowserAction {
+  action_type: "click_text" | "click_css" | "wait_for_text" | "wait_for_selector" | "expand_text" | "scroll_to";
+  value: string;
+}
+
 interface Recipe {
   discovery_strategy: string;
   seed_urls: string[];
@@ -73,6 +86,8 @@ interface Recipe {
   fee_year: number | null;
   fee_rules_undergraduate: FeeRule[];
   fee_rules_postgraduate: FeeRule[];
+  fee_reject_keywords: string[];
+  fee_prefer_international: boolean;
   campus?: {
     default_city: string;
     valid_campuses: string[];
@@ -80,6 +95,10 @@ interface Recipe {
   };
   minimum_completeness: number;
   required_fields: string[];
+  follow_links: string[];
+  band_reference_url: string;
+  band_mapping: Record<string, BandSpecUI>;
+  actions: BrowserAction[];
 }
 
 const EMPTY_RECIPE: Recipe = {
@@ -97,8 +116,14 @@ const EMPTY_RECIPE: Recipe = {
   fee_year: null,
   fee_rules_undergraduate: [],
   fee_rules_postgraduate: [],
+  fee_reject_keywords: [],
+  fee_prefer_international: false,
   minimum_completeness: 85,
   required_fields: [],
+  follow_links: [],
+  band_reference_url: "",
+  band_mapping: {},
+  actions: [],
 };
 
 const STANDARD_FIELDS = [
@@ -272,6 +297,221 @@ function KeyValueEditor({
           </button>
         </div>
       ))}
+    </div>
+  );
+}
+
+// ── Band Mapping Editor ────────────────────────────────────────────────────
+
+function BandMappingEditor({
+  mapping, onChange
+}: {
+  mapping: Record<string, BandSpecUI>;
+  onChange: (m: Record<string, BandSpecUI>) => void;
+}) {
+  const [draftBand, setDraftBand] = useState("");
+  const [draftSpec, setDraftSpec] = useState<BandSpecUI>({ ielts_overall: "", ielts_each: "" });
+
+  const addBand = () => {
+    const k = draftBand.trim();
+    if (!k) return;
+    onChange({ ...mapping, [k]: draftSpec });
+    setDraftBand("");
+    setDraftSpec({ ielts_overall: "", ielts_each: "" });
+  };
+
+  const removeBand = (k: string) => {
+    const next = { ...mapping };
+    delete next[k];
+    onChange(next);
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="text-xs text-muted-foreground">
+        Maps band labels (e.g. "Band 2") → IELTS scores. Applied when IELTS is still blank after
+        all extractors run. Lookup is case-insensitive.
+      </div>
+
+      {/* Existing bands */}
+      {Object.entries(mapping).length > 0 && (
+        <div className="rounded-lg border overflow-hidden">
+          <table className="w-full text-xs">
+            <thead className="bg-muted/50">
+              <tr>
+                <th className="px-3 py-2 text-left font-medium">Band Label</th>
+                <th className="px-3 py-2 text-left font-medium">IELTS Overall</th>
+                <th className="px-3 py-2 text-left font-medium">IELTS Each</th>
+                <th className="px-3 py-2 text-left font-medium">PTE Overall</th>
+                <th className="px-3 py-2 text-left font-medium">TOEFL iBT</th>
+                <th className="px-2 py-2"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {Object.entries(mapping).map(([band, spec]) => (
+                <tr key={band} className="border-t">
+                  <td className="px-3 py-2 font-mono font-semibold text-blue-700">{band}</td>
+                  <td className="px-3 py-2">{spec.ielts_overall || "—"}</td>
+                  <td className="px-3 py-2">{spec.ielts_each || "—"}</td>
+                  <td className="px-3 py-2">{spec.pte_overall || "—"}</td>
+                  <td className="px-3 py-2">{spec.toefl_overall || "—"}</td>
+                  <td className="px-2 py-2">
+                    <button onClick={() => removeBand(band)} className="text-destructive hover:opacity-70">
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {Object.entries(mapping).length === 0 && (
+        <p className="text-xs text-muted-foreground italic">No band mappings defined.</p>
+      )}
+
+      {/* Add new band */}
+      <div className="rounded-lg border border-dashed p-3 space-y-2 bg-muted/20">
+        <div className="text-xs font-medium text-muted-foreground">Add Band</div>
+        <div className="flex gap-2 flex-wrap">
+          <Input
+            value={draftBand}
+            onChange={e => setDraftBand(e.target.value)}
+            placeholder='Band label (e.g. "Band 2")'
+            className="text-sm w-48"
+          />
+          <Input
+            type="number"
+            step="0.5"
+            value={draftSpec.ielts_overall ?? ""}
+            onChange={e => setDraftSpec(s => ({ ...s, ielts_overall: e.target.value ? parseFloat(e.target.value) : "" }))}
+            placeholder="IELTS overall (e.g. 6.5)"
+            className="text-sm w-44"
+          />
+          <Input
+            type="number"
+            step="0.5"
+            value={draftSpec.ielts_each ?? ""}
+            onChange={e => setDraftSpec(s => ({ ...s, ielts_each: e.target.value ? parseFloat(e.target.value) : "" }))}
+            placeholder="IELTS each (e.g. 6.0)"
+            className="text-sm w-44"
+          />
+          <Input
+            type="number"
+            value={draftSpec.pte_overall ?? ""}
+            onChange={e => setDraftSpec(s => ({ ...s, pte_overall: e.target.value ? parseInt(e.target.value) : "" }))}
+            placeholder="PTE (optional)"
+            className="text-sm w-32"
+          />
+          <Button type="button" variant="outline" size="sm" onClick={addBand}>
+            <Plus className="h-3 w-3 mr-1" /> Add
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Browser Actions Editor ─────────────────────────────────────────────────
+
+const ACTION_TYPES: { value: BrowserAction["action_type"]; label: string; hint: string }[] = [
+  { value: "click_text",       label: "Click Text",         hint: 'Click first visible element whose text contains this (e.g. "International")' },
+  { value: "click_css",        label: "Click CSS",          hint: 'Click first element matching a CSS selector (e.g. "[data-tab=\'intl\']")' },
+  { value: "wait_for_text",    label: "Wait for Text",      hint: 'Pause until page contains this text (e.g. "estimated annual tuition")' },
+  { value: "wait_for_selector",label: "Wait for Selector",  hint: "Pause until this CSS selector appears on the page" },
+  { value: "expand_text",      label: "Expand Section",     hint: 'Click an accordion / "Show more" whose trigger text matches' },
+  { value: "scroll_to",        label: "Scroll To",          hint: 'Scroll to a CSS selector or anchor (e.g. "#fees")' },
+];
+
+function BrowserActionsEditor({
+  actions, onChange
+}: {
+  actions: BrowserAction[];
+  onChange: (a: BrowserAction[]) => void;
+}) {
+  const [draftType, setDraftType] = useState<BrowserAction["action_type"]>("click_text");
+  const [draftValue, setDraftValue] = useState("");
+
+  const addAction = () => {
+    const v = draftValue.trim();
+    if (!v) return;
+    onChange([...actions, { action_type: draftType, value: v }]);
+    setDraftValue("");
+  };
+
+  const removeAction = (i: number) => onChange(actions.filter((_, j) => j !== i));
+
+  const currentHint = ACTION_TYPES.find(a => a.value === draftType)?.hint || "";
+
+  return (
+    <div className="space-y-3">
+      <div className="text-xs text-muted-foreground">
+        Ordered steps executed in the browser after page load, before HTML is captured.
+        Use this to click tabs (e.g. "International"), expand sections, or wait for dynamic content.
+      </div>
+
+      {/* Ordered list of existing actions */}
+      {actions.length > 0 && (
+        <div className="space-y-2">
+          {actions.map((action, i) => {
+            const typeInfo = ACTION_TYPES.find(a => a.value === action.action_type);
+            return (
+              <div key={i} className="flex items-center gap-2 bg-muted/40 rounded-lg px-3 py-2 border">
+                <GripVertical className="h-4 w-4 text-muted-foreground shrink-0" />
+                <span className="text-xs font-medium w-36 shrink-0 text-blue-700">{typeInfo?.label}</span>
+                <code className="text-xs flex-1 truncate font-mono">{action.value}</code>
+                <button onClick={() => removeAction(i)} className="text-destructive hover:opacity-70 shrink-0">
+                  <Trash2 className="h-3 w-3" />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {actions.length === 0 && (
+        <p className="text-xs text-muted-foreground italic">No browser actions defined. Add steps below.</p>
+      )}
+
+      {/* Add new action */}
+      <div className="rounded-lg border border-dashed p-3 space-y-2 bg-muted/20">
+        <div className="text-xs font-medium text-muted-foreground">Add Action</div>
+        <div className="flex gap-2 flex-wrap items-end">
+          <div className="w-48">
+            <Select value={draftType} onValueChange={v => setDraftType(v as BrowserAction["action_type"])}>
+              <SelectTrigger className="text-sm h-9"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {ACTION_TYPES.map(a => (
+                  <SelectItem key={a.value} value={a.value}>{a.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex-1 min-w-48">
+            <Input
+              value={draftValue}
+              onChange={e => setDraftValue(e.target.value)}
+              placeholder={currentHint.slice(0, 55)}
+              className="text-sm"
+              onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addAction(); } }}
+            />
+          </div>
+          <Button type="button" variant="outline" size="sm" onClick={addAction}>
+            <Plus className="h-3 w-3 mr-1" /> Add
+          </Button>
+        </div>
+        {currentHint && (
+          <p className="text-xs text-muted-foreground">{currentHint}</p>
+        )}
+      </div>
+
+      {actions.length > 0 && (
+        <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-xs text-amber-800">
+          <strong>Note:</strong> Browser actions only run when the scraper uses a browser session (live site,
+          not Wayback HTML). For universities with <code>skip_browser_rescue: true</code> in their YAML
+          (e.g. JCU), actions are skipped — use <strong>English Follow Links</strong> or
+          <strong> Fee Reject Keywords</strong> instead.
+        </div>
+      )}
     </div>
   );
 }
@@ -697,6 +937,7 @@ export default function RecipeEditorPage() {
           <TabsTrigger value="selectors" className="flex items-center gap-1"><Code2 className="h-3 w-3" /> Field Selectors</TabsTrigger>
           <TabsTrigger value="fees" className="flex items-center gap-1"><DollarSign className="h-3 w-3" /> Fee Rules</TabsTrigger>
           <TabsTrigger value="english" className="flex items-center gap-1"><BookOpen className="h-3 w-3" /> IELTS & Intake</TabsTrigger>
+          <TabsTrigger value="browser" className="flex items-center gap-1"><MousePointerClick className="h-3 w-3" /> Browser Actions</TabsTrigger>
           <TabsTrigger value="campus" className="flex items-center gap-1"><MapPin className="h-3 w-3" /> Campus</TabsTrigger>
           <TabsTrigger value="quality" className="flex items-center gap-1"><ShieldCheck className="h-3 w-3" /> Quality</TabsTrigger>
         </TabsList>
@@ -1112,6 +1353,44 @@ export default function RecipeEditorPage() {
                 rules={recipe.fee_rules_postgraduate}
                 onChange={v => patchRecipe({ fee_rules_postgraduate: v })}
               />
+
+              <Separator />
+
+              {/* ── International fee preference ── */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold flex items-center gap-2">
+                  <DollarSign className="h-4 w-4 text-green-600" />
+                  International Fee Preference
+                </h3>
+                <div className="flex items-center gap-3">
+                  <Switch
+                    checked={recipe.fee_prefer_international}
+                    onCheckedChange={v => patchRecipe({ fee_prefer_international: v })}
+                  />
+                  <div>
+                    <Label>Prefer International Fee</Label>
+                    <p className="text-xs text-muted-foreground">
+                      When both a domestic and an international fee appear on the same page,
+                      always keep the international one — even if domestic was extracted first.
+                      Use for universities with tab-based fee layouts (e.g. JCU).
+                    </p>
+                  </div>
+                </div>
+
+                <StringListEditor
+                  label="Reject Domestic Fee Keywords"
+                  values={recipe.fee_reject_keywords}
+                  onChange={v => patchRecipe({ fee_reject_keywords: v })}
+                  placeholder='e.g. "Commonwealth Supported" or "HECS"'
+                  helpText="Case-insensitive. If any keyword appears in the text surrounding an extracted fee, that fee is discarded as domestic/CSP and not staged as international_fee."
+                />
+                {recipe.fee_reject_keywords.length === 0 && (
+                  <div className="rounded-lg bg-blue-50 border border-blue-200 p-3 text-xs text-blue-700">
+                    <strong>Tip for JCU:</strong> Add "Commonwealth Supported", "CSP", "HECS", "HECS-HELP",
+                    "Domestic students", "Domestic fee" to reject domestic fees automatically.
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -1164,6 +1443,60 @@ export default function RecipeEditorPage() {
 
               <Separator />
 
+              {/* ── English follow links ── */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold flex items-center gap-2">
+                  <Link className="h-4 w-4 text-blue-600" />
+                  English Requirement Link Following
+                </h3>
+                <StringListEditor
+                  label="Follow Link Text Patterns"
+                  values={recipe.follow_links}
+                  onChange={v => patchRecipe({ follow_links: v })}
+                  placeholder='e.g. "minimum English language requirements"'
+                  helpText="When IELTS is blank after main extraction, the scraper finds <a> tags whose text matches any of these phrases and fetches those pages to extract IELTS/PTE/TOEFL. Case-insensitive substring match."
+                />
+                {recipe.follow_links.length === 0 && (
+                  <div className="rounded-lg bg-blue-50 border border-blue-200 p-3 text-xs text-blue-700">
+                    <strong>Tip for JCU:</strong> Add "minimum English language requirements",
+                    "English language requirements", "admissions policy schedule".
+                  </div>
+                )}
+              </div>
+
+              <Separator />
+
+              {/* ── Band mapping ── */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold flex items-center gap-2">
+                  <BookOpen className="h-4 w-4 text-purple-600" />
+                  English Band Mapping
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  For universities that show a band label (e.g. "Band 2") instead of direct IELTS scores.
+                  When IELTS is still blank after all extractors run, the band label found in the course
+                  page is resolved to concrete scores using this table.
+                </p>
+                <div>
+                  <Label>Band Reference URL</Label>
+                  <Input
+                    value={recipe.band_reference_url}
+                    onChange={e => patchRecipe({ band_reference_url: e.target.value })}
+                    placeholder="https://www.university.edu/admissions-policy"
+                    className="mt-1 text-sm"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    URL of the page that defines the band scores. Stored in evidence so reviewers can verify.
+                  </p>
+                </div>
+                <BandMappingEditor
+                  mapping={recipe.band_mapping}
+                  onChange={v => patchRecipe({ band_mapping: v })}
+                />
+              </div>
+
+              <Separator />
+
               <div className="space-y-4">
                 <h3 className="text-sm font-semibold">Intake / Start Date Extraction</h3>
                 <div className="grid grid-cols-2 gap-4">
@@ -1199,7 +1532,54 @@ export default function RecipeEditorPage() {
           </Card>
         </TabsContent>
 
-        {/* ── 7. Campus ──────────────────────────────────────────────────── */}
+        {/* ── 7. Browser Actions ─────────────────────────────────────────── */}
+        <TabsContent value="browser">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <MousePointerClick className="h-4 w-4" /> Browser Interaction Actions
+              </CardTitle>
+              <CardDescription>
+                Configure interactive steps the browser executes after loading a course page —
+                before HTML is captured for extraction. Use this to click tabs (e.g. "International"),
+                expand sections, or wait for dynamic content to load.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <BrowserActionsEditor
+                actions={recipe.actions}
+                onChange={v => patchRecipe({ actions: v })}
+              />
+
+              {recipe.actions.length > 0 && (
+                <>
+                  <Separator />
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-semibold">Generated YAML Preview</h3>
+                    <pre className="text-xs bg-muted rounded-lg p-3 overflow-auto max-h-48 font-mono">
+{`extraction:\n  actions:\n${recipe.actions.map(a => {
+  if (a.action_type === "wait_for_text") return `    - wait_for:\n        text: "${a.value}"`;
+  if (a.action_type === "wait_for_selector") return `    - wait_for:\n        selector: "${a.value}"`;
+  const key = a.action_type === "click_text" ? "click_text"
+    : a.action_type === "click_css" ? "click_css"
+    : a.action_type === "expand_text" ? "expand_text"
+    : "scroll_to";
+  return `    - ${key}: "${a.value}"`;
+}).join("\n")}`}
+                    </pre>
+                    <p className="text-xs text-muted-foreground">
+                      Copy this into the university's YAML file under{" "}
+                      <code className="bg-muted px-1 rounded">scraper_config/unis/</code> to apply
+                      permanently, or save the recipe here for operator-level control.
+                    </p>
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ── 8. Campus ──────────────────────────────────────────────────── */}
         <TabsContent value="campus">
           <Card>
             <CardHeader>

@@ -56,3 +56,54 @@ extraction:
   filters:
     domestic_only:
       enabled: true
+
+  # ── English language requirements ─────────────────────────────────────────
+  #
+  # JCU course pages show "Band 2" / "Band 3" instead of direct IELTS scores.
+  # The band-to-score mapping is published at the admissions policy schedule
+  # linked from every course page.
+  #
+  # follow_links: when IELTS is still blank after main extraction, the scraper
+  #   follows any <a> whose text contains one of these phrases and re-runs the
+  #   English extractor on the linked page.
+  #
+  # band_mapping: if IELTS is still blank after follow_links (because the policy
+  #   page uses the same "Band N" label), the band label found in the course
+  #   HTML is resolved to concrete scores via this mapping.
+  #
+  # Source: https://www.jcu.edu.au/policy/academic-governance/student-experience/admissions-policy-schedule-ii
+  english:
+    follow_links:
+      - "minimum English language requirements"
+      - "English language requirements"
+      - "admissions policy schedule"
+    band_reference_url: "https://www.jcu.edu.au/policy/academic-governance/student-experience/admissions-policy-schedule-ii"
+    band_mapping:
+      "Band 1":
+        ielts_overall: 6.0
+        ielts_each: 6.0
+      "Band 2":
+        ielts_overall: 6.5
+        ielts_each: 6.0
+      "Band 3":
+        ielts_overall: 7.0
+        ielts_each: 7.0
+
+  # ── Fee extraction ────────────────────────────────────────────────────────
+  #
+  # JCU pages show a Domestic tab by default.  International fees appear only
+  # after switching tabs or on a separate section.  The reject_keywords list
+  # discards any fee amount whose surrounding text contains domestic / CSP
+  # markers, ensuring only genuine international tuition fees are staged.
+  #
+  # prefer_international: when both a domestic and an international fee are
+  #   detected on the same page, always keep the international value.
+  fees:
+    prefer_international: true
+    reject_keywords:
+      - "Commonwealth Supported"
+      - "CSP"
+      - "HECS"
+      - "HECS-HELP"
+      - "Domestic students"
+      - "Domestic fee"

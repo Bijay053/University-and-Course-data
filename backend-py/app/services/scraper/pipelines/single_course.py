@@ -3135,6 +3135,119 @@ async def extract_course(
                 except Exception as _flen_exc:  # noqa: BLE001
                     log.warning("english follow_links error on %s: %s", url, _flen_exc)
 
+        # ── YAML: English band mapping ─────────────────────────────────────────
+        # For universities that publish English requirements as named bands
+        # (e.g. JCU "Band 2" = IELTS 6.5 overall, 6.0 each component), search
+        # the course HTML for a recognised band label and apply the mapped scores
+        # when IELTS is still missing after all other extractors have run.
+        if payload.get("ielts_overall") in (None, "", 0):
+            try:
+                _uc_bm = get_uni_config()
+                _band_map: dict = (
+                    {
+                        k: v if isinstance(v, dict) else (v.model_dump() if hasattr(v, "model_dump") else {})
+                        for k, v in _uc_bm.extraction.english.band_mapping.items()
+                    }
+                    if _uc_bm and _uc_bm.extraction.english.band_mapping
+                    else {}
+                )
+                _band_ref_url: str | None = (
+                    _uc_bm.extraction.english.band_reference_url if _uc_bm else None
+                )
+            except Exception:  # noqa: BLE001
+                _band_map = {}
+                _band_ref_url = None
+            if _band_map and html:
+                import re as _re_bm
+                _bm_text = html_to_text(html)
+                _matched_band: str | None = None
+                _matched_spec: dict | None = None
+                for _bname, _bspec in _band_map.items():
+                    if _re_bm.search(
+                        r"\b" + _re_bm.escape(_bname) + r"\b",
+                        _bm_text,
+                        _re_bm.IGNORECASE,
+                    ):
+                        _matched_band = _bname
+                        _matched_spec = _bspec if isinstance(_bspec, dict) else {}
+                        break
+                if _matched_band and _matched_spec is not None:
+                    _bm_filled: list[str] = []
+                    _bm_snippet = (
+                        f"Band mapping: {_matched_band} → "
+                        f"IELTS {_matched_spec.get('ielts_overall')} "
+                        f"(each ≥{_matched_spec.get('ielts_each')})"
+                    )
+                    _bm_src = _band_ref_url or url
+                    # Apply IELTS overall
+                    _bm_ielts_overall = _matched_spec.get("ielts_overall")
+                    if _bm_ielts_overall is not None and payload.get("ielts_overall") in (None, "", 0):
+                        payload["ielts_overall"] = float(_bm_ielts_overall)
+                        evidence.append({
+                            "field_key": "ielts_overall",
+                            "value": float(_bm_ielts_overall),
+                            "confidence": 0.90,
+                            "method": "yaml_band_mapping",
+                            "snippet": _bm_snippet,
+                            "source_url": _bm_src,
+                        })
+                        _bm_filled.append("ielts_overall")
+                    # Apply IELTS per-component (listening, reading, speaking, writing)
+                    _bm_ielts_each = _matched_spec.get("ielts_each")
+                    if _bm_ielts_each is not None:
+                        for _bm_field in (
+                            "ielts_listening", "ielts_reading",
+                            "ielts_speaking", "ielts_writing",
+                        ):
+                            if payload.get(_bm_field) in (None, "", 0):
+                                payload[_bm_field] = float(_bm_ielts_each)
+                                evidence.append({
+                                    "field_key": _bm_field,
+                                    "value": float(_bm_ielts_each),
+                                    "confidence": 0.90,
+                                    "method": "yaml_band_mapping",
+                                    "snippet": _bm_snippet,
+                                    "source_url": _bm_src,
+                                })
+                                _bm_filled.append(_bm_field)
+                    # Apply PTE overall
+                    _bm_pte = _matched_spec.get("pte_overall")
+                    if _bm_pte is not None and payload.get("pte_overall") in (None, "", 0):
+                        payload["pte_overall"] = int(_bm_pte)
+                        evidence.append({
+                            "field_key": "pte_overall",
+                            "value": int(_bm_pte),
+                            "confidence": 0.90,
+                            "method": "yaml_band_mapping",
+                            "snippet": _bm_snippet,
+                            "source_url": _bm_src,
+                        })
+                        _bm_filled.append("pte_overall")
+                    # Apply TOEFL overall
+                    _bm_toefl = _matched_spec.get("toefl_overall")
+                    if _bm_toefl is not None and payload.get("toefl_overall") in (None, "", 0):
+                        payload["toefl_overall"] = int(_bm_toefl)
+                        evidence.append({
+                            "field_key": "toefl_overall",
+                            "value": int(_bm_toefl),
+                            "confidence": 0.90,
+                            "method": "yaml_band_mapping",
+                            "snippet": _bm_snippet,
+                            "source_url": _bm_src,
+                        })
+                        _bm_filled.append("toefl_overall")
+                    if emit and _bm_filled:
+                        await emit(
+                            "status",
+                            f"[BAND_MAP] {str(payload.get('course_name', url))[:35]} "
+                            f"→ {_matched_band}: filled {_bm_filled}",
+                            phase="extract",
+                            kind="english_band_mapping",
+                            url=url,
+                            band=_matched_band,
+                            filled=_bm_filled,
+                        )
+
         # ── Reverse no_location_online_override when browser fills location ──
         # The override fired at line 901 when course_location was blank
         # (SPA static shell returns the same content for every URL — the

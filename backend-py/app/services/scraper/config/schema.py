@@ -503,6 +503,30 @@ class FeesConfig(BaseModel):
     )
 
 
+class BandSpec(BaseModel):
+    """Score values for one named English-requirement band (e.g. 'Band 2')."""
+
+    ielts_overall: Optional[float] = Field(
+        default=None,
+        description="IELTS overall band score for this band level.",
+    )
+    ielts_each: Optional[float] = Field(
+        default=None,
+        description=(
+            "Minimum score for each IELTS component (listening, reading, "
+            "speaking, writing).  Stored in all four ielts_* per-band fields."
+        ),
+    )
+    pte_overall: Optional[int] = Field(
+        default=None,
+        description="PTE Academic overall score for this band level.",
+    )
+    toefl_overall: Optional[int] = Field(
+        default=None,
+        description="TOEFL iBT overall score for this band level.",
+    )
+
+
 class EnglishConfig(BaseModel):
     central_page: Optional[str] = Field(
         default=None,
@@ -572,6 +596,31 @@ class EnglishConfig(BaseModel):
             "\"Minimum English Requirements\", \"Entry Requirements\"]``. "
             "Fetched pages are added to the evidence store so the review panel "
             "shows the source URL. Empty by default — opt-in per university."
+        ),
+    )
+    band_mapping: dict[str, BandSpec] = Field(
+        default_factory=dict,
+        description=(
+            "Named band → score mapping for universities that publish English "
+            "requirements as labelled bands rather than direct IELTS scores "
+            "(e.g. JCU uses 'Band 1', 'Band 2', 'Band 3'). "
+            "Keys are the exact band labels as they appear on the course page "
+            "(case-insensitive match at runtime). "
+            "Values are :class:`BandSpec` dicts with ``ielts_overall``, "
+            "``ielts_each``, ``pte_overall``, ``toefl_overall``. "
+            "When a course page contains a recognised band label and IELTS is "
+            "still blank after all other extractors have run, the mapped scores "
+            "are applied with ``method='yaml_band_mapping'``. "
+            "Empty by default — opt-in per university."
+        ),
+    )
+    band_reference_url: Optional[str] = Field(
+        default=None,
+        description=(
+            "URL of the page that defines the band-to-score mapping "
+            "(e.g. the university's admissions policy schedule).  Stored as "
+            "``source_url`` in the evidence row so reviewers can verify the "
+            "mapping without a code search."
         ),
     )
 
