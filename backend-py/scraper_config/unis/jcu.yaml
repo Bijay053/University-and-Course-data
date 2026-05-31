@@ -107,16 +107,28 @@ extraction:
       - "English language requirements"
       - "admissions policy schedule"
     band_reference_url: "https://www.jcu.edu.au/policy/academic-governance/student-experience/admissions-policy-schedule-ii"
+    # All four test scores per band, sourced from JCU Admissions Policy
+    # Schedule II: https://www.jcu.edu.au/policy/academic-governance/
+    #   student-experience/admissions-policy-schedule-ii
+    # Using the full mapping here prevents the TOEFL/PTE extractors from
+    # picking up the wrong band's score when the Schedule II page lists
+    # all three bands in a table (extractors may latch on to the first row).
     band_mapping:
       "Band 1":
         ielts_overall: 6.0
         ielts_each: 6.0
+        pte_overall: 50
+        toefl_overall: 60
       "Band 2":
         ielts_overall: 6.5
         ielts_each: 6.0
+        pte_overall: 58
+        toefl_overall: 79
       "Band 3":
         ielts_overall: 7.0
         ielts_each: 7.0
+        pte_overall: 66
+        toefl_overall: 94
 
   # ── Fee extraction ────────────────────────────────────────────────────────
   #

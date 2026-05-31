@@ -920,6 +920,23 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
             # (not a combined-degree sentence) will win by ×1000.
             if is_combined_degree_sentence:
                 weight_mod *= 0.001
+            # Demote part-time-only loose-fallback matches (Pattern-2, ×0.1).
+            # When a course page lists two separate lines:
+            #   "3 years full-time"  and  "6 years part-time"
+            # Pattern-2 fires on both; without this demote the larger number
+            # (6) wins even though the canonical program length is the
+            # full-time value.  Only Pattern-2 (loose fallback) is demoted —
+            # Pattern-0 (labeled "Duration: N years") and Pattern-1
+            # ("full-time N years" label-before-number) are unaffected.
+            if pat_idx == 2 and not is_combined_degree_sentence:
+                sentence_has_parttime = bool(
+                    re.search(r"\bpart[- ]?time\b", s, re.IGNORECASE)
+                )
+                sentence_has_fulltime = bool(
+                    re.search(r"\bfull[- ]?time\b", s, re.IGNORECASE)
+                )
+                if sentence_has_parttime and not sentence_has_fulltime:
+                    weight_mod *= 0.1
             # Cap depending on unit so we reject only true outliers
             # (e.g. "120 weeks" is 2 years, fine; "200 years" is junk).
             cap = {"Year": 12, "Semester": 24, "Trimester": 36, "Month": 96, "Week": 416}[unit]

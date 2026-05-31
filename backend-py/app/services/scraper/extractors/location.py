@@ -35,7 +35,7 @@ _MARKETING_HINTS = re.compile(
     re.I,
 )
 _JUNK = re.compile(
-    r"\b(?:https?://|www\.|src=|href=|style=|googletagmanager|qtac|cricos|step\s*\d+\s*of|student\s*type|fee\s*type|study\s*mode|reset\s*fee\s*calculator)\b",
+    r"\b(?:https?://|www\.|src=|href=|style=|googletagmanager|qtac|satac|cricos|step\s*\d+\s*of|student\s*type|fee\s*type|study\s*mode|reset\s*fee\s*calculator)\b",
     re.I,
 )
 _TRAILING_KEYS = re.compile(
@@ -494,14 +494,28 @@ def _normalise(raw: str | None) -> str | None:
     return head[:120]
 
 
+_CAMPUS_AVAILABILITY_SUFFIX_RE = re.compile(
+    r"\s+(?:not\s+(?:offered|available|applicable)|not|available|offered|applicable)\s*$",
+    re.IGNORECASE,
+)
+
+
 def _sanitise_for_display(raw: str | None) -> str | None:
     if not raw:
         return None
+    # Strip trailing availability qualifiers from each campus part before
+    # any other processing.  JCU course pages render availability as a table
+    # whose cells end up as "Townsville Not offered", "Cairns Not", etc. after
+    # html_to_text flattening.  Stripping these suffixes avoids storing
+    # "Townsville Not" as the campus location.
+    def _strip_avail(part: str) -> str:
+        return _CAMPUS_AVAILABILITY_SUFFIX_RE.sub("", part).strip()
+
     parts = [
-        p.strip() for p in raw.split(",")
-        if p.strip()
+        _strip_avail(p.strip()) for p in raw.split(",")
+        if _strip_avail(p.strip())
         and not _REMOVE_VIRTUAL.search(p)
-        and p.strip().lower() not in _COUNTRY_NAME_PARTS_LC
+        and _strip_avail(p.strip()).lower() not in _COUNTRY_NAME_PARTS_LC
     ]
     if parts:
         # de-dup preserving order
