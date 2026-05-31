@@ -169,6 +169,13 @@ _NETWORKIDLE_HOSTS: tuple[str, ...] = (
     # networkidle with a tighter 30s / 25s budget is sufficient for SPA
     # hydration and avoids over-waiting on vocational pages.
     "vit.edu.au",
+    # JCU: handbook pages are server-rendered so domcontentloaded fires
+    # correctly, but the default 60s outer ceiling causes huge wall-clock
+    # times (49 min for 116 courses) because many pages hit the ceiling
+    # before returning content. networkidle with the 30s / 25s budget is
+    # sufficient — if networkidle fires early we save time; if the page is
+    # blocked by Cloudflare the 30s cap terminates it in half the time.
+    "jcu.edu.au",
 )
 
 # Hosts that need domcontentloaded + a longer-than-default JS settle window.

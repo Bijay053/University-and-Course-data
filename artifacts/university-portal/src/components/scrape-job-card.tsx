@@ -744,16 +744,20 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
             {/* Progress bar */}
             {progressLog && progressLog.total ? (() => {
               const pct = ((progressLog.current ?? 0) / progressLog.total!) * 100;
-              const remaining = startTime && (progressLog.current ?? 0) > 0
+              const allDispatched = (progressLog.current ?? 0) >= progressLog.total!;
+              const remaining = !allDispatched && startTime && (progressLog.current ?? 0) > 0
                 ? fmt(((now - startTime) / (progressLog.current ?? 1)) * ((progressLog.total ?? 1) - (progressLog.current ?? 0)))
                 : null;
               return (
                 <div className="space-y-1">
                   <div className="flex justify-between text-xs text-gray-500">
-                    <span>Scraping courses…</span>
+                    <span>{allDispatched ? "Completing…" : "Scraping courses…"}</span>
                     <span className="tabular-nums">
                       {progressLog.current}/{progressLog.total}
-                      {remaining && <span className="ml-2 text-blue-500 font-medium">~{remaining} left</span>}
+                      {allDispatched
+                        ? <span className="ml-2 text-amber-500 font-medium animate-pulse">finishing last batch…</span>
+                        : remaining && <span className="ml-2 text-blue-500 font-medium">~{remaining} left</span>
+                      }
                     </span>
                   </div>
                   <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
