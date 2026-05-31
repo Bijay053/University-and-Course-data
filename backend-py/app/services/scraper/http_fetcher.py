@@ -341,6 +341,7 @@ async def _client():
 async def fetch_html(url: str, *, retries: int = 2) -> str | None:
     last_exc: Exception | None = None
     got_cloudflare_block = False
+    got_hard_403 = False
     for attempt in range(retries + 1):
         async with _sem:
             try:
@@ -359,11 +360,26 @@ async def fetch_html(url: str, *, retries: int = 2) -> str | None:
                             url, r.status_code,
                         )
                         break  # no point retrying with plain httpx; go straight to cffi
+                    if r.status_code == 403:
+                        # Hard 403 from the origin server (not Cloudflare).
+                        # The server explicitly refused our request — retrying
+                        # will not help and wastes ~15-20s per blocked course.
+                        # cffi / Wayback are also skipped: if the server rejects
+                        # on HTTP level, the archived copy may not exist or may
+                        # also be gated. Return None immediately.
+                        got_hard_403 = True
+                        log.warning("fetch %s -> 403 (hard block) — skipping retries", url)
+                        break
                     log.warning("fetch %s -> %s", url, r.status_code)
             except Exception as exc:
                 last_exc = exc
                 log.warning("fetch %s attempt %s failed: %s", url, attempt, exc)
         await asyncio.sleep(1.5 * (attempt + 1))
+
+    if got_hard_403:
+        # Server explicitly rejected the request — no point trying cffi or
+        # Wayback Machine. Return None so the pipeline records a fetch_failed.
+        return None
 
     if got_cloudflare_block:
         cffi_result = await fetch_html_cffi(url)
