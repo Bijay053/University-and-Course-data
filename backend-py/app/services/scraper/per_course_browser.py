@@ -125,6 +125,14 @@ _SKIP_BROWSER_HOSTS: tuple[str, ...] = (
     # Skipping saves ~60s × n_courses per run with zero data loss — the static
     # extractors already capture all data AUT publishes on course detail pages.
     "aut.ac.nz",
+    # JCU (James Cook University): Cloudflare WAF blocks all datacenter IPs
+    # on per-course pages. httpx → 403, cffi → 403, Wayback → 200 (works).
+    # The browser is ALSO Cloudflare-blocked (every invocation times out at
+    # 60s). Confirmed: 116 courses × 60s browser timeout ÷ 4 parallel = ~29 min
+    # wasted on guaranteed failures. Wayback HTML is the only successful fetch
+    # path; the browser adds nothing. Skipping saves the entire browser budget
+    # (≥29 min on a 116-course run) with zero data loss.
+    "jcu.edu.au",
 )
 
 
@@ -169,13 +177,6 @@ _NETWORKIDLE_HOSTS: tuple[str, ...] = (
     # networkidle with a tighter 30s / 25s budget is sufficient for SPA
     # hydration and avoids over-waiting on vocational pages.
     "vit.edu.au",
-    # JCU: handbook pages are server-rendered so domcontentloaded fires
-    # correctly, but the default 60s outer ceiling causes huge wall-clock
-    # times (49 min for 116 courses) because many pages hit the ceiling
-    # before returning content. networkidle with the 30s / 25s budget is
-    # sufficient — if networkidle fires early we save time; if the page is
-    # blocked by Cloudflare the 30s cap terminates it in half the time.
-    "jcu.edu.au",
 )
 
 # Hosts that need domcontentloaded + a longer-than-default JS settle window.

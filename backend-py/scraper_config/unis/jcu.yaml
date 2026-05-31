@@ -24,6 +24,12 @@ discovery:
     - '/courses/'
 
 extraction:
+  # JCU per-course pages are Cloudflare WAF-blocked for all datacenter IPs.
+  # The browser (Playwright) is also always blocked — guaranteed 60s timeout
+  # per course with zero data returned. Wayback Machine HTML is the only
+  # working fetch path. Skip browser entirely to avoid wasting 30-60s/course.
+  skip_browser_rescue: true
+
   filters:
     domestic_only:
       enabled: true   # Preserve current prod behaviour: filter runs for all unis.
