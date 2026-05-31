@@ -104,7 +104,21 @@ async def _analyse_last_job(uni_id: int, db: AsyncSession) -> dict[str, Any]:
             COUNT(*)                 FILTER (WHERE study_mode = 'On Campus')         AS sm_on_campus,
             COUNT(*)                 FILTER (WHERE study_mode = 'Blended')           AS sm_blended,
             COUNT(*)                 FILTER (WHERE international_fee IS NOT NULL
-                                               AND international_fee BETWEEN 1 AND 9999) AS suspiciously_low_fee
+                                               AND international_fee BETWEEN 1 AND 9999) AS suspiciously_low_fee,
+            -- ── Quality: filled but correct? ──────────────────────────────────
+            COUNT(international_fee) FILTER (WHERE international_fee >= 10000)       AS good_fee,
+            COUNT(ielts_overall)     FILTER (WHERE ielts_overall BETWEEN 4.0 AND 8.5) AS good_ielts,
+            COUNT(course_location)   FILTER (
+                WHERE course_location IS NOT NULL AND course_location <> ''
+                AND   length(course_location) > 2
+                AND   course_location !~* '\\y(not|this|internal|mixed|tba|tbd|n/?a|unknown|online only)\\y'
+            )                                                                        AS good_location,
+            COUNT(course_location)   FILTER (WHERE course_location IS NOT NULL
+                                               AND course_location <> '')            AS has_location,
+            COUNT(study_mode)        FILTER (
+                WHERE study_mode IN ('On Campus','Online','Blended',
+                                     'On Campus/Online','Distance','Flexible')
+            )                                                                        AS good_study_mode
         FROM scraped_courses
         WHERE scrape_job_id = :jid
     """), {"jid": job_id})).fetchone()
@@ -114,16 +128,26 @@ async def _analyse_last_job(uni_id: int, db: AsyncSession) -> dict[str, Any]:
     def _pct(n: Any) -> float:
         return round(int(n or 0) / total, 3) if total else 0.0
 
+    def _quality(filled: Any, good: Any) -> float:
+        f = int(filled or 0)
+        return round(int(good or 0) / f, 3) if f else 1.0
+
     field_completion = {
         "international_fee": {
             "count": int(cmp[1] or 0),
             "missing": total - int(cmp[1] or 0),
             "pct": _pct(cmp[1]),
+            "quality_pct": _quality(cmp[1], cmp[14]),
+            "quality_issues": int(cmp[1] or 0) - int(cmp[14] or 0),
+            "quality_label": "Fee ≥ $10,000 (not domestic)",
         },
         "ielts_overall": {
             "count": int(cmp[2] or 0),
             "missing": total - int(cmp[2] or 0),
             "pct": _pct(cmp[2]),
+            "quality_pct": _quality(cmp[2], cmp[15]),
+            "quality_issues": int(cmp[2] or 0) - int(cmp[15] or 0),
+            "quality_label": "IELTS in valid range 4.0–8.5",
         },
         "pte_overall": {
             "count": int(cmp[3] or 0),
@@ -139,6 +163,9 @@ async def _analyse_last_job(uni_id: int, db: AsyncSession) -> dict[str, Any]:
             "count": int(cmp[5] or 0),
             "missing": total - int(cmp[5] or 0),
             "pct": _pct(cmp[5]),
+            "quality_pct": _quality(cmp[5], cmp[18]),
+            "quality_issues": int(cmp[5] or 0) - int(cmp[18] or 0),
+            "quality_label": "Recognised mode value",
         },
         "degree_level": {
             "count": int(cmp[6] or 0),
@@ -160,7 +187,77 @@ async def _analyse_last_job(uni_id: int, db: AsyncSession) -> dict[str, Any]:
             "missing": total - int(cmp[9] or 0),
             "pct": _pct(cmp[9]),
         },
+        "course_location": {
+            "count": int(cmp[17] or 0),
+            "missing": total - int(cmp[17] or 0),
+            "pct": _pct(cmp[17]),
+            "quality_pct": _quality(cmp[17], cmp[16]),
+            "quality_issues": int(cmp[17] or 0) - int(cmp[16] or 0),
+            "quality_label": "Location not garbage (no 'Not', 'TBA', 'Internal')",
+        },
     }
+
+    # ── Top 10 most broken courses ─────────────────────────────────────────────
+    broken_rows = (await db.execute(text("""
+        SELECT
+            course_name,
+            international_fee,
+            ielts_overall,
+            course_location,
+            study_mode,
+            degree_level,
+            -- Issue flags as integer scores for ranking
+            CASE WHEN international_fee IS NULL OR international_fee = 0 THEN 2
+                 WHEN international_fee BETWEEN 1 AND 9999            THEN 1
+                 ELSE 0 END                                           AS fee_score,
+            CASE WHEN ielts_overall IS NULL OR ielts_overall = 0      THEN 2 ELSE 0 END AS ielts_score,
+            CASE WHEN course_location IS NULL OR course_location = ''  THEN 1
+                 WHEN course_location ~* '\\y(not|this|internal|mixed|tba|tbd)\\y' THEN 1
+                 ELSE 0 END                                           AS loc_score,
+            CASE WHEN study_mode IS NULL OR study_mode = ''           THEN 1 ELSE 0 END AS mode_score,
+            CASE WHEN degree_level IS NULL OR degree_level = ''       THEN 1 ELSE 0 END AS deg_score
+        FROM scraped_courses
+        WHERE scrape_job_id = :jid
+        ORDER BY (
+            CASE WHEN international_fee IS NULL OR international_fee = 0 THEN 2
+                 WHEN international_fee BETWEEN 1 AND 9999 THEN 1 ELSE 0 END +
+            CASE WHEN ielts_overall IS NULL OR ielts_overall = 0 THEN 2 ELSE 0 END +
+            CASE WHEN course_location IS NULL OR course_location = '' THEN 1
+                 WHEN course_location ~* '\\y(not|this|internal|mixed|tba|tbd)\\y' THEN 1
+                 ELSE 0 END +
+            CASE WHEN study_mode IS NULL OR study_mode = '' THEN 1 ELSE 0 END +
+            CASE WHEN degree_level IS NULL OR degree_level = '' THEN 1 ELSE 0 END
+        ) DESC, course_name
+        LIMIT 10
+    """), {"jid": job_id})).fetchall()
+
+    top_broken_courses = []
+    for row in broken_rows:
+        name, fee, ielts, loc, mode, deg, fee_s, ielts_s, loc_s, mode_s, deg_s = row
+        total_score = fee_s + ielts_s + loc_s + mode_s + deg_s
+        if total_score == 0:
+            continue  # course is fine — stop once we reach clean courses
+        issues = []
+        if fee_s == 2:
+            issues.append({"field": "international_fee", "label": "Fee missing", "severity": "critical"})
+        elif fee_s == 1:
+            issues.append({"field": "international_fee", "label": f"Domestic fee (${int(fee):,})", "severity": "critical"})
+        if ielts_s == 2:
+            issues.append({"field": "ielts_overall", "label": "IELTS missing", "severity": "critical"})
+        if loc_s == 1:
+            if loc:
+                issues.append({"field": "course_location", "label": f"Invalid location: {loc[:40]}", "severity": "warning"})
+            else:
+                issues.append({"field": "course_location", "label": "Location missing", "severity": "warning"})
+        if mode_s:
+            issues.append({"field": "study_mode", "label": "Study mode missing", "severity": "warning"})
+        if deg_s:
+            issues.append({"field": "degree_level", "label": "Degree level missing", "severity": "warning"})
+        top_broken_courses.append({
+            "course_name": name or "(unnamed)",
+            "score": total_score,
+            "issues": issues,
+        })
 
     return {
         "status": "ok",
@@ -177,6 +274,7 @@ async def _analyse_last_job(uni_id: int, db: AsyncSession) -> dict[str, Any]:
             "Blended": int(cmp[12] or 0),
         },
         "suspiciously_low_fee_count": int(cmp[13] or 0),
+        "top_broken_courses": top_broken_courses,
     }
 
 
@@ -473,6 +571,50 @@ async def _probe_sample_course_pages(
 
 # ── Phase 3: Cross-correlate and generate recommendations ─────────────────────
 
+def _impact_estimate(
+    phase1: dict,
+    target_fields: list[str],
+    estimated_fill_pct: float = 0.85,
+    courses_affected_override: int | None = None,
+) -> dict[str, Any]:
+    """Estimate the impact of fixing one or more fields.
+
+    Returns:
+        courses_affected  — number of courses that would gain data
+        overall_before    — current mean completeness across all fields (%)
+        overall_after     — estimated mean completeness after the fix (%)
+        delta             — expected completeness gain (percentage points)
+    """
+    fc = phase1.get("field_completion", {})
+    total = max(phase1.get("courses_analysed", 1), 1)
+
+    if courses_affected_override is not None:
+        courses_affected = courses_affected_override
+    else:
+        courses_affected = sum(fc.get(f, {}).get("missing", 0) for f in target_fields)
+
+    before_pcts = [v.get("pct", 0.0) for v in fc.values()]
+    overall_before = round(sum(before_pcts) / max(len(before_pcts), 1) * 100, 1)
+
+    # Simulate: affected fields rise toward estimated_fill_pct
+    after_fc = {k: dict(v) for k, v in fc.items()}
+    for f in target_fields:
+        if f in after_fc:
+            current_pct = after_fc[f].get("pct", 0.0)
+            gain = min(estimated_fill_pct, current_pct + (after_fc[f].get("missing", 0) / total))
+            after_fc[f]["pct"] = gain
+
+    after_pcts = [v.get("pct", 0.0) for v in after_fc.values()]
+    overall_after = round(sum(after_pcts) / max(len(after_pcts), 1) * 100, 1)
+
+    return {
+        "courses_affected": courses_affected,
+        "overall_completeness_before": overall_before,
+        "overall_completeness_after": overall_after,
+        "delta": round(overall_after - overall_before, 1),
+    }
+
+
 def _generate_recommendations(
     phase1: dict, phase2: dict, patterns: dict, course_probe: dict
 ) -> list[dict]:
@@ -513,6 +655,7 @@ def _generate_recommendations(
                 ),
                 "root_cause": "English requirements page exists but scraper is not following it",
                 "confidence": 0.90,
+                "impact_estimate": _impact_estimate(phase1, ["ielts_overall"]),
                 "fix": {
                     "type": "english_follow_links",
                     "description": f'Add follow-links: {", ".join(repr(t) for t in best[:3])}',
@@ -531,6 +674,7 @@ def _generate_recommendations(
                 ),
                 "root_cause": "English requirements not found in standard link positions",
                 "confidence": 0.60,
+                "impact_estimate": _impact_estimate(phase1, ["ielts_overall"]),
                 "fix": None,
             })
 
@@ -557,6 +701,7 @@ def _generate_recommendations(
                 ),
                 "root_cause": "International fee page detected but scraper is not following it",
                 "confidence": 0.90,
+                "impact_estimate": _impact_estimate(phase1, ["international_fee"]),
                 "fix": {
                     "type": "fee_follow_links",
                     "description": f'Add fee follow-links: {", ".join(repr(t) for t in best[:3])}',
@@ -575,6 +720,7 @@ def _generate_recommendations(
                 ),
                 "root_cause": "International fee hidden behind a tab interaction",
                 "confidence": 0.75,
+                "impact_estimate": _impact_estimate(phase1, ["international_fee"]),
                 "fix": {
                     "type": "browser_action",
                     "description": "Add a Browser Action to click the 'International' tab before extracting fees",
@@ -592,6 +738,7 @@ def _generate_recommendations(
                 ),
                 "root_cause": "International fee source not identified — may require manual inspection",
                 "confidence": 0.50,
+                "impact_estimate": _impact_estimate(phase1, ["international_fee"]),
                 "fix": None,
             })
 
@@ -608,6 +755,9 @@ def _generate_recommendations(
             ),
             "root_cause": "Domestic fee (CSP / Commonwealth Supported) extracted instead of international tuition",
             "confidence": 0.80,
+            "impact_estimate": _impact_estimate(phase1, ["international_fee"],
+                                                 estimated_fill_pct=0.95,
+                                                 courses_affected_override=low_fee),
             "fix": {
                 "type": "fee_reject_keywords",
                 "description": 'Add reject keywords: "Commonwealth Supported", "CSP", "Domestic"',
@@ -689,6 +839,7 @@ def _generate_recommendations(
                 "add a field selector to point to the element that contains this information."
             ),
             "confidence": 0.65,
+            "impact_estimate": _impact_estimate(phase1, ["degree_level"]),
             "fix": {
                 "type": "field_selector",
                 "description": "Add a Field Selector for degree_level in the Field Selectors tab",
@@ -717,6 +868,13 @@ def _generate_recommendations(
                 "separated by '|'. The scraper is extracting the full element text."
             ),
             "confidence": 0.90,
+            "impact_estimate": {
+                "courses_affected": pipe_count,
+                "overall_completeness_before": None,
+                "overall_completeness_after": None,
+                "delta": None,
+                "note": "Fixes course name quality — no completeness change",
+            },
             "fix": {
                 "type": "field_selector",
                 "description": (
@@ -746,6 +904,7 @@ def _generate_recommendations(
                     "The band reference URL or band key names may not match what the site publishes."
                 ),
                 "confidence": 0.85,
+                "impact_estimate": _impact_estimate(phase1, ["ielts_overall"]),
                 "fix": {
                     "type": "band_reference_url",
                     "description": (
@@ -767,6 +926,7 @@ def _generate_recommendations(
                 ),
                 "root_cause": "Band mapping configured but IELTS still blank — verify band keys match site labels",
                 "confidence": 0.70,
+                "impact_estimate": _impact_estimate(phase1, ["ielts_overall"]),
                 "fix": {
                     "type": "band_reference_url",
                     "description": (
@@ -793,6 +953,7 @@ def _generate_recommendations(
                 "Common causes: amounts in a table with unusual headers, or in a JS-rendered element."
             ),
             "confidence": 0.85,
+            "impact_estimate": _impact_estimate(phase1, ["international_fee"]),
             "fix": {
                 "type": "fee_selector",
                 "description": (
@@ -822,6 +983,9 @@ def _generate_recommendations(
                 "The international fee is typically higher and labelled differently on the page."
             ),
             "confidence": 0.90,
+            "impact_estimate": _impact_estimate(phase1, ["international_fee"],
+                                                 estimated_fill_pct=0.95,
+                                                 courses_affected_override=existing_low_fee),
             "fix": {
                 "type": "fee_reject_keywords",
                 "description": "Reject domestic fee keywords and prefer the higher international fee",
@@ -851,6 +1015,13 @@ def _generate_recommendations(
                 "A campus allowlist discards everything that isn't a known campus name."
             ),
             "confidence": 0.88,
+            "impact_estimate": {
+                "courses_affected": garbage_loc,
+                "overall_completeness_before": None,
+                "overall_completeness_after": None,
+                "delta": None,
+                "note": "Fixes location quality — no completeness change",
+            },
             "fix": {
                 "type": "campus_allowlist",
                 "description": (

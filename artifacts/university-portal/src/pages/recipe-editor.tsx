@@ -1061,27 +1061,59 @@ export default function RecipeEditorPage() {
 
             <CardContent className="space-y-5 pt-0">
 
-              {/* Phase 1 — Field Completion */}
+              {/* Phase 1 — Field Completion + Quality */}
               {p1.status === "ok" && p1.field_completion && (
                 <div>
                   <div className="flex items-center gap-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                    <TrendingUp className="h-3 w-3" /> Field Completion
+                    <TrendingUp className="h-3 w-3" /> Field Completion &amp; Quality
                   </div>
-                  <div className="grid grid-cols-2 gap-x-6 gap-y-1.5">
+                  <div className="grid grid-cols-2 gap-x-6 gap-y-3">
                     {Object.entries(p1.field_completion as Record<string, any>).map(([field, stat]) => {
                       const pct = Math.round((stat.pct || 0) * 100);
-                      const color = pct >= 80 ? "bg-green-500" : pct >= 50 ? "bg-yellow-500" : "bg-red-500";
+                      const qPct = stat.quality_pct != null ? Math.round(stat.quality_pct * 100) : null;
+                      const completionColor = pct >= 80 ? "bg-green-500" : pct >= 50 ? "bg-yellow-500" : "bg-red-500";
+                      // Quality bar: only show when field has quality data and is mostly filled
+                      const hasQuality = qPct != null && stat.count > 0;
+                      const qualityColor = !hasQuality ? "" : qPct >= 90 ? "bg-green-400" : qPct >= 70 ? "bg-yellow-400" : "bg-orange-500";
+                      const qualityBad = hasQuality && qPct < 90 && stat.quality_issues > 0;
                       return (
                         <div key={field}>
                           <div className="flex justify-between text-xs mb-0.5">
                             <span className="text-muted-foreground">{FIELD_LABELS[field] ?? field}</span>
-                            <span className={`font-medium ${pct >= 80 ? "text-green-700" : pct >= 50 ? "text-yellow-700" : "text-red-700"}`}>
-                              {pct}% <span className="font-normal text-muted-foreground">({stat.count}/{stat.count + stat.missing})</span>
-                            </span>
+                            <div className="flex items-center gap-2">
+                              {hasQuality && qualityBad && (
+                                <span className="text-orange-600 font-medium" title={stat.quality_label}>
+                                  {qPct}% quality
+                                </span>
+                              )}
+                              <span className={`font-medium ${pct >= 80 ? "text-green-700" : pct >= 50 ? "text-yellow-700" : "text-red-700"}`}>
+                                {pct}% <span className="font-normal text-muted-foreground">({stat.count}/{stat.count + stat.missing})</span>
+                              </span>
+                            </div>
                           </div>
-                          <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
-                            <div className={`h-full rounded-full ${color}`} style={{ width: `${pct}%` }} />
+                          {/* Completion bar */}
+                          <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden mb-0.5">
+                            <div className={`h-full rounded-full ${completionColor}`} style={{ width: `${pct}%` }} />
                           </div>
+                          {/* Quality bar (only when filled data exists and quality differs from completion) */}
+                          {hasQuality && pct > 10 && (
+                            <div className="h-1 rounded-full bg-gray-100 overflow-hidden" title={`Quality: ${stat.quality_label ?? "valid values"}`}>
+                              <div
+                                className={`h-full rounded-full ${qualityColor}`}
+                                style={{ width: `${pct}%` }}
+                              >
+                                <div
+                                  className="h-full bg-gray-200 rounded-full float-right"
+                                  style={{ width: `${Math.max(0, 100 - qPct)}%` }}
+                                />
+                              </div>
+                            </div>
+                          )}
+                          {hasQuality && qualityBad && (
+                            <p className="text-xs text-orange-600 mt-0.5">
+                              {stat.quality_issues} filled but incorrect
+                            </p>
+                          )}
                         </div>
                       );
                     })}
@@ -1095,6 +1127,41 @@ export default function RecipeEditorPage() {
                       ))}
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* Top 10 Broken Courses */}
+              {p1.top_broken_courses && p1.top_broken_courses.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                    <XCircle className="h-3 w-3 text-red-500" /> Most Broken Courses
+                  </div>
+                  <div className="space-y-1.5">
+                    {(p1.top_broken_courses as any[]).map((course: any, idx: number) => (
+                      <div key={idx} className="flex items-start gap-2 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2">
+                        <span className="text-xs font-bold text-muted-foreground w-4 shrink-0 mt-0.5">{idx + 1}.</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium text-foreground truncate" title={course.course_name}>
+                            {course.course_name}
+                          </p>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {(course.issues as any[]).map((issue: any, i: number) => (
+                              <span
+                                key={i}
+                                className={`inline-flex text-xs px-1.5 py-0.5 rounded font-medium ${
+                                  issue.severity === "critical"
+                                    ? "bg-red-100 text-red-800"
+                                    : "bg-yellow-100 text-yellow-800"
+                                }`}
+                              >
+                                {issue.label}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 
@@ -1170,6 +1237,27 @@ export default function RecipeEditorPage() {
                                 <p className="text-xs mt-1">
                                   <span className="font-medium">Root cause: </span>{rec.root_cause}
                                 </p>
+                              )}
+                              {/* Impact estimate */}
+                              {rec.impact_estimate && rec.impact_estimate.courses_affected > 0 && (
+                                <div className="mt-2 rounded-md bg-white/70 border border-current/10 px-2.5 py-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs">
+                                  <span>
+                                    <span className="font-semibold text-foreground">{rec.impact_estimate.courses_affected}</span>
+                                    <span className="text-muted-foreground"> courses affected</span>
+                                  </span>
+                                  {rec.impact_estimate.delta != null && rec.impact_estimate.delta > 0 && (
+                                    <span>
+                                      <span className="text-muted-foreground">Completeness </span>
+                                      <span className="font-semibold text-foreground">{rec.impact_estimate.overall_completeness_before}%</span>
+                                      <span className="text-muted-foreground"> → </span>
+                                      <span className="font-semibold text-green-700">{rec.impact_estimate.overall_completeness_after}%</span>
+                                      <span className="text-green-700 font-bold ml-1">+{rec.impact_estimate.delta}pp</span>
+                                    </span>
+                                  )}
+                                  {rec.impact_estimate.note && (
+                                    <span className="text-muted-foreground italic">{rec.impact_estimate.note}</span>
+                                  )}
+                                </div>
                               )}
                               {rec.fix && (
                                 <div className="mt-2 flex items-center gap-2 flex-wrap">
