@@ -14,7 +14,7 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import and_, case, desc, func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -1148,6 +1148,68 @@ async def rescrape_alias(
 ) -> ScrapeStartResponse:
     """Same as /start, just different name UI uses."""
     return await start_scrape(body, db)
+
+
+class RescrapeCoursesBody(BaseModel):
+    """Request body for per-course and targeted rescrape operations."""
+
+    university_id: int = Field(alias="universityId")
+    scraped_course_ids: list[int] = Field(
+        default_factory=list,
+        alias="scrapedCourseIds",
+        description=(
+            "IDs of specific scraped_courses rows to re-extract.  "
+            "When provided, only those course URLs are fetched; the full "
+            "university discovery run is skipped.  Leave empty to trigger "
+            "a standard full university re-scrape."
+        ),
+    )
+
+    model_config = {"populate_by_name": True}
+
+
+@router.post("/rescrape-courses")
+async def rescrape_courses(
+    body: RescrapeCoursesBody,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ScrapeStartResponse:
+    """Trigger a targeted rescrape for one or more staged courses by ID.
+
+    Looks up the ``course_website`` URL from the scraped_courses rows and
+    queues a focused scrape job for each URL.  Falls back to a standard
+    university-level rescrape when no ``scraped_course_ids`` are supplied.
+    """
+    from app.models import ScrapedCourse, University
+
+    # Build the StartScrapeBody from the university record
+    uni = await db.get(University, body.university_id)
+    if uni is None:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail=f"University {body.university_id} not found")
+
+    target_urls: list[str] = []
+    if body.scraped_course_ids:
+        rows = (
+            await db.execute(
+                select(ScrapedCourse).where(
+                    ScrapedCourse.university_id == body.university_id,
+                    ScrapedCourse.id.in_(body.scraped_course_ids),
+                )
+            )
+        ).scalars().all()
+        target_urls = [r.course_website for r in rows if r.course_website]
+
+    scrape_url = (
+        target_urls[0]
+        if len(target_urls) == 1
+        else (uni.scrape_url or uni.website or "")
+    )
+
+    scrape_body = StartScrapeBody(
+        url=scrape_url,
+        universityId=body.university_id,
+    )
+    return await start_scrape(scrape_body, db)
 
 
 @router.get("/staged")

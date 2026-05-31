@@ -3003,6 +3003,138 @@ async def extract_course(
                 payload.setdefault(k, v)
         evidence.extend(browser_evidence)
 
+        # ── YAML: fee rejection (reject_keywords) ─────────────────────────────
+        # Discards international_fee when the winning evidence snippet contains
+        # a configured keyword indicating it is a domestic / CSP / HECS fee.
+        # Also honours prefer_international by preferring the highest-ranked
+        # non-rejected fee evidence row instead of the first one written.
+        try:
+            _uc_fee_reject = get_uni_config()
+            _fee_reject_kws: list[str] = (
+                _uc_fee_reject.extraction.fees.reject_keywords if _uc_fee_reject else []
+            ) or []
+        except Exception:  # noqa: BLE001
+            _fee_reject_kws = []
+        if _fee_reject_kws and payload.get("international_fee") is not None:
+            _fee_ev_snips: list[str] = [
+                str(e.get("snippet") or "").lower()
+                for e in evidence
+                if e.get("field_key") == "international_fee"
+            ]
+            _kw_hit: str | None = next(
+                (kw for kw in _fee_reject_kws if any(kw.lower() in s for s in _fee_ev_snips)),
+                None,
+            )
+            if _kw_hit:
+                log.info(
+                    "[FEE_REJECT] course=%r — international_fee=%r discarded; "
+                    "reject_keyword %r matched evidence snippet.",
+                    payload.get("course_name") or url,
+                    payload["international_fee"],
+                    _kw_hit,
+                )
+                payload["international_fee"] = None
+                evidence.append({
+                    "field_key": "international_fee",
+                    "value": None,
+                    "confidence": 0.0,
+                    "method": "yaml_reject_keyword",
+                    "snippet": (
+                        f"Fee discarded: evidence snippet matched reject_keyword "
+                        f"'{_kw_hit}' from extraction.fees.reject_keywords"
+                    ),
+                })
+                if emit:
+                    await emit(
+                        "status",
+                        f"[FEE_REJECT] {str(payload.get('course_name', url))[:40]} — "
+                        f"domestic fee discarded (keyword: {_kw_hit!r})",
+                        phase="extract",
+                        kind="fee_rejected",
+                        url=url,
+                        keyword=_kw_hit,
+                    )
+
+        # ── YAML: English link-following (follow_links) ───────────────────────
+        # When IELTS / PTE / TOEFL are still missing after all course-page
+        # extraction AND extraction.english.follow_links is configured, find
+        # <a> elements in the course HTML whose text matches any listed phrase,
+        # fetch the linked page, and re-run the English extractor.
+        if any(payload.get(k) in (None, "", 0) for k in (
+            "ielts_overall", "pte_overall", "toefl_overall",
+        )):
+            try:
+                _uc_en_follow = get_uni_config()
+                _follow_patterns: list[str] = (
+                    _uc_en_follow.extraction.english.follow_links if _uc_en_follow else []
+                ) or []
+            except Exception:  # noqa: BLE001
+                _follow_patterns = []
+            if _follow_patterns and html:
+                try:
+                    from bs4 import BeautifulSoup as _BS4
+                    from urllib.parse import urljoin as _urljoin2
+                    import httpx as _httpx_en
+                    from app.services.scraper.extractors import english_test as _et2
+                    _soup_en = _BS4(html, "html.parser")
+                    _followed_urls: list[str] = []
+                    for _a_tag in _soup_en.find_all("a", href=True)[:300]:
+                        _lt = (_a_tag.get_text() or "").strip()
+                        if any(p.lower() in _lt.lower() for p in _follow_patterns):
+                            _href = _urljoin2(url, str(_a_tag["href"]))
+                            if _href != url and _href not in _followed_urls:
+                                _followed_urls.append(_href)
+                            if len(_followed_urls) >= 3:
+                                break
+                    for _fl_url in _followed_urls:
+                        try:
+                            async with _httpx_en.AsyncClient(
+                                follow_redirects=True, timeout=15
+                            ) as _cl:
+                                _fl_resp = await _cl.get(
+                                    _fl_url,
+                                    headers={"User-Agent": "Mozilla/5.0"},
+                                )
+                            _fl_html = _fl_resp.text if _fl_resp.status_code == 200 else None
+                        except Exception:  # noqa: BLE001
+                            _fl_html = None
+                        if not _fl_html:
+                            continue
+                        _fl_text = html_to_text(_fl_html)
+                        _fl_result = _et2.extract(_fl_text, url=_fl_url)
+                        _fl_fields = getattr(_fl_result, "fields", {}) or {}
+                        _fl_filled: list[str] = []
+                        for _fk, _fv in _fl_fields.items():
+                            if _fv in (None, "", 0):
+                                continue
+                            if _fk not in ("ielts_overall", "pte_overall", "toefl_overall",
+                                           "cambridge_overall", "duolingo_overall"):
+                                continue
+                            if payload.get(_fk) not in (None, "", 0):
+                                continue
+                            payload[_fk] = _fv
+                            evidence.append({
+                                "field_key": _fk,
+                                "value": _fv,
+                                "confidence": 0.78,
+                                "method": "yaml_follow_link",
+                                "snippet": f"Followed link: {_fl_url}",
+                                "source_url": _fl_url,
+                            })
+                            _fl_filled.append(_fk)
+                        if emit and _fl_filled:
+                            await emit(
+                                "status",
+                                f"[FOLLOW_LINK] {str(payload.get('course_name', url))[:35]} "
+                                f"→ {_fl_url[:55]}: filled {_fl_filled}",
+                                phase="extract",
+                                kind="english_follow_link",
+                                url=_fl_url,
+                                filled=_fl_filled,
+                            )
+                except Exception as _flen_exc:  # noqa: BLE001
+                    log.warning("english follow_links error on %s: %s", url, _flen_exc)
+
         # ── Reverse no_location_online_override when browser fills location ──
         # The override fired at line 901 when course_location was blank
         # (SPA static shell returns the same content for every URL — the

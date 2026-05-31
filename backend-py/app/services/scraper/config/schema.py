@@ -475,6 +475,32 @@ class FeesConfig(BaseModel):
             "falls back to legacy on subprocess failure."
         ),
     )
+    # ── Fee source preference / rejection ────────────────────────────────────
+    reject_keywords: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Case-insensitive keywords that, when present in the text surrounding "
+            "an extracted fee amount, indicate the fee is a *domestic* or "
+            "CSP/HECS fee that must NOT be published as an international fee. "
+            "Typical values: ``[\"Commonwealth Supported\", \"CSP\", \"HECS\", "
+            "\"Domestic\", \"HECS-HELP\", \"Indicative domestic\"]\`. "
+            "When the winning fee amount's snippet matches ANY keyword, the fee "
+            "is discarded and ``international_fee`` is left null (→ DQ warning). "
+            "Empty by default — opt-in per university."
+        ),
+    )
+    prefer_international: bool = Field(
+        default=False,
+        description=(
+            "When True, if both an international fee AND a domestic/CSP fee were "
+            "found on the same page, the pipeline always selects the international "
+            "one even if the domestic value was extracted first or has higher "
+            "confidence.  Pairs with ``reject_keywords`` to handle universities "
+            "that publish domestic fees first and international fees below (e.g. "
+            "JCU tab pages, Newcastle right-sidebar, Murdoch toggle). "
+            "Default False preserves the existing 'highest confidence wins' logic."
+        ),
+    )
 
 
 class EnglishConfig(BaseModel):
@@ -532,6 +558,20 @@ class EnglishConfig(BaseModel):
             "incidentally mentions a test it does not actually accept (e.g. a "
             "marketing page links 'KITE' as a competitor product, polluting "
             "the extracted English requirements). Empty by default."
+        ),
+    )
+    follow_links: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Link-text patterns (case-insensitive, substring match) that the "
+            "scraper should follow when IELTS / PTE / TOEFL scores are missing "
+            "after the main course-page extraction.  The scraper looks for "
+            "<a> elements whose visible text contains any listed phrase, fetches "
+            "the linked page, and re-runs the English extractor against it. "
+            "Typical values: ``[\"English Language Requirements\", "
+            "\"Minimum English Requirements\", \"Entry Requirements\"]``. "
+            "Fetched pages are added to the evidence store so the review panel "
+            "shows the source URL. Empty by default — opt-in per university."
         ),
     )
 
@@ -832,6 +872,35 @@ class ExtractionConfig(BaseModel):
             "values reduce throughput per-batch but eliminate the 600s "
             "cooldown penalties, typically making the overall run faster."
         ),
+    )
+    # ── YAML-driven browser interaction actions ───────────────────────────────
+    # Allows clients to configure interactive browser behaviour without code changes.
+    # Executed in order after the initial page load and settle delay, before
+    # the HTML is captured for extraction.
+    #
+    # Supported action keys (all optional, only one per dict entry):
+    #   click_text:  str  — click the first visible element whose text
+    #                        matches (case-insensitive, partial OK if unique).
+    #                        "International" uses the smart toggle JS.
+    #   click_css:   str  — click the first element matching this CSS selector.
+    #   wait_for:   dict  — wait for a condition; supported sub-keys:
+    #                         text: str    — wait until page contains this text
+    #                         selector: str — wait until selector is visible
+    #   expand_text: str  — click accordion / <details> / "Show more" whose
+    #                        trigger text contains this phrase.
+    #   scroll_to:   str  — scroll to a CSS selector or anchor (e.g. "#fees").
+    #
+    # Example (JCU international fee tab):
+    #   extraction:
+    #     actions:
+    #       - click_text: "International"
+    #       - wait_for:
+    #           text: "International Students"
+    #
+    # After clicking, the scraper waits for networkidle (up to 5s) + 1.2s settle.
+    actions: list[dict] = Field(
+        default_factory=list,
+        description="Ordered list of browser interaction steps to execute after page load.",
     )
 
 

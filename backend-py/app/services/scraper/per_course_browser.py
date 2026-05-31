@@ -22,6 +22,7 @@ from typing import Any, Awaitable, Callable
 from urllib.parse import urlparse
 
 from app.services.scraper.browser_pool import pool as browser_pool
+from app.services.scraper.config.context import get_uni_config
 from app.services.scraper.extractors import (
     duration,
     english_test,
@@ -734,6 +735,7 @@ async def maybe_browser_refetch(
                 settle_ms=settle_ms,
                 timeout=goto_ms,
                 click_international=_needs_international_toggle(url),
+                actions=get_uni_config().extraction.actions or None,
             ),
             timeout=outer_sec,
         )

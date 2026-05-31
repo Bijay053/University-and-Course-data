@@ -1,7 +1,7 @@
 import { Fragment, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, ExternalLink, ChevronRight, ChevronDown } from "lucide-react";
+import { AlertTriangle, ExternalLink, ChevronRight, ChevronDown, RefreshCw } from "lucide-react";
 
 export type ReviewEvidenceItem = {
   id: number;
@@ -54,6 +54,11 @@ interface Props {
    *  evidence grouped by field_key. Requires `course.evidence` to be
    *  populated by the API. */
   showEvidence?: boolean;
+  /** University ID used by the repair-queue re-scrape button. */
+  universityId?: number;
+  /** Callback fired when the operator triggers a per-course re-scrape.
+   *  Receives the scraped_course id(s) to rescrape. */
+  onRescrape?: (courseId: number) => void;
 }
 
 function feeDisplay(c: ReviewStagedCourse) {
@@ -351,8 +356,27 @@ function EvidencePanel({ evidence, course }: { evidence: ReviewEvidenceItem[]; c
   );
 }
 
-export function ReviewScrapedCoursesTable({ courses, readOnly, showEvidence }: Props) {
+export function ReviewScrapedCoursesTable({ courses, readOnly, showEvidence, universityId, onRescrape }: Props) {
+  const [rescraping, setRescraping] = useState<Set<number>>(new Set());
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
+
+  const handleRescrape = async (course: ReviewStagedCourse) => {
+    if (!universityId) return;
+    setRescraping((prev) => new Set(prev).add(course.id));
+    try {
+      await fetch("/api/scrape/rescrape-courses", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ universityId, scrapedCourseIds: [course.id] }),
+        credentials: "include",
+      });
+      onRescrape?.(course.id);
+    } catch {
+      /* ignore — user can see job in scrape log */
+    } finally {
+      setRescraping((prev) => { const s = new Set(prev); s.delete(course.id); return s; });
+    }
+  };
 
   const toggle = (id: number) => {
     setExpanded((prev) => {
@@ -387,6 +411,9 @@ export function ReviewScrapedCoursesTable({ courses, readOnly, showEvidence }: P
               <th className="text-left p-2 font-medium text-gray-600">Intakes</th>
               <th className="text-left p-2 font-medium text-gray-600">Course Location</th>
               <th className="text-left p-2 font-medium text-gray-600">Mode</th>
+              {!readOnly ? (
+                <th className="text-center p-2 font-medium text-gray-500 w-24">Actions</th>
+              ) : null}
             </tr>
           </thead>
           <tbody className="divide-y">
@@ -525,10 +552,45 @@ export function ReviewScrapedCoursesTable({ courses, readOnly, showEvidence }: P
                     <td className="p-2 text-xs text-gray-600 align-top">
                       {course.studyMode || <span className="text-gray-300">-</span>}
                     </td>
+                    {!readOnly ? (
+                      <td className="p-2 text-center align-top whitespace-nowrap">
+                        <div className="flex items-center justify-center gap-1">
+                          {course.courseWebsite && (
+                            <a
+                              href={course.courseWebsite}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title="Open course page in new tab"
+                            >
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 w-7 p-0 text-blue-500 hover:text-blue-700 hover:bg-blue-50"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <ExternalLink className="w-3.5 h-3.5" />
+                              </Button>
+                            </a>
+                          )}
+                          {universityId && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 w-7 p-0 text-amber-600 hover:text-amber-800 hover:bg-amber-50"
+                              title="Re-scrape this course"
+                              disabled={rescraping.has(course.id)}
+                              onClick={() => handleRescrape(course)}
+                            >
+                              <RefreshCw className={`w-3.5 h-3.5 ${rescraping.has(course.id) ? "animate-spin" : ""}`} />
+                            </Button>
+                          )}
+                        </div>
+                      </td>
+                    ) : null}
                   </tr>
                   {showEvidence && isOpen ? (
                     <tr>
-                      <td colSpan={15} className="p-0">
+                      <td colSpan={readOnly ? 15 : 16} className="p-0">
                         <EvidencePanel evidence={course.evidence ?? []} course={course} />
                       </td>
                     </tr>
@@ -537,7 +599,7 @@ export function ReviewScrapedCoursesTable({ courses, readOnly, showEvidence }: P
               );
             })}
             {courses.length === 0 ? (
-              <tr><td colSpan={showEvidence ? 15 : 14} className="p-4 text-center text-gray-400">No courses recorded.</td></tr>
+              <tr><td colSpan={(showEvidence ? 15 : 14) + (readOnly ? 0 : 1)} className="p-4 text-center text-gray-400">No courses recorded.</td></tr>
             ) : null}
           </tbody>
         </table>

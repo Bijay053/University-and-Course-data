@@ -241,6 +241,104 @@ class BrowserPool:
             finally:
                 await ctx.close()
 
+    async def _execute_actions(self, page: Any, actions: list[dict]) -> None:
+        """Execute a YAML-driven list of browser interaction actions.
+
+        Each dict in *actions* should have exactly ONE of the following keys:
+          click_text   str  — click a visible element whose text matches
+                              (case-insensitive). The value "International"
+                              uses the smart _INTERNATIONAL_TOGGLE_JS.
+          click_css    str  — click the first element matching a CSS selector.
+          wait_for     dict — wait for a condition (sub-keys: text | selector).
+          expand_text  str  — click an accordion / <details> trigger whose
+                              text contains this phrase.
+          scroll_to    str  — scroll to a CSS selector or anchor id.
+        """
+        for step in actions:
+            try:
+                if "click_text" in step:
+                    txt = str(step["click_text"])
+                    if txt.lower() == "international":
+                        # Use the battle-tested smart JS for the common case
+                        clicked = await page.evaluate(_INTERNATIONAL_TOGGLE_JS)
+                    else:
+                        # Generic click-by-text for any other phrase
+                        esc = txt.replace("'", "\\'")
+                        js = f"""
+() => {{
+  const target = '{esc}'.toLowerCase();
+  const sel = 'button,[role="tab"],[role="button"],a,label,summary,span,div';
+  for (const el of document.querySelectorAll(sel)) {{
+    const t = (el.textContent || '').trim().toLowerCase();
+    if (t !== target && !t.startsWith(target)) continue;
+    const style = window.getComputedStyle(el);
+    if (style.display === 'none' || style.visibility === 'hidden') continue;
+    let inNav = false;
+    let p = el.parentElement;
+    while (p) {{
+      if ('nav,header,footer'.includes(p.tagName.toLowerCase())) {{ inNav = true; break; }}
+      p = p.parentElement;
+    }}
+    if (inNav) continue;
+    el.click();
+    return true;
+  }}
+  return false;
+}}"""
+                        clicked = await page.evaluate(js)
+                    if clicked:
+                        try:
+                            await page.wait_for_load_state("networkidle", timeout=5000)
+                        except Exception:
+                            pass
+                        await page.wait_for_timeout(1200)
+
+                elif "click_css" in step:
+                    sel = str(step["click_css"])
+                    elem = page.locator(sel).first
+                    await elem.click(timeout=5000)
+                    try:
+                        await page.wait_for_load_state("networkidle", timeout=5000)
+                    except Exception:
+                        pass
+                    await page.wait_for_timeout(1000)
+
+                elif "wait_for" in step:
+                    wf = step["wait_for"] or {}
+                    if "text" in wf:
+                        await page.wait_for_function(
+                            f"() => document.body.innerText.includes('{wf['text']}')",
+                            timeout=8000,
+                        )
+                    elif "selector" in wf:
+                        await page.wait_for_selector(wf["selector"], timeout=8000)
+
+                elif "expand_text" in step:
+                    esc = str(step["expand_text"]).replace("'", "\\'")
+                    await page.evaluate(f"""
+() => {{
+  for (const el of document.querySelectorAll('details,summary,button,[aria-expanded]')) {{
+    const t = (el.textContent || '').toLowerCase();
+    if (!t.includes('{esc.lower()}')) continue;
+    const expanded = el.getAttribute('aria-expanded');
+    if (expanded === 'true') continue;
+    el.click();
+    return true;
+  }}
+  return false;
+}}""")
+                    await page.wait_for_timeout(600)
+
+                elif "scroll_to" in step:
+                    tgt = str(step["scroll_to"])
+                    await page.evaluate(
+                        f"() => {{ const el = document.querySelector('{tgt}'); if (el) el.scrollIntoView(); }}"
+                    )
+                    await page.wait_for_timeout(400)
+
+            except Exception as exc:
+                log.debug("action step %r failed on %s: %s", step, page.url, exc)
+
     async def fetch_html(
         self,
         url: str,
@@ -249,6 +347,7 @@ class BrowserPool:
         timeout: int = 30000,
         settle_ms: int = 1500,
         click_international: bool = False,
+        actions: list[dict] | None = None,
     ) -> str | None:
         """Fetch a URL via real browser and return HTML. Returns None on failure.
 
@@ -305,10 +404,12 @@ class BrowserPool:
                 return await self._fetch_html_inner(
                     url, wait_until=wait_until, timeout=timeout,
                     settle_ms=settle_ms, click_international=click_international,
+                    actions=actions,
                 )
         return await self._fetch_html_inner(
             url, wait_until=wait_until, timeout=timeout,
             settle_ms=settle_ms, click_international=click_international,
+            actions=actions,
         )
 
     async def _fetch_html_inner(
@@ -319,6 +420,7 @@ class BrowserPool:
         timeout: int,
         settle_ms: int,
         click_international: bool,
+        actions: list[dict] | None = None,
     ) -> str | None:
         try:
             async with self.page() as page:
@@ -393,29 +495,19 @@ class BrowserPool:
                     return None
                 # Give Akamai/JS a moment to settle
                 await page.wait_for_timeout(settle_ms)
-                # T005: optional "International students" toggle click.
-                # Mirrors Node ``browser-helper.ts`` lines 260-340 — used
-                # by VIT pages where domestic fees show by default and
-                # the international panel is gated behind a radio /
-                # checkbox / link toggle. The JS finds any clickable
-                # whose text/value/aria-label matches "international"
-                # and isn't already active, then clicks it. Best-effort:
-                # any failure during the click is silent — we still
-                # return the post-settle HTML.
+                # ── Browser interaction step executor ────────────────────
+                # Two sources of actions (combined into one ordered list):
+                #   1. Legacy click_international=True → prepends the smart
+                #      International toggle as the first action.
+                #   2. YAML-driven `actions` list from extraction.actions
+                #      config — click_text, click_css, wait_for, etc.
+                _all_actions: list[dict] = []
                 if click_international:
-                    try:
-                        clicked = await page.evaluate(_INTERNATIONAL_TOGGLE_JS)
-                        if clicked:
-                            # Wait for any post-click XHR / re-render.
-                            try:
-                                await page.wait_for_load_state(
-                                    "networkidle", timeout=5000
-                                )
-                            except Exception:
-                                pass
-                            await page.wait_for_timeout(1200)
-                    except Exception as exc:
-                        log.debug("international toggle click failed on %s: %s", url, exc)
+                    _all_actions.append({"click_text": "International"})
+                if actions:
+                    _all_actions.extend(actions)
+                if _all_actions:
+                    await self._execute_actions(page, _all_actions)
                 html = await page.content()
                 return html
         except Exception as exc:
