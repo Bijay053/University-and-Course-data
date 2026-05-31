@@ -47,6 +47,23 @@ _REMOVE_VIRTUAL = re.compile(
     r"\b(?:online|virtual|remote|distance(?:\s*learning)?|off[-\s]?campus|external)\b",
     re.I,
 )
+
+# Navigation / menu text that is NEVER a campus name.
+# These keywords appear in site-wide header/footer navigation blocks that
+# sometimes bleed into location extraction when the page structure is flat
+# (e.g. JCU Wayback HTML).  If the extracted string contains any of these,
+# discard it entirely rather than storing garbage as a campus location.
+_NAV_TEXT_LOCATION_RE = re.compile(
+    r"\b(?:scholarship|global\s+rankings?|accessibility\s+support|"
+    r"admissions?\s+and\s+entry|apply\s+to\s+\w|entry\s+options?|"
+    r"application\s+due\s+dates?|how\s+to\s+apply|"
+    r"fees?\s+calculator|student\s+(?:life|hub|portal|login)|"
+    r"international\s+students?\s+home|visit\s+(?:us|the\s+campus)|"
+    r"career\s+(?:outcomes?|services?)|related\s+(?:courses?|programs?)|"
+    r"contact\s+us|news\s+and\s+events|open\s+day|"
+    r"research\s+(?:degrees?|programs?)|find\s+a\s+course)\b",
+    re.IGNORECASE,
+)
 # Country names that sometimes appear as standalone comma-split parts in a
 # location string (e.g. "Sydney, Melbourne, Brisbane, Australia").  They are
 # not campus names and must be stripped from the parts list in
@@ -444,6 +461,17 @@ def _normalise(raw: str | None) -> str | None:
     # from being saved as a course location even if a future cascade
     # method bypasses the _sanitise_for_display strip.
     if _is_only_delivery_method(head):
+        return None
+    # Reject navigation / menu text captured from page headers or footers.
+    # Any location longer than 80 chars that also contains a navigation
+    # keyword is guaranteed to be nav text, not a campus.  Discard it so
+    # garbage like "Global rankings Scholarships Accessibility support …"
+    # never reaches the staging queue.
+    if _NAV_TEXT_LOCATION_RE.search(head):
+        return None
+    if len(head) > 80 and head.count(",") < 3:
+        # Long string with few comma-separated campus names = likely a
+        # prose sentence or nav block, not a location list.
         return None
     return head[:120]
 

@@ -30,6 +30,16 @@ extraction:
   # working fetch path. Skip browser entirely to avoid wasting 30-60s/course.
   skip_browser_rescue: true
 
+  # Campus allowlist — any staged course whose location does not contain
+  # at least one of these strings is flagged as a data-quality failure.
+  # Source: https://www.jcu.edu.au/campuses-and-facilities
+  campus_allowlist:
+    - Townsville
+    - Cairns
+    - Brisbane
+    - Singapore
+    - Online
+
   filters:
     domestic_only:
       enabled: true   # Preserve current prod behaviour: filter runs for all unis.

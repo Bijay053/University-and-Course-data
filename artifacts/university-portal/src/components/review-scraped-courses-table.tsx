@@ -438,9 +438,12 @@ export function ReviewScrapedCoursesTable({ courses, readOnly, showEvidence }: P
                           <Badge variant="outline" title="Auto-publish decision" className={`text-[10px] ${
                             course.autoPublishStatus === "approved" ? "text-green-700 border-green-200" :
                             course.autoPublishStatus === "rejected" ? "text-red-700 border-red-200" :
+                            course.autoPublishStatus === "data_quality_failure" ? "text-red-800 border-red-400 bg-red-50 font-semibold" :
                             "text-amber-700 border-amber-200"
                           }`}>
-                            Publish: {course.autoPublishStatus === "approved" ? "ready" : course.autoPublishStatus === "pending_review" ? "review" : course.autoPublishStatus}
+                            {course.autoPublishStatus === "data_quality_failure"
+                              ? "⛔ Data Quality Failure"
+                              : `Publish: ${course.autoPublishStatus === "approved" ? "ready" : course.autoPublishStatus === "pending_review" ? "review" : course.autoPublishStatus}`}
                           </Badge>
                         )}
                         {course.eligibilityStatus && (

@@ -784,6 +784,16 @@ class ExtractionConfig(BaseModel):
             "missing from the crawled HTML."
         ),
     )
+    campus_allowlist: list[str] = Field(
+        default_factory=list,
+        description=(
+            "When non-empty, any staged course whose course_location does NOT "
+            "contain at least one of these strings (case-insensitive) is flagged "
+            "as a critical data-quality failure. Useful for universities with a "
+            "fixed set of known campuses (e.g. JCU: Townsville, Cairns, Brisbane, "
+            "Singapore). Leave empty (default) to disable allowlist checking."
+        ),
+    )
     skip_browser_rescue: bool = Field(
         default=False,
         description=(

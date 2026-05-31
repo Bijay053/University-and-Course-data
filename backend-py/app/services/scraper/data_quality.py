@@ -22,7 +22,10 @@ from __future__ import annotations
 import logging
 import re
 from collections import defaultdict
-from typing import Any, Awaitable, Callable
+from typing import TYPE_CHECKING, Any, Awaitable, Callable
+
+if TYPE_CHECKING:
+    from app.services.scraper.config.schema import UniConfig
 
 log = logging.getLogger(__name__)
 
@@ -95,6 +98,37 @@ _JUNK_LOCATION_RE = re.compile(
     r"university\s+club|building\s+\d+|student\s+services|"
     r"administration|reception|library|sports\s+centre|"
     r"box\s+\d+|po\s+box|locked\s+bag|gpo\s+box",
+    re.IGNORECASE,
+)
+
+# Navigation / header / menu text that is categorically not a campus name.
+# Mirror of the same pattern in location.py — this catches anything that
+# slipped through the extractor-level guard (e.g. via Gemini hallucination,
+# sibling-cache, or PDF path) rather than the regex extractor.
+_NAV_LOCATION_RE = re.compile(
+    r"\b(?:scholarship|global\s+rankings?|accessibility\s+support|"
+    r"admissions?\s+and\s+entry|apply\s+to\s+\w|entry\s+options?|"
+    r"application\s+due\s+dates?|how\s+to\s+apply|"
+    r"fees?\s+calculator|student\s+(?:life|hub|portal|login)|"
+    r"international\s+students?\s+home|visit\s+(?:us|the\s+campus)|"
+    r"career\s+(?:outcomes?|services?)|related\s+(?:courses?|programs?)|"
+    r"contact\s+us|news\s+and\s+events|open\s+day|"
+    r"research\s+(?:degrees?|programs?)|find\s+a\s+course)\b",
+    re.IGNORECASE,
+)
+
+# Maximum plausible length for a campus/location string.
+# Legitimate multi-campus strings like "Townsville, Cairns, Brisbane, Singapore"
+# are ≤ 50 chars.  Anything over this threshold is almost certainly page prose
+# or navigation text bled through the extractor.
+_MAX_LOCATION_LEN = 80
+
+# Domestic-fee context patterns — same family as _CSP_DOMESTIC_CTX in fee.py.
+# Used to detect when a scrape has domestic fees only (CSP / HECS / govt-funded)
+# with no international fee, which is a critical data gap for international portals.
+_CSP_FEE_RE = re.compile(
+    r"\b(?:commonwealth\s+supported\s+place|CSP|HECS(?:-HELP)?|"
+    r"domestic\s+(?:student\s+)?(?:tuition\s+)?fee|government\s+supported)\b",
     re.IGNORECASE,
 )
 
@@ -226,8 +260,24 @@ def _check_english_coherence(payload: Payload, url: str, name: str) -> list[Qual
     return issues
 
 
-def _check_course(payload: Payload, url: str) -> list[QualityIssue]:
-    """Return a list of quality issues for one staged course payload."""
+def _check_course(
+    payload: Payload,
+    url: str,
+    campus_allowlist: list[str] | None = None,
+) -> list[QualityIssue]:
+    """Return a list of quality issues for one staged course payload.
+
+    Parameters
+    ----------
+    payload:
+        Extracted course data dict.
+    url:
+        Source URL (used in issue records for traceability).
+    campus_allowlist:
+        When non-empty, the course_location must contain at least one of these
+        strings (case-insensitive).  Sourced from ExtractionConfig.campus_allowlist
+        in the per-uni YAML.  An empty list disables the check.
+    """
     issues: list[QualityIssue] = []
     name = payload.get("course_name") or payload.get("name") or "?"
 
@@ -246,14 +296,36 @@ def _check_course(payload: Payload, url: str) -> list[QualityIssue]:
 
     # ── 2. Fee ───────────────────────────────────────────────────────────
     intl_fee = payload.get("international_fee")
+    domestic_fee = payload.get("domestic_fee")
     has_central_fee = payload.get("has_central_fee_page")
     if intl_fee is None:
-        if not has_central_fee:
-            add("critical", "missing_international_fee",
-                "No international fee found and no central fee page flag set.")
-        else:
-            add("warning", "missing_international_fee_central_page",
-                "International fee absent — marked for central fee page review.")
+        # Detect CSP / domestic-only fee situation — when a domestic fee
+        # (HECS / Commonwealth Supported Place) is present but no international
+        # fee was extracted, it means the page only published domestic pricing.
+        # Flag as critical: international agents cannot use a CSP fee.
+        if domestic_fee is not None:
+            try:
+                dom_val = float(domestic_fee)
+                if 0 < dom_val < 30_000:
+                    add(
+                        "critical",
+                        "domestic_fee_only_no_international",
+                        f"Only a domestic fee found (${dom_val:,.0f}) with no international fee. "
+                        f"This is likely a Commonwealth Supported Place / CSP / HECS fee. "
+                        f"The page may not publish international pricing — leave blank rather "
+                        f"than showing a misleading domestic figure.",
+                    )
+                    # Don't also fire missing_international_fee — that's noise on top
+                    # of the more specific diagnostic above.
+            except (TypeError, ValueError):
+                pass
+        if intl_fee is None and domestic_fee is None:
+            if not has_central_fee:
+                add("critical", "missing_international_fee",
+                    "No international fee found and no central fee page flag set.")
+            else:
+                add("warning", "missing_international_fee_central_page",
+                    "International fee absent — marked for central fee page review.")
     else:
         try:
             fee_val = float(intl_fee)
@@ -360,9 +432,45 @@ def _check_course(payload: Payload, url: str) -> list[QualityIssue]:
     if not location.strip():
         add("info", "missing_location",
             "No course location extracted.")
-    elif _JUNK_LOCATION_RE.search(location):
-        add("warning", "suspicious_location",
-            f"Location looks like footer/admin text rather than a campus name: {location!r}")
+    else:
+        # Check for navigation / menu text that bled through the extractor.
+        # This is a CRITICAL issue — the value is definitively wrong and must
+        # never be published (e.g. "Global rankings Scholarships Accessibility
+        # support Admissions and entry Apply to JCU Entry options …").
+        if _NAV_LOCATION_RE.search(location):
+            add(
+                "critical",
+                "nav_text_location",
+                f"Location contains navigation/menu keywords — this is page header text, "
+                f"not a campus name: {location[:120]!r}",
+            )
+        elif len(location) > _MAX_LOCATION_LEN and location.count(",") < 3:
+            # Long string with few comma-separated segments is likely prose or
+            # a nav block, not a list of campuses.
+            add(
+                "critical",
+                "location_too_long",
+                f"Location is {len(location)} chars with {location.count(',') + 1} segment(s) — "
+                f"almost certainly page text rather than campus names: {location[:80]!r}…",
+            )
+        elif _JUNK_LOCATION_RE.search(location):
+            add("warning", "suspicious_location",
+                f"Location looks like footer/admin text rather than a campus name: {location!r}")
+
+        # Campus allowlist check (per-uni YAML configurable).
+        # Only fires when: (a) allowlist is non-empty, (b) location is set and
+        # passed the nav-text checks above, (c) no allowlist entry appears in
+        # the location string (case-insensitive).
+        if campus_allowlist and not _NAV_LOCATION_RE.search(location):
+            loc_lower = location.lower()
+            if not any(campus.lower() in loc_lower for campus in campus_allowlist):
+                add(
+                    "critical",
+                    "campus_not_in_allowlist",
+                    f"Location {location!r} does not match any known campus: "
+                    f"{campus_allowlist}. Verify the location extractor is reading "
+                    f"the correct page element.",
+                )
 
     # ── 7. Study mode ────────────────────────────────────────────────────
     study_mode = payload.get("study_mode") or ""
@@ -457,6 +565,7 @@ async def run_quality_checks(
     staged_results: list[dict[str, Any]],
     *,
     emit: EmitFn = None,
+    uni_config: "UniConfig | None" = None,
 ) -> dict[str, Any]:
     """Run all quality checks over the staged course batch.
 
@@ -471,18 +580,32 @@ async def run_quality_checks(
         signature.  When provided, issues are streamed to the live log as they
         are found and a summary table is emitted at the end.
 
+    uni_config:
+        Optional merged UniConfig for the current scrape job.  When provided,
+        per-university settings such as ``campus_allowlist`` are applied.
+        Sourced from the ``current_uni_config`` contextvar via ``get_uni_config()``.
+
     Returns
     -------
     dict with keys:
-        total_courses  — number of courses checked
-        total_issues   — total issue count
-        critical       — count of critical issues
-        warnings       — count of warning issues
-        info           — count of info issues
-        issues         — list of issue dicts (sorted severity → code → url)
+        total_courses       — number of courses checked
+        total_issues        — total issue count
+        critical            — count of critical issues
+        warnings            — count of warning issues
+        info                — count of info issues
+        issues              — list of issue dicts (sorted severity → code → url)
+        critical_urls       — set of URLs where at least one critical issue was found
     """
     all_issues: list[QualityIssue] = []
     payloads_with_urls: list[tuple[Payload, str]] = []
+
+    # Extract campus allowlist from uni_config if provided.
+    campus_allowlist: list[str] = []
+    if uni_config is not None:
+        try:
+            campus_allowlist = uni_config.extraction.campus_allowlist or []
+        except AttributeError:
+            pass
 
     for r in staged_results:
         if not isinstance(r, dict):
@@ -497,7 +620,7 @@ async def run_quality_checks(
             continue
         url = r.get("url") or r.get("source_url") or ""
         payloads_with_urls.append((payload, url))
-        course_issues = _check_course(payload, url)
+        course_issues = _check_course(payload, url, campus_allowlist=campus_allowlist or None)
         all_issues.extend(course_issues)
 
     # Duplicate checks are cross-course
@@ -513,11 +636,18 @@ async def run_quality_checks(
     for issue in all_issues:
         counts[issue.severity] = counts.get(issue.severity, 0) + 1
 
+    # Build the set of URLs that have at least one critical issue so the
+    # orchestrator can mark those scraped_courses rows as data_quality_failure.
+    critical_urls: set[str] = {
+        i.url for i in all_issues if i.severity == "critical" and i.url
+    }
+
     report: dict[str, Any] = {
         "total_courses": len(payloads_with_urls),
         "total_issues": len(all_issues),
         **counts,
         "issues": [i.to_dict() for i in all_issues],
+        "critical_urls": critical_urls,
     }
 
     if emit:

@@ -2595,9 +2595,50 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # server log. Never blocks the scrape — catches errors internally.
         try:
             from app.services.scraper.data_quality import run_quality_checks
+            from app.services.scraper.config.context import get_uni_config as _get_uc_dq
 
             _staged_dicts = [r for r in results if isinstance(r, dict) and not r.get("error")]
-            await run_quality_checks(_staged_dicts, emit=emit)
+            try:
+                _dq_uni_cfg = _get_uc_dq()
+            except Exception:
+                _dq_uni_cfg = None
+            _dq_report = await run_quality_checks(
+                _staged_dicts, emit=emit, uni_config=_dq_uni_cfg
+            )
+
+            # Mark courses with critical data-quality issues so operators see
+            # DATA QUALITY FAILURE in the Review UI instead of generic review.
+            _dq_critical_urls = _dq_report.get("critical_urls") or set()
+            if _dq_critical_urls:
+                from sqlalchemy import update as _dq_upd, text as _dq_txt
+                from app.models import ScrapedCourse as _DqSC
+
+                _dq_url_list = list(_dq_critical_urls)
+                await db.execute(
+                    _dq_upd(_DqSC)
+                    .where(_DqSC.scrape_job_id == runtime_job_id)
+                    .where(_DqSC.course_website.in_(_dq_url_list))
+                    .where(_DqSC.auto_publish_status.notin_(["auto_published", "rejected"]))
+                    .values(auto_publish_status="data_quality_failure")
+                )
+                await db.commit()
+                n_dqf = len(_dq_url_list)
+                log.info(
+                    "[DATA QUALITY] Marked %d course(s) as data_quality_failure for job %s",
+                    n_dqf,
+                    runtime_job_id,
+                )
+                if emit:
+                    await emit(
+                        "status",
+                        f"[DATA QUALITY] {n_dqf} course(s) marked DATA QUALITY FAILURE "
+                        f"— critical issues found (bad location, domestic-only fee, "
+                        f"campus allowlist violation). These will NOT appear in Publish: Review.",
+                        phase="complete",
+                        kind="data_quality_failure_count",
+                        count=n_dqf,
+                        level="error",
+                    )
         except Exception as _dq_exc:  # noqa: BLE001
             log.warning("data_quality check raised: %s", _dq_exc)
 
