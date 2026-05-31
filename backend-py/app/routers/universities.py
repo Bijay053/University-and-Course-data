@@ -828,6 +828,294 @@ async def get_filter_impact(
             "warning" if drop_rate >= 0.20 else
             "ok"
         ),
+        # Historical pts contribution (0-30) for composite safety score
+        "historical_pts": (
+            0 if len(known_urls) == 0 else
+            0 if drop_rate >= 0.70 else
+            int(30 * (1 - drop_rate)) if drop_rate >= 0.20 else
+            30
+        ),
+    }
+
+
+@router.post("/universities/{uni_id}/test-discovery")
+async def post_test_discovery(
+    uni_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[dict, Depends(get_current_user)],
+) -> dict:
+    """Live seed-URL test: fetch each configured seed page, count course-link candidates,
+    then apply current URL filters to those links.
+
+    Does NOT run a full BFS — just fetches seed pages (max 5, 8s each) and counts
+    <a href> links that look like course detail pages.  Returns per-seed results,
+    aggregate stats, and an AI Safety Score (0-100) combining:
+      - Historical URL simulation (30 pts)
+      - Live seed test pass-rate (40 pts)
+      - Config sanity check (30 pts)
+    """
+    import re as _re_td
+    import httpx as _httpx
+    from html.parser import HTMLParser as _HTMLParser
+    from urllib.parse import urljoin as _urljoin
+
+    class _LinkExtractor(_HTMLParser):
+        def __init__(self, base: str):
+            super().__init__()
+            self.links: list[tuple[str, str]] = []
+            self._base = base
+            self._cur: list[str] = []
+            self._in_a = False
+            self._href = ""
+
+        def handle_starttag(self, tag: str, attrs: list):
+            if tag == "a":
+                self._in_a = True
+                self._cur = []
+                for k, v in attrs:
+                    if k == "href" and v:
+                        self._href = v
+
+        def handle_data(self, data: str):
+            if self._in_a:
+                self._cur.append(data.strip())
+
+        def handle_endtag(self, tag: str):
+            if tag == "a" and self._in_a:
+                href = self._href
+                text = " ".join(t for t in self._cur if t)
+                if href and not href.startswith(("#", "javascript:", "mailto:", "tel:")):
+                    full = _urljoin(self._base, href).split("?")[0].split("#")[0]
+                    self.links.append((full, text))
+                self._in_a = False
+                self._href = ""
+                self._cur = []
+
+    _COURSE_URL_HINTS = (
+        "/course", "/programme", "/program", "/study/", "/degree/",
+        "/bachelor", "/master", "/doctor", "/phd", "/mba",
+        "/graduate", "/undergraduate", "/postgraduate",
+        "/diploma", "/certificate", "/associate",
+    )
+
+    def _quick_course(url: str, text: str) -> bool:
+        lurl = url.lower()
+        if any(h in lurl for h in _COURSE_URL_HINTS):
+            return True
+        if text:
+            tl = text.lower()
+            for kw in ("bachelor", "master", "doctor", "phd", "diploma",
+                       "certificate", "mba", "graduate", "honours"):
+                if kw in tl:
+                    return True
+        return False
+
+    u: University | None = await db.get(University, uni_id)
+    if not u:
+        raise HTTPException(status_code=404, detail="University not found")
+
+    # Load effective config
+    allow_pats: list[str] = []
+    mc_patterns: list[str] = []
+    block_pats: list[str] = []
+    seed_urls_cfg: list[str] = []
+    try:
+        from app.services.scraper.config.loader import get_config_for_host as _gcfh3
+        from urllib.parse import urlparse as _up3
+        _h = _up3(u.scrape_url or "").hostname or ""
+        _uc = _gcfh3(
+            hostname=_h, name=u.name or "",
+            scrape_url=u.scrape_url or "",
+            university_id=u.id,
+            db_scrape_config=dict(u.scrape_config or {}),
+        )
+        allow_pats = list(_uc.discovery.allow_url_patterns or [])
+        mc_patterns = list(_uc.discovery.must_contain or [])
+        block_pats = list(_uc.discovery.block_url_patterns or [])
+        seed_urls_cfg = list(_uc.discovery.seed_urls or [])
+    except Exception:
+        pass
+
+    if not seed_urls_cfg and u.scrape_url:
+        seed_urls_cfg = [u.scrape_url]
+    if not seed_urls_cfg:
+        return {"ok": False, "error": "No seed URLs configured"}
+
+    compiled_allow = [_re_td.compile(p, _re_td.IGNORECASE) for p in allow_pats if p]
+    compiled_block = [_re_td.compile(p, _re_td.IGNORECASE) for p in block_pats if p]
+    mc_lower = [m.lower() for m in mc_patterns if m]
+
+    def _passes(url: str) -> bool:
+        ul = url.lower()
+        if compiled_allow and not any(pat.search(url) for pat in compiled_allow):
+            return False
+        if mc_lower and not any(m in ul for m in mc_lower):
+            return False
+        if compiled_block and any(pat.search(url) for pat in compiled_block):
+            return False
+        return True
+
+    # Historical URL pts (0-30) — reuse scraped_courses
+    from app.models import ScrapedCourse as _SC3
+    _url_rows = (await db.execute(
+        select(_SC3.course_website)
+        .where(_SC3.university_id == uni_id)
+        .where(_SC3.course_website.isnot(None))
+        .limit(200)
+    )).scalars().all()
+    _known_urls = [x for x in _url_rows if x]
+    if not _known_urls:
+        historical_pts = 0
+    else:
+        _hist_passing = sum(1 for u2 in _known_urls if _passes(u2))
+        _hist_drop = 1 - _hist_passing / len(_known_urls)
+        historical_pts = (
+            0 if _hist_drop >= 0.70 else
+            int(30 * (1 - _hist_drop)) if _hist_drop >= 0.20 else
+            30
+        )
+
+    # Fetch each seed URL
+    seed_results = []
+    all_raw_set: set[str] = set()
+    all_pass_set: set[str] = set()
+    warnings: list[str] = []
+
+    async with _httpx.AsyncClient(
+        headers={"User-Agent": "Mozilla/5.0 (compatible; UniPortalBot/1.0)"},
+        follow_redirects=True,
+        timeout=8.0,
+    ) as _client:
+        for seed_url in seed_urls_cfg[:5]:
+            try:
+                resp = await _client.get(seed_url)
+                parser = _LinkExtractor(seed_url)
+                try:
+                    parser.feed(resp.text)
+                except Exception:
+                    pass
+                seen: set[str] = set()
+                candidates: list[str] = []
+                for link_url, text in parser.links:
+                    if link_url in seen:
+                        continue
+                    seen.add(link_url)
+                    if _quick_course(link_url, text):
+                        candidates.append(link_url)
+
+                passing = [u2 for u2 in candidates if _passes(u2)]
+                dropped = [u2 for u2 in candidates if not _passes(u2)]
+                drop_r = len(dropped) / len(candidates) if candidates else 0
+
+                all_raw_set.update(candidates)
+                all_pass_set.update(passing)
+
+                sr: dict = {
+                    "seed_url": seed_url,
+                    "status_code": resp.status_code,
+                    "raw_candidates": len(candidates),
+                    "after_filter": len(passing),
+                    "dropped": len(dropped),
+                    "drop_rate_pct": round(drop_r * 100),
+                    "sample_passing": passing[:6],
+                    "sample_dropped": dropped[:6],
+                    "ok": resp.status_code < 400,
+                }
+
+                if len(candidates) < 5:
+                    w = (
+                        f"'{seed_url}' returned only {len(candidates)} course-link "
+                        f"candidate(s) — the URL may be incorrect, or the page uses "
+                        f"JavaScript rendering (links not in HTML source)."
+                    )
+                    warnings.append(w)
+                    sr["warning"] = w
+                elif drop_r >= 0.70:
+                    w = (
+                        f"'{seed_url}' found {len(candidates)} course links but "
+                        f"the current filter dropped {len(dropped)} ({round(drop_r*100)}%)."
+                    )
+                    warnings.append(w)
+                    sr["warning"] = w
+
+                seed_results.append(sr)
+            except Exception as exc:
+                err = str(exc)[:120]
+                seed_results.append({
+                    "seed_url": seed_url,
+                    "status_code": 0,
+                    "raw_candidates": 0,
+                    "after_filter": 0,
+                    "dropped": 0,
+                    "drop_rate_pct": 0,
+                    "sample_passing": [],
+                    "sample_dropped": [],
+                    "ok": False,
+                    "error": err,
+                    "warning": f"Could not fetch '{seed_url}': {err[:80]}",
+                })
+                warnings.append(f"Could not fetch '{seed_url}': {err[:80]}")
+
+    total_raw = len(all_raw_set)
+    total_passing = len(all_pass_set)
+    total_dropped = total_raw - total_passing
+    agg_drop = total_dropped / total_raw if total_raw > 0 else 0
+
+    # Seed pts (0-40)
+    if total_raw == 0:
+        seed_pts = 0
+    elif agg_drop >= 0.70:
+        seed_pts = 0
+    elif agg_drop >= 0.20:
+        seed_pts = int(40 * (1 - agg_drop))
+    elif total_raw < 5:
+        seed_pts = 15  # found too few to be confident
+    else:
+        seed_pts = 40
+
+    # Config pts (0-30)
+    has_filters = bool(allow_pats or mc_patterns or block_pats)
+    if not has_filters:
+        config_pts = 30
+    elif total_raw > 0 and agg_drop < 0.20:
+        config_pts = 20
+    elif total_raw > 0 and agg_drop < 0.50:
+        config_pts = 10
+    else:
+        config_pts = 0
+
+    safety_score = historical_pts + seed_pts + config_pts
+
+    return {
+        "ok": True,
+        "seed_results": seed_results,
+        "total_raw": total_raw,
+        "total_passing": total_passing,
+        "total_dropped": total_dropped,
+        "agg_drop_rate_pct": round(agg_drop * 100),
+        "warnings": warnings,
+        "has_filters": has_filters,
+        "safety_score": safety_score,
+        "safety_score_breakdown": {
+            "historical_pts": historical_pts,
+            "seed_pts": seed_pts,
+            "config_pts": config_pts,
+        },
+        "safety_level": (
+            "safe" if safety_score >= 90 else
+            "warning" if safety_score >= 70 else
+            "dangerous"
+        ),
+        "agg_status": (
+            "critical" if agg_drop >= 0.70 or (0 < total_raw < 5) else
+            "warning" if agg_drop >= 0.20 or total_raw < 10 else
+            "ok"
+        ),
+        "filter_config": {
+            "allow_url_patterns": allow_pats,
+            "must_contain": mc_patterns,
+            "block_url_patterns": block_pats,
+        },
     }
 
 

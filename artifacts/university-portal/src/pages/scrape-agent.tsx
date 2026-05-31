@@ -84,7 +84,39 @@ type FilterImpact = {
   dropped_samples: string[];
   filter_config: { allow_url_patterns: string[]; must_contain: string[]; block_url_patterns: string[] };
   status: "ok" | "warning" | "critical";
+  historical_pts?: number;
   message?: string;
+};
+
+type SeedResult = {
+  seed_url: string;
+  status_code: number;
+  raw_candidates: number;
+  after_filter: number;
+  dropped: number;
+  drop_rate_pct: number;
+  sample_passing: string[];
+  sample_dropped: string[];
+  ok: boolean;
+  warning?: string;
+  error?: string;
+};
+
+type DiscoveryTest = {
+  ok: boolean;
+  seed_results: SeedResult[];
+  total_raw: number;
+  total_passing: number;
+  total_dropped: number;
+  agg_drop_rate_pct: number;
+  warnings: string[];
+  has_filters: boolean;
+  safety_score: number;
+  safety_score_breakdown: { historical_pts: number; seed_pts: number; config_pts: number };
+  safety_level: "safe" | "warning" | "dangerous";
+  agg_status: "ok" | "warning" | "critical";
+  filter_config: { allow_url_patterns: string[]; must_contain: string[]; block_url_patterns: string[] };
+  error?: string;
 };
 
 type ExtractionIssue = {
@@ -229,6 +261,8 @@ export default function ScrapeAgentPage() {
   const [rollingBack, setRollingBack] = useState(false);
   const [filterImpact, setFilterImpact] = useState<FilterImpact | null>(null);
   const [loadingImpact, setLoadingImpact] = useState(false);
+  const [discoveryTest, setDiscoveryTest] = useState<DiscoveryTest | null>(null);
+  const [testingDiscovery, setTestingDiscovery] = useState(false);
   const [checkingExtraction, setCheckingExtraction] = useState(false);
   const [extractionResult, setExtractionResult] = useState<ExtractionQualityResult | null>(null);
 
@@ -300,6 +334,23 @@ export default function ScrapeAgentPage() {
   }, [uniId]);
 
   useEffect(() => { loadFilterImpact(); }, [loadFilterImpact]);
+
+  const runDiscoveryTest = useCallback(async () => {
+    if (!uniId) return;
+    setTestingDiscovery(true);
+    setDiscoveryTest(null);
+    try {
+      const res = await fetch(`${BASE}/api/universities/${uniId}/test-discovery`, { method: "POST" });
+      const data: DiscoveryTest = await res.json();
+      setDiscoveryTest(data);
+      // Refresh historical simulation too so scores stay in sync
+      loadFilterImpact();
+    } catch (e) {
+      toast({ title: "Discovery test failed", description: String(e), variant: "destructive" });
+    } finally {
+      setTestingDiscovery(false);
+    }
+  }, [uniId, loadFilterImpact, toast]);
 
   // Build admin_config dict from UI state
   const buildAdminConfig = () => {
@@ -700,6 +751,186 @@ export default function ScrapeAgentPage() {
           )}
         </div>
       )}
+
+      {/* ── Test Discovery Panel ──────────────────────────────────────────── */}
+      <div className="bg-white border rounded-xl p-4 space-y-3">
+        {/* Header row */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <Target className="w-4 h-4 text-blue-600 shrink-0" />
+            <h3 className="text-sm font-semibold text-gray-700">Test Discovery</h3>
+            <span className="text-[10px] text-gray-400 font-normal hidden sm:inline">
+              Fetch seed URLs live and simulate filter impact before scraping
+            </span>
+          </div>
+
+          {/* Safety score badge — shown once test has run */}
+          {discoveryTest && (
+            <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${
+              discoveryTest.safety_level === "safe"
+                ? "bg-green-50 border-green-300 text-green-800"
+                : discoveryTest.safety_level === "warning"
+                ? "bg-amber-50 border-amber-300 text-amber-800"
+                : "bg-red-50 border-red-300 text-red-800"
+            }`}>
+              <ShieldAlert className="w-3 h-3" />
+              AI Fix Safety: {discoveryTest.safety_score}/100
+              {" · "}
+              {discoveryTest.safety_level === "safe" ? "Safe" :
+               discoveryTest.safety_level === "warning" ? "Warning" : "Dangerous"}
+            </div>
+          )}
+
+          <button
+            onClick={runDiscoveryTest}
+            disabled={testingDiscovery}
+            className="inline-flex items-center gap-1.5 text-xs font-medium bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-3 py-1.5 rounded-md transition-colors"
+          >
+            {testingDiscovery
+              ? <><Loader2 className="w-3 h-3 animate-spin" />Testing…</>
+              : <><Play className="w-3 h-3" />Test Discovery</>}
+          </button>
+        </div>
+
+        {/* Score breakdown — shown after test */}
+        {discoveryTest && (
+          <div className="space-y-3">
+            {/* Score bar */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-[11px] text-gray-500">
+                <span>Safety Score</span>
+                <span className="font-medium text-gray-700">{discoveryTest.safety_score}/100</span>
+              </div>
+              <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all ${
+                    discoveryTest.safety_score >= 90 ? "bg-green-500" :
+                    discoveryTest.safety_score >= 70 ? "bg-amber-400" : "bg-red-500"
+                  }`}
+                  style={{ width: `${discoveryTest.safety_score}%` }}
+                />
+              </div>
+              {/* Breakdown chips */}
+              <div className="flex gap-2 flex-wrap text-[11px]">
+                {[
+                  { label: "Historical URLs", pts: discoveryTest.safety_score_breakdown.historical_pts, max: 30 },
+                  { label: "Live seed test", pts: discoveryTest.safety_score_breakdown.seed_pts, max: 40 },
+                  { label: "Config check", pts: discoveryTest.safety_score_breakdown.config_pts, max: 30 },
+                ].map(({ label, pts, max }) => (
+                  <span key={label} className={`px-2 py-0.5 rounded-full border text-[10px] font-medium ${
+                    pts === max ? "bg-green-50 border-green-200 text-green-700" :
+                    pts >= max * 0.5 ? "bg-amber-50 border-amber-200 text-amber-700" :
+                    "bg-red-50 border-red-200 text-red-700"
+                  }`}>
+                    {label}: {pts}/{max}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            {/* Aggregate stats */}
+            <div className="grid grid-cols-3 gap-2">
+              <div className="bg-gray-50 rounded-lg p-2 text-center">
+                <p className="text-base font-bold text-gray-800">{discoveryTest.total_raw}</p>
+                <p className="text-[10px] text-gray-500">raw discovered</p>
+              </div>
+              <div className={`rounded-lg p-2 text-center ${discoveryTest.total_passing > 0 ? "bg-green-50" : "bg-gray-50"}`}>
+                <p className={`text-base font-bold ${discoveryTest.total_passing > 0 ? "text-green-700" : "text-gray-400"}`}>
+                  {discoveryTest.total_passing}
+                </p>
+                <p className="text-[10px] text-gray-500">pass filter</p>
+              </div>
+              <div className={`rounded-lg p-2 text-center ${discoveryTest.total_dropped > 0 && discoveryTest.agg_drop_rate_pct >= 20 ? "bg-red-50" : "bg-gray-50"}`}>
+                <p className={`text-base font-bold ${discoveryTest.total_dropped > 0 && discoveryTest.agg_drop_rate_pct >= 20 ? "text-red-700" : "text-gray-500"}`}>
+                  {discoveryTest.agg_drop_rate_pct}%
+                </p>
+                <p className="text-[10px] text-gray-500">drop rate</p>
+              </div>
+            </div>
+
+            {/* Warnings */}
+            {discoveryTest.warnings.length > 0 && (
+              <div className="space-y-1.5">
+                {discoveryTest.warnings.map((w, i) => (
+                  <div key={i} className="flex gap-2 bg-amber-50 border border-amber-200 rounded-lg p-2.5">
+                    <ShieldAlert className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
+                    <p className="text-xs text-amber-800">{w}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Per-seed results */}
+            <div className="space-y-2">
+              {discoveryTest.seed_results.map((sr, i) => (
+                <div key={i} className={`border rounded-lg p-3 space-y-2 ${
+                  sr.warning || !sr.ok ? "bg-amber-50 border-amber-200" :
+                  sr.drop_rate_pct >= 70 ? "bg-red-50 border-red-200" :
+                  "bg-gray-50 border-gray-200"
+                }`}>
+                  <div className="flex items-start gap-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[11px] font-mono text-gray-700 truncate">{sr.seed_url}</p>
+                      {sr.ok ? (
+                        <p className="text-[11px] text-gray-500 mt-0.5">
+                          {sr.raw_candidates} course links found
+                          {" · "}
+                          <span className={sr.after_filter > 0 ? "text-green-700 font-medium" : "text-red-700 font-medium"}>
+                            {sr.after_filter} pass filter
+                          </span>
+                          {sr.dropped > 0 && (
+                            <span className="text-red-700"> · {sr.dropped} dropped ({sr.drop_rate_pct}%)</span>
+                          )}
+                        </p>
+                      ) : (
+                        <p className="text-[11px] text-red-700 mt-0.5">
+                          {sr.error ?? `HTTP ${sr.status_code}`}
+                        </p>
+                      )}
+                    </div>
+                    <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded shrink-0 ${
+                      !sr.ok ? "bg-red-100 text-red-700" :
+                      sr.raw_candidates < 5 ? "bg-amber-100 text-amber-700" :
+                      sr.drop_rate_pct >= 70 ? "bg-red-100 text-red-700" :
+                      sr.drop_rate_pct >= 20 ? "bg-amber-100 text-amber-700" :
+                      "bg-green-100 text-green-700"
+                    }`}>
+                      {!sr.ok ? "Error" :
+                       sr.raw_candidates < 5 ? "Too few" :
+                       sr.drop_rate_pct >= 70 ? "Blocked" :
+                       sr.drop_rate_pct >= 20 ? "Warning" : "OK"}
+                    </span>
+                  </div>
+
+                  {sr.sample_dropped.length > 0 && (
+                    <div>
+                      <p className="text-[10px] font-semibold text-red-700 uppercase tracking-wide mb-0.5">Dropped</p>
+                      {sr.sample_dropped.slice(0, 4).map((u, j) => (
+                        <p key={j} className="text-[10px] font-mono text-red-700 truncate">{u}</p>
+                      ))}
+                    </div>
+                  )}
+                  {sr.sample_passing.length > 0 && (
+                    <div>
+                      <p className="text-[10px] font-semibold text-green-700 uppercase tracking-wide mb-0.5">Passing</p>
+                      {sr.sample_passing.slice(0, 4).map((u, j) => (
+                        <p key={j} className="text-[10px] font-mono text-green-700 truncate">{u}</p>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {!discoveryTest && !testingDiscovery && (
+          <p className="text-xs text-gray-400">
+            Click <strong>Test Discovery</strong> to fetch seed URLs live, count course-link candidates,
+            and simulate how URL filters affect them — before triggering a real scrape.
+          </p>
+        )}
+      </div>
 
       {/* ── Scrape Rules Editor ───────────────────────────────────────────── */}
       <div className="bg-white border rounded-xl p-4 space-y-5">
