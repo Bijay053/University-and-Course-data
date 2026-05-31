@@ -528,7 +528,31 @@ def derive_mode_from_location(location_str: str | None) -> str | None:
     return None
 
 
+# Per-host suppression list: universities whose pages contain structural
+# "online" labels (e.g. "Apply online", "Online resources") that trigger
+# the label-regex or strong-label pass at 0.70 confidence and then block
+# Gemini PRIMARY from overwriting with the correct "On Campus" value (the
+# structural protection in single_course.py prevents Gemini from overriding
+# any study_mode: prefix method).
+#
+# For these hosts the rule extractor returns an empty list so Gemini can
+# write study_mode freely. Genuinely online courses at these universities
+# are still detected by Gemini (which reads the full page context).
+#
+# UEL (2026-05-31): every course page contains "apply online" / "online
+# student services" text that triggers the label pass → 'Online' at 0.70,
+# blocking Gemini's correct 'On Campus' extraction.
+_STUDY_MODE_RULE_SUPPRESSED_HOSTS: frozenset[str] = frozenset({
+    "www.uel.ac.uk",
+    "uel.ac.uk",
+})
+
+
 async def extract(html: str, url: str) -> list[ExtractionResult]:
+    import urllib.parse as _up
+    _host = _up.urlparse(url).netloc.lower()
+    if _host in _STUDY_MODE_RULE_SUPPRESSED_HOSTS:
+        return []
     mode, snippet, confidence = classify_study_mode(html)
     if not mode:
         return []

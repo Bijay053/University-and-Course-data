@@ -246,62 +246,29 @@ _HOST_EXTRA_SEEDS: dict[str, list[str]] = {
         "https://www.newcastle.edu.au/degrees/research",
     ],
     # University of East London (UEL) — www.uel.ac.uk.
-    # Site is Cloudflare-protected so BFS returns 0.  Browser discovery falls
-    # into generic nav following, which wastes 9+ minutes on low-value pages
-    # (apprenticeships, fees, pre-entry, student-life).  Seeding the three
-    # known catalogue roots lets the BFS jump straight to course listing pages.
+    # Site is Cloudflare-protected so BFS returns 0. Browser discovery is
+    # mandatory. Previous seed list had 18 paginated ?page=N URLs that all
+    # returned 0 links (UEL pagination is client-side JS — the URL doesn't
+    # change per page) and consumed the entire 120s budget before BFS could
+    # explore the 32 nav candidates queued from the homepage.
+    #
+    # Fix (2026-05-31): use the direct course catalogue pages instead.
+    # Individual course pages are at /(under|post)graduate/courses/{slug},
+    # so the listing pages are at /undergraduate/courses and /postgraduate/courses.
+    # Keep the /study/* hub pages as final fallbacks (they surface 1-4 featured
+    # courses each and are guaranteed to exist).
+    # Budget raised to 300s in the YAML to give BFS time to explore nav links.
     "www.uel.ac.uk": [
+        "https://www.uel.ac.uk/undergraduate/courses",
+        "https://www.uel.ac.uk/postgraduate/courses",
         "https://www.uel.ac.uk/study/undergraduate",
         "https://www.uel.ac.uk/study/postgraduate",
-        "https://www.uel.ac.uk/study/courses",
-        "https://www.uel.ac.uk/study/all-courses",
-        "https://www.uel.ac.uk/study/course-search",
-        # Drupal pagination: ?page=N gives subsequent pages of the course grid.
-        # Each page shows ~12 courses; adding pages 1-9 covers ~120 more courses
-        # across UG and PG listing pages (UEL has ~200 courses total).
-        "https://www.uel.ac.uk/study/undergraduate?page=1",
-        "https://www.uel.ac.uk/study/undergraduate?page=2",
-        "https://www.uel.ac.uk/study/undergraduate?page=3",
-        "https://www.uel.ac.uk/study/undergraduate?page=4",
-        "https://www.uel.ac.uk/study/undergraduate?page=5",
-        "https://www.uel.ac.uk/study/undergraduate?page=6",
-        "https://www.uel.ac.uk/study/undergraduate?page=7",
-        "https://www.uel.ac.uk/study/undergraduate?page=8",
-        "https://www.uel.ac.uk/study/undergraduate?page=9",
-        "https://www.uel.ac.uk/study/postgraduate?page=1",
-        "https://www.uel.ac.uk/study/postgraduate?page=2",
-        "https://www.uel.ac.uk/study/postgraduate?page=3",
-        "https://www.uel.ac.uk/study/postgraduate?page=4",
-        "https://www.uel.ac.uk/study/postgraduate?page=5",
-        "https://www.uel.ac.uk/study/postgraduate?page=6",
-        "https://www.uel.ac.uk/study/postgraduate?page=7",
-        "https://www.uel.ac.uk/study/postgraduate?page=8",
-        "https://www.uel.ac.uk/study/postgraduate?page=9",
     ],
     "uel.ac.uk": [
+        "https://www.uel.ac.uk/undergraduate/courses",
+        "https://www.uel.ac.uk/postgraduate/courses",
         "https://www.uel.ac.uk/study/undergraduate",
         "https://www.uel.ac.uk/study/postgraduate",
-        "https://www.uel.ac.uk/study/courses",
-        "https://www.uel.ac.uk/study/all-courses",
-        "https://www.uel.ac.uk/study/course-search",
-        "https://www.uel.ac.uk/study/undergraduate?page=1",
-        "https://www.uel.ac.uk/study/undergraduate?page=2",
-        "https://www.uel.ac.uk/study/undergraduate?page=3",
-        "https://www.uel.ac.uk/study/undergraduate?page=4",
-        "https://www.uel.ac.uk/study/undergraduate?page=5",
-        "https://www.uel.ac.uk/study/undergraduate?page=6",
-        "https://www.uel.ac.uk/study/undergraduate?page=7",
-        "https://www.uel.ac.uk/study/undergraduate?page=8",
-        "https://www.uel.ac.uk/study/undergraduate?page=9",
-        "https://www.uel.ac.uk/study/postgraduate?page=1",
-        "https://www.uel.ac.uk/study/postgraduate?page=2",
-        "https://www.uel.ac.uk/study/postgraduate?page=3",
-        "https://www.uel.ac.uk/study/postgraduate?page=4",
-        "https://www.uel.ac.uk/study/postgraduate?page=5",
-        "https://www.uel.ac.uk/study/postgraduate?page=6",
-        "https://www.uel.ac.uk/study/postgraduate?page=7",
-        "https://www.uel.ac.uk/study/postgraduate?page=8",
-        "https://www.uel.ac.uk/study/postgraduate?page=9",
     ],
     # University of Huddersfield — uni_id 1166.
     # Both www.hud.ac.uk and courses.hud.ac.uk are React SPAs.  HTTP BFS on

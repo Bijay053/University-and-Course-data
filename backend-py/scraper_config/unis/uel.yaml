@@ -29,19 +29,21 @@
 discovery:
   always_browser_discover: true
 
-  # Real course-listing pages — navigated DIRECTLY in the pre-seed phase
-  # BEFORE any homepage BFS.  The scraper opens each URL, extracts course
-  # links, and skips the homepage entirely if enough are found.
-  # UG: /study/undergraduate/courses  (~120 courses)
-  # PG: /study/postgraduate/courses   (~80 courses)
+  # Direct course catalogue listing pages (2026-05-31 fix).
+  # Individual course pages are at /(under|post)graduate/courses/{slug},
+  # so the listing pages are at the parent paths below.
+  # The /study/* hub pages are kept in _HOST_EXTRA_SEEDS as fallbacks;
+  # these YAML seeds are prepended by the scraper and navigated first.
   seed_urls:
-    - https://www.uel.ac.uk/study/undergraduate/courses
-    - https://www.uel.ac.uk/study/postgraduate/courses
+    - https://www.uel.ac.uk/undergraduate/courses
+    - https://www.uel.ac.uk/postgraduate/courses
 
   # Hard wall-clock limit for the browser nav BFS (seconds).
-  # 120 s — the pre-seed phase visits 2 listing pages (~20 s each);
-  # the remaining budget handles sub-listing pages if needed.
-  browser_time_budget_s: 120
+  # Previous value (120 s) was exhausted entirely by 18 useless paginated
+  # ?page=N seeds that all returned 0 links. New seeds are 4 targeted URLs
+  # so the budget is spent on BFS exploration instead.
+  # 300 s gives the BFS time to explore all 32+ queued nav candidates.
+  browser_time_budget_s: 300
 
   # Stop nav BFS once this many course links are collected.
   # UEL catalogue is ~200 courses total (UG ~120 + PG ~80).

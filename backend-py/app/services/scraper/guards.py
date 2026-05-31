@@ -310,9 +310,30 @@ _DEGREE_QUALIFIER_RE = re.compile(
 _QUAL_CODE_PREFIX_RE = re.compile(r"^[A-Za-z]{2,6}\d{4,6}\s+", re.I)
 
 
+# Some universities name courses with the degree abbreviation at the END
+# rather than the start, e.g. UEL's "Primary with Early Years (3-7) Pgce"
+# or "Business Management MBA". These are genuine degree pages whose H1
+# puts the subject first and the award last. Match trailing abbreviations
+# to prevent false category_landing_page rejections.
+# Requires the abbreviation to be the last word (possibly after whitespace
+# and closing parentheses/brackets) so "Learn about MBA programmes" doesn't
+# match — that has words after the abbreviation.
+_TRAILING_QUALIFIER_RE = re.compile(
+    r"\b(?:"
+    r"pgce|pgcert|pgdip|"
+    r"mba|mbs|mpa|mph|med|mit|msc|mcom|mres|mfin|mfin|"
+    r"phd|ph\.d|dba|"
+    r"bba|bbs|bcom|bbus|bit|bsw|bsc|beng|"
+    r"ba|llb|llm|mbbs|bds|mpharm"
+    r")\s*[\)\]]*\s*$",
+    re.IGNORECASE,
+)
+
+
 def _name_has_degree_qualifier(name: str) -> bool:
     """True when *name* (or *name* stripped of a leading qualification code)
-    starts with a recognised degree-level prefix.
+    starts with a recognised degree-level prefix, OR ends with a well-known
+    degree abbreviation (e.g. "Primary with Early Years (3-7) Pgce").
 
     Handles entries like "ICT50220 Diploma of Information Technology" where
     an Australian/UK national qualification code precedes the degree title.
@@ -323,6 +344,11 @@ def _name_has_degree_qualifier(name: str) -> bool:
     # Try stripping a leading qualification code and re-matching.
     stripped = _QUAL_CODE_PREFIX_RE.sub("", raw)
     if stripped != raw and _DEGREE_QUALIFIER_RE.match(stripped):
+        return True
+    # Check for trailing degree abbreviations (e.g. "Business Management MBA",
+    # "Primary with Early Years (3-7) Pgce"). Only recognised abbreviations
+    # match; plain English words like "online" or "courses" do not.
+    if _TRAILING_QUALIFIER_RE.search(raw):
         return True
     return False
 

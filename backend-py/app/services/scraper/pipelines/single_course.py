@@ -3831,6 +3831,52 @@ async def extract_course(
         # so AI-filled units don't silently drop on the floor. See B20.
         _apply_ai_duration_mapping(payload, ai_filled)
 
+        # ── Post-ai_fallback study_mode correction (2026-05-31) ──────────
+        # The first _rule_only_online / _low_conf_online correction earlier
+        # in this function runs BEFORE ai_fallback fills course_location, so
+        # _has_physical_location=False there even when a physical campus
+        # exists. Run a second pass now that ai_fallback has had a chance to
+        # populate course_location.  Uses the same logic but only fires when
+        # study_mode is still 'Online' from rule-only evidence AND
+        # ai_fallback has now confirmed a physical campus location.
+        _post_ai_study_mode_evidence = [
+            e for e in evidence if e["field_key"] == "study_mode"
+        ]
+        _post_ai_still_online = payload.get("study_mode") == "Online"
+        _post_ai_has_location = bool((payload.get("course_location") or "").strip())
+        _post_ai_rule_only = (
+            _post_ai_still_online
+            and bool(_post_ai_study_mode_evidence)
+            and all(
+                (e.get("method") or "").startswith("study_mode:rule")
+                for e in _post_ai_study_mode_evidence
+            )
+            and _post_ai_has_location
+        )
+        if _post_ai_rule_only:
+            from app.services.scraper.extractors.study_mode import derive_mode_from_location
+            _derived = derive_mode_from_location(payload.get("course_location"))
+            if _derived:
+                payload["study_mode"] = _derived
+                evidence.append({
+                    "field_key": "study_mode",
+                    "value": _derived,
+                    "confidence": 0.65,
+                    "method": "study_mode:location_derived",
+                    "snippet": (
+                        "Post-ai_fallback correction: rule-only 'Online' overridden "
+                        f"by ai_fallback-confirmed physical campus: "
+                        f"{(payload.get('course_location') or '')[:80]}"
+                    ),
+                })
+                log.info(
+                    "[STUDY_MODE POST-AI] course=%r — rule-only 'Online' corrected "
+                    "to %r after ai_fallback filled course_location=%r",
+                    payload.get("course_name") or url,
+                    _derived,
+                    payload.get("course_location"),
+                )
+
         # ── Federation JSON-block authoritative override (2026-05-10) ──
         # Federation embeds the canonical course summary as a JSON tree
         # inside <script>; the standard text-strip wipes it, so the
