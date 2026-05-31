@@ -3216,7 +3216,7 @@ Return only valid JSON, no markdown fences."""
         }
 
     # Parse Gemini response (it should be JSON)
-    raw_text = (resp or "").strip()
+    raw_text = (resp.text if resp else "").strip()
     try:
         diagnosis = json.loads(raw_text)
     except Exception:
