@@ -14,7 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   ArrowLeft, Save, Plus, Trash2, Globe, Database, Filter,
   Code2, DollarSign, BookOpen, MapPin, ShieldCheck, Zap, RefreshCw,
-  FlaskConical, CheckCircle2, XCircle, AlertTriangle, ChevronDown, ChevronUp
+  FlaskConical, CheckCircle2, XCircle, AlertTriangle, ChevronDown, ChevronUp, Info
 } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -466,12 +466,42 @@ export default function RecipeEditorPage() {
 
       {discoveryResult && !testingDiscovery && (() => {
         const r = discoveryResult;
-        const verdict = r.status as "PASS" | "WARN" | "FAIL";
+        const verdict = r.status as "PASS" | "WARN" | "FAIL" | "NOT_CONFIGURED";
+
+        // NOT_CONFIGURED: no seeds and no API endpoint — the recipe hasn't been
+        // set up yet.  Show a neutral gray card, not a red FAIL card.
+        if (verdict === "NOT_CONFIGURED") {
+          return (
+            <Card className="border-gray-200 bg-gray-50">
+              <CardHeader className="pb-3 pt-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Info className="h-5 w-5 text-gray-400" />
+                    <CardTitle className="text-base">Discovery Test Result</CardTitle>
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-gray-200 text-gray-600">NOT CONFIGURED</span>
+                  </div>
+                  <button onClick={() => setDiscoveryResult(null)} className="text-xs text-muted-foreground hover:text-foreground">Dismiss</button>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-0 space-y-3">
+                <p className="text-sm text-gray-600">
+                  No seed URLs or API endpoint configured — there was nothing to test.
+                </p>
+                <p className="text-sm text-gray-500">
+                  Add course listing page URLs under <strong>Discovery Seed URLs</strong> below
+                  (e.g. <code className="text-xs bg-gray-100 px-1 rounded">https://www.example.com/study/undergraduate/courses</code>),
+                  then click <strong>Test Discovery</strong> again.
+                </p>
+              </CardContent>
+            </Card>
+          );
+        }
+
         const colors = {
           PASS: { card: "border-green-200 bg-green-50", badge: "bg-green-100 text-green-800", icon: <CheckCircle2 className="h-5 w-5 text-green-600" /> },
           WARN: { card: "border-yellow-200 bg-yellow-50", badge: "bg-yellow-100 text-yellow-800", icon: <AlertTriangle className="h-5 w-5 text-yellow-600" /> },
           FAIL: { card: "border-red-200 bg-red-50",   badge: "bg-red-100 text-red-800",   icon: <XCircle className="h-5 w-5 text-red-600" /> },
-        }[verdict];
+        }[verdict as "PASS" | "WARN" | "FAIL"];
 
         return (
           <Card className={colors.card}>

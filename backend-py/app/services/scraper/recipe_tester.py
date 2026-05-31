@@ -350,7 +350,18 @@ async def test_recipe(
     drop_pct = (len(dropped) / raw_found * 100) if raw_found else 0.0
 
     # ── 4. Verdict ────────────────────────────────────────────────────────────
-    if expected_min_courses:
+    # Detect "nothing to test" before scoring — no seeds AND no API endpoint
+    # means the tester had nothing to fetch.  This is NOT a test failure; it
+    # means the recipe is not yet configured.  Show NOT_CONFIGURED (neutral)
+    # rather than FAIL so operators know to add seed URLs, not debug a failure.
+    _no_input = (
+        not seed_urls
+        and not (json_api_cfg and json_api_cfg.get("endpoint"))
+    )
+
+    if _no_input:
+        verdict = "NOT_CONFIGURED"
+    elif expected_min_courses:
         if after_filter >= expected_min_courses:
             verdict = "PASS"
         elif after_filter >= max(1, int(expected_min_courses * 0.5)):
