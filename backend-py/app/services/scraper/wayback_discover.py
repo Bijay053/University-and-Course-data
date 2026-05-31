@@ -108,16 +108,11 @@ _HOST_CDX_URL_PREFIX: dict[str, str] = {
     # (/programs/arts-and-sciences/) are rejected by _is_category_landing() downstream.
     "www.notredame.edu.au": "www.notredame.edu.au/programs/*",
     "notredame.edu.au": "www.notredame.edu.au/programs/*",
-    # JCU: course pages live at /study/courses/<slug>.  The live site is
-    # Cloudflare Enterprise-walled (BFS + browser both return 403), so
-    # Wayback CDX is the only discovery path.  The top-level wildcard
-    # returns 10 000 mixed URLs in SURT order — /about/, /news/, /research/
-    # and other non-course paths exhaust the limit before /study/courses/*
-    # is reached, yielding 0 course URLs.  Targeting /study/courses/* returns
-    # only the course subtree.  Category landings (/study/courses/arts) are
-    # rejected by _is_category_landing() downstream.
-    "www.jcu.edu.au": "www.jcu.edu.au/study/courses/*",
-    "jcu.edu.au": "www.jcu.edu.au/study/courses/*",
+    # JCU (www.jcu.edu.au): NOT listed here.
+    # Wayback has minimal JCU coverage — neither the broad wildcard nor any
+    # targeted path prefix (/study/courses/*, /courses/*) returns real course
+    # pages from the CDX index.  The default www.jcu.edu.au/* query is used
+    # as a harmless final fallback; browser discovery is the primary path.
 }
 
 

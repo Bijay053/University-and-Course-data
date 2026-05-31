@@ -1,39 +1,41 @@
 # James Cook University
 # Hostname: www.jcu.edu.au
 #
-# Bug history / rationale:
-#   - Cloudflare WAF blocks the scraper on some paths, returning 403/503.
-#   - The scrape_url may need to use a 'www' prefix explicitly — JCU has had
-#     issues where the bare domain (jcu.edu.au) redirects to a Cloudflare
-#     challenge page while www.jcu.edu.au serves the expected content.
-#   - 0 staged courses reported in some runs; likely caused by BFS being blocked
-#     before it can collect course-page URLs.
+# Discovery: Cloudflare WAF blocks plain HTTP (BFS/httpx always returns 403).
+#   Browser discovery (Playwright) is the only live-site path; it works
+#   intermittently and is slow (the browser challenges take time).  seed_urls
+#   points the browser directly at the course catalogue so it doesn't waste
+#   time crawling the homepage nav first.
 #
-# Discovery notes:
-#   - JCU's course catalogue is at /study/courses — confirm this is still the
-#     correct scrape_url entry point.
-#   - Consider adding /study/courses to allow_url_patterns to constrain BFS to
-#     only the course subtree (reduces Cloudflare exposure).
+#   Wayback CDX is kept as a final fallback but JCU is barely indexed there —
+#   expect 0 results most of the time.  CDX prefix override removed because
+#   no path prefix has useful course coverage in the Wayback archive.
 #
-# TODO: investigate Cloudflare bypass options (User-Agent rotation, JS challenge).
-# TODO: verify that www.jcu.edu.au is set as the scrape_url base.
+# Extraction: per-course browser rescue is permanently disabled.  JCU course
+#   pages are Cloudflare-walled at datacenter IPs — the browser always times
+#   out (60 s × N courses = very slow run).  Wayback HTML + Gemini is
+#   sufficient for 85 %+ completeness without any browser call per course.
 
 discovery:
   allow_url_patterns:
+    - '/courses'
     - '/study/courses'
-    - '/courses/'
 
-  # JCU's live site is Cloudflare Enterprise-walled — even the browser (Playwright)
-  # gets a 403 with a 90-second timeout.  Skip straight to Wayback CDX discovery
-  # which queries archive.org and cannot be blocked.
-  skip_browser_discovery: true
+  # Seed the browser crawler directly at the JCU course catalogue so it
+  # reaches course-detail pages immediately without navigating from the
+  # homepage (fewer Cloudflare-exposed requests, faster discovery).
+  seed_urls:
+    - 'https://www.jcu.edu.au/courses'
+    - 'https://www.jcu.edu.au/study/courses/find-a-course'
+
+  # Keep Wayback as a safety net — no useful CDX coverage exists today
+  # but it may improve over time.
   use_wayback: true
 
 extraction:
-  # JCU per-course pages are Cloudflare WAF-blocked for all datacenter IPs.
-  # The browser (Playwright) is also always blocked — guaranteed 60s timeout
-  # per course with zero data returned. Wayback Machine HTML is the only
-  # working fetch path. Skip browser entirely to avoid wasting 30-60s/course.
+  # Per-course browser rescue is disabled — JCU live pages are
+  # Cloudflare-walled for all datacenter IPs; the browser always returns
+  # 403 with a 60-second timeout.  Wayback HTML is the fetch path instead.
   skip_browser_rescue: true
 
   # Campus allowlist — any staged course whose location does not contain
@@ -48,4 +50,4 @@ extraction:
 
   filters:
     domestic_only:
-      enabled: true   # Preserve current prod behaviour: filter runs for all unis.
+      enabled: true
