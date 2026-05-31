@@ -316,6 +316,30 @@ def _check_course(
     intl_fee = payload.get("international_fee")
     domestic_fee = payload.get("domestic_fee")
     has_central_fee = payload.get("has_central_fee_page")
+    fee_term = (payload.get("fee_term") or "").strip()
+    duration_raw = payload.get("duration")
+    duration_term_raw = (payload.get("duration_term") or "year").lower()
+    degree_level_raw = (payload.get("degree_level") or "").lower()
+
+    # Annual-equivalent thresholds by degree level (AUD/year).
+    # Used when fee_term == "Full Course" to catch unreasonably high totals.
+    _ANNUAL_THRESH: list[tuple[list[str], float]] = [
+        (["doctorate", "phd", "ph.d"],          90_000.0),
+        (["master"],                             70_000.0),
+        (["graduate certificate"],               40_000.0),
+        (["graduate diploma"],                   55_000.0),
+        (["diploma"],                            50_000.0),
+        (["bachelor"],                           60_000.0),
+        (["associate"],                          45_000.0),
+        (["certificate"],                        35_000.0),
+    ]
+
+    def _annual_threshold(dl: str) -> float:
+        for keywords, thresh in _ANNUAL_THRESH:
+            if any(k in dl for k in keywords):
+                return thresh
+        return 80_000.0  # conservative fallback
+
     if intl_fee is None:
         # Detect CSP / domestic-only fee situation — when a domestic fee
         # (HECS / Commonwealth Supported Place) is present but no international
@@ -355,6 +379,67 @@ def _check_course(
                 add("critical", "fee_too_high",
                     f"International fee {fee_val:.0f} AUD is implausibly high "
                     f"(max threshold: {_FEE_MAX:.0f}).")
+
+            # ── Full Course fee normalisation ──────────────────────────
+            is_full_course = fee_term.lower() in ("full course", "full", "total", "full program")
+            if is_full_course:
+                # Always emit an info chip so operators know this is a total fee.
+                add(
+                    "info",
+                    "full_course_fee_detected",
+                    f"Fee {fee_val:,.0f} is marked as a full-course total (fee_term={fee_term!r}). "
+                    "Annual equivalent should be verified against course duration.",
+                )
+
+                # Convert duration to years for the annual equivalent.
+                dur_years: float | None = None
+                if duration_raw is not None:
+                    try:
+                        d = float(duration_raw)
+                        t = duration_term_raw
+                        if "month" in t:
+                            dur_years = d / 12.0
+                        elif "week" in t:
+                            dur_years = d / 52.0
+                        elif "semester" in t or "trimester" in t:
+                            dur_years = d / 2.0
+                        else:
+                            dur_years = d  # assume years
+                    except (TypeError, ValueError):
+                        pass
+
+                if dur_years is None or dur_years <= 0:
+                    add(
+                        "critical",
+                        "full_course_fee_no_duration",
+                        f"Fee is marked as a full-course total ({fee_val:,.0f}) but no valid "
+                        "duration was found. Cannot calculate the annual equivalent — "
+                        "manual review required before publishing.",
+                    )
+                else:
+                    annual_equiv = fee_val / dur_years
+                    thresh = _annual_threshold(degree_level_raw)
+                    if annual_equiv > thresh:
+                        add(
+                            "warning",
+                            "full_course_fee_suspicious",
+                            f"Full-course fee {fee_val:,.0f} ÷ {dur_years:.1f} yr = "
+                            f"{annual_equiv:,.0f}/yr — exceeds the expected annual "
+                            f"threshold of {thresh:,.0f}/yr for this degree level "
+                            f"({degree_level_raw or 'unknown'}). "
+                            "The fee may have been captured as an annual amount that "
+                            "was mistakenly tagged as Full Course, or the total is genuinely "
+                            "high. Review before publishing.",
+                        )
+                    else:
+                        # Within threshold — emit info with the calculated equivalent.
+                        add(
+                            "info",
+                            "full_course_fee_annual_ok",
+                            f"Annual equivalent: {annual_equiv:,.0f}/yr "
+                            f"({fee_val:,.0f} ÷ {dur_years:.1f} yr). "
+                            "Within expected range — verify against source page.",
+                        )
         except (TypeError, ValueError):
             add("warning", "non_numeric_fee",
                 f"International fee value is not numeric: {intl_fee!r}")

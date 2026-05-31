@@ -2196,13 +2196,45 @@ export default function Scraping() {
                           {course.duration ? `${course.duration} ${course.durationTerm || ""}` : <span className="text-gray-300">-</span>}
                         </td>
                         <td className="p-2 text-right font-medium whitespace-nowrap">
-                          {course.internationalFee ? (
-                            <span className="text-green-700">
-                              {course.currency === "GBP" ? "\u00A3" : course.currency === "USD" ? "$" : "A$"}
-                              {course.internationalFee.toLocaleString()}
-                              <span className="text-xs text-gray-400 ml-1">/{course.feeTerm || "yr"}</span>
-                            </span>
-                          ) : (
+                          {course.internationalFee ? (() => {
+                            const currSym = course.currency === "GBP" ? "£" : course.currency === "USD" ? "$" : "A$";
+                            const isFullCourse = (course.feeTerm || "").toLowerCase().includes("full");
+                            const dur = course.duration;
+                            const durTerm = (course.durationTerm || "year").toLowerCase();
+                            let annualEquiv: number | null = null;
+                            if (isFullCourse && dur && dur > 0) {
+                              const durYears = durTerm.includes("month") ? dur / 12
+                                : durTerm.includes("week") ? dur / 52
+                                : durTerm.includes("semester") || durTerm.includes("trimester") ? dur / 2
+                                : dur;
+                              annualEquiv = Math.round(course.internationalFee / durYears);
+                            }
+                            return (
+                              <span>
+                                {isFullCourse ? (
+                                  <span className="text-amber-700" title={`Full course total: ${currSym}${course.internationalFee.toLocaleString()}`}>
+                                    <span className="text-[10px] text-amber-500 block leading-none mb-0.5">full course</span>
+                                    {currSym}{course.internationalFee.toLocaleString()}
+                                  </span>
+                                ) : (
+                                  <span className="text-green-700">
+                                    {currSym}{course.internationalFee.toLocaleString()}
+                                    <span className="text-xs text-gray-400 ml-1">/{course.feeTerm || "yr"}</span>
+                                  </span>
+                                )}
+                                {isFullCourse && annualEquiv !== null && (
+                                  <span className="block text-[10px] text-green-600 leading-none mt-0.5" title="Annual equivalent (÷ duration)">
+                                    ≈ {currSym}{annualEquiv.toLocaleString()}/yr
+                                  </span>
+                                )}
+                                {isFullCourse && !annualEquiv && (
+                                  <span className="block text-[10px] text-red-500 leading-none mt-0.5" title="Cannot compute annual equivalent — duration missing">
+                                    ⚠ no duration
+                                  </span>
+                                )}
+                              </span>
+                            );
+                          })() : (
                             <span className="inline-flex items-center gap-0.5 text-amber-600 text-xs font-medium" title="Missing international fee">
                               <AlertTriangle className="w-3 h-3" />
                             </span>

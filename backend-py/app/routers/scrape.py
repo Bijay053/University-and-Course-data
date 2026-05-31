@@ -3312,7 +3312,7 @@ async def get_course_quality_scores(
     rows = (await db.execute(
         text("""
             SELECT
-                id, course_name, international_fee,
+                id, course_name, international_fee, fee_term,
                 ielts_overall, ielts_reading, ielts_writing,
                 ielts_listening, ielts_speaking,
                 pte_overall, toefl_overall, cambridge_overall, duolingo_overall,
@@ -3334,6 +3334,10 @@ async def get_course_quality_scores(
         "fee_too_high":                          "Fee Too High",
         "missing_international_fee_central_page":"Fee: Central Page",
         "non_numeric_fee":                       "Bad Fee Value",
+        "full_course_fee_detected":              "Full Course Fee",
+        "full_course_fee_no_duration":           "Full Course / No Duration",
+        "full_course_fee_suspicious":            "Full Course Fee High",
+        "full_course_fee_annual_ok":             "Annual Equiv. OK",
         "missing_english_requirement":           "Missing IELTS",
         "english_coherence_toefl":               "IELTS/TOEFL Mismatch",
         "english_coherence_pte":                 "IELTS/PTE Mismatch",
@@ -3360,6 +3364,10 @@ async def get_course_quality_scores(
             "domestic_fee_only_no_international",
             "fee_too_low", "fee_too_high", "non_numeric_fee",
             "missing_international_fee_central_page",
+            "full_course_fee_detected",
+            "full_course_fee_no_duration",
+            "full_course_fee_suspicious",
+            "full_course_fee_annual_ok",
         },
         "ielts": {
             "missing_english_requirement",
@@ -3385,6 +3393,7 @@ async def get_course_quality_scores(
         payload: dict = {
             "course_name":       row["course_name"],
             "international_fee": row["international_fee"],
+            "fee_term":          row["fee_term"],
             "domestic_fee":      None,
             "ielts_overall":     row["ielts_overall"],
             "ielts_reading":     row["ielts_reading"],
@@ -4367,7 +4376,66 @@ async def extraction_quality_report(
             ),
         })
 
-    # 5. Fee suspiciously low (likely domestic AUD/GBP captured instead of international)
+    # 5a. Full Course fee pattern — many fees tagged as "Full Course" total
+    _full_course_rows = [
+        r for r in rows
+        if r.international_fee and (r.fee_term or "").lower() in (
+            "full course", "full", "total", "full program"
+        )
+    ]
+    if _full_course_rows:
+        fc_cnt = len(_full_course_rows)
+        fc_pct = fc_cnt / n * 100
+        # Compute annual equivalents for ones that have duration
+        _annual_equivs = []
+        for _r in _full_course_rows:
+            try:
+                _d = float(_r.duration) if _r.duration else None
+                _t = (_r.duration_term or "year").lower()
+                if _d and _d > 0:
+                    _dy = _d / 12 if "month" in _t else _d / 52 if "week" in _t else _d
+                    _ae = float(_r.international_fee) / _dy
+                    _annual_equivs.append((_r.course_name, float(_r.international_fee), _dy, _ae))
+            except Exception:
+                pass
+        _no_dur_cnt = fc_cnt - len(_annual_equivs)
+        detail_parts = [
+            f"{fc_cnt} of {n} courses ({fc_pct:.0f}%) have fee_term='Full Course' — "
+            "these are total programme fees, NOT annual fees. "
+            "The quality score treats them as-is which may make fees appear inflated."
+        ]
+        if _no_dur_cnt:
+            detail_parts.append(
+                f"{_no_dur_cnt} of these have no duration, so the annual equivalent cannot be calculated — "
+                "they will be flagged as Data Quality Failure."
+            )
+        if _annual_equivs:
+            examples = "; ".join(
+                f"{name}: {fee:,.0f} ÷ {dy:.1f}yr = {ae:,.0f}/yr"
+                for name, fee, dy, ae in _annual_equivs[:3]
+            )
+            detail_parts.append(f"Annual equivalents: {examples}")
+        issues.append({
+            "field": "international_fee",
+            "issue_type": "full_course_fee_pattern",
+            "severity": "high" if fc_pct > 50 else "medium",
+            "count": fc_cnt,
+            "pct": round(fc_pct, 1),
+            "label": "Full Course fee total (not annual)",
+            "detail": " ".join(detail_parts),
+            "examples": [
+                f"{name}: {fee:,.0f} total → {ae:,.0f}/yr ({dy:.1f}yr)"
+                for name, fee, dy, ae in _annual_equivs[:3]
+            ],
+            "suggested_fix": (
+                "Check whether the extractor is capturing the total programme cost. "
+                "If the page lists an annual fee, update fee_term to 'Year' in the YAML. "
+                "If it is genuinely a full-course total, the quality gate will require duration "
+                "to be set so the annual equivalent can be validated."
+            ),
+        })
+
+    # 5b. Fee suspiciously low (likely domestic AUD/GBP captured instead of international)
     _low_fees = [
         r for r in rows
         if r.international_fee and 0 < r.international_fee < 2000
