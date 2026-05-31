@@ -3877,6 +3877,82 @@ async def extract_course(
                     payload.get("course_location"),
                 )
 
+        # ── UEL: on-campus study_mode override (2026-05-31) ─────────────────
+        # UEL (www.uel.ac.uk) is a physical campus university (Docklands /
+        # Stratford campuses). Every course page contains "apply online" /
+        # "online student services" which leads Gemini (ai_fallback) to return
+        # study_mode="Online". The study_mode:rule extractor is already
+        # suppressed for UEL (no rule evidence), so the _post_ai_rule_only
+        # gate above never fires — ALL evidence is ai_fallback, not rule-only.
+        # Override to "On Campus" when:
+        #   (a) host is UEL, AND
+        #   (b) study_mode is still "Online", AND
+        #   (c) no high-authority structural evidence confirms Online delivery
+        #       (span_id_delivery / data_attribute / gemini_primary are the only
+        #       methods trusted to identify genuinely online-only courses).
+        _uel_host = urlparse(url).netloc.lower()
+        if _uel_host in {"www.uel.ac.uk", "uel.ac.uk"}:
+            _uel_high_auth = {"span_id_delivery", "data_attribute", "gemini_primary"}
+            _uel_study_ev = [e for e in evidence if e.get("field_key") == "study_mode"]
+            if (
+                payload.get("study_mode") == "Online"
+                and not any(e.get("method", "") in _uel_high_auth for e in _uel_study_ev)
+            ):
+                payload["study_mode"] = "On Campus"
+                evidence.append({
+                    "field_key": "study_mode",
+                    "value": "On Campus",
+                    "confidence": 0.70,
+                    "method": "study_mode:host_default",
+                    "snippet": (
+                        "UEL on-campus override: 'Online' from ai_fallback with no "
+                        "structural delivery evidence overridden to 'On Campus'"
+                    ),
+                })
+                log.info(
+                    "[UEL] study_mode 'Online' → 'On Campus' (no structural delivery evidence) for %s",
+                    url,
+                )
+
+            # ── UEL: campus location normalisation (2026-05-31) ──────────────
+            # Extractor often picks up "London" from generic page copy (footer,
+            # "Study in London" marketing). UEL campuses are:
+            #   • Docklands (Royal Docks, E16)
+            #   • Stratford / University Square Stratford (E20)
+            # Map extracted values to canonical names; blank out bare "London"
+            # so auto-publish doesn't stage ambiguous location data.
+            _uel_raw_loc = (payload.get("course_location") or "").strip()
+            if _uel_raw_loc:
+                _uel_loc_lc = _uel_raw_loc.lower()
+                if "docklands" in _uel_loc_lc or "royal docks" in _uel_loc_lc:
+                    _uel_norm_loc: str | None = "Docklands"
+                elif "university square" in _uel_loc_lc or "uss" in _uel_loc_lc:
+                    _uel_norm_loc = "University Square Stratford"
+                elif "stratford" in _uel_loc_lc:
+                    _uel_norm_loc = "Stratford"
+                elif _uel_loc_lc.strip(" ,") in {
+                    "london", "london uk", "london, uk",
+                    "united kingdom", "uk", "east london",
+                }:
+                    _uel_norm_loc = None
+                else:
+                    _uel_norm_loc = _uel_raw_loc
+                if _uel_norm_loc != _uel_raw_loc:
+                    payload["course_location"] = _uel_norm_loc
+                    evidence.append({
+                        "field_key": "course_location",
+                        "value": _uel_norm_loc or "",
+                        "confidence": 0.80,
+                        "method": "course_location:uel_campus_normalise",
+                        "snippet": (
+                            f"UEL campus normalisation: {_uel_raw_loc!r} → {_uel_norm_loc!r}"
+                        ),
+                    })
+                    log.info(
+                        "[UEL] course_location %r → %r for %s",
+                        _uel_raw_loc, _uel_norm_loc, url,
+                    )
+
         # ── Federation JSON-block authoritative override (2026-05-10) ──
         # Federation embeds the canonical course summary as a JSON tree
         # inside <script>; the standard text-strip wipes it, so the

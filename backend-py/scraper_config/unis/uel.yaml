@@ -75,14 +75,21 @@ discovery:
     - "/business"
     - "/employer"
 
-  # Post-filter: only course URLs containing /courses/ in the path are kept.
-  # UEL individual course pages live at /courses/<level>/<slug> (e.g.
-  # /courses/undergraduate/ba-business-management). The listing/hub pages are
-  # at /study/*, but the individual degree pages do NOT contain /study/.
-  # Previous value was "/study/" which dropped all discovered URLs (Bug fix
-  # 2026-05-30: changed from "/study/" to "/courses/").
+  # Post-filter: keep any course URL that looks like a UEL course page.
+  # ANY match in the list passes (OR semantics).
+  #
+  # Why two patterns:
+  #   "/postgraduate/courses/" — confirmed PG URL structure (e.g. /postgraduate/courses/msc-xxx)
+  #   "/undergraduate/"       — UG course pages may live at /undergraduate/<slug> WITHOUT
+  #                             a nested /courses/ segment; using just "/courses/" silently
+  #                             drops the entire undergraduate catalogue.
+  #
+  # Previous value was "/courses/" only, which filtered out all UG course links
+  # whose URLs were at /undergraduate/<slug> rather than /undergraduate/courses/<slug>.
+  # (Bug identified 2026-05-31: 51 staged courses, all Master's, 0 UG.)
   must_contain:
-    - "/courses/"
+    - "/undergraduate/"
+    - "/postgraduate/courses/"
 
 extraction:
   filters:
