@@ -538,7 +538,7 @@ export default function RecipeEditorPage() {
   const [showDropped, setShowDropped] = useState(false);
   const [diagnosing, setDiagnosing] = useState(false);
   const [diagnoseResult, setDiagnoseResult] = useState<any | null>(null);
-  const [beforeSnapshot, setBeforeSnapshot] = useState<Record<string, { count: number; missing: number; pct: number }> | null>(null);
+  const [beforeSnapshot, setBeforeSnapshot] = useState<Record<string, any> | null>(null);
 
   // ── Load ──
   useEffect(() => {
@@ -1313,69 +1313,166 @@ export default function RecipeEditorPage() {
                 const before = beforeSnapshot;
                 const after = p1.field_completion as Record<string, any>;
                 const allFields = Array.from(new Set([...Object.keys(before), ...Object.keys(after)]));
-                const improved = allFields.filter(f => (after[f]?.pct ?? 0) > (before[f]?.pct ?? 0) + 0.04);
-                const worsened = allFields.filter(f => (after[f]?.pct ?? 0) < (before[f]?.pct ?? 0) - 0.04);
+
+                // A field "improved" if completion OR quality went up meaningfully
+                const fillImproved  = allFields.filter(f => (after[f]?.pct ?? 0) > (before[f]?.pct ?? 0) + 0.04);
+                const qualImproved  = allFields.filter(f =>
+                  after[f]?.quality_pct != null &&
+                  before[f]?.quality_pct != null &&
+                  (after[f].quality_pct - before[f].quality_pct) > 0.04
+                );
+                const anyImproved   = Array.from(new Set([...fillImproved, ...qualImproved]));
+                const fillWorsened  = allFields.filter(f => (after[f]?.pct ?? 0) < (before[f]?.pct ?? 0) - 0.04);
 
                 const verdict =
-                  improved.length >= allFields.length * 0.5
-                    ? { label: "Successful", icon: "✅", className: "bg-green-50 border-green-200 text-green-800" }
-                    : improved.length > 0
-                    ? { label: "Partially Successful", icon: "⚠️", className: "bg-yellow-50 border-yellow-200 text-yellow-800" }
-                    : { label: "No Improvement Detected", icon: "❌", className: "bg-red-50 border-red-200 text-red-800" };
+                  anyImproved.length >= allFields.length * 0.5
+                    ? { label: "Successful", icon: "✅", className: "bg-green-50 border-green-300 text-green-800" }
+                    : anyImproved.length > 0
+                    ? { label: "Partially Successful", icon: "⚠️", className: "bg-yellow-50 border-yellow-300 text-yellow-800" }
+                    : { label: "No Improvement Detected", icon: "❌", className: "bg-red-50 border-red-300 text-red-800" };
 
                 const FIELD_LABELS2: Record<string, string> = {
                   international_fee: "International fee", ielts_overall: "IELTS",
                   pte_overall: "PTE", toefl_overall: "TOEFL", study_mode: "Study mode",
                   degree_level: "Degree level", duration: "Duration",
                   academic_level: "Academic level", intake_months: "Intakes",
+                  course_location: "Location",
                 };
+
+                // Helper: delta badge
+                const DeltaBadge = ({ val }: { val: number }) =>
+                  val === 0
+                    ? <span className="text-muted-foreground">—</span>
+                    : <span className={`font-bold ${val > 0 ? "text-green-700" : "text-red-700"}`}>
+                        {val > 0 ? "+" : ""}{val}pp
+                      </span>;
+
+                // Helper: cell showing fill% and optionally quality%
+                const Cell = ({ stat, dim }: { stat: any; dim?: "fill" | "quality" }) => {
+                  if (!stat) return <span className="text-muted-foreground">—</span>;
+                  if (dim === "quality") {
+                    if (stat.quality_pct == null) return <span className="text-muted-foreground text-xs italic">n/a</span>;
+                    const q = Math.round(stat.quality_pct * 100);
+                    return <span className={q >= 90 ? "text-green-700 font-semibold" : q >= 70 ? "text-yellow-700 font-semibold" : "text-orange-700 font-semibold"}>{q}%</span>;
+                  }
+                  const p = Math.round((stat.pct ?? 0) * 100);
+                  return <span className={p >= 80 ? "text-green-700 font-semibold" : p >= 50 ? "text-yellow-700 font-semibold" : "text-red-700 font-semibold"}>{p}%</span>;
+                };
+
+                // Only show quality rows when at least one field has quality data
+                const hasAnyQuality = allFields.some(f => after[f]?.quality_pct != null || before[f]?.quality_pct != null);
 
                 return (
                   <div>
                     <div className="flex items-center gap-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
                       <TrendingUp className="h-3 w-3" /> Fix Verification — Before vs After
                     </div>
-                    <div className={`rounded-lg border px-3 py-2 mb-3 flex items-center gap-2 text-sm font-medium ${verdict.className}`}>
-                      <span>{verdict.icon}</span>
+
+                    {/* Verdict banner */}
+                    <div className={`rounded-lg border px-3 py-2.5 mb-3 flex items-center gap-2 text-sm font-semibold ${verdict.className}`}>
+                      <span className="text-base">{verdict.icon}</span>
                       <span>{verdict.label}</span>
-                      {improved.length > 0 && (
-                        <span className="ml-1 font-normal text-xs">
-                          {improved.length} field{improved.length !== 1 ? "s" : ""} improved
-                          {worsened.length > 0 ? `, ${worsened.length} worsened` : ""}
-                        </span>
-                      )}
+                      <span className="font-normal text-xs ml-1">
+                        {anyImproved.length > 0
+                          ? `${anyImproved.length} field${anyImproved.length !== 1 ? "s" : ""} improved${fillWorsened.length > 0 ? ` · ${fillWorsened.length} worsened` : ""}`
+                          : "No fields improved after applying this fix"}
+                      </span>
                     </div>
+
+                    {/* Comparison table */}
                     <div className="overflow-x-auto rounded-lg border border-gray-200">
                       <table className="w-full text-xs">
                         <thead>
                           <tr className="bg-gray-50 border-b border-gray-200">
-                            <th className="text-left px-3 py-2 text-muted-foreground font-medium">Field</th>
-                            <th className="text-right px-3 py-2 text-muted-foreground font-medium">Before</th>
-                            <th className="text-right px-3 py-2 text-muted-foreground font-medium">After</th>
-                            <th className="text-right px-3 py-2 text-muted-foreground font-medium">Δ</th>
+                            <th className="text-left px-3 py-2 text-muted-foreground font-medium w-32">Field</th>
+                            <th className="text-center px-2 py-2 text-muted-foreground font-medium" colSpan={2}>Before Fix</th>
+                            <th className="text-center px-2 py-2 text-muted-foreground font-medium" colSpan={2}>After Fix</th>
+                            <th className="text-center px-2 py-2 text-muted-foreground font-medium" colSpan={2}>Change</th>
+                          </tr>
+                          <tr className="bg-gray-50/60 border-b border-gray-200 text-muted-foreground/70">
+                            <th className="px-3 py-1" />
+                            <th className="px-2 py-1 font-normal text-center">Fill</th>
+                            {hasAnyQuality && <th className="px-2 py-1 font-normal text-center">Quality</th>}
+                            <th className="px-2 py-1 font-normal text-center">Fill</th>
+                            {hasAnyQuality && <th className="px-2 py-1 font-normal text-center">Quality</th>}
+                            <th className="px-2 py-1 font-normal text-center">Fill Δ</th>
+                            {hasAnyQuality && <th className="px-2 py-1 font-normal text-center">Quality Δ</th>}
                           </tr>
                         </thead>
                         <tbody>
                           {allFields.map(f => {
-                            const bPct = Math.round((before[f]?.pct ?? 0) * 100);
-                            const aPct = Math.round((after[f]?.pct ?? 0) * 100);
-                            const delta = aPct - bPct;
-                            const isImproved = improved.includes(f);
-                            const isWorsened = worsened.includes(f);
+                            const bFill = Math.round((before[f]?.pct ?? 0) * 100);
+                            const aFill = Math.round((after[f]?.pct ?? 0) * 100);
+                            const fillDelta = aFill - bFill;
+                            const bQual = before[f]?.quality_pct != null ? Math.round(before[f].quality_pct * 100) : null;
+                            const aQual = after[f]?.quality_pct != null  ? Math.round(after[f].quality_pct * 100)  : null;
+                            const qualDelta = bQual != null && aQual != null ? aQual - bQual : null;
+                            const rowImproved = fillDelta > 4 || (qualDelta != null && qualDelta > 4);
+                            const rowWorsened = fillDelta < -4;
                             return (
-                              <tr key={f} className={`border-b border-gray-100 last:border-0 ${isImproved ? "bg-green-50" : isWorsened ? "bg-red-50" : ""}`}>
-                                <td className="px-3 py-1.5 text-muted-foreground">{FIELD_LABELS2[f] ?? f}</td>
-                                <td className="px-3 py-1.5 text-right">{bPct}%</td>
-                                <td className="px-3 py-1.5 text-right font-medium">{aPct}%</td>
-                                <td className={`px-3 py-1.5 text-right font-bold ${delta > 0 ? "text-green-700" : delta < 0 ? "text-red-700" : "text-muted-foreground"}`}>
-                                  {delta > 0 ? `+${delta}` : delta === 0 ? "—" : delta}%
+                              <tr
+                                key={f}
+                                className={`border-b border-gray-100 last:border-0 ${rowImproved ? "bg-green-50" : rowWorsened ? "bg-red-50" : ""}`}
+                              >
+                                <td className="px-3 py-2 text-muted-foreground font-medium">
+                                  {FIELD_LABELS2[f] ?? f}
                                 </td>
+                                {/* Before fill */}
+                                <td className="px-2 py-2 text-center">
+                                  <Cell stat={before[f]} dim="fill" />
+                                </td>
+                                {/* Before quality */}
+                                {hasAnyQuality && (
+                                  <td className="px-2 py-2 text-center">
+                                    <Cell stat={before[f]} dim="quality" />
+                                  </td>
+                                )}
+                                {/* After fill */}
+                                <td className="px-2 py-2 text-center">
+                                  <Cell stat={after[f]} dim="fill" />
+                                </td>
+                                {/* After quality */}
+                                {hasAnyQuality && (
+                                  <td className="px-2 py-2 text-center">
+                                    <Cell stat={after[f]} dim="quality" />
+                                  </td>
+                                )}
+                                {/* Fill delta */}
+                                <td className="px-2 py-2 text-center">
+                                  <DeltaBadge val={fillDelta} />
+                                </td>
+                                {/* Quality delta */}
+                                {hasAnyQuality && (
+                                  <td className="px-2 py-2 text-center">
+                                    {qualDelta != null ? <DeltaBadge val={qualDelta} /> : <span className="text-muted-foreground">—</span>}
+                                  </td>
+                                )}
                               </tr>
                             );
                           })}
                         </tbody>
                       </table>
                     </div>
+
+                    {/* Plain-language summary */}
+                    <div className="mt-2 space-y-0.5">
+                      {fillImproved.length > 0 && (
+                        <p className="text-xs text-green-700">
+                          ✓ Fill improved on: {fillImproved.map(f => FIELD_LABELS2[f] ?? f).join(", ")}
+                        </p>
+                      )}
+                      {qualImproved.length > 0 && (
+                        <p className="text-xs text-green-700">
+                          ✓ Quality improved on: {qualImproved.map(f => FIELD_LABELS2[f] ?? f).join(", ")}
+                        </p>
+                      )}
+                      {fillWorsened.length > 0 && (
+                        <p className="text-xs text-red-700">
+                          ✗ Fill dropped on: {fillWorsened.map(f => FIELD_LABELS2[f] ?? f).join(", ")}
+                        </p>
+                      )}
+                    </div>
+
                     <button
                       onClick={() => setBeforeSnapshot(null)}
                       className="mt-2 text-xs text-muted-foreground hover:text-foreground"
