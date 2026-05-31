@@ -3611,6 +3611,444 @@ Return only valid JSON, no markdown fences."""
     }
 
 
+# ── Extraction Quality Report ─────────────────────────────────────────────────
+
+@router.post("/jobs/{job_id}/extraction-quality")
+async def extraction_quality_report(
+    job_id: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> dict:
+    """Per-field extraction quality diagnostics for a scrape job.
+
+    Scans ALL staged courses for the job and returns:
+    - Fill rates for every completeness field
+    - Detected extraction defects (uni name in title, domestic fee, nav text
+      as location, blank IELTS, etc.) with counts, percentages, and examples
+    - An overall extraction score (0-100)
+
+    All checks are deterministic — no LLM cost, runs in < 1 s.
+    """
+    from sqlalchemy import select as _sel
+    from app.models import ScrapeRuntimeJob, University, ScrapedCourse
+    from app.services.scraper.course_name_cleaner import clean_course_name
+
+    # ── Load job & university ──────────────────────────────────────────────
+    job = (await db.execute(
+        _sel(ScrapeRuntimeJob).where(ScrapeRuntimeJob.runtime_job_id == job_id)
+    )).scalar_one_or_none()
+    if not job:
+        raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
+
+    uni: University | None = await db.get(University, job.university_id) if job.university_id else None
+    uni_name = uni.name if uni else ""
+
+    # ── Load all staged courses for this job ──────────────────────────────
+    rows: list[ScrapedCourse] = (await db.execute(
+        _sel(ScrapedCourse).where(ScrapedCourse.scrape_job_id == job_id)
+    )).scalars().all()
+
+    n = len(rows)
+    if n == 0:
+        return {
+            "ok": True,
+            "job_id": job_id,
+            "course_count": 0,
+            "avg_completeness_pct": 0,
+            "field_fill_rates": {},
+            "issues": [],
+            "extraction_score": 0,
+            "message": "No staged courses found for this job.",
+        }
+
+    # ── Field fill rates (mirror the 13 auto-publish completeness fields) ──
+    def _has_english(r: ScrapedCourse) -> bool:
+        return bool(r.ielts_overall or r.pte_overall or r.toefl_overall or r.cambridge_overall)
+
+    _FIELDS: list[tuple[str, str]] = [
+        ("course_name",       "Course Name"),
+        ("degree_level",      "Degree Level"),
+        ("category",          "Category"),
+        ("study_mode",        "Study Mode"),
+        ("course_location",   "Course Location"),
+        ("duration",          "Duration"),
+        ("intake_months",     "Intake Months"),
+        ("international_fee", "International Fee"),
+        ("description",       "Description"),
+        ("academic_level",    "Academic Level"),
+        ("academic_score",    "Academic Score"),
+        ("english_test",      "English Test"),
+        ("other_requirement", "Other Requirement"),
+    ]
+
+    def _filled(r: ScrapedCourse, field: str) -> bool:
+        if field == "english_test":
+            return _has_english(r)
+        if field == "intake_months":
+            v = r.intake_months
+            return bool(v) and len(v) > 0
+        v = getattr(r, field, None)
+        if isinstance(v, str):
+            return bool(v.strip())
+        return v is not None
+
+    fill_counts: dict[str, int] = {f: sum(1 for r in rows if _filled(r, f)) for f, _ in _FIELDS}
+    field_fill_rates: dict[str, float] = {
+        f: round(fill_counts[f] / n * 100, 1) for f, _ in _FIELDS
+    }
+
+    avg_completeness = round(sum(field_fill_rates.values()) / len(_FIELDS), 1)
+
+    # ── Nav-text regex (same as diagnose endpoint) ─────────────────────────
+    _NAV_HINTS_EQ = re.compile(
+        r"\b(?:student\s+information|campus\s+life|current\s+students|new\s+students|"
+        r"term\s+dates?|open\s+days?|how\s+to\s+apply|apply\s+now|contact\s+us|"
+        r"student\s+services|clearing|accommodation|global\s+rankings?|"
+        r"scholarships?|accessibility|international\s+students?)\b",
+        re.I,
+    )
+
+    # ── Issue detectors ────────────────────────────────────────────────────
+    issues: list[dict] = []
+
+    # 1. University name embedded in course title
+    _name_in_title: list[str] = []
+    for r in rows:
+        if not r.course_name:
+            continue
+        _, stripped = clean_course_name(r.course_name, university_name=uni_name)
+        if stripped:
+            _name_in_title.append(r.course_name)
+    if _name_in_title:
+        cnt = len(_name_in_title)
+        issues.append({
+            "field": "course_name",
+            "issue_type": "uni_name_in_title",
+            "severity": "critical",
+            "count": cnt,
+            "pct": round(cnt / n * 100, 1),
+            "label": "University name inside course title",
+            "detail": (
+                f"{cnt} of {n} courses ({cnt/n*100:.0f}%) have the university name embedded in "
+                f"the title after a separator (e.g. '| {uni_name}', 'at {uni_name}')."
+            ),
+            "examples": _name_in_title[:3],
+            "suggested_fix": (
+                f"Add '{uni_name}' and any short aliases to "
+                f"extraction.course_name.university_aliases in the university's YAML config, "
+                f"or click 'Clean course names' on the staged courses panel."
+            ),
+        })
+
+    # 2. Course name too short
+    _too_short = [r.course_name for r in rows if r.course_name and len(r.course_name.strip()) < 10]
+    if _too_short:
+        cnt = len(_too_short)
+        issues.append({
+            "field": "course_name",
+            "issue_type": "course_name_too_short",
+            "severity": "high",
+            "count": cnt,
+            "pct": round(cnt / n * 100, 1),
+            "label": "Course name too short",
+            "detail": (
+                f"{cnt} courses have a name under 10 characters. "
+                "This usually means an abbreviation, code, or nav element was extracted instead of the full title."
+            ),
+            "examples": _too_short[:3],
+            "suggested_fix": (
+                "Check the course page HTML. The scraper may be reading a breadcrumb, "
+                "a course code field, or a collapsed heading element. "
+                "Try adding a CSS selector for the main h1 heading."
+            ),
+        })
+
+    # 3. Course name too long (likely nav content or multiple elements joined)
+    _too_long = [r.course_name for r in rows if r.course_name and len(r.course_name.strip()) > 200]
+    if _too_long:
+        cnt = len(_too_long)
+        issues.append({
+            "field": "course_name",
+            "issue_type": "course_name_too_long",
+            "severity": "medium",
+            "count": cnt,
+            "pct": round(cnt / n * 100, 1),
+            "label": "Course name suspiciously long",
+            "detail": (
+                f"{cnt} courses have a name over 200 characters. "
+                "The scraper may be capturing the page title + site name, or concatenating multiple elements."
+            ),
+            "examples": [n[:80] + "…" for n in _too_long[:3]],
+            "suggested_fix": (
+                "Inspect the extracted HTML element. The course title selector is likely "
+                "matching a container element rather than the specific h1/h2 heading."
+            ),
+        })
+
+    # 4. International fee blank
+    _fee_blank_cnt = sum(1 for r in rows if not r.international_fee or r.international_fee == 0)
+    if _fee_blank_cnt > 0:
+        pct = _fee_blank_cnt / n * 100
+        sev = "critical" if pct > 30 else "high" if pct > 10 else "medium"
+        issues.append({
+            "field": "international_fee",
+            "issue_type": "international_fee_blank",
+            "severity": sev,
+            "count": _fee_blank_cnt,
+            "pct": round(pct, 1),
+            "label": "International fee missing",
+            "detail": (
+                f"{_fee_blank_cnt} of {n} courses ({pct:.0f}%) have no international fee. "
+                "This is the most important field for agents comparing universities."
+            ),
+            "examples": [],
+            "suggested_fix": (
+                "Check whether fees are on a separate fee schedule page (add its URL to "
+                "extraction.fee_page_urls in the YAML). If fees are behind an 'International' tab, "
+                "enable the international tab click in extraction config."
+            ),
+        })
+
+    # 5. Fee suspiciously low (likely domestic AUD/GBP captured instead of international)
+    _low_fees = [
+        r for r in rows
+        if r.international_fee and 0 < r.international_fee < 2000
+    ]
+    if _low_fees:
+        cnt = len(_low_fees)
+        issues.append({
+            "field": "international_fee",
+            "issue_type": "fee_suspiciously_low",
+            "severity": "high",
+            "count": cnt,
+            "pct": round(cnt / n * 100, 1),
+            "label": "Fee value suspiciously low (< 2000)",
+            "detail": (
+                f"{cnt} courses have an international fee below 2,000. "
+                "This typically means a domestic/HECS fee was extracted, a per-unit fee was captured "
+                "instead of the annual total, or the page lists a partial fee."
+            ),
+            "examples": [f"{r.course_name}: {r.currency or ''}{r.international_fee}" for r in _low_fees[:3]],
+            "suggested_fix": (
+                "Inspect the fee element on the course page. Ensure the scraper targets "
+                "the international annual total, not per-credit-point or domestic amounts. "
+                "If the page has an 'International students' tab, the scraper needs to click it first."
+            ),
+        })
+
+    # 6. Location: nav text contamination
+    _nav_locs = [
+        r.course_location for r in rows
+        if r.course_location and _NAV_HINTS_EQ.search(r.course_location)
+    ]
+    if _nav_locs:
+        cnt = len(_nav_locs)
+        issues.append({
+            "field": "course_location",
+            "issue_type": "nav_text_as_location",
+            "severity": "high",
+            "count": cnt,
+            "pct": round(cnt / n * 100, 1),
+            "label": "Navigation text extracted as campus location",
+            "detail": (
+                f"{cnt} courses have nav/footer text saved as the campus location "
+                "(e.g. 'How to Apply', 'Scholarships', 'Student Services'). "
+                "The location selector is matching the page sidebar or footer."
+            ),
+            "examples": [v[:60] for v in _nav_locs[:3]],
+            "suggested_fix": (
+                "Add a CSS selector for the 'Fast Facts → Location' or 'Study Locations' section "
+                "to extraction.css_selectors.location in the YAML. "
+                "The current selector is too broad and matches navigation menus."
+            ),
+        })
+
+    # 7. Location: too long (multiple campuses concatenated without parsing)
+    _long_locs = [
+        r.course_location for r in rows
+        if r.course_location and len(r.course_location) > 150
+    ]
+    if _long_locs:
+        cnt = len(_long_locs)
+        issues.append({
+            "field": "course_location",
+            "issue_type": "location_over_concatenated",
+            "severity": "medium",
+            "count": cnt,
+            "pct": round(cnt / n * 100, 1),
+            "label": "Location value very long (multiple campuses joined)",
+            "detail": (
+                f"{cnt} courses have a location string over 150 characters. "
+                "Multiple campus names may be concatenated into a single text block."
+            ),
+            "examples": [v[:80] + "…" for v in _long_locs[:3]],
+            "suggested_fix": (
+                "Parse the location container and join only the campus name text nodes, "
+                "not the full surrounding block. Limit to the first 3 campus entries."
+            ),
+        })
+
+    # 8. English test entirely blank
+    _eng_blank_cnt = sum(1 for r in rows if not _has_english(r))
+    if _eng_blank_cnt > 0:
+        pct = _eng_blank_cnt / n * 100
+        sev = "critical" if pct > 50 else "high" if pct > 20 else "medium"
+        issues.append({
+            "field": "english_test",
+            "issue_type": "english_all_blank",
+            "severity": sev,
+            "count": _eng_blank_cnt,
+            "pct": round(pct, 1),
+            "label": "English requirement missing (IELTS/PTE/TOEFL all blank)",
+            "detail": (
+                f"{_eng_blank_cnt} of {n} courses ({pct:.0f}%) have no English test scores. "
+                "If the university publishes IELTS requirements, the scraper is not following "
+                "the English requirements link or is not reading the correct section."
+            ),
+            "examples": [],
+            "suggested_fix": (
+                "Check whether the university has a central 'English Language Requirements' page. "
+                "Add its URL to extraction.english_requirements_page_url in the YAML, or enable "
+                "extraction.follow_english_links to auto-follow requirement links on each course page."
+            ),
+        })
+
+    # 9. IELTS value out of plausible range
+    _bad_ielts = [
+        r for r in rows
+        if r.ielts_overall is not None and (r.ielts_overall < 4.0 or r.ielts_overall > 9.5)
+    ]
+    if _bad_ielts:
+        cnt = len(_bad_ielts)
+        issues.append({
+            "field": "ielts_overall",
+            "issue_type": "ielts_out_of_range",
+            "severity": "high",
+            "count": cnt,
+            "pct": round(cnt / n * 100, 1),
+            "label": "IELTS score outside valid range (4.0–9.5)",
+            "detail": (
+                f"{cnt} courses have an IELTS value outside the plausible 4.0–9.5 band. "
+                "The scraper may be capturing a wrong number (e.g. a year, phone number suffix, or credit value)."
+            ),
+            "examples": [f"{r.course_name}: IELTS {r.ielts_overall}" for r in _bad_ielts[:3]],
+            "suggested_fix": (
+                "Inspect the text node around the IELTS score. Add a tighter CSS selector or "
+                "regex anchor so only the band score number is extracted."
+            ),
+        })
+
+    # 10. Study mode blank
+    _mode_blank_cnt = sum(1 for r in rows if not r.study_mode)
+    if _mode_blank_cnt > 0:
+        pct = _mode_blank_cnt / n * 100
+        sev = "high" if pct > 30 else "medium"
+        issues.append({
+            "field": "study_mode",
+            "issue_type": "study_mode_blank",
+            "severity": sev,
+            "count": _mode_blank_cnt,
+            "pct": round(pct, 1),
+            "label": "Study mode missing",
+            "detail": (
+                f"{_mode_blank_cnt} of {n} courses ({pct:.0f}%) have no study mode (On-Campus / Online / Hybrid). "
+                "Agents use this to filter courses for visa eligibility."
+            ),
+            "examples": [],
+            "suggested_fix": (
+                "Add 'On-Campus', 'Online', or 'Blended' keywords to the study mode extraction rules. "
+                "The delivery mode is often in a 'Fast Facts' sidebar, a 'How you'll study' section, "
+                "or tagged as a structured data property."
+            ),
+        })
+
+    # 11. Intake months blank
+    _intake_blank_cnt = sum(1 for r in rows if not r.intake_months or len(r.intake_months) == 0)
+    if _intake_blank_cnt > 0:
+        pct = _intake_blank_cnt / n * 100
+        sev = "high" if pct > 40 else "medium"
+        issues.append({
+            "field": "intake_months",
+            "issue_type": "intake_blank",
+            "severity": sev,
+            "count": _intake_blank_cnt,
+            "pct": round(pct, 1),
+            "label": "Intake months missing",
+            "detail": (
+                f"{_intake_blank_cnt} of {n} courses ({pct:.0f}%) have no intake months. "
+                "Intake data is typically in a 'Start dates', 'Intake', or 'Application deadline' section."
+            ),
+            "examples": [],
+            "suggested_fix": (
+                "Look for 'Start dates', 'Semester 1 / Semester 2', 'January/February/July' on "
+                "course pages. If intakes are listed on a central academic calendar, add that URL "
+                "to extraction.intake_page_url in the YAML."
+            ),
+        })
+
+    # 12. Degree level blank
+    _degree_blank_cnt = sum(1 for r in rows if not r.degree_level)
+    if _degree_blank_cnt > 0:
+        pct = _degree_blank_cnt / n * 100
+        sev = "high" if pct > 20 else "medium"
+        issues.append({
+            "field": "degree_level",
+            "issue_type": "degree_level_blank",
+            "severity": sev,
+            "count": _degree_blank_cnt,
+            "pct": round(pct, 1),
+            "label": "Degree level missing",
+            "detail": (
+                f"{_degree_blank_cnt} of {n} courses ({pct:.0f}%) have no degree level. "
+                "Degree level is inferred from the title keywords (Bachelor, Master, PhD, etc.)."
+            ),
+            "examples": [],
+            "suggested_fix": (
+                "Check whether course names follow a standard pattern. "
+                "If the university uses non-standard degree names, add keyword mappings "
+                "to extraction.degree_level_map in the YAML."
+            ),
+        })
+
+    # ── Sort issues: critical → high → medium → low ────────────────────────
+    _SEV_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3}
+    issues.sort(key=lambda i: _SEV_ORDER.get(i["severity"], 9))
+
+    # ── Overall extraction score ───────────────────────────────────────────
+    # Weighted average of key field fill rates, penalised by critical/high issues
+    _KEY_WEIGHTS = {
+        "course_name": 0.15,
+        "degree_level": 0.08,
+        "international_fee": 0.20,
+        "english_test": 0.15,
+        "study_mode": 0.10,
+        "course_location": 0.08,
+        "intake_months": 0.10,
+        "duration": 0.07,
+        "description": 0.07,
+    }
+    base_score = sum(
+        field_fill_rates.get(f, 0) * w for f, w in _KEY_WEIGHTS.items()
+    )
+    # Penalty: -5 per critical issue, -2 per high issue
+    penalty = sum(
+        5 if i["severity"] == "critical" else 2 if i["severity"] == "high" else 0
+        for i in issues
+    )
+    extraction_score = max(0, round(base_score - penalty))
+
+    return {
+        "ok": True,
+        "job_id": job_id,
+        "university": uni_name,
+        "course_count": n,
+        "avg_completeness_pct": avg_completeness,
+        "field_fill_rates": field_fill_rates,
+        "field_labels": {f: lbl for f, lbl in _FIELDS},
+        "issues": issues,
+        "extraction_score": extraction_score,
+    }
+
+
 @router.post("/jobs/{job_id}/apply-fix")
 async def apply_scrape_fix(
     job_id: str,
