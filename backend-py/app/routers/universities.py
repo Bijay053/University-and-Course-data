@@ -785,6 +785,93 @@ async def put_recipe(
     return {"ok": True, "university_id": uni_id, "recipe": body}
 
 
+@router.post("/universities/{uni_id}/recipe/test")
+async def test_recipe(
+    uni_id: int,
+    body: dict,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[dict, Depends(get_current_user)],
+) -> dict:
+    """Lightweight recipe discovery test — no staging, no Gemini, no DB writes.
+
+    Body fields (all optional — uses saved recipe + YAML defaults as fallback):
+      seed_urls           list[str]   Course listing page URLs to test
+      must_contain        list[str]   URL substrings that discovered links must contain
+      block_url_patterns  list[str]   Regex patterns to drop from discovered URLs
+      expected_min_courses int | null Warn/fail if fewer courses found
+      json_api            dict | null JSON API config {endpoint, root_path, course_url_template, ...}
+      time_limit_s        int         Max seconds to spend (default 60)
+
+    Returns:
+      status              PASS / WARN / FAIL
+      raw_found           Total course links before filters (deduped)
+      after_filter_count  Links surviving filters
+      seed_results        Per-seed-URL breakdown [{url, raw_found, status, sample_urls}]
+      api_result          JSON API result (if configured)
+      dropped_samples     First 10 dropped URLs
+      kept_samples        First 10 surviving URLs
+      warnings            Non-fatal issues
+      recommendations     Actionable next steps
+      elapsed_s           Seconds taken
+    """
+    u: University | None = await db.get(University, uni_id)
+    if not u:
+        raise HTTPException(status_code=404, detail="University not found")
+
+    scrape_url: str = u.scrape_url or ""
+    if not scrape_url:
+        raise HTTPException(status_code=400, detail="University has no scrape_url configured")
+
+    # Merge: saved recipe → request body (body fields win)
+    sc: dict = u.scrape_config or {}
+    saved_recipe: dict = sc.get("recipe") or {}
+
+    seed_urls: list[str] = body.get("seed_urls") or saved_recipe.get("seed_urls") or []
+    must_contain: list[str] = body.get("must_contain") or saved_recipe.get("must_contain") or []
+    block_url_patterns: list[str] = (
+        body.get("block_url_patterns") or saved_recipe.get("block_url_patterns") or []
+    )
+    expected_min: int | None = (
+        body.get("expected_min_courses") or saved_recipe.get("expected_min_courses") or None
+    )
+    json_api_cfg: dict | None = body.get("json_api") or saved_recipe.get("api") or None
+    time_limit_s: int = int(body.get("time_limit_s") or 60)
+    time_limit_s = max(10, min(time_limit_s, 120))  # clamp 10–120 s
+
+    # Also pull seed_urls from the YAML config if nothing else is configured
+    if not seed_urls:
+        try:
+            from app.services.scraper.config.loader import load_uni_config
+            _ucfg = await load_uni_config(uni_id, db)
+            yaml_seeds = list(getattr(getattr(_ucfg, "discovery", None), "seed_urls", []) or [])
+            if yaml_seeds:
+                seed_urls = yaml_seeds
+            if not expected_min:
+                expected_min = getattr(getattr(_ucfg, "discovery", None), "expected_min_courses", None)
+            if not must_contain:
+                must_contain = list(getattr(getattr(_ucfg, "discovery", None), "must_contain", []) or [])
+        except Exception:
+            pass
+
+    from app.services.scraper.recipe_tester import test_recipe as _test
+    result = await _test(
+        scrape_url=scrape_url,
+        seed_urls=seed_urls,
+        must_contain=must_contain,
+        block_url_patterns=block_url_patterns,
+        expected_min_courses=expected_min,
+        json_api_cfg=json_api_cfg,
+        time_limit_s=time_limit_s,
+    )
+
+    return {
+        "university_id": uni_id,
+        "university_name": u.name,
+        "scrape_url": scrape_url,
+        **result,
+    }
+
+
 def _to_camel_uni(u) -> dict:
     """Add camelCase aliases UI expects: scrapeUrl, feePageUrl, etc."""
     if hasattr(u, '__table__'):

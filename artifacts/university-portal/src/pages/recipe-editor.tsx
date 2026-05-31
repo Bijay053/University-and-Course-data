@@ -13,7 +13,8 @@ import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import {
   ArrowLeft, Save, Plus, Trash2, Globe, Database, Filter,
-  Code2, DollarSign, BookOpen, MapPin, ShieldCheck, Zap, RefreshCw
+  Code2, DollarSign, BookOpen, MapPin, ShieldCheck, Zap, RefreshCw,
+  FlaskConical, CheckCircle2, XCircle, AlertTriangle, ChevronDown, ChevronUp
 } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -289,6 +290,9 @@ export default function RecipeEditorPage() {
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ count: number; sample: any[] } | null>(null);
+  const [testingDiscovery, setTestingDiscovery] = useState(false);
+  const [discoveryResult, setDiscoveryResult] = useState<any | null>(null);
+  const [showDropped, setShowDropped] = useState(false);
 
   // ── Load ──
   useEffect(() => {
@@ -339,7 +343,7 @@ export default function RecipeEditorPage() {
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const data = await resp.json();
 
-      let items: any[] = data;
+      let items: any = data;
       if (api.root_path) {
         const parts = api.root_path.split(".");
         for (const part of parts) {
@@ -355,6 +359,45 @@ export default function RecipeEditorPage() {
       setTesting(false);
     }
   }, [recipe.api]);
+
+  // ── Test Discovery ──
+  const testDiscovery = useCallback(async () => {
+    setTestingDiscovery(true);
+    setDiscoveryResult(null);
+    setShowDropped(false);
+    try {
+      const payload: Record<string, any> = {
+        seed_urls: recipe.seed_urls.filter(Boolean),
+        must_contain: recipe.must_contain.filter(Boolean),
+        block_url_patterns: recipe.block_url_patterns.filter(Boolean),
+        expected_min_courses: recipe.expected_min_courses || null,
+        time_limit_s: 60,
+      };
+      if (recipe.api?.endpoint) {
+        payload.json_api = {
+          endpoint: recipe.api.endpoint,
+          root_path: recipe.api.root_path,
+          course_url_template: recipe.api.course_url_template,
+          method: recipe.api.method,
+          fields: recipe.api.fields,
+          headers: recipe.api.headers,
+        };
+      }
+      const resp = await fetch(`/api/universities/${id}/recipe/test`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!resp.ok) throw new Error(await resp.text());
+      const data = await resp.json();
+      setDiscoveryResult(data);
+    } catch (e: any) {
+      toast({ title: "Test failed", description: e.message, variant: "destructive" });
+    } finally {
+      setTestingDiscovery(false);
+    }
+  }, [id, recipe]);
 
   // ── Patch helpers ──
   const patchRecipe = (patch: Partial<Recipe>) => setRecipe(r => ({ ...r, ...patch }));
@@ -397,12 +440,186 @@ export default function RecipeEditorPage() {
           <Badge variant={recipe.discovery_strategy === "json_api" ? "default" : "secondary"}>
             {recipe.discovery_strategy}
           </Badge>
-          <Button onClick={save} disabled={saving}>
+          <Button variant="outline" onClick={testDiscovery} disabled={testingDiscovery || saving}>
+            <FlaskConical className="h-4 w-4 mr-2" />
+            {testingDiscovery ? "Testing…" : "Test Discovery"}
+          </Button>
+          <Button onClick={save} disabled={saving || testingDiscovery}>
             <Save className="h-4 w-4 mr-2" />
             {saving ? "Saving…" : "Save Recipe"}
           </Button>
         </div>
       </div>
+
+      {/* ── Discovery Test Results ──────────────────────────────────────── */}
+      {testingDiscovery && (
+        <Card className="border-blue-200 bg-blue-50">
+          <CardContent className="pt-4 pb-3">
+            <div className="flex items-center gap-2 text-blue-700 text-sm">
+              <FlaskConical className="h-4 w-4 animate-pulse" />
+              <span>Running discovery test — opening seed URLs and counting course links…</span>
+              <span className="text-xs text-blue-500">(up to 60 s)</span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {discoveryResult && !testingDiscovery && (() => {
+        const r = discoveryResult;
+        const verdict = r.status as "PASS" | "WARN" | "FAIL";
+        const colors = {
+          PASS: { card: "border-green-200 bg-green-50", badge: "bg-green-100 text-green-800", icon: <CheckCircle2 className="h-5 w-5 text-green-600" /> },
+          WARN: { card: "border-yellow-200 bg-yellow-50", badge: "bg-yellow-100 text-yellow-800", icon: <AlertTriangle className="h-5 w-5 text-yellow-600" /> },
+          FAIL: { card: "border-red-200 bg-red-50",   badge: "bg-red-100 text-red-800",   icon: <XCircle className="h-5 w-5 text-red-600" /> },
+        }[verdict];
+
+        return (
+          <Card className={colors.card}>
+            <CardHeader className="pb-3 pt-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  {colors.icon}
+                  <CardTitle className="text-base">Discovery Test Result</CardTitle>
+                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${colors.badge}`}>{verdict}</span>
+                </div>
+                <span className="text-xs text-muted-foreground">{r.elapsed_s}s</span>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4 pt-0">
+
+              {/* Overall counts */}
+              <div className="grid grid-cols-3 gap-3">
+                <div className="bg-white rounded-lg p-3 text-center border">
+                  <div className="text-2xl font-bold">{r.raw_found}</div>
+                  <div className="text-xs text-muted-foreground">Raw links found</div>
+                </div>
+                <div className="bg-white rounded-lg p-3 text-center border">
+                  <div className="text-2xl font-bold">{r.after_filter_count}</div>
+                  <div className="text-xs text-muted-foreground">After filters</div>
+                </div>
+                <div className="bg-white rounded-lg p-3 text-center border">
+                  <div className={`text-2xl font-bold ${verdict === "PASS" ? "text-green-600" : verdict === "WARN" ? "text-yellow-600" : "text-red-600"}`}>
+                    {r.expected_min_courses ? `${r.after_filter_count} / ${r.expected_min_courses}` : r.after_filter_count}
+                  </div>
+                  <div className="text-xs text-muted-foreground">{r.expected_min_courses ? "Found / Expected" : "Total after filter"}</div>
+                </div>
+              </div>
+
+              {/* Per-seed URL breakdown */}
+              {r.seed_results?.length > 0 && (
+                <div>
+                  <div className="text-xs font-semibold text-muted-foreground mb-1 uppercase tracking-wide">Seed URLs</div>
+                  <div className="space-y-1">
+                    {r.seed_results.map((sr: any, i: number) => (
+                      <div key={i} className="flex items-center gap-2 bg-white rounded p-2 border text-sm">
+                        <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${sr.status === "ok" ? "bg-green-100 text-green-700" : sr.status === "blocked_403" ? "bg-orange-100 text-orange-700" : "bg-red-100 text-red-700"}`}>
+                          {sr.status === "ok" ? "OK" : sr.status === "blocked_403" ? "403" : sr.status.toUpperCase()}
+                        </span>
+                        <span className="font-mono text-xs flex-1 truncate">{sr.url}</span>
+                        <span className="font-bold text-sm">{sr.raw_found}</span>
+                        <span className="text-xs text-muted-foreground">links</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* JSON API result */}
+              {r.api_result && (
+                <div>
+                  <div className="text-xs font-semibold text-muted-foreground mb-1 uppercase tracking-wide">JSON API</div>
+                  <div className="bg-white rounded p-3 border text-sm space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${r.api_result.status === "ok" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
+                        {r.api_result.status.toUpperCase()}
+                      </span>
+                      <span>{r.api_result.records_found ?? 0} records returned</span>
+                      {r.api_result.urls_generated != null && (
+                        <span className="text-muted-foreground">· {r.api_result.urls_generated} URLs generated</span>
+                      )}
+                    </div>
+                    {r.api_result.root_path_used && (
+                      <div className="text-xs text-muted-foreground">root_path: <code>{r.api_result.root_path_used}</code></div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Filter stats */}
+              {(r.dropped_count > 0 || r.filters_applied?.must_contain?.length > 0) && (
+                <div>
+                  <button
+                    onClick={() => setShowDropped(v => !v)}
+                    className="flex items-center gap-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide hover:text-foreground"
+                  >
+                    {showDropped ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                    Filters ({r.dropped_count} dropped, {r.drop_pct}%)
+                  </button>
+                  {showDropped && (
+                    <div className="mt-1 space-y-1">
+                      {r.filters_applied?.must_contain?.length > 0 && (
+                        <div className="text-xs bg-white rounded p-2 border">
+                          <span className="font-medium">must_contain:</span>{" "}
+                          {r.filters_applied.must_contain.map((m: string) => (
+                            <code key={m} className="bg-gray-100 px-1 rounded mr-1">{m}</code>
+                          ))}
+                        </div>
+                      )}
+                      {r.dropped_samples?.length > 0 && (
+                        <div className="text-xs bg-white rounded p-2 border">
+                          <div className="font-medium mb-1">Sample dropped URLs:</div>
+                          {r.dropped_samples.slice(0, 5).map((u: string, i: number) => (
+                            <div key={i} className="font-mono text-xs truncate text-red-700">{u}</div>
+                          ))}
+                        </div>
+                      )}
+                      {r.kept_samples?.length > 0 && (
+                        <div className="text-xs bg-white rounded p-2 border">
+                          <div className="font-medium mb-1">Sample kept URLs:</div>
+                          {r.kept_samples.slice(0, 5).map((u: string, i: number) => (
+                            <div key={i} className="font-mono text-xs truncate text-green-700">{u}</div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Warnings */}
+              {r.warnings?.length > 0 && (
+                <div className="space-y-1">
+                  {r.warnings.map((w: string, i: number) => (
+                    <div key={i} className="flex gap-2 text-xs bg-yellow-100 text-yellow-800 rounded p-2 border border-yellow-200">
+                      <AlertTriangle className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                      <span>{w}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Recommendations */}
+              {r.recommendations?.length > 0 && (
+                <div className="space-y-1">
+                  <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Recommendations</div>
+                  {r.recommendations.map((rec: string, i: number) => (
+                    <div key={i} className="flex gap-2 text-xs bg-white rounded p-2 border text-foreground">
+                      <Zap className="h-3 w-3 mt-0.5 flex-shrink-0 text-blue-500" />
+                      <span>{rec}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex justify-end pt-1">
+                <button onClick={() => setDiscoveryResult(null)} className="text-xs text-muted-foreground hover:text-foreground">
+                  Dismiss
+                </button>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       <Tabs defaultValue="discovery" className="space-y-4">
         <TabsList className="flex flex-wrap h-auto gap-1">
