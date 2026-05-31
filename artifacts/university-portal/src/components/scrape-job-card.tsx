@@ -79,7 +79,7 @@ type DiagnoseResult = {
 export type ScrapeJobCardProps = {
   slotIndex: number;
   universities: UniOption[];
-  onReviewReady: (jobId: string, uniName: string) => void;
+  onReviewReady: (jobId: string, uniName: string, force?: boolean) => void;
   onRemove?: () => void;
   canRemove?: boolean;
   /** Incremented by the parent's "Cancel All" action to force-reset this card. */
@@ -1208,7 +1208,7 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
             <div className="flex gap-2">
               {completedJobId && resultSummary && resultSummary.imported > 0 && (
                 <Button
-                  onClick={() => completedJobId && onReviewReady(completedJobId, uniName)}
+                  onClick={() => completedJobId && onReviewReady(completedJobId, uniName, true)}
                   className="flex-1 bg-green-600 hover:bg-green-700 h-9"
                   size="sm"
                 >

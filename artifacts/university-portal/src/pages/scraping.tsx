@@ -746,10 +746,11 @@ export default function Scraping() {
   useEffect(() => { showReviewRef.current = showReview; }, [showReview]);
   useEffect(() => { reviewJobIdRef.current = reviewJobId; }, [reviewJobId]);
 
-  const handleReviewReady = useCallback((jobId: string) => {
-    // Don't replace a review the user is actively looking at with a different
-    // job's results. Only auto-open the review panel when no review is visible.
-    if (showReviewRef.current && reviewJobIdRef.current && reviewJobIdRef.current !== jobId) return;
+  const handleReviewReady = useCallback((jobId: string, _uniName?: string, force?: boolean) => {
+    // Auto-trigger: don't replace a review the user is actively reading with a
+    // different job's results. Only auto-open when no review is already visible.
+    // Explicit user clicks (force=true) always load immediately.
+    if (!force && showReviewRef.current && reviewJobIdRef.current && reviewJobIdRef.current !== jobId) return;
     loadStagedCourses(jobId);
   }, [loadStagedCourses]);
 
