@@ -1647,29 +1647,57 @@ export default function Scraping() {
     setCleaningNames(false);
   };
 
+  const _FIX_BATCH = 50; // max per /analyze and /re-extract call
+
   const handleFixSelected = async () => {
     if (!selectedUni || selectedUni === ALL || selectedIds.size === 0) return;
     const uniId = parseInt(selectedUni);
     if (isNaN(uniId)) return;
     const ids = Array.from(selectedIds);
-    if (ids.length > 50) {
-      toast({ title: "Too many selected", description: "Select up to 50 courses at a time for AI fix.", variant: "destructive" });
-      return;
-    }
     setAnalyzingFix(true);
     try {
-      const res = await fetch("/api/scrape/staged/analyze", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids, universityId: uniId }),
-      });
-      if (res.ok) {
-        const analysis: FixAnalysis = await res.json();
-        setFixAnalysis(analysis);
-        setShowFixPreviewDialog(true);
-      } else {
-        toast({ title: "Analysis failed", description: await getFetchErrorMessage(res), variant: "destructive" });
+      // Batch analyze in chunks of 50 and merge the results.
+      const chunks: number[][] = [];
+      for (let i = 0; i < ids.length; i += _FIX_BATCH) chunks.push(ids.slice(i, i + _FIX_BATCH));
+
+      let merged: FixAnalysis = { total: 0, courses_with_url: 0, issues: [] };
+      const issueMap = new Map<string, FixIssue>();
+
+      for (const chunk of chunks) {
+        const res = await fetch("/api/scrape/staged/analyze", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ids: chunk, universityId: uniId }),
+        });
+        if (!res.ok) {
+          toast({ title: "Analysis failed", description: await getFetchErrorMessage(res), variant: "destructive" });
+          setAnalyzingFix(false);
+          return;
+        }
+        const part: FixAnalysis = await res.json();
+        merged.total += part.total;
+        merged.courses_with_url += part.courses_with_url;
+        for (const issue of part.issues) {
+          const existing = issueMap.get(issue.field);
+          if (existing) {
+            // Combine counts; recalculate percentages proportionally.
+            const combinedTotal = existing.total + issue.total;
+            const combinedMissing = existing.missing + issue.missing;
+            issueMap.set(issue.field, {
+              ...existing,
+              total: combinedTotal,
+              missing: combinedMissing,
+              current_pct: combinedTotal > 0 ? Math.round(100 * (1 - combinedMissing / combinedTotal)) : 100,
+              expected_fill_pct: Math.round((existing.expected_fill_pct + issue.expected_fill_pct) / 2),
+            });
+          } else {
+            issueMap.set(issue.field, { ...issue });
+          }
+        }
       }
+      merged.issues = Array.from(issueMap.values());
+      setFixAnalysis(merged);
+      setShowFixPreviewDialog(true);
     } catch {
       toast({ title: "Analysis failed", description: "Network error — check your connection.", variant: "destructive" });
     }
@@ -1684,17 +1712,29 @@ export default function Scraping() {
     const beforeIssues = fixAnalysis.issues;
     setFixingSelected(true);
     try {
-      const res = await fetch("/api/scrape/staged/re-extract", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids, universityId: uniId }),
-      });
-      if (!res.ok) {
-        toast({ title: "Fix failed", description: await getFetchErrorMessage(res), variant: "destructive" });
-        setFixingSelected(false);
-        return;
+      // Process in batches of 50 (backend hard limit per call).
+      const chunks: number[][] = [];
+      for (let i = 0; i < ids.length; i += _FIX_BATCH) chunks.push(ids.slice(i, i + _FIX_BATCH));
+
+      let totalUpdated = 0, totalSkipped = 0, totalErrors = 0, totalTotal = 0;
+      for (const chunk of chunks) {
+        const res = await fetch("/api/scrape/staged/re-extract", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ids: chunk, universityId: uniId }),
+        });
+        if (!res.ok) {
+          toast({ title: "Fix failed", description: await getFetchErrorMessage(res), variant: "destructive" });
+          setFixingSelected(false);
+          return;
+        }
+        const part = await res.json();
+        totalUpdated += part.updated ?? 0;
+        totalSkipped += part.skipped ?? 0;
+        totalErrors += part.errors ?? 0;
+        totalTotal += part.total ?? 0;
       }
-      const data = await res.json();
+      const data = { updated: totalUpdated, skipped: totalSkipped, errors: totalErrors, total: totalTotal };
 
       // Reload staged courses then re-analyze to get accurate after counts.
       if (reviewJobId) await loadStagedCourses(reviewJobId);
