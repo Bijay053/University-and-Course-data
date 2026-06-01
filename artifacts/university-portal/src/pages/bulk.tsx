@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import BulkRepairPage from "@/pages/bulk-repair";
 import { useListUniversities } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -199,7 +200,7 @@ function UniCombobox({ universities, value, onChange }: {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function Bulk() {
-  const [activeTab, setActiveTab] = useState<"scrape" | "import">("scrape");
+  const [activeTab, setActiveTab] = useState<"scrape" | "import" | "repair">("scrape");
 
   // ── Server-side session state ──────────────────────────────────────────────
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -448,12 +449,12 @@ export default function Bulk() {
     <div className="space-y-5 max-w-4xl">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Bulk Operations</h1>
-        <p className="text-muted-foreground text-sm">Scrape all universities sequentially or import course data from Excel.</p>
+        <p className="text-muted-foreground text-sm">Scrape all universities sequentially, import course data from Excel, or repair quality issues in bulk.</p>
       </div>
 
       {/* Tabs */}
       <div className="flex border-b gap-1">
-        {(["scrape", "import"] as const).map((tab) => (
+        {(["scrape", "import", "repair"] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -463,7 +464,7 @@ export default function Bulk() {
                 : "border-transparent text-gray-500 hover:text-gray-700"
             }`}
           >
-            {tab === "scrape" ? "Bulk Scrape" : "Excel Import"}
+            {tab === "scrape" ? "Bulk Scrape" : tab === "import" ? "Excel Import" : "Bulk Repair"}
           </button>
         ))}
       </div>
@@ -1016,6 +1017,9 @@ export default function Bulk() {
           </div>
         </div>
       )}
+
+      {/* ── Bulk Repair Tab ──────────────────────────────────────────────────── */}
+      {activeTab === "repair" && <BulkRepairPage />}
     </div>
   );
 }

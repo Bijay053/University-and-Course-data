@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Building2, HardDrive, UploadCloud, Menu, X, Shield, Settings, Search as SearchIcon, LogOut, Users as UsersIcon, BarChart2, Radio, Send, ShieldCheck, Wrench } from "lucide-react";
+import { LayoutDashboard, Building2, HardDrive, UploadCloud, Menu, X, Shield, Settings, Search as SearchIcon, LogOut, Users as UsersIcon, BarChart2, Radio, Send, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import brandLogo from "@assets/image_1776917782083.png";
 import { useAuth } from "@/context/auth";
@@ -10,7 +10,6 @@ const navigation: { name: string; href: string; icon: typeof LayoutDashboard; pe
   { name: "Course Search", href: "/search", icon: SearchIcon, permission: "search.view" },
   { name: "Universities", href: "/universities", icon: Building2, permission: "universities.view" },
   { name: "Cert Dashboard", href: "/cert-dashboard", icon: ShieldCheck, permission: "universities.view" },
-  { name: "Bulk Repair", href: "/bulk-repair", icon: Wrench, permission: "universities.view" },
   { name: "Scraping", href: "/scraping", icon: HardDrive, permission: "scraping.view" },
   { name: "Bulk Upload", href: "/bulk", icon: UploadCloud, permission: "bulk.view" },
   { name: "Data Backup", href: "/backup", icon: Shield, permission: "backup.view" },
