@@ -404,18 +404,21 @@ function EvidenceDialogContent({ reviewDetail }: { reviewDetail: CourseReviewPay
             {reviewDetail.course.eligibilityReason ? ` — ${reviewDetail.course.eligibilityReason}` : ""}
           </div>
         </div>
-        <div className="flex flex-col items-end gap-1">
+        <div className="flex flex-col items-end gap-2">
           <div className="text-xs text-muted-foreground">{allFieldKeys.length} field{allFieldKeys.length !== 1 ? "s" : ""} with evidence</div>
-          {suppressedCount > 0 || !hideSuppressed ? (
-            <button
-              onClick={() => setHideSuppressed((v) => !v)}
-              className="text-[11px] text-slate-500 hover:text-slate-800 underline underline-offset-2"
-            >
-              {hideSuppressed
-                ? `Show ${suppressedCount} suppressed field${suppressedCount === 1 ? "" : "s"}`
-                : "Hide suppressed"}
-            </button>
-          ) : null}
+          {suppressedCount > 0 && (
+            <label className="flex items-center gap-1.5 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={!hideSuppressed}
+                onChange={() => setHideSuppressed((v) => !v)}
+                className="w-3.5 h-3.5 accent-slate-500 shrink-0"
+              />
+              <span className="text-[11px] text-slate-500">
+                Show {suppressedCount} suppressed field{suppressedCount === 1 ? "" : "s"}
+              </span>
+            </label>
+          )}
         </div>
       </div>
 
