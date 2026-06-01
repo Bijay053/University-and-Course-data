@@ -211,6 +211,8 @@ type DeterministicIssue = {
     yaml_keys?: Record<string, unknown>;
     note?: string;
   };
+  recipe_patch?: Record<string, unknown>;
+  recipe_patch_description?: string;
 };
 
 type DiagnoseResult = {
@@ -487,6 +489,10 @@ export default function ScrapeAgentPage() {
   const [appliedConfig, setAppliedConfig] = useState<Record<string, unknown> | null>(null);
   const [fixBlock, setFixBlock] = useState<FixBlock | null>(null);
   const [rollingBack, setRollingBack] = useState(false);
+  const [autoRepairing, setAutoRepairing] = useState(false);
+  const [autoRepairResult, setAutoRepairResult] = useState<{
+    status: string; filter_cleared: string; new_job_id?: string | null; message: string; has_rollback?: boolean;
+  } | null>(null);
   const [filterImpact, setFilterImpact] = useState<FilterImpact | null>(null);
   const [loadingImpact, setLoadingImpact] = useState(false);
   const [discoveryTest, setDiscoveryTest] = useState<DiscoveryTest | null>(null);
@@ -725,10 +731,49 @@ export default function ScrapeAgentPage() {
     }
     setDiagnosing(true);
     setDiagnoseResult(null);
+    setAutoRepairResult(null);
     try {
       const res = await fetch(`${BASE}/api/scrape/jobs/${jobId}/diagnose`, { method: "POST" });
       const data: DiagnoseResult = await res.json();
       setDiagnoseResult(data);
+
+      // ── Auto-repair: if 100% filter drop detected, fix it automatically ──
+      const allFilteredIssue = (data.deterministic_issues || []).find(
+        (di: any) => di.check === "all_filtered" && di.recipe_patch
+      );
+      if (allFilteredIssue?.recipe_patch) {
+        // Determine which filter key was cleared from the patch
+        const discPatch = allFilteredIssue.recipe_patch?.discovery || {};
+        const filterCleared = Object.keys(discPatch)[0] || "url_filter";
+
+        setAutoRepairing(true);
+        try {
+          const repairRes = await fetch(`${BASE}/api/scrape/jobs/${jobId}/auto-repair-filter`, {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              recipe_patch: allFilteredIssue.recipe_patch,
+              filter_cleared: filterCleared,
+            }),
+          });
+          if (!repairRes.ok) throw new Error(await repairRes.text());
+          const repairData = await repairRes.json();
+          setAutoRepairResult(repairData);
+          if (repairData.status === "ok") {
+            // Reload config so job list updates
+            await loadConfig();
+          }
+        } catch (repairErr) {
+          setAutoRepairResult({
+            status: "error",
+            filter_cleared: filterCleared,
+            message: `Auto-repair failed: ${repairErr}`,
+          });
+        } finally {
+          setAutoRepairing(false);
+        }
+      }
     } catch (e) {
       setDiagnoseResult({ ok: false, error: String(e) });
     } finally {
@@ -1485,10 +1530,12 @@ export default function ScrapeAgentPage() {
           </div>
         )}
 
-        {diagnosing && (
+        {(diagnosing || autoRepairing) && (
           <div className="flex items-center justify-center gap-2 py-8 text-blue-500 text-sm">
             <Loader2 className="w-5 h-5 animate-spin" />
-            AI is reading the scrape logs and thinking…
+            {autoRepairing
+              ? "AI detected a filter issue — applying fix and restarting scrape…"
+              : "AI is reading the scrape logs and thinking…"}
           </div>
         )}
 
@@ -1604,12 +1651,58 @@ export default function ScrapeAgentPage() {
                 </div>
               )}
 
+              {/* ── Auto-repair banner: shown when system fixed filter automatically ── */}
+              {autoRepairResult && (
+                <div className={`rounded-xl border px-4 py-3 flex items-start gap-3 ${
+                  autoRepairResult.status === "ok"
+                    ? "border-emerald-300 bg-emerald-50"
+                    : autoRepairResult.status === "trigger_failed"
+                    ? "border-amber-300 bg-amber-50"
+                    : "border-red-300 bg-red-50"
+                }`}>
+                  <div className={`shrink-0 mt-0.5 ${
+                    autoRepairResult.status === "ok" ? "text-emerald-600" :
+                    autoRepairResult.status === "trigger_failed" ? "text-amber-600" : "text-red-600"
+                  }`}>
+                    {autoRepairResult.status === "ok"
+                      ? <CheckCheck className="w-5 h-5" />
+                      : <AlertTriangle className="w-5 h-5" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-sm font-semibold mb-1 ${
+                      autoRepairResult.status === "ok" ? "text-emerald-800" :
+                      autoRepairResult.status === "trigger_failed" ? "text-amber-800" : "text-red-800"
+                    }`}>
+                      {autoRepairResult.status === "ok"
+                        ? "✓ Auto-repaired — scrape restarted"
+                        : autoRepairResult.status === "trigger_failed"
+                        ? "Filter fixed — please start scrape manually"
+                        : "Auto-repair failed"}
+                    </p>
+                    <p className="text-xs text-gray-700 leading-relaxed">{autoRepairResult.message}</p>
+                    {autoRepairResult.new_job_id && (
+                      <p className="text-[10px] text-gray-500 mt-1.5 font-mono">
+                        New job: {autoRepairResult.new_job_id}
+                      </p>
+                    )}
+                    {autoRepairResult.has_rollback && (
+                      <p className="text-[10px] text-emerald-700 mt-1">
+                        Previous config saved — rollback available if results are unexpected.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* Deterministic issues — shown BEFORE AI summary, no LLM involved */}
               {diagnoseResult.deterministic_issues && diagnoseResult.deterministic_issues.length > 0 && (
                 <div className="space-y-2">
                   {diagnoseResult.deterministic_issues.map((di, i) => {
                     const isZero = di.check === "zero_courses_discovered";
-                    const borderCls = di.severity === "critical"
+                    const isAutoRepaired = di.check === "all_filtered" && autoRepairResult?.status === "ok";
+                    const borderCls = isAutoRepaired
+                      ? "border-emerald-400 bg-emerald-50/60"
+                      : di.severity === "critical"
                       ? "border-red-500 bg-red-50"
                       : di.severity === "high"
                       ? "border-orange-400 bg-orange-50"
@@ -1617,42 +1710,51 @@ export default function ScrapeAgentPage() {
                     return (
                       <div key={i} className={`rounded-lg border-l-4 px-3 py-2.5 ${borderCls}`}>
                         <div className="flex items-center gap-2 mb-1">
-                          <AlertTriangle className={`w-3.5 h-3.5 shrink-0 ${di.severity === "critical" ? "text-red-500" : "text-orange-500"}`} />
+                          {isAutoRepaired
+                            ? <CheckCheck className="w-3.5 h-3.5 shrink-0 text-emerald-600" />
+                            : <AlertTriangle className={`w-3.5 h-3.5 shrink-0 ${di.severity === "critical" ? "text-red-500" : "text-orange-500"}`} />}
                           <span className="text-xs font-semibold text-gray-800">{di.issue}</span>
-                          <Badge variant="outline" className={`text-[9px] px-1.5 ml-auto ${di.severity === "critical" ? "border-red-300 text-red-600" : "border-orange-300 text-orange-600"}`}>
-                            {di.severity}
-                          </Badge>
+                          {isAutoRepaired
+                            ? <Badge variant="outline" className="text-[9px] px-1.5 ml-auto border-emerald-300 text-emerald-700">auto-repaired</Badge>
+                            : <Badge variant="outline" className={`text-[9px] px-1.5 ml-auto ${di.severity === "critical" ? "border-red-300 text-red-600" : "border-orange-300 text-orange-600"}`}>
+                                {di.severity}
+                              </Badge>}
                         </div>
-                        <p className="text-xs text-gray-600 leading-relaxed">{di.detail}</p>
-                        {di.potential_causes && di.potential_causes.length > 0 && (
-                          <ul className="mt-1.5 space-y-0.5">
-                            {di.potential_causes.map((c, j) => (
-                              <li key={j} className="text-[10px] text-gray-500 flex items-start gap-1">
-                                <span className="shrink-0 mt-0.5">•</span>{c}
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                        {di.fix && (
-                          <div className={`mt-2 rounded px-2.5 py-2 border ${isZero ? "bg-blue-50 border-blue-200" : "bg-white border-gray-200"}`}>
-                            <p className={`text-[10px] font-semibold mb-1.5 ${isZero ? "text-blue-700" : "text-gray-700"}`}>
-                              {isZero ? "⚙️ Required YAML fix" : "🔧 Fix"}
-                            </p>
-                            <p className="text-[10px] text-gray-600 mb-1.5">{di.fix.action}</p>
-                            {di.fix.yaml_keys && (
-                              <div className="space-y-1">
-                                {Object.entries(di.fix.yaml_keys).map(([k, v]) => (
-                                  <div key={k} className="flex items-start gap-1.5 font-mono text-[10px]">
-                                    <span className="text-blue-700 shrink-0">{k}:</span>
-                                    <span className="text-gray-600">{typeof v === "object" ? JSON.stringify(v) : String(v)}</span>
-                                  </div>
+                        {/* Show full detail only when NOT auto-repaired (dev info, not needed by client) */}
+                        {!isAutoRepaired && (
+                          <>
+                            <p className="text-xs text-gray-600 leading-relaxed">{di.detail}</p>
+                            {di.potential_causes && di.potential_causes.length > 0 && (
+                              <ul className="mt-1.5 space-y-0.5">
+                                {di.potential_causes.map((c: string, j: number) => (
+                                  <li key={j} className="text-[10px] text-gray-500 flex items-start gap-1">
+                                    <span className="shrink-0 mt-0.5">•</span>{c}
+                                  </li>
                                 ))}
+                              </ul>
+                            )}
+                            {di.fix && (
+                              <div className={`mt-2 rounded px-2.5 py-2 border ${isZero ? "bg-blue-50 border-blue-200" : "bg-white border-gray-200"}`}>
+                                <p className={`text-[10px] font-semibold mb-1.5 ${isZero ? "text-blue-700" : "text-gray-700"}`}>
+                                  {isZero ? "⚙️ Required YAML fix" : "🔧 Fix"}
+                                </p>
+                                <p className="text-[10px] text-gray-600 mb-1.5">{di.fix.action}</p>
+                                {di.fix.yaml_keys && (
+                                  <div className="space-y-1">
+                                    {Object.entries(di.fix.yaml_keys).map(([k, v]) => (
+                                      <div key={k} className="flex items-start gap-1.5 font-mono text-[10px]">
+                                        <span className="text-blue-700 shrink-0">{k}:</span>
+                                        <span className="text-gray-600">{typeof v === "object" ? JSON.stringify(v) : String(v)}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                                {di.fix.note && (
+                                  <p className="text-[10px] text-gray-500 mt-1.5 italic">{di.fix.note}</p>
+                                )}
                               </div>
                             )}
-                            {di.fix.note && (
-                              <p className="text-[10px] text-gray-500 mt-1.5 italic">{di.fix.note}</p>
-                            )}
-                          </div>
+                          </>
                         )}
                       </div>
                     );
@@ -1791,8 +1893,8 @@ export default function ScrapeAgentPage() {
                 </div>
               )}
 
-              {/* Suggested config + Apply Fix */}
-              {hasSuggestions && (() => {
+              {/* Suggested config + Apply Fix — hidden when auto-repair already handled the issue */}
+              {hasSuggestions && !autoRepairResult && (() => {
                 const sugDisc = (suggestedConfig.discovery ?? {}) as Record<string, unknown>;
                 const hasMustContain = Array.isArray(sugDisc.must_contain) && (sugDisc.must_contain as string[]).length > 0;
                 return (

@@ -25,6 +25,13 @@
 #      matched 0 of the 219 /courses/* URLs, so every course was dropped
 #      at the allow stage before block_url_patterns was even consulted.
 #      Fixed via discovery.allow_url_patterns below. (verified 2026-06-01)
+#   5. Per-band IELTS minimum ("no band less than X") missing from scrape,
+#      and overall risked being read from the wrong statement. Federation
+#      course pages carry TWO conflicting IELTS lines: a generic one in
+#      "Academic entry requirements" (e.g. 6.0) and the authoritative one
+#      under the "English language requirements" heading (e.g. 6.5). Scoped
+#      extraction to the dedicated heading + capture overall AND min band
+#      via extraction.english below. (verified 2026-06-01)
 
 discovery:
   # allow-list OVERRIDE (Fix 4): Federation's real course-detail pages live
@@ -125,6 +132,36 @@ extraction:
       "bachelor of it (business analysis)": "Bachelor of Information Technology (Business Analysis)"
       "bachelor of it (cybersecurity)": "Bachelor of Information Technology (Cybersecurity)"
       "bachelor of it (software application development)": "Bachelor of Information Technology (Software Application Development)"
+
+  english:
+    # Fix 5 (2026-06-01): per-band minimum ("no band less than X") was
+    # missing from scraped English requirements, and the overall risked
+    # being grabbed from the WRONG statement.
+    #
+    # Federation publishes English requirements IN the HTML course page
+    # (not a central page or PDF like CQU/Curtin). Each course page has a
+    # dedicated "English language requirements" heading, e.g. on
+    # /courses/dre4-graduate-certificate-in-research/:
+    #     "Overall IELTS band score of 6.5, with no band less 6.00"
+    #
+    # PROBLEM: the page ALSO carries a generic IELTS line earlier, in the
+    # "Academic entry requirements" bullets, with DIFFERENT numbers:
+    #     "...overall band score of 6.0, with no band less than 6.0..."
+    # An unscoped match takes that first (6.0) and never reaches the
+    # authoritative 6.5 — and dropped the min-band either way.
+    #
+    # FIX: scope extraction to the dedicated section heading, then pull
+    # BOTH the overall and the per-band minimum. Patterns are
+    # case-insensitive; min_band makes "than" optional because Federation's
+    # copy is ungrammatical ("no band less 6.00", no "than").
+    #
+    # source_priority: prefer the dedicated section; only fall back to the
+    # academic-entry bullet if the section heading is absent on a page.
+    source_priority:
+      - section: "English language requirements"
+      - section: "Academic entry requirements"   # fallback only
+    overall_pattern: '(?i)overall\s+ielts\s+band\s+score\s+of\s+(?P<overall>\d+(?:\.\d+)?)'
+    min_band_pattern: '(?i)no\s+(?:individual\s+)?band\s+(?:score\s+)?(?:of\s+)?less\s+(?:than\s+)?(?P<min_band>\d+(?:\.\d+)?)'
 
   text_cleaning:
     location:

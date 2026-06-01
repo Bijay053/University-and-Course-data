@@ -5775,6 +5775,143 @@ async def apply_scrape_fix(
     }
 
 
+@router.post("/jobs/{job_id}/auto-repair-filter")
+async def auto_repair_filter(
+    job_id: str,
+    body: dict,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[dict, Depends(get_current_user)],
+) -> dict:
+    """Auto-repair a 100% URL-filter-drop without any operator action.
+
+    Called by the frontend when diagnosis detects ``check: "all_filtered"``
+    and a ``recipe_patch`` is present.  The endpoint:
+
+      1. Applies the supplied ``recipe_patch`` to ``admin_config`` (no safety
+         guard — we are *relaxing* filters, not adding them, so it cannot make
+         the situation worse).
+      2. Stores the previous config in ``_prev_admin_config`` so a rollback is
+         still possible.
+      3. Triggers a fresh scrape job automatically.
+
+    Body::
+
+        {
+          "recipe_patch": {"discovery": {"must_contain": []}},
+          "filter_cleared": "must_contain"
+        }
+
+    Returns::
+
+        {
+          "status": "ok" | "trigger_failed",
+          "filter_cleared": "must_contain",
+          "new_job_id": "job_abc123",
+          "message": "..."
+        }
+    """
+    from sqlalchemy import text as _text
+    import json as _json
+
+    # ── 1. Find the job → university ─────────────────────────────────────────
+    job_row = (await db.execute(
+        _text("SELECT university_id FROM scrape_runtime_jobs WHERE runtime_job_id = :j"),
+        {"j": job_id},
+    )).mappings().first()
+    if not job_row:
+        raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
+
+    uni_id: int = job_row["university_id"]
+    recipe_patch: dict = body.get("recipe_patch") or {}
+    filter_cleared: str = body.get("filter_cleared") or "unknown"
+
+    if not recipe_patch:
+        return {
+            "status": "no_patch",
+            "message": "No recipe_patch provided — nothing to apply.",
+        }
+
+    # ── 2. Load existing scrape_config ───────────────────────────────────────
+    uni_row = (await db.execute(
+        _text("SELECT id, name, scrape_url, scrape_config FROM universities WHERE id = :id"),
+        {"id": uni_id},
+    )).mappings().first()
+    if not uni_row:
+        raise HTTPException(status_code=404, detail="University not found")
+
+    sc: dict = dict(uni_row.get("scrape_config") or {})
+    existing: dict = dict(sc.get("admin_config") or {})
+
+    # ── 3. Apply patch (deep-merge, same logic as apply_scrape_fix) ──────────
+    if existing:
+        sc["_prev_admin_config"] = existing
+
+    def _deep_merge(base: dict, override: dict) -> dict:
+        result = dict(base)
+        for k, v in override.items():
+            if k in result and isinstance(result[k], dict) and isinstance(v, dict):
+                result[k] = _deep_merge(result[k], v)
+            else:
+                result[k] = v
+        return result
+
+    sc["admin_config"] = _deep_merge(existing, recipe_patch)
+
+    await db.execute(
+        _text("UPDATE universities SET scrape_config = CAST(:cfg AS jsonb) WHERE id = :id"),
+        {"cfg": _json.dumps(sc), "id": uni_id},
+    )
+    await db.commit()
+
+    log.info(
+        "auto_repair_filter: cleared %s for uni %s (job %s) → saved admin_config",
+        filter_cleared, uni_id, job_id,
+    )
+
+    # ── 4. Trigger a fresh scrape ─────────────────────────────────────────────
+    scrape_url: str = uni_row.get("scrape_url") or ""
+    uni_name: str = uni_row.get("name") or str(uni_id)
+    new_job_id: str | None = None
+    trigger_ok = False
+
+    try:
+        scrape_body = StartScrapeBody(
+            url=scrape_url,
+            universityId=uni_id,
+        )
+        result = await start_scrape(scrape_body, db)
+        new_job_id = result.job_id
+        trigger_ok = True
+        log.info("auto_repair_filter: triggered new scrape job %s for uni %s", new_job_id, uni_id)
+    except Exception as exc:
+        log.warning(
+            "auto_repair_filter: scrape trigger failed for uni %s: %s", uni_id, exc,
+        )
+
+    if trigger_ok:
+        message = (
+            "AI found that course pages were discovered, but all URLs were blocked by "
+            f"the current filter rules ({filter_cleared}). "
+            "The system has automatically adjusted the filter and restarted the scrape. "
+            "No action is required from your side."
+        )
+        return_status = "ok"
+    else:
+        message = (
+            f"Filter ({filter_cleared}) cleared successfully, but the new scrape could not "
+            "be started automatically. Please start a new scrape manually."
+        )
+        return_status = "trigger_failed"
+
+    return {
+        "status": return_status,
+        "filter_cleared": filter_cleared,
+        "new_job_id": new_job_id,
+        "message": message,
+        "has_rollback": bool(existing),
+    }
+
+
 @router.post("/jobs/{job_id}/preview-fix")
 async def preview_scrape_fix(
     job_id: str,
