@@ -540,6 +540,45 @@ extraction:
   # with zero benefit).
   skip_browser_rescue: false
 
+  # ── Per-course browser controls (YAML alternative to code changes) ──────────
+  #
+  # skip_per_course_browser: true
+  #   Skip ALL per-course Playwright fetches for this university.
+  #   YAML equivalent of adding the host to _SKIP_BROWSER_HOSTS in code.
+  #   Use when:
+  #     (a) Static HTML already contains all required fields AND the browser
+  #         always times out (e.g. AIT, AUT: 12-13 timeouts × 60s = 12 min wasted).
+  #     (b) Cloudflare WAF blocks Playwright just as it blocks plain HTTP —
+  #         rendered=0B every time, no data gained.
+  #   Log line: "[per-course browser skipped] <url> — YAML skip_per_course_browser"
+  skip_per_course_browser: false
+
+  # browser_wait_strategy: networkidle | domcontentloaded | null
+  #   Override the Playwright wait_until strategy. YAML alternative to adding the
+  #   host to _NETWORKIDLE_HOSTS or _DCL_SETTLE_MS_OVERRIDES in code.
+  #   When null (default), the global host-list logic in per_course_browser.py applies.
+  #
+  #   Use 'networkidle' when:
+  #     Critical fields (fees, IELTS, intakes) are loaded via XHR after initial
+  #     render and domcontentloaded fires before the content is present.
+  #     Examples: UOW, UniSQ, Murdoch — accordion data arrives after page load.
+  #
+  #   Use 'domcontentloaded' (+browser_dcl_settle_ms) when:
+  #     networkidle NEVER fires because persistent analytics / chat widgets keep
+  #     the network busy indefinitely (e.g. UWA — askuwa widget, Google Analytics).
+  #     The shorter DCL event fires in 1-2s, then the settle delay lets JS hydrate.
+  browser_wait_strategy: null
+
+  # browser_dcl_settle_ms: integer (milliseconds) | null
+  #   Extra settle delay after domcontentloaded fires, before HTML is captured.
+  #   Only meaningful when browser_wait_strategy is 'domcontentloaded' (or the
+  #   host falls into that bucket via the global host lists).
+  #   YAML alternative to _DCL_SETTLE_MS_OVERRIDES in per_course_browser.py.
+  #   Default (null): 1500 ms. Set to 4000-6000 for SPAs that need extra time
+  #   for React/Sitecore hydration after DCL fires.
+  #   Example: UWA Sitecore needs 5000ms to mount the entry requirements panel.
+  browser_dcl_settle_ms: null
+
   # Cap the asyncio.Semaphore concurrency during the extraction gather phase.
   # null = global default (currently 4). Set to 2 or 1 for Cloudflare-heavy sites
   # where 4 simultaneous browser sessions trigger aggressive 429 rate-limiting.

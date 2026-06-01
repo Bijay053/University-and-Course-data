@@ -1257,6 +1257,49 @@ class ExtractionConfig(BaseModel):
             "210-course job from ~6 minutes to 106 minutes."
         ),
     )
+    skip_per_course_browser: bool = Field(
+        default=False,
+        description=(
+            "When True, skip ALL per-course browser fetches for this university "
+            "(equivalent to adding the host to _SKIP_BROWSER_HOSTS in code). "
+            "Use when: (a) the static HTML already contains all required fields "
+            "and the browser always times out wasting 60s × n_courses, or (b) "
+            "Cloudflare WAF blocks the headless browser just as it blocks plain "
+            "HTTP — rendered=0B every time. "
+            "YAML alternative to engineering changes in per_course_browser.py. "
+            "Example: extraction.skip_per_course_browser: true"
+        ),
+    )
+    browser_wait_strategy: Optional[str] = Field(
+        default=None,
+        description=(
+            "Override the Playwright wait_until strategy for this university. "
+            "Accepted values: 'networkidle' | 'domcontentloaded'. "
+            "YAML alternative to adding the host to _NETWORKIDLE_HOSTS or "
+            "_DCL_SETTLE_MS_OVERRIDES in per_course_browser.py code. "
+            "Use 'networkidle' when critical data (fees, IELTS, intakes) is "
+            "loaded via XHR after the initial render and domcontentloaded fires "
+            "before the content is present. "
+            "Use 'domcontentloaded' (plus browser_dcl_settle_ms if needed) when "
+            "networkidle never fires because persistent analytics / chat widgets "
+            "keep the network permanently busy (e.g. UWA, some Sitecore sites). "
+            "When None (default), the global host-list logic in "
+            "per_course_browser.py selects the strategy."
+        ),
+    )
+    browser_dcl_settle_ms: Optional[int] = Field(
+        default=None,
+        description=(
+            "Extra settle delay in milliseconds after domcontentloaded fires, "
+            "before the HTML is captured. Only used when browser_wait_strategy "
+            "is 'domcontentloaded' (or the host falls into that bucket via the "
+            "global host lists). YAML alternative to _DCL_SETTLE_MS_OVERRIDES. "
+            "Default (when None): 1500 ms (the global _DEFAULT_SETTLE_MS). "
+            "Set to 4000–6000 for React/Sitecore SPAs that need a few extra "
+            "seconds for JS hydration after DCL fires. "
+            "Example: extraction.browser_dcl_settle_ms: 5000"
+        ),
+    )
     max_parallel_fetch: Optional[int] = Field(
         default=None,
         description=(

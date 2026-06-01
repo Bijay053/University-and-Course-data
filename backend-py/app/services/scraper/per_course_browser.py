@@ -359,22 +359,45 @@ def _browser_config_for(url: str) -> tuple[str, int, int, int]:
     """Return (wait_until, settle_ms, outer_timeout_sec, goto_timeout_ms)
     for the given URL.
 
-    * Hosts in :data:`_SLOW_HOSTS` (ASA, KBS, CSU) get ``networkidle``
-      + 3s settle, 60s outer ceiling, 50s goto.
-    * Hosts in :data:`_NETWORKIDLE_HOSTS` get ``networkidle`` + 3s
-      settle, 30s outer ceiling, 25s goto.
-    * Hosts in :data:`_DCL_SETTLE_MS_OVERRIDES` get ``domcontentloaded``
-      + a host-specific settle, 60s outer ceiling, 50s goto.  Used for
-      VIT: analytics widgets prevent networkidle from firing, so we use
-      domcontentloaded + 6s settle to let the International toggle mount.
-    * Everyone else gets ``domcontentloaded`` + 1.5s settle, 60s outer
-      ceiling, 50s goto.  The default was raised from 20s after multiple
-      Australian education sites proved too slow for the old ceiling.
+    Priority (highest first):
+    1. Per-uni YAML ``extraction.browser_wait_strategy`` + ``browser_dcl_settle_ms``
+       — operator-configurable without code changes.
+    2. Hardcoded host lists (_SLOW_HOSTS, _NETWORKIDLE_HOSTS, _DCL_SETTLE_MS_OVERRIDES)
+       — existing behaviour for hosts already in the code lists.
+    3. Global defaults (domcontentloaded + 1.5s settle, 60s outer, 50s goto).
     """
     try:
         host = (urlparse(url).hostname or "").lower()
     except Exception:
         host = ""
+
+    # ── 1. YAML override wins over all hardcoded lists ────────────────────────
+    try:
+        _yaml_cfg = get_uni_config().extraction
+        _yaml_strategy = getattr(_yaml_cfg, "browser_wait_strategy", None)
+        _yaml_settle = getattr(_yaml_cfg, "browser_dcl_settle_ms", None)
+    except Exception:
+        _yaml_strategy = None
+        _yaml_settle = None
+
+    if _yaml_strategy == "networkidle":
+        settle_ms = int(_yaml_settle) if _yaml_settle is not None else _NETWORKIDLE_SETTLE_MS
+        return (
+            "networkidle",
+            settle_ms,
+            _NETWORKIDLE_OUTER_TIMEOUT_SEC,
+            _NETWORKIDLE_GOTO_TIMEOUT_MS,
+        )
+    if _yaml_strategy == "domcontentloaded":
+        settle_ms = int(_yaml_settle) if _yaml_settle is not None else _DEFAULT_SETTLE_MS
+        return (
+            "domcontentloaded",
+            settle_ms,
+            _DEFAULT_OUTER_TIMEOUT_SEC,
+            _DEFAULT_GOTO_TIMEOUT_MS,
+        )
+
+    # ── 2. Hardcoded host lists (existing behaviour) ──────────────────────────
     if any(host == h or host.endswith("." + h) for h in _SLOW_HOSTS):
         # Per-host settle override (e.g. UTAS Cloudflare needs 5s) wins
         # over the default 3s.
@@ -404,6 +427,8 @@ def _browser_config_for(url: str) -> tuple[str, int, int, int]:
                 _DEFAULT_OUTER_TIMEOUT_SEC,
                 _DEFAULT_GOTO_TIMEOUT_MS,
             )
+
+    # ── 3. Global defaults ────────────────────────────────────────────────────
     return (
         "domcontentloaded",
         _DEFAULT_SETTLE_MS,
@@ -702,16 +727,23 @@ async def maybe_browser_refetch(
     if force and not _all_english_empty(payload) and payload.get("international_fee"):
         return {}, [], None, False
 
-    # Issue 1: skip browser pass for paths where a static fallback is
-    # sufficient and the browser is known to always time out (e.g. VIT
-    # /vocational/* pages). Log a single info line so the sweep log is
-    # diagnostic without being noisy.
-    if _skip_browser_for_url(url):
-        log.info("per_course_browser: skipping browser pass for %s (static fallback sufficient)", url)
+    # Issue 1: skip browser pass when:
+    #   (a) YAML extraction.skip_per_course_browser: true  — operator-configured skip
+    #   (b) host is in the hardcoded _SKIP_BROWSER_HOSTS / _SKIP_BROWSER_PATH_PREFIXES
+    # Log a single info line so the sweep log is diagnostic without being noisy.
+    _yaml_skip = False
+    try:
+        _yaml_skip = bool(get_uni_config().extraction.skip_per_course_browser)
+    except Exception:
+        pass
+
+    if _yaml_skip or _skip_browser_for_url(url):
+        reason = "YAML skip_per_course_browser" if _yaml_skip else "static fallback sufficient"
+        log.info("per_course_browser: skipping browser pass for %s (%s)", url, reason)
         if emit:
             await emit(
                 "status",
-                f"[per-course browser skipped] {url} — vocational static fallback",
+                f"[per-course browser skipped] {url} — {reason}",
                 phase="fallback",
                 kind="per_course_browser_skipped",
                 url=url,
