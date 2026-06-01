@@ -647,6 +647,12 @@ export default function RecipeEditorPage() {
   const [filterSimError, setFilterSimError] = useState<string | null>(null);
   const [filterSimAllowPats, setFilterSimAllowPats] = useState<string[]>([]);
 
+  // Local raw-text state for year textareas — avoids the "can't type partial year"
+  // problem that occurs when the controlled value is derived from number[] and the
+  // onChange filter strips any value < 2001 (so "202" disappears mid-keystroke).
+  const [ignoreYearsText, setIgnoreYearsText] = useState("");
+  const [feeRejectYearsText, setFeeRejectYearsText] = useState("");
+
   // ── Load ──
   useEffect(() => {
     if (!id) return;
@@ -656,7 +662,11 @@ export default function RecipeEditorPage() {
         setUniName(data.university_name || "");
         setScrapeUrl(data.scrape_url || "");
         if (data.recipe && Object.keys(data.recipe).length > 0) {
-          setRecipe({ ...EMPTY_RECIPE, ...data.recipe });
+          const loaded: Recipe = { ...EMPTY_RECIPE, ...data.recipe };
+          setRecipe(loaded);
+          // Sync raw-text mirrors from the loaded recipe
+          setIgnoreYearsText((loaded.course_year?.ignore_years || []).join("\n"));
+          setFeeRejectYearsText((loaded.fee_reject_years || []).join("\n"));
         }
       })
       .catch(() => toast({ title: "Failed to load recipe", variant: "destructive" }))
@@ -2928,10 +2938,12 @@ export default function RecipeEditorPage() {
                         <span className="text-[10px] text-muted-foreground font-normal">(one per line)</span>
                       </Label>
                       <Textarea
-                        value={(cy.ignore_years || []).join("\n")}
-                        onChange={e => {
-                          const yrs = e.target.value.split("\n").map(s => parseInt(s.trim())).filter(n => !isNaN(n) && n > 2000 && n < 2100);
+                        value={ignoreYearsText}
+                        onChange={e => setIgnoreYearsText(e.target.value)}
+                        onBlur={() => {
+                          const yrs = ignoreYearsText.split("\n").map(s => parseInt(s.trim())).filter(n => !isNaN(n) && n > 2000 && n < 2100);
                           patchCY({ ignore_years: yrs });
+                          setIgnoreYearsText(yrs.join("\n"));
                         }}
                         placeholder={"2027\n2028"}
                         className="mt-1 font-mono text-sm h-20"
@@ -3008,10 +3020,12 @@ export default function RecipeEditorPage() {
                         <span className="text-[10px] text-muted-foreground font-normal">(one per line)</span>
                       </Label>
                       <Textarea
-                        value={(recipe.fee_reject_years || []).join("\n")}
-                        onChange={e => {
-                          const yrs = e.target.value.split("\n").map(s => parseInt(s.trim())).filter(n => !isNaN(n) && n > 2000 && n < 2100);
+                        value={feeRejectYearsText}
+                        onChange={e => setFeeRejectYearsText(e.target.value)}
+                        onBlur={() => {
+                          const yrs = feeRejectYearsText.split("\n").map(s => parseInt(s.trim())).filter(n => !isNaN(n) && n > 2000 && n < 2100);
                           patchRecipe({ fee_reject_years: yrs });
+                          setFeeRejectYearsText(yrs.join("\n"));
                         }}
                         placeholder={"2027\n2028"}
                         className="mt-1 font-mono text-sm h-20"
