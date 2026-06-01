@@ -1219,6 +1219,21 @@ async def extract_course(
                 )
                 _parsed_url = urlparse(url)  # re-parse for any later rewrite
 
+    # JCU: James Cook University serves a "Domestic / International" Fast Facts
+    # toggle on every course detail page.  International fees, IELTS, intakes,
+    # and campus details are only visible when ?international is appended to the
+    # URL.  Without this rewrite the scraper sees the default domestic CSP view
+    # (showing $15 k–25 k Commonwealth Supported fees) and Gemini returns
+    # international_fee=null for every course.  Some research-degree courses
+    # link to an "International postgraduate research fees" PDF instead of showing
+    # an inline fee — the follow_links config in jcu.yaml handles those.
+    _parsed_url = urlparse(url)
+    if _parsed_url.netloc in ("www.jcu.edu.au", "jcu.edu.au") and "/courses/" in _parsed_url.path:
+        _qs = parse_qs(_parsed_url.query)
+        if "international" not in _qs:
+            _qs["international"] = ["true"]
+            url = urlunparse(_parsed_url._replace(query=urlencode({k: v[0] for k, v in _qs.items()})))
+
     # UNE: international student info (IELTS, PTE, fees, campus availability)
     # is only visible on the ?international=true variant of each course page.
     # Rewrite the URL before fetching so extractors always see the right tab.

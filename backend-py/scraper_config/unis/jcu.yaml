@@ -29,8 +29,19 @@ discovery:
   max_candidates: 180
 
 extraction:
-  skip_browser_rescue: true
-  max_parallel_fetch: 4
+  # skip_browser_rescue left false (default) so the per-course browser rescue
+  # runs for courses that still show no international_fee after the static fetch.
+  # JCU's ?international URL rewrite makes most courses resolve in static HTML,
+  # but research-degree courses redirect to a PDF — the browser can follow that.
+  skip_browser_rescue: false
+  max_parallel_fetch: 8
+
+  # Browser actions: click the "International" tab on the Fast Facts panel.
+  # Runs only during the browser rescue pass (when static HTML fetch missed fee).
+  actions:
+    - click_text: "International"
+    - wait_for:
+        text: "International"
 
   filters:
     domestic_only:
@@ -56,8 +67,11 @@ extraction:
     follow_links:
       - "fees and scholarships"
       - "international student fees"
+      - "international postgraduate research fees"
       - "fees for your course"
       - "view fees"
+      - "view international fees"
+      - "fee schedule"
 
     force_central_fee_stage: true
 
