@@ -70,7 +70,7 @@ const COUNTRIES = [
 ];
 
 
-type Tab = "courses" | "english" | "academic" | "scholarships" | "assessment" | "rawdata" | "locations";
+type Tab = "courses" | "english" | "academic" | "scholarships" | "assessment" | "rawdata" | "locations" | "intelligence";
 
 const DEGREE_COLORS: Record<string, string> = {
   Bachelor: "bg-blue-100 text-blue-700",
@@ -1583,6 +1583,7 @@ export default function UniversityDetail() {
     { key: "locations", label: "Locations", icon: <MapPin className="w-4 h-4" /> },
     { key: "scholarships", label: "Scholarships", icon: <Award className="w-4 h-4" /> },
     { key: "rawdata", label: "Raw Data", icon: <Database className="w-4 h-4" /> },
+    { key: "intelligence", label: "Intelligence", icon: <Zap className="w-4 h-4" /> },
   ];
 
   // ── Bulk apply handler ──────────────────────────────────────────
@@ -1976,7 +1977,7 @@ export default function UniversityDetail() {
       </div>
 
       {/* ── Probe Status Card ── */}
-      {probeCardOpen && !!probeResult?.probe_result && (
+      {tab === "intelligence" && !!probeResult?.probe_result && (
         <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 font-semibold text-emerald-800">
@@ -2140,7 +2141,7 @@ export default function UniversityDetail() {
       )}
 
       {/* ── Phase 9: Verification Intelligence Card ─────────────────────── */}
-      {verifCardOpen && verifSummary && verifSummary.total_fields_verified > 0 && (
+      {tab === "intelligence" && verifSummary && verifSummary.total_fields_verified > 0 && (
         <div className="rounded-lg border border-sky-200 bg-sky-50 p-4 text-sm space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 font-semibold text-sky-800">
@@ -2306,7 +2307,7 @@ export default function UniversityDetail() {
       )}
 
       {/* ── Conflict Repair Panel (Phase 9) ──────────────────────────────── */}
-      {verifSummary?.repair_stats && (
+      {tab === "intelligence" && verifSummary?.repair_stats && (
         <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 font-semibold text-rose-800">
@@ -2449,7 +2450,7 @@ export default function UniversityDetail() {
       )}
 
       {/* ── Change Detection Panel (Phase 10) ───────────────────────────── */}
-      {changeData && changeData.summary.total > 0 && (
+      {tab === "intelligence" && changeData && changeData.summary.total > 0 && (
         <div className="rounded-lg border border-orange-200 bg-orange-50 p-4 text-sm space-y-3">
           {/* Header */}
           <div className="flex items-center justify-between">
@@ -2598,6 +2599,7 @@ export default function UniversityDetail() {
       )}
 
       {/* ── Knowledge Graph Panel (Phase 11) ────────────────────────────── */}
+      {tab === "intelligence" && (
       <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-4 text-sm space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 font-semibold text-indigo-800">
@@ -2884,9 +2886,10 @@ export default function UniversityDetail() {
             )}
           </div>
         )}
-      </div>
+      </div>)}
 
       {/* ── Country Intelligence Panel (Phase 12) ────────────────────────── */}
+      {tab === "intelligence" && (
       <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 font-semibold text-emerald-800">
@@ -3176,10 +3179,10 @@ export default function UniversityDetail() {
             )}
           </div>
         )}
-      </div>
+      </div>)}
 
       {/* ── Extraction Rules Card (Phase 2) ─────────────────────────────── */}
-      {probeResult?.auto_config &&
+      {tab === "intelligence" && probeResult?.auto_config &&
         typeof probeResult.auto_config === "object" &&
         !!probeResult.auto_config.extraction_rules &&
         typeof probeResult.auto_config.extraction_rules === "object" && (
