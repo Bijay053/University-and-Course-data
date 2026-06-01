@@ -19,6 +19,7 @@ from app.routers import (
     acronyms,
     assessment_notes,
     auth,
+    bulk_repair,
     changes,
     country_intelligence,
     courses,
@@ -101,6 +102,7 @@ app.include_router(_import_routes.router, prefix="/api")
 app.include_router(_backup.router, prefix="/api", tags=["backup"])
 app.include_router(assessment_notes.router, prefix="/api", tags=["assessment-notes"])
 app.include_router(users.router, prefix="/api", tags=["users"])
+app.include_router(bulk_repair.router, prefix="/api", tags=["bulk-repair"])
 app.include_router(performance.router, prefix="/api/performance", tags=["performance"])
 app.include_router(locations.router, prefix="/api", tags=["locations"])
 app.include_router(verification.router, prefix="/api", tags=["verification"])

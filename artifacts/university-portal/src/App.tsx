@@ -30,6 +30,7 @@ import PublishingPage from "@/pages/publishing";
 import ScrapeAgentPage from "@/pages/scrape-agent";
 import RecipeEditorPage from "@/pages/recipe-editor";
 import CertDashboardPage from "@/pages/cert-dashboard";
+import BulkRepairPage from "@/pages/bulk-repair";
 
 const queryClient = new QueryClient();
 
@@ -86,6 +87,7 @@ function Router() {
               <Route path="/monitoring" component={MonitoringPage} />
               <Route path="/publishing" component={PublishingPage} />
               <Route path="/cert-dashboard" component={CertDashboardPage} />
+              <Route path="/bulk-repair" component={BulkRepairPage} />
               <Route path="/universities/:id/scrape-agent" component={ScrapeAgentPage} />
               <Route path="/universities/:id/recipe" component={RecipeEditorPage} />
               <Route component={NotFound} />
