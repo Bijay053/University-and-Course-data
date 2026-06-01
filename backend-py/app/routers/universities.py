@@ -104,6 +104,114 @@ async def list_universities(
     })
 
 
+@router.get("/universities/cert-dashboard")
+async def get_cert_dashboard(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _user: Annotated[dict, Depends(get_current_user)],
+) -> dict[str, Any]:
+    """Return cert-status summary counts + per-university health-score rows.
+
+    Health score uses the same 40/30/30 formula as the scrape-agent config
+    endpoint so numbers are consistent across the product.
+    """
+    rows = (
+        await db.execute(
+            text(
+                """
+                SELECT
+                    u.id,
+                    u.name,
+                    u.country,
+                    u.scrape_url,
+                    COALESCE(u.certification_status, 'draft') AS certification_status,
+                    u.last_certified_score,
+                    u.last_certified_at,
+                    j.runtime_job_id,
+                    j.total_found,
+                    j.imported,
+                    j.created_at            AS last_scrape_at,
+                    j.avg_completeness,
+                    sj.scrape_config
+                FROM universities u
+                LEFT JOIN LATERAL (
+                    SELECT
+                        rj.runtime_job_id,
+                        rj.total_found,
+                        rj.imported,
+                        rj.created_at,
+                        (
+                            SELECT ROUND(AVG(sc.completeness)::numeric, 1)
+                            FROM scraped_courses sc
+                            WHERE sc.scrape_job_id = rj.runtime_job_id
+                              AND sc.completeness IS NOT NULL
+                        ) AS avg_completeness
+                    FROM scrape_runtime_jobs rj
+                    WHERE rj.university_id = u.id
+                    ORDER BY rj.created_at DESC
+                    LIMIT 1
+                ) j ON true
+                LEFT JOIN LATERAL (
+                    SELECT scrape_config
+                    FROM scraping_jobs
+                    WHERE university_id = u.id
+                    ORDER BY id DESC
+                    LIMIT 1
+                ) sj ON true
+                ORDER BY u.name
+                """
+            )
+        )
+    ).mappings().all()
+
+    universities_out = []
+    summary: dict[str, int] = {
+        "certified": 0, "testing": 0, "needs_review": 0, "failed": 0, "draft": 0,
+    }
+
+    for r in rows:
+        cert_status = r["certification_status"] or "draft"
+        summary[cert_status] = summary.get(cert_status, 0) + 1
+
+        admin_cfg: dict = {}
+        sc = r["scrape_config"]
+        if sc and isinstance(sc, dict):
+            admin_cfg = sc.get("admin", {})
+
+        min_expected = int(admin_cfg.get("_min_expected_courses") or 0)
+        found = int(r["total_found"] or 0)
+        imported = int(r["imported"] or 0)
+        avg_comp = float(r["avg_completeness"] or 0)
+
+        score_found = (
+            40 * min(found / max(min_expected, 1), 1.0)
+            if min_expected
+            else (40 if found >= 10 else 40 * found / 10)
+        )
+        score_comp = 30 * min(avg_comp / 100.0, 1.0)
+        score_stage = 30 * min(imported / max(found, 1), 1.0) if found else 0
+        current_score = round(score_found + score_comp + score_stage)
+
+        last_cert = r["last_certified_score"]
+        score_drop = (int(last_cert) - current_score) if last_cert is not None else None
+
+        universities_out.append({
+            "id": r["id"],
+            "name": r["name"],
+            "country": r["country"],
+            "scrape_url": r["scrape_url"],
+            "certification_status": cert_status,
+            "last_certified_score": last_cert,
+            "last_certified_at": r["last_certified_at"].isoformat() if r["last_certified_at"] else None,
+            "current_health_score": current_score,
+            "score_drop": score_drop,
+            "last_scrape_at": r["last_scrape_at"].isoformat() if r["last_scrape_at"] else None,
+            "staged_courses": imported,
+            "total_found": found,
+        })
+
+    return {"summary": summary, "universities": universities_out}
+
+
 @router.get("/universities/{uni_id}")
 async def get_university(uni_id: int, db: Annotated[AsyncSession, Depends(get_db)]) -> UniversityRead:
     u = await db.get(University, uni_id)
@@ -342,115 +450,6 @@ async def bulk_import_universities(
 
 
 _CERT_STATUSES = ("draft", "testing", "certified", "needs_review", "failed")
-
-
-@router.get("/universities/cert-dashboard")
-async def get_cert_dashboard(
-    db: Annotated[AsyncSession, Depends(get_db)],
-    _user: Annotated[dict, Depends(get_current_user)],
-) -> dict[str, Any]:
-    """Return cert-status summary counts + per-university health-score rows.
-
-    Health score uses the same 40/30/30 formula as the scrape-agent config
-    endpoint so numbers are consistent across the product.
-    """
-    rows = (
-        await db.execute(
-            text(
-                """
-                SELECT
-                    u.id,
-                    u.name,
-                    u.country,
-                    u.scrape_url,
-                    COALESCE(u.certification_status, 'draft') AS certification_status,
-                    u.last_certified_score,
-                    u.last_certified_at,
-                    j.runtime_job_id,
-                    j.total_found,
-                    j.imported,
-                    j.created_at            AS last_scrape_at,
-                    j.avg_completeness,
-                    sj.scrape_config
-                FROM universities u
-                LEFT JOIN LATERAL (
-                    SELECT
-                        rj.runtime_job_id,
-                        rj.total_found,
-                        rj.imported,
-                        rj.created_at,
-                        (
-                            SELECT ROUND(AVG(sc.completeness)::numeric, 1)
-                            FROM scraped_courses sc
-                            WHERE sc.scrape_job_id = rj.runtime_job_id
-                              AND sc.completeness IS NOT NULL
-                        ) AS avg_completeness
-                    FROM scrape_runtime_jobs rj
-                    WHERE rj.university_id = u.id
-                    ORDER BY rj.created_at DESC
-                    LIMIT 1
-                ) j ON true
-                LEFT JOIN LATERAL (
-                    SELECT scrape_config
-                    FROM scraping_jobs
-                    WHERE university_id = u.id
-                    ORDER BY id DESC
-                    LIMIT 1
-                ) sj ON true
-                ORDER BY u.name
-                """
-            )
-        )
-    ).mappings().all()
-
-    universities_out = []
-    summary: dict[str, int] = {
-        "certified": 0, "testing": 0, "needs_review": 0, "failed": 0, "draft": 0,
-    }
-
-    for r in rows:
-        cert_status = r["certification_status"] or "draft"
-        summary[cert_status] = summary.get(cert_status, 0) + 1
-
-        # Compute health score (40 found + 30 completeness + 30 staged ratio)
-        admin_cfg: dict = {}
-        sc = r["scrape_config"]
-        if sc and isinstance(sc, dict):
-            admin_cfg = sc.get("admin", {})
-
-        min_expected = int(admin_cfg.get("_min_expected_courses") or 0)
-        found = int(r["total_found"] or 0)
-        imported = int(r["imported"] or 0)
-        avg_comp = float(r["avg_completeness"] or 0)
-
-        score_found = (
-            40 * min(found / max(min_expected, 1), 1.0)
-            if min_expected
-            else (40 if found >= 10 else 40 * found / 10)
-        )
-        score_comp = 30 * min(avg_comp / 100.0, 1.0)
-        score_stage = 30 * min(imported / max(found, 1), 1.0) if found else 0
-        current_score = round(score_found + score_comp + score_stage)
-
-        last_cert = r["last_certified_score"]
-        score_drop = (int(last_cert) - current_score) if last_cert is not None else None
-
-        universities_out.append({
-            "id": r["id"],
-            "name": r["name"],
-            "country": r["country"],
-            "scrape_url": r["scrape_url"],
-            "certification_status": cert_status,
-            "last_certified_score": last_cert,
-            "last_certified_at": r["last_certified_at"].isoformat() if r["last_certified_at"] else None,
-            "current_health_score": current_score,
-            "score_drop": score_drop,
-            "last_scrape_at": r["last_scrape_at"].isoformat() if r["last_scrape_at"] else None,
-            "staged_courses": imported,
-            "total_found": found,
-        })
-
-    return {"summary": summary, "universities": universities_out}
 
 
 @router.get("/universities/{uni_id}/certification-status")
