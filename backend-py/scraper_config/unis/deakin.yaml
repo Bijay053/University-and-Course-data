@@ -1,10 +1,47 @@
-# Deakin University — stub created for Week 4 scale-up.
-# Hostname: www.deakin.edu.au  (course catalogue at /course)
+# Deakin University — www.deakin.edu.au
 #
-# Bug history: none yet — fill in after first scrape.
-# Note: Deakin uses Sitecore + heavy JS; expect browser timeout tuning.
+# SITE STRUCTURE (two-level category hierarchy — both cases handled by BFS):
+#
+#   Case 1 (direct listing):
+#     /choosing-your-degree/accounting-and-finance → course tiles
+#
+#   Case 2 (sub-category drill-in):
+#     /choosing-your-degree → study-area cards
+#       → /choosing-your-degree/accounting-and-finance → course tiles
+#
+#   BFS handles Case 2 natively via _is_category_landing() — sub-category pages
+#   are enqueued at depth+1 rather than staged as course candidates.
+#
+# JS RENDERING: Deakin uses Sitecore. HTTP BFS sees no links from JS-rendered
+#   pages. Primary strategy = sitemap (bypasses JS entirely). Browser is the
+#   fallback if the sitemap proves thin on international courses.
+#
+# SCRAPE_URL: should be set to the international-students catalogue entry point
+#   in the DB: https://www.deakin.edu.au/international-students/choosing-your-degree
+#
 discovery:
+  # Primary: sitemap lists all /course/* URLs directly — no JS needed.
   always_sitemap_supplement: true
+
+  # Fallback: if sitemap yields <10 international course URLs, browser renders
+  # the JS and follows the two-level study-area card hierarchy normally.
+  always_browser_discover: true
+
+  # Budget for browser mode: ~14 study-area pages + top-level listing = 15
+  # intermediate pages, then course links are harvested directly (not fetched).
+  bfs_page_budget: 60
+
+  # Seed the international-students catalogue entry point explicitly so BFS
+  # doesn't have to guess from the homepage.
+  seed_urls:
+    - "https://www.deakin.edu.au/international-students/choosing-your-degree"
+
+  # Deakin course URLs live under /course/<slug> — the allow pattern ensures
+  # sub-category pages (/choosing-your-degree/*) are followed but not staged,
+  # while only real course-detail URLs are staged.
+  allow_url_patterns:
+    - "/course/"
+
 extraction:
   filters:
     domestic_only:
