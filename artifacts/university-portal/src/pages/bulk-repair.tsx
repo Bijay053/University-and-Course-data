@@ -4,6 +4,7 @@ import {
   Languages, DollarSign, TrendingUp, Search, CheckSquare, Square,
   RefreshCw, Wrench, FlaskConical, ChevronRight, AlertTriangle,
   CheckCircle2, XCircle, ExternalLink, Bot, Info, ShieldAlert,
+  History, User, Calendar, ChevronDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -88,6 +89,20 @@ interface PreviewData {
   };
 }
 
+interface HistoryEntry {
+  id: number;
+  created_at: string;
+  triggered_by_email: string;
+  triggered_by_name: string | null;
+  issue_types: string[];
+  selected_count: number;
+  queued_count: number;
+  skipped_count: number;
+  failed_count: number;
+  mark_testing: boolean;
+  university_names: string[];
+}
+
 // ── Issue config ─────────────────────────────────────────────────────────────
 const ISSUE_CFG: Record<IssueKey, {
   label: string; shortLabel: string; desc: string;
@@ -142,11 +157,125 @@ function relativeTime(iso: string | null): string {
   return `${Math.floor(days / 30)}mo ago`;
 }
 
+// ── History view ──────────────────────────────────────────────────────────────
+function HistoryView() {
+  const [expanded, setExpanded] = useState<number | null>(null);
+  const { data, isLoading } = useQuery<{ history: HistoryEntry[] }>({
+    queryKey: ["bulk-repair-history"],
+    queryFn: () => apiFetch("/api/bulk-repair/history?limit=50"),
+    staleTime: 30_000,
+  });
+
+  const entries = data?.history ?? [];
+
+  function absTime(iso: string) {
+    return new Date(iso).toLocaleString("en-AU", {
+      day: "2-digit", month: "short", year: "numeric",
+      hour: "2-digit", minute: "2-digit",
+    });
+  }
+
+  if (isLoading) return <div className="py-12 text-center text-gray-400 text-sm">Loading history…</div>;
+
+  if (entries.length === 0) return (
+    <div className="py-16 text-center text-gray-400">
+      <History className="h-10 w-10 mx-auto mb-3 opacity-30" />
+      <p className="text-sm">No bulk repair actions recorded yet.</p>
+      <p className="text-xs mt-1">Each confirmed repair will appear here.</p>
+    </div>
+  );
+
+  return (
+    <div className="space-y-3">
+      {entries.map(e => (
+        <div key={e.id} className="rounded-xl border bg-white shadow-sm overflow-hidden">
+          {/* Summary row */}
+          <button
+            className="w-full flex items-center gap-4 px-5 py-4 text-left hover:bg-gray-50 transition-colors"
+            onClick={() => setExpanded(expanded === e.id ? null : e.id)}
+          >
+            <div className="h-9 w-9 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+              <Wrench className="h-4 w-4 text-blue-600" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-semibold text-sm text-gray-900">Bulk Repair</span>
+                {e.mark_testing && (
+                  <span className="text-xs px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">+ Testing</span>
+                )}
+                {e.failed_count > 0 && (
+                  <span className="text-xs px-1.5 py-0.5 rounded bg-red-50 text-red-700 border border-red-200">{e.failed_count} failed</span>
+                )}
+              </div>
+              <div className="text-xs text-gray-500 mt-0.5 flex items-center gap-3 flex-wrap">
+                <span className="flex items-center gap-1"><User className="h-3 w-3" />{e.triggered_by_name || e.triggered_by_email}</span>
+                <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />{absTime(e.created_at)}</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-4 shrink-0 text-sm">
+              <div className="text-center hidden sm:block">
+                <div className="font-bold text-gray-900">{e.selected_count}</div>
+                <div className="text-xs text-gray-400">Selected</div>
+              </div>
+              <div className="text-center hidden sm:block">
+                <div className="font-bold text-emerald-700">{e.queued_count}</div>
+                <div className="text-xs text-gray-400">Queued</div>
+              </div>
+              {e.skipped_count > 0 && (
+                <div className="text-center hidden sm:block">
+                  <div className="font-bold text-amber-600">{e.skipped_count}</div>
+                  <div className="text-xs text-gray-400">Skipped</div>
+                </div>
+              )}
+              <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${expanded === e.id ? "rotate-180" : ""}`} />
+            </div>
+          </button>
+
+          {/* Expanded detail */}
+          {expanded === e.id && (
+            <div className="border-t bg-gray-50 px-5 py-4 space-y-3">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {[
+                  { label: "Selected",  val: e.selected_count,  color: "text-gray-900" },
+                  { label: "Queued",    val: e.queued_count,    color: "text-emerald-700" },
+                  { label: "Skipped",   val: e.skipped_count,   color: "text-amber-600" },
+                  { label: "Failed",    val: e.failed_count,    color: "text-red-600" },
+                ].map(({ label, val, color }) => (
+                  <div key={label} className="rounded-lg bg-white border px-3 py-2 text-center">
+                    <div className={`text-xl font-bold ${color}`}>{val}</div>
+                    <div className="text-xs text-gray-400">{label}</div>
+                  </div>
+                ))}
+              </div>
+              <div>
+                <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Universities ({e.university_names.length})</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {e.university_names.slice(0, 20).map(n => (
+                    <span key={n} className="text-xs px-2 py-0.5 rounded-full bg-white border text-gray-700">{n}</span>
+                  ))}
+                  {e.university_names.length > 20 && (
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">+{e.university_names.length - 20} more</span>
+                  )}
+                </div>
+              </div>
+              <div className="text-xs text-gray-400 flex items-center gap-1.5">
+                <User className="h-3 w-3" />
+                Triggered by <span className="font-medium text-gray-600">{e.triggered_by_email}</span>
+              </div>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 type Step = "scan" | "select" | "applying" | "results";
 
 export default function BulkRepairPage() {
   const { toast } = useToast();
+  const [viewMode, setViewMode] = useState<"workflow" | "history">("workflow");
   const [step, setStep] = useState<Step>("scan");
   const [activeIssues, setActiveIssues] = useState<Set<IssueKey>>(new Set());
   const [selected, setSelected] = useState<Set<number>>(new Set());
@@ -333,10 +462,28 @@ export default function BulkRepairPage() {
           <h1 className="text-2xl font-bold tracking-tight">Bulk Repair</h1>
           <p className="text-sm text-gray-500 mt-0.5">Find quality issues across universities, select affected ones, and queue repairs in one action.</p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching} className="gap-1.5">
-          <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant={viewMode === "history" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setViewMode(viewMode === "history" ? "workflow" : "history")}
+            className="gap-1.5"
+          >
+            <History className="h-4 w-4" />History
+          </Button>
+          {viewMode === "workflow" && (
+            <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching} className="gap-1.5">
+              <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />Refresh
+            </Button>
+          )}
+        </div>
       </div>
+
+      {/* History view */}
+      {viewMode === "history" && <HistoryView />}
+
+      {/* Workflow content — hidden when viewing history */}
+      {viewMode === "workflow" && <>
 
       {/* Workflow steps hint */}
       <div className="flex items-center gap-2 text-xs text-gray-400 overflow-x-auto">
@@ -544,6 +691,8 @@ export default function BulkRepairPage() {
           <p>Click an issue card above to scan for affected universities.</p>
         </div>
       )}
+
+      </>}
 
       {/* ── Bulk Repair Preview Modal ─────────────────────────────────────── */}
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>

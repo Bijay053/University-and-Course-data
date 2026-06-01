@@ -377,9 +377,93 @@ async def bulk_repair_apply(
         })
 
     succeeded = sum(1 for r in results if r.get("ok"))
+    failed    = len(uni_ids) - succeeded
+    skipped   = sum(1 for r in results if r.get("ok") and not r.get("repair_job_id"))
+
+    # ── Audit history record ───────────────────────────────────────────────
+    try:
+        uni_names = [r["name"] for r in results if "name" in r]
+        await db.execute(
+            text(
+                """
+                INSERT INTO bulk_repair_history
+                    (triggered_by_email, triggered_by_name,
+                     issue_types, selected_count, queued_count,
+                     skipped_count, failed_count, mark_testing,
+                     university_names, result)
+                VALUES
+                    (:email, :name,
+                     :issue_types, :selected, :queued,
+                     :skipped, :failed, :mark_testing,
+                     :uni_names, :result)
+                """
+            ),
+            {
+                "email":       _user.get("email", "unknown"),
+                "name":        _user.get("name"),
+                "issue_types": [],
+                "selected":    len(uni_ids),
+                "queued":      succeeded - skipped,
+                "skipped":     skipped,
+                "failed":      failed,
+                "mark_testing": do_testing,
+                "uni_names":   uni_names,
+                "result":      __import__("json").dumps(results),
+            },
+        )
+        await db.commit()
+    except Exception:
+        pass  # audit failure must never block the response
+
     return {
         "total": len(uni_ids),
         "succeeded": succeeded,
-        "failed": len(uni_ids) - succeeded,
+        "failed": failed,
         "results": results,
+    }
+
+
+# ── History ───────────────────────────────────────────────────────────────────
+
+@router.get("/bulk-repair/history")
+async def bulk_repair_history(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _user: Annotated[dict, Depends(get_current_user)],
+    limit: int = 50,
+) -> dict[str, Any]:
+    """Return the bulk repair audit log, most recent first."""
+    rows = (
+        await db.execute(
+            text(
+                """
+                SELECT id, created_at, triggered_by_email, triggered_by_name,
+                       issue_types, selected_count, queued_count, skipped_count,
+                       failed_count, mark_testing, university_names, result
+                FROM bulk_repair_history
+                ORDER BY created_at DESC
+                LIMIT :limit
+                """
+            ),
+            {"limit": limit},
+        )
+    ).mappings().all()
+
+    return {
+        "history": [
+            {
+                "id":                  r["id"],
+                "created_at":          r["created_at"].isoformat(),
+                "triggered_by_email":  r["triggered_by_email"],
+                "triggered_by_name":   r["triggered_by_name"],
+                "issue_types":         r["issue_types"] or [],
+                "selected_count":      r["selected_count"],
+                "queued_count":        r["queued_count"],
+                "skipped_count":       r["skipped_count"],
+                "failed_count":        r["failed_count"],
+                "mark_testing":        r["mark_testing"],
+                "university_names":    r["university_names"] or [],
+                "result":              r["result"],
+            }
+            for r in rows
+        ]
     }

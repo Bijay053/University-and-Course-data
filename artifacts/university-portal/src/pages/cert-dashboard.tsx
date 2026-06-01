@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ShieldCheck, ShieldX, FlaskConical, FileEdit, AlertTriangle,
   RefreshCw, ExternalLink, TrendingDown, Bot, Clock, ChevronDown, ChevronUp,
-  Search,
+  Search, Wrench, User, CheckCircle2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -141,6 +141,17 @@ export default function CertDashboardPage() {
   const { data, isLoading, isError, refetch, isFetching } = useQuery<DashboardData>({
     queryKey: ["cert-dashboard"],
     queryFn: () => apiFetch("/api/universities/cert-dashboard"),
+    staleTime: 60_000,
+  });
+
+  const { data: historyData } = useQuery<{ history: Array<{
+    id: number; created_at: string; triggered_by_name: string | null;
+    triggered_by_email: string; selected_count: number; queued_count: number;
+    skipped_count: number; failed_count: number; mark_testing: boolean;
+    university_names: string[];
+  }> }>({
+    queryKey: ["bulk-repair-history-dash"],
+    queryFn: () => apiFetch("/api/bulk-repair/history?limit=5"),
     staleTime: 60_000,
   });
 
@@ -399,6 +410,66 @@ export default function CertDashboardPage() {
           </div>
         )}
       </div>
+
+      {/* ── Bulk Repair History panel ────────────────────────────────────── */}
+      {historyData && historyData.history.length > 0 && (
+        <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-3 border-b bg-gray-50/60">
+            <div className="flex items-center gap-2 font-semibold text-sm text-gray-700">
+              <Wrench className="h-4 w-4 text-blue-600" />
+              Bulk Repair History
+            </div>
+            <a href="/bulk?tab=repair" className="text-xs text-blue-600 hover:underline">View all →</a>
+          </div>
+          <div className="divide-y">
+            {historyData.history.map(e => {
+              const relTime = (() => {
+                const diff = Date.now() - new Date(e.created_at).getTime();
+                const days = Math.floor(diff / 86400000);
+                if (days === 0) return "Today";
+                if (days === 1) return "Yesterday";
+                if (days < 7) return `${days}d ago`;
+                return new Date(e.created_at).toLocaleDateString("en-AU", { day: "2-digit", month: "short" });
+              })();
+              return (
+                <div key={e.id} className="flex items-center gap-4 px-5 py-3 text-sm">
+                  <div className="h-7 w-7 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+                    <Wrench className="h-3.5 w-3.5 text-blue-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-medium text-gray-900">Bulk Repair</span>
+                      {e.mark_testing && <span className="text-xs px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">+Testing</span>}
+                      {e.failed_count > 0 && <span className="text-xs px-1.5 py-0.5 rounded bg-red-50 text-red-700 border border-red-200">{e.failed_count} failed</span>}
+                    </div>
+                    <div className="text-xs text-gray-400 mt-0.5 flex items-center gap-2">
+                      <span className="flex items-center gap-1"><User className="h-3 w-3" />{e.triggered_by_name || e.triggered_by_email}</span>
+                      <span>·</span>
+                      <span>{relTime}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4 text-xs shrink-0">
+                    <div className="text-center">
+                      <div className="font-bold text-gray-900">{e.selected_count}</div>
+                      <div className="text-gray-400">Selected</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="font-bold text-emerald-700">{e.queued_count}</div>
+                      <div className="text-gray-400">Queued</div>
+                    </div>
+                    {e.skipped_count > 0 && (
+                      <div className="text-center">
+                        <div className="font-bold text-amber-600">{e.skipped_count}</div>
+                        <div className="text-gray-400">Skipped</div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
