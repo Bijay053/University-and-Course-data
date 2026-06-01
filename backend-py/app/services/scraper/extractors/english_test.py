@@ -229,7 +229,7 @@ def _ielts(text: str) -> dict[str, float] | None:
         if 4 <= ov <= 9 and 4 <= ea <= 9:
             return {"overall": ov, "listening": ea, "reading": ea, "writing": ea, "speaking": ea}
 
-    # Pattern 3: explicit subscores in order
+    # Pattern 3: explicit subscores in order (L → R → W → S)
     m = re.search(
         r"ielts(?:\s+academic)?.*?overall\s*([0-9]+(?:\.[0-9]+)?).*?"
         r"listening\s*([0-9]+(?:\.[0-9]+)?).*?reading\s*([0-9]+(?:\.[0-9]+)?).*?"
@@ -246,6 +246,41 @@ def _ielts(text: str) -> dict[str, float] | None:
             "speaking": float(m.group(5)),
         }
 
+    # Pattern 3.5: order-independent subscores with optional "minimum" prefix.
+    # Handles SCU-style table layout where the order is Overall → Listening →
+    # Speaking → Reading → Writing (speaking before reading) and each band score
+    # is written as "minimum 6.0" rather than a bare digit.
+    # e.g. "Category Score Overall 6.5 Listening minimum 6.0 Speaking minimum 6.0
+    #        Reading minimum 6.0 Writing minimum 6.0"
+    # Requires at least 2 of the 4 band rows to be present before returning, to
+    # avoid a false positive when the page only lists overall.
+    _BS = r"[\s:.\-]+(?:(?:minimum|min\.?|at\s+least)\s+)?"
+    _ov35 = re.search(
+        r"ielts(?:\s+academic)?.{0,600}?overall" + _BS + r"([0-9]+(?:\.[0-9]+)?)",
+        text,
+        re.I | re.S,
+    )
+    if _ov35:
+        _l35 = re.search(r"\blistening" + _BS + r"([0-9]+(?:\.[0-9]+)?)\b", text, re.I)
+        _r35 = re.search(r"\breading" + _BS + r"([0-9]+(?:\.[0-9]+)?)\b", text, re.I)
+        _w35 = re.search(r"\bwriting" + _BS + r"([0-9]+(?:\.[0-9]+)?)\b", text, re.I)
+        _s35 = re.search(r"\bspeaking" + _BS + r"([0-9]+(?:\.[0-9]+)?)\b", text, re.I)
+        if sum(1 for _b in [_l35, _r35, _w35, _s35] if _b) >= 2:
+            _ov35_val = float(_ov35.group(1))
+            if 4 <= _ov35_val <= 9:
+                def _b35(_bm: re.Match | None) -> float | None:
+                    if not _bm:
+                        return None
+                    _v = float(_bm.group(1))
+                    return _v if 4 <= _v <= 9 else None
+                return {
+                    "overall": _ov35_val,
+                    "listening": _b35(_l35),
+                    "reading": _b35(_r35),
+                    "writing": _b35(_w35),
+                    "speaking": _b35(_s35),
+                }
+
     # Pattern 4: overall near "ielts" + standalone subscores.
     # The optional `(?:\s+(?:band\s+)?score)?` bridge after "overall"
     # lets us also catch Gemini Vision's verbose phrasing — e.g.
@@ -254,16 +289,20 @@ def _ielts(text: str) -> dict[str, float] | None:
     # `\s*`) so "IELTS Academic listening: 6" parses; the leading `\b`
     # plus a 12-char window (with no other digit and no other test name)
     # keeps us from picking up unrelated numbers from elsewhere on the page.
+    # The _BAND_SEP bridge also allows an optional qualifier word
+    # ("minimum", "min.", "at least") between the band label and the digit
+    # so "Listening minimum 6.0" style tables are captured (SCU/AU layout).
+    _BAND_SEP = r"[\s:.\-]+(?:(?:minimum|min\.?|at\s+least)\s+)?"
     overall_m = re.search(
         r"ielts(?:\s+academic)?.{0,120}?overall(?:\s+band)?(?:\s+score)?"
         r"[\s:.\-]+([0-9]+(?:\.[0-9]+)?)",
         text,
         re.I | re.S,
     )
-    listen_m = re.search(r"\blistening[\s:.\-]+([0-9]+(?:\.[0-9]+)?)\b", text, re.I)
-    read_m = re.search(r"\breading[\s:.\-]+([0-9]+(?:\.[0-9]+)?)\b", text, re.I)
-    write_m = re.search(r"\bwriting[\s:.\-]+([0-9]+(?:\.[0-9]+)?)\b", text, re.I)
-    speak_m = re.search(r"\bspeaking[\s:.\-]+([0-9]+(?:\.[0-9]+)?)\b", text, re.I)
+    listen_m = re.search(r"\blistening" + _BAND_SEP + r"([0-9]+(?:\.[0-9]+)?)\b", text, re.I)
+    read_m = re.search(r"\breading" + _BAND_SEP + r"([0-9]+(?:\.[0-9]+)?)\b", text, re.I)
+    write_m = re.search(r"\bwriting" + _BAND_SEP + r"([0-9]+(?:\.[0-9]+)?)\b", text, re.I)
+    speak_m = re.search(r"\bspeaking" + _BAND_SEP + r"([0-9]+(?:\.[0-9]+)?)\b", text, re.I)
     if overall_m and (listen_m or read_m or write_m or speak_m):
         ov = float(overall_m.group(1))
         if 4 <= ov <= 9:
