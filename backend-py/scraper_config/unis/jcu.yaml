@@ -1,33 +1,37 @@
 # James Cook University
 # Hostname: www.jcu.edu.au
 #
-# JCU is a JS-heavy SPA. BFS/browser discovery is unreliable — the site
-# is Cloudflare-protected and returns empty HTML for datacenter IPs.
-# We query the SearchStax Solr core used by the site's own search widget.
-# API discovery runs before BFS (orchestrator YAML-API tier).
+# JCU is Cloudflare-protected. BFS discovery is slow but works — the site
+# returns HTML for browser-mode requests and has a stable /courses listing.
+# 104 extractable courses found via BFS in the 2026-05-30 scrape.
 #
-# WARNING: The endpoint URL below contains a SearchStax core identifier
-# captured from JCU's network requests. Verify it is still correct and
-# that the token in headers is the current active token. Do NOT commit
-# the literal token to VCS — replace with an env-var reference when
-# rotating. (2026-05-01)
+# DISABLED API BLOCK — DO NOT RE-ENABLE without finding JCU's actual endpoint
+# ──────────────────────────────────────────────────────────────────────────────
+# The URL that was here (searchcloud-1-eu-west-2.searchstax.com/29847/qmu-1736)
+# is Queen Margaret University's SearchStax core, NOT JCU's.  It was copy-pasted
+# in error and always returns 0 results.  The correct JCU SearchStax endpoint is
+# not yet known.  To find it: open browser DevTools → Network tab → visit
+# https://www.jcu.edu.au/courses → filter XHR by "searchstax" or "searchcloud" →
+# copy the full request URL and token, then update this block and set enabled: true.
 
 discovery:
   # ── YAML-driven API-first discovery ──────────────────────────────────────
-  # Queries JCU's SearchStax Solr core before any BFS/browser attempt.
-  # Set enabled: false to fall back to browser discovery for debugging.
+  # DISABLED: URL is wrong (see comments above). BFS fallback handles discovery.
+  # Re-enable once the correct JCU SearchStax endpoint is identified.
   generic_search_api:
-    enabled: true
+    enabled: false
     method: GET
-    url: "https://searchcloud-1-eu-west-2.searchstax.com/29847/qmu-1736/emselect"
+    url: "REPLACE_WITH_JCU_SEARCHSTAX_URL"
+    # How to find the correct URL:
+    #   1. Open https://www.jcu.edu.au/courses in a browser
+    #   2. Open DevTools → Network → filter by "searchstax" or "searchcloud"
+    #   3. Copy the full request URL (e.g. https://searchcloud-X.searchstax.com/NNNNN/jcu-NNNN/emselect)
+    #   4. Copy the Authorization header token
+    #   5. Replace url and authorization below, set enabled: true
     headers:
-      authorization: "Token bc0d2578c3f22cca23fdb327f7490ddb56098759"
+      authorization: "Token REPLACE_WITH_JCU_TOKEN"
     params:
       q: "*"
-      spellcheck.correct: "true"
-      hl.fragsize: "200"
-      model: "coursefinder-ug"
-      language: "en"
       rows: "250"
     root_path: "response.docs"
     url_fields:

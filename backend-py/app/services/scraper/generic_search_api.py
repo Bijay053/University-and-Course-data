@@ -777,19 +777,28 @@ async def fetch_yaml_api_links(cfg: Any, emit: Callable[..., Any] | None = None)
     cfg:
         ``GenericSearchApiConfig`` instance (from schema.py).
     emit:
-        Optional logging callable (matches orchestrator emit signature).
+        Async callable with signature ``emit("status", msg, phase="discover")``.
+        Matches the orchestrator's emit function.  When None, progress is
+        written to the log only.
     """
+    import asyncio
     import httpx
 
-    def _emit(msg: str) -> None:
+    async def _emit(msg: str) -> None:
+        """Forward a progress line to both the Celery log and the portal stream."""
         log.info("[YAML_API] %s", msg)
         if emit:
             try:
-                emit(msg)
+                coro = emit("status", f"[DISCOVER] API: {msg}", phase="discover")
+                if asyncio.iscoroutine(coro):
+                    await coro
             except Exception:
                 pass
 
-    _emit(f"Starting YAML generic_search_api: {cfg.method} {cfg.url}")
+    await _emit(
+        f"generic_search_api enabled — {cfg.method} {cfg.url[:80]}"
+        + (f" (root_path={cfg.root_path!r})" if cfg.root_path else "")
+    )
 
     # ── Build allow/block regex sets ──────────────────────────────────────────
     _allow_res = []
@@ -848,69 +857,135 @@ async def fetch_yaml_api_links(cfg: Any, emit: Callable[..., Any] | None = None)
                 req_params[cfg.page_size_param] = str(page_size)
                 req_params[cfg.offset_param] = str(offset)
 
+            # ── Make the HTTP request ────────────────────────────────────────
+            resp = None
             try:
                 if cfg.method.upper() == "POST":
                     resp = await client.post(cfg.url, headers=cfg.headers, json=req_params)
                 else:
                     resp = await client.get(cfg.url, headers=cfg.headers, params=req_params)
-                resp.raise_for_status()
             except Exception as exc:
-                log.error("[YAML_API] request failed (page %d): %s", page_num, exc)
+                await _emit(
+                    f"request failed (page {page_num}, network error): {exc}"
+                )
+                log.error("[YAML_API] network error page=%d: %s", page_num, exc, exc_info=True)
                 break
 
+            # ── Check HTTP status ────────────────────────────────────────────
+            if resp.status_code != 200:
+                snippet = resp.text[:200].replace("\n", " ")
+                await _emit(
+                    f"HTTP {resp.status_code} from {cfg.url[:60]} — "
+                    f"check URL, headers/token, or network. "
+                    f"Response snippet: {snippet!r}"
+                )
+                log.error(
+                    "[YAML_API] HTTP %d page=%d url=%s body_start=%r",
+                    resp.status_code, page_num, cfg.url, snippet,
+                )
+                break
+
+            # ── Parse JSON ───────────────────────────────────────────────────
             try:
                 data = resp.json()
             except Exception as exc:
-                log.error("[YAML_API] JSON decode failed: %s", exc)
+                snippet = resp.text[:200].replace("\n", " ")
+                await _emit(
+                    f"JSON decode failed: {exc} — "
+                    f"response snippet: {snippet!r}"
+                )
+                log.error("[YAML_API] JSON decode failed: %s body=%r", exc, snippet)
                 break
 
+            # ── Extract items from configured root_path ──────────────────────
             items: list[dict] = []
             if cfg.root_path:
-                items = _dig(data, cfg.root_path) or []
+                raw = _dig(data, cfg.root_path)
+                items = raw if isinstance(raw, list) else []
+                if not isinstance(raw, list):
+                    # Show operator the actual top-level keys so they can fix root_path
+                    top_keys = list(data.keys())[:10] if isinstance(data, dict) else type(data).__name__
+                    await _emit(
+                        f"root_path={cfg.root_path!r} → {type(raw).__name__} "
+                        f"(expected list). Top-level keys: {top_keys}. "
+                        f"Fix root_path in YAML."
+                    )
             elif isinstance(data, list):
                 items = data
             else:
                 # Try common wrapper keys
-                for k in ("results", "items", "data", "courses", "docs"):
-                    if isinstance(data.get(k), list):
-                        items = data[k]
+                for k in ("results", "items", "data", "courses", "docs", "response"):
+                    v = data.get(k) if isinstance(data, dict) else None
+                    if isinstance(v, list):
+                        items = v
                         break
+                    # Handle Solr-style: response.docs
+                    if isinstance(v, dict):
+                        docs = v.get("docs")
+                        if isinstance(docs, list):
+                            items = docs
+                            break
+
+            if page_num == 0:
+                await _emit(
+                    f"HTTP 200 — {len(items)} items in page 0"
+                    + (f" (root_path={cfg.root_path!r})" if cfg.root_path else "")
+                )
 
             if not items:
-                _emit(f"Page {page_num}: 0 items — stopping pagination")
+                if page_num == 0:
+                    top_keys = list(data.keys())[:10] if isinstance(data, dict) else type(data).__name__
+                    await _emit(
+                        f"0 items found — response top-level keys: {top_keys}. "
+                        f"Verify root_path in YAML matches the API response structure."
+                    )
+                else:
+                    await _emit(f"page {page_num}: 0 items — end of pagination")
                 break
 
+            # ── Extract URLs ─────────────────────────────────────────────────
             page_links = 0
+            filtered_out = 0
+            no_url = 0
             for item in items:
                 if not isinstance(item, dict):
                     continue
                 raw_url = _first_field(item, cfg.url_fields)
                 name = _first_field(item, cfg.title_fields) or raw_url
                 if not raw_url:
+                    no_url += 1
                     continue
                 url = _resolve_url(raw_url)
                 if not _keep_url(url):
+                    filtered_out += 1
                     continue
                 links.append({"name": name, "url": url})
                 page_links += 1
 
                 if cfg.max_courses and len(links) >= cfg.max_courses:
-                    _emit(f"Reached max_courses cap ({cfg.max_courses})")
-                    return links
+                    await _emit(f"reached max_courses cap ({cfg.max_courses})")
+                    # Deduplicate and return early
+                    seen: set[str] = set()
+                    return [lk for lk in links if not (lk["url"] in seen or seen.add(lk["url"]))]  # type: ignore[func-returns-value]
 
-            _emit(f"Page {page_num}: {page_links} links kept (total: {len(links)})")
+            detail = f"{page_links} links kept"
+            if filtered_out:
+                detail += f", {filtered_out} dropped by allow/block patterns"
+            if no_url:
+                detail += f", {no_url} items had no URL in fields {cfg.url_fields}"
+            await _emit(f"page {page_num}: {detail} (running total: {len(links)})")
 
             if not paginate or len(items) < page_size:
                 break  # last page
             offset += page_size
 
-    # Deduplicate by URL (preserve order)
-    seen: set[str] = set()
+    # ── Deduplicate by URL (preserve order) ──────────────────────────────────
+    seen_urls: set[str] = set()
     deduped = []
     for lk in links:
-        if lk["url"] not in seen:
-            seen.add(lk["url"])
+        if lk["url"] not in seen_urls:
+            seen_urls.add(lk["url"])
             deduped.append(lk)
 
-    _emit(f"Done: {len(deduped)} unique course links from YAML generic_search_api")
+    await _emit(f"done — {len(deduped)} unique course links")
     return deduped
