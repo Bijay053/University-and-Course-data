@@ -861,25 +861,46 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # always take priority.  Falls through to BFS if 0 links returned.
         _yaml_api_cfg = getattr(_uni_cfg.discovery, "generic_search_api", None)
         if not links and _yaml_api_cfg is not None and getattr(_yaml_api_cfg, "enabled", True):
+            _yapi_url = getattr(_yaml_api_cfg, "url", "?")
             log.info(
                 "[YAML_API] discovery.generic_search_api configured — "
                 "routing to YAML generic API before BFS (url=%s)",
-                getattr(_yaml_api_cfg, "url", "?")[:80],
+                _yapi_url[:80],
+            )
+            await emit(
+                "status",
+                f"[DISCOVER] API: querying configured search API ({_yapi_url[:60]})...",
+                phase="discover",
             )
             try:
                 from app.services.scraper.generic_search_api import fetch_yaml_api_links
                 _yaml_api_links = await fetch_yaml_api_links(_yaml_api_cfg, emit=emit)
             except Exception as _yapi_exc:
                 log.error("[YAML_API] provider failed: %s", _yapi_exc, exc_info=True)
+                await emit(
+                    "status",
+                    f"[DISCOVER] API: request failed ({_yapi_exc}) — falling through to browser discovery",
+                    phase="discover",
+                )
                 _yaml_api_links = []
             if _yaml_api_links:
                 links = _yaml_api_links
                 _always_browser = False
                 log.info("[YAML_API] %d links from YAML generic_search_api", len(links))
+                await emit(
+                    "status",
+                    f"[DISCOVER] API: found {len(links)} course link(s) — skipping browser discovery",
+                    phase="discover",
+                )
             else:
                 log.warning(
                     "[YAML_API] generic_search_api returned 0 links — "
                     "falling through to BFS/browser discovery"
+                )
+                await emit(
+                    "status",
+                    "[DISCOVER] API: returned 0 links — falling through to browser discovery",
+                    phase="discover",
                 )
 
         # ── Auto-config generic search API routing ────────────────────────────
