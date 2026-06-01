@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { SettingsTabs } from "@/components/settings-tabs";
-import { Plus, Save, Trash2, Sparkles, Search, RefreshCw, X, Play, Loader2, CheckCircle2, AlertCircle, Clock, GitCompare, Code, History, RotateCcw, Download, Clipboard, Check } from "lucide-react";
+import { Plus, Save, Trash2, Sparkles, Search, RefreshCw, X, Play, Loader2, CheckCircle2, AlertCircle, Clock, GitCompare, Code, History, RotateCcw, Download, Clipboard, Check, Wand2, Undo2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { fetchWithAuth } from "@/lib/api";
 import { CountrySelect } from "@/components/country-select";
@@ -1169,6 +1169,12 @@ export default function SettingsScraperConfigs() {
   const [triggering, setTriggering] = useState<string | null>(null);
   const pollTimerRef = useRef<number | null>(null);
 
+  // ── AI YAML fix ──────────────────────────────────────────────────────────
+  const [aiFixOpen, setAiFixOpen] = useState(false);
+  const [aiFixPrompt, setAiFixPrompt] = useState("");
+  const [aiFixing, setAiFixing] = useState(false);
+  const [aiFixPrev, setAiFixPrev] = useState<string | null>(null);
+
   const fetchConfigs = useCallback(async () => {
     setLoading(true);
     try {
@@ -1403,6 +1409,37 @@ export default function SettingsScraperConfigs() {
       toast({ title: "Delete failed", description: (err as Error).message, variant: "destructive" });
     } finally {
       setDeleting(false);
+    }
+  };
+
+  const handleAiFix = async () => {
+    if (!aiFixPrompt.trim()) {
+      toast({ title: "Prompt required", description: "Describe what you want to change.", variant: "destructive" });
+      return;
+    }
+    if (!editorSlug.trim()) {
+      toast({ title: "No config selected", description: "Select or create a config first.", variant: "destructive" });
+      return;
+    }
+    setAiFixing(true);
+    try {
+      const res = await fetchWithAuth(`${BASE}/api/settings/scraper-configs/${editorSlug.trim()}/ai-fix`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: aiFixPrompt.trim(), yaml_content: editorYaml }),
+      });
+      if (!res.ok) { const d = await res.json(); throw new Error(d.detail ?? "AI fix failed"); }
+      const data = await res.json();
+      setAiFixPrev(editorYaml);
+      setEditorYaml(data.yaml ?? editorYaml);
+      setAiFixOpen(false);
+      setAiFixPrompt("");
+      setView("diff");
+      toast({ title: "AI fix applied", description: "Review the changes in the diff view, then Save when ready." });
+    } catch (err) {
+      toast({ title: "AI fix failed", description: (err as Error).message, variant: "destructive" });
+    } finally {
+      setAiFixing(false);
     }
   };
 
@@ -1764,6 +1801,28 @@ export default function SettingsScraperConfigs() {
                     )}
                   </div>
 
+                  <Button
+                    size="sm"
+                    variant={aiFixOpen ? "default" : "outline"}
+                    className="h-7 text-xs"
+                    onClick={() => { setAiFixOpen(o => !o); }}
+                    title="Fix YAML with AI — describe a change and Gemini applies it"
+                  >
+                    <Wand2 className="h-3.5 w-3.5 mr-1" />
+                    Fix with AI
+                  </Button>
+                  {aiFixPrev !== null && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 text-xs text-amber-700 border-amber-300 hover:bg-amber-50"
+                      onClick={() => { setEditorYaml(aiFixPrev!); setAiFixPrev(null); setView("editor"); toast({ title: "Undone", description: "AI fix reverted to previous YAML." }); }}
+                      title="Undo the last AI fix"
+                    >
+                      <Undo2 className="h-3.5 w-3.5 mr-1" />
+                      Undo AI
+                    </Button>
+                  )}
                   <Button size="sm" className="h-7 text-xs" onClick={handleSave} disabled={saving}>
                     <Save className="h-3.5 w-3.5 mr-1" />
                     {saving ? "Saving…" : "Save"}
@@ -1782,6 +1841,42 @@ export default function SettingsScraperConfigs() {
                   )}
                 </div>
               </div>
+
+              {/* AI Fix panel */}
+              {aiFixOpen && (
+                <div className="px-4 py-3 border-b bg-violet-50 dark:bg-violet-950/30 flex flex-col gap-2">
+                  <div className="flex items-center gap-2">
+                    <Wand2 className="h-3.5 w-3.5 text-violet-600 dark:text-violet-400 flex-shrink-0" />
+                    <span className="text-xs font-medium text-violet-800 dark:text-violet-300">AI YAML Fix</span>
+                    <span className="text-xs text-muted-foreground flex-1">Describe what to change — Gemini updates the YAML for you to review</span>
+                    <button onClick={() => setAiFixOpen(false)} className="text-muted-foreground hover:text-foreground">
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      className="flex-1 h-8 rounded-md border border-input bg-background px-3 text-xs focus:outline-none focus:ring-1 focus:ring-violet-400"
+                      placeholder={`e.g. "add allow_url_patterns for /courses/ only" or "set bfs_page_budget to 80" or "enable always_sitemap_supplement"`}
+                      value={aiFixPrompt}
+                      onChange={e => setAiFixPrompt(e.target.value)}
+                      onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void handleAiFix(); } }}
+                      disabled={aiFixing}
+                      autoFocus
+                    />
+                    <Button
+                      size="sm"
+                      className="h-8 text-xs bg-violet-600 hover:bg-violet-700 text-white"
+                      onClick={handleAiFix}
+                      disabled={aiFixing || !aiFixPrompt.trim()}
+                    >
+                      {aiFixing ? <><Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />Fixing…</> : <><Wand2 className="h-3.5 w-3.5 mr-1" />Fix</>}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Changes appear in the editor — switch to <strong>Changes</strong> to review the diff, then <strong>Save</strong> to persist.
+                  </p>
+                </div>
+              )}
 
               {/* Draft-restored banner */}
               {draftBanner && draftBanner.slug === (selected ?? editorSlug) && (

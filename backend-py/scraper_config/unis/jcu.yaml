@@ -2,15 +2,68 @@
 # Hostname: www.jcu.edu.au
 
 discovery:
-  always_browser_discover: true
+  always_browser_discover: false
   use_stealth_browser: true
   use_wayback: false
 
   seed_urls:
     - https://www.jcu.edu.au/courses
 
+  bfs_page_budget: 0
+  browser_early_stop_courses: 180
+  max_candidates: 220
+
+  generic_search_api:
+    enabled: true
+    priority: first
+    method: GET
+    url: "https://searchcloud-1-eu-west-2.searchstax.com/29847/qmu-1736/emselect"
+    headers:
+      authorization: "Token bc0d2578c3f22cca23fdb327f7490ddb56098759"
+    params:
+      q: "*"
+      spellcheck.correct: "true"
+      hl.fragsize: "200"
+      model: "coursefinder-ug"
+      language: "en"
+      rows: "250"
+
+    root_path: "response.docs"
+
+    url_fields:
+      - url
+      - course_url
+      - page_url
+      - link
+      - path
+
+    title_fields:
+      - title
+      - name
+      - course_name
+
+    allow_url_patterns:
+      - '^https://www\.jcu\.edu\.au/courses/[a-z0-9-]+/?$'
+      - '^/courses/[a-z0-9-]+/?$'
+
+    block_url_patterns:
+      - '/courses/study/'
+      - '/courses/undergraduate$'
+      - '/courses/postgraduate$'
+      - '/courses/research$'
+      - '/linkassets/'
+      - '/news'
+      - '/events'
+      - '/staff/'
+      - '/about'
+      - '/contact'
+
+    normalize_relative_urls: true
+    base_url: "https://www.jcu.edu.au"
+
   allow_url_patterns:
-    - '/courses/(?:bachelor|master|graduate|doctor|diploma|certificate|associate|honours|juris)[^/]*$'
+    - '^https://www\.jcu\.edu\.au/courses/[a-z0-9-]+/?$'
+    - '^/courses/[a-z0-9-]+/?$'
 
   block_url_patterns:
     - '/linkassets/'
@@ -24,18 +77,13 @@ discovery:
     - '/about'
     - '/contact'
 
-  browser_early_stop_courses: 160
-  bfs_page_budget: 0
-  max_candidates: 180
-
 extraction:
   skip_browser_rescue: true
   max_parallel_fetch: 8
 
-  actions:
-    - click_text: "International"
-    - wait_for:
-        text: "International"
+  url_rewrites:
+    append_query:
+      - "international"
 
   filters:
     domestic_only:
@@ -70,6 +118,7 @@ extraction:
       - "fee schedule"
 
   english:
+    enabled: true
     central_page: https://www.jcu.edu.au/policy/academic-governance/student-experience/admissions-policy-schedule-ii
     band_reference_url: https://www.jcu.edu.au/policy/academic-governance/student-experience/admissions-policy-schedule-ii
 
@@ -88,13 +137,6 @@ extraction:
 
     band_detection:
       enabled: true
-      source_priority:
-        - course_page
-        - international_page
-        - entry_requirements
-        - english_language_requirements
-        - central_page
-
       patterns:
         - '(?i)\bBand\s*P\b'
         - '(?i)\bBand\s*1\b'
@@ -102,112 +144,52 @@ extraction:
         - '(?i)\bBand\s*3a\b'
         - '(?i)\bBand\s*3b\b'
         - '(?i)\bBand\s*3c\b'
-        - '(?i)English\s+Language\s+Band\s*P'
-        - '(?i)English\s+Language\s+Band\s*1'
-        - '(?i)English\s+Language\s+Band\s*2'
-        - '(?i)English\s+Language\s+Band\s*3a'
-        - '(?i)English\s+Language\s+Band\s*3b'
-        - '(?i)English\s+Language\s+Band\s*3c'
-        - '(?i)English\s+Band\s*P'
-        - '(?i)English\s+Band\s*1'
-        - '(?i)English\s+Band\s*2'
-        - '(?i)English\s+Band\s*3a'
-        - '(?i)English\s+Band\s*3b'
-        - '(?i)English\s+Band\s*3c'
-
-      normalize:
-        'band p': "Band P"
-        'bandp': "Band P"
-        'english language band p': "Band P"
-        'english band p': "Band P"
-
-        'band 1': "Band 1"
-        'band1': "Band 1"
-        'english language band 1': "Band 1"
-        'english band 1': "Band 1"
-
-        'band 2': "Band 2"
-        'band2': "Band 2"
-        'english language band 2': "Band 2"
-        'english band 2': "Band 2"
-
-        'band 3a': "Band 3a"
-        'band3a': "Band 3a"
-        'english language band 3a': "Band 3a"
-        'english band 3a': "Band 3a"
-
-        'band 3b': "Band 3b"
-        'band3b': "Band 3b"
-        'english language band 3b': "Band 3b"
-        'english band 3b': "Band 3b"
-
-        'band 3c': "Band 3c"
-        'band3c': "Band 3c"
-        'english language band 3c': "Band 3c"
-        'english band 3c': "Band 3c"
+        - '(?i)English\s+Language\s+Band\s*(P|1|2|3a|3b|3c)'
+        - '(?i)English\s+Band\s*(P|1|2|3a|3b|3c)'
 
     band_mapping:
       "Band P":
         ielts_overall: 5.5
         ielts_each: 5.0
         pte_overall: 46
-        pte_each: 42
         toefl_overall: 56
-        toefl_each: 16
         cae_overall: 162
-        cae_each: 154
 
       "Band 1":
         ielts_overall: 6.0
         ielts_each: 6.0
         pte_overall: 52
-        pte_each: 52
         toefl_overall: 74
-        toefl_each: 18
         cae_overall: 169
-        cae_each: 169
 
       "Band 2":
         ielts_overall: 6.5
         ielts_each: 6.0
         pte_overall: 58
-        pte_each: 54
         toefl_overall: 86
-        toefl_each: 21
         cae_overall: 176
-        cae_each: 169
 
       "Band 3a":
         ielts_overall: 7.0
         ielts_each: 6.5
         pte_overall: 65
-        pte_each: 58
         toefl_overall: 94
-        toefl_each: 23
         cae_overall: 185
-        cae_each: 176
 
       "Band 3b":
         ielts_overall: 7.0
         ielts_each: 6.5
         ielts_note: "7.0 in three components and 6.5 in one component"
         pte_overall: 65
-        pte_each: 58
-        pte_note: "65 in three components and 58 in one component"
         toefl_overall: 94
-        toefl_note: "23 Speaking, 24 Listening, 24 Reading, 27 Writing"
         cae_overall: 185
-        cae_each: 176
 
       "Band 3c":
         ielts_overall: 7.0
         ielts_each: 7.0
         pte_overall: 65
-        pte_each: 65
         toefl_overall: 94
-        toefl_note: "23 Speaking, 24 Listening, 24 Reading, 27 Writing"
         cae_overall: 185
-        cae_each: 185
 
   intake:
     rolling_enrollment_label: "Rolling"

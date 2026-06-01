@@ -749,6 +749,97 @@ async def _probe_university_site(base_url: str) -> dict:
     return result
 
 
+# ── AI YAML fix ───────────────────────────────────────────────────────────────
+
+class AiFixBody(BaseModel):
+    prompt: str
+    yaml_content: str = ""  # current editor content; falls back to file on disk
+
+
+@router.post("/scraper-configs/{slug}/ai-fix")
+async def ai_fix_scraper_config(
+    slug: str,
+    body: AiFixBody,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _user: Annotated[dict, Depends(require_permission("settings.edit"))],
+) -> JSONResponse:
+    """Apply an operator-described change to a YAML config using Gemini.
+
+    Accepts the current YAML from the editor plus a plain-English description
+    of what to change.  Returns the updated YAML — no file is written; the
+    operator must still click Save.
+    """
+    _validate_slug(slug)
+    api_key = os.environ.get("GEMINI_API_KEY", "")
+    if not api_key:
+        raise HTTPException(status_code=503, detail="GEMINI_API_KEY not configured")
+
+    try:
+        from google import genai as google_genai
+        client = google_genai.Client(api_key=api_key)
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Gemini client error: {exc}") from exc
+
+    # Use yaml_content from body if provided, otherwise load from the file on disk
+    current_yaml = body.yaml_content.strip() if body.yaml_content.strip() else _read_yaml_raw(_slug_path(slug))
+    if not current_yaml:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No config found for slug '{slug}' — save it first or paste YAML into the editor",
+        )
+
+    # Provide the sample YAML (full field reference) as schema context
+    defaults_excerpt = _read_yaml_raw(_DEFAULTS_FILE)[:4000]
+
+    prompt = f"""You are an expert at configuring university web scrapers using YAML config files.
+
+The following excerpt shows available settings and their documented meanings:
+--- SETTINGS REFERENCE ---
+{defaults_excerpt}
+--- END REFERENCE ---
+
+Current YAML config for this university:
+--- CURRENT CONFIG ---
+{current_yaml}
+--- END CURRENT CONFIG ---
+
+Operator request:
+{body.prompt.strip()}
+
+Instructions:
+- Apply ONLY the changes needed to fulfil the operator request.
+- Preserve every existing key, comment, indentation, and structure that the request does not touch.
+- Keep all existing rationale / bug-history comment lines unchanged.
+- If the request asks for something that cannot be expressed in YAML (needs a code fix), add a short YAML comment explaining this and leave the rest of the file unchanged.
+- Output ONLY the complete updated YAML — no markdown fences, no explanation, no preamble."""
+
+    try:
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt,
+        )
+        yaml_text: str = (response.text or "").strip()
+        # Strip markdown fences if Gemini wrapped them anyway
+        if yaml_text.startswith("```"):
+            yaml_text = re.sub(r"^```(?:yaml)?\n?", "", yaml_text)
+            yaml_text = re.sub(r"\n?```$", "", yaml_text.strip())
+        yaml_text = yaml_text.strip()
+
+        # Validate the output parses as valid YAML
+        try:
+            yaml.safe_load(yaml_text)
+        except yaml.YAMLError as ye:
+            raise HTTPException(status_code=422, detail=f"AI produced invalid YAML: {ye}")
+
+        return JSONResponse(content={"yaml": yaml_text})
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        log.exception("Gemini ai_fix failed for slug=%r", slug)
+        raise HTTPException(status_code=500, detail=f"AI fix failed: {exc}") from exc
+
+
 @router.post("/scraper-configs/generate")
 async def generate_scraper_config(
     body: GenerateConfigBody,
