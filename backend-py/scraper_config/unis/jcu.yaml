@@ -30,7 +30,7 @@ discovery:
 
 extraction:
   skip_browser_rescue: true
-  max_parallel_fetch: 2
+  max_parallel_fetch: 4
 
   filters:
     domestic_only:
