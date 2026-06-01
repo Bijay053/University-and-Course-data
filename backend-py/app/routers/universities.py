@@ -39,7 +39,7 @@ def _to_read(u: University, course_count: int = 0) -> UniversityRead:
 @router.get("/universities")
 async def list_universities(
     db: Annotated[AsyncSession, Depends(get_db)],
-    q: str | None = None,
+    search: str | None = None,
     country: str | None = None,
     city: str | None = None,
     page: int = Query(default=1, ge=1),
@@ -48,8 +48,8 @@ async def list_universities(
     stmt = select(University, func.count(Course.id).label("course_count")).outerjoin(
         Course, Course.university_id == University.id
     )
-    if q:
-        like = f"%{q.lower()}%"
+    if search:
+        like = f"%{search.lower()}%"
         stmt = stmt.where(
             or_(
                 func.lower(University.name).like(like),
