@@ -2477,6 +2477,7 @@ function FixPreviewModal({
   const [validating, setValidating] = useState(false);
   const [validationResult, setValidationResult] = useState<DiscoveryTest | null>(null);
   const [showAllCourses, setShowAllCourses] = useState(false);
+  const [launching, setLaunching] = useState(false);
 
   // Derive primary field from rec id
   const fieldMap: Record<string, string> = {
@@ -2558,6 +2559,62 @@ function FixPreviewModal({
         variant: "destructive",
       });
       setApplying(false);
+    }
+  };
+
+  // ── Safe-to-scrape gate ──────────────────────────────────────────────────────
+  // Determines whether a full scrape is safe to run after applying the fix.
+  // Filter fixes (url_safety present) are held to a stricter standard.
+  const isFilterFix = Boolean(preview?.url_safety);
+  const scrapeBlockReasons: string[] = (() => {
+    if (!validationResult) return [];
+    const reasons: string[] = [];
+    const { agg_status, agg_drop_rate_pct, total_passing, total_dropped } = validationResult;
+    if (agg_status === "critical") {
+      reasons.push("Discovery status is critical.");
+    }
+    if (isFilterFix) {
+      if (agg_drop_rate_pct >= 70) {
+        reasons.push(`URL filter would drop ${agg_drop_rate_pct}% of discovered course URLs.`);
+      }
+      if (total_passing === 0) {
+        reasons.push("After-filter course count is 0 — no courses would be discovered.");
+      } else if (total_passing < 5) {
+        reasons.push(`Seed URL returned fewer than 5 courses (${total_passing} found).`);
+      }
+      if (total_dropped > total_passing * 2) {
+        reasons.push(`Filter drops more than twice the number of passing URLs (${total_dropped} dropped vs ${total_passing} passing).`);
+      }
+    }
+    if (agg_status === "warning" && reasons.length === 0) {
+      reasons.push("Discovery returned warnings — review issues above before scraping.");
+    }
+    return reasons;
+  })();
+  const safeToScrape = applied && validationResult != null && scrapeBlockReasons.length === 0;
+
+  const handleRunFullScrape = async () => {
+    setLaunching(true);
+    try {
+      const res = await fetch(`${BASE}/api/scrape/start`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ university_id: uniId }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err?.detail?.message ?? err?.detail ?? `HTTP ${res.status}`);
+      }
+      toast({ title: "Full scrape started", description: "Monitor progress in Scraping Jobs." });
+      onClose();
+    } catch (e: unknown) {
+      toast({
+        title: "Failed to start scrape",
+        description: e instanceof Error ? e.message : "Unknown error",
+        variant: "destructive",
+      });
+    } finally {
+      setLaunching(false);
     }
   };
 
@@ -2844,13 +2901,14 @@ function FixPreviewModal({
                       <p className="text-[11px] text-teal-700">Discovery validation could not run — trigger a manual test discovery to verify.</p>
                     )}
                     {validationResult && (
-                      <div className="space-y-1">
+                      <div className="space-y-1.5">
+                        {/* Status row */}
                         <div className="flex items-center gap-3 flex-wrap">
                           <span className={`text-[11px] font-semibold ${validationResult.total_passing > 0 ? "text-green-700" : "text-red-700"}`}>
                             {validationResult.total_passing > 0 ? "✓" : "✗"} {validationResult.total_passing} URLs passing
                           </span>
                           {validationResult.total_dropped > 0 && (
-                            <span className="text-[11px] text-amber-700">{validationResult.total_dropped} dropped</span>
+                            <span className="text-[11px] text-amber-700">{validationResult.total_dropped} dropped ({validationResult.agg_drop_rate_pct}%)</span>
                           )}
                           <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium ${
                             validationResult.agg_status === "ok" ? "bg-green-100 text-green-700 border border-green-200"
@@ -2860,10 +2918,33 @@ function FixPreviewModal({
                             {validationResult.agg_status}
                           </span>
                         </div>
+
+                        {/* Discovery warnings */}
                         {validationResult.warnings?.slice(0, 2).map((w, i) => (
-                          <p key={i} className="text-[10px] text-gray-600">• {w}</p>
+                          <p key={i} className="text-[10px] text-gray-500">• {w}</p>
                         ))}
-                        <p className="text-[9px] text-teal-600 mt-1">Fast check complete. Run a full scrape to apply changes to staged courses.</p>
+
+                        {/* Safe-to-scrape verdict */}
+                        {safeToScrape ? (
+                          <div className="flex items-center gap-1.5 mt-1 p-2 bg-green-50 border border-green-200 rounded text-[11px] text-green-800">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-green-600 shrink-0" />
+                            <span>
+                              {isFilterFix
+                                ? "Filter validated — safe to run full scrape."
+                                : "Discovery unaffected — safe to run full scrape."}
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="mt-1 p-2 bg-red-50 border border-red-200 rounded space-y-1">
+                            <p className="text-[11px] font-semibold text-red-800 flex items-center gap-1">
+                              <ShieldAlert className="w-3.5 h-3.5 shrink-0" /> Cannot run full scrape yet.
+                            </p>
+                            <p className="text-[10px] text-red-700 font-medium">Recipe validation failed:</p>
+                            {scrapeBlockReasons.map((r, i) => (
+                              <p key={i} className="text-[10px] text-red-700">• {r}</p>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -2882,6 +2963,8 @@ function FixPreviewModal({
           >
             {applied ? "Close" : "Cancel"}
           </button>
+
+          {/* Pre-apply: Apply Fix button */}
           {!applied && preview && rec.fix?.recipe_patch && (
             <button
               type="button"
@@ -2896,10 +2979,39 @@ function FixPreviewModal({
                   : <><Zap className="w-3.5 h-3.5" /> Apply Fix</>}
             </button>
           )}
+
+          {/* Post-apply, still validating */}
           {applied && validating && (
             <span className="text-[11px] text-teal-600 flex items-center gap-1.5">
               <Loader2 className="w-3 h-3 animate-spin" /> Validating…
             </span>
+          )}
+
+          {/* Post-apply, validation complete: Run Full Scrape gate */}
+          {applied && !validating && validationResult && (
+            <div className="flex flex-col items-end gap-1">
+              <button
+                type="button"
+                onClick={safeToScrape ? handleRunFullScrape : undefined}
+                disabled={!safeToScrape || launching}
+                className={`flex items-center gap-1.5 text-xs font-medium rounded px-3 py-1.5 transition-colors ${
+                  safeToScrape
+                    ? "text-white bg-green-600 hover:bg-green-700"
+                    : "text-gray-400 bg-gray-100 border border-gray-200 cursor-not-allowed"
+                } disabled:opacity-60`}
+              >
+                {launching
+                  ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Starting…</>
+                  : safeToScrape
+                    ? <><Play className="w-3.5 h-3.5" /> Run Full Scrape</>
+                    : <><ShieldAlert className="w-3.5 h-3.5" /> Run Full Scrape Blocked</>}
+              </button>
+              {!safeToScrape && (
+                <p className="text-[9px] text-red-600 text-right max-w-[220px] leading-tight">
+                  Fix the recipe issue above before running a scrape.
+                </p>
+              )}
+            </div>
           )}
         </div>
       </div>
