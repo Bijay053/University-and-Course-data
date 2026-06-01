@@ -1878,6 +1878,13 @@ export default function RecipeEditorPage() {
                   <Input
                     value={recipe.api?.endpoint || ""}
                     onChange={e => patchApi({ endpoint: e.target.value })}
+                    onPaste={e => {
+                      const text = e.clipboardData.getData("text/plain");
+                      if (text) {
+                        e.preventDefault();
+                        patchApi({ endpoint: text.trim() });
+                      }
+                    }}
                     placeholder="https://courses.example.ac.uk/json/2025-26/sort:title"
                     className="mt-1 text-sm font-mono"
                   />
