@@ -4035,13 +4035,53 @@ async def diagnose_scrape_job(
         else:
             level_breakdown["unknown"] += _lr.cnt
 
+    # ── Extract pipeline stats (raw vs post-filter counts) ───────────────────
+    # Stored by the orchestrator in discovered_config.pipeline_stats so we can
+    # distinguish "0 links found by discovery" from "links found but filtered out".
+    # Falls back to total_found for jobs that ran before this field was added.
+    _pipeline_stats: dict = (job.discovered_config or {}).get("pipeline_stats") or {}
+    _raw_discovered: int = _pipeline_stats.get("raw_discovered", job.total_found or 0)
+    _after_filter: int = _pipeline_stats.get("after_filter", job.total_found or 0)
+    _filter_drop_count: int = _pipeline_stats.get("filter_drop_count", 0)
+    _filter_drop_pct: float = _pipeline_stats.get("filter_drop_pct", 0.0)
+    _has_pipeline_stats: bool = bool(_pipeline_stats)
+
     # ── Deterministic issue detection ─────────────────────────────────────────
     # Rules that can be determined without AI based purely on course counts.
     # These are shown in the UI BEFORE the AI diagnosis (higher trust, no LLM).
     deterministic_issues: list[dict] = []
 
-    # Zero discovery — must be checked first, highest priority
-    if (job.total_found or 0) == 0:
+    # HIGHEST PRIORITY: URL filter removed all discovered URLs.
+    # Must be checked BEFORE the zero-discovery check — both show total_found=0
+    # but they have completely different fixes.
+    if _raw_discovered > 10 and _after_filter == 0:
+        deterministic_issues.append({
+            "issue": "URL filter removed all discovered course URLs",
+            "severity": "critical",
+            "check": "all_filtered",
+            "detail": (
+                f"Discovery successfully found {_raw_discovered} candidate course URL(s). "
+                f"A URL filter (allow_url_patterns, must_contain, or block_url_patterns) "
+                f"then dropped 100% of them — 0 URLs reached the extraction step. "
+                f"Discovery worked correctly; the problem is in the filter config."
+            ),
+            "potential_causes": [
+                "allow_url_patterns regex doesn't match actual course page URL structure",
+                "must_contain substring is too restrictive or uses the wrong path segment",
+                "block_url_patterns accidentally matching all course pages",
+                "AI Fix previously applied a bad filter pattern — check admin_config",
+            ],
+            "fix": {
+                "type": "config",
+                "action": "Review and fix URL filter config (allow_url_patterns / must_contain / block_url_patterns)",
+                "note": (
+                    "Check the scrape log for '⚠ URL filter dropped' lines and sample dropped URLs. "
+                    "Remove or relax the filter that is dropping real course pages."
+                ),
+            },
+        })
+    # Zero discovery — only if raw count was also zero (discovery genuinely failed)
+    elif _raw_discovered == 0:
         deterministic_issues.append({
             "issue": "Zero courses discovered — site is JavaScript-rendered",
             "severity": "critical",
@@ -4108,15 +4148,21 @@ async def diagnose_scrape_job(
                 "Postgraduate course URLs do not match the must_contain filter",
             ],
         })
-    if (job.total_found or 0) > 0 and (job.imported or 0) == 0:
+    # Partial filter drop: some URLs survived the filter but staged count is low
+    # (only fires when filters didn't drop 100% — the 100% case is already handled above)
+    if (
+        _after_filter > 0
+        and (job.imported or 0) == 0
+        and not any(i["check"] == "all_filtered" for i in deterministic_issues)
+    ):
         deterministic_issues.append({
             "issue": "All discovered URLs dropped by filter",
             "severity": "critical",
             "check": "all_filtered",
             "detail": (
-                f"{job.total_found} URLs were discovered but 0 courses were staged. "
-                "A URL filter (must_contain or block_url_patterns) is likely too strict "
-                "and is dropping all candidate course links."
+                f"{_raw_discovered} URLs were discovered, {_after_filter} passed URL filters, "
+                "but 0 courses were staged. "
+                "A gate (must_contain or block_url_patterns) may be too strict."
             ),
             "potential_causes": [
                 "must_contain pattern doesn't match actual course URL structure",
@@ -4125,9 +4171,9 @@ async def diagnose_scrape_job(
         })
 
     # ── allow_url_patterns over-restriction check ─────────────────────────────
-    # If allow_url_patterns is configured AND the staged/discovered ratio is
-    # low (< 20%), flag it — the regex is likely too strict and is eating course
-    # pages that should have been extracted.
+    # Uses raw_discovered (pre-filter) so the ratio reflects actual filter aggressiveness.
+    # If allow_url_patterns is configured AND the staged/raw ratio is low (< 20%),
+    # flag it — the regex is likely too strict and is eating course pages.
     try:
         _effective_disc_tmp = {}
         if uni and uni.scrape_url:
@@ -4147,23 +4193,21 @@ async def diagnose_scrape_job(
         pass
 
     _allow_pats_configured = bool(_effective_disc_tmp.get("allow_url_patterns"))
-    _total = job.total_found or 0
     _imported = job.imported or 0
     if (
         _allow_pats_configured
-        and _total > 10
-        and _imported < _total * 0.2
-        and not any(i["check"] == "all_filtered" for i in deterministic_issues)
+        and _raw_discovered > 10
+        and _imported < _raw_discovered * 0.2
+        and not any(i["check"] in ("all_filtered", "zero_courses_discovered") for i in deterministic_issues)
     ):
         deterministic_issues.append({
             "issue": "allow_url_patterns may be filtering out real course pages",
             "severity": "critical",
             "check": "allow_url_patterns_drop_high",
             "detail": (
-                f"{_total} URLs were discovered but only {_imported} courses staged "
-                f"({100 * _imported // max(_total, 1)}% pass rate). "
-                "allow_url_patterns is configured and is likely too restrictive, "
-                "filtering out legitimate course detail pages. "
+                f"Discovery found {_raw_discovered} raw URLs but only {_imported} courses were staged "
+                f"({100 * _imported // max(_raw_discovered, 1)}% pass rate). "
+                "allow_url_patterns is configured and is likely too restrictive. "
                 "Check the live log for '⚠ URL filter dropped' lines and review the sample dropped URLs."
             ),
             "potential_causes": [
@@ -4251,18 +4295,33 @@ async def diagnose_scrape_job(
     _probe_summary_text = "\n".join(_probe_lines) if _probe_lines else "(no pages probed)"
 
     # ── Build prompt ──────────────────────────────────────────────────────────
+    # Build pipeline summary line for prompt
+    if _has_pipeline_stats:
+        _pipeline_summary = (
+            f"Raw URLs discovered by crawler: {_raw_discovered}\n"
+            f"URLs after URL filters (allow_url_patterns / must_contain / block_url_patterns): {_after_filter}\n"
+            f"Filter drop count: {_filter_drop_count} ({_filter_drop_pct:.0f}% of raw)\n"
+            f"Courses staged (passed extraction): {job.imported or 0}"
+        )
+    else:
+        _pipeline_summary = (
+            f"URLs discovered / after filters: {job.total_found or 0} (pipeline stats not available for this job)\n"
+            f"Courses staged: {job.imported or 0}"
+        )
+
     prompt = f"""You are an expert web scraping engineer diagnosing why a university course scraper produced poor results.
 
 University: {uni_name}
 Scrape URL: {scrape_url}
 Job ID: {job_id}
 Job status: {job.status or 'unknown'}
-Total URLs discovered (raw): {job.total_found or 0}
-Courses staged: {job.imported or 0}
 Courses skipped: {job.skipped or 0}
 Errors: {job.errors or 0}
 Avg completeness: {avg_completeness * 100:.1f}%
 Sample course names: {course_names}
+
+PIPELINE COUNTS (discovery → filter → extraction):
+{_pipeline_summary}
 
 DISCOVERY HEALTH (per academic level — deterministic, pre-computed):
 Undergraduate courses staged: {level_breakdown['undergraduate']}
@@ -4286,18 +4345,25 @@ LIVE COURSE PAGE PROBE RESULTS (httpx fetch of {_course_probe.get("probed", 0)} 
 Diagnose the scraping failure in plain English for a non-technical admin.
 
 URL FILTER KILL PATTERN — highest priority diagnosis rule:
-If "Total URLs discovered" > 50 AND "Courses staged" == 0:
-  - The root cause is ALWAYS a URL filter (must_contain / allow_url_patterns / block_url_patterns)
-    that is dropping all discovered course links before extraction can run.
-  - Do NOT say "Cloudflare is blocking".  Do NOT say "scrape failed".
-  - The correct root_causes entry is:
+Read the PIPELINE COUNTS block above carefully before writing any diagnosis.
+
+If "Raw URLs discovered" > 10 AND "URLs after URL filters" == 0 AND "Courses staged" == 0:
+  - Discovery WORKED. The crawler found courses. Do NOT suggest enabling browser discovery.
+  - The root cause is a URL filter (allow_url_patterns / must_contain / block_url_patterns)
+    that dropped 100% of discovered URLs before extraction could run.
+  - Do NOT say "Cloudflare is blocking". Do NOT suggest always_browser_discover.
+  - The correct diagnosis is:
     {{
-      "issue": "URL filter removed all valid course URLs",
+      "issue": "URL filter removed all discovered course URLs",
       "severity": "high",
-      "explanation": "Discovery found X course links but a URL filter (allow_url_patterns or must_contain) dropped all of them before extraction. Staged courses = 0."
+      "explanation": "Discovery found {_raw_discovered} candidate URLs but a URL filter dropped all of them (0 reached extraction). The filter config needs to be fixed or removed."
     }}
-  - The correct recommended_action is to remove or fix the URL filter.
-  - If "Total URLs discovered" == 0: THEN it may be a seed URL or Cloudflare issue.
+  - The correct recommended_action is to review and relax allow_url_patterns / must_contain / block_url_patterns.
+  - The discovery_verdict should be "ok" (discovery succeeded; filtering is the problem).
+
+If "Raw URLs discovered" == 0 AND "Courses staged" == 0:
+  - Discovery genuinely returned nothing. THEN it may be a JS rendering / seed URL / Cloudflare issue.
+  - Only in this case suggest always_browser_discover or seed_urls changes.
 
 CRITICAL FIX-TYPE RULES — apply BEFORE choosing fix_type:
 1. "recipe_fix" = operator can fix using the Recipe Editor UI (no developer needed).

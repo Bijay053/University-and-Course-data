@@ -1871,6 +1871,16 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # Overwrite job.total_found so the completed job row in the DB and UI
         # reflects the post-filter count, not the inflated raw count.
         job.total_found = len(links)
+        # Store raw vs post-filter counts in discovered_config so the diagnostic
+        # endpoint can distinguish "0 links found" from "links found but filtered out".
+        _dc = dict(job.discovered_config or {})
+        _dc["pipeline_stats"] = {
+            "raw_discovered": _raw,
+            "after_filter": len(links),
+            "filter_drop_count": _raw - len(links),
+            "filter_drop_pct": round((_raw - len(links)) / _raw * 100) if _raw else 0,
+        }
+        job.discovered_config = _dc
         job.heartbeat_at = datetime.now(timezone.utc)
         await db.commit()
 
