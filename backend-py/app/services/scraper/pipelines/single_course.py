@@ -5415,7 +5415,7 @@ async def extract_course(
                             _hit_band_spec = _bsd
                             break
                     if _hit_band_name and _hit_band_spec:
-                        _BAND_FIELDS = ("pte_overall", "toefl_overall", "cambridge_overall")
+                        _BAND_FIELDS = ("pte_overall", "toefl_overall", "cambridge_overall", "duolingo_overall")
                         _BAND_OVERRIDE_METHODS = frozenset({
                             "central_page:english", "central_page:english_level",
                             "ai_fallback", "gemini_primary", "",
@@ -5465,7 +5465,7 @@ async def extract_course(
                                 fields_applied=_band_applied,
                             )
             except Exception as _band_exc:
-                log.debug("[BAND] band_mapping correction skipped on %s: %s", url, _band_exc)
+                log.warning("[BAND] band_mapping correction failed on %s: %s", url, _band_exc)
 
         except Exception as exc:  # noqa: BLE001 — never abort extraction
             log.warning("central_pages fallback errored on %s: %s", url, exc)

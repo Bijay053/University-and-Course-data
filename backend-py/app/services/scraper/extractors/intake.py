@@ -47,6 +47,30 @@ _KEYWORD_WINDOW = re.compile(
     re.I,
 )
 
+# ── Start-dates-section anchor (YAML start_dates_only mode) ────────────────
+# Matches a "Start dates" / "Next start date" / "Start dates for YYYY" heading
+# as it appears in flattened page text.  The trailing [\s\S]{0,40}? allows
+# for "Start dates for 2027 Semester One" before the newline/colon delimiter.
+# Used by the start_dates_only pass to anchor the extraction window so that
+# only months from the authoritative start-dates block are captured.
+_START_DATES_SECTION_RE = re.compile(
+    r"(?:next\s+)?start\s+dates?\b[^\n.!?]{0,60}?(?=\n|\r|:\s*\n|Starts?\b|Semester\b)",
+    re.I,
+)
+
+# Matches "Semester One – 1 March", "Semester 2 – 20 July", "Starts – March"
+# as they appear in Auckland-style "Start dates for YYYY" sections.
+# Named group ``month`` captures the month name/abbreviation.
+_SEMESTER_DATE_RE = re.compile(
+    r"(?:Semester\s+(?:One|Two|Three|Four|1|2|3|4)|Starts?)"
+    r"\s*[-\u2013\u2014]\s*"
+    r"(?:\d{1,2}\s+)?"
+    r"(?P<month>"
+    + (_MONTH_FULL + "|" + _MONTH_ABBR)
+    + r")",
+    re.I,
+)
+
 # Months appearing near research-candidature language are NOT course
 # intake months — they're HDR enrollment windows, research-period
 # admission dates, or thesis submission deadlines.  Chunks containing
@@ -592,6 +616,65 @@ async def _extract_raw(html: str, url: str) -> list[ExtractionResult]:
     # widget; leaving it in causes months from unrelated courses to be
     # captured as this course's own intake dates.
     text = _strip_recently_viewed(text)
+
+    # ── Pass 0a: Start-dates-section anchor (YAML start_dates_only) ───────
+    # When extraction.intake.start_dates_only=True in the per-uni YAML, only
+    # extract months from the dedicated "Start dates" / "Next start date"
+    # section on the course page.  This prevents exam calendars, deadlines,
+    # and academic-calendar tables from adding spurious months to the list.
+    # Confidence 0.92 beats every other text pass so it always wins.
+    # Falls through when the anchor heading is not found (safety net).
+    try:
+        from app.services.scraper.config.context import require_uni_config as _ruc
+        _uc_i = _ruc()
+        _cfg_sd_only: bool = bool(
+            getattr(getattr(getattr(_uc_i, "extraction", None), "intake", None), "start_dates_only", False)
+        )
+        _cfg_sd_win: int = int(
+            getattr(getattr(getattr(_uc_i, "extraction", None), "intake", None), "start_dates_window_chars", 600)
+        )
+    except Exception:
+        _cfg_sd_only = False
+        _cfg_sd_win = 600
+
+    if _cfg_sd_only:
+        _anchor_m = _START_DATES_SECTION_RE.search(text)
+        if _anchor_m:
+            _section = text[_anchor_m.start(): _anchor_m.start() + _cfg_sd_win]
+            _sd_months: list[str] = []
+            # First: "Semester X – DD Month" or "Starts – DD Month" patterns
+            for _sm in _SEMESTER_DATE_RE.finditer(_section):
+                _mn = _normalise_month(_sm.group("month"))
+                if _mn and _mn not in _sd_months:
+                    _sd_months.append(_mn)
+            # Second: bare "DD Month" full-date patterns in the section
+            if not _sd_months:
+                for _fm in _FULL_DATE.finditer(_section):
+                    _mn = _normalise_month(_fm.group(2))
+                    if _mn and _mn not in _sd_months:
+                        _sd_months.append(_mn)
+            # Third: bare month names anywhere in the section
+            if not _sd_months:
+                for _raw in _MONTH_RE.findall(_section):
+                    _mn = _normalise_month(_raw)
+                    if _mn and _mn not in _sd_months:
+                        _sd_months.append(_mn)
+            if _sd_months:
+                _ordered_sd = [mo for mo in _MONTHS if mo in set(_sd_months)]
+                return [
+                    ExtractionResult(
+                        field_key="intake_months",
+                        value=_ordered_sd,
+                        normalized={"intake_months": _ordered_sd, "intake_days": None},
+                        confidence=0.92,
+                        snippet=f"start_dates_section: {_section[:120].strip()}",
+                        method="intake.start_dates_section",
+                    )
+                ]
+            # Anchor found but no months in section — return empty rather than
+            # falling through to greedy passes that would give wrong months.
+            return []
+        # Anchor not found — fall through to standard passes as safety net.
 
     # ── Pass 0b: labeled summary "Start [months]" field ───────────────────
     # The structural DOM pass above catches <strong>/<dt>/<th> patterns, but

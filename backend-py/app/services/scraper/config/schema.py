@@ -589,6 +589,15 @@ class BandSpec(BaseModel):
         default=None,
         description="Cambridge C1 Advanced (CAE) overall score for this band level.",
     )
+    duolingo_overall: Optional[int] = Field(
+        default=None,
+        description=(
+            "Duolingo English Test (DET) minimum overall score for this band level. "
+            "When set and ielts_overall matches the per-course IELTS score, the "
+            "band-mapping pipeline writes this value to duolingo_overall in the "
+            "staged course record with method='yaml_band_mapping'."
+        ),
+    )
 
 
 class EnglishConfig(BaseModel):
@@ -728,6 +737,30 @@ class OnlineOnlyFilter(BaseModel):
 
 
 class IntakeConfig(BaseModel):
+    start_dates_only: bool = Field(
+        default=False,
+        description=(
+            "When True, restrict intake extraction to a dedicated 'Start dates' "
+            "section on the course page.  The extractor anchors on the text "
+            "heading 'Start dates' / 'Next start date' / 'Start dates for YYYY' "
+            "and scans only the following ``start_dates_window_chars`` characters "
+            "for month patterns.  This prevents exam calendars, application "
+            "deadlines, and academic-calendar tables from injecting spurious "
+            "months into the intake list. "
+            "Enable for universities that publish a structured 'Start dates' "
+            "section with 'Semester X – DD Month' or 'Starts – DD Month' entries "
+            "(e.g. University of Auckland)."
+        ),
+    )
+    start_dates_window_chars: int = Field(
+        default=600,
+        description=(
+            "Number of characters to scan after the 'Start dates' anchor when "
+            "start_dates_only=True.  600 chars covers 3-4 semester entries "
+            "including multi-year listings.  Raise if the section is unusually "
+            "long or the scraper misses late-listed entries."
+        ),
+    )
     rolling_enrollment_label: Optional[str] = Field(
         default=None,
         description=(

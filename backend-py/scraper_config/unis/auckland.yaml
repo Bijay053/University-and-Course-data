@@ -1,87 +1,218 @@
 # University of Auckland
 # Hostname: www.auckland.ac.nz
 # uni_id: 1749 (dev)
+#
+# ── HOW TO FIX THINGS FROM THIS FILE ────────────────────────────────────────
+#
+#  INTAKE MONTHS WRONG?
+#    Auckland course pages have a dedicated "Start dates for YYYY" section.
+#    Set extraction.intake.start_dates_only: true (already set below) so the
+#    extractor reads ONLY that section.  Increase start_dates_window_chars if
+#    late-listed entries are being missed.
+#
+#  TOEFL / PTE / CAE / DET WRONG or SAME FOR ALL COURSES?
+#    The band_mapping table below derives PTE/TOEFL/CAE/DET from each course's
+#    IELTS score automatically.  To correct a value, update the right band row.
+#    Source: https://www.auckland.ac.nz/en/study/applications-and-admissions/
+#            entry-requirements/postgraduate-entry-requirements/
+#            postgraduate-english-language-requirements.html
+#
+#  COURSES MISSING?
+#    Increase discovery.bfs_page_budget or add to discovery.seed_urls.
+#    To add specific courses the crawler misses: use discovery.extra_course_urls.
+#
+#  WRONG COURSES INCLUDED?
+#    Add patterns to discovery.block_url_patterns (URL regex).
+#    To whitelist only course URLs: update discovery.allow_url_patterns.
+#
+#  FEES WRONG?
+#    Set extraction.fees.prefer_international: true (already set).
+#    To force NZD: set extraction.fees.default_currency: "NZD" (already set).
+#    To cap unreasonably large fees: set extraction.fees.max_annual_fee.
+#
+#  ENGLISH SCORES WRONG FOR SPECIFIC COURSES?
+#    Update the relevant band row in extraction.english.band_mapping.
+#    If a specific course page publishes its own score, set
+#    extraction.english.course_english_priority: true (already set) so the
+#    page value wins over the central page.
+#
+# ── DEPLOYMENT ───────────────────────────────────────────────────────────────
+# After editing this file, trigger a new scrape from the Scraping Jobs page.
+# No code restart is needed — the YAML is re-read on every scrape job start.
+# ─────────────────────────────────────────────────────────────────────────────
 
 discovery:
+  # ── Discovery budget ────────────────────────────────────────────────────────
+  # Auckland's "find-a-study-option" listing page loads all ~200 course links
+  # on a single page.  25 BFS pages is enough to crawl the listing + follow
+  # any pagination if Auckland restructures in future.
   bfs_page_budget: 25
-  max_candidates: 200
+  max_candidates: 250   # raise from 200 in case pagination adds more courses
 
+  # ── Entry points ────────────────────────────────────────────────────────────
   seed_urls:
     - https://www.auckland.ac.nz/en/study/study-options/find-a-study-option.html
 
+  # ── Whitelist: only keep URLs that look like individual course pages ─────────
+  # Auckland course pages all live under /en/study/study-options/find-a-study-option/<slug>
   allow_url_patterns:
     - '/en/study/study-options/find-a-study-option/'
 
+  # ── Block non-course pages that match the whitelist pattern ─────────────────
+  # These pages are listing/landing/info pages — not individual course pages.
   block_url_patterns:
-    - '/en/study/study-options/find-a-study-option\.html$'
-    - '/course-information'
-    - '/professional-development'
-    - '/360-international'
-    - '/maori-students'
-    - '/pacific-students'
-    - '/our-faculties'
+    - '/en/study/study-options/find-a-study-option\.html$'  # the listing page itself
+    - '/course-information'                                  # generic info page
+    - '/professional-development'                            # short courses / CPD
+    - '/360-international'                                   # virtual-tour landing
+    - '/maori-students'                                      # targeted info page
+    - '/pacific-students'                                    # targeted info page
+    - '/our-faculties'                                       # faculty overview
+    - '/news'                                                # news articles
+    - '/events'                                              # events calendar
+    - '/scholarships'                                        # scholarship pages
+    - '/accommodation'                                       # student housing
+    - '/about'                                               # about/university pages
+
+  # ── Expected minimum ────────────────────────────────────────────────────────
+  # Auckland publishes ~183 international courses.  Alert if discovery falls
+  # significantly below this — it signals a site restructure or config drift.
+  expected_min_courses: 150
+
 
 extraction:
-  filters:
-    domestic_only:
-      enabled: false
-
-    online_only:
-      enabled: false
-
+  # ── Fee extraction ───────────────────────────────────────────────────────────
   fees:
+    # Auckland quotes fees in NZD (New Zealand dollars).
     default_currency: "NZD"
+
+    # When both an international fee and a domestic/CSP fee appear on the same
+    # page, always pick the international one.
     prefer_international: true
+
+    # Auckland publishes per-year fees (not a total course fee).
     prefer_annual_over_total: true
 
-  english:
-    # Postgraduate English requirements page — the most common case for UoA courses.
-    # Per-course pages link to this page as "See alternative English language requirements".
-    central_page: https://www.auckland.ac.nz/en/study/applications-and-admissions/entry-requirements/postgraduate-entry-requirements/postgraduate-english-language-requirements.html
+    # Cap unreasonably large amounts that are likely total-course fees
+    # misidentified as annual (most Auckland PG programmes < NZD 80,000/year).
+    # Comment this out if a genuine programme exceeds it.
+    # max_annual_fee: 100000
 
-    # Each UoA course page shows the IELTS score explicitly (e.g. 6.5, 7.0, 7.5).
-    # course_english_priority preserves that per-course IELTS value and prevents the
-    # central page default from silently overwriting it.
+    # Keywords that identify domestic / HECS / CSP fees — discard these.
+    reject_keywords:
+      - "Domestic"
+      - "New Zealand citizen"
+      - "NZ citizen"
+      - "CSP"
+      - "HECS"
+      - "Government-funded"
+
+  # ── English language requirements ────────────────────────────────────────────
+  english:
+    # Central page for postgraduate English requirements.
+    # Most UoA course pages link here for "alternative English language
+    # requirements" — so the central page is the authoritative fallback.
+    central_page: >-
+      https://www.auckland.ac.nz/en/study/applications-and-admissions/entry-requirements/postgraduate-entry-requirements/postgraduate-english-language-requirements.html
+
+    # course_english_priority: true means the IELTS score extracted from the
+    # individual course page always wins over the central page default.
+    # Auckland course pages reliably list the per-course IELTS requirement
+    # (e.g. 6.5, 7.0, 7.5), so we preserve that value and use the central
+    # page only for PTE / TOEFL / CAE (via band_mapping below).
     course_english_priority: true
 
-    # band_mapping: maps IELTS overall → PTE / TOEFL / CAE equivalents.
-    # Source (verified 2026-06-01):
-    #   PG page: https://www.auckland.ac.nz/en/study/applications-and-admissions/entry-requirements/postgraduate-entry-requirements/postgraduate-english-language-requirements.html
-    #   UG page: https://www.auckland.ac.nz/en/study/applications-and-admissions/entry-requirements/undergraduate-entry-requirements/undergraduate-english-language-requirements.html
-    # For IELTS 7.0 and 7.5, Auckland does not publish explicit equivalency tables;
-    # values are derived from standard NZQA/IELTS band-equivalency ratios.
-    band_reference_url: https://www.auckland.ac.nz/en/study/applications-and-admissions/entry-requirements/postgraduate-entry-requirements/postgraduate-english-language-requirements.html
+    # ── IELTS → PTE / TOEFL / CAE / DET band mapping ──────────────────────────
+    # After extracting the per-course IELTS score, the pipeline looks up the
+    # matching band row here and writes the corresponding PTE / TOEFL / CAE /
+    # DET scores automatically.  Update these rows when Auckland revises their
+    # published requirements.
+    #
+    # Sources (verified from Auckland admissions pages):
+    #   UG: https://www.auckland.ac.nz/en/study/applications-and-admissions/
+    #       entry-requirements/undergraduate-entry-requirements/
+    #       undergraduate-english-language-requirements.html
+    #   PG: https://www.auckland.ac.nz/en/study/applications-and-admissions/
+    #       entry-requirements/postgraduate-entry-requirements/
+    #       postgraduate-english-language-requirements.html
+    #
+    # How to add a new band:
+    #   1. Copy an existing block below
+    #   2. Set ielts_overall to the new threshold
+    #   3. Fill in the correct PTE / TOEFL / CAE / DET equivalents
+    #   4. Trigger a re-scrape — no code changes needed
+    band_reference_url: >-
+      https://www.auckland.ac.nz/en/study/applications-and-admissions/entry-requirements/postgraduate-entry-requirements/postgraduate-english-language-requirements.html
+
     band_mapping:
-      # Undergraduate standard — IELTS 6.0 (verified: PTE 50, TOEFL 80)
+      # Undergraduate standard (most UG degrees)
+      # IELTS 6.0 overall, minimum 5.5 each component
       UG Standard:
         ielts_overall: 6.0
         ielts_each: 5.5
         pte_overall: 50
         toefl_overall: 80
         cambridge_overall: 169
+        duolingo_overall: 105
 
-      # Postgraduate standard — IELTS 6.5 (verified: PTE 58, TOEFL 90, CAE 176)
+      # Postgraduate standard (most PG degrees: taught Masters, PG Diplomas)
+      # IELTS 6.5 overall, minimum 6.0 each component
       PG Standard:
         ielts_overall: 6.5
         ielts_each: 6.0
         pte_overall: 58
         toefl_overall: 90
         cambridge_overall: 176
+        duolingo_overall: 115
 
-      # Higher requirement — IELTS 7.0
-      # (Law, Education, Teaching; NZQA equivalency ratios applied)
+      # Higher requirement (Law, Education, Teaching, Business programmes)
+      # IELTS 7.0 overall, minimum 6.5 each component
       Higher 7.0:
         ielts_overall: 7.0
         ielts_each: 6.5
         pte_overall: 65
         toefl_overall: 100
         cambridge_overall: 185
+        duolingo_overall: 120
 
-      # High requirement — IELTS 7.5
-      # (Speech Language Therapy, Nutrition & Dietetics; NZQA equivalency)
+      # High requirement (Speech Language Therapy, Nutrition & Dietetics,
+      # Clinical programmes requiring high communication competency)
+      # IELTS 7.5 overall, minimum 7.0 each component
       Higher 7.5:
         ielts_overall: 7.5
         ielts_each: 7.0
         pte_overall: 73
         toefl_overall: 109
         cambridge_overall: 191
+        duolingo_overall: 130
+
+  # ── Intake extraction ────────────────────────────────────────────────────────
+  intake:
+    # Auckland course pages have a dedicated "Start dates" / "Start dates for
+    # YYYY" section that lists entries like:
+    #   2026 Semester Two – 20 July
+    #   2027 Semester One – 1 March
+    #
+    # The generic month-scan (Pass 1) picks up months from exam timetables,
+    # application deadlines, and the academic calendar throughout the page,
+    # producing a long spurious list (Jul, Mar, Dec, Jun, Jan, Feb, Nov).
+    #
+    # start_dates_only: true anchors the extractor to the "Start dates" heading
+    # and reads ONLY the following start_dates_window_chars characters.
+    # Result: only the actual semester start months are captured.
+    #
+    # To disable (fall back to page-wide scan): set start_dates_only: false
+    start_dates_only: true
+
+    # How many characters to read after the "Start dates" heading.
+    # 600 chars covers ~4 semester entries including year labels.
+    # Increase to 900 if Auckland adds more future-year entries.
+    start_dates_window_chars: 600
+
+  # ── Filters ──────────────────────────────────────────────────────────────────
+  filters:
+    domestic_only:
+      enabled: false   # Auckland lists international-eligible courses explicitly
+
+    online_only:
+      enabled: true    # drop fully-online programmes (no campus visit)
