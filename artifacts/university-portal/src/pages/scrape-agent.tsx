@@ -10,7 +10,7 @@ import {
   ArrowLeft, Bot, CheckCircle2, AlertTriangle, Loader2, Zap, RefreshCw,
   CheckCheck, X, Plus, Save, Settings2, Activity, Target, TrendingUp,
   ShieldAlert, Play, ExternalLink, FlaskConical, BarChart3, Wrench, RotateCcw,
-  Search,
+  Search, Award, ListChecks, ArrowLeftRight, ChevronDown, ChevronUp,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -157,6 +157,54 @@ type DiagnoseResult = {
 
 type SimChange = { field: string; before: string | null; after: string | null };
 type SimSample = { id: number; name: string; changes: SimChange[] };
+
+// ── Operator confidence features ───────────────────────────────────────────────
+
+type RecipeCoverageItem = {
+  id: string;
+  title: string;
+  category: string;
+  fix_type: "recipe_fix" | "config" | "platform_bug";
+  has_recipe_patch: boolean;
+  field: string | null;
+  recipe_keys: string[];
+  description: string;
+};
+type RecipeCoverageCategory = {
+  id: string;
+  label: string;
+  total: number;
+  covered: number;
+  items: RecipeCoverageItem[];
+};
+type RecipeCoverage = {
+  total: number;
+  covered: number;
+  missing_count: number;
+  coverage_pct: number;
+  categories: RecipeCoverageCategory[];
+  missing: RecipeCoverageItem[];
+};
+
+type CertDimension = { score: number; label: string; detail: string };
+type CertificationScore = {
+  available: boolean;
+  reason?: string;
+  overall_score: number;
+  cert_level: "certified" | "good" | "needs_work" | "poor";
+  dimensions: { discovery: CertDimension; extraction: CertDimension; quality: CertDimension };
+  last_scrape: { job_id: string; staged: number; started_at: string | null; status: string };
+};
+
+type FieldDelta = { field: string; label: string; before: number; after: number; delta: number };
+type ScrapeComparison = {
+  available: boolean;
+  reason?: string;
+  current: { job_id: string; staged: number; started_at: string | null };
+  previous: { job_id: string; staged: number; started_at: string | null };
+  staged_delta: number;
+  field_deltas: FieldDelta[];
+};
 type SimResult = { total: number; changed: number; samples: SimSample[]; message?: string };
 
 type FilterImpact = {
@@ -689,6 +737,7 @@ export default function ScrapeAgentPage() {
     );
   }
 
+
   const d = diagnoseResult?.diagnosis ?? diagnoseResult?.fallback;
   const suggestedConfig = diagnoseResult?.suggested_config || {};
   const hasSuggestions = Object.keys(suggestedConfig).length > 0;
@@ -738,6 +787,9 @@ export default function ScrapeAgentPage() {
           </div>
         )}
       </div>
+
+      {/* ── Certification Score ───────────────────────────────────────────── */}
+      <CertificationScoreCard uniId={uniId} />
 
       {/* ── URL Filter Kill Banner ─────────────────────────────────────────── */}
       {js && (js.total_found ?? 0) > 50 && (js.imported ?? 0) === 0 && (
@@ -1817,6 +1869,12 @@ export default function ScrapeAgentPage() {
       </div>
 
       {/* ── After fix: run scrape prompt ─────────────────────────────────── */}
+      {/* ── Post-Scrape Comparison ────────────────────────────────────────── */}
+      <ScrapeComparisonPanel uniId={uniId} />
+
+      {/* ── Recipe Coverage Audit ─────────────────────────────────────────── */}
+      <RecipeCoveragePanel />
+
       {appliedConfig && (
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-center gap-3">
           <CheckCircle2 className="w-5 h-5 text-blue-600 shrink-0" />
@@ -1832,6 +1890,268 @@ export default function ScrapeAgentPage() {
           >
             Go to Scraping
           </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Operator confidence components ─────────────────────────────────────────────
+
+function CertificationScoreCard({ uniId }: { uniId: number }) {
+  const [score, setScore] = useState<CertificationScore | null>(null);
+
+  useEffect(() => {
+    fetch(`${BASE}/api/scrape/${uniId}/certification-score`)
+      .then((r) => r.json())
+      .then(setScore)
+      .catch(() => {});
+  }, [uniId]);
+
+  if (!score?.available) return null;
+
+  const levelCfg = {
+    certified: { color: "text-emerald-700", bg: "bg-emerald-50 border-emerald-200", label: "Certified" },
+    good:       { color: "text-blue-700",    bg: "bg-blue-50 border-blue-200",       label: "Good"      },
+    needs_work: { color: "text-amber-700",   bg: "bg-amber-50 border-amber-200",     label: "Needs Work"},
+    poor:       { color: "text-red-700",     bg: "bg-red-50 border-red-200",         label: "Poor"      },
+  };
+  const lc = levelCfg[score.cert_level] ?? levelCfg.needs_work;
+
+  const ScoreBar = ({ val }: { val: number }) => (
+    <div className="flex-1 bg-gray-200 rounded-full h-1.5 overflow-hidden">
+      <div
+        className={`h-full rounded-full ${val >= 85 ? "bg-emerald-500" : val >= 70 ? "bg-blue-500" : val >= 50 ? "bg-amber-500" : "bg-red-500"}`}
+        style={{ width: `${val}%` }}
+      />
+    </div>
+  );
+
+  const started = score.last_scrape.started_at
+    ? new Date(score.last_scrape.started_at).toLocaleDateString()
+    : "—";
+
+  return (
+    <div className={`border rounded-xl p-4 space-y-3 ${lc.bg}`}>
+      <div className="flex items-center gap-3 flex-wrap">
+        <Award className={`w-4 h-4 ${lc.color}`} />
+        <span className={`text-sm font-bold ${lc.color}`}>{lc.label}</span>
+        <span className={`text-xl font-bold ${lc.color}`}>{score.overall_score}%</span>
+        <span className="text-[10px] text-gray-400 ml-auto">
+          Last scrape: {score.last_scrape.staged} courses · {started}
+        </span>
+      </div>
+      <div className="grid grid-cols-3 gap-3">
+        {(Object.values(score.dimensions) as CertDimension[]).map((dim) => (
+          <div key={dim.label} className="space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-gray-500">{dim.label}</span>
+              <span className="text-[10px] font-bold text-gray-700">{dim.score}%</span>
+            </div>
+            <ScoreBar val={dim.score} />
+            <p className="text-[9px] text-gray-400 leading-tight">{dim.detail}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ScrapeComparisonPanel({ uniId }: { uniId: number }) {
+  const [data, setData] = useState<ScrapeComparison | null>(null);
+
+  useEffect(() => {
+    fetch(`${BASE}/api/scrape/${uniId}/scrape-comparison`)
+      .then((r) => r.json())
+      .then(setData)
+      .catch(() => {});
+  }, [uniId]);
+
+  if (!data?.available) return null;
+  const hasChanges = data.field_deltas.some((f) => f.delta !== 0) || data.staged_delta !== 0;
+  if (!hasChanges) return null;
+
+  const DeltaChip = ({ delta }: { delta: number }) => (
+    <span
+      className={`text-[10px] font-bold px-1.5 rounded shrink-0 ${
+        delta > 0 ? "text-emerald-700 bg-emerald-100" : delta < 0 ? "text-red-700 bg-red-100" : "text-gray-400"
+      }`}
+    >
+      {delta > 0 ? `+${delta}` : delta === 0 ? "—" : delta}pp
+    </span>
+  );
+
+  const visibleFields = data.field_deltas.filter((f) => f.before > 0 || f.after > 0);
+
+  const prevDate = data.previous.started_at ? new Date(data.previous.started_at).toLocaleDateString() : "—";
+  const curDate = data.current.started_at ? new Date(data.current.started_at).toLocaleDateString() : "—";
+
+  return (
+    <div className="bg-white border rounded-xl p-4 space-y-3">
+      <h2 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+        <ArrowLeftRight className="w-4 h-4 text-violet-600" /> Post-Scrape Comparison
+        <span className="text-[10px] font-normal text-gray-400">Before fix vs after fix · field fill rates</span>
+      </h2>
+
+      {/* Staged courses delta */}
+      <div className="grid grid-cols-3 gap-2 text-center text-xs">
+        <div className="bg-gray-50 border rounded-lg p-2.5">
+          <div className="text-lg font-bold text-gray-600">{data.previous.staged}</div>
+          <div className="text-[9px] text-gray-400 mt-0.5">Before · {prevDate}</div>
+          <div className="text-[9px] text-gray-500">Courses staged</div>
+        </div>
+        <div className="flex items-center justify-center">
+          <ArrowLeftRight className="w-4 h-4 text-gray-300" />
+        </div>
+        <div
+          className={`border rounded-lg p-2.5 ${
+            data.staged_delta > 0 ? "bg-emerald-50 border-emerald-200" : data.staged_delta < 0 ? "bg-red-50 border-red-200" : "bg-gray-50"
+          }`}
+        >
+          <div className={`text-lg font-bold ${data.staged_delta > 0 ? "text-emerald-700" : data.staged_delta < 0 ? "text-red-700" : "text-gray-600"}`}>
+            {data.current.staged}
+          </div>
+          <div className="text-[9px] text-gray-400 mt-0.5">After · {curDate}</div>
+          <DeltaChip delta={data.staged_delta} />
+        </div>
+      </div>
+
+      {/* Per-field fill-rate bars */}
+      {visibleFields.length > 0 && (
+        <div className="space-y-1.5">
+          {visibleFields.map((f) => (
+            <div key={f.field} className="flex items-center gap-2">
+              <span className="w-24 text-[10px] text-gray-500 shrink-0">{f.label}</span>
+              <span className="w-7 text-right text-[10px] text-gray-400 shrink-0">{f.before}%</span>
+              <div className="flex-1 bg-gray-100 rounded-full h-2 relative overflow-hidden">
+                <div className="absolute inset-y-0 left-0 bg-gray-300 rounded-full" style={{ width: `${f.before}%` }} />
+                {f.after > f.before && (
+                  <div className="absolute inset-y-0 rounded-full bg-emerald-400" style={{ left: `${f.before}%`, width: `${f.after - f.before}%` }} />
+                )}
+                {f.after < f.before && (
+                  <div className="absolute inset-y-0 rounded-full bg-red-400" style={{ left: `${f.after}%`, width: `${f.before - f.after}%` }} />
+                )}
+              </div>
+              <span className={`w-7 text-[10px] font-medium shrink-0 ${f.after >= f.before ? "text-emerald-700" : "text-red-600"}`}>{f.after}%</span>
+              <DeltaChip delta={f.delta} />
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RecipeCoveragePanel() {
+  const [data, setData] = useState<RecipeCoverage | null>(null);
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const toggle = async () => {
+    if (data) { setOpen((v) => !v); return; }
+    setLoading(true);
+    try {
+      const r = await fetch(`${BASE}/api/scrape/recipe-coverage`);
+      setData(await r.json());
+      setOpen(true);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="bg-white border rounded-xl p-4 space-y-3">
+      <button type="button" className="w-full flex items-center justify-between group" onClick={toggle}>
+        <h2 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+          <ListChecks className="w-4 h-4 text-indigo-600" />
+          Recipe Coverage Audit
+          {data && (
+            <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${data.coverage_pct >= 80 ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+              {data.covered}/{data.total} covered
+            </span>
+          )}
+          {!data && <span className="text-[10px] font-normal text-gray-400">Can every detected problem be fixed from Recipe Editor?</span>}
+        </h2>
+        {loading
+          ? <Loader2 className="w-3.5 h-3.5 animate-spin text-gray-400" />
+          : open
+            ? <ChevronUp className="w-4 h-4 text-gray-400" />
+            : <ChevronDown className="w-4 h-4 text-gray-400" />
+        }
+      </button>
+
+      {data && open && (
+        <div className="space-y-4">
+          {/* Summary row */}
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className="text-sm font-bold text-gray-800">Covered: {data.covered} / {data.total} issues</span>
+            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${data.coverage_pct >= 80 ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+              {data.coverage_pct}% recipe-fixable
+            </span>
+            {data.missing_count > 0 && (
+              <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-medium">
+                {data.missing_count} missing recipe fix
+              </span>
+            )}
+          </div>
+
+          {/* Per-category breakdown */}
+          <div className="space-y-3">
+            {data.categories.map((cat) => (
+              <div key={cat.id} className="space-y-1">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">{cat.label}</span>
+                  <span className="text-[10px] text-gray-400">{cat.covered}/{cat.total}</span>
+                </div>
+                {cat.items.map((item) => (
+                  <div
+                    key={item.id}
+                    className={`flex items-start gap-2 px-2 py-1.5 rounded-lg text-xs ${
+                      item.has_recipe_patch
+                        ? "bg-emerald-50 border border-emerald-100"
+                        : "bg-red-50 border border-red-200"
+                    }`}
+                  >
+                    <span className={`text-[11px] font-bold mt-0.5 shrink-0 ${item.has_recipe_patch ? "text-emerald-600" : "text-red-500"}`}>
+                      {item.has_recipe_patch ? "✓" : "✗"}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <span className="font-medium text-gray-700">{item.title}</span>
+                      {item.recipe_keys.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-0.5">
+                          {item.recipe_keys.map((k) => (
+                            <span key={k} className="text-[9px] font-mono bg-white border border-emerald-200 text-emerald-700 rounded px-1 py-0.5">
+                              {k}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      {!item.has_recipe_patch && (
+                        <p className="text-[10px] text-red-600 mt-0.5">
+                          {item.fix_type === "platform_bug" ? "Requires developer fix" : "Config-level fix only (YAML)"}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+
+          {/* Missing list summary */}
+          {data.missing.length > 0 && (
+            <div className="border border-red-200 rounded-lg p-3 bg-red-50 space-y-2">
+              <p className="text-xs font-semibold text-red-800">Missing recipe fix ({data.missing.length}):</p>
+              {data.missing.map((m) => (
+                <div key={m.id} className="flex items-start gap-2">
+                  <span className="text-[9px] font-mono bg-white border border-red-200 rounded px-1 py-0.5 text-red-600 shrink-0 mt-0.5">
+                    {m.id}
+                  </span>
+                  <span className="text-xs text-red-700">{m.title}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -2492,8 +2812,13 @@ function FixPreviewModal({
     missing_fee_tab: "international_fee",
     missing_fee_unknown: "international_fee",
     suspiciously_low_fee: "international_fee",
+    fee_visible_not_extracted: "international_fee",
+    csp_domestic_fee_detected: "international_fee",
     missing_degree_level: "degree_level",
     garbage_location: "course_location",
+    course_name_pipe_suffix: "course_name",
+    zero_discovery: "discovery",
+    low_course_count: "discovery",
   };
   const field = fieldMap[rec.id] || "";
 

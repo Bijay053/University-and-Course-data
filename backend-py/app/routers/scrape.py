@@ -5878,3 +5878,469 @@ async def rollback_scrape_fix(
         "university_id": uni_id,
         "restored_admin_config": prev,
     }
+
+
+# ── Recipe Coverage Registry ───────────────────────────────────────────────────
+# Static truth table: all known diagnostic issue types + whether the Recipe
+# Editor can fix them without developer involvement.
+
+_RECIPE_COVERAGE_REGISTRY: list[dict] = [
+    # ── IELTS / English Requirements (6) ─────────────────────────────────────
+    {
+        "id": "missing_ielts_follow_link",
+        "title": "IELTS missing — follow-link available",
+        "category": "ielts",
+        "fix_type": "recipe_fix",
+        "has_recipe_patch": True,
+        "field": "ielts_overall",
+        "recipe_keys": ["english.follow_links", "english.band_mapping"],
+        "description": "IELTS requirements page is linked from the course page but not followed by the scraper.",
+    },
+    {
+        "id": "missing_ielts_page_has_data",
+        "title": "IELTS missing — data on page, extractor missed it",
+        "category": "ielts",
+        "fix_type": "recipe_fix",
+        "has_recipe_patch": True,
+        "field": "ielts_overall",
+        "recipe_keys": ["english.band_mapping", "english.follow_links"],
+        "description": "IELTS text is present on the page but the extractor returned blank.",
+    },
+    {
+        "id": "missing_ielts_no_link",
+        "title": "IELTS missing — no link or data found on page",
+        "category": "ielts",
+        "fix_type": "recipe_fix",
+        "has_recipe_patch": True,
+        "field": "ielts_overall",
+        "recipe_keys": ["english.follow_links", "english.band_mapping"],
+        "description": "No IELTS data or English requirements link detected on probed pages.",
+    },
+    {
+        "id": "band_mapping_not_applied",
+        "title": "Band mapping configured but not applied",
+        "category": "ielts",
+        "fix_type": "recipe_fix",
+        "has_recipe_patch": True,
+        "field": "ielts_overall",
+        "recipe_keys": ["english.band_reference_url"],
+        "description": "Band mapping is configured but IELTS scores are still blank — reference URL may be wrong.",
+    },
+    {
+        "id": "band_mapping_ielts_blank",
+        "title": "Band mapping may need tuning",
+        "category": "ielts",
+        "fix_type": "recipe_fix",
+        "has_recipe_patch": True,
+        "field": "ielts_overall",
+        "recipe_keys": ["english.band_reference_url", "english.band_mapping"],
+        "description": "Band mapping is set but not producing correct IELTS scores.",
+    },
+    {
+        "id": "ielts_components_missing",
+        "title": "IELTS overall extracted but component scores missing",
+        "category": "ielts",
+        "fix_type": "recipe_fix",
+        "has_recipe_patch": True,
+        "field": "ielts_overall",
+        "recipe_keys": ["english.component_mapping"],
+        "description": "IELTS overall is present but Listening/Reading/Writing/Speaking component scores are blank.",
+    },
+    # ── International Fees (7) ────────────────────────────────────────────────
+    {
+        "id": "missing_fee_follow_link",
+        "title": "Fee missing — follow-link available",
+        "category": "fees",
+        "fix_type": "recipe_fix",
+        "has_recipe_patch": True,
+        "field": "international_fee",
+        "recipe_keys": ["fees.follow_links"],
+        "description": "Fee page is linked from the course page but not followed by the scraper.",
+    },
+    {
+        "id": "missing_fee_page_has_text",
+        "title": "Fee missing — text on page but not extracted",
+        "category": "fees",
+        "fix_type": "recipe_fix",
+        "has_recipe_patch": True,
+        "field": "international_fee",
+        "recipe_keys": ["fees.prefer_international", "fees.reject_keywords"],
+        "description": "Fee amount text is on the page but the extractor returned blank.",
+    },
+    {
+        "id": "missing_fee_tab",
+        "title": "Fee missing — international tab not selected",
+        "category": "fees",
+        "fix_type": "recipe_fix",
+        "has_recipe_patch": True,
+        "field": "international_fee",
+        "recipe_keys": ["fees.prefer_international"],
+        "description": "Fee page has domestic/international tabs; the domestic tab is being selected.",
+    },
+    {
+        "id": "missing_fee_unknown",
+        "title": "Fee missing — source unknown",
+        "category": "fees",
+        "fix_type": "recipe_fix",
+        "has_recipe_patch": True,
+        "field": "international_fee",
+        "recipe_keys": ["fees.source_urls"],
+        "description": "Fee is missing and no clear root cause was detected automatically.",
+    },
+    {
+        "id": "suspiciously_low_fee",
+        "title": "Suspiciously low fee — domestic amount stored as international",
+        "category": "fees",
+        "fix_type": "recipe_fix",
+        "has_recipe_patch": True,
+        "field": "international_fee",
+        "recipe_keys": ["fees.reject_keywords"],
+        "description": "Stored fee is below typical international fee range — likely a domestic fee.",
+    },
+    {
+        "id": "fee_visible_not_extracted",
+        "title": "Fee visible in page text but not extracted",
+        "category": "fees",
+        "fix_type": "recipe_fix",
+        "has_recipe_patch": True,
+        "field": "international_fee",
+        "recipe_keys": ["fees.prefer_international"],
+        "description": "Fee amount text exists on the page but extraction returned blank.",
+    },
+    {
+        "id": "csp_domestic_fee_detected",
+        "title": "Domestic/CSP fee text detected — may be stored as international",
+        "category": "fees",
+        "fix_type": "recipe_fix",
+        "has_recipe_patch": True,
+        "field": "international_fee",
+        "recipe_keys": ["fees.reject_keywords", "fees.prefer_international"],
+        "description": "CSP/domestic fee text was detected on course pages alongside international fees.",
+    },
+    # ── Location (1) ──────────────────────────────────────────────────────────
+    {
+        "id": "garbage_location",
+        "title": "Invalid location values — navigation text contaminating field",
+        "category": "location",
+        "fix_type": "recipe_fix",
+        "has_recipe_patch": True,
+        "field": "course_location",
+        "recipe_keys": ["location.reject_values", "location.allowed_values"],
+        "description": "Location field contains page navigation text instead of campus names.",
+    },
+    # ── Degree Level (1) ──────────────────────────────────────────────────────
+    {
+        "id": "missing_degree_level",
+        "title": "Degree level missing — field selector may need config",
+        "category": "degree_level",
+        "fix_type": "recipe_fix",
+        "has_recipe_patch": True,
+        "field": "degree_level",
+        "recipe_keys": ["field_selectors.degree_level"],
+        "description": "Degree level is blank across most staged courses.",
+    },
+    # ── Course Name (1) ───────────────────────────────────────────────────────
+    {
+        "id": "course_name_pipe_suffix",
+        "title": "Course names contain university label suffix",
+        "category": "course_name",
+        "fix_type": "recipe_fix",
+        "has_recipe_patch": True,
+        "field": "course_name",
+        "recipe_keys": ["cleanup.course_name.remove_after"],
+        "description": "Course names end with '| University Name' or similar suffix from the page title.",
+    },
+    # ── Study Mode (1) ────────────────────────────────────────────────────────
+    {
+        "id": "study_mode_blended",
+        "title": "Study mode — blended/online-only misclassification",
+        "category": "study_mode",
+        "fix_type": "platform_bug",
+        "has_recipe_patch": False,
+        "field": "study_mode",
+        "recipe_keys": [],
+        "description": "Study mode is showing as blended or online-only incorrectly. Requires a developer fix to the extractor.",
+    },
+    # ── Discovery — config-fixable with recipe keys (2) ──────────────────────
+    {
+        "id": "zero_discovery",
+        "title": "Zero courses discovered — site requires browser discovery",
+        "category": "discovery",
+        "fix_type": "config",
+        "has_recipe_patch": True,
+        "field": None,
+        "recipe_keys": ["discovery.always_browser_discover", "discovery.seed_urls"],
+        "description": "No course links found by static BFS. Needs browser discovery enabled in the config.",
+    },
+    {
+        "id": "low_course_count",
+        "title": "Low course count — seed URLs may be incomplete",
+        "category": "discovery",
+        "fix_type": "config",
+        "has_recipe_patch": True,
+        "field": None,
+        "recipe_keys": ["discovery.seed_urls"],
+        "description": "Fewer courses discovered than expected. Adding catalogue listing seed URLs usually helps.",
+    },
+    # ── Discovery — config-only, no recipe patch (3) ──────────────────────────
+    {
+        "id": "all_filtered",
+        "title": "All discovered URLs dropped by URL filter",
+        "category": "discovery",
+        "fix_type": "config",
+        "has_recipe_patch": False,
+        "field": None,
+        "recipe_keys": [],
+        "description": "must_contain or block_url_patterns is dropping all course candidate URLs before extraction.",
+    },
+    {
+        "id": "undergraduate_count_zero",
+        "title": "Undergraduate catalogue missing",
+        "category": "discovery",
+        "fix_type": "config",
+        "has_recipe_patch": False,
+        "field": None,
+        "recipe_keys": [],
+        "description": "0 undergraduate courses staged despite postgraduate courses being found.",
+    },
+    {
+        "id": "postgraduate_count_zero",
+        "title": "Postgraduate catalogue missing",
+        "category": "discovery",
+        "fix_type": "config",
+        "has_recipe_patch": False,
+        "field": None,
+        "recipe_keys": [],
+        "description": "0 postgraduate courses staged despite undergraduate courses being found.",
+    },
+]
+
+_CATEGORY_LABELS: dict[str, str] = {
+    "ielts": "IELTS / English",
+    "fees": "International Fees",
+    "location": "Location",
+    "degree_level": "Degree Level",
+    "course_name": "Course Name",
+    "study_mode": "Study Mode",
+    "discovery": "Discovery",
+}
+
+
+@router.get("/recipe-coverage")
+async def get_recipe_coverage():
+    """Static registry of all known diagnostic issue types and their recipe-fix coverage."""
+    covered = [r for r in _RECIPE_COVERAGE_REGISTRY if r["has_recipe_patch"]]
+    missing = [r for r in _RECIPE_COVERAGE_REGISTRY if not r["has_recipe_patch"]]
+
+    categories: dict[str, dict] = {}
+    for rec in _RECIPE_COVERAGE_REGISTRY:
+        cat = rec["category"]
+        if cat not in categories:
+            categories[cat] = {
+                "id": cat,
+                "label": _CATEGORY_LABELS.get(cat, cat.title()),
+                "total": 0,
+                "covered": 0,
+                "items": [],
+            }
+        categories[cat]["total"] += 1
+        if rec["has_recipe_patch"]:
+            categories[cat]["covered"] += 1
+        categories[cat]["items"].append(rec)
+
+    return {
+        "total": len(_RECIPE_COVERAGE_REGISTRY),
+        "covered": len(covered),
+        "missing_count": len(missing),
+        "coverage_pct": round(len(covered) / max(len(_RECIPE_COVERAGE_REGISTRY), 1) * 100),
+        "categories": list(categories.values()),
+        "missing": missing,
+    }
+
+
+@router.get("/{uni_id}/certification-score")
+async def get_certification_score(uni_id: int, db: AsyncSession = Depends(get_db)):
+    """Four-dimension certification score for a university based on the latest scrape data."""
+    from sqlalchemy import text as _text
+
+    row = await db.execute(
+        _text("""
+        SELECT j.runtime_job_id, j.total_found, j.imported, j.started_at, j.status,
+               s.fill_rate_international_fee, s.fill_rate_ielts_overall,
+               s.fill_rate_duration,          s.fill_rate_study_mode,
+               s.fill_rate_intake_months,     s.fill_rate_course_location
+        FROM   scrape_runtime_jobs j
+        LEFT   JOIN scrape_run_summary s ON s.scrape_run_id = j.runtime_job_id
+        WHERE  j.university_id = :uid
+          AND  j.status IN ('completed','success','partial','done')
+        ORDER  BY j.started_at DESC
+        LIMIT  1
+        """),
+        {"uid": uni_id},
+    )
+    job = row.mappings().first()
+
+    if not job:
+        return {"available": False, "reason": "No completed scrape jobs found."}
+
+    total_found = job["total_found"] or 0
+    imported = job["imported"] or 0
+
+    # Discovery: how many of discovered links were actually staged
+    discovery_score = min(100, round(imported / total_found * 100)) if total_found > 0 else 0
+
+    # Extraction: avg of key per-field fill rates
+    fill_vals = [
+        float(job["fill_rate_international_fee"] or 0),
+        float(job["fill_rate_ielts_overall"] or 0),
+        float(job["fill_rate_duration"] or 0),
+        float(job["fill_rate_study_mode"] or 0),
+        float(job["fill_rate_intake_months"] or 0),
+        float(job["fill_rate_course_location"] or 0),
+    ]
+    non_zero = [v for v in fill_vals if v > 0]
+    extraction_score = round(sum(non_zero) / len(non_zero) * 100) if non_zero else 0
+
+    # Quality: % of staged courses at ≥ 85 % completeness
+    q_row = await db.execute(
+        _text("""
+        SELECT COUNT(*)                                         AS total,
+               COUNT(*) FILTER (WHERE completeness >= 85)      AS at_threshold,
+               ROUND(AVG(completeness))                        AS avg_completeness
+        FROM   scraped_courses
+        WHERE  university_id = :uid
+          AND  status IN ('pending','approved','ready','promoted')
+        """),
+        {"uid": uni_id},
+    )
+    q = q_row.mappings().first()
+    total_courses = int(q["total"] or 0)
+    at_threshold = int(q["at_threshold"] or 0)
+    avg_completeness = int(q["avg_completeness"] or 0)
+    quality_score = round(at_threshold / total_courses * 100) if total_courses > 0 else 0
+
+    # Overall (weighted)
+    overall = round(discovery_score * 0.25 + extraction_score * 0.40 + quality_score * 0.35)
+
+    cert_level = (
+        "certified" if overall >= 85 else
+        "good"      if overall >= 70 else
+        "needs_work" if overall >= 50 else
+        "poor"
+    )
+
+    started = job["started_at"]
+
+    return {
+        "available": True,
+        "overall_score": overall,
+        "cert_level": cert_level,
+        "dimensions": {
+            "discovery": {
+                "score": discovery_score,
+                "label": "Discovery",
+                "detail": f"{imported} of {total_found} URLs staged",
+            },
+            "extraction": {
+                "score": extraction_score,
+                "label": "Extraction",
+                "detail": "Avg of key field fill rates",
+                "fill_rates": {
+                    "international_fee": round(float(job["fill_rate_international_fee"] or 0) * 100),
+                    "ielts_overall":     round(float(job["fill_rate_ielts_overall"]     or 0) * 100),
+                    "duration":          round(float(job["fill_rate_duration"]           or 0) * 100),
+                    "study_mode":        round(float(job["fill_rate_study_mode"]         or 0) * 100),
+                    "intake_months":     round(float(job["fill_rate_intake_months"]      or 0) * 100),
+                    "course_location":   round(float(job["fill_rate_course_location"]    or 0) * 100),
+                },
+            },
+            "quality": {
+                "score": quality_score,
+                "label": "Quality",
+                "detail": f"{at_threshold} of {total_courses} courses ≥85% complete",
+                "avg_completeness": avg_completeness,
+                "total_courses": total_courses,
+                "at_threshold": at_threshold,
+            },
+        },
+        "last_scrape": {
+            "job_id": job["runtime_job_id"],
+            "staged": imported,
+            "started_at": started.isoformat() if started else None,
+            "status": job["status"],
+        },
+    }
+
+
+@router.get("/{uni_id}/scrape-comparison")
+async def get_scrape_comparison(uni_id: int, db: AsyncSession = Depends(get_db)):
+    """Before/after field fill-rate comparison between the last two completed scrape jobs."""
+    from sqlalchemy import text as _text
+
+    rows = await db.execute(
+        _text("""
+        SELECT j.runtime_job_id, j.total_found, j.imported, j.started_at, j.status,
+               s.fill_rate_international_fee, s.fill_rate_ielts_overall,
+               s.fill_rate_pte_overall,       s.fill_rate_toefl_overall,
+               s.fill_rate_duration,          s.fill_rate_study_mode,
+               s.fill_rate_intake_months,     s.fill_rate_course_location
+        FROM   scrape_runtime_jobs j
+        LEFT   JOIN scrape_run_summary s ON s.scrape_run_id = j.runtime_job_id
+        WHERE  j.university_id = :uid
+          AND  j.status IN ('completed','success','partial','done')
+        ORDER  BY j.started_at DESC
+        LIMIT  2
+        """),
+        {"uid": uni_id},
+    )
+    jobs = list(rows.mappings())
+
+    if len(jobs) < 2:
+        return {"available": False, "reason": "Need at least 2 completed scrape jobs to compare."}
+
+    current, previous = jobs[0], jobs[1]
+
+    def pct(val) -> int:
+        return round(float(val or 0) * 100)
+
+    field_spec = [
+        ("international_fee", "International Fee",  "fill_rate_international_fee"),
+        ("ielts_overall",     "IELTS",             "fill_rate_ielts_overall"),
+        ("pte_overall",       "PTE",               "fill_rate_pte_overall"),
+        ("toefl_overall",     "TOEFL",             "fill_rate_toefl_overall"),
+        ("duration",          "Duration",           "fill_rate_duration"),
+        ("study_mode",        "Study Mode",         "fill_rate_study_mode"),
+        ("intake_months",     "Intakes",            "fill_rate_intake_months"),
+        ("course_location",   "Location",           "fill_rate_course_location"),
+    ]
+
+    field_deltas = []
+    for fid, label, col in field_spec:
+        before = pct(previous[col])
+        after = pct(current[col])
+        field_deltas.append({
+            "field": fid,
+            "label": label,
+            "before": before,
+            "after": after,
+            "delta": after - before,
+        })
+
+    cur_started = current["started_at"]
+    prev_started = previous["started_at"]
+
+    return {
+        "available": True,
+        "current": {
+            "job_id": current["runtime_job_id"],
+            "staged": current["imported"] or 0,
+            "started_at": cur_started.isoformat() if cur_started else None,
+        },
+        "previous": {
+            "job_id": previous["runtime_job_id"],
+            "staged": previous["imported"] or 0,
+            "started_at": prev_started.isoformat() if prev_started else None,
+        },
+        "staged_delta": (current["imported"] or 0) - (previous["imported"] or 0),
+        "field_deltas": field_deltas,
+    }
