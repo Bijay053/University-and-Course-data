@@ -613,22 +613,146 @@ async def add_university_by_url(
             country = cntry
             break
 
-    # Name from <title> or hostname
+    # Name + city from page HTML
+    _UNI_KEYWORDS = _re.compile(
+        r"\b(university|université|universität|universiteit|institute|"
+        r"institution|college|school\s+of|academy|polytechnic|wānanga|"
+        r"teknoloji|teknologi|tec\b|tecnológico)\b",
+        _re.I,
+    )
+
+    # Small hostname → city lookup for universities whose homepages use
+    # a marketing phrase as the page title rather than their real name.
+    _HOSTNAME_CITY: dict[str, str] = {
+        "waikato.ac.nz":     "Hamilton",
+        "auckland.ac.nz":    "Auckland",
+        "aut.ac.nz":         "Auckland",
+        "victoria.ac.nz":    "Wellington",
+        "vuw.ac.nz":         "Wellington",
+        "massey.ac.nz":      "Palmerston North",
+        "lincoln.ac.nz":     "Christchurch",
+        "canterbury.ac.nz":  "Christchurch",
+        "otago.ac.nz":       "Dunedin",
+        "anu.edu.au":        "Canberra",
+        "unimelb.edu.au":    "Melbourne",
+        "sydney.edu.au":     "Sydney",
+        "unsw.edu.au":       "Sydney",
+        "uts.edu.au":        "Sydney",
+        "mq.edu.au":         "Sydney",
+        "uws.edu.au":        "Sydney",
+        "westernsydney.edu.au": "Sydney",
+        "uq.edu.au":         "Brisbane",
+        "qut.edu.au":        "Brisbane",
+        "griffith.edu.au":   "Brisbane",
+        "bond.edu.au":       "Gold Coast",
+        "monash.edu":        "Melbourne",
+        "deakin.edu.au":     "Melbourne",
+        "rmit.edu.au":       "Melbourne",
+        "latrobe.edu.au":    "Melbourne",
+        "swin.edu.au":       "Melbourne",
+        "uwa.edu.au":        "Perth",
+        "curtin.edu.au":     "Perth",
+        "murdoch.edu.au":    "Perth",
+        "ecu.edu.au":        "Perth",
+        "adelaide.edu.au":   "Adelaide",
+        "unisa.edu.au":      "Adelaide",
+        "flinders.edu.au":   "Adelaide",
+        "csu.edu.au":        "Bathurst",
+        "newcastle.edu.au":  "Newcastle",
+        "uon.edu.au":        "Newcastle",
+        "une.edu.au":        "Armidale",
+        "uow.edu.au":        "Wollongong",
+        "canberra.edu.au":   "Canberra",
+        "uts.edu.au":        "Sydney",
+        "jcu.edu.au":        "Townsville",
+        "cdu.edu.au":        "Darwin",
+        "federation.edu.au": "Ballarat",
+        "usq.edu.au":        "Toowoomba",
+        "unisq.edu.au":      "Toowoomba",
+        "scu.edu.au":        "Lismore",
+    }
+
     try:
         async with _httpx.AsyncClient(
-            follow_redirects=True, timeout=8.0, verify=False,
+            follow_redirects=True, timeout=10.0, verify=False,
             headers={"User-Agent": "Mozilla/5.0 (compatible; UniPortalBot/1.0)"},
         ) as client:
             resp = await client.get(root_url)
             if resp.status_code < 400:
-                # Extract <title>
-                title_m = _re.search(r"<title[^>]*>([^<]+)</title>", resp.text, _re.I)
+                html = resp.text
+
+                # ── Name from <title> ────────────────────────────────────────
+                title_m = _re.search(r"<title[^>]*>([^<]+)</title>", html, _re.I)
                 if title_m:
                     raw_title = title_m.group(1).strip()
-                    # Take the first segment before | — or :
-                    name = _re.split(r"\s*[|–—:]\s*", raw_title)[0].strip()[:200]
+                    segments = [s.strip() for s in _re.split(r"\s*[|–—:]\s*", raw_title) if s.strip()]
+                    if segments:
+                        # Prefer the segment that looks like an institution name
+                        preferred = next(
+                            (s for s in segments if _UNI_KEYWORDS.search(s)),
+                            None,
+                        )
+                        if preferred is None:
+                            # Fall back to the longest segment
+                            preferred = max(segments, key=len)
+                        name = preferred[:200]
+
+                # ── City from JSON-LD structured data ────────────────────────
+                for ld_block in _re.finditer(
+                    r'<script[^>]+type=["\']application/ld\+json["\'][^>]*>(.*?)</script>',
+                    html, _re.S | _re.I,
+                ):
+                    import json as _json
+                    try:
+                        ld = _json.loads(ld_block.group(1))
+                        # ld may be a list or a dict
+                        items = ld if isinstance(ld, list) else [ld]
+                        for item in items:
+                            addr = item.get("address") or {}
+                            locality = (
+                                addr.get("addressLocality")
+                                or item.get("addressLocality")
+                                or ""
+                            )
+                            if locality:
+                                city = locality.strip()
+                                break
+                    except Exception:
+                        pass
+                    if city != "Unknown":
+                        break
+
+                # ── City from <meta name="geo.placename"> ───────────────────
+                if city == "Unknown":
+                    geo_m = _re.search(
+                        r'<meta[^>]+name=["\']geo\.placename["\'][^>]+content=["\']([^"\']+)["\']',
+                        html, _re.I,
+                    )
+                    if geo_m:
+                        city = geo_m.group(1).strip()
+
+                # ── City from <meta property="og:locality"> ──────────────────
+                if city == "Unknown":
+                    og_m = _re.search(
+                        r'<meta[^>]+property=["\']og:locality["\'][^>]+content=["\']([^"\']+)["\']',
+                        html, _re.I,
+                    )
+                    if og_m:
+                        city = og_m.group(1).strip()
+
     except Exception:
         pass  # Best-effort; we'll fall back to hostname-derived name
+
+    # ── City fallback: hostname lookup ────────────────────────────────────────
+    if city == "Unknown":
+        # Strip www. prefix then try progressively shorter domain suffixes
+        _stripped = hostname.removeprefix("www.")
+        _host_parts = _stripped.split(".")
+        for _n in range(len(_host_parts), 0, -1):
+            _candidate = ".".join(_host_parts[-_n:])
+            if _candidate in _HOSTNAME_CITY:
+                city = _HOSTNAME_CITY[_candidate]
+                break
 
     if not name:
         # Fallback: capitalise hostname parts
