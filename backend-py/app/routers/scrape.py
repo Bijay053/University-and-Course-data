@@ -4368,17 +4368,30 @@ async def diagnose_scrape_job(
             log.debug("diagnose: could not load effective UniConfig: %s", _cfg_err)
 
     # ── Inject recipe_patch into deterministic issues ─────────────────────────
-    # Now that _effective_disc is populated we know exactly what filters are
-    # configured, so we can attach a concrete, one-click-applicable patch to
-    # each issue instead of just text advice.
-    _eff_must_contain:  list = list(_effective_disc.get("must_contain")        or [])
-    _eff_block_pats:    list = list(_effective_disc.get("block_url_patterns")  or [])
-    _eff_allow_pats:    list = list(_effective_disc.get("allow_url_patterns")  or [])
+    # Now that _effective_disc and _current_admin_cfg are populated we know
+    # exactly which filters are configured and which level they come from
+    # (YAML vs admin_config override), so we can attach a concrete,
+    # one-click-applicable patch to each issue instead of just text advice.
+    #
+    # Priority order for "what is causing 100% drop":
+    #   1. must_contain   — substring allowlist, drops everything that doesn't contain it
+    #   2. allow_url_patterns — regex allowlist, drops everything that doesn't match
+    #   3. block_url_patterns — blocklist, only fires on matching URLs
+    #
+    # allow_url_patterns is checked BEFORE block_url_patterns because an allowlist
+    # configured incorrectly causes 100% drop far more often than a blocklist.
+    _eff_must_contain: list = list(_effective_disc.get("must_contain")       or [])
+    _eff_block_pats:   list = list(_effective_disc.get("block_url_patterns") or [])
+    _eff_allow_pats:   list = list(_effective_disc.get("allow_url_patterns") or [])
+
+    # What is actually stored in admin_config (may override YAML values)
+    _admin_disc:       dict = (_current_admin_cfg.get("discovery") or {})
+    _admin_allow_pats: list = list(_admin_disc.get("allow_url_patterns") or [])
 
     for _di in deterministic_issues:
         if _di.get("check") == "all_filtered":
             if _eff_must_contain:
-                # must_contain is the most common cause of 100% URL drop
+                # must_contain is an allowlist — drops every URL that lacks the substring
                 _di["recipe_patch"] = {"discovery": {"must_contain": []}}
                 _pat_preview = ", ".join(f'"{p}"' for p in _eff_must_contain[:3])
                 if len(_eff_must_contain) > 3:
@@ -4388,23 +4401,39 @@ async def diagnose_scrape_job(
                     "that are rejecting all discovered URLs. Re-run the scrape to verify, "
                     "then add back a narrower pattern once you've confirmed the URL structure."
                 )
+            elif _eff_allow_pats and (_after_filter == 0 or (job.imported or 0) == 0):
+                # allow_url_patterns is a regex allowlist — if configured incorrectly it
+                # silently drops every URL that doesn't match.  Common cause:
+                #   • A previous AI Fix wrote a wrong pattern into admin_config that now
+                #     overrides the correct YAML pattern (e.g. /study/courses/ vs /courses/).
+                #   • The YAML pattern itself is too narrow (only matches category slugs,
+                #     not individual course slugs).
+                # Clearing admin_config's override restores the YAML-configured pattern.
+                _di["recipe_patch"] = {"discovery": {"allow_url_patterns": []}}
+                if _admin_allow_pats:
+                    _prev = ", ".join(f'"{p}"' for p in _admin_allow_pats[:3])
+                    _di["recipe_patch_description"] = (
+                        f"Remove the admin_config override allow_url_patterns ({_prev}) which "
+                        "is blocking all discovered URLs and overrides the YAML-configured pattern. "
+                        "Clearing it restores the YAML setting. Re-run the scrape to confirm."
+                    )
+                else:
+                    _pat_preview = ", ".join(f'"{p}"' for p in _eff_allow_pats[:2])
+                    _di["recipe_patch_description"] = (
+                        f"Remove the allow_url_patterns filter ({_pat_preview}) — the current "
+                        "regex is not matching any of the discovered URLs so all "
+                        f"{_raw_discovered} course pages are dropped before extraction. "
+                        "Clearing it lets all discovered URLs through; "
+                        "re-add a corrected pattern after inspecting the discovered URLs."
+                    )
             elif _eff_block_pats and _after_filter == 0 and _raw_discovered > 0:
-                # block_url_patterns dropped every discovered link
+                # block_url_patterns is a blocklist — only fires on matching URLs,
+                # so it causes 100% drop only when it matches every discovered link.
                 _di["recipe_patch"] = {"discovery": {"block_url_patterns": []}}
                 _di["recipe_patch_description"] = (
-                    f"Clear {len(_eff_block_pats)} block_url_patterns that are removing "
-                    "100% of discovered URLs. Re-run after clearing to confirm what pages "
-                    "are actually reachable, then re-add targeted block patterns."
-                )
-            elif _eff_allow_pats and _after_filter > 0 and (job.imported or 0) == 0:
-                # allow_url_patterns is passing category/listing pages, not course detail pages
-                _di["recipe_patch"] = {"discovery": {"allow_url_patterns": []}}
-                _di["recipe_patch_description"] = (
-                    "Remove the allow_url_patterns filter — the current regex matches "
-                    "category/listing pages rather than individual course detail pages, "
-                    "so 0 courses can be extracted. Clearing this lets the browser reach "
-                    "all reachable URLs; after the next scrape inspect the discovered URLs "
-                    "and write a more specific regex that targets course-detail pages only."
+                    f"Clear {len(_eff_block_pats)} block_url_patterns — the patterns are "
+                    "matching every discovered URL and blocking all of them. Re-run to see "
+                    "what pages are reachable, then re-add targeted patterns."
                 )
 
     # ── Run diagnostics in parallel with Gemini ──────────────────────────────
