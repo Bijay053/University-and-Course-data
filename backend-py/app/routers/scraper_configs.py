@@ -1139,7 +1139,14 @@ async def ai_fix_scraper_config(
 
     settings_reference = _read_yaml_raw(_TEMPLATE_FILE)[:10000]
 
-    prompt = f"""You are an expert at configuring university web scrapers using YAML config files.
+    prompt = f"""You are a university scraper configuration assistant helping a non-technical portal admin update YAML settings.
+
+STRICT LANGUAGE RULES:
+- NEVER mention code files, module names, function names, or internal implementation details.
+- NEVER say "Developer should..." or "Engineering should...".
+- If the request cannot be done with YAML settings, add ONLY this comment in the YAML:
+  # This setting cannot be changed via YAML — please contact support with a description of what you need.
+  Then leave the rest of the file unchanged. Do NOT add any technical explanation.
 
 SETTINGS REFERENCE (every available key with comments and examples):
 {settings_reference}
@@ -1157,7 +1164,7 @@ Instructions:
 - Apply ONLY the changes needed to fulfil the operator request.
 - Preserve every existing key, comment, indentation, and structure that the request does not touch.
 - Keep all existing rationale / bug-history comment lines unchanged.
-- If the request asks for something that cannot be expressed in YAML (needs a code fix), add a short YAML comment explaining this and leave the rest of the file unchanged.
+- Only use YAML keys that exist in the SETTINGS REFERENCE above — never invent new keys.
 - Output ONLY the complete updated YAML — no markdown fences, no explanation, no preamble."""
 
     try:
@@ -1500,12 +1507,34 @@ async def ai_diagnose_scraper_config(
 
     extra_instr = f"\n\nOperator's additional note: {body.prompt.strip()}" if body.prompt.strip() else ""
 
-    gemini_prompt = f"""You are a senior university-scraper engineer and AI agent. Your job is to:
-1. Diagnose EXACTLY why the scrape produced poor results — use the evidence data, do NOT contradict it
-2. Apply precise YAML fixes that would actually solve the root cause
-3. Explain the diagnosis in plain English for a non-developer operator
+    gemini_prompt = f"""You are a university scraper configuration assistant. You help non-technical university administrators improve their scraping results by adjusting YAML settings. Your audience is a portal admin, NOT a developer.
 
-IMPORTANT: The "PROBLEMS DETECTED FROM DATA" section below contains machine-verified facts. You MUST include every CRITICAL issue listed there in your DIAGNOSIS. Do not dismiss or ignore data-verified problems.
+STRICT LANGUAGE RULES — violations will confuse and frustrate the user:
+- NEVER mention code files, module names, function names, or internal implementation details
+  (no "browser_discovery.py", no "requests.get", no "page.locator", no "discover_candidate_course_pages", no Python/JS code)
+- NEVER say "Developer should...", "Engineering should...", or "Check the code..."
+- If a problem cannot be fixed with YAML settings, say exactly:
+  "This issue requires a support ticket — YAML changes alone cannot fix it."
+  Then briefly describe WHAT is wrong in plain English (e.g. "The university's website blocks automated requests") and stop.
+- Write as if explaining to someone who has never seen a terminal. Plain English only.
+
+HOW TO READ THE EVIDENCE AND APPLY YAML FIXES:
+
+Using the live website inspection report:
+- If the inspection says "JAVASCRIPT RENDERING DETECTED" or the body is very short (< 400 chars):
+  → The site is JavaScript-rendered. Set always_browser_discover: true and use_stealth_browser: true.
+  → Do NOT suggest URL pattern changes — the problem is rendering, not filtering.
+- If the inspection lists URL path patterns that contain /courses/, /study/, or /programs/:
+  → Set allow_url_patterns to those paths. Example: allow_url_patterns: ["/courses/"]
+  → Remove any block_url_patterns entries that would block those same paths.
+- If the sitemap was found and contains course URLs:
+  → Add always_sitemap_supplement: true and set allow_url_patterns to the path prefix from the sitemap.
+- If the seed URL returned an error or was empty:
+  → Update seed_urls to the correct course listing page URL you found in the inspection.
+- If "international fee: NOT FOUND" on the course page:
+  → The fee is probably on a separate fees page or behind a JavaScript tab. Suggest fees.central_page or fees.fees_pdf_url.
+- If "IELTS: NOT FOUND" on the course page:
+  → The English requirements are probably on a central page. Suggest english.central_page.
 
 === YAML SETTINGS REFERENCE (every available key with comments and examples) ===
 {settings_reference}
@@ -1522,7 +1551,7 @@ Slug: {slug}
 === FIELD FILL RATES (% of staged courses where each field was successfully extracted) ===
 {fill_block}
 
-=== PROBLEMS DETECTED FROM DATA (machine-verified — you MUST address these) ===
+=== PROBLEMS DETECTED FROM DATA (machine-verified — include every CRITICAL issue in your DIAGNOSIS) ===
 {quality_block}
 
 === WORST-PERFORMING STAGED COURSES (samples with lowest completeness) ===
@@ -1532,59 +1561,30 @@ Slug: {slug}
 {current_yaml}
 === END CURRENT CONFIG ==={extra_instr}
 
-Respond in this EXACT format (no markdown, no code fences):
+Respond in this EXACT format (no markdown, no code fences, no extra sections):
 
 DIAGNOSIS:
-- [CRITICAL] Short issue title | Plain English explanation of the root cause based on the evidence above. Quote numbers from the stats. Be specific.
-- [WARNING] Short issue title | Explanation.
-- [INFO] Short issue title | Explanation.
-(one bullet per distinct issue)
+- [CRITICAL] Short plain-English title | What is wrong and why — quote actual numbers from the stats. No code or file names.
+- [WARNING] Short plain-English title | Explanation.
+- [INFO] Short plain-English title | Explanation.
+(one bullet per distinct issue; if an issue cannot be fixed by YAML say "Needs support ticket" in the title)
 
 CHANGES:
-- Describe each YAML key you added/changed and WHY it fixes the specific problem you diagnosed.
-(one bullet per change; write "No changes needed" if truly no issues exist)
+- Describe each YAML setting you added or changed and why it helps. Plain English. No code.
+(one bullet per change; write "No changes needed" if the config is already correct)
 
 SUMMARY:
-One plain-English sentence: what was wrong and what the fix does.
+One plain-English sentence saying what was wrong and what the fix does (or that a support ticket is needed).
 
 YAML:
-(complete updated YAML with all fixes applied — preserve all existing comments and keys)
-
-HOW TO USE THE LIVE WEBSITE INSPECTION REPORT:
-The inspection report above was fetched RIGHT NOW from the real website. It is ground truth.
-Read it carefully and use it to make SPECIFIC, ACCURATE fixes — not generic suggestions.
-
-1. JAVASCRIPT DETECTION:
-   If the inspection says "JAVASCRIPT RENDERING DETECTED" or body < 400 chars:
-   → Set: always_browser_discover: true, use_stealth_browser: true
-   → Do NOT suggest allow_url_patterns changes as the problem is rendering, not filtering.
-
-2. URL PATTERN ANALYSIS — use the EXACT patterns you see in the inspection output:
-   If the inspection lists "Top URL path patterns" with course-like paths (e.g., /courses/, /study/, /programs/):
-   → Set allow_url_patterns to match exactly those paths. Use the actual path prefix shown, e.g.:
-     allow_url_patterns: ["/courses/", "/study/"] 
-   → Remove block_url_patterns entries that would block those same paths.
-   If the sitemap step found course URLs, note the path prefix and set allow_url_patterns to match it.
-
-3. FIELD VISIBILITY — from the course detail page inspection:
-   If "international fee ($): NOT FOUND" → fee is on a separate fees page or behind JS. Suggest PDF fee extraction or browser.
-   If "IELTS score: NOT FOUND" → add extraction.hints for ielts_overall pointing to the requirements section.
-   If "intake months: NOT FOUND" → add extraction.hints for intake_months.
-
-4. SEED URL:
-   If the seed URL returned HTTP 4xx or was empty → update seed_urls to the correct course listing URL.
-   Look at the actual URL patterns found and pick the listing-level parent URL.
-
-5. SITEMAP:
-   If sitemap.xml was found AND has course URLs → add always_sitemap_supplement: true.
-   Use the actual path prefix from the sitemap course URLs for allow_url_patterns.
+(complete updated YAML with all fixes applied — preserve every existing comment and key)
 
 Rules:
-- MUST include every CRITICAL issue from "PROBLEMS DETECTED FROM DATA" in your DIAGNOSIS.
-- Quote actual numbers from the stats and actual URL patterns from the inspection.
-- Never suggest a fix you cannot back up with evidence from the inspection report or the scrape stats.
-- Only use YAML keys that exist in the SETTINGS REFERENCE.
-- Preserve all existing YAML comments and structure."""
+- Include every CRITICAL issue from "PROBLEMS DETECTED FROM DATA" in the DIAGNOSIS.
+- Quote actual numbers and URL patterns from the evidence — never make up values.
+- Only use YAML keys that exist in the SETTINGS REFERENCE above — never invent new keys.
+- Preserve all existing YAML comments and structure.
+- Output ONLY the four sections above. No extra commentary after YAML."""
 
     try:
         raw_text = await _call_gemini_with_retry(client, gemini_prompt)
