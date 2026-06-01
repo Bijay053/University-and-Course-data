@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { SettingsTabs } from "@/components/settings-tabs";
-import { Plus, Save, Trash2, Sparkles, Search, RefreshCw, X, Play, Loader2, CheckCircle2, AlertCircle, Clock, GitCompare, Code, History, RotateCcw, Download, Clipboard, Check, Wand2, Undo2 } from "lucide-react";
+import { Plus, Save, Trash2, Sparkles, Search, RefreshCw, X, Play, Loader2, CheckCircle2, AlertCircle, Clock, GitCompare, Code, History, RotateCcw, Download, Clipboard, Check, Wand2, Undo2, Bot, ShieldAlert, TriangleAlert, Info, ChevronDown, ChevronUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { fetchWithAuth } from "@/lib/api";
 import { CountrySelect } from "@/components/country-select";
@@ -353,6 +353,34 @@ interface HistoryEntry {
 }
 
 type EditorView = "editor" | "diff" | "history";
+
+interface DiagnosisIssue {
+  severity: "critical" | "warning" | "info";
+  title: string;
+  detail: string;
+}
+
+interface DiagnosisResult {
+  university_found: boolean;
+  university_name: string;
+  university_id: number | null;
+  last_job: {
+    job_id: string;
+    status: string;
+    total_found: number;
+    imported: number;
+    errors: number;
+    created_at: string | null;
+    raw_discovered: number;
+    after_filter: number;
+    filter_drop_count: number;
+  } | null;
+  issues: DiagnosisIssue[];
+  changes: string[];
+  summary: string;
+  yaml: string;
+  has_changes: boolean;
+}
 
 const TERMINAL_STATUSES: JobStatus[] = ["done", "awaiting_approval", "failed", "cancelled"];
 
@@ -1175,6 +1203,13 @@ export default function SettingsScraperConfigs() {
   const [aiFixing, setAiFixing] = useState(false);
   const [aiFixPrev, setAiFixPrev] = useState<string | null>(null);
 
+  // ── AI Diagnose & Fix ─────────────────────────────────────────────────────
+  const [diagnosing, setDiagnosing] = useState(false);
+  const [diagnosisOpen, setDiagnosisOpen] = useState(false);
+  const [diagnosisResult, setDiagnosisResult] = useState<DiagnosisResult | null>(null);
+  const [diagnosisPrompt, setDiagnosisPrompt] = useState("");
+  const [diagnosisExpanded, setDiagnosisExpanded] = useState<Record<number, boolean>>({});
+
   const fetchConfigs = useCallback(async () => {
     setLoading(true);
     try {
@@ -1441,6 +1476,48 @@ export default function SettingsScraperConfigs() {
     } finally {
       setAiFixing(false);
     }
+  };
+
+  const handleDiagnose = async () => {
+    if (!editorSlug.trim()) {
+      toast({ title: "No config selected", description: "Select a config first.", variant: "destructive" });
+      return;
+    }
+    setDiagnosing(true);
+    setDiagnosisOpen(true);
+    setDiagnosisResult(null);
+    setDiagnosisExpanded({});
+    setAiFixOpen(false);
+    try {
+      const res = await fetchWithAuth(`${BASE}/api/settings/scraper-configs/${editorSlug.trim()}/ai-diagnose`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ yaml_content: editorYaml, prompt: diagnosisPrompt }),
+      });
+      if (!res.ok) { const d = await res.json(); throw new Error(d.detail ?? "Diagnosis failed"); }
+      const data: DiagnosisResult = await res.json();
+      setDiagnosisResult(data);
+      const critCount = data.issues.filter(i => i.severity === "critical").length;
+      if (data.has_changes) {
+        toast({ title: `${critCount > 0 ? critCount + " critical issue(s) found" : "Diagnosis complete"}`, description: "Review the findings below, then apply the fix." });
+      } else {
+        toast({ title: "All clear", description: "No config changes needed — the config looks correct." });
+      }
+    } catch (err) {
+      toast({ title: "Diagnosis failed", description: (err as Error).message, variant: "destructive" });
+      setDiagnosisOpen(false);
+    } finally {
+      setDiagnosing(false);
+    }
+  };
+
+  const applyDiagnosis = () => {
+    if (!diagnosisResult?.yaml) return;
+    setAiFixPrev(editorYaml);
+    setEditorYaml(diagnosisResult.yaml);
+    setDiagnosisOpen(false);
+    setView("diff");
+    toast({ title: "Fix applied", description: "Review in the Changes view, then Save to persist." });
   };
 
   const handleCreateManually = () => {
@@ -1803,9 +1880,25 @@ export default function SettingsScraperConfigs() {
 
                   <Button
                     size="sm"
+                    variant={diagnosisOpen ? "default" : "outline"}
+                    className={cn("h-7 text-xs", diagnosisOpen ? "" : "border-blue-300 text-blue-700 hover:bg-blue-50 dark:border-blue-700 dark:text-blue-400 dark:hover:bg-blue-950/40")}
+                    onClick={() => {
+                      if (diagnosisOpen && diagnosisResult) { setDiagnosisOpen(false); }
+                      else { void handleDiagnose(); }
+                    }}
+                    disabled={diagnosing}
+                    title="Auto-diagnose scrape issues using real data from the last scrape job"
+                  >
+                    {diagnosing
+                      ? <><Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />Diagnosing…</>
+                      : <><Bot className="h-3.5 w-3.5 mr-1" />Diagnose &amp; Fix</>
+                    }
+                  </Button>
+                  <Button
+                    size="sm"
                     variant={aiFixOpen ? "default" : "outline"}
                     className="h-7 text-xs"
-                    onClick={() => { setAiFixOpen(o => !o); }}
+                    onClick={() => { setAiFixOpen(o => !o); setDiagnosisOpen(false); }}
                     title="Fix YAML with AI — describe a change and Gemini applies it"
                   >
                     <Wand2 className="h-3.5 w-3.5 mr-1" />
@@ -1875,6 +1968,166 @@ export default function SettingsScraperConfigs() {
                   <p className="text-xs text-muted-foreground">
                     Changes appear in the editor — switch to <strong>Changes</strong> to review the diff, then <strong>Save</strong> to persist.
                   </p>
+                </div>
+              )}
+
+              {/* AI Diagnose & Fix panel */}
+              {diagnosisOpen && (
+                <div className="border-b bg-blue-50 dark:bg-blue-950/30 flex flex-col">
+                  {/* Header */}
+                  <div className="px-4 py-3 flex items-center gap-2 border-b border-blue-100 dark:border-blue-900">
+                    <Bot className="h-4 w-4 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+                    <span className="text-xs font-semibold text-blue-900 dark:text-blue-200">AI Scrape Diagnosis</span>
+                    {diagnosing && <span className="text-xs text-blue-600 dark:text-blue-400 flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" />Analysing last scrape job…</span>}
+                    {diagnosisResult && !diagnosing && (
+                      <span className="text-xs text-muted-foreground flex-1">
+                        {diagnosisResult.university_found
+                          ? `${diagnosisResult.university_name} · ${diagnosisResult.issues.length} issue(s) found`
+                          : "University not linked — add a # Hostname: comment to the YAML"}
+                      </span>
+                    )}
+                    <div className="flex items-center gap-2 ml-auto">
+                      {/* Optional extra note input */}
+                      <input
+                        className="h-7 w-48 rounded-md border border-blue-200 dark:border-blue-700 bg-white dark:bg-blue-950/60 px-2 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400 placeholder:text-muted-foreground"
+                        placeholder="Optional note (e.g. fees are in PDF)"
+                        value={diagnosisPrompt}
+                        onChange={e => setDiagnosisPrompt(e.target.value)}
+                        onKeyDown={e => { if (e.key === "Enter") void handleDiagnose(); }}
+                        disabled={diagnosing}
+                      />
+                      <Button size="sm" variant="outline" className="h-7 text-xs border-blue-300 text-blue-700 hover:bg-blue-100 dark:border-blue-700 dark:text-blue-400" onClick={handleDiagnose} disabled={diagnosing}>
+                        {diagnosing ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+                      </Button>
+                      <button onClick={() => setDiagnosisOpen(false)} className="text-muted-foreground hover:text-foreground">
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Loading skeleton */}
+                  {diagnosing && (
+                    <div className="px-4 py-5 flex flex-col gap-3">
+                      {[1,2,3].map(i => (
+                        <div key={i} className="flex gap-3 animate-pulse">
+                          <div className="h-5 w-5 rounded-full bg-blue-200 dark:bg-blue-800 flex-shrink-0" />
+                          <div className="flex-1 space-y-1.5">
+                            <div className="h-3 bg-blue-200 dark:bg-blue-800 rounded w-1/3" />
+                            <div className="h-3 bg-blue-100 dark:bg-blue-900 rounded w-2/3" />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Results */}
+                  {diagnosisResult && !diagnosing && (
+                    <div className="px-4 py-3 flex flex-col gap-3 max-h-[500px] overflow-y-auto">
+
+                      {/* Last job stats bar */}
+                      {diagnosisResult.last_job && (
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground bg-white dark:bg-blue-950/20 border border-blue-100 dark:border-blue-800 rounded-md px-3 py-2">
+                          <span className="font-medium text-foreground">Last scrape:</span>
+                          <span>🔍 {diagnosisResult.last_job.raw_discovered} discovered</span>
+                          <span>→ {diagnosisResult.last_job.after_filter} after filter</span>
+                          <span>→ <strong>{diagnosisResult.last_job.imported}</strong> staged</span>
+                          {diagnosisResult.last_job.errors > 0 && <span className="text-red-600">⚠ {diagnosisResult.last_job.errors} errors</span>}
+                          {diagnosisResult.last_job.created_at && <span className="text-muted-foreground">· {diagnosisResult.last_job.created_at}</span>}
+                        </div>
+                      )}
+
+                      {/* Issues */}
+                      {diagnosisResult.issues.length > 0 ? (
+                        <div className="flex flex-col gap-2">
+                          {diagnosisResult.issues.map((issue, idx) => {
+                            const isExpanded = diagnosisExpanded[idx] ?? true;
+                            const color = issue.severity === "critical"
+                              ? "border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/30"
+                              : issue.severity === "warning"
+                              ? "border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30"
+                              : "border-blue-200 dark:border-blue-800 bg-white dark:bg-blue-950/20";
+                            const Icon = issue.severity === "critical" ? ShieldAlert : issue.severity === "warning" ? TriangleAlert : Info;
+                            const iconColor = issue.severity === "critical"
+                              ? "text-red-600 dark:text-red-400"
+                              : issue.severity === "warning"
+                              ? "text-amber-600 dark:text-amber-400"
+                              : "text-blue-500 dark:text-blue-400";
+                            const badge = issue.severity === "critical"
+                              ? "bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300"
+                              : issue.severity === "warning"
+                              ? "bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300"
+                              : "bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300";
+                            return (
+                              <div key={idx} className={cn("border rounded-md overflow-hidden", color)}>
+                                <button
+                                  className="w-full flex items-center gap-2 px-3 py-2 text-left"
+                                  onClick={() => setDiagnosisExpanded(prev => ({ ...prev, [idx]: !isExpanded }))}
+                                >
+                                  <Icon className={cn("h-4 w-4 flex-shrink-0", iconColor)} />
+                                  <span className="flex-1 text-xs font-medium text-foreground">{issue.title}</span>
+                                  <span className={cn("text-[10px] font-semibold px-1.5 py-0.5 rounded uppercase tracking-wide flex-shrink-0", badge)}>
+                                    {issue.severity}
+                                  </span>
+                                  {isExpanded ? <ChevronUp className="h-3 w-3 text-muted-foreground flex-shrink-0" /> : <ChevronDown className="h-3 w-3 text-muted-foreground flex-shrink-0" />}
+                                </button>
+                                {isExpanded && issue.detail && (
+                                  <div className="px-3 pb-2.5 text-xs text-muted-foreground leading-relaxed border-t border-inherit pt-2">
+                                    {issue.detail}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 text-xs text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-md px-3 py-2">
+                          <CheckCircle2 className="h-4 w-4 flex-shrink-0" />
+                          No issues detected — the config looks correct.
+                        </div>
+                      )}
+
+                      {/* Summary */}
+                      {diagnosisResult.summary && (
+                        <div className="text-xs text-muted-foreground italic border-l-2 border-blue-300 dark:border-blue-600 pl-3">
+                          {diagnosisResult.summary}
+                        </div>
+                      )}
+
+                      {/* Changes to be applied */}
+                      {diagnosisResult.has_changes && diagnosisResult.changes.length > 0 && (
+                        <div className="bg-white dark:bg-blue-950/20 border border-blue-100 dark:border-blue-800 rounded-md px-3 py-2.5">
+                          <p className="text-xs font-medium text-foreground mb-1.5">Config changes ready to apply:</p>
+                          <ul className="flex flex-col gap-1">
+                            {diagnosisResult.changes.map((c, i) => (
+                              <li key={i} className="text-xs text-muted-foreground flex gap-1.5">
+                                <span className="text-green-600 dark:text-green-400 flex-shrink-0">+</span>
+                                {c}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {/* Action buttons */}
+                      <div className="flex gap-2 pt-1">
+                        {diagnosisResult.has_changes ? (
+                          <>
+                            <Button size="sm" className="h-8 text-xs bg-blue-600 hover:bg-blue-700 text-white" onClick={applyDiagnosis}>
+                              <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
+                              Apply Fix &amp; Review Changes
+                            </Button>
+                            <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setDiagnosisOpen(false)}>
+                              Dismiss
+                            </Button>
+                          </>
+                        ) : (
+                          <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setDiagnosisOpen(false)}>
+                            Close
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 

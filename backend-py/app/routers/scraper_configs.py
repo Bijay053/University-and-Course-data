@@ -840,6 +840,349 @@ Instructions:
         raise HTTPException(status_code=500, detail=f"AI fix failed: {exc}") from exc
 
 
+# ── AI Diagnose & Fix ─────────────────────────────────────────────────────────
+
+class AiDiagnoseBody(BaseModel):
+    yaml_content: str = ""   # current editor YAML; falls back to file on disk
+    prompt: str = ""         # optional extra instruction from operator
+
+
+@router.post("/scraper-configs/{slug}/ai-diagnose")
+async def ai_diagnose_scraper_config(
+    slug: str,
+    body: AiDiagnoseBody,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _user: Annotated[dict, Depends(require_permission("settings.edit"))],
+) -> JSONResponse:
+    """Auto-diagnose scrape problems and apply AI-suggested YAML fixes.
+
+    Gathers evidence from the last scrape job (field fill rates, staged
+    course samples, quality issues) and feeds it to Gemini so it can reason
+    about root causes and apply targeted YAML fixes — no developer knowledge
+    needed by the operator.
+
+    Returns:
+        university_found  — whether we resolved the slug to a DB university
+        university_name   — matched university name
+        last_job          — summary of the most-recent scrape job
+        issues            — list of {severity, title, detail} objects
+        changes           — list of plain-English change descriptions
+        summary           — one-sentence non-technical summary
+        yaml              — complete updated YAML (may be unchanged)
+        has_changes       — whether the YAML was modified
+    """
+    _validate_slug(slug)
+    api_key = os.environ.get("GEMINI_API_KEY", "")
+    if not api_key:
+        raise HTTPException(status_code=503, detail="GEMINI_API_KEY not configured")
+
+    try:
+        from google import genai as google_genai
+        client = google_genai.Client(api_key=api_key)
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Gemini client error: {exc}") from exc
+
+    current_yaml = body.yaml_content.strip() if body.yaml_content.strip() else _read_yaml_raw(_slug_path(slug))
+    if not current_yaml:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No config found for slug '{slug}' — save it first or paste YAML into the editor",
+        )
+
+    # ── Resolve slug → university_id via hostname matching ────────────────────
+    hostname = _extract_hostname_from_yaml(current_yaml)
+    university_id: Optional[int] = None
+    university_name: str = "Unknown"
+
+    if hostname:
+        db_rows = (await db.execute(
+            text("""
+                SELECT id, name,
+                       LOWER(REGEXP_REPLACE(COALESCE(scrape_url, website, ''), '^https?://', '')) AS bare_url
+                FROM universities
+                WHERE COALESCE(scrape_url, website, '') != ''
+            """)
+        )).all()
+        h_bare = re.sub(r"^www\.", "", hostname.lower())
+        for uni_id, uni_name, bare_url in db_rows:
+            if not bare_url:
+                continue
+            url_host = re.sub(r"^www\.", "", bare_url.split("/")[0])
+            if url_host == h_bare or url_host.endswith("." + h_bare):
+                university_id = uni_id
+                university_name = uni_name or "Unknown"
+                break
+
+    # ── Gather scrape evidence ─────────────────────────────────────────────────
+    last_job_summary: dict[str, Any] = {}
+    field_fill_rates: dict[str, dict] = {}
+    staged_samples: list[dict] = []
+    quality_issues: list[str] = []
+
+    if university_id is not None:
+        from sqlalchemy import select as _sel, desc as _desc, func as _func
+        from app.models import ScrapeRuntimeJob, ScrapedCourse
+
+        # Most-recent scrape job (any status)
+        last_job = (await db.execute(
+            _sel(ScrapeRuntimeJob)
+            .where(ScrapeRuntimeJob.university_id == university_id)
+            .order_by(_desc(ScrapeRuntimeJob.created_at))
+            .limit(1)
+        )).scalar_one_or_none()
+
+        if last_job:
+            pipeline_stats: dict = (last_job.discovered_config or {}).get("pipeline_stats") or {}
+            last_job_summary = {
+                "job_id": last_job.runtime_job_id,
+                "status": last_job.status,
+                "total_found": last_job.total_found or 0,
+                "imported": last_job.imported or 0,
+                "errors": last_job.errors or 0,
+                "created_at": str(last_job.created_at)[:19] if last_job.created_at else None,
+                "raw_discovered": pipeline_stats.get("raw_discovered", last_job.total_found or 0),
+                "after_filter": pipeline_stats.get("after_filter", last_job.total_found or 0),
+                "filter_drop_count": pipeline_stats.get("filter_drop_count", 0),
+            }
+
+            # ── Field fill rates ───────────────────────────────────────────────
+            _FIELDS = [
+                "course_name", "degree_level", "category", "study_mode",
+                "course_location", "duration", "intake_months",
+                "international_fee", "description", "academic_level",
+                "academic_score", "english_test", "other_requirement",
+            ]
+            total_staged = (await db.execute(
+                _sel(_func.count()).where(ScrapedCourse.scrape_job_id == last_job.runtime_job_id)
+            )).scalar() or 0
+
+            if total_staged > 0:
+                try:
+                    from app.models.evidence import ScrapedFieldEvidence
+                    ev_rows = (await db.execute(
+                        _sel(
+                            ScrapedFieldEvidence.field_key,
+                            _func.count(ScrapedFieldEvidence.id).label("filled"),
+                        )
+                        .join(ScrapedCourse, ScrapedFieldEvidence.scraped_course_id == ScrapedCourse.id)
+                        .where(
+                            ScrapedCourse.scrape_job_id == last_job.runtime_job_id,
+                            ScrapedFieldEvidence.selected.is_(True),
+                            ScrapedFieldEvidence.field_key.in_(_FIELDS),
+                        )
+                        .group_by(ScrapedFieldEvidence.field_key)
+                    )).all()
+                    filled_map = {r.field_key: r.filled for r in ev_rows}
+                    for f in _FIELDS:
+                        filled = filled_map.get(f, 0)
+                        rate = round(filled / total_staged, 3)
+                        field_fill_rates[f] = {"rate": rate, "filled": filled, "total": total_staged}
+                        pct = int(rate * 100)
+                        if rate < 0.50:
+                            quality_issues.append(f"CRITICAL: {f} fill rate only {pct}% ({filled}/{total_staged} courses have this field)")
+                        elif rate < 0.80:
+                            quality_issues.append(f"WARNING: {f} fill rate {pct}% ({filled}/{total_staged} courses)")
+                except Exception as _e:
+                    log.warning("ai_diagnose: evidence query failed: %s", _e)
+
+                # ── Staged samples (lowest completeness first) ─────────────────
+                sample_rows = (await db.execute(
+                    _sel(ScrapedCourse)
+                    .where(ScrapedCourse.scrape_job_id == last_job.runtime_job_id)
+                    .order_by(ScrapedCourse.completeness.asc())
+                    .limit(6)
+                )).scalars().all()
+                for r in sample_rows:
+                    missing = [
+                        f for f, v in [
+                            ("international_fee", r.international_fee),
+                            ("study_mode", r.study_mode),
+                            ("course_location", r.course_location),
+                            ("intake_months", r.intake_months),
+                            ("duration", r.duration),
+                            ("degree_level", r.degree_level),
+                            ("academic_level", r.academic_level),
+                        ] if not v
+                    ]
+                    staged_samples.append({
+                        "name": (r.course_name or "unnamed")[:80],
+                        "completeness_pct": int((r.completeness or 0) * 100),
+                        "missing_fields": missing,
+                        "auto_publish_status": r.auto_publish_status or "unknown",
+                    })
+
+            # ── Zero-discovery check ───────────────────────────────────────────
+            raw_disc = last_job_summary["raw_discovered"]
+            after_filter = last_job_summary["after_filter"]
+            if raw_disc == 0:
+                quality_issues.insert(0, "CRITICAL: Zero courses discovered — site is likely JavaScript-rendered (BFS/static crawling returned nothing)")
+            elif raw_disc > 10 and after_filter == 0:
+                quality_issues.insert(0, f"CRITICAL: Discovery found {raw_disc} URLs but URL filter dropped ALL of them — filter config is too restrictive")
+            elif total_staged == 0 and raw_disc > 0:
+                quality_issues.insert(0, f"CRITICAL: {raw_disc} URLs discovered but 0 courses staged — extraction failing on all pages")
+
+    # ── Build Gemini prompt ────────────────────────────────────────────────────
+    defaults_excerpt = _read_yaml_raw(_DEFAULTS_FILE)[:4000]
+
+    job_block = "No scrape jobs found for this university yet — config has never been run." if not last_job_summary else (
+        f"  Status: {last_job_summary['status']}\n"
+        f"  Raw URLs discovered: {last_job_summary['raw_discovered']}\n"
+        f"  URLs after URL-filter: {last_job_summary['after_filter']}\n"
+        f"  Courses staged (extracted): {last_job_summary['imported']}\n"
+        f"  Errors: {last_job_summary['errors']}\n"
+        f"  Run date: {last_job_summary.get('created_at', 'unknown')}"
+    )
+    fill_block = "\n".join(
+        f"  {f}: {int(d['rate'] * 100)}%  ({d['filled']}/{d['total']} courses)"
+        for f, d in field_fill_rates.items()
+    ) or "  No field fill data available (no staged courses in last job)."
+    quality_block = "\n".join(f"  - {q}" for q in quality_issues) or "  No critical issues detected from data."
+    samples_block = "\n".join(
+        f"  [{i+1}] {s['name']}  completeness={s['completeness_pct']}%  missing=[{', '.join(s['missing_fields']) or 'none'}]  status={s['auto_publish_status']}"
+        for i, s in enumerate(staged_samples)
+    ) or "  No staged courses to sample."
+
+    extra_instr = f"\n\nOperator's additional note: {body.prompt.strip()}" if body.prompt.strip() else ""
+
+    gemini_prompt = f"""You are a senior university-scraper engineer. Your job is to diagnose why a scrape produced poor results and apply precise YAML config fixes. A non-developer operator will read your diagnosis — explain things in plain, simple English.
+
+=== YAML SETTINGS REFERENCE (available keys and their meaning) ===
+{defaults_excerpt}
+=== END REFERENCE ===
+
+=== UNIVERSITY BEING DIAGNOSED ===
+Name: {university_name}
+Slug: {slug}
+
+=== LAST SCRAPE JOB STATISTICS ===
+{job_block}
+
+=== FIELD FILL RATES (% of staged courses where each field was successfully extracted) ===
+{fill_block}
+
+=== PROBLEMS DETECTED FROM DATA ===
+{quality_block}
+
+=== WORST-PERFORMING STAGED COURSES (samples with lowest completeness) ===
+{samples_block}
+
+=== CURRENT YAML CONFIG ===
+{current_yaml}
+=== END CURRENT CONFIG ==={extra_instr}
+
+Respond in this EXACT format (no markdown, no code fences):
+
+DIAGNOSIS:
+- [CRITICAL] Short issue title | Plain English explanation of the root cause based on the evidence above. Be specific — quote numbers from the stats.
+- [WARNING] Short issue title | Explanation.
+- [INFO] Short issue title | Explanation.
+(one bullet per distinct issue; omit severity levels that don't apply)
+
+CHANGES:
+- Describe each YAML key you added/changed and why it fixes the problem.
+(one bullet per change; write "No changes needed" if config is already correct)
+
+SUMMARY:
+One plain-English sentence for a non-developer: what was wrong and what was fixed.
+
+YAML:
+(complete updated YAML with fixes applied — preserve all existing comments and keys)
+
+Rules:
+- Only fix things supported by the SETTINGS REFERENCE.
+- If 0 courses discovered → consider: always_browser_discover, use_stealth_browser, seed_urls.
+- If URLs filtered to 0 → relax or remove allow_url_patterns / must_contain / block_url_patterns.
+- If field fill rates < 50% → add extraction hints, AI extraction config, or PDF config.
+- If no changes needed → output the original YAML unchanged and say so in SUMMARY.
+- The YAML section must be valid YAML.
+- Do NOT invent YAML keys that are not in the SETTINGS REFERENCE."""
+
+    try:
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=gemini_prompt,
+        )
+        raw_text: str = (response.text or "").strip()
+
+        # ── Parse structured sections ──────────────────────────────────────────
+        def _section(text: str, header: str) -> str:
+            m = re.search(
+                rf"^{re.escape(header)}\s*\n(.*?)(?=\n[A-Z]+:|\Z)",
+                text, re.MULTILINE | re.DOTALL,
+            )
+            return m.group(1).strip() if m else ""
+
+        diagnosis_raw = _section(raw_text, "DIAGNOSIS")
+        changes_raw = _section(raw_text, "CHANGES")
+        summary_raw = _section(raw_text, "SUMMARY")
+        yaml_raw = _section(raw_text, "YAML")
+
+        # Strip fences Gemini may add despite instructions
+        if yaml_raw.startswith("```"):
+            yaml_raw = re.sub(r"^```(?:yaml)?\n?", "", yaml_raw)
+            yaml_raw = re.sub(r"\n?```$", "", yaml_raw.strip())
+        yaml_raw = yaml_raw.strip()
+
+        # Validate; fall back to original on bad YAML
+        if yaml_raw:
+            try:
+                yaml.safe_load(yaml_raw)
+            except yaml.YAMLError as ye:
+                log.warning("ai_diagnose: Gemini produced invalid YAML for %r: %s", slug, ye)
+                yaml_raw = current_yaml
+                summary_raw = f"AI produced invalid YAML ({ye}); original config preserved unchanged."
+
+        # ── Parse diagnosis bullets into structured items ───────────────────
+        issues: list[dict] = []
+        for raw_line in diagnosis_raw.splitlines():
+            line = raw_line.strip().lstrip("- ").strip()
+            if not line:
+                continue
+            line_upper = line.upper()
+            if "[CRITICAL]" in line_upper[:20]:
+                severity = "critical"
+            elif "[WARNING]" in line_upper[:20]:
+                severity = "warning"
+            elif "[INFO]" in line_upper[:20]:
+                severity = "info"
+            else:
+                severity = "info"
+            cleaned = re.sub(r"\[(CRITICAL|WARNING|INFO)\]\s*", "", line, flags=re.IGNORECASE).strip()
+            parts = cleaned.split("|", 1)
+            issues.append({
+                "severity": severity,
+                "title": parts[0].strip(),
+                "detail": parts[1].strip() if len(parts) > 1 else "",
+            })
+
+        # ── Parse changes list ────────────────────────────────────────────
+        changes_list = [
+            ln.strip().lstrip("- ").strip()
+            for ln in changes_raw.splitlines()
+            if ln.strip().lstrip("- ").strip()
+        ]
+
+        has_changes = bool(yaml_raw) and yaml_raw != current_yaml.strip()
+
+        return JSONResponse(content={
+            "university_found": university_id is not None,
+            "university_name": university_name,
+            "university_id": university_id,
+            "last_job": last_job_summary or None,
+            "issues": issues,
+            "changes": changes_list,
+            "summary": summary_raw,
+            "yaml": yaml_raw or current_yaml,
+            "has_changes": has_changes,
+        })
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        log.exception("Gemini ai_diagnose failed for slug=%r", slug)
+        raise HTTPException(status_code=500, detail=f"AI diagnosis failed: {exc}") from exc
+
+
 @router.post("/scraper-configs/generate")
 async def generate_scraper_config(
     body: GenerateConfigBody,
