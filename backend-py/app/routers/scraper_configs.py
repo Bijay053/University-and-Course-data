@@ -36,6 +36,7 @@ router = APIRouter()
 
 _UNIS_DIR = Path(__file__).parent.parent.parent / "scraper_config" / "unis"
 _DEFAULTS_FILE = Path(__file__).parent.parent.parent / "scraper_config" / "defaults.yaml"
+_TEMPLATE_FILE = Path(__file__).parent.parent.parent / "scraper_config" / "_template.yaml"
 
 _SLUG_RE = re.compile(r"^[a-z0-9_-]{1,64}$")
 
@@ -1136,12 +1137,12 @@ async def ai_fix_scraper_config(
             "Use them as style and structure references:\n\n" + "\n\n".join(parts)
         )
 
-    defaults_excerpt = _read_yaml_raw(_DEFAULTS_FILE)[:4000]
+    settings_reference = _read_yaml_raw(_TEMPLATE_FILE)[:10000]
 
     prompt = f"""You are an expert at configuring university web scrapers using YAML config files.
 
-SETTINGS REFERENCE (available keys and their meaning):
-{defaults_excerpt}
+SETTINGS REFERENCE (every available key with comments and examples):
+{settings_reference}
 {examples_block}
 
 Current YAML config for this university:
@@ -1461,7 +1462,7 @@ async def ai_diagnose_scraper_config(
         )
 
     # ── Build Gemini prompt ────────────────────────────────────────────────────
-    defaults_excerpt = _read_yaml_raw(_DEFAULTS_FILE)[:4000]
+    settings_reference = _read_yaml_raw(_TEMPLATE_FILE)[:10000]
 
     admin_cfg_block = ""
     if admin_config_json:
@@ -1506,8 +1507,8 @@ async def ai_diagnose_scraper_config(
 
 IMPORTANT: The "PROBLEMS DETECTED FROM DATA" section below contains machine-verified facts. You MUST include every CRITICAL issue listed there in your DIAGNOSIS. Do not dismiss or ignore data-verified problems.
 
-=== YAML SETTINGS REFERENCE (available keys and their meaning) ===
-{defaults_excerpt}
+=== YAML SETTINGS REFERENCE (every available key with comments and examples) ===
+{settings_reference}
 === END REFERENCE ==={examples_section}{live_page_block}
 
 === UNIVERSITY BEING DIAGNOSED ===
