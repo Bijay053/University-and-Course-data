@@ -1781,18 +1781,18 @@ export default function SettingsScraperConfigs() {
             </div>
           ) : (
             <>
-              <div className="px-4 py-2 border-b flex items-center gap-3">
-                <div className="flex-1 flex items-center gap-2">
+              <div className="px-4 py-2 border-b flex flex-wrap items-center gap-x-3 gap-y-2">
+                <div className="flex items-center gap-2 min-w-0 flex-shrink-0">
                   <Label className="text-xs text-muted-foreground whitespace-nowrap">Slug</Label>
                   <Input
-                    className="h-7 text-xs font-mono w-48"
+                    className="h-7 text-xs font-mono w-36"
                     value={editorSlug}
                     onChange={e => setEditorSlug(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ""))}
                     placeholder="e.g. myuniversity"
                   />
-                  <span className="text-xs text-muted-foreground">→ scraper_config/unis/{editorSlug || "…"}.yaml</span>
+                  <span className="text-xs text-muted-foreground hidden md:inline truncate max-w-[180px]" title={`scraper_config/unis/${editorSlug || "…"}.yaml`}>→ scraper_config/unis/{editorSlug || "…"}.yaml</span>
                 </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
+                <div className="flex items-center gap-1.5 flex-wrap flex-1 justify-end">
                   {/* Trigger scrape button + status in editor header */}
                   {selected && (
                     <div className="flex items-center gap-2">
