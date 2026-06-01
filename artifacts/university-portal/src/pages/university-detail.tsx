@@ -1976,6 +1976,30 @@ export default function UniversityDetail() {
         </div>
       </div>
 
+
+      {/* Tab Bar */}
+      <div className="border-b flex gap-0 overflow-x-auto">
+        {TABS.map((t) => (
+          <button
+            key={t.key}
+            onClick={() => switchTab(t.key)}
+            className={`flex items-center gap-2 px-5 py-3 text-sm font-medium border-b-2 transition-colors -mb-px whitespace-nowrap ${
+              tab === t.key
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground hover:border-gray-200"
+            }`}
+          >
+            {t.icon}
+            {t.label}
+            {t.key === "courses" && total > 0 && (
+              <span className="ml-1 text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-semibold">
+                {total}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
       {/* ── Probe Status Card ── */}
       {tab === "intelligence" && !!probeResult?.probe_result && (
         <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm space-y-3">
@@ -3322,30 +3346,6 @@ export default function UniversityDetail() {
           )}
         </div>
       )}
-
-      {/* Tab Bar */}
-      <div className="border-b flex gap-0 overflow-x-auto">
-        {TABS.map((t) => (
-          <button
-            key={t.key}
-            onClick={() => switchTab(t.key)}
-            className={`flex items-center gap-2 px-5 py-3 text-sm font-medium border-b-2 transition-colors -mb-px whitespace-nowrap ${
-              tab === t.key
-                ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:text-foreground hover:border-gray-200"
-            }`}
-          >
-            {t.icon}
-            {t.label}
-            {t.key === "courses" && total > 0 && (
-              <span className="ml-1 text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-semibold">
-                {total}
-              </span>
-            )}
-          </button>
-        ))}
-      </div>
-
       {/* ── COURSES TAB ── */}
       {tab === "courses" && (
         <div className="space-y-3">
