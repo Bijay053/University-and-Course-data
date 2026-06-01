@@ -57,7 +57,10 @@ async def performance_summary(
             COUNT(*) FILTER (WHERE browser_retry_fired)               AS browser_count,
             COUNT(*) FILTER (WHERE quality_optimizer_fired)           AS p7_count,
             COUNT(*) FILTER (WHERE human_intervention_needed)         AS human_count,
-            SUM(p7_inline_improved)                                   AS total_p7_improved
+            SUM(p7_inline_improved)                                   AS total_p7_improved,
+            MIN(recorded_at)                                          AS oldest_at,
+            MAX(recorded_at)                                          AS newest_at,
+            COUNT(*) FILTER (WHERE recorded_at >= NOW() - interval '7 days') AS count_7d
         FROM scrape_performance_ledger
         WHERE recorded_at >= NOW() - (:days || ' days')::INTERVAL
     """), {"days": str(days)})).mappings().first())
@@ -65,6 +68,12 @@ async def performance_summary(
     jobs_below = _i(row.get("jobs_below_85_start"))
     crossed = _i(row.get("jobs_crossed_85"))
     conversion_rate = round(crossed / jobs_below, 3) if jobs_below else 0.0
+
+    oldest_at = row.get("oldest_at")
+    newest_at = row.get("newest_at")
+    # True when ALL data in the table fits inside the shortest selectable window (7d).
+    # Used by the UI to show a "history still accumulating" notice.
+    all_within_7d = _i(row.get("count_7d")) >= _i(row.get("total_jobs")) and _i(row.get("total_jobs")) > 0
 
     return {
         "period_days": days,
@@ -81,6 +90,9 @@ async def performance_summary(
         "total_gemini_cost_usd": _f(row.get("total_gemini_cost"), 4),
         "total_patterns_reused": _i(row.get("total_patterns_reused")),
         "total_p7_inline_improved": _i(row.get("total_p7_improved")),
+        "oldest_recorded_at": oldest_at.isoformat() if oldest_at else None,
+        "newest_recorded_at": newest_at.isoformat() if newest_at else None,
+        "all_within_7d": all_within_7d,
         "recovery_counts": {
             "cascade": _i(row.get("cascade_count")),
             "repair_extractor": _i(row.get("repair_count")),

@@ -48,6 +48,9 @@ type Summary = {
   total_gemini_cost_usd: number;
   total_patterns_reused: number;
   total_p7_inline_improved: number;
+  oldest_recorded_at: string | null;
+  newest_recorded_at: string | null;
+  all_within_7d: boolean;
   recovery_counts: Record<string, number>;
 };
 
@@ -284,6 +287,23 @@ export default function PerformancePage() {
           </Button>
         </div>
       </div>
+
+      {/* Data-range notice — shown when all history fits within 7d so the user
+          understands why the period buttons don't change the numbers yet */}
+      {summary && summary.all_within_7d && (
+        <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800 flex items-start gap-2">
+          <span className="mt-0.5 shrink-0">ℹ️</span>
+          <span>
+            All {summary.total_jobs} recorded jobs fall within the last 7 days
+            {summary.oldest_recorded_at
+              ? ` (earliest: ${new Date(summary.oldest_recorded_at).toLocaleDateString()})`
+              : ""
+            }
+            , so the 7d / 30d / 90d totals are identical right now.
+            The filter will show different numbers once history accumulates beyond 7 days.
+          </span>
+        </div>
+      )}
 
       {error && (
         <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
