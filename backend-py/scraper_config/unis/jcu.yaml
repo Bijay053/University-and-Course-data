@@ -9,7 +9,8 @@ discovery:
   seed_urls:
     - https://www.jcu.edu.au/courses
 
-  bfs_page_budget: 0
+  # BFS is skipped for this JS-heavy site. Setting to null to use default if ever reconsidered.
+  bfs_page_budget: null
   browser_early_stop_courses: 180
   max_candidates: 220
 
@@ -47,11 +48,13 @@ discovery:
       - '^/courses/[a-z0-9-]+/?$'
 
     block_url_patterns:
-      - '/courses/study/'
-      - '/courses/undergraduate$'
-      - '/courses/postgraduate$'
-      - '/courses/research$'
       - '/linkassets/'
+      # Removed specific listing pages from block_url_patterns to allow browser discovery to traverse them.
+      # They are navigation pages leading to course pages, not actual course pages themselves.
+      # - '/courses/undergraduate$'
+      # - '/courses/postgraduate$'
+      # - '/courses/research$'
+      - '/courses/study/'
       - '/news'
       - '/events'
       - '/staff/'
@@ -67,10 +70,12 @@ discovery:
 
   block_url_patterns:
     - '/linkassets/'
+    # Removed specific listing pages from block_url_patterns to allow browser discovery to traverse them.
+    # They are navigation pages leading to course pages, not actual course pages themselves.
+    # - '/courses/undergraduate$'
+    # - '/courses/postgraduate$'
+    # - '/courses/research$'
     - '/courses/study/'
-    - '/courses/undergraduate$'
-    - '/courses/postgraduate$'
-    - '/courses/research$'
     - '/news'
     - '/events'
     - '/staff/'

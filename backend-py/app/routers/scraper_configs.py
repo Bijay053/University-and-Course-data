@@ -141,6 +141,51 @@ async def _load_example_yamls(db: AsyncSession, exclude_slug: str, max_examples:
     return examples
 
 
+async def _fetch_live_page_sample(url: str, max_chars: int = 5000) -> str:
+    """Fetch a live URL and return stripped readable text for AI analysis.
+
+    Returns an empty string on any network / parse error (non-fatal).
+    Used to give the AI real page content when 0 courses are staged.
+    """
+    try:
+        import httpx
+        from bs4 import BeautifulSoup
+        headers = {
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/124.0.0.0 Safari/537.36"
+            ),
+            "Accept-Language": "en-US,en;q=0.9",
+        }
+        async with httpx.AsyncClient(follow_redirects=True, timeout=12.0) as client:
+            resp = await client.get(url, headers=headers)
+        if resp.status_code >= 400:
+            return f"[HTTP {resp.status_code} fetching {url}]"
+        soup = BeautifulSoup(resp.text, "html.parser")
+        # Remove script / style noise
+        for tag in soup(["script", "style", "noscript", "meta", "link", "svg"]):
+            tag.decompose()
+        text = soup.get_text(separator="\n", strip=True)
+        # Collapse blank lines
+        lines = [l for l in text.splitlines() if l.strip()]
+        return "\n".join(lines)[:max_chars]
+    except Exception as exc:
+        log.warning("_fetch_live_page_sample(%s) failed: %s", url, exc)
+        return f"[Could not fetch {url}: {exc}]"
+
+
+def _extract_seed_urls_from_yaml(yaml_text: str) -> list[str]:
+    """Extract seed_urls list from a YAML string; returns empty list on error."""
+    try:
+        data = yaml.safe_load(yaml_text) or {}
+        disc = data.get("discovery", {}) or {}
+        seeds = disc.get("seed_urls", []) or []
+        return [s for s in seeds if isinstance(s, str) and s.startswith("http")]
+    except Exception:
+        return []
+
+
 def _slug_path(slug: str) -> Path:
     return _UNIS_DIR / f"{slug}.yaml"
 
@@ -1123,15 +1168,27 @@ async def ai_diagnose_scraper_config(
                         "auto_publish_status": r.auto_publish_status or "unknown",
                     })
 
-            # ── Zero-discovery check ───────────────────────────────────────────
+            # ── Zero-discovery / zero-staging check ───────────────────────────
             raw_disc = last_job_summary["raw_discovered"]
             after_filter = last_job_summary["after_filter"]
             if raw_disc == 0:
-                quality_issues.insert(0, "CRITICAL: Zero courses discovered — site is likely JavaScript-rendered (BFS/static crawling returned nothing)")
+                quality_issues.insert(0, "CRITICAL: Zero courses discovered — site is likely JavaScript-rendered (BFS/static crawling returned nothing). Enable always_browser_discover and use_stealth_browser.")
             elif raw_disc > 10 and after_filter == 0:
-                quality_issues.insert(0, f"CRITICAL: Discovery found {raw_disc} URLs but URL filter dropped ALL of them — filter config is too restrictive")
+                quality_issues.insert(0, f"CRITICAL: Discovery found {raw_disc} URLs but URL filter dropped ALL of them — allow_url_patterns or must_contain is too restrictive. Remove or relax those filters.")
             elif total_staged == 0 and raw_disc > 0:
-                quality_issues.insert(0, f"CRITICAL: {raw_disc} URLs discovered but 0 courses staged — extraction failing on all pages")
+                quality_issues.insert(0, (
+                    f"CRITICAL: {raw_disc} URLs discovered, {after_filter} passed URL-filter, but 0 courses were staged — "
+                    "the extraction step is failing on every page. Root causes to check: "
+                    "(1) block_url_patterns is blocking actual course-detail pages, only listing/navigation pages should pass, "
+                    "(2) allow_url_patterns is too strict and is passing only navigation pages not course pages, "
+                    "(3) the site uses JavaScript rendering so pages arrive empty — enable always_browser_discover+use_stealth_browser, "
+                    "(4) extraction selectors don't match the site's HTML structure."
+                ))
+            elif last_job_summary["imported"] < 10 and raw_disc > 20:
+                quality_issues.append(
+                    f"WARNING: Only {last_job_summary['imported']} courses staged out of {raw_disc} discovered — "
+                    "very low staging rate suggests URL-filters are admitting navigation/listing pages instead of course-detail pages."
+                )
 
     # ── Detect critical admin-config issues (DB scrape_config JSON) ───────────
     admin_config_issues: list[str] = []
@@ -1161,6 +1218,36 @@ async def ai_diagnose_scraper_config(
                 f"WARNING: Only {staged} courses staged but admin config expects ≥{min_expected} — "
                 f"staged count is less than 30% of expected. A filter or discovery problem is likely."
             )
+
+    # ── Fetch live page sample when 0 staged (gives AI real HTML to analyse) ──
+    live_page_block = ""
+    if last_job_summary and last_job_summary.get("imported", 0) == 0:
+        seed_urls = _extract_seed_urls_from_yaml(current_yaml)
+        # Also try the university website URL from DB
+        if university_id and not seed_urls:
+            try:
+                uni_row = (await db.execute(
+                    text("SELECT COALESCE(scrape_url, website, '') AS url FROM universities WHERE id = :uid"),
+                    {"uid": university_id}
+                )).one_or_none()
+                if uni_row and uni_row.url:
+                    seed_urls = [uni_row.url]
+            except Exception:
+                pass
+        if seed_urls:
+            fetch_url = seed_urls[0]
+            log.info("ai_diagnose: fetching live sample from %s (0 staged)", fetch_url)
+            page_text = await _fetch_live_page_sample(fetch_url, max_chars=4500)
+            if page_text and not page_text.startswith("[Could not"):
+                live_page_block = (
+                    f"\n=== LIVE PAGE SAMPLE (fetched from {fetch_url}) ===\n"
+                    "This is the actual text content of the university's seed URL. "
+                    "Use it to understand the site structure and why extraction is failing:\n\n"
+                    + page_text
+                    + "\n=== END LIVE PAGE SAMPLE ==="
+                )
+            else:
+                live_page_block = f"\n=== LIVE PAGE SAMPLE ===\n{page_text}\n=== END ==="
 
     # ── Load successful YAML examples for AI context ───────────────────────────
     examples = await _load_example_yamls(db, exclude_slug=slug, max_examples=3)
@@ -1218,11 +1305,16 @@ async def ai_diagnose_scraper_config(
 
     extra_instr = f"\n\nOperator's additional note: {body.prompt.strip()}" if body.prompt.strip() else ""
 
-    gemini_prompt = f"""You are a senior university-scraper engineer. Your job is to diagnose why a scrape produced poor results and apply precise YAML config fixes. A non-developer operator will read your diagnosis — explain things in plain, simple English.
+    gemini_prompt = f"""You are a senior university-scraper engineer and AI agent. Your job is to:
+1. Diagnose EXACTLY why the scrape produced poor results — use the evidence data, do NOT contradict it
+2. Apply precise YAML fixes that would actually solve the root cause
+3. Explain the diagnosis in plain English for a non-developer operator
+
+IMPORTANT: The "PROBLEMS DETECTED FROM DATA" section below contains machine-verified facts. You MUST include every CRITICAL issue listed there in your DIAGNOSIS. Do not dismiss or ignore data-verified problems.
 
 === YAML SETTINGS REFERENCE (available keys and their meaning) ===
 {defaults_excerpt}
-=== END REFERENCE ==={examples_section}
+=== END REFERENCE ==={examples_section}{live_page_block}
 
 === UNIVERSITY BEING DIAGNOSED ===
 Name: {university_name}
@@ -1235,7 +1327,7 @@ Slug: {slug}
 === FIELD FILL RATES (% of staged courses where each field was successfully extracted) ===
 {fill_block}
 
-=== PROBLEMS DETECTED FROM DATA ===
+=== PROBLEMS DETECTED FROM DATA (machine-verified — you MUST address these) ===
 {quality_block}
 
 === WORST-PERFORMING STAGED COURSES (samples with lowest completeness) ===
@@ -1248,29 +1340,29 @@ Slug: {slug}
 Respond in this EXACT format (no markdown, no code fences):
 
 DIAGNOSIS:
-- [CRITICAL] Short issue title | Plain English explanation of the root cause based on the evidence above. Be specific — quote numbers from the stats.
+- [CRITICAL] Short issue title | Plain English explanation of the root cause based on the evidence above. Quote numbers from the stats. Be specific.
 - [WARNING] Short issue title | Explanation.
 - [INFO] Short issue title | Explanation.
-(one bullet per distinct issue; omit severity levels that don't apply)
+(one bullet per distinct issue)
 
 CHANGES:
-- Describe each YAML key you added/changed and why it fixes the problem.
-(one bullet per change; write "No changes needed" if config is already correct)
+- Describe each YAML key you added/changed and WHY it fixes the specific problem you diagnosed.
+(one bullet per change; write "No changes needed" if truly no issues exist)
 
 SUMMARY:
-One plain-English sentence for a non-developer: what was wrong and what was fixed.
+One plain-English sentence: what was wrong and what the fix does.
 
 YAML:
-(complete updated YAML with fixes applied — preserve all existing comments and keys)
+(complete updated YAML with all fixes applied — preserve all existing comments and keys)
 
 Rules:
-- Only fix things supported by the SETTINGS REFERENCE.
-- If 0 courses discovered → consider: always_browser_discover, use_stealth_browser, seed_urls.
-- If URLs filtered to 0 → relax or remove allow_url_patterns / must_contain / block_url_patterns.
-- If field fill rates < 50% → add extraction hints, AI extraction config, or PDF config.
-- If no changes needed → output the original YAML unchanged and say so in SUMMARY.
-- The YAML section must be valid YAML.
-- Do NOT invent YAML keys that are not in the SETTINGS REFERENCE."""
+- You MUST include every CRITICAL issue from "PROBLEMS DETECTED FROM DATA" in your DIAGNOSIS.
+- If 0 courses staged but URLs were found: block_url_patterns may be blocking course-detail pages, or the site needs browser rendering. Look at the LIVE PAGE SAMPLE if provided.
+- If the LIVE PAGE SAMPLE shows JavaScript-heavy content or empty body: set always_browser_discover: true and use_stealth_browser: true.
+- If the LIVE PAGE SAMPLE shows course links at specific URL patterns: update allow_url_patterns to match those patterns.
+- If field fill rates < 50%: add extraction.hints or extraction.ai config.
+- Only use YAML keys from the SETTINGS REFERENCE — do NOT invent keys.
+- Preserve all existing comments and structure unless replacing them with better ones."""
 
     try:
         raw_text = await _call_gemini_with_retry(client, gemini_prompt)
@@ -1326,6 +1418,37 @@ Rules:
                 "detail": parts[1].strip() if len(parts) > 1 else "",
             })
 
+        # ── Merge deterministic issues Gemini may have missed ─────────────
+        # Machine-verified problems are ground truth — inject any that Gemini
+        # didn't mention so operators always see the real data-backed issues.
+        existing_titles_lower = {i["title"].lower() for i in issues}
+
+        def _inject_if_missing(raw_issue: str, severity: str) -> None:
+            parts = raw_issue.split("|", 1) if "|" in raw_issue else [raw_issue]
+            title = re.sub(r"^CRITICAL:\s*|^WARNING:\s*|^INFO:\s*", "", parts[0], flags=re.IGNORECASE).strip()
+            detail = parts[1].strip() if len(parts) > 1 else parts[0].strip()
+            # Check if Gemini already covered this (fuzzy — first 6 words)
+            key = " ".join(title.lower().split()[:6])
+            already_covered = any(key in t for t in existing_titles_lower)
+            if not already_covered:
+                issues.insert(0 if severity == "critical" else len(issues), {
+                    "severity": severity,
+                    "title": title[:120],
+                    "detail": detail,
+                })
+
+        for qi in quality_issues:
+            if qi.upper().startswith("CRITICAL"):
+                _inject_if_missing(qi, "critical")
+            elif qi.upper().startswith("WARNING"):
+                _inject_if_missing(qi, "warning")
+
+        for ai_issue in admin_config_issues:
+            if ai_issue.upper().startswith("CRITICAL"):
+                _inject_if_missing(ai_issue, "critical")
+            elif ai_issue.upper().startswith("WARNING"):
+                _inject_if_missing(ai_issue, "warning")
+
         # ── Parse changes list ────────────────────────────────────────────
         changes_list = [
             ln.strip().lstrip("- ").strip()
@@ -1334,6 +1457,13 @@ Rules:
         ]
 
         has_changes = bool(yaml_raw) and yaml_raw != current_yaml.strip()
+
+        # If deterministic issues exist but Gemini said no changes — flag it
+        crit_count = sum(1 for i in issues if i["severity"] == "critical")
+        if crit_count > 0 and not has_changes and not changes_list:
+            changes_list = ["⚠ AI could not determine automatic YAML fixes for the detected issues — review the CRITICAL items above and adjust config manually or add an operator note describing the problem."]
+            if not summary_raw:
+                summary_raw = f"{crit_count} critical issue(s) detected from scrape data — manual review needed."
 
         return JSONResponse(content={
             "university_found": university_id is not None,
