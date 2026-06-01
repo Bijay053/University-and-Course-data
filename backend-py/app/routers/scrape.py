@@ -201,6 +201,76 @@ async def _attach_evidence_bulk(
         d["evidence"] = grouped.get(d["id"], [])
 
 
+# English-test field names that may be suppressed when only inherited
+_ENGLISH_TEST_FIELDS = [
+    "toefl_overall", "pte_overall", "cambridge_overall",
+    "duolingo_overall", "ielts_overall",
+]
+_ENGLISH_TEST_RESPONSE_KEYS = {
+    "toefl_overall":     ("toeflOverall", "toefl_overall"),
+    "pte_overall":       ("pteOverall", "pte_overall"),
+    "cambridge_overall": ("cambridgeOverall", "cambridge_overall"),
+    "duolingo_overall":  ("duolingoOverall", "duolingo_overall"),
+    "ielts_overall":     ("ieltsOverall", "ielts_overall"),
+}
+
+
+async def _apply_inherited_suppression(
+    db: AsyncSession,
+    course_dicts: list[dict],
+) -> None:
+    """Null out English-test scores that were only inherited (not freshly scraped).
+
+    When a value like toefl_overall has NO freshly-scraped evidence — only
+    'approved row:inherited' rows carried over from a prior approval — it
+    should NOT appear in the table as if it was confirmed by the current
+    scrape.  We detect this by checking whether ALL evidence rows for the
+    field have an extraction_method that contains 'inherited'.
+
+    Any field that also has at least one non-inherited evidence row is left
+    intact (fresh evidence confirms the value is still present on the site).
+    """
+    if not course_dicts:
+        return
+    ids = [d["id"] for d in course_dicts if d.get("id") is not None]
+    if not ids:
+        return
+
+    from sqlalchemy import text as _t
+    # Find (course_id, field_key) pairs where EVERY evidence row is inherited
+    rows = (await db.execute(
+        _t("""
+            SELECT scraped_course_id, field_key
+            FROM scraped_field_evidence
+            WHERE scraped_course_id = ANY(:ids)
+              AND field_key = ANY(:fields)
+            GROUP BY scraped_course_id, field_key
+            HAVING COUNT(*) > 0
+               AND COUNT(*) = COUNT(
+                   CASE WHEN extraction_method ILIKE '%inherited%' THEN 1 END
+               )
+        """),
+        {"ids": ids, "fields": _ENGLISH_TEST_FIELDS},
+    )).all()
+
+    if not rows:
+        return
+
+    # Build: {course_id -> set of field_keys to suppress}
+    suppress: dict[int, set[str]] = {}
+    for row in rows:
+        suppress.setdefault(row.scraped_course_id, set()).add(row.field_key)
+
+    for d in course_dicts:
+        cid = d.get("id")
+        if cid not in suppress:
+            continue
+        for db_field, (camel_key, snake_key) in _ENGLISH_TEST_RESPONSE_KEYS.items():
+            if db_field in suppress[cid]:
+                d[camel_key] = None
+                d[snake_key] = None
+
+
 @router.get("/jobs")
 async def list_jobs(
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -1170,7 +1240,9 @@ async def history_one(job_id: str, db: Annotated[AsyncSession, Depends(get_db)])
         "createdAt": s.created_at.isoformat() if s.created_at else None,
         "evidence": [],
     } for s in sc_rows]
-    
+    await _attach_evidence_bulk(db, staged)
+    await _apply_inherited_suppression(db, staged)
+
     return {
         "job": {
             "runtimeJobId": job.runtime_job_id,
@@ -1838,6 +1910,7 @@ async def staged_list(
     # UI expects a bare array (Array.isArray check)
     dicts = [_staged_row_to_dict(r) for r in rows]
     await _attach_evidence_bulk(db, dicts)
+    await _apply_inherited_suppression(db, dicts)
     return dicts
 
 
