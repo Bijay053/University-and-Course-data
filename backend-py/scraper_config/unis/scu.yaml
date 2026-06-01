@@ -15,6 +15,10 @@
 discovery:
   always_browser_discover: true
   always_sitemap_supplement: true
+  # Squiz Matrix SPA — uses JS rendering + Cloudflare; stealth (patchright+Xvfb)
+  # bypasses bot detection that blocks standard headless Playwright and causes
+  # intermittent 0-course discovery runs.
+  use_stealth_browser: true
   seed_urls:
     - https://www.scu.edu.au/study/undergraduate/
     - https://www.scu.edu.au/study/postgraduate/

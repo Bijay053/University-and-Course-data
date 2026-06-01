@@ -639,11 +639,13 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             db_scrape_config=uni_scrape_config,
         )
         set_uni_config(_uni_cfg)
-        log.debug(
-            "UniConfig loaded: slug=%r yaml_file=%r always_sitemap=%r",
+        log.info(
+            "UniConfig loaded: slug=%r yaml_file=%r always_browser=%r always_sitemap=%r stealth=%r",
             _uni_cfg.slug,
             f"scraper_config/unis/{_uni_cfg.slug}.yaml",
+            _uni_cfg.discovery.always_browser_discover,
             _uni_cfg.discovery.always_sitemap_supplement,
+            getattr(_uni_cfg.discovery, "use_stealth_browser", False),
         )
         # ── Log active auto_config so scrape runs are traceable ───────────────
         _ac_strategy = "unknown"  # initialise before conditional so CASCADE can always read it
