@@ -1472,7 +1472,9 @@ export default function SettingsScraperConfigs() {
       setView("diff");
       toast({ title: "AI fix applied", description: "Review the changes in the diff view, then Save when ready." });
     } catch (err) {
-      toast({ title: "AI fix failed", description: (err as Error).message, variant: "destructive" });
+      const msg = (err as Error).message;
+      const isBusy = msg.toLowerCase().includes("busy") || msg.toLowerCase().includes("try again");
+      toast({ title: isBusy ? "Gemini is busy" : "AI fix failed", description: msg, variant: "destructive" });
     } finally {
       setAiFixing(false);
     }
@@ -1504,7 +1506,9 @@ export default function SettingsScraperConfigs() {
         toast({ title: "All clear", description: "No config changes needed — the config looks correct." });
       }
     } catch (err) {
-      toast({ title: "Diagnosis failed", description: (err as Error).message, variant: "destructive" });
+      const msg = (err as Error).message;
+      const isBusy = msg.toLowerCase().includes("busy") || msg.toLowerCase().includes("try again");
+      toast({ title: isBusy ? "Gemini is busy" : "Diagnosis failed", description: msg, variant: "destructive" });
       setDiagnosisOpen(false);
     } finally {
       setDiagnosing(false);

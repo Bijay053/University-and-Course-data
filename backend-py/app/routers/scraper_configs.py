@@ -41,6 +41,105 @@ _SLUG_RE = re.compile(r"^[a-z0-9_-]{1,64}$")
 
 _HISTORY_KEEP = 100  # rows per slug retained (older rows pruned on save)
 
+# ── Gemini model config ───────────────────────────────────────────────────────
+_GEMINI_PRIMARY   = "gemini-2.5-flash"
+_GEMINI_FALLBACK  = "gemini-2.5-flash-lite"
+# transient-error signals that warrant a retry / model fallback
+_GEMINI_TRANSIENT = ("UNAVAILABLE", "503", "quota", "rate limit", "overloaded",
+                     "Resource has been exhausted", "429")
+
+
+async def _call_gemini_with_retry(client: Any, prompt: str) -> str:
+    """Call Gemini with automatic retry + model fallback on 503/UNAVAILABLE.
+
+    Strategy:
+      1. gemini-2.5-flash  — attempt 1 (immediate)
+      2. gemini-2.5-flash  — attempt 2 (after 2 s)
+      3. gemini-2.5-flash-lite — attempt 1 (immediate)
+      4. gemini-2.5-flash-lite — attempt 2 (after 2 s)
+
+    Returns the stripped text response.
+    Raises HTTPException(503) with a user-friendly message if all fail.
+    """
+    for model in (_GEMINI_PRIMARY, _GEMINI_FALLBACK):
+        for delay in (0.0, 2.0):
+            if delay:
+                await asyncio.sleep(delay)
+            try:
+                resp = client.models.generate_content(model=model, contents=prompt)
+                return (resp.text or "").strip()
+            except Exception as exc:
+                exc_s = str(exc)
+                is_transient = any(sig.lower() in exc_s.lower() for sig in _GEMINI_TRANSIENT)
+                if is_transient:
+                    log.warning("Gemini %s transient error (will retry): %s", model, exc_s[:160])
+                    continue
+                raise  # non-transient — propagate immediately
+
+    raise HTTPException(
+        status_code=503,
+        detail="Gemini is busy right now — please try again in a moment.",
+    )
+
+
+async def _load_example_yamls(db: AsyncSession, exclude_slug: str, max_examples: int = 3) -> list[dict]:
+    """Return YAML excerpts from universities with the best recent scrape results.
+
+    Only includes non-stub configs (>8 lines) that belong to universities with
+    ≥15 courses staged in their most-recent completed scrape job.
+    Limited to first 60 lines each so the token cost stays manageable.
+    """
+    rows = (await db.execute(
+        text("""
+            SELECT DISTINCT ON (srj.university_id)
+                   u.name,
+                   srj.imported,
+                   LOWER(REGEXP_REPLACE(COALESCE(u.scrape_url, u.website, ''), '^https?://', '')) AS bare_url
+            FROM   scrape_runtime_jobs srj
+            JOIN   universities u ON u.id = srj.university_id
+            WHERE  srj.status   = 'completed'
+              AND  srj.job_type = 'scrape'
+              AND  srj.imported >= 15
+            ORDER  BY srj.university_id, srj.imported DESC
+        """)
+    )).all()
+
+    # Sort by most courses staged — best examples first
+    sorted_rows = sorted(rows, key=lambda r: r.imported, reverse=True)
+
+    # Build hostname → slug map from disk
+    slug_map: dict[str, str] = {}
+    for f in _UNIS_DIR.glob("*.yaml"):
+        raw = _read_yaml_raw(f)
+        h = _extract_hostname_from_yaml(raw)
+        if h:
+            slug_map[re.sub(r"^www\.", "", h.lower())] = f.stem
+
+    examples: list[dict] = []
+    seen_slugs: set[str] = {exclude_slug}
+    for row in sorted_rows:
+        if not row.bare_url:
+            continue
+        url_host = re.sub(r"^www\.", "", row.bare_url.split("/")[0])
+        slug = slug_map.get(url_host)
+        if not slug or slug in seen_slugs:
+            continue
+        raw = _read_yaml_raw(_slug_path(slug))
+        if not raw or raw.count("\n") < 8:
+            continue  # skip stubs
+        excerpt = "\n".join(raw.splitlines()[:60])
+        examples.append({
+            "slug": slug,
+            "university_name": row.name or slug,
+            "imported_count": row.imported,
+            "yaml_excerpt": excerpt,
+        })
+        seen_slugs.add(slug)
+        if len(examples) >= max_examples:
+            break
+
+    return examples
+
 
 def _slug_path(slug: str) -> Path:
     return _UNIS_DIR / f"{slug}.yaml"
@@ -788,15 +887,29 @@ async def ai_fix_scraper_config(
             detail=f"No config found for slug '{slug}' — save it first or paste YAML into the editor",
         )
 
-    # Provide the sample YAML (full field reference) as schema context
+    # Load YAML examples from universities with good scrape results
+    examples = await _load_example_yamls(db, exclude_slug=slug, max_examples=3)
+    examples_block = ""
+    if examples:
+        parts = []
+        for ex in examples:
+            parts.append(
+                f"--- EXAMPLE: {ex['university_name']} ({ex['imported_count']} courses staged) ---\n"
+                f"{ex['yaml_excerpt']}\n"
+                f"--- END EXAMPLE ---"
+            )
+        examples_block = (
+            "\n\nThe following are YAML configs from universities whose scrapes work well. "
+            "Use them as style and structure references:\n\n" + "\n\n".join(parts)
+        )
+
     defaults_excerpt = _read_yaml_raw(_DEFAULTS_FILE)[:4000]
 
     prompt = f"""You are an expert at configuring university web scrapers using YAML config files.
 
-The following excerpt shows available settings and their documented meanings:
---- SETTINGS REFERENCE ---
+SETTINGS REFERENCE (available keys and their meaning):
 {defaults_excerpt}
---- END REFERENCE ---
+{examples_block}
 
 Current YAML config for this university:
 --- CURRENT CONFIG ---
@@ -814,11 +927,7 @@ Instructions:
 - Output ONLY the complete updated YAML — no markdown fences, no explanation, no preamble."""
 
     try:
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=prompt,
-        )
-        yaml_text: str = (response.text or "").strip()
+        yaml_text = await _call_gemini_with_retry(client, prompt)
         # Strip markdown fences if Gemini wrapped them anyway
         if yaml_text.startswith("```"):
             yaml_text = re.sub(r"^```(?:yaml)?\n?", "", yaml_text)
@@ -894,23 +1003,26 @@ async def ai_diagnose_scraper_config(
     university_id: Optional[int] = None
     university_name: str = "Unknown"
 
+    admin_config_json: dict = {}  # DB scrape_config for this university (if found)
     if hostname:
         db_rows = (await db.execute(
             text("""
-                SELECT id, name,
+                SELECT id, name, scrape_config,
                        LOWER(REGEXP_REPLACE(COALESCE(scrape_url, website, ''), '^https?://', '')) AS bare_url
                 FROM universities
                 WHERE COALESCE(scrape_url, website, '') != ''
             """)
         )).all()
         h_bare = re.sub(r"^www\.", "", hostname.lower())
-        for uni_id, uni_name, bare_url in db_rows:
+        for row in db_rows:
+            uni_id, uni_name, uni_scrape_config, bare_url = row
             if not bare_url:
                 continue
             url_host = re.sub(r"^www\.", "", bare_url.split("/")[0])
             if url_host == h_bare or url_host.endswith("." + h_bare):
                 university_id = uni_id
                 university_name = uni_name or "Unknown"
+                admin_config_json = uni_scrape_config or {}
                 break
 
     # ── Gather scrape evidence ─────────────────────────────────────────────────
@@ -1021,8 +1133,70 @@ async def ai_diagnose_scraper_config(
             elif total_staged == 0 and raw_disc > 0:
                 quality_issues.insert(0, f"CRITICAL: {raw_disc} URLs discovered but 0 courses staged — extraction failing on all pages")
 
+    # ── Detect critical admin-config issues (DB scrape_config JSON) ───────────
+    admin_config_issues: list[str] = []
+    if admin_config_json:
+        extr_cfg = admin_config_json.get("extraction", {}) or {}
+        filters_cfg = extr_cfg.get("filters", {}) or {}
+        online_only = filters_cfg.get("online_only", {}) or {}
+        if online_only.get("enabled"):
+            admin_config_issues.append(
+                "CRITICAL: online_only filter is ENABLED in the DB admin config — "
+                "only online/distance courses are kept; ALL on-campus courses are silently discarded. "
+                "This is the most common cause of a suspiciously low staged count. "
+                "Fix: go to the university's admin config and set online_only.enabled to false."
+            )
+        domestic_only = filters_cfg.get("domestic_only", {}) or {}
+        if domestic_only.get("enabled"):
+            admin_config_issues.append(
+                "WARNING: domestic_only filter is ENABLED in the DB admin config — "
+                "international course variants are being filtered out. "
+                "Fix: set domestic_only.enabled to false unless this is intentional."
+            )
+        # Warn if _min_expected_courses far exceeds actual staged count
+        min_expected = admin_config_json.get("_min_expected_courses", 0) or 0
+        staged = last_job_summary.get("imported", 0)
+        if min_expected > 0 and staged > 0 and staged < min_expected * 0.3:
+            admin_config_issues.append(
+                f"WARNING: Only {staged} courses staged but admin config expects ≥{min_expected} — "
+                f"staged count is less than 30% of expected. A filter or discovery problem is likely."
+            )
+
+    # ── Load successful YAML examples for AI context ───────────────────────────
+    examples = await _load_example_yamls(db, exclude_slug=slug, max_examples=3)
+    examples_section = ""
+    if examples:
+        parts = []
+        for ex in examples:
+            parts.append(
+                f"--- EXAMPLE ({ex['university_name']}, {ex['imported_count']} courses staged successfully) ---\n"
+                f"{ex['yaml_excerpt']}\n--- END EXAMPLE ---"
+            )
+        examples_section = (
+            "\n=== REFERENCE CONFIGS FROM UNIVERSITIES THAT SCRAPE WELL ===\n"
+            "(Use these as structural/stylistic references when suggesting fixes)\n\n"
+            + "\n\n".join(parts)
+            + "\n=== END REFERENCE CONFIGS ==="
+        )
+
     # ── Build Gemini prompt ────────────────────────────────────────────────────
     defaults_excerpt = _read_yaml_raw(_DEFAULTS_FILE)[:4000]
+
+    admin_cfg_block = ""
+    if admin_config_json:
+        import json as _json
+        admin_cfg_block = (
+            "\n=== DB ADMIN CONFIG (universities.scrape_config JSON) ===\n"
+            + _json.dumps(admin_config_json, indent=2)[:1200]
+            + "\n=== END ADMIN CONFIG ==="
+        )
+    admin_issues_block = ""
+    if admin_config_issues:
+        admin_issues_block = (
+            "\n=== ADMIN CONFIG ISSUES (detected before Gemini analysis) ===\n"
+            + "\n".join(f"  - {i}" for i in admin_config_issues)
+            + "\n=== END ADMIN CONFIG ISSUES ==="
+        )
 
     job_block = "No scrape jobs found for this university yet — config has never been run." if not last_job_summary else (
         f"  Status: {last_job_summary['status']}\n"
@@ -1048,11 +1222,12 @@ async def ai_diagnose_scraper_config(
 
 === YAML SETTINGS REFERENCE (available keys and their meaning) ===
 {defaults_excerpt}
-=== END REFERENCE ===
+=== END REFERENCE ==={examples_section}
 
 === UNIVERSITY BEING DIAGNOSED ===
 Name: {university_name}
 Slug: {slug}
+{admin_cfg_block}{admin_issues_block}
 
 === LAST SCRAPE JOB STATISTICS ===
 {job_block}
@@ -1098,11 +1273,7 @@ Rules:
 - Do NOT invent YAML keys that are not in the SETTINGS REFERENCE."""
 
     try:
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=gemini_prompt,
-        )
-        raw_text: str = (response.text or "").strip()
+        raw_text = await _call_gemini_with_retry(client, gemini_prompt)
 
         # ── Parse structured sections ──────────────────────────────────────────
         def _section(text: str, header: str) -> str:
@@ -1343,12 +1514,7 @@ STRICTLY FORBIDDEN — every item below causes real harm:
 Output ONLY the completed YAML — no markdown fences, no commentary:"""
 
     try:
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=prompt,
-        )
-        yaml_text: str = response.text or ""
-        yaml_text = yaml_text.strip()
+        yaml_text = await _call_gemini_with_retry(client, prompt)
         # Strip markdown fences if Gemini wrapped them anyway
         if yaml_text.startswith("```"):
             yaml_text = re.sub(r"^```(?:yaml)?\n?", "", yaml_text)
