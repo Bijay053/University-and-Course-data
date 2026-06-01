@@ -1537,6 +1537,7 @@ async def put_recipe(
     english_patch: dict = {}
     fee_patch: dict = {}
     extraction_patch: dict = {}
+    discovery_patch: dict = {}
 
     if body.get("follow_links"):
         english_patch["follow_links"] = body["follow_links"]
@@ -1554,21 +1555,28 @@ async def put_recipe(
         extraction_patch["actions"] = body["actions"]
     if body.get("url_rewrites"):
         extraction_patch["url_rewrites"] = body["url_rewrites"]
+    if body.get("browser_time_budget_s") is not None:
+        discovery_patch["browser_time_budget_s"] = int(body["browser_time_budget_s"])
+    if body.get("browser_early_stop_courses") is not None:
+        discovery_patch["browser_early_stop_courses"] = int(body["browser_early_stop_courses"])
 
     if english_patch:
         extraction_patch["english"] = english_patch
     if fee_patch:
         extraction_patch["fees"] = fee_patch
 
-    if extraction_patch:
+    if extraction_patch or discovery_patch:
         admin_cfg: dict = dict(sc.get("admin_config") or {})
-        existing_extraction = dict(admin_cfg.get("extraction") or {})
-        for k, v in extraction_patch.items():
-            if isinstance(v, dict) and isinstance(existing_extraction.get(k), dict):
-                existing_extraction[k] = {**existing_extraction[k], **v}
-            else:
-                existing_extraction[k] = v
-        admin_cfg["extraction"] = existing_extraction
+        if extraction_patch:
+            existing_extraction = dict(admin_cfg.get("extraction") or {})
+            for k, v in extraction_patch.items():
+                if isinstance(v, dict) and isinstance(existing_extraction.get(k), dict):
+                    existing_extraction[k] = {**existing_extraction[k], **v}
+                else:
+                    existing_extraction[k] = v
+            admin_cfg["extraction"] = existing_extraction
+        if discovery_patch:
+            admin_cfg["discovery"] = {**dict(admin_cfg.get("discovery") or {}), **discovery_patch}
         sc["admin_config"] = admin_cfg
 
     await db.execute(

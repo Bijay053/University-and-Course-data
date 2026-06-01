@@ -756,6 +756,26 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # BFS / browser / sitemap tiers.  On 0 results, falls through to
         # fallback_strategy (default: bfs) unless fallback_strategy='none'.
         _recipe: dict = (uni_scrape_config or {}).get("recipe") or {}
+
+        # ── Merge recipe discovery overrides into _uni_cfg ─────────────────────
+        # Recipe seed_urls are ADDED to the YAML seeds (not replacing them) so
+        # the operator can supplement without losing YAML-configured listing pages.
+        # browser_time_budget_s and browser_early_stop_courses come from the
+        # loader (admin_config.discovery.*) automatically — only seeds need merging
+        # here because they live in the recipe dict, not admin_config.discovery.
+        _recipe_seeds = [s for s in (_recipe.get("seed_urls") or []) if s]
+        if _recipe_seeds:
+            _yaml_seeds = list(_uni_cfg.discovery.seed_urls or [])
+            _merged_seeds = list(dict.fromkeys(_yaml_seeds + _recipe_seeds))
+            _uni_cfg = _uni_cfg.model_copy(
+                update={"discovery": _uni_cfg.discovery.model_copy(update={"seed_urls": _merged_seeds})}
+            )
+            set_uni_config(_uni_cfg)
+            log.info(
+                "[RECIPE] merged %d recipe seed URL(s) into uni config (total seeds: %d)",
+                len(_recipe_seeds), len(_merged_seeds),
+            )
+
         if _recipe.get("discovery_strategy") == "json_api" and _recipe.get("api"):
             _api_endpoint = (_recipe.get("api") or {}).get("endpoint", "")
             log.info(
@@ -1046,6 +1066,13 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                         f"[DISCOVER] always_browser_discover=True — running browser "
                         f"discovery in addition to {len(links)} BFS links to sweep "
                         f"Cloudflare-protected faculty pages...",
+                        phase="discover",
+                    )
+                elif _always_browser:
+                    await emit(
+                        "status",
+                        "[DISCOVER] Browser: primary discovery mode "
+                        "(BFS skipped — Cloudflare/JS-heavy site, seed URLs queued)...",
                         phase="discover",
                     )
                 else:

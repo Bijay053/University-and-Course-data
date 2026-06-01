@@ -67,6 +67,8 @@ interface Recipe {
   extra_course_urls: string[];
   expected_min_courses: number | null;
   expected_max_courses: number | null;
+  browser_time_budget_s: number | null;
+  browser_early_stop_courses: number | null;
   fallback_strategy: string;
   api?: ApiConfig;
   must_contain: string[];
@@ -132,6 +134,8 @@ const EMPTY_RECIPE: Recipe = {
   extra_course_urls: [],
   expected_min_courses: null,
   expected_max_courses: null,
+  browser_time_budget_s: null,
+  browser_early_stop_courses: null,
   fallback_strategy: "bfs",
   must_contain: [],
   block_url_patterns: [],
@@ -1657,6 +1661,35 @@ export default function RecipeEditorPage() {
                 </div>
               </div>
 
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Browser Discovery Timeout (seconds)</Label>
+                  <Input
+                    type="number"
+                    value={recipe.browser_time_budget_s ?? ""}
+                    onChange={e => patchRecipe({ browser_time_budget_s: e.target.value ? parseInt(e.target.value) : null })}
+                    placeholder="default: 90"
+                    className="mt-1 text-sm"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Max seconds for browser-based discovery. Increase (e.g. 180) for slow JS-heavy sites like SCU.
+                  </p>
+                </div>
+                <div>
+                  <Label>Browser Early Stop (courses)</Label>
+                  <Input
+                    type="number"
+                    value={recipe.browser_early_stop_courses ?? ""}
+                    onChange={e => patchRecipe({ browser_early_stop_courses: e.target.value ? parseInt(e.target.value) : null })}
+                    placeholder="default: 100"
+                    className="mt-1 text-sm"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Stop browser discovery once this many course links are found. Raise if the university has more courses.
+                  </p>
+                </div>
+              </div>
+
               <Separator />
 
               <StringListEditor
@@ -1664,7 +1697,7 @@ export default function RecipeEditorPage() {
                 values={recipe.seed_urls}
                 onChange={v => patchRecipe({ seed_urls: v })}
                 placeholder="https://example.com/study/undergraduate/courses"
-                helpText="Course-listing pages visited first (BFS mode). Visitors follow links from these pages to find individual courses."
+                helpText="Course-listing pages visited first during discovery (BFS and browser mode). These are queued at highest priority so the crawler goes there before anywhere else. Use for JS-heavy sites like SCU — add the undergraduate/postgraduate listing pages, not just the homepage."
               />
 
               <StringListEditor
