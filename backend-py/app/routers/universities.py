@@ -1955,6 +1955,83 @@ async def test_json_api_endpoint(
     return result
 
 
+@router.post("/universities/{uni_id}/auto-repair-filter")
+async def auto_repair_filter_from_discovery(
+    uni_id: int,
+    body: dict,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[dict, Depends(get_current_user)],
+) -> dict:
+    """Clear a URL filter that is blocking 100% of discovered links.
+
+    Called by the Test Discovery panel when it detects raw_discovered > 0 AND
+    total_passing == 0.  Unlike the job-based version in scrape.py this endpoint
+    does NOT trigger a new scrape — it only patches the config so the operator can
+    immediately re-run Test Discovery and see the effect.
+
+    Body::
+
+        {
+          "recipe_patch": {"discovery": {"allow_url_patterns": []}},
+          "filter_cleared": "allow_url_patterns"
+        }
+    """
+    import json as _json
+    from sqlalchemy import text as _text
+
+    recipe_patch: dict = body.get("recipe_patch") or {}
+    filter_cleared: str = body.get("filter_cleared") or "unknown"
+
+    if not recipe_patch:
+        return {"status": "no_patch", "message": "No recipe_patch provided — nothing to apply."}
+
+    uni_row = (await db.execute(
+        _text("SELECT id, name, scrape_config FROM universities WHERE id = :id"),
+        {"id": uni_id},
+    )).mappings().first()
+    if not uni_row:
+        raise HTTPException(status_code=404, detail="University not found")
+
+    sc: dict = dict(uni_row.get("scrape_config") or {})
+    existing: dict = dict(sc.get("admin_config") or {})
+
+    # Save rollback snapshot
+    if existing:
+        sc["_prev_admin_config"] = existing
+
+    def _deep_merge(base: dict, override: dict) -> dict:
+        result = dict(base)
+        for k, v in override.items():
+            if k in result and isinstance(result[k], dict) and isinstance(v, dict):
+                result[k] = _deep_merge(result[k], v)
+            else:
+                result[k] = v
+        return result
+
+    sc["admin_config"] = _deep_merge(existing, recipe_patch)
+
+    await db.execute(
+        _text("UPDATE universities SET scrape_config = CAST(:cfg AS jsonb) WHERE id = :id"),
+        {"cfg": _json.dumps(sc), "id": uni_id},
+    )
+    await db.commit()
+
+    log.info(
+        "auto_repair_filter(discovery): cleared %s for uni %s → saved admin_config",
+        filter_cleared, uni_id,
+    )
+
+    return {
+        "status": "ok",
+        "filter_cleared": filter_cleared,
+        "has_rollback": bool(existing),
+        "message": (
+            f"Cleared '{filter_cleared}' filter. "
+            "Re-run Test Discovery to confirm URLs now pass."
+        ),
+    }
+
+
 def _to_camel_uni(u) -> dict:
     """Add camelCase aliases UI expects: scrapeUrl, feePageUrl, etc."""
     if hasattr(u, '__table__'):

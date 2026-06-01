@@ -498,6 +498,10 @@ export default function ScrapeAgentPage() {
   const [discoveryTest, setDiscoveryTest] = useState<DiscoveryTest | null>(null);
   const [testingDiscovery, setTestingDiscovery] = useState(false);
   const [fastOnly, setFastOnly] = useState(false);
+  const [discoveryFixLoading, setDiscoveryFixLoading] = useState(false);
+  const [discoveryFixResult, setDiscoveryFixResult] = useState<{
+    status: string; filter_cleared: string; message: string; has_rollback?: boolean;
+  } | null>(null);
   const [checkingExtraction, setCheckingExtraction] = useState(false);
   const [extractionResult, setExtractionResult] = useState<ExtractionQualityResult | null>(null);
 
@@ -594,6 +598,50 @@ export default function ScrapeAgentPage() {
       setTestingDiscovery(false);
     }
   }, [uniId, loadFilterImpact, toast]);
+
+  // Fix the URL filter that is blocking 100% of discovered links, then re-test
+  const fixUrlFilterAndRetry = useCallback(async () => {
+    if (!uniId || !discoveryTest) return;
+    const fc = discoveryTest.filter_config;
+
+    // Determine which filter to clear (priority: must_contain → allow_url_patterns → block_url_patterns)
+    let filterCleared = "";
+    let recipePatch: Record<string, unknown> = {};
+
+    if (fc.must_contain && fc.must_contain.length > 0) {
+      filterCleared = "must_contain";
+      recipePatch = { discovery: { must_contain: [] } };
+    } else if (fc.allow_url_patterns && fc.allow_url_patterns.length > 0) {
+      filterCleared = "allow_url_patterns";
+      recipePatch = { discovery: { allow_url_patterns: [] } };
+    } else if (fc.block_url_patterns && fc.block_url_patterns.length > 0) {
+      filterCleared = "block_url_patterns";
+      recipePatch = { discovery: { block_url_patterns: [] } };
+    } else {
+      toast({ title: "No active filter found", description: "Could not determine which filter to clear.", variant: "destructive" });
+      return;
+    }
+
+    setDiscoveryFixLoading(true);
+    setDiscoveryFixResult(null);
+    try {
+      const res = await fetch(`${BASE}/api/universities/${uniId}/auto-repair-filter`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ recipe_patch: recipePatch, filter_cleared: filterCleared }),
+      });
+      const data = await res.json();
+      setDiscoveryFixResult(data);
+      if (data.status === "ok") {
+        // Auto re-run discovery test to show the effect
+        await runDiscoveryTest();
+      }
+    } catch (e) {
+      toast({ title: "Fix failed", description: String(e), variant: "destructive" });
+    } finally {
+      setDiscoveryFixLoading(false);
+    }
+  }, [uniId, discoveryTest, toast, runDiscoveryTest]);
 
   // Build admin_config dict from UI state
   const buildAdminConfig = () => {
@@ -1181,6 +1229,39 @@ export default function ScrapeAgentPage() {
                 <p className="text-[10px] text-gray-500">drop rate</p>
               </div>
             </div>
+
+            {/* ── Inline fix when 100% of URLs are dropped by a filter ─────── */}
+            {discoveryTest.total_raw > 0 && discoveryTest.total_passing === 0 && discoveryTest.has_filters && (
+              <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 space-y-2">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-red-600 shrink-0" />
+                  <p className="text-xs font-semibold text-red-800">
+                    {discoveryTest.total_raw} course URL{discoveryTest.total_raw !== 1 ? "s" : ""} discovered — all blocked by{" "}
+                    {discoveryTest.filter_config.must_contain?.length
+                      ? "must_contain filter"
+                      : discoveryTest.filter_config.allow_url_patterns?.length
+                      ? "allow_url_patterns filter"
+                      : "block_url_patterns filter"}
+                  </p>
+                </div>
+                {discoveryFixResult?.status === "ok" ? (
+                  <div className="flex items-center gap-2 text-emerald-700 text-xs font-medium">
+                    <CheckCheck className="w-4 h-4 shrink-0" />
+                    Filter cleared ({discoveryFixResult.filter_cleared}) — re-testing discovery…
+                  </div>
+                ) : (
+                  <button
+                    onClick={fixUrlFilterAndRetry}
+                    disabled={discoveryFixLoading}
+                    className="flex items-center gap-1.5 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 disabled:opacity-60 rounded-lg px-3 py-1.5 transition-colors"
+                  >
+                    {discoveryFixLoading
+                      ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Clearing filter…</>
+                      : <><Zap className="w-3.5 h-3.5" /> Fix URL Filter & Retry</>}
+                  </button>
+                )}
+              </div>
+            )}
 
             {/* Warnings */}
             {discoveryTest.warnings.length > 0 && (
