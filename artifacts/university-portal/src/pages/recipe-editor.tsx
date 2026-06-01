@@ -69,6 +69,8 @@ interface Recipe {
   expected_max_courses: number | null;
   browser_time_budget_s: number | null;
   browser_early_stop_courses: number | null;
+  max_candidates: number | null;
+  bfs_page_budget: number | null;
   fallback_strategy: string;
   api?: ApiConfig;
   must_contain: string[];
@@ -136,6 +138,8 @@ const EMPTY_RECIPE: Recipe = {
   expected_max_courses: null,
   browser_time_budget_s: null,
   browser_early_stop_courses: null,
+  max_candidates: null,
+  bfs_page_budget: null,
   fallback_strategy: "bfs",
   must_contain: [],
   block_url_patterns: [],
@@ -1658,6 +1662,35 @@ export default function RecipeEditorPage() {
                     className="mt-1 text-sm"
                   />
                   <p className="text-xs text-muted-foreground mt-1">Sanity cap — flag if exceeded.</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Max Discovery Candidates</Label>
+                  <Input
+                    type="number"
+                    value={recipe.max_candidates ?? ""}
+                    onChange={e => patchRecipe({ max_candidates: e.target.value ? parseInt(e.target.value) : null })}
+                    placeholder="default: 200"
+                    className="mt-1 text-sm"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Max URLs collected during BFS crawl. Increase (e.g. 500) when discovery stops early and misses categories — e.g. Swinburne has 20+ category pages.
+                  </p>
+                </div>
+                <div>
+                  <Label>Max BFS Pages</Label>
+                  <Input
+                    type="number"
+                    value={recipe.bfs_page_budget ?? ""}
+                    onChange={e => patchRecipe({ bfs_page_budget: e.target.value ? parseInt(e.target.value) : null })}
+                    placeholder="default: 25"
+                    className="mt-1 text-sm"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Max pages crawled during BFS discovery. Increase (e.g. 60) when the log shows discovery stopping before all category pages are visited.
+                  </p>
                 </div>
               </div>
 

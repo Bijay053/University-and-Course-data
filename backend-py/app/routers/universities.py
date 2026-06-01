@@ -1559,6 +1559,10 @@ async def put_recipe(
         discovery_patch["browser_time_budget_s"] = int(body["browser_time_budget_s"])
     if body.get("browser_early_stop_courses") is not None:
         discovery_patch["browser_early_stop_courses"] = int(body["browser_early_stop_courses"])
+    if body.get("max_candidates") is not None:
+        discovery_patch["max_candidates"] = int(body["max_candidates"])
+    if body.get("bfs_page_budget") is not None:
+        discovery_patch["bfs_page_budget"] = int(body["bfs_page_budget"])
 
     if english_patch:
         extraction_patch["english"] = english_patch
