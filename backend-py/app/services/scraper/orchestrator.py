@@ -1922,7 +1922,9 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         _prefer_url_pats_r: list[str] = list(_recipe.get("prefer_urls_matching") or [])
 
         import re as _re_yr_r
-        _YEAR_SEG_R = _re_yr_r.compile(r"[/_\-](\d{4})[/_\-\?]|[/_\-](\d{4})$")
+        # Restrict to 20xx years so 4-digit course codes (e.g. "5350" in
+        # "admin-5350/2027/") are not mistaken for the year segment.
+        _YEAR_SEG_R = _re_yr_r.compile(r"[/_\-](20\d{2})[/_\-\?]|[/_\-](20\d{2})$")
 
         def _url_year_r(url: str) -> "int | None":
             m = _YEAR_SEG_R.search(url)
@@ -1932,6 +1934,31 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
 
         def _strip_year_r(url: str) -> str:
             return _YEAR_SEG_R.sub("/YYYY/", url)
+
+        # Step 0: recipe block_url_patterns — substring deny-list from the UI recipe editor.
+        # Unlike YAML discovery.block_url_patterns (which applies during BFS), these run
+        # here so they can be set through the recipe UI without a YAML deploy.
+        _recipe_block_pats_r: list[str] = list(_recipe.get("block_url_patterns") or [])
+        if _recipe_block_pats_r and links:
+            _pre_rbp_r = len(links)
+            links = [
+                _lk for _lk in links
+                if not any(pat in (_lk.get("url") or "") for pat in _recipe_block_pats_r)
+            ]
+            _rbp_dropped_r = _pre_rbp_r - len(links)
+            if _rbp_dropped_r:
+                log.info(
+                    "[RECIPE] block_url_patterns=%s: dropped %d URLs (%d remain)",
+                    _recipe_block_pats_r, _rbp_dropped_r, len(links),
+                )
+                await emit(
+                    "status",
+                    f"[RECIPE] block_url_patterns: dropped {_rbp_dropped_r} blocked URL(s) ({len(links)} remain)",
+                    phase="extract",
+                    kind="recipe_block_url_patterns",
+                    dropped=_rbp_dropped_r,
+                    kept=len(links),
+                )
 
         # Step 1: ignore_urls_matching — drop URLs containing any configured substring
         if _ignore_url_pats_r and links:
