@@ -1,0 +1,87 @@
+# University of Auckland
+# Hostname: www.auckland.ac.nz
+# uni_id: 1749 (dev)
+
+discovery:
+  bfs_page_budget: 25
+  max_candidates: 200
+
+  seed_urls:
+    - https://www.auckland.ac.nz/en/study/study-options/find-a-study-option.html
+
+  allow_url_patterns:
+    - '/en/study/study-options/find-a-study-option/'
+
+  block_url_patterns:
+    - '/en/study/study-options/find-a-study-option\.html$'
+    - '/course-information'
+    - '/professional-development'
+    - '/360-international'
+    - '/maori-students'
+    - '/pacific-students'
+    - '/our-faculties'
+
+extraction:
+  filters:
+    domestic_only:
+      enabled: false
+
+    online_only:
+      enabled: false
+
+  fees:
+    default_currency: "NZD"
+    prefer_international: true
+    prefer_annual_over_total: true
+
+  english:
+    # Postgraduate English requirements page — the most common case for UoA courses.
+    # Per-course pages link to this page as "See alternative English language requirements".
+    central_page: https://www.auckland.ac.nz/en/study/applications-and-admissions/entry-requirements/postgraduate-entry-requirements/postgraduate-english-language-requirements.html
+
+    # Each UoA course page shows the IELTS score explicitly (e.g. 6.5, 7.0, 7.5).
+    # course_english_priority preserves that per-course IELTS value and prevents the
+    # central page default from silently overwriting it.
+    course_english_priority: true
+
+    # band_mapping: maps IELTS overall → PTE / TOEFL / CAE equivalents.
+    # Source (verified 2026-06-01):
+    #   PG page: https://www.auckland.ac.nz/en/study/applications-and-admissions/entry-requirements/postgraduate-entry-requirements/postgraduate-english-language-requirements.html
+    #   UG page: https://www.auckland.ac.nz/en/study/applications-and-admissions/entry-requirements/undergraduate-entry-requirements/undergraduate-english-language-requirements.html
+    # For IELTS 7.0 and 7.5, Auckland does not publish explicit equivalency tables;
+    # values are derived from standard NZQA/IELTS band-equivalency ratios.
+    band_reference_url: https://www.auckland.ac.nz/en/study/applications-and-admissions/entry-requirements/postgraduate-entry-requirements/postgraduate-english-language-requirements.html
+    band_mapping:
+      # Undergraduate standard — IELTS 6.0 (verified: PTE 50, TOEFL 80)
+      UG Standard:
+        ielts_overall: 6.0
+        ielts_each: 5.5
+        pte_overall: 50
+        toefl_overall: 80
+        cambridge_overall: 169
+
+      # Postgraduate standard — IELTS 6.5 (verified: PTE 58, TOEFL 90, CAE 176)
+      PG Standard:
+        ielts_overall: 6.5
+        ielts_each: 6.0
+        pte_overall: 58
+        toefl_overall: 90
+        cambridge_overall: 176
+
+      # Higher requirement — IELTS 7.0
+      # (Law, Education, Teaching; NZQA equivalency ratios applied)
+      Higher 7.0:
+        ielts_overall: 7.0
+        ielts_each: 6.5
+        pte_overall: 65
+        toefl_overall: 100
+        cambridge_overall: 185
+
+      # High requirement — IELTS 7.5
+      # (Speech Language Therapy, Nutrition & Dietetics; NZQA equivalency)
+      Higher 7.5:
+        ielts_overall: 7.5
+        ielts_each: 7.0
+        pte_overall: 73
+        toefl_overall: 109
+        cambridge_overall: 191
