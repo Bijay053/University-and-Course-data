@@ -1850,6 +1850,136 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     dropped_sample=_dropped_urls[:5],
                 )
 
+        # Phase A.5c — Recipe year filter + year-based URL deduplication ──────────
+        # Reads course_year config from the recipe (stored in uni_scrape_config["recipe"]).
+        # Three operations applied in order:
+        #   1. Drop URLs matching ignore_urls_matching substrings (exact substring match)
+        #   2. Drop URLs whose path contains any explicitly ignored year value
+        #   3. Deduplicate by URL slug-without-year (keep preferred / latest year)
+        _cy_cfg: dict = _recipe.get("course_year") or {}
+        _cy_mode_r: str = _cy_cfg.get("mode", "keep_all")
+        _cy_preferred_r: int | None = None
+        try:
+            _cy_preferred_r = int(_cy_cfg["preferred_year"]) if _cy_cfg.get("preferred_year") else None
+        except (TypeError, ValueError):
+            pass
+        _cy_ignore_yrs_r: list[int] = []
+        for _raw_yr_r in (_cy_cfg.get("ignore_years") or []):
+            try:
+                _cy_ignore_yrs_r.append(int(_raw_yr_r))
+            except (TypeError, ValueError):
+                pass
+        _cy_dup_key_r: str = _cy_cfg.get("duplicate_key", "none")
+        _ignore_url_pats_r: list[str] = list(_recipe.get("ignore_urls_matching") or [])
+
+        import re as _re_yr_r
+        _YEAR_SEG_R = _re_yr_r.compile(r"[/_\-](\d{4})[/_\-\?]|[/_\-](\d{4})$")
+
+        def _url_year_r(url: str) -> "int | None":
+            m = _YEAR_SEG_R.search(url)
+            if m:
+                return int(m.group(1) or m.group(2))
+            return None
+
+        def _strip_year_r(url: str) -> str:
+            return _YEAR_SEG_R.sub("/YYYY/", url)
+
+        # Step 1: ignore_urls_matching — drop URLs containing any configured substring
+        if _ignore_url_pats_r and links:
+            _pre_iym_r = len(links)
+            links = [
+                _lk for _lk in links
+                if not any(pat in (_lk.get("url") or "") for pat in _ignore_url_pats_r)
+            ]
+            _iym_dropped_r = _pre_iym_r - len(links)
+            if _iym_dropped_r:
+                log.info(
+                    "[RECIPE] ignore_urls_matching: dropped %d URLs (%d remain)",
+                    _iym_dropped_r, len(links),
+                )
+                await emit(
+                    "status",
+                    f"[RECIPE] Year URL filter: dropped {_iym_dropped_r} URLs matching ignore_urls_matching ({len(links)} remain)",
+                    phase="extract",
+                    kind="recipe_ignore_url_matching",
+                    dropped=_iym_dropped_r,
+                    kept=len(links),
+                )
+
+        # Step 2: ignore_years — drop URLs whose path contains an ignored year value
+        if _cy_ignore_yrs_r and links:
+            _pre_ign_r = len(links)
+            links = [
+                _lk for _lk in links
+                if _url_year_r(_lk.get("url") or "") not in _cy_ignore_yrs_r
+            ]
+            _ign_yr_dropped_r = _pre_ign_r - len(links)
+            if _ign_yr_dropped_r:
+                log.info(
+                    "[RECIPE] course_year.ignore_years=%s: dropped %d URLs (%d remain)",
+                    _cy_ignore_yrs_r, _ign_yr_dropped_r, len(links),
+                )
+                await emit(
+                    "status",
+                    f"[RECIPE] Year filter: dropped {_ign_yr_dropped_r} URLs with ignore_years={_cy_ignore_yrs_r} ({len(links)} remain)",
+                    phase="extract",
+                    kind="recipe_year_ignore",
+                    dropped=_ign_yr_dropped_r,
+                    kept=len(links),
+                )
+
+        # Step 3: slug-without-year deduplication
+        if _cy_dup_key_r == "slug_without_year" and _cy_mode_r != "keep_all" and links:
+            from collections import defaultdict as _ddict_r
+            import datetime as _dt_yr_r
+            _yr_groups_r: "dict[str, list[tuple[int, dict]]]" = _ddict_r(list)
+            _no_yr_links_r: "list[dict]" = []
+            for _lk_r in links:
+                _url_r = _lk_r.get("url") or ""
+                _yr_r = _url_year_r(_url_r)
+                if _yr_r is None:
+                    _no_yr_links_r.append(_lk_r)
+                else:
+                    _yr_groups_r[_strip_year_r(_url_r)].append((_yr_r, _lk_r))
+
+            _kept_r: "list[dict]" = list(_no_yr_links_r)
+            _dedup_dropped_r = 0
+            for _sk_r, _versions_r in _yr_groups_r.items():
+                if len(_versions_r) == 1:
+                    _kept_r.append(_versions_r[0][1])
+                    continue
+                # Multiple year versions — pick winner
+                if _cy_mode_r == "keep_preferred_year" and _cy_preferred_r:
+                    _winner_r = next(
+                        (v for yr, v in _versions_r if yr == _cy_preferred_r), None
+                    )
+                    if _winner_r is None:
+                        _winner_r = sorted(_versions_r, key=lambda x: x[0], reverse=True)[0][1]
+                elif _cy_mode_r == "keep_latest":
+                    _winner_r = sorted(_versions_r, key=lambda x: x[0], reverse=True)[0][1]
+                elif _cy_mode_r == "keep_current":
+                    _cur_yr_r = _dt_yr_r.datetime.now().year
+                    _winner_r = min(_versions_r, key=lambda x: abs(x[0] - _cur_yr_r))[1]
+                else:
+                    _winner_r = _versions_r[0][1]
+                _kept_r.append(_winner_r)
+                _dedup_dropped_r += len(_versions_r) - 1
+
+            if _dedup_dropped_r:
+                log.info(
+                    "[RECIPE] year dedup (mode=%s preferred=%s): dropped %d duplicate-year URLs, kept %d / %d",
+                    _cy_mode_r, _cy_preferred_r, _dedup_dropped_r, len(_kept_r), len(links),
+                )
+                await emit(
+                    "status",
+                    f"[RECIPE] Year dedup: kept {len(_kept_r)} unique courses (dropped {_dedup_dropped_r} year duplicates, mode={_cy_mode_r}, preferred={_cy_preferred_r})",
+                    phase="extract",
+                    kind="recipe_year_dedup",
+                    dropped=_dedup_dropped_r,
+                    kept=len(_kept_r),
+                )
+            links = _kept_r
+
         # ── Post-filter discovered count ──────────────────────────────────────────
         # Now that must_contain (and any other post-discovery filters) have run,
         # lock in the true extractable count.  This is what the UI and DB show

@@ -4228,6 +4228,103 @@ async def diagnose_scrape_job(
             ],
         })
 
+    # ── Duplicate year version detection ─────────────────────────────────────────
+    # Detects the same course appearing multiple times under different year-segment
+    # URLs (e.g. /2026/bachelor-it and /2027/bachelor-it). 3+ courses → flag.
+    try:
+        import re as _re_dup_yr
+        _YR_SEG_D = _re_dup_yr.compile(r"[/_\-](\d{4})[/_\-\?]|[/_\-](\d{4})$")
+        _dup_yr_rows = (await db.execute(
+            _text("""
+            SELECT course_name, course_website, international_fee, fee_term
+            FROM   scraped_courses
+            WHERE  scrape_job_id = :jid
+              AND  course_name IS NOT NULL
+              AND  course_website IS NOT NULL
+            ORDER  BY course_name
+            """),
+            {"jid": job_id},
+        )).mappings().all()
+
+        from collections import defaultdict as _ddict_d
+        _name_yr_grps: "dict[str, list]" = _ddict_d(list)
+        for _dr in _dup_yr_rows:
+            _nm_k = (_dr["course_name"] or "").strip().lower()
+            _url_d = _dr["course_website"] or ""
+            _m_d = _YR_SEG_D.search(_url_d)
+            if _m_d:
+                _yr_v = int(_m_d.group(1) or _m_d.group(2))
+                _name_yr_grps[_nm_k].append({
+                    "name": _dr["course_name"],
+                    "year": _yr_v,
+                    "url": _url_d,
+                    "fee": _dr["international_fee"],
+                    "fee_term": _dr["fee_term"],
+                })
+
+        _dup_yr_examples: list[dict] = []
+        _all_yrs_d: set = set()
+        for _nm_k, _versions_d in _name_yr_grps.items():
+            _yrs_d = {v["year"] for v in _versions_d}
+            if len(_yrs_d) > 1:
+                _dup_yr_examples.append({
+                    "name": _versions_d[0]["name"],
+                    "versions": sorted(_versions_d, key=lambda x: x["year"]),
+                })
+                _all_yrs_d.update(_yrs_d)
+
+        if len(_dup_yr_examples) >= 3:
+            _sorted_yrs_d = sorted(_all_yrs_d)
+            _pref_yr_d = min(_sorted_yrs_d)
+            _ign_yrs_d = [y for y in _sorted_yrs_d if y != _pref_yr_d]
+
+            def _fmt_fee(v: dict) -> str:
+                if v.get("fee"):
+                    return f"A${v['fee']:,.0f}/{v.get('fee_term') or 'Annual'}"
+                return "no fee"
+
+            _ex_lines = [
+                f'{ex["name"]} — ' + " vs ".join(
+                    f'{v["year"]}: {_fmt_fee(v)}' for v in ex["versions"][:2]
+                )
+                for ex in _dup_yr_examples[:3]
+            ]
+            deterministic_issues.append({
+                "issue": f"Duplicate year versions detected ({len(_dup_yr_examples)} courses)",
+                "severity": "high",
+                "check": "duplicate_year_versions",
+                "detail": (
+                    f"{len(_dup_yr_examples)} courses are staged multiple times — once per academic year URL. "
+                    f"Example: {_ex_lines[0] if _ex_lines else ''}. "
+                    f"The scraper treats each year URL as a separate course, creating duplicates."
+                ),
+                "potential_causes": [
+                    f"University lists the same course for multiple years under year-path URLs (/{_sorted_yrs_d[0]}/ and /{_sorted_yrs_d[-1]}/)",
+                    "Each year is a separate URL path segment — the scraper discovers all of them",
+                    "No Year & Duplicate Handling rule is configured in the recipe",
+                ],
+                "examples": _ex_lines,
+                "fix": {
+                    "action": (
+                        f"Open Recipe Editor → Year & Duplicates. "
+                        f"Set Mode=keep_preferred_year, Preferred Year={_pref_yr_d}, "
+                        f"Ignore Years={_ign_yrs_d}, Duplicate Key=slug_without_year. "
+                        f"Also add '/{_ign_yrs_d[0]}/' to Ignore URLs Matching."
+                    ),
+                    "recipe_patch": {
+                        "course_year": {
+                            "mode": "keep_preferred_year",
+                            "preferred_year": _pref_yr_d,
+                            "ignore_years": _ign_yrs_d,
+                            "duplicate_key": "slug_without_year",
+                        },
+                        "ignore_urls_matching": [f"/{y}/" for y in _ign_yrs_d],
+                    },
+                },
+            })
+    except Exception as _dup_yr_exc:
+        log.warning("duplicate year version detection failed: %s", _dup_yr_exc)
+
     # ── Load effective (fully-merged) config ─────────────────────────────────
     # Build the real UniConfig the scraper will use: defaults → YAML → admin_config.
     # Passing this to the AI prevents it from suggesting settings that are already

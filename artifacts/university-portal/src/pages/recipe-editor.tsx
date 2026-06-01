@@ -16,7 +16,7 @@ import {
   Code2, DollarSign, BookOpen, MapPin, ShieldCheck, Zap, RefreshCw,
   FlaskConical, CheckCircle2, XCircle, AlertTriangle, ChevronDown, ChevronUp, Info,
   MousePointerClick, GripVertical, Link, Stethoscope, Loader2, Wand2, WifiOff,
-  TrendingUp, ExternalLink, Play, Type
+  TrendingUp, ExternalLink, Play, Type, Calendar, GitMerge,
 } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -113,6 +113,16 @@ interface Recipe {
   // Study mode
   study_mode_from_location: boolean;
   study_mode_online_keywords: string[];
+  // Year & Duplicate Handling
+  course_year: {
+    mode: string;
+    preferred_year: number | null;
+    ignore_years: number[];
+    duplicate_key: string;
+  };
+  ignore_urls_matching: string[];
+  prefer_urls_matching: string[];
+  fee_reject_years: number[];
 }
 
 const EMPTY_RECIPE: Recipe = {
@@ -148,6 +158,15 @@ const EMPTY_RECIPE: Recipe = {
   location_reject_values: [],
   study_mode_from_location: false,
   study_mode_online_keywords: [],
+  course_year: {
+    mode: "keep_all",
+    preferred_year: null,
+    ignore_years: [],
+    duplicate_key: "none",
+  },
+  ignore_urls_matching: [],
+  prefer_urls_matching: [],
+  fee_reject_years: [],
 };
 
 const STANDARD_FIELDS = [
@@ -1558,6 +1577,7 @@ export default function RecipeEditorPage() {
           <TabsTrigger value="browser" className="flex items-center gap-1"><MousePointerClick className="h-3 w-3" /> Browser Actions</TabsTrigger>
           <TabsTrigger value="names" className="flex items-center gap-1"><Type className="h-3 w-3" /> Course Names</TabsTrigger>
           <TabsTrigger value="campus" className="flex items-center gap-1"><MapPin className="h-3 w-3" /> Campus & Location</TabsTrigger>
+          <TabsTrigger value="year" className="flex items-center gap-1"><Calendar className="h-3 w-3" /> Year & Duplicates</TabsTrigger>
           <TabsTrigger value="quality" className="flex items-center gap-1"><ShieldCheck className="h-3 w-3" /> Quality</TabsTrigger>
         </TabsList>
 
@@ -2349,7 +2369,213 @@ export default function RecipeEditorPage() {
           </div>
         </TabsContent>
 
-        {/* ── 10. Quality ─────────────────────────────────────────────────── */}
+        {/* ── 10. Year & Duplicate Handling ───────────────────────────────── */}
+        <TabsContent value="year">
+          {(() => {
+            const cy = recipe.course_year;
+            const patchCY = (patch: Partial<typeof cy>) =>
+              patchRecipe({ course_year: { ...cy, ...patch } });
+            const isActive = cy.mode !== "keep_all" || cy.ignore_years.length > 0 || recipe.ignore_urls_matching.length > 0;
+            return (
+              <div className="space-y-4">
+                {/* Info banner */}
+                <Card className={isActive ? "border-blue-200 bg-blue-50" : "border-gray-100"}>
+                  <CardHeader className="pb-2 pt-4">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Calendar className="h-4 w-4 text-blue-600" />
+                      Year &amp; Duplicate Handling
+                      {isActive && <span className="ml-2 text-[11px] font-normal px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">Active</span>}
+                    </CardTitle>
+                    <CardDescription>
+                      When a university lists the same course for multiple academic years (e.g.
+                      <code className="text-xs bg-gray-100 px-1 mx-1 rounded">/2026/bachelor-it</code> and
+                      <code className="text-xs bg-gray-100 px-1 mx-1 rounded">/2027/bachelor-it</code>),
+                      the scraper stages both as separate courses. Use these rules to keep only the preferred year.
+                    </CardDescription>
+                  </CardHeader>
+                </Card>
+
+                {/* ── Course Year Mode ── */}
+                <Card>
+                  <CardHeader className="pb-3 pt-4">
+                    <CardTitle className="text-sm flex items-center gap-2"><Calendar className="h-4 w-4" /> Course Year Mode</CardTitle>
+                    <CardDescription>
+                      When the same course URL slug appears under multiple year paths, which version should be kept?
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-5">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label>Year Mode</Label>
+                        <Select value={cy.mode} onValueChange={v => patchCY({ mode: v })}>
+                          <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="keep_all">Keep All (no dedup)</SelectItem>
+                            <SelectItem value="keep_preferred_year">Keep Preferred Year</SelectItem>
+                            <SelectItem value="keep_latest">Keep Latest Year</SelectItem>
+                            <SelectItem value="keep_current">Keep Current Calendar Year</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <p className="text-[11px] text-muted-foreground mt-1">
+                          {cy.mode === "keep_preferred_year" && "Keeps only the preferred_year version. Falls back to latest if preferred isn't found."}
+                          {cy.mode === "keep_latest" && "Always keeps the highest year number found for each course slug."}
+                          {cy.mode === "keep_current" && `Keeps the version closest to the current calendar year (${new Date().getFullYear()}).`}
+                          {cy.mode === "keep_all" && "No deduplication — both year versions are staged."}
+                        </p>
+                      </div>
+                      <div>
+                        <Label>Preferred Year</Label>
+                        <Input
+                          type="number"
+                          value={cy.preferred_year ?? ""}
+                          onChange={e => patchCY({ preferred_year: e.target.value ? parseInt(e.target.value) : null })}
+                          placeholder={`e.g. ${new Date().getFullYear()}`}
+                          className="mt-1 text-sm"
+                          disabled={cy.mode !== "keep_preferred_year"}
+                        />
+                        <p className="text-[11px] text-muted-foreground mt-1">
+                          Year to keep when mode=keep_preferred_year.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label>Duplicate Key</Label>
+                      <Select value={cy.duplicate_key} onValueChange={v => patchCY({ duplicate_key: v })}>
+                        <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">None (no dedup)</SelectItem>
+                          <SelectItem value="slug_without_year">URL slug without year segment</SelectItem>
+                          <SelectItem value="name">Course name</SelectItem>
+                          <SelectItem value="cricos_code">CRICOS code</SelectItem>
+                          <SelectItem value="course_code">Course code</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-[11px] text-muted-foreground mt-1">
+                        How to identify that two URLs are the same course. <strong>slug_without_year</strong> strips the 4-digit year segment from the URL path and groups URLs by the resulting base slug — the most common case for SCU-style sites.
+                      </p>
+                    </div>
+
+                    <div>
+                      <Label className="flex items-center gap-1.5">
+                        Ignore Years
+                        <span className="text-[10px] text-muted-foreground font-normal">(one per line)</span>
+                      </Label>
+                      <Textarea
+                        value={(cy.ignore_years || []).join("\n")}
+                        onChange={e => {
+                          const yrs = e.target.value.split("\n").map(s => parseInt(s.trim())).filter(n => !isNaN(n) && n > 2000 && n < 2100);
+                          patchCY({ ignore_years: yrs });
+                        }}
+                        placeholder={"2027\n2028"}
+                        className="mt-1 font-mono text-sm h-20"
+                      />
+                      <p className="text-[11px] text-muted-foreground mt-1">
+                        URLs containing any of these year values in their path are dropped before extraction (e.g. <code>/2027/</code>). Applied even when mode=keep_all.
+                      </p>
+                    </div>
+
+                    {cy.mode !== "keep_all" && cy.preferred_year && cy.ignore_years.length > 0 && cy.duplicate_key !== "none" && (
+                      <div className="rounded-lg bg-green-50 border border-green-200 p-3 text-xs text-green-800">
+                        <div className="font-semibold mb-1">✅ Active rule for this university:</div>
+                        <pre className="font-mono text-[11px] whitespace-pre-wrap">{`course_year:
+  mode: ${cy.mode}
+  preferred_year: ${cy.preferred_year}
+  ignore_years: [${cy.ignore_years.join(", ")}]
+  duplicate_key: ${cy.duplicate_key}`}</pre>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* ── URL Pattern Filtering ── */}
+                <Card>
+                  <CardHeader className="pb-3 pt-4">
+                    <CardTitle className="text-sm flex items-center gap-2"><Filter className="h-4 w-4" /> URL Year Patterns</CardTitle>
+                    <CardDescription>
+                      Drop or prefer URLs matching specific substrings (applied before deduplication).
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <StringListEditor
+                      label="Ignore URLs Matching"
+                      values={recipe.ignore_urls_matching}
+                      onChange={v => patchRecipe({ ignore_urls_matching: v })}
+                      placeholder='e.g. "/2027/"'
+                      helpText="Any discovered URL containing this substring is dropped. Use for year-path filtering (e.g. /2027/ to drop all 2027 course URLs)."
+                    />
+                    <StringListEditor
+                      label="Prefer URLs Matching"
+                      values={recipe.prefer_urls_matching}
+                      onChange={v => patchRecipe({ prefer_urls_matching: v })}
+                      placeholder='e.g. "/2026/"'
+                      helpText="When deduplicating by slug, prefer the version whose URL matches this substring. Not required when preferred_year is set."
+                    />
+                  </CardContent>
+                </Card>
+
+                {/* ── Fee Year Rules ── */}
+                <Card>
+                  <CardHeader className="pb-3 pt-4">
+                    <CardTitle className="text-sm flex items-center gap-2"><DollarSign className="h-4 w-4" /> Fee Year Rules</CardTitle>
+                    <CardDescription>
+                      Control which year's fee data is used when multiple year pages are found.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label>Fee Preferred Year</Label>
+                        <Input
+                          type="number"
+                          value={recipe.fee_year ?? ""}
+                          onChange={e => patchRecipe({ fee_year: e.target.value ? parseInt(e.target.value) : null })}
+                          placeholder={`e.g. ${new Date().getFullYear()}`}
+                          className="mt-1 text-sm"
+                        />
+                        <p className="text-[11px] text-muted-foreground mt-1">Use fees extracted from this year's page only. Matches the existing fee_year field.</p>
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="flex items-center gap-1.5">
+                        Reject Fee Years
+                        <span className="text-[10px] text-muted-foreground font-normal">(one per line)</span>
+                      </Label>
+                      <Textarea
+                        value={(recipe.fee_reject_years || []).join("\n")}
+                        onChange={e => {
+                          const yrs = e.target.value.split("\n").map(s => parseInt(s.trim())).filter(n => !isNaN(n) && n > 2000 && n < 2100);
+                          patchRecipe({ fee_reject_years: yrs });
+                        }}
+                        placeholder={"2027\n2028"}
+                        className="mt-1 font-mono text-sm h-20"
+                      />
+                      <p className="text-[11px] text-muted-foreground mt-1">
+                        If a fee is extracted from a page URL containing one of these year values, it is discarded and not staged as international_fee.
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* ── SCU quick-apply tip ── */}
+                <Card className="border-amber-200 bg-amber-50">
+                  <CardContent className="pt-4 pb-3">
+                    <div className="flex items-start gap-3">
+                      <GitMerge className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+                      <div className="text-xs text-amber-800 space-y-1">
+                        <p className="font-semibold">Typical fix for universities with year-segment URLs (e.g. SCU)</p>
+                        <p>Set <strong>Mode = Keep Preferred Year</strong>, <strong>Preferred Year = {new Date().getFullYear()}</strong>, <strong>Ignore Years = [{new Date().getFullYear() + 1}]</strong>, <strong>Duplicate Key = URL slug without year</strong>.</p>
+                        <p>Then add <code className="bg-amber-100 px-1 rounded">/{new Date().getFullYear() + 1}/</code> to <strong>Ignore URLs Matching</strong> as a belt-and-braces guard.</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            );
+          })()}
+        </TabsContent>
+
+        {/* ── 11. Quality ─────────────────────────────────────────────────── */}
         <TabsContent value="quality">
           <Card>
             <CardHeader>
