@@ -5912,6 +5912,151 @@ async def auto_repair_filter(
     }
 
 
+@router.post("/jobs/{job_id}/auto-repair-candidates")
+async def auto_repair_candidates(
+    job_id: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[dict, Depends(get_current_user)],
+) -> dict:
+    """Generate ranked repair candidates for a failed scrape job.
+
+    No AI call required — pure rule-based simulation against historical URLs.
+    Each candidate includes a before/after count, drop-rate simulation,
+    confidence score, and the recipe_patch to apply.
+
+    Returns::
+
+        {
+          "ok": true,
+          "problem": "url_filter_drop",
+          "candidates": [
+            {
+              "id": "clear_allow_patterns",
+              "rank": 1,
+              "label": "Remove allow_url_patterns",
+              "description": "...",
+              "category": "url_filter",
+              "recipe_patch": {"discovery": {"allow_url_patterns": []}},
+              "simulation": {
+                "method": "historical_filter",
+                "before_count": 0,
+                "after_count": 122,
+                "drop_rate_before_pct": 100,
+                "drop_rate_after_pct": 0,
+                "historical_url_count": 138,
+                "sample_urls_rescued": ["https://..."]
+              },
+              "confidence": 90,
+              "is_recommended": true,
+              "safety_gate_passed": true,
+              "expected_gain": 122
+            },
+            ...
+          ]
+        }
+    """
+    from sqlalchemy import text as _text
+    import json as _json
+    from app.services.scraper.auto_repair_candidates import generate_repair_candidates
+    from app.services.scraper.config.loader import get_config_for_host as _gcfh
+    from urllib.parse import urlparse as _up
+    from app.models import ScrapedCourse as _SC
+
+    # ── 1. Load job ───────────────────────────────────────────────────────────
+    job_row = (await db.execute(
+        _text("""
+            SELECT j.runtime_job_id, j.university_id, j.total_found, j.imported,
+                   j.discovered_config
+            FROM scrape_runtime_jobs j
+            WHERE j.runtime_job_id = :jid
+        """),
+        {"jid": job_id},
+    )).mappings().first()
+    if not job_row:
+        raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
+
+    uni_id: int = job_row["university_id"]
+    imported: int = job_row.get("imported") or 0
+    discovered_cfg: dict = job_row.get("discovered_config") or {}
+    pipeline_stats: dict = discovered_cfg.get("pipeline_stats") or {}
+    raw_discovered: int = pipeline_stats.get("raw_discovered", job_row.get("total_found") or 0)
+    after_filter: int = pipeline_stats.get("after_filter", job_row.get("total_found") or 0)
+
+    # ── 2. Load university + effective config ─────────────────────────────────
+    uni_row = (await db.execute(
+        _text("SELECT id, name, scrape_url, scrape_config FROM universities WHERE id = :id"),
+        {"id": uni_id},
+    )).mappings().first()
+    if not uni_row:
+        raise HTTPException(status_code=404, detail="University not found")
+
+    uni_name: str = uni_row.get("name") or str(uni_id)
+    scrape_url: str = uni_row.get("scrape_url") or ""
+    sc: dict = dict(uni_row.get("scrape_config") or {})
+
+    # Load merged effective config (YAML + admin_config)
+    allow_pats: list[str] = []
+    must_contain: list[str] = []
+    block_pats: list[str] = []
+    try:
+        _h = _up(scrape_url).hostname or ""
+        _uc = _gcfh(
+            hostname=_h, name=uni_name,
+            scrape_url=scrape_url,
+            university_id=uni_id,
+            db_scrape_config=sc,
+        )
+        allow_pats = list(_uc.discovery.allow_url_patterns or [])
+        must_contain = list(_uc.discovery.must_contain or [])
+        block_pats = list(_uc.discovery.block_url_patterns or [])
+    except Exception as _exc:
+        log.warning("auto_repair_candidates: config load failed: %s", _exc)
+
+    # ── 3. Load historical course URLs ────────────────────────────────────────
+    url_rows = (await db.execute(
+        select(_SC.course_website)
+        .where(_SC.university_id == uni_id)
+        .where(_SC.course_website.isnot(None))
+        .limit(200)
+    )).scalars().all()
+    historical_urls: list[str] = [u for u in url_rows if u]
+
+    # ── 4. Generate candidates ────────────────────────────────────────────────
+    candidates = await generate_repair_candidates(
+        uni_id=uni_id,
+        uni_name=uni_name,
+        scrape_url=scrape_url,
+        current_allow_pats=allow_pats,
+        current_must_contain=must_contain,
+        current_block_pats=block_pats,
+        raw_discovered=raw_discovered,
+        after_filter=after_filter,
+        imported=imported,
+        historical_urls=historical_urls,
+        pipeline_stats=pipeline_stats,
+    )
+
+    problem = "unknown"
+    if raw_discovered > 5 and after_filter == 0:
+        problem = "url_filter_drop"
+    elif raw_discovered > 5 and after_filter < raw_discovered * 0.5:
+        problem = "partial_filter"
+    elif raw_discovered == 0:
+        problem = "low_discovery"
+    elif imported > 0 and imported < 30:
+        problem = "low_count"
+
+    return {
+        "ok": True,
+        "problem": problem,
+        "raw_discovered": raw_discovered,
+        "after_filter": after_filter,
+        "imported": imported,
+        "historical_url_count": len(historical_urls),
+        "candidates": candidates,
+    }
+
+
 @router.post("/jobs/{job_id}/preview-fix")
 async def preview_scrape_fix(
     job_id: str,

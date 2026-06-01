@@ -374,6 +374,45 @@ type ExtractionQualityResult = {
   error?: string;
 };
 
+// ── Auto Repair types ─────────────────────────────────────────────────────────
+
+type RepairSimulation = {
+  method: "historical_filter" | "job_stats" | "estimated";
+  before_count: number;
+  after_count: number;
+  drop_rate_before_pct: number;
+  drop_rate_after_pct: number;
+  historical_url_count: number;
+  sample_urls_rescued: string[];
+  sample_urls_kept: string[];
+  note: string;
+};
+
+type RepairCandidate = {
+  id: string;
+  rank: number;
+  label: string;
+  description: string;
+  category: "url_filter" | "discovery" | "url_rewrite" | "extraction";
+  problem_addressed: string;
+  recipe_patch: Record<string, unknown>;
+  simulation: RepairSimulation;
+  confidence: number;
+  is_recommended: boolean;
+  safety_gate_passed: boolean;
+  expected_gain: number;
+};
+
+type RepairCandidatesResult = {
+  ok: boolean;
+  problem: string;
+  raw_discovered: number;
+  after_filter: number;
+  imported: number;
+  historical_url_count: number;
+  candidates: RepairCandidate[];
+};
+
 // ── Tag input helper ──────────────────────────────────────────────────────────
 
 function TagInput({
@@ -504,6 +543,9 @@ export default function ScrapeAgentPage() {
   } | null>(null);
   const [checkingExtraction, setCheckingExtraction] = useState(false);
   const [extractionResult, setExtractionResult] = useState<ExtractionQualityResult | null>(null);
+  const [loadingCandidates, setLoadingCandidates] = useState(false);
+  const [repairCandidates, setRepairCandidates] = useState<RepairCandidatesResult | null>(null);
+  const [applyingCandidateId, setApplyingCandidateId] = useState<string | null>(null);
 
   const loadConfig = useCallback(async () => {
     setLoading(true);
@@ -642,6 +684,56 @@ export default function ScrapeAgentPage() {
       setDiscoveryFixLoading(false);
     }
   }, [uniId, discoveryTest, toast, runDiscoveryTest]);
+
+  const generateRepairCandidates = useCallback(async () => {
+    const jobId = config?.latest_job_id;
+    if (!jobId) {
+      toast({ title: "No scrape job found", description: "Run a scrape first.", variant: "destructive" });
+      return;
+    }
+    setLoadingCandidates(true);
+    setRepairCandidates(null);
+    try {
+      const res = await fetch(`${BASE}/api/scrape/jobs/${jobId}/auto-repair-candidates`, { method: "POST" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data: RepairCandidatesResult = await res.json();
+      setRepairCandidates(data);
+    } catch (err) {
+      toast({ title: "Auto Repair failed", description: String(err), variant: "destructive" });
+    } finally {
+      setLoadingCandidates(false);
+    }
+  }, [config?.latest_job_id, toast]);
+
+  const applyRepairCandidate = useCallback(async (candidate: RepairCandidate) => {
+    const jobId = config?.latest_job_id;
+    if (!jobId) return;
+    setApplyingCandidateId(candidate.id);
+    try {
+      const res = await fetch(`${BASE}/api/scrape/jobs/${jobId}/auto-repair-filter`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          recipe_patch: candidate.recipe_patch,
+          filter_cleared: candidate.id,
+        }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setAutoRepairResult(data);
+      setRepairCandidates(null);
+      if (data.status === "ok") {
+        toast({ title: "Fix applied — new scrape started", description: candidate.label });
+        await loadConfig();
+      } else {
+        toast({ title: "Fix applied", description: data.message, variant: "destructive" });
+      }
+    } catch (err) {
+      toast({ title: "Apply failed", description: String(err), variant: "destructive" });
+    } finally {
+      setApplyingCandidateId(null);
+    }
+  }, [config?.latest_job_id, toast, loadConfig]);
 
   // Build admin_config dict from UI state
   const buildAdminConfig = () => {
@@ -1601,6 +1693,16 @@ export default function ScrapeAgentPage() {
               {diagnosing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
               {diagnosing ? "Analysing…" : "Run Diagnosis"}
             </Button>
+            <Button
+              size="sm"
+              onClick={generateRepairCandidates}
+              disabled={loadingCandidates || !config?.latest_job_id}
+              variant="outline"
+              className="h-7 text-xs gap-1.5 border-violet-300 text-violet-700 hover:bg-violet-50"
+            >
+              {loadingCandidates ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wrench className="w-3 h-3" />}
+              {loadingCandidates ? "Generating fixes…" : "Auto Repair"}
+            </Button>
           </div>
         </div>
 
@@ -1973,6 +2075,251 @@ export default function ScrapeAgentPage() {
                   ))}
                 </div>
               )}
+
+              {/* ── Auto Repair: loading spinner ──────────────────────────── */}
+              {loadingCandidates && (
+                <div className="flex items-center gap-2 py-4 text-violet-600 text-xs">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Simulating fix candidates against historical URLs…
+                </div>
+              )}
+
+              {/* ── Auto Repair: ranked candidates panel ─────────────────── */}
+              {repairCandidates && !loadingCandidates && !autoRepairResult && (() => {
+                const { candidates, problem, raw_discovered, after_filter, historical_url_count } = repairCandidates;
+                const recommended = candidates.find(c => c.is_recommended);
+                const others = candidates.filter(c => !c.is_recommended);
+                const problemLabel: Record<string, string> = {
+                  url_filter_drop: "URL filter dropped all discovered links",
+                  partial_filter: "URL filter dropped >50% of discovered links",
+                  low_discovery: "Discovery found 0 links (JS-rendered site)",
+                  low_count: "Fewer courses found than expected",
+                };
+
+                const CategoryIcon = ({ cat }: { cat: string }) => {
+                  if (cat === "url_filter") return <ShieldAlert className="w-3 h-3 shrink-0" />;
+                  if (cat === "discovery") return <Search className="w-3 h-3 shrink-0" />;
+                  return <Wrench className="w-3 h-3 shrink-0" />;
+                };
+
+                const MethodBadge = ({ method }: { method: string }) => {
+                  const styles: Record<string, string> = {
+                    historical_filter: "bg-emerald-100 text-emerald-700 border-emerald-200",
+                    job_stats: "bg-blue-100 text-blue-700 border-blue-200",
+                    estimated: "bg-amber-100 text-amber-700 border-amber-200",
+                  };
+                  const labels: Record<string, string> = {
+                    historical_filter: "simulated",
+                    job_stats: "job data",
+                    estimated: "estimated",
+                  };
+                  return (
+                    <span className={`text-[9px] px-1.5 py-0.5 rounded border font-medium ${styles[method] ?? styles.estimated}`}>
+                      {labels[method] ?? method}
+                    </span>
+                  );
+                };
+
+                const CountBar = ({ before, after }: { before: number; after: number }) => {
+                  const max = Math.max(before, after, 1);
+                  return (
+                    <div className="flex items-center gap-2 text-[10px]">
+                      <span className="text-gray-500 w-10 text-right">{before}</span>
+                      <div className="flex-1 h-3 bg-gray-100 rounded-full overflow-hidden flex">
+                        <div
+                          className="h-full bg-red-300 rounded-l-full"
+                          style={{ width: `${(before / max) * 100}%` }}
+                        />
+                      </div>
+                      <span className="text-gray-400">→</span>
+                      <div className="flex-1 h-3 bg-gray-100 rounded-full overflow-hidden flex">
+                        <div
+                          className="h-full bg-emerald-400 rounded-l-full transition-all"
+                          style={{ width: `${(after / max) * 100}%` }}
+                        />
+                      </div>
+                      <span className="text-emerald-700 font-semibold w-10">{after}</span>
+                    </div>
+                  );
+                };
+
+                const CandidateCard = ({ c, isTop }: { c: RepairCandidate; isTop: boolean }) => {
+                  const isApplying = applyingCandidateId === c.id;
+                  const anyApplying = applyingCandidateId !== null;
+                  return (
+                    <div className={`rounded-lg border p-3 space-y-2.5 ${
+                      isTop
+                        ? "border-violet-300 bg-violet-50"
+                        : "border-gray-200 bg-white"
+                    }`}>
+                      {/* Header row */}
+                      <div className="flex items-start gap-2 flex-wrap">
+                        <CategoryIcon cat={c.category} />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {isTop && (
+                              <span className="text-[9px] bg-violet-600 text-white rounded-full px-2 py-0.5 font-semibold">
+                                Recommended
+                              </span>
+                            )}
+                            {!c.safety_gate_passed && (
+                              <span className="text-[9px] bg-red-100 text-red-700 border border-red-200 rounded-full px-2 py-0.5 font-medium">
+                                Safety gate failed
+                              </span>
+                            )}
+                            <MethodBadge method={c.simulation.method} />
+                          </div>
+                          <p className="text-[11px] font-semibold text-gray-800 mt-0.5">{c.label}</p>
+                          <p className="text-[10px] text-gray-500 leading-relaxed">{c.description}</p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <div className="text-lg font-bold text-violet-700">{c.confidence}%</div>
+                          <div className="text-[9px] text-gray-400">confidence</div>
+                        </div>
+                      </div>
+
+                      {/* Count bar */}
+                      <div>
+                        <div className="flex justify-between text-[9px] text-gray-400 mb-1">
+                          <span>URLs before fix</span>
+                          <span>URLs after fix</span>
+                        </div>
+                        <CountBar before={c.simulation.before_count} after={c.simulation.after_count} />
+                      </div>
+
+                      {/* Drop rate + gain */}
+                      <div className="grid grid-cols-3 gap-1.5 text-center text-[10px]">
+                        <div className="bg-white rounded border border-gray-200 p-1.5">
+                          <div className="font-bold text-red-600">{c.simulation.drop_rate_before_pct}%</div>
+                          <div className="text-gray-400">Drop before</div>
+                        </div>
+                        <div className="bg-white rounded border border-gray-200 p-1.5">
+                          <div className="font-bold text-emerald-600">{c.simulation.drop_rate_after_pct}%</div>
+                          <div className="text-gray-400">Drop after</div>
+                        </div>
+                        <div className="bg-white rounded border border-gray-200 p-1.5">
+                          <div className="font-bold text-violet-700">+{c.expected_gain}</div>
+                          <div className="text-gray-400">Expected gain</div>
+                        </div>
+                      </div>
+
+                      {/* Rescued URL samples */}
+                      {c.simulation.sample_urls_rescued.length > 0 && (
+                        <div>
+                          <p className="text-[9px] font-semibold text-emerald-700 mb-0.5">Sample URLs this fix rescues:</p>
+                          <ul className="text-[9px] text-emerald-800 font-mono space-y-0.5 max-h-[60px] overflow-auto">
+                            {c.simulation.sample_urls_rescued.map((u, i) => (
+                              <li key={i} className="truncate">✓ {u}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {/* Simulation note */}
+                      {c.simulation.note && (
+                        <p className="text-[9px] text-amber-700 bg-amber-50 border border-amber-100 rounded px-2 py-1 leading-relaxed">
+                          {c.simulation.note}
+                        </p>
+                      )}
+
+                      {/* Apply button */}
+                      {c.safety_gate_passed && (
+                        <Button
+                          size="sm"
+                          onClick={() => applyRepairCandidate(c)}
+                          disabled={anyApplying}
+                          className={`w-full h-7 text-xs gap-1.5 ${
+                            isTop
+                              ? "bg-violet-600 hover:bg-violet-700 text-white"
+                              : "bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-300"
+                          }`}
+                        >
+                          {isApplying ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCheck className="w-3 h-3" />}
+                          {isApplying
+                            ? "Applying fix…"
+                            : isTop
+                              ? "Apply Recommended Fix"
+                              : "Apply This Fix"}
+                        </Button>
+                      )}
+                    </div>
+                  );
+                };
+
+                return (
+                  <div className="border border-violet-200 rounded-xl p-3 bg-violet-50/40 space-y-3">
+                    {/* Panel header */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <Wrench className="w-4 h-4 text-violet-600" />
+                          <p className="text-xs font-bold text-violet-900">Auto Repair Results</p>
+                          <span className="text-[9px] bg-violet-100 text-violet-700 border border-violet-200 rounded-full px-2 py-0.5 font-medium">
+                            {candidates.length} fix{candidates.length !== 1 ? "es" : ""} tested
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-gray-500 mt-0.5">
+                          Problem: <strong>{problemLabel[problem] ?? problem}</strong>
+                          {" · "}
+                          {raw_discovered} discovered
+                          {" → "}
+                          {after_filter} passed filter
+                          {historical_url_count > 0 && ` · simulated against ${historical_url_count} historical URLs`}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        className="text-gray-400 hover:text-gray-600 p-0.5"
+                        onClick={() => setRepairCandidates(null)}
+                        title="Dismiss"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    {candidates.length === 0 && (
+                      <p className="text-xs text-gray-400 text-center py-3">
+                        No fix candidates passed the safety gate (after_count &gt; 0, drop_rate &lt; 70%).
+                        Try running Test Discovery first to see what the scraper is finding.
+                      </p>
+                    )}
+
+                    {/* Recommended fix */}
+                    {recommended && (
+                      <div>
+                        <p className="text-[9px] font-semibold text-violet-700 uppercase tracking-wide mb-1.5">Recommended fix</p>
+                        <CandidateCard c={recommended} isTop={true} />
+                      </div>
+                    )}
+
+                    {/* Other options */}
+                    {others.length > 0 && (
+                      <div>
+                        <p className="text-[9px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
+                          Other options ({others.length})
+                        </p>
+                        <div className="space-y-2">
+                          {others.map(c => (
+                            <CandidateCard key={c.id} c={c} isTop={false} />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Refresh link */}
+                    <div className="flex justify-end">
+                      <button
+                        type="button"
+                        onClick={generateRepairCandidates}
+                        disabled={loadingCandidates}
+                        className="text-[10px] text-violet-500 hover:text-violet-700 flex items-center gap-1"
+                      >
+                        <RefreshCw className="w-3 h-3" /> Re-run simulation
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Suggested config + Apply Fix — hidden when auto-repair already handled the issue */}
               {hasSuggestions && !autoRepairResult && (() => {
