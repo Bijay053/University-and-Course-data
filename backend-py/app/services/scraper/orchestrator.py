@@ -844,8 +844,10 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 _failure_msg = (
                     f"SearchStax provider returned 0 links — aborting (not falling "
                     f"back to BFS which will also return 0).  Provider error: {_ss_error or 'none'}. "
-                    f"Check that SCRAPE_DO_TOKEN (or literal token in hud.yaml) is valid "
-                    f"and that the Solr endpoint is reachable."
+                    f"Check that the SearchStax token is valid: set 'authorization_token' "
+                    f"in the uni YAML, 'token_env' pointing to an env var, or the global "
+                    f"'SEARCHSTAX_TOKEN' environment variable.  Also verify the Solr "
+                    f"endpoint URL is reachable and the filter_query matches this core."
                 )
                 log.error(_failure_msg)
                 job.status = "failed"

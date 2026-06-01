@@ -38,6 +38,10 @@
 #      detector ran against the static nav/footer shell and never saw the
 #      international student-type data. Disabled the filter — see
 #      extraction.filters.domestic_only below. (2026-06-01)
+#   7. REVERTS Fix 6 — domestic-only courses were leaking into staged output.
+#      The disable was an overcorrection: the filter actually fires per-course
+#      (single vs double Nursing, Bachelor vs Master Social Work), proving it
+#      reads a real per-course marker and is reliable. Re-enabled. (2026-06-01)
 
 discovery:
   # allow-list OVERRIDE (Fix 4): Federation's real course-detail pages live
@@ -186,35 +190,27 @@ extraction:
 
   filters:
     domestic_only:
-      # DISABLED 2026-06-01 (Fix 6) — this filter was dropping legitimate
-      # INTERNATIONAL courses as domestic-only.
+      # RE-ENABLED 2026-06-01 (Fix 7) — reverts the Fix 6 disable, which was an
+      # overcorrection that let genuinely domestic-only courses leak through.
       #
-      # The original assumption (below) was that only VET/TAFE pages carry
-      # `"hasInternational": false` and HE courses set it true. That breaks on
-      # Federation because every /courses/* page is fully JS-rendered: the
-      # static HTML the detector sees is just the global nav/footer shell
-      # (text_len=0), and the real student-type tab loads via JavaScript.
-      # _DOMESTIC_ONLY_RE therefore matches the shell's per-course marker
-      # WITHOUT the international data ever being present, and false-positives
-      # on Bachelor/Master/PhD courses (Criminology, Arts, Visual Arts, Music
-      # Theatre, Social Work, Midwifery, ~40 total). Those drops then cascaded
-      # into "missing_english_requirement" CRITICAL failures downstream.
+      # The run log shows this filter fires PER-COURSE and SELECTIVELY, which is
+      # only possible if it reads a real per-course marker on each page (the
+      # StudentTypeBlock `"hasInternational": false`), NOT a blind global shell:
+      #   - Bachelor of Nursing (Dnn5) staged as international, but the
+      #     Nursing/Midwifery double (Dhl5) was dropped domestic-only.
+      #   - Master of Social Work staged; Bachelor of Social Work was dropped.
+      #   - Bachelor of Business specialisations staged; the base Bachelor of
+      #     Business was dropped.
+      # So the marker IS present per page and the detector is reliable. The Fix 6
+      # claim that it false-positives on a blind JS shell was wrong: a blind
+      # shell would drop all-or-none, not pick single vs double degrees apart.
       #
-      # Turning the filter off stops the false positives. TRADE-OFF: genuinely
-      # domestic-only VET Cert III/IV courses are no longer dropped HERE and
-      # will flow into extraction — most still get caught as
-      # category_landing_page, but expect some VET noise in Publish: Review.
-      # NOTE: some placement-heavy degrees (Nursing, Midwifery, Social Work,
-      # Teaching, Criminology) may be genuinely domestic-only at Federation;
-      # verify a few on the live site (International tab) and prune by name if
-      # needed rather than re-enabling this shell-based detector.
+      # The courses it drops (VET Cert I–IV, Skill Sets, short courses, and
+      # placement-heavy degrees like Nursing/Midwifery doubles, Social Work,
+      # Visual Arts, Music Theatre) are genuinely not offered to international
+      # students at Federation — correctly rejected at the staging gate.
       #
-      # PROPER FIX (code, out of YAML scope): run domestic/international
-      # detection on the BROWSER-RENDERED DOM, not the static shell — or scope
-      # this filter to VET award levels only. Until then this stays off.
-      #
-      # Original (now-invalid) rationale:
-      #   Federation's VET / TAFE Certificate III/IV and Diploma pages render a
-      #   "StudentTypeBlock" JSON with `"hasInternational": false`; the global
-      #   _DOMESTIC_ONLY_RE matched that and dropped them at the staging gate.
-      enabled: false
+      # If a SPECIFIC international course is ever wrongly dropped, prune/allow it
+      # by name rather than disabling the whole filter; a blanket disable trades
+      # one wrong course for ~100 domestic-only courses leaking in.
+      enabled: true

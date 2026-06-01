@@ -1,0 +1,129 @@
+# University of Canterbury (canterbury.ac.nz) — New Zealand
+# New per-uni config. Created 2026-06-01. Verified against live pages same day.
+#
+# WHY THIS CONFIG EXISTS — the un-configured run staged only 4 of 64 candidates,
+# and all 4 were pathway/foundation programmes, NOT degrees. Root causes:
+#
+#   1. DISCOVERY crawled the wrong subtree. BFS from the homepage went into
+#      /study/getting-started/ (fees), /study/study-support-info/ (exam admin),
+#      and /study/academic-study/<faculty> (school/department browse) — none of
+#      which are the course catalogue. It found 64 junk candidates (≥5), so it
+#      never fell back to the sitemap the way Federation did.
+#
+#   2. The REAL qualification pages live at
+#         /study/academic-study/qualifications/<slug>
+#      e.g. /study/academic-study/qualifications/bachelor-of-arts-with-honours
+#      (VERIFIED 2026-06-01 — this is the canonical URL; the marketing
+#      /study/qualifications-and-courses/.../ URLs 301 here). Template is
+#      `uc-qualification-page`, meta DC.type=Qualification. The two real degrees
+#      that DID stage (CUP, DipUniSt) came from exactly this prefix.
+#
+#   3. The catalogue LISTING (/study/academic-study/qualifications) is a JS
+#      Funnelback search. BFS sees "no course links" and cannot enumerate the
+#      detail pages. So discovery MUST come from the sitemap (or a seeded URL
+#      list) — BFS alone will never reach the degrees.
+#
+# CONFIRMED-WORKING keys (same as the Federation per-uni config):
+#   discovery.allow_url_patterns, discovery.block_url_patterns,
+#   extraction.fees.central_page, extraction.english.central_page,
+#   extraction.text_cleaning.
+#
+# KEYS MARKED "VERIFY" below are the linchpin for coverage but their exact names
+# are NOT confirmed against this pipeline — wire them to whatever the discoverer
+# actually reads. (Federation's run used a sitemap fallback, so the capability
+# exists; it just needs to be forced here instead of BFS.)
+
+discovery:
+  # ---- LINCHPIN: force sitemap discovery (VERIFY key names) ----------------
+  # BFS cannot crawl the JS qualifications search, so seed discovery from the
+  # sitemap and let allow_url_patterns below keep only qualification pages.
+  # Without this, allow_url_patterns just filters the junk BFS set down to ~0
+  # and COVERAGE DOES NOT IMPROVE. Confirm the sitemap URL resolves before
+  # relying on it (UC is an AEM site; the sitemap may be split/indexed).
+  force_sitemap: true
+  sitemap_url: "https://www.canterbury.ac.nz/sitemap.xml"
+
+  # ---- allow-list: keep ONLY real qualification detail + intl pathway pages -
+  # The trailing slash after "qualifications/" is deliberate: it matches
+  # /qualifications/<slug> DETAIL pages but NOT the bare /qualifications?...
+  # Funnelback SEARCH URLs (which carry a query string, no slash).
+  allow_url_patterns:
+    - "/study/academic-study/qualifications/"
+    - "/study/other-study-options/transition-programmes/pathways-for-international-students/"
+
+  # ---- block-list: the subtrees that flooded the un-configured run ----------
+  # Redundant once allow_url_patterns is active (these all fail the allow
+  # filter anyway), but kept to document intent and guard the allow-list.
+  # NOTE: none of these strings appear inside /study/academic-study/qualifications/<slug>,
+  # so they cannot accidentally drop a real qualification page.
+  block_url_patterns:
+    - "/study/getting-started/"          # fees, funding, admission, study-costs
+    - "/study/study-support-info/"       # exams, graduation, dates, timetables
+    - "/study/academic-study/arts"       # faculty browse / schools / subjects
+    - "/study/academic-study/business"
+    - "/study/academic-study/education"
+    - "/study/academic-study/engineering"
+    - "/study/academic-study/health"
+    - "/study/academic-study/law"
+    - "/study/academic-study/science"
+    - "/study/academic-study/subjects"   # subject A–Z (JS search)
+    - "/communities/"                    # future-students / international hubs
+    - "scholarships"
+    - "?"                                # drop Funnelback faceted-search URLs
+
+extraction:
+  fees:
+    # UC does NOT publish a single per-course international fee on qualification
+    # pages. Tuition is charged per 15-point course via subject/level "Tuition
+    # Fee Bands", published centrally. Expect per-course fee regex to mostly
+    # MISS or return band/partial values (the run produced bogus fees like
+    # 14,663 / 5,184 / 1,236 — these are domestic/CSP-range, correctly flagged
+    # by your data-quality gate). Point the prefetcher at the central hub; the
+    # indicative per-degree annual fee (e.g. BA ~NZ$22k–42k) lives on the
+    # international-tuition-fees sub-page.
+    central_page: "https://www.canterbury.ac.nz/study/getting-started/study-and-living-costs/study-costs/international-tuition-fees"
+
+  english:
+    # Central English-language requirements page. VERIFY THIS URL RESOLVES — the
+    # run never reached a central English page, and I have not confirmed it. If
+    # it 404s, find the live one (UC links it from each qualification page's
+    # entry-requirements section) before relying on it.
+    central_page: "https://www.canterbury.ac.nz/study/getting-started/admission-and-enrolment/english-language-requirements"
+
+  text_cleaning:
+    name:
+      # UC pages render tel:/mailto: buttons whose ARIA text is being captured
+      # INTO the course name, producing names like:
+      #   "International tuition fees Pressing this button will open your email
+      #    client. Pressing this button will start a call."
+      #   "Arts qualifications Pressing this button will open your email client..."
+      # Strip this boilerplate from extracted names. (CONFIRM your pipeline
+      # supports a `name` strip list — Federation only used `location` strips;
+      # if names aren't configurable, this needs a small extractor change.)
+      strip_patterns:
+        - '\s*Pressing this button will open your email client\.?'
+        - '\s*Pressing this button will start a call\.?'
+    location:
+      # Same boilerplate occasionally lands in location; strip there too.
+      strip_patterns:
+        - '\s*Pressing this button will (?:open your email client|start a call)\.?'
+
+# ---------------------------------------------------------------------------
+# EXTRACTION ENHANCEMENT (code, out of YAML scope — strongest signal on UC)
+# ---------------------------------------------------------------------------
+# Every qualification page embeds structured metadata in <head>, far more
+# reliable than body-text regex or Gemini. Teach the extractor to read these
+# meta tags on uc-qualification-page templates:
+#   meta-UC.degree.duration   -> duration   (e.g. "1 year full-time, up to 2 years part-time")
+#   meta-UC.degree.start      -> intake      (e.g. "Semester 1 or 2 (February or July)")
+#   meta-UC.qualification.type -> degree_level (e.g. "Honours degree")
+#   meta-UC.subject.area      -> category    (e.g. "Arts")
+#   meta-DC.type=Qualification -> page-type gate (only treat these as courses)
+# This would resolve the run's mass "missing duration / missing degree_level /
+# missing intake" warnings without any browser fetch.
+#
+# PERFORMANCE NOTE (not YAML): the run took 268s PER course because nearly every
+# page hit "sparse-static rescue -> per-course browser ↻ -> 60s timeout". UC's
+# STATIC fetch already returns usable text (text_len up to ~50k here), so the
+# forced browser refetch is wasted on this site. Prefer static-first / disable
+# the browser rescue for canterbury.ac.nz to cut runtime ~10x.

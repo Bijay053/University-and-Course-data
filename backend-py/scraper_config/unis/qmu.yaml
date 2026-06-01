@@ -1,0 +1,99 @@
+# Queen Margaret University (QMU)
+# Hostname: www.qmu.ac.uk
+# SearchStax Solr endpoint: searchcloud-1-eu-west-2.searchstax.com/29847/qmu-1736/
+#
+# ── HOW TO FIX THINGS FROM THIS FILE ─────────────────────────────────────────
+#
+#  NO COURSES FOUND / AUTH ERROR?
+#    The SearchStax token below expires when QMU rotates it. To update:
+#    Option A (YAML): set authorization_token to the new token value.
+#    Option B (env var, preferred for prod):
+#      - Remove or comment out authorization_token below
+#      - Add: token_env: QMU_SEARCHSTAX_TOKEN
+#      - Set the QMU_SEARCHSTAX_TOKEN secret in the Replit environment
+#    Option C (global env): set SEARCHSTAX_TOKEN in the environment — this
+#      is used as a last-resort fallback for ALL SearchStax universities.
+#
+#  TOO FEW COURSES?
+#    QMU uses model=coursefinder-ug for undergraduate courses.  If there
+#    are also postgraduate courses on a different model, add:
+#      extra_params:
+#        model: coursefinder-pg
+#        language: en
+#    in a separate scrape job, or check if the filter_query needs changing.
+#
+#  WRONG FILTER (0 RESULTS)?
+#    The provider automatically retries without filter_query when the first
+#    page returns 0 results.  To skip the filter entirely from the start:
+#      filter_query: ""
+#
+#  FEES MISSING?
+#    QMU fees are not in the Solr response — reviewers must fill them in
+#    via the portal, or set central_fee_page to QMU's international fees page.
+#
+#  COURSES HAVE WRONG FIELD VALUES?
+#    This uses the generic mapper (use_generic_mapper: true). It extracts
+#    name, URL, degree level, IELTS, and duration from standard Solr fields.
+#    For custom field extraction, open a code request — no YAML-only fix.
+#
+# ── DEPLOYMENT ────────────────────────────────────────────────────────────────
+# After editing this file, trigger a new scrape from the Scraping Jobs page.
+# No code restart is needed — the YAML is re-read on every scrape job start.
+# ─────────────────────────────────────────────────────────────────────────────
+
+discovery:
+  searchstax:
+    enabled: true
+
+    # SearchStax Solr endpoint for QMU's course finder
+    endpoint: "https://searchcloud-1-eu-west-2.searchstax.com/29847/qmu-1736/emselect"
+
+    # Authentication token — this is the public client token the QMU SPA
+    # sends from every browser session.  It is NOT a server secret, but
+    # rotate it when QMU rebuilds their frontend.
+    #
+    # For production: use token_env instead to avoid committing tokens to git:
+    #   token_env: QMU_SEARCHSTAX_TOKEN
+    authorization_token: "bc0d2578c3f22cca23fdb327f7490ddb56098759"
+
+    # Filter Solr results to course documents only.
+    # The provider auto-retries without this filter if it returns 0 results.
+    filter_query: "sectionType_s:course"
+
+    # QMU-specific Solr params required by their course-finder model.
+    # model=coursefinder-ug: selects QMU's undergraduate course model
+    # language=en: filters to English-language courses
+    # spellcheck.correct=true: Solr spellcheck correction
+    # hl.fragsize=200: highlighting fragment size (safe to include)
+    extra_params:
+      model: "coursefinder-ug"
+      language: "en"
+      spellcheck.correct: "true"
+      hl.fragsize: "200"
+
+    # Use the generic field mapper (not the Huddersfield-specific one).
+    # QMU does not use HUD's fee band schedule or title reformatting.
+    use_generic_mapper: true
+
+    # Pagination
+    page_size: 100
+
+    # Currency for fee rows (GBP — QMU is in Edinburgh, Scotland)
+    currency: "GBP"
+    fee_year: 2025
+
+    # Optional: point at QMU's international fees page so evidence rows
+    # have a meaningful source URL when fees are filled by the reviewer.
+    # central_fee_page: "https://www.qmu.ac.uk/study-here/fees-and-funding/international-student-fees/"
+
+
+extraction:
+  fees:
+    default_currency: "GBP"
+    prefer_international: true
+
+  filters:
+    domestic_only:
+      enabled: false
+    online_only:
+      enabled: true

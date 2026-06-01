@@ -31,41 +31,93 @@ from pydantic import BaseModel, Field
 class SearchStaxConfig(BaseModel):
     """Custom data-source provider: a SearchStax-hosted Solr course index.
 
-    Some universities (e.g. University of Huddersfield) serve their course
-    catalogue from a SearchStax Solr core — the same endpoint their live
-    React SPA queries client-side.  When this block is present the
-    orchestrator skips HTML discovery + per-course extraction entirely and
-    builds fully-formed staged-course records straight from the Solr docs
-    (see ``searchstax_hud.py``).  No page fetching is needed because the
+    Some universities (e.g. University of Huddersfield, Queen Margaret
+    University) serve their course catalogue from a SearchStax Solr core —
+    the same endpoint their live React SPA queries client-side.  When this
+    block is present the orchestrator skips HTML discovery + per-course
+    extraction entirely and builds fully-formed staged-course records
+    straight from the Solr docs.  No page fetching is needed because the
     ``content`` field carries the full page text (IELTS, entry reqs, etc.).
 
-    The ``token`` is the SearchStax read token the SPA ships to every
-    browser, so it is not a server secret — but operators should rotate it
-    periodically.  Prefer ``token_env`` to read it from an environment
-    variable instead of committing it to YAML.
+    Token resolution order (first non-empty wins):
+      1. ``authorization_token`` — literal value in this YAML block
+      2. env var named by ``token_env`` (e.g. ``HUD_SEARCHSTAX_TOKEN``)
+      3. ``token`` — legacy literal field
+      4. ``SEARCHSTAX_TOKEN`` — global fallback env var (set once, works for
+         all universities that don't specify their own token field)
+
+    The read tokens the SPA ships to every browser are not server secrets,
+    but operators should rotate them periodically.  For production, prefer
+    ``token_env`` or the global ``SEARCHSTAX_TOKEN`` env var over committing
+    a literal value.
     """
 
+    enabled: bool = Field(
+        default=True,
+        description=(
+            "Set to false to temporarily disable the SearchStax provider "
+            "without removing the config block.  When false the orchestrator "
+            "falls through to BFS / browser discovery."
+        ),
+    )
     endpoint: str = Field(
         description="Full Solr select URL (e.g. '.../emselect').",
+    )
+    authorization_token: Optional[str] = Field(
+        default=None,
+        description=(
+            "SearchStax read token used in the 'Authorization: Token <t>' "
+            "header.  Priority 1 in the token resolution chain.  The SPA "
+            "ships this to every browser so it is not a server secret, but "
+            "prefer token_env for production to avoid committing it to YAML."
+        ),
     )
     token: Optional[str] = Field(
         default=None,
         description=(
-            "SearchStax read token used in the 'Authorization: Token <t>' "
-            "header.  This is the public client token the SPA exposes; not a "
-            "server secret.  Prefer token_env over hardcoding here."
+            "Legacy literal token field (priority 3).  Prefer "
+            "authorization_token (priority 1) or token_env (priority 2)."
         ),
     )
     token_env: Optional[str] = Field(
         default=None,
         description=(
-            "Name of an environment variable to read the token from. When "
-            "set and present, overrides the literal `token` field."
+            "Name of an environment variable to read the token from (priority "
+            "2).  E.g. 'HUD_SEARCHSTAX_TOKEN' or 'QMU_SEARCHSTAX_TOKEN'.  "
+            "When unset, the global 'SEARCHSTAX_TOKEN' env var is tried last."
         ),
     )
     filter_query: str = Field(
         default="sectionType_s:course",
-        description="Solr fq applied to restrict the result set to courses.",
+        description=(
+            "Solr fq applied to restrict the result set to courses.  The "
+            "provider automatically retries without this filter when the "
+            "initial query returns 0 results (some cores use different section "
+            "types).  Set to empty string '' to skip the filter entirely."
+        ),
+    )
+    extra_params: dict[str, str] = Field(
+        default_factory=dict,
+        description=(
+            "Additional Solr query parameters merged into every paginated "
+            "request.  Use for university-specific API flags that the generic "
+            "provider does not set by default.  "
+            "Example (QMU): {model: 'coursefinder-ug', language: 'en', "
+            "spellcheck.correct: 'true', hl.fragsize: '200'}. "
+            "Values override built-in defaults (q, fq, rows, start, fl, wt) "
+            "when the same key is present."
+        ),
+    )
+    use_generic_mapper: bool = Field(
+        default=False,
+        description=(
+            "When True, use the generic Solr-field mapper from "
+            "generic_search_api instead of the Huddersfield-specific mapper "
+            "(which applies HUD fee bands + name reformatting).  Set to True "
+            "for any university that is NOT Huddersfield.  The generic mapper "
+            "extracts name, URL, degree level, IELTS, duration, and "
+            "description from common Solr field names and the content blob."
+        ),
     )
     page_size: int = Field(
         default=100,

@@ -580,11 +580,23 @@ def _map_doc(doc: dict, cfg: SearchStaxConfig) -> Optional[dict]:
 
 
 def _resolve_token(cfg: SearchStaxConfig) -> Optional[str]:
+    """Resolve the auth token using a 4-level priority chain.
+
+    1. cfg.authorization_token  — new preferred field
+    2. os.environ[cfg.token_env] — per-uni env var name
+    3. cfg.token                 — legacy literal field
+    4. os.environ["SEARCHSTAX_TOKEN"] — global fallback
+    """
+    if cfg.authorization_token:
+        return cfg.authorization_token
     if cfg.token_env:
         env_val = os.environ.get(cfg.token_env)
         if env_val:
             return env_val
-    return cfg.token
+    if cfg.token:
+        return cfg.token
+    # Global fallback — set once in the environment, works for any uni
+    return os.environ.get("SEARCHSTAX_TOKEN") or None
 
 
 async def fetch_searchstax_links(cfg: SearchStaxConfig, emit=None) -> list[dict]:
@@ -592,11 +604,39 @@ async def fetch_searchstax_links(cfg: SearchStaxConfig, emit=None) -> list[dict]
 
     Each returned dict carries a prebuilt ``searchstax_result`` payload that
     ``orchestrator._extract_only`` returns verbatim.
+
+    When ``cfg.use_generic_mapper`` is True the generic field mapper from
+    ``generic_search_api`` is used instead of the Huddersfield-specific one
+    (which applies HUD fee bands + name reformatting).  Set this to True for
+    any non-HUD university.
+
+    ``cfg.extra_params`` is merged into every Solr request, allowing
+    university-specific flags (e.g. ``model=coursefinder-ug``) without code
+    changes.
     """
     token = _resolve_token(cfg)
     headers = {"Accept": "application/json"}
     if token:
         headers["Authorization"] = f"Token {token}"
+
+    # Choose mapper: HUD-specific (default) or generic
+    if cfg.use_generic_mapper:
+        from app.services.scraper.generic_search_api import _map_searchstax_doc
+        def _mapper(doc: dict) -> Optional[dict]:
+            link = _map_searchstax_doc(doc)
+            if not link:
+                return None
+            # Wrap in searchstax_result so orchestrator returns it verbatim
+            result = {
+                "name": link.get("name", ""),
+                "url": link.get("url", ""),
+                "payload": link.get("auto_extracted", {}),
+                "evidence": [],
+            }
+            return {"name": result["name"], "url": result["url"], "searchstax_result": result}
+    else:
+        def _mapper(doc: dict) -> Optional[dict]:  # type: ignore[misc]
+            return _map_doc(doc, cfg)
 
     async def _emit(msg: str) -> None:
         if emit:
@@ -610,31 +650,64 @@ async def fetch_searchstax_links(cfg: SearchStaxConfig, emit=None) -> list[dict]
     start = 0
     page_size = max(1, int(cfg.page_size or 100))
     total: Optional[int] = None
+    _filter = cfg.filter_query or ""
 
-    await _emit(f"[SEARCHSTAX] Querying Solr core ({cfg.filter_query})...")
+    await _emit(
+        f"[SEARCHSTAX] Querying Solr core "
+        f"({'fq=' + _filter if _filter else 'unfiltered'}) ..."
+    )
 
     async with httpx.AsyncClient(timeout=30.0) as client:
+        _retried_unfiltered = False
         while True:
-            params = {
+            params: dict[str, Any] = {
                 "q": "*:*",
-                "fq": cfg.filter_query,
                 "rows": str(page_size),
                 "start": str(start),
                 "fl": _FIELDS,
                 "wt": "json",
             }
-            resp = await client.get(cfg.endpoint, params=params, headers=headers)
-            resp.raise_for_status()
-            data = resp.json()
+            if _filter:
+                params["fq"] = _filter
+            # Merge university-specific extra params (override builtins if same key)
+            params.update(cfg.extra_params or {})
+
+            try:
+                resp = await client.get(cfg.endpoint, params=params, headers=headers)
+                resp.raise_for_status()
+                data = resp.json()
+            except Exception as _fetch_exc:
+                log.error("[SEARCHSTAX] fetch failed (start=%d): %s", start, _fetch_exc)
+                break
+
             response = data.get("response", {})
+            docs = response.get("docs", [])
+
+            # Auto-fallback: if the filter returned 0 on the first page, retry
+            # without it — some cores use different sectionType values.
+            if start == 0 and not docs and _filter and not _retried_unfiltered:
+                _retried_unfiltered = True
+                await _emit(
+                    f"[SEARCHSTAX] {_filter!r} returned 0 — retrying unfiltered ..."
+                )
+                log.info("[SEARCHSTAX] fq=%r returned 0 docs — retrying without filter", _filter)
+                _filter = ""
+                continue
+
             if total is None:
                 total = int(response.get("numFound", 0))
                 await _emit(f"[SEARCHSTAX] {total} course docs found.")
-            docs = response.get("docs", [])
+                if not token:
+                    await _emit(
+                        "[SEARCHSTAX] WARNING: no token configured — requests are "
+                        "unauthenticated.  Set authorization_token in the YAML, "
+                        "token_env, or the SEARCHSTAX_TOKEN environment variable."
+                    )
+
             if not docs:
                 break
             for doc in docs:
-                mapped = _map_doc(doc, cfg)
+                mapped = _mapper(doc)
                 if mapped is not None:
                     links.append(mapped)
                 else:
@@ -652,7 +725,7 @@ async def fetch_searchstax_links(cfg: SearchStaxConfig, emit=None) -> list[dict]
         f"({skipped} unclassifiable doc(s) skipped)."
     )
     log.info(
-        "[SEARCHSTAX] fetched=%s mapped=%s skipped=%s",
-        total, len(links), skipped,
+        "[SEARCHSTAX] fetched=%s mapped=%s skipped=%s token=%s",
+        total, len(links), skipped, "yes" if token else "NO",
     )
     return links

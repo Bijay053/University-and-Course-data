@@ -4,9 +4,6 @@
 discovery:
   always_browser_discover: true
   use_stealth_browser: true
-  # Wayback CDX for jcu.edu.au hits the 10,000-URL cap and returns 0 useful course
-  # URLs every time — pure overhead of 5+ minutes per run. Browser discovers ~109
-  # links directly from the seed URL, so Wayback adds nothing here.
   use_wayback: false
 
   seed_urls:
@@ -32,17 +29,9 @@ discovery:
   max_candidates: 180
 
 extraction:
-  # JCU's "International" tab is JS-driven — appending ?international=true
-  # to a static HTTP request triggers Cloudflare bot detection and returns a
-  # challenge page (no course content), so static URL rewrites cannot be used.
-  # skip_browser_rescue is true to avoid cascading 101 browser sessions; the
-  # browser actions below are available for future targeted use (e.g. repair
-  # passes or manual single-course re-scrapes that allow browser mode).
   skip_browser_rescue: true
   max_parallel_fetch: 8
 
-  # Browser actions: click the "International" tab on the Fast Facts panel.
-  # Runs only during the browser rescue pass (when static HTML fetch missed fee).
   actions:
     - click_text: "International"
     - wait_for:
@@ -59,12 +48,8 @@ extraction:
     default_currency: "AUD"
     prefer_international: true
     prefer_annual_over_total: true
-    # JCU international fees are only on the ?international variant of each
-    # course page (e.g. /courses/bachelor-of-science?international). The
-    # valueless query flag cannot be expressed in url_rewrites.append_query
-    # so we use fee_url_suffix instead.  Cloudflare blocks ?international=true
-    # (static HTTP) but ?international (no value) renders the JS-free tab.
     fee_url_suffix: "?international"
+    force_central_fee_stage: true
 
     reject_keywords:
       - "Commonwealth Supported"
@@ -84,69 +69,145 @@ extraction:
       - "view international fees"
       - "fee schedule"
 
-    force_central_fee_stage: true
-
   english:
     central_page: https://www.jcu.edu.au/policy/academic-governance/student-experience/admissions-policy-schedule-ii
-    # Individual JCU course pages carry per-course IELTS bands (e.g. 6.0, 6.5,
-    # 7.0) that differ from the institution-wide default (5.5 on the central
-    # policy page). Setting course_english_priority prevents the cached central
-    # value from silently overwriting per-course values already extracted from
-    # the ?international page.
+    band_reference_url: https://www.jcu.edu.au/policy/academic-governance/student-experience/admissions-policy-schedule-ii
+
     course_english_priority: true
+    prefer_course_band: true
+    band_overrides_default: true
+    band_overrides_generic_ielts: true
+    do_not_use_central_default_when_band_found: true
+    extract_band_from_course_page: true
+
+    default_band: "Band 2"
     default_ielts: 6.5
     default_pte: 58
-    default_toefl: 79
+    default_toefl: 86
+    default_cae: 176
 
-    # Band → score lookup from JCU Admissions Policy Schedule II.
-    # Each course page says "Band 2" or "Band 3a" in Entry Requirements.
-    # The band_mapping code overrides any central_page-derived value with the
-    # correct per-course band score (more specific than the institution default).
-    # Source: https://www.jcu.edu.au/policy/academic-governance/student-experience/admissions-policy-schedule-ii
-    band_reference_url: https://www.jcu.edu.au/policy/academic-governance/student-experience/admissions-policy-schedule-ii
+    band_detection:
+      enabled: true
+      source_priority:
+        - course_page
+        - international_page
+        - entry_requirements
+        - english_language_requirements
+        - central_page
+
+      patterns:
+        - '(?i)\bBand\s*P\b'
+        - '(?i)\bBand\s*1\b'
+        - '(?i)\bBand\s*2\b'
+        - '(?i)\bBand\s*3a\b'
+        - '(?i)\bBand\s*3b\b'
+        - '(?i)\bBand\s*3c\b'
+        - '(?i)English\s+Language\s+Band\s*P'
+        - '(?i)English\s+Language\s+Band\s*1'
+        - '(?i)English\s+Language\s+Band\s*2'
+        - '(?i)English\s+Language\s+Band\s*3a'
+        - '(?i)English\s+Language\s+Band\s*3b'
+        - '(?i)English\s+Language\s+Band\s*3c'
+        - '(?i)English\s+Band\s*P'
+        - '(?i)English\s+Band\s*1'
+        - '(?i)English\s+Band\s*2'
+        - '(?i)English\s+Band\s*3a'
+        - '(?i)English\s+Band\s*3b'
+        - '(?i)English\s+Band\s*3c'
+
+      normalize:
+        'band p': "Band P"
+        'bandp': "Band P"
+        'english language band p': "Band P"
+        'english band p': "Band P"
+
+        'band 1': "Band 1"
+        'band1': "Band 1"
+        'english language band 1': "Band 1"
+        'english band 1': "Band 1"
+
+        'band 2': "Band 2"
+        'band2': "Band 2"
+        'english language band 2': "Band 2"
+        'english band 2': "Band 2"
+
+        'band 3a': "Band 3a"
+        'band3a': "Band 3a"
+        'english language band 3a': "Band 3a"
+        'english band 3a': "Band 3a"
+
+        'band 3b': "Band 3b"
+        'band3b': "Band 3b"
+        'english language band 3b': "Band 3b"
+        'english band 3b': "Band 3b"
+
+        'band 3c': "Band 3c"
+        'band3c': "Band 3c"
+        'english language band 3c': "Band 3c"
+        'english band 3c': "Band 3c"
+
     band_mapping:
-      # Band P: Foundation-level English (e.g. some pathway, foundation courses)
-      Band P:
+      "Band P":
         ielts_overall: 5.5
         ielts_each: 5.0
         pte_overall: 46
+        pte_each: 42
         toefl_overall: 56
-        cambridge_overall: 162
-      # Band 1: General undergraduate entry
-      Band 1:
+        toefl_each: 16
+        cae_overall: 162
+        cae_each: 154
+
+      "Band 1":
         ielts_overall: 6.0
         ielts_each: 6.0
-        pte_overall: 50
+        pte_overall: 52
+        pte_each: 52
         toefl_overall: 74
-        cambridge_overall: 169
-      # Band 2: Standard undergraduate / most postgraduate programs
-      Band 2:
+        toefl_each: 18
+        cae_overall: 169
+        cae_each: 169
+
+      "Band 2":
         ielts_overall: 6.5
         ielts_each: 6.0
         pte_overall: 58
+        pte_each: 54
         toefl_overall: 86
-        cambridge_overall: 176
-      # Band 3a: Higher-requirement programs (e.g. Medicine, Psychology, Law)
-      Band 3a:
+        toefl_each: 21
+        cae_overall: 176
+        cae_each: 169
+
+      "Band 3a":
         ielts_overall: 7.0
         ielts_each: 6.5
         pte_overall: 65
+        pte_each: 58
         toefl_overall: 94
-        cambridge_overall: 185
-      # Band 3b: Same overall as 3a but 7.0 required in 3 components (6.5 in 1)
-      Band 3b:
+        toefl_each: 23
+        cae_overall: 185
+        cae_each: 176
+
+      "Band 3b":
         ielts_overall: 7.0
         ielts_each: 6.5
+        ielts_note: "7.0 in three components and 6.5 in one component"
         pte_overall: 65
+        pte_each: 58
+        pte_note: "65 in three components and 58 in one component"
         toefl_overall: 94
-        cambridge_overall: 185
-      # Band 3c: Strictest — no IELTS component below 7.0
-      Band 3c:
+        toefl_note: "23 Speaking, 24 Listening, 24 Reading, 27 Writing"
+        cae_overall: 185
+        cae_each: 176
+
+      "Band 3c":
         ielts_overall: 7.0
         ielts_each: 7.0
         pte_overall: 65
+        pte_each: 65
         toefl_overall: 94
-        cambridge_overall: 185
+        toefl_note: "23 Speaking, 24 Listening, 24 Reading, 27 Writing"
+        cae_overall: 185
+        cae_each: 185
 
   intake:
     rolling_enrollment_label: "Rolling"
