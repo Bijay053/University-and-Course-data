@@ -1,0 +1,546 @@
+# ============================================================================
+# PER-UNIVERSITY SCRAPER CONFIGURATION TEMPLATE
+# ============================================================================
+#
+# HOW TO USE
+# ----------
+# 1. Copy this file to scraper_config/unis/<slug>.yaml
+#    (slug = hostname with www. stripped and dots/hyphens collapsed to the
+#     2nd-level domain, e.g. www.acu.edu.au → acu, study.csu.edu.au → csu)
+# 2. Delete every section / key you do NOT need.
+#    The scraper merges defaults.yaml first, then this file — only include
+#    keys where you want to OVERRIDE the default value.
+# 3. Add a header comment block (see top of waikato.yaml or jcu.yaml) with:
+#      - Hostname, CMS platform, country/currency
+#      - Why this config exists (the discovery/extraction problem it solves)
+#      - Any "VERIFY" notes for keys that need live confirmation
+#
+# MERGE ORDER (loader.py, highest priority last)
+# -----------------------------------------------
+#   1. defaults.yaml               — global defaults for every university
+#   2. DB uni pages translation    — central_page/requirements_pdf_url from DB
+#   3. auto_config (site probe)    — auto-detected sitemap URL etc.
+#   4. THIS FILE (per-uni YAML)    — operator-curated per-site overrides   ← you are here
+#   4.5. admin_config (DB)         — overrides applied by the AI fix UI
+#
+# ⚠ ADMIN_CONFIG WARNING
+# -----------------------
+# Step 4.5 admin_config is written by the AI Diagnose/Fix UI and has the
+# HIGHEST priority — it silently overrides anything in this YAML file.
+# Three universities (JCU, Waikato, Canterbury) previously had broken
+# scrapes because stale admin_config values overwrote correct YAML settings.
+#
+# Before relying on a YAML key, check the DB for conflicts:
+#   SELECT scrape_config->'admin_config'->'discovery'
+#   FROM universities WHERE name ILIKE '%<name>%';
+#
+# If admin_config.discovery contains a key you also set here, remove it:
+#   UPDATE universities
+#   SET scrape_config = jsonb_set(
+#       scrape_config, '{admin_config,discovery}',
+#       (scrape_config->'admin_config'->'discovery') - '<key>'
+#   )
+#   WHERE id = <uni_id>;
+#
+# ============================================================================
+
+
+# ── DISCOVERY ────────────────────────────────────────────────────────────────
+# Controls how the URL-discovery phase finds course pages.
+# These settings are SAFE to replay against unknown universities (Tier-3).
+
+discovery:
+
+  # ── Tier 0: SearchStax Solr provider ─────────────────────────────────────
+  # Query a SearchStax-hosted Solr core directly — bypasses all HTML crawling.
+  # Use when the university's site is a JS SPA and the site's own search
+  # widget queries a Solr endpoint client-side (e.g. Huddersfield, QMU).
+  # When present, this tier runs FIRST and skips all other discovery.
+  #
+  # searchstax:
+  #   enabled: true
+  #   endpoint: "https://searchcloud-1-eu-west-2.searchstax.com/29847/<core-id>/emselect"
+  #   # Token resolution order: authorization_token → token_env → token → SEARCHSTAX_TOKEN env
+  #   token_env: "HUD_SEARCHSTAX_TOKEN"       # preferred: env var name (do NOT commit literal)
+  #   # authorization_token: "Token abc123"   # alternative: literal (rotate periodically)
+  #   filter_query: "sectionType_s:course"    # Solr fq restricting to course docs
+  #   use_generic_mapper: false               # true for non-HUD universities
+  #   extra_params:
+  #     model: "coursefinder-ug"
+  #     language: "en"
+  #     spellcheck.correct: "true"
+  #     hl.fragsize: "200"
+  #   page_size: 100                          # Solr docs per paginated request
+  #   max_courses: null                       # cap for debug runs; null = no limit
+  #   fee_year: 2025
+  #   currency: "GBP"                         # NZD for NZ, AUD for AU, GBP for UK
+  #   central_fee_page: null                  # URL used as source_url for fee evidence rows
+
+  # ── Tier 1: YAML-driven generic JSON/REST API ──────────────────────────────
+  # Query any JSON/REST API (SearchStax Solr, Algolia, custom endpoint) for
+  # course links BEFORE BFS/browser. Runs after SearchStax tier.
+  # When it returns ≥1 link, BFS and browser tiers are skipped entirely.
+  #
+  # generic_search_api:
+  #   enabled: true
+  #   method: GET                             # GET or POST
+  #   url: "https://searchcloud-1.searchstax.com/29847/myuni-1234/emselect"
+  #   headers:
+  #     authorization: "Token <your-token>"   # do NOT commit literal tokens to VCS
+  #     accept: "application/json"
+  #   params:
+  #     q: "*"
+  #     rows: "250"
+  #     model: "coursefinder-ug"
+  #   root_path: "response.docs"              # dot-path to the course array in the response
+  #   url_fields: [url, course_url, page_url, link, path]   # tried in order, first wins
+  #   title_fields: [title, name, course_name]              # tried in order, first wins
+  #   allow_url_patterns:
+  #     - '^https://www\.myuni\.edu\.au/courses/[a-z0-9-]+/?$'
+  #   block_url_patterns:
+  #     - '/linkassets/'
+  #     - '/news'
+  #   normalize_relative_urls: true           # prepend base_url to relative paths
+  #   base_url: "https://www.myuni.edu.au"
+  #   page_size: null                         # set to paginate; null = single request
+  #   page_size_param: "rows"
+  #   offset_param: "start"
+  #   max_pages: 20
+  #   max_courses: null                       # debug cap; null = no limit
+
+  # ── Tier 2: Scrapy spider ─────────────────────────────────────────────────
+  # Run a custom Scrapy spider for discovery. Output feeds the normal staging
+  # pipeline. Falls through to BFS/sitemap if the spider returns 0 links.
+  # Spider files must live in backend-py/spiders/<spider>.py.
+  #
+  # scrapy:
+  #   spider: "myuni"                         # filename without .py
+  #   settings:
+  #     DOWNLOAD_DELAY: 1
+  #     CONCURRENT_REQUESTS: 4
+  #   max_courses: null                       # debug cap; null = no limit
+  #   timeout_seconds: 600
+
+  # ── BFS / Sitemap / Browser discovery ─────────────────────────────────────
+
+  # Explicit seed URLs injected into the BFS queue with highest priority (+300
+  # score bonus). Use when you know the exact listing pages and want the crawler
+  # to visit them first rather than guessing from the homepage.
+  # Unlike extra_course_urls, these are LISTING pages — the crawler follows
+  # links from them to individual course pages.
+  seed_urls: []
+  #   - https://www.myuni.edu.au/study/undergraduate/
+  #   - https://www.myuni.edu.au/study/postgraduate/
+
+  # Explicit course page URLs injected directly into the discovered link set
+  # AFTER all discovery tiers. Bypasses BFS, sitemap, browser, and Wayback.
+  # Surgical fallback for known-CRICOS courses all discovery tiers consistently
+  # miss (e.g. a single page behind Cloudflare not reachable by any crawler).
+  extra_course_urls: []
+
+  # Regex whitelist: if non-empty, only URLs matching at least one pattern are
+  # kept. Applied AFTER block_url_patterns.
+  allow_url_patterns: []
+  #   - /study/(?:undergraduate|postgraduate|research)/[a-z0-9-]+/?$
+
+  # Regex blocklist: matching URLs are dropped before extraction.
+  block_url_patterns: []
+  #   - /study/getting-started/
+  #   - /study/fees
+  #   - /news/
+  #   - /events/
+
+  # Substring whitelist (simpler than allow_url_patterns — no regex). Any URL
+  # that does not contain at least one of these substrings is dropped. Empty
+  # list = no-op.
+  must_contain: []
+  #   - /courses/
+  #   - /study/
+
+  # Run Playwright browser-based discovery IN ADDITION to BFS (merging results).
+  # Enable for Cloudflare-protected sites where BFS succeeds on some faculties
+  # but silently misses others that return 403 for plain HTTP. Default: false.
+  always_browser_discover: false
+
+  # Skip the browser discovery fallback entirely, even when BFS returns 0 links.
+  # Enable for Cloudflare Enterprise-walled sites where Playwright is also
+  # IP-blocked — the 90s timeout fires with 0 results and only wastes time.
+  skip_browser_discovery: false
+
+  # Route browser discovery AND per-course HTML fetches through the patchright +
+  # Xvfb stealth stack. Enable ONLY for hosts where regular headless Playwright
+  # fails the Cloudflare challenge (verified for mq.edu.au). Adds ~2–4s/page.
+  # Requires `patchright` package and `xorg.xvfb` system dependency.
+  use_stealth_browser: false
+
+  # Wayback Machine CDX control (tri-state):
+  #   null / omit  — fallback-only: Wayback runs only when ALL other discovery
+  #                  returns 0 links (default behaviour).
+  #   true         — supplemental: always run Wayback AFTER BFS+browser and merge.
+  #   false        — never: disabled even as a fallback (Cloudflare-blocked sites
+  #                  that archive.org cannot index, e.g. JCU).
+  # use_wayback: null
+
+  # Route blocked page fetches through scrape.do residential proxy. Enable when
+  # Cloudflare Enterprise blocks all cloud/datacenter IPs. Requires SCRAPE_DO_TOKEN.
+  scrape_do_fallback: false
+
+  # Always merge sitemap results with BFS candidates even when BFS exceeded the
+  # fallback threshold. Needed for JS-rendered SPAs (Torrens, CDU) and deep-faculty
+  # sites where BFS burns its page budget on info/marketing pages (AUT, ACU).
+  always_sitemap_supplement: false
+
+  # Explicit sitemap URL. Overrides the auto-detected /sitemap.xml location.
+  sitemap_url: null
+  #   sitemap_url: "https://www.myuni.edu.au/sitemap_index.xml"
+
+  # Override the default BFS page budget (12 fast-mode / 25 full-mode). Raise
+  # for sites with unusually large numbers of listing pages (e.g. UOW: 80).
+  bfs_page_budget: null
+
+  # Override the default candidate cap (20 fast / 200 full). Raise when a
+  # sitemap publishes more allow-filtered URLs than the default cap can hold.
+  max_candidates: null
+
+  # Hard wall-clock time limit for the browser-based discovery pass. Default: 90s.
+  browser_time_budget_s: 90
+
+  # Stop following nav pages once this many course links have been found. Default: 100.
+  browser_early_stop_courses: 100
+
+  # Substring patterns (case-insensitive) for nav-candidate URLs to discard without
+  # visiting. Extends the global low-value blocklist (news, fees, events, etc.).
+  block_nav_patterns: []
+  #   - /open-evenings
+  #   - /scholarships
+  #   - /accommodation
+
+  # Additional subdomains to probe when primary URL yields < 5 candidates.
+  # {domain} is replaced with the apex hostname (www. stripped).
+  fallback_subdomains: []
+  #   - handbook.{domain}
+  #   - courses.{domain}
+  #   - international.{domain}
+
+  # Minimum number of courses expected from discovery. When set, the orchestrator
+  # emits a WARNING if the discovered count falls below this threshold. Does not
+  # block the job.
+  expected_min_courses: null
+
+
+# ── EXTRACTION ───────────────────────────────────────────────────────────────
+# Settings that depend on this university's specific content structure.
+# These MUST NOT be replayed against unknown universities in Tier-3.
+
+extraction:
+
+  # ── Fees ──────────────────────────────────────────────────────────────────
+  fees:
+    # URL of the university-wide fee schedule page (prefetched by fee extractor).
+    central_page: null
+    #   central_page: "https://www.myuni.edu.au/study/international/fees"
+
+    # URL of the university-wide fee schedule PDF.
+    fees_pdf_url: null
+
+    # When true, force has_central_fee_page=True so all courses pass the staging
+    # gate even when individual course pages have no fee listed. Use for
+    # universities that publish fees on a separate central schedule only (e.g. UTAS).
+    force_central_fee_stage: false
+
+    # ISO currency code. Override to NZD for NZ universities, GBP for UK.
+    default_currency: "AUD"
+
+    # Number of credit points per unit. When set, per-unit fees × this = total fee.
+    # null = use credit points extracted from the course page.
+    credit_points_per_unit: null
+
+    # Append a raw string to every course URL before fetching, to switch to the
+    # international fee view. E.g. "?international" (JCU), "?audience=INTERNATIONAL".
+    fee_url_suffix: null
+
+    # Prefer the annual fee over the full-course total when the PDF row exposes both.
+    prefer_annual_over_total: false
+
+    # Prefer the "Year 1 fee" amount over the "Total course fee" from the course page.
+    prefer_year_one_over_total: false
+
+    # When true, a successful per-course PDF row match OVERWRITES fee fields already
+    # filled by an earlier extractor (page regex / Gemini). Use when the HTML carries
+    # stale marketing prices but the PDF schedule is the authoritative source.
+    pdf_overrides_page_regex: false
+
+    # Fee calculation mode:
+    #   null / "use_source_value_only"  — store fee as extracted (default).
+    #   "full_course_to_annual"         — divide Full Course total by duration to
+    #                                     get per-year figure (e.g. $166,500/3yr → $55,500).
+    fee_calculation_mode: null
+
+    # Override the recipe-level fee_prevent_full_course_rollup. Set false when
+    # fee_calculation_mode='full_course_to_annual' so the conversion can see fee_term.
+    fee_prevent_full_course_rollup: null
+
+    # Discard any extracted Annual fee above this AUD threshold (likely a total-course
+    # amount misidentified as per-year). Typical safe cap: 80000.
+    max_annual_fee: null
+
+    # Per-uni PDF parser strategy: null = legacy regex, "columnar" = pdftotext-layout
+    # column-aware parser (handles multi-line course names in fee PDFs, e.g. Torrens).
+    pdf_parser: null
+
+    # Per-uni regex override for the per-course PDF data row. Must define group `cricos`.
+    pdf_row_pattern: null
+
+    # Per-uni override for the fee_term emitted by per-course PDF rows.
+    # E.g. "Annual" for PDFs that carry only an annual figure.
+    pdf_fee_term: null
+
+    # Alias map: DB course name (lower-cased) → PDF course name. Used when the PDF
+    # row carries a qualifier not in the DB name and fuzzy matching fails.
+    # course_pdf_aliases:
+    #   "master of design": "Master of Design (Non-Cognate)"
+
+    # Case-insensitive keywords indicating the extracted amount is a domestic/CSP fee.
+    # When present in the fee text, the fee is discarded and left null.
+    reject_keywords: []
+    #   - "Commonwealth Supported"
+    #   - "CSP"
+    #   - "HECS"
+    #   - "HECS-HELP"
+    #   - "Domestic students"
+
+    # When true, prefer the international fee over domestic even when domestic was
+    # extracted first or has higher confidence. Pairs with reject_keywords.
+    prefer_international: false
+
+    # Link-text patterns (case-insensitive, substring). When international_fee is
+    # still blank, follow <a> elements whose text matches any of these phrases
+    # and re-run the fee extractor on the linked page.
+    follow_links: []
+    #   - "fees and scholarships"
+    #   - "international student fees"
+    #   - "fee schedule"
+    #   - "view fees"
+
+
+  # ── English requirements ───────────────────────────────────────────────────
+  english:
+    # URL of the university-wide English requirements page (prefetched by extractor).
+    central_page: null
+    #   central_page: "https://www.myuni.edu.au/international/english-requirements"
+
+    # URL of the English requirements PDF.
+    requirements_pdf_url: null
+
+    # When true, the central-page values are only fallbacks — they never overwrite
+    # a value already extracted from the individual course page. Use for universities
+    # where individual pages carry per-course IELTS that differ from the institution
+    # default (e.g. JCU: Band 1–3, not all 6.5).
+    course_english_priority: false
+
+    # Set false when Gemini vision consistently hallucinates IELTS/PTE scores from
+    # decorative images (e.g. ACAP). Falls back to HTML extraction only.
+    trust_vision_ocr: true
+
+    # Default false. Enable only for universities whose requirements live exclusively
+    # inside images that the DOM-section detector misses — verified by manual spot-check.
+    trust_tier1_vision_ocr_english: false
+
+    # Institutional IELTS/PTE/TOEFL defaults applied when no per-course value is found.
+    # Only set when the university publicly states a single entry standard for all courses.
+    default_ielts: null
+    default_pte: null
+    default_toefl: null
+
+    # Per-uni English-test names to drop from results (case-insensitive).
+    # Use when a marketing page incidentally mentions a test the uni doesn't accept.
+    test_blocklist: []
+    #   - "kite"
+    #   - "pte"
+
+    # Link-text patterns (case-insensitive, substring). Follow <a> elements whose
+    # text matches any of these when IELTS/PTE/TOEFL are missing after course-page extraction.
+    follow_links: []
+    #   - "English Language Requirements"
+    #   - "Minimum English Requirements"
+    #   - "Entry Requirements"
+
+    # Band → score mapping for universities that publish English as named bands
+    # rather than direct IELTS scores (e.g. JCU Bands P–3c).
+    # Keys are the exact band labels as they appear on course pages.
+    # band_mapping:
+    #   "Band 1":
+    #     ielts_overall: 6.0
+    #     ielts_each: 6.0
+    #     pte_overall: 52
+    #     toefl_overall: 74
+    #     cambridge_overall: 169
+    #     duolingo_overall: null
+    #   "Band 2":
+    #     ielts_overall: 6.5
+    #     ielts_each: 6.0
+    #     pte_overall: 58
+    #     toefl_overall: 86
+    #     cambridge_overall: 176
+
+    # URL of the page that defines the band-to-score mapping. Stored as source_url
+    # in the evidence row so reviewers can verify without a code search.
+    band_reference_url: null
+
+
+  # ── Intake ─────────────────────────────────────────────────────────────────
+  intake:
+    # Restrict intake extraction to a dedicated "Start dates" section on the page.
+    # Prevents exam calendars and application deadlines from injecting spurious months.
+    # Enable for universities with a structured "Start dates" / "Next start date" section.
+    start_dates_only: false
+
+    # Characters to scan after the "Start dates" anchor when start_dates_only=true.
+    # 600 covers 3–4 semester entries. Raise if late-listed entries are missed.
+    start_dates_window_chars: 600
+
+    # When set AND the page text contains rolling_enrollment_markers AND no intake
+    # months were extracted, write this label into intake_months. Use for research
+    # degrees (PhD/MPhil) with continuous enrolment (e.g. "Rolling").
+    rolling_enrollment_label: null
+
+    # Lower-cased substrings searched to trigger the rolling_enrollment_label fallback.
+    rolling_enrollment_markers: []
+    #   - "enrolment shall be continuous"
+    #   - "rolling intake"
+
+
+  # ── Filters ────────────────────────────────────────────────────────────────
+  filters:
+    domestic_only:
+      # Drop courses detected as domestic-only during staging. Enable for universities
+      # that list non-international courses without clearly marking them (e.g. ACAP).
+      enabled: false
+
+    online_only:
+      # Drop courses with all-online delivery during staging. Default true mirrors
+      # the historical hard-coded reject. Distance-education-heavy unis (e.g. CSU)
+      # set this to false.
+      enabled: true
+
+
+  # ── Text cleaning ──────────────────────────────────────────────────────────
+  text_cleaning:
+    location:
+      # Regex patterns stripped from raw location strings before parsing.
+      # Applied left to right. Use for site-specific CMS formatting noise.
+      strip_patterns: []
+      #   - '^\s*Available in\s+'
+      #   - '\s*Delivery method\s*'
+
+    duration:
+      # Split compound duration strings on '/' before parsing.
+      # Needed for KBS/Torrens compound patterns: 'X years / Y subjects / Z trimesters'.
+      split_on_slash: false
+
+      # Regex patterns (case-insensitive) applied to each candidate sentence. Sentences
+      # matching any pattern are skipped entirely. Use only for patterns specific to this
+      # university's CMS that the global anti-context filters don't catch.
+      reject_sentence_patterns: []
+      #   - 'up to \d+ years to complete'
+      #   - 'up to \d+ months'
+
+    # Substrings stripped (case-insensitive) from EVERY string field on the staged
+    # payload before DB write. Use for CMS boilerplate polluting multiple fields.
+    global_substring_blocklist: []
+    #   - "Apply Now"
+    #   - "Find out more"
+    #   - "Saved"
+    #   - "Chat"
+
+    # Per-URL hard overrides. Each entry: url_regex, field, value.
+    # When the course URL matches the regex, the named payload field is set to value.
+    # Apply sparingly — extractor / YAML fixes are preferred.
+    field_overrides: []
+    #   - url_regex: '/courses/business-administration'
+    #     field: course_location
+    #     value: "Sydney"
+    #   - url_regex: '/courses/online-.*'
+    #     field: study_mode
+    #     value: "Online"
+
+
+  # ── Course name cleaning ───────────────────────────────────────────────────
+  course_name:
+    # Literal substrings stripped from the raw H1/title text before the standard
+    # suffix-detection regex runs. Matching is case-sensitive, checked from the end.
+    strip_title_suffixes: []
+    #   - " : the University of Western Australia"
+    #   - " | MyUni"
+
+    # University name aliases that must be stripped from scraped course titles.
+    # The full DB university name is always tried; these add abbreviations/brand variants.
+    university_aliases: []
+    #   - "University of East London"
+    #   - "UEL"
+
+    # Additional separator strings checked before the default set (|, -, –, —, :, at, @).
+    remove_separator_suffix: []
+
+
+  # ── URL rewrites ───────────────────────────────────────────────────────────
+  # Per-host query-param rewrites applied to every course URL before fetch.
+  # Use to switch the site into the international-student view.
+  url_rewrites: []
+  #   - host: "www.cqu.edu.au"
+  #     path_contains: "/courses/"    # optional — restrict to course pages
+  #     append_query: "audience=INTERNATIONAL"
+  #   - host: "www.uow.edu.au"
+  #     append_query: "students=international&year=2026"
+
+
+  # ── Browser interaction actions ────────────────────────────────────────────
+  # Ordered browser steps executed after page load, before HTML is captured.
+  # Use to click tabs/accordions that gate international fee or IELTS content.
+  actions: []
+  #   - click_text: "International"       # click tab/button by visible text
+  #   - wait_for:
+  #       text: "International Students"  # wait until page contains text
+  #   - click_css: "#fees-tab"            # click by CSS selector
+  #   - expand_text: "Show more"          # expand accordion/details element
+  #   - scroll_to: "#fees"                # scroll to selector or anchor
+
+
+  # ── Staging gate ───────────────────────────────────────────────────────────
+  staging:
+    # Fields that must be non-null/non-empty for a staged course to pass.
+    # A course missing any listed field is rejected at staging time.
+    reject_if_missing:
+      - course_name
+
+
+  # ── Per-course extraction options ──────────────────────────────────────────
+
+  # Fallback value written to course_location when all extractors return empty.
+  # Use for Cloudflare-protected sites where partial HTML occasionally omits the
+  # Location panel. Set to the primary campus city/name (e.g. "Hobart").
+  default_course_location: null
+
+  # When non-empty, any staged course whose course_location does NOT contain at
+  # least one of these strings (case-insensitive) is flagged as a data-quality failure.
+  campus_allowlist: []
+  #   - Townsville
+  #   - Cairns
+  #   - Brisbane
+  #   - Singapore
+
+  # When true AND the study-mode rule extractor emitted 'Online' at low confidence
+  # AND a physical campus was found in course_location, set study_mode='Blended'.
+  # Use for universities that genuinely offer both online AND on-campus delivery.
+  prefer_blended_over_on_campus: false
+
+  # Skip the sparse-static rescue browser refetch even when fee and duration are
+  # blank after the Gemini-primary pass. Enable for Cloudflare Enterprise-walled
+  # sites where Playwright is also IP-blocked (e.g. Notre Dame: adds 30s/course
+  # with zero benefit).
+  skip_browser_rescue: false
+
+  # Cap the asyncio.Semaphore concurrency during the extraction gather phase.
+  # null = global default (currently 4). Set to 2 or 1 for Cloudflare-heavy sites
+  # where 4 simultaneous browser sessions trigger aggressive 429 rate-limiting.
+  max_parallel_fetch: null
