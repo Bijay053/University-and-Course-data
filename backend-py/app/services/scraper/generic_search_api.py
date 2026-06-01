@@ -762,3 +762,155 @@ async def fetch_generic_api_links(
         provider, api_type,
     )
     return []
+
+
+# ── YAML-driven generic API (discovery.generic_search_api) ───────────────────
+
+async def fetch_yaml_api_links(cfg: Any, emit: Callable[..., Any] | None = None) -> list[dict]:
+    """Fetch course links from a YAML-configured JSON/REST API endpoint.
+
+    Called by the orchestrator when ``discovery.generic_search_api`` is set
+    in the per-uni YAML.  Runs BEFORE BFS/browser discovery — API-first.
+
+    Parameters
+    ----------
+    cfg:
+        ``GenericSearchApiConfig`` instance (from schema.py).
+    emit:
+        Optional logging callable (matches orchestrator emit signature).
+    """
+    import httpx
+
+    def _emit(msg: str) -> None:
+        log.info("[YAML_API] %s", msg)
+        if emit:
+            try:
+                emit(msg)
+            except Exception:
+                pass
+
+    _emit(f"Starting YAML generic_search_api: {cfg.method} {cfg.url}")
+
+    # ── Build allow/block regex sets ──────────────────────────────────────────
+    _allow_res = []
+    for pat in (cfg.allow_url_patterns or []):
+        try:
+            _allow_res.append(re.compile(pat, re.I))
+        except re.error as e:
+            log.warning("[YAML_API] bad allow_url_pattern %r: %s", pat, e)
+    _block_res = []
+    for pat in (cfg.block_url_patterns or []):
+        try:
+            _block_res.append(re.compile(pat, re.I))
+        except re.error as e:
+            log.warning("[YAML_API] bad block_url_pattern %r: %s", pat, e)
+
+    def _keep_url(url: str) -> bool:
+        if _block_res and any(r.search(url) for r in _block_res):
+            return False
+        if _allow_res and not any(r.search(url) for r in _allow_res):
+            return False
+        return True
+
+    def _resolve_url(url: str) -> str:
+        if url and url.startswith("/") and cfg.normalize_relative_urls and cfg.base_url:
+            return cfg.base_url.rstrip("/") + url
+        return url
+
+    def _dig(obj: Any, path: str) -> Any:
+        """Navigate dot-separated path into a JSON structure."""
+        for key in path.split("."):
+            if isinstance(obj, dict):
+                obj = obj.get(key)
+            elif isinstance(obj, list) and key.isdigit():
+                obj = obj[int(key)]
+            else:
+                return None
+        return obj
+
+    def _first_field(item: dict, fields: list[str]) -> str:
+        for f in fields:
+            v = item.get(f)
+            if v and isinstance(v, str):
+                return v.strip()
+        return ""
+
+    # ── Pagination loop ───────────────────────────────────────────────────────
+    links: list[dict] = []
+    offset = 0
+    page_size = cfg.page_size or int(cfg.params.get(cfg.page_size_param, "0") or 0)
+    paginate = page_size > 0
+
+    async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
+        for page_num in range(cfg.max_pages):
+            req_params = dict(cfg.params)
+            if paginate:
+                req_params[cfg.page_size_param] = str(page_size)
+                req_params[cfg.offset_param] = str(offset)
+
+            try:
+                if cfg.method.upper() == "POST":
+                    resp = await client.post(cfg.url, headers=cfg.headers, json=req_params)
+                else:
+                    resp = await client.get(cfg.url, headers=cfg.headers, params=req_params)
+                resp.raise_for_status()
+            except Exception as exc:
+                log.error("[YAML_API] request failed (page %d): %s", page_num, exc)
+                break
+
+            try:
+                data = resp.json()
+            except Exception as exc:
+                log.error("[YAML_API] JSON decode failed: %s", exc)
+                break
+
+            items: list[dict] = []
+            if cfg.root_path:
+                items = _dig(data, cfg.root_path) or []
+            elif isinstance(data, list):
+                items = data
+            else:
+                # Try common wrapper keys
+                for k in ("results", "items", "data", "courses", "docs"):
+                    if isinstance(data.get(k), list):
+                        items = data[k]
+                        break
+
+            if not items:
+                _emit(f"Page {page_num}: 0 items — stopping pagination")
+                break
+
+            page_links = 0
+            for item in items:
+                if not isinstance(item, dict):
+                    continue
+                raw_url = _first_field(item, cfg.url_fields)
+                name = _first_field(item, cfg.title_fields) or raw_url
+                if not raw_url:
+                    continue
+                url = _resolve_url(raw_url)
+                if not _keep_url(url):
+                    continue
+                links.append({"name": name, "url": url})
+                page_links += 1
+
+                if cfg.max_courses and len(links) >= cfg.max_courses:
+                    _emit(f"Reached max_courses cap ({cfg.max_courses})")
+                    return links
+
+            _emit(f"Page {page_num}: {page_links} links kept (total: {len(links)})")
+
+            if not paginate or len(items) < page_size:
+                break  # last page
+            offset += page_size
+
+    # Deduplicate by URL (preserve order)
+    seen: set[str] = set()
+    deduped = []
+    for lk in links:
+        if lk["url"] not in seen:
+            seen.add(lk["url"])
+            deduped.append(lk)
+
+    _emit(f"Done: {len(deduped)} unique course links from YAML generic_search_api")
+    return deduped

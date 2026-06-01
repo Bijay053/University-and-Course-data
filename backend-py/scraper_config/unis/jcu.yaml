@@ -1,22 +1,23 @@
 # James Cook University
 # Hostname: www.jcu.edu.au
+#
+# JCU is a JS-heavy SPA. BFS/browser discovery is unreliable — the site
+# is Cloudflare-protected and returns empty HTML for datacenter IPs.
+# We query the SearchStax Solr core used by the site's own search widget.
+# API discovery runs before BFS (orchestrator YAML-API tier).
+#
+# WARNING: The endpoint URL below contains a SearchStax core identifier
+# captured from JCU's network requests. Verify it is still correct and
+# that the token in headers is the current active token. Do NOT commit
+# the literal token to VCS — replace with an env-var reference when
+# rotating. (2026-05-01)
 
 discovery:
-  always_browser_discover: false
-  use_stealth_browser: true
-  use_wayback: false
-
-  seed_urls:
-    - https://www.jcu.edu.au/courses
-
-  # BFS is skipped for this JS-heavy site. Setting to null to use default if ever reconsidered.
-  bfs_page_budget: null
-  browser_early_stop_courses: 180
-  max_candidates: 220
-
+  # ── YAML-driven API-first discovery ──────────────────────────────────────
+  # Queries JCU's SearchStax Solr core before any BFS/browser attempt.
+  # Set enabled: false to fall back to browser discovery for debugging.
   generic_search_api:
     enabled: true
-    priority: first
     method: GET
     url: "https://searchcloud-1-eu-west-2.searchstax.com/29847/qmu-1736/emselect"
     headers:
@@ -28,41 +29,41 @@ discovery:
       model: "coursefinder-ug"
       language: "en"
       rows: "250"
-
     root_path: "response.docs"
-
     url_fields:
       - url
       - course_url
       - page_url
       - link
       - path
-
     title_fields:
       - title
       - name
       - course_name
-
     allow_url_patterns:
       - '^https://www\.jcu\.edu\.au/courses/[a-z0-9-]+/?$'
       - '^/courses/[a-z0-9-]+/?$'
-
     block_url_patterns:
       - '/linkassets/'
-      # Removed specific listing pages from block_url_patterns to allow browser discovery to traverse them.
-      # They are navigation pages leading to course pages, not actual course pages themselves.
-      # - '/courses/undergraduate$'
-      # - '/courses/postgraduate$'
-      # - '/courses/research$'
       - '/courses/study/'
       - '/news'
       - '/events'
       - '/staff/'
       - '/about'
       - '/contact'
-
     normalize_relative_urls: true
     base_url: "https://www.jcu.edu.au"
+
+  # ── BFS / browser fallback (when API returns 0 links) ────────────────────
+  always_browser_discover: false
+  use_stealth_browser: true
+  use_wayback: false
+  bfs_page_budget: null
+  browser_early_stop_courses: 180
+  max_candidates: 220
+
+  seed_urls:
+    - https://www.jcu.edu.au/courses
 
   allow_url_patterns:
     - '^https://www\.jcu\.edu\.au/courses/[a-z0-9-]+/?$'
@@ -70,11 +71,6 @@ discovery:
 
   block_url_patterns:
     - '/linkassets/'
-    # Removed specific listing pages from block_url_patterns to allow browser discovery to traverse them.
-    # They are navigation pages leading to course pages, not actual course pages themselves.
-    # - '/courses/undergraduate$'
-    # - '/courses/postgraduate$'
-    # - '/courses/research$'
     - '/courses/study/'
     - '/news'
     - '/events'
@@ -82,18 +78,14 @@ discovery:
     - '/about'
     - '/contact'
 
-extraction:
-  skip_browser_rescue: true
-  max_parallel_fetch: 8
 
-  url_rewrites:
-    append_query:
-      - "international"
+extraction:
+  skip_browser_rescue: true   # Cloudflare Enterprise blocks Playwright too; rescue wastes 30 s/course
+  max_parallel_fetch: 8
 
   filters:
     domestic_only:
       enabled: false
-
     online_only:
       enabled: false
 
@@ -101,9 +93,9 @@ extraction:
     default_currency: "AUD"
     prefer_international: true
     prefer_annual_over_total: true
+    # Appends ?international to each course URL so the international fee tab is active
     fee_url_suffix: "?international"
     force_central_fee_stage: true
-
     reject_keywords:
       - "Commonwealth Supported"
       - "CSP"
@@ -112,7 +104,6 @@ extraction:
       - "Domestic students"
       - "Domestic fee"
       - "estimated annual Commonwealth Supported Fee"
-
     follow_links:
       - "fees and scholarships"
       - "international student fees"
@@ -123,78 +114,55 @@ extraction:
       - "fee schedule"
 
   english:
-    enabled: true
-    central_page: https://www.jcu.edu.au/policy/academic-governance/student-experience/admissions-policy-schedule-ii
-    band_reference_url: https://www.jcu.edu.au/policy/academic-governance/student-experience/admissions-policy-schedule-ii
-
+    central_page: "https://www.jcu.edu.au/policy/academic-governance/student-experience/admissions-policy-schedule-ii"
+    band_reference_url: "https://www.jcu.edu.au/policy/academic-governance/student-experience/admissions-policy-schedule-ii"
+    # Prefer the English band stated on the individual course page over the
+    # central-page default (courses vary from Band P to Band 3c). (2026-05-01)
     course_english_priority: true
-    prefer_course_band: true
-    band_overrides_default: true
-    band_overrides_generic_ielts: true
-    do_not_use_central_default_when_band_found: true
-    extract_band_from_course_page: true
-
-    default_band: "Band 2"
     default_ielts: 6.5
     default_pte: 58
     default_toefl: 86
-    default_cae: 176
-
-    band_detection:
-      enabled: true
-      patterns:
-        - '(?i)\bBand\s*P\b'
-        - '(?i)\bBand\s*1\b'
-        - '(?i)\bBand\s*2\b'
-        - '(?i)\bBand\s*3a\b'
-        - '(?i)\bBand\s*3b\b'
-        - '(?i)\bBand\s*3c\b'
-        - '(?i)English\s+Language\s+Band\s*(P|1|2|3a|3b|3c)'
-        - '(?i)English\s+Band\s*(P|1|2|3a|3b|3c)'
-
+    # band_mapping: detect band name on course page → look up IELTS/PTE/TOEFL/CAE scores.
+    # Key = band label as it appears verbatim on course pages.
+    # Valid BandSpec fields: ielts_overall, ielts_each, pte_overall, toefl_overall,
+    #   cambridge_overall, duolingo_overall.
     band_mapping:
       "Band P":
         ielts_overall: 5.5
         ielts_each: 5.0
         pte_overall: 46
         toefl_overall: 56
-        cae_overall: 162
-
+        cambridge_overall: 162
       "Band 1":
         ielts_overall: 6.0
         ielts_each: 6.0
         pte_overall: 52
         toefl_overall: 74
-        cae_overall: 169
-
+        cambridge_overall: 169
       "Band 2":
         ielts_overall: 6.5
         ielts_each: 6.0
         pte_overall: 58
         toefl_overall: 86
-        cae_overall: 176
-
+        cambridge_overall: 176
       "Band 3a":
         ielts_overall: 7.0
         ielts_each: 6.5
         pte_overall: 65
         toefl_overall: 94
-        cae_overall: 185
-
+        cambridge_overall: 185
       "Band 3b":
         ielts_overall: 7.0
         ielts_each: 6.5
-        ielts_note: "7.0 in three components and 6.5 in one component"
         pte_overall: 65
         toefl_overall: 94
-        cae_overall: 185
-
+        cambridge_overall: 185
       "Band 3c":
         ielts_overall: 7.0
         ielts_each: 7.0
         pte_overall: 65
         toefl_overall: 94
-        cae_overall: 185
+        cambridge_overall: 185
 
   intake:
     rolling_enrollment_label: "Rolling"

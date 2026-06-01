@@ -190,6 +190,142 @@ class ScrapyConfig(BaseModel):
     )
 
 
+class GenericSearchApiConfig(BaseModel):
+    """YAML-driven generic JSON/REST API discovery.
+
+    Use when a university's course catalogue is served from a JSON/REST API
+    (SearchStax Solr, Algolia, custom REST endpoint) and you want API-first
+    discovery to run BEFORE BFS/browser tiers.
+
+    Unlike ``discovery.searchstax`` (which uses the HUD-specific or generic
+    Solr mapper), this config lets you specify the full HTTP request shape:
+    method, URL, headers, query params, and how to extract URLs and names from
+    the response.  The orchestrator runs this tier immediately after SearchStax
+    and before BFS/browser discovery — API discovery always wins when it
+    returns ≥1 link.
+
+    Example (SearchStax Solr core for a non-HUD university)::
+
+        discovery:
+          generic_search_api:
+            url: "https://searchcloud-1.searchstax.com/29847/myuni-1234/emselect"
+            headers:
+              authorization: "Token <your-token>"
+            params:
+              q: "*"
+              rows: "250"
+            root_path: "response.docs"
+            url_fields: [url, page_url]
+            title_fields: [title, name]
+            allow_url_patterns:
+              - '^https://www\\.myuni\\.edu\\.au/courses/[a-z0-9-]+/?$'
+            normalize_relative_urls: true
+            base_url: "https://www.myuni.edu.au"
+    """
+
+    enabled: bool = Field(
+        default=True,
+        description=(
+            "Set false to disable without removing the config block. "
+            "When false the orchestrator falls through to BFS/browser."
+        ),
+    )
+    method: str = Field(
+        default="GET",
+        description="HTTP method for the API request: GET or POST.",
+    )
+    url: str = Field(
+        description="Full URL of the JSON/REST API endpoint.",
+    )
+    headers: dict[str, str] = Field(
+        default_factory=dict,
+        description=(
+            "HTTP headers to send with every request. "
+            "E.g. {'authorization': 'Token abc123', 'accept': 'application/json'}. "
+            "Prefer using an environment variable for tokens — do not commit "
+            "literal tokens to the YAML file."
+        ),
+    )
+    params: dict[str, str] = Field(
+        default_factory=dict,
+        description=(
+            "Query parameters (GET) or body fields (POST) sent with every request. "
+            "E.g. {'q': '*', 'rows': '250', 'model': 'coursefinder-ug'}."
+        ),
+    )
+    root_path: Optional[str] = Field(
+        default=None,
+        description=(
+            "Dot-separated path into the JSON response to reach the array of course "
+            "items. E.g. 'response.docs', 'data.items', 'results'. "
+            "None = the response itself is the array."
+        ),
+    )
+    url_fields: list[str] = Field(
+        default_factory=lambda: ["url", "course_url", "page_url", "link", "path"],
+        description=(
+            "Ordered list of JSON field names to try when extracting the course URL "
+            "from each item. The first non-empty value wins."
+        ),
+    )
+    title_fields: list[str] = Field(
+        default_factory=lambda: ["title", "name", "course_name"],
+        description=(
+            "Ordered list of JSON field names to try when extracting the course name. "
+            "The first non-empty value wins."
+        ),
+    )
+    allow_url_patterns: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Regex whitelist applied to extracted URLs. If non-empty, only URLs "
+            "matching at least one pattern are kept."
+        ),
+    )
+    block_url_patterns: list[str] = Field(
+        default_factory=list,
+        description="Regex blocklist applied to extracted URLs. Matching URLs are dropped.",
+    )
+    normalize_relative_urls: bool = Field(
+        default=True,
+        description=(
+            "When True, relative URLs (starting with /) are prepended with base_url "
+            "to make them absolute."
+        ),
+    )
+    base_url: Optional[str] = Field(
+        default=None,
+        description=(
+            "Origin URL used to resolve relative URLs "
+            "(e.g. 'https://www.jcu.edu.au'). Required when normalize_relative_urls=True "
+            "and the API returns relative paths."
+        ),
+    )
+    page_size: Optional[int] = Field(
+        default=None,
+        description=(
+            "When set, paginate the API using page_size_param and offset_param. "
+            "None = single request (rely on rows param in params instead)."
+        ),
+    )
+    page_size_param: str = Field(
+        default="rows",
+        description="Query parameter name for page size (used when page_size is set).",
+    )
+    offset_param: str = Field(
+        default="start",
+        description="Query parameter name for offset / page start.",
+    )
+    max_pages: int = Field(
+        default=20,
+        description="Hard ceiling on pagination rounds to prevent runaway loops.",
+    )
+    max_courses: Optional[int] = Field(
+        default=None,
+        description="Optional cap on extracted links (useful for debug runs).",
+    )
+
+
 class DiscoveryConfig(BaseModel):
     """Safe to replay against unknown universities (Tier-3 playbook matching)."""
 
@@ -207,6 +343,17 @@ class DiscoveryConfig(BaseModel):
             "Spider output feeds the normal staging pipeline. "
             "Falls through to BFS/sitemap if the spider returns 0 links. "
             "See ScrapyConfig and backend-py/spiders/template_spider.py."
+        ),
+    )
+    generic_search_api: Optional[GenericSearchApiConfig] = Field(
+        default=None,
+        description=(
+            "When present, query the configured JSON/REST API for course links "
+            "BEFORE BFS/browser discovery. Supports SearchStax Solr, Algolia, "
+            "and any custom REST endpoint that returns a JSON array. "
+            "The API tier runs immediately after SearchStax — if it returns ≥1 "
+            "link, BFS and browser tiers are skipped. Falls through to BFS if "
+            "0 links returned. See GenericSearchApiConfig for full field docs."
         ),
     )
     fallback_subdomains: list[str] = Field(
