@@ -141,38 +141,226 @@ async def _load_example_yamls(db: AsyncSession, exclude_slug: str, max_examples:
     return examples
 
 
-async def _fetch_live_page_sample(url: str, max_chars: int = 5000) -> str:
-    """Fetch a live URL and return stripped readable text for AI analysis.
+_INSPECT_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/124.0.0.0 Safari/537.36"
+    ),
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+}
 
-    Returns an empty string on any network / parse error (non-fatal).
-    Used to give the AI real page content when 0 courses are staged.
+# URL path segments that almost certainly indicate course-detail pages
+_COURSE_PATH_SIGNALS = re.compile(
+    r"/(courses?|programs?|study|degrees?|postgraduate|undergraduate"
+    r"|bachelor|master|phd|doctorate|diplom|certif|graduate)(/|$|-)",
+    re.IGNORECASE,
+)
+# Segments that are navigation, not content
+_NAV_PATH_SIGNALS = re.compile(
+    r"/(about|contact|news|events|blog|careers|staff|research|login"
+    r"|search|sitemap|privacy|terms|alumni|donate|library|portal|my-)",
+    re.IGNORECASE,
+)
+_JS_SIGNALS = re.compile(
+    r"(enable javascript|javascript is required|javascript is disabled"
+    r"|loading\.\.\.|please wait|cloudflare ray id|just a moment)",
+    re.IGNORECASE,
+)
+
+
+def _page_text(soup: "BeautifulSoup") -> str:  # type: ignore[name-defined]
+    for tag in soup(["script", "style", "noscript", "meta", "link", "svg", "header", "footer", "nav"]):
+        tag.decompose()
+    lines = [l.strip() for l in soup.get_text(separator="\n").splitlines() if l.strip()]
+    return "\n".join(lines)
+
+
+async def _inspect_website_for_ai(
+    seed_url: str,
+    extra_urls: list[str] | None = None,
+) -> str:
+    """Multi-step website inspection for AI diagnosis.
+
+    Steps:
+      1. Fetch the seed/listing URL — detect JS rendering, extract course links
+      2. Follow one course detail page — check field visibility
+      3. Check sitemap.xml
+
+    Returns a rich structured text block for the Gemini prompt.
+    Non-fatal: always returns a string even on total failure.
     """
+    import httpx
+    from bs4 import BeautifulSoup
+    from urllib.parse import urljoin, urlparse
+    from collections import Counter
+
+    findings: list[str] = []
+    errors: list[str] = []
+
+    parsed_root = urlparse(seed_url)
+    origin = f"{parsed_root.scheme}://{parsed_root.netloc}"
+
+    async def _get(client: httpx.AsyncClient, url: str, timeout: float = 12.0) -> httpx.Response | None:
+        try:
+            r = await client.get(url, headers=_INSPECT_HEADERS, timeout=timeout, follow_redirects=True)
+            return r
+        except Exception as exc:
+            errors.append(f"GET {url}: {exc}")
+            return None
+
     try:
-        import httpx
-        from bs4 import BeautifulSoup
-        headers = {
-            "User-Agent": (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/124.0.0.0 Safari/537.36"
-            ),
-            "Accept-Language": "en-US,en;q=0.9",
-        }
-        async with httpx.AsyncClient(follow_redirects=True, timeout=12.0) as client:
-            resp = await client.get(url, headers=headers)
-        if resp.status_code >= 400:
-            return f"[HTTP {resp.status_code} fetching {url}]"
-        soup = BeautifulSoup(resp.text, "html.parser")
-        # Remove script / style noise
-        for tag in soup(["script", "style", "noscript", "meta", "link", "svg"]):
-            tag.decompose()
-        text = soup.get_text(separator="\n", strip=True)
-        # Collapse blank lines
-        lines = [l for l in text.splitlines() if l.strip()]
-        return "\n".join(lines)[:max_chars]
+        async with httpx.AsyncClient(follow_redirects=True, timeout=15.0) as client:
+
+            # ── STEP 1: Fetch seed listing page ───────────────────────────────
+            findings.append(f"STEP 1 — Fetching seed/listing page: {seed_url}")
+            r = await _get(client, seed_url)
+            if r is None or r.status_code >= 400:
+                findings.append(f"  ERROR: Could not fetch seed URL (status={getattr(r,'status_code','timeout')})")
+            else:
+                soup = BeautifulSoup(r.text, "html.parser")
+                body_text = _page_text(soup)
+                body_len = len(body_text)
+
+                # Detect JS rendering
+                is_js_rendered = body_len < 400 or bool(_JS_SIGNALS.search(body_text[:600]))
+                findings.append(f"  HTTP {r.status_code}  |  body text length: {body_len} chars")
+                if is_js_rendered:
+                    findings.append(
+                        "  ⚠ JAVASCRIPT RENDERING DETECTED — the page body is nearly empty or shows "
+                        "'enable JavaScript' text. Static HTTP fetching returns a shell; the scraper "
+                        "needs always_browser_discover: true + use_stealth_browser: true to get real content."
+                    )
+                else:
+                    findings.append("  ✓ Page rendered server-side (body has real content)")
+
+                # Show a snippet of the page body
+                snippet = "\n".join(body_text.splitlines()[:40])
+                findings.append(f"\n  --- PAGE BODY SNIPPET (first 40 lines) ---\n{snippet}\n  --- END SNIPPET ---")
+
+                # Extract all internal links + categorise by path pattern
+                all_links = [
+                    urljoin(seed_url, a["href"])
+                    for a in soup.find_all("a", href=True)
+                    if not a["href"].startswith(("#", "mailto:", "tel:", "javascript:"))
+                    and urlparse(urljoin(seed_url, a["href"])).netloc == parsed_root.netloc
+                ]
+
+                # Count path-prefix patterns (first 2 segments)
+                path_patterns: Counter = Counter()
+                for link in all_links:
+                    p = urlparse(link).path
+                    segs = [s for s in p.split("/") if s]
+                    prefix = "/" + "/".join(segs[:2]) if len(segs) >= 2 else "/" + "/".join(segs)
+                    if prefix and prefix != "/":
+                        path_patterns[prefix] += 1
+
+                top_patterns = path_patterns.most_common(15)
+                if top_patterns:
+                    findings.append(f"\n  Internal links found: {len(all_links)}")
+                    findings.append("  Top URL path patterns (prefix → count):")
+                    for pat, cnt in top_patterns:
+                        tag = ""
+                        if _COURSE_PATH_SIGNALS.search(pat):
+                            tag = "  ← LIKELY COURSE PAGES"
+                        elif _NAV_PATH_SIGNALS.search(pat):
+                            tag = "  (navigation)"
+                        findings.append(f"    {pat}  ({cnt} links){tag}")
+                else:
+                    findings.append("  No internal links found on page — site may be fully JS-rendered.")
+
+                # Pick the best candidate course detail URL to follow
+                course_candidates = [
+                    link for link in all_links
+                    if _COURSE_PATH_SIGNALS.search(urlparse(link).path)
+                    and not _NAV_PATH_SIGNALS.search(urlparse(link).path)
+                    and len(urlparse(link).path.split("/")) >= 3  # must have depth > 2
+                ]
+                detail_url: str | None = course_candidates[0] if course_candidates else None
+
+                # ── STEP 2: Fetch one course detail page ──────────────────────
+                if detail_url:
+                    findings.append(f"\nSTEP 2 — Fetching course detail page: {detail_url}")
+                    r2 = await _get(client, detail_url)
+                    if r2 and r2.status_code < 400:
+                        soup2 = BeautifulSoup(r2.text, "html.parser")
+                        detail_text = _page_text(soup2)
+                        detail_len = len(detail_text)
+                        findings.append(f"  HTTP {r2.status_code}  |  body text length: {detail_len} chars")
+
+                        detail_js = detail_len < 400 or bool(_JS_SIGNALS.search(detail_text[:600]))
+                        if detail_js:
+                            findings.append("  ⚠ COURSE DETAIL PAGE IS ALSO JS-RENDERED — confirms browser rendering required.")
+                        else:
+                            findings.append("  ✓ Course detail page has real content")
+
+                        # Check which fields are visible
+                        fee_found = bool(re.search(r"\$[\d,]{4,}", detail_text))
+                        ielts_found = bool(re.search(r"IELTS\s*[:\s]?\s*\d+\.?\d*", detail_text, re.IGNORECASE))
+                        duration_found = bool(re.search(r"\d+\s*(year|month|semester|week)", detail_text, re.IGNORECASE))
+                        intake_found = bool(re.search(r"(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4}", detail_text, re.IGNORECASE))
+                        degree_found = bool(re.search(r"(Bachelor|Master|PhD|Doctor|Graduate|Diploma|Certificate)", detail_text, re.IGNORECASE))
+
+                        findings.append("\n  Fields visible on course detail page:")
+                        findings.append(f"    degree/title: {'✓ YES' if degree_found else '✗ NOT FOUND'}")
+                        findings.append(f"    international fee ($): {'✓ YES' if fee_found else '✗ NOT FOUND — fee extraction will fail'}")
+                        findings.append(f"    IELTS score: {'✓ YES' if ielts_found else '✗ NOT FOUND'}")
+                        findings.append(f"    duration: {'✓ YES' if duration_found else '✗ NOT FOUND'}")
+                        findings.append(f"    intake months: {'✓ YES' if intake_found else '✗ NOT FOUND'}")
+
+                        # Show detail page snippet
+                        detail_snippet = "\n".join(detail_text.splitlines()[:50])
+                        findings.append(f"\n  --- COURSE DETAIL PAGE SNIPPET (first 50 lines) ---\n{detail_snippet}\n  --- END SNIPPET ---")
+                    else:
+                        findings.append(f"  ERROR: Could not fetch detail page (status={getattr(r2,'status_code','timeout') if r2 else 'timeout'})")
+                else:
+                    findings.append("\nSTEP 2 — No course-like links found on listing page to follow.")
+                    if not is_js_rendered:
+                        findings.append("  This strongly suggests the listing page itself is not the right seed URL,")
+                        findings.append("  OR the course links use a pattern not matching common keywords.")
+
+            # ── STEP 3: Check sitemap ────────────────────────────────────────
+            findings.append(f"\nSTEP 3 — Checking sitemap at {origin}/sitemap.xml")
+            r3 = await _get(client, f"{origin}/sitemap.xml", timeout=8.0)
+            if r3 and r3.status_code == 200:
+                sitemap_text = r3.text[:8000]
+                # Count URLs in sitemap matching course-like patterns
+                sitemap_urls = re.findall(r"<loc>(.*?)</loc>", sitemap_text)
+                course_sitemap = [u for u in sitemap_urls if _COURSE_PATH_SIGNALS.search(u)]
+                findings.append(f"  ✓ sitemap.xml found — {len(sitemap_urls)} URLs total, {len(course_sitemap)} match course-like patterns")
+                if course_sitemap:
+                    findings.append(f"  Sample course URLs from sitemap:")
+                    for u in course_sitemap[:5]:
+                        findings.append(f"    {u}")
+                    # Suggest the common prefix
+                    if len(course_sitemap) > 3:
+                        paths = [urlparse(u).path for u in course_sitemap]
+                        prefix_counts: Counter = Counter()
+                        for p in paths:
+                            segs = [s for s in p.split("/") if s]
+                            pfx = "/" + segs[0] if segs else "/"
+                            prefix_counts[pfx] += 1
+                        top_pfx = prefix_counts.most_common(1)[0][0]
+                        findings.append(f"  → Most common path prefix in sitemap: {top_pfx}  (set as allow_url_patterns pattern)")
+            else:
+                status = getattr(r3, "status_code", "timeout") if r3 else "timeout"
+                findings.append(f"  sitemap.xml returned {status} — no sitemap available")
+                # Try sitemap_index.xml
+                r3b = await _get(client, f"{origin}/sitemap_index.xml", timeout=6.0)
+                if r3b and r3b.status_code == 200:
+                    findings.append(f"  ✓ sitemap_index.xml found — use always_sitemap_supplement: true")
+
     except Exception as exc:
-        log.warning("_fetch_live_page_sample(%s) failed: %s", url, exc)
-        return f"[Could not fetch {url}: {exc}]"
+        log.exception("_inspect_website_for_ai(%s) outer error: %s", seed_url, exc)
+        findings.append(f"[Inspection failed with error: {exc}]")
+
+    if errors:
+        findings.append("\nNetwork errors during inspection:")
+        for e in errors:
+            findings.append(f"  {e}")
+
+    return "\n".join(findings)
 
 
 def _extract_seed_urls_from_yaml(yaml_text: str) -> list[str]:
@@ -1219,35 +1407,41 @@ async def ai_diagnose_scraper_config(
                 f"staged count is less than 30% of expected. A filter or discovery problem is likely."
             )
 
-    # ── Fetch live page sample when 0 staged (gives AI real HTML to analyse) ──
+    # ── Live website inspection (always run — gives AI real evidence) ─────────
+    # Inspect if: 0 staged, OR low staging rate (<30% of expected), OR any CRITICAL issue detected.
+    # This ensures Gemini always has ground-truth data about what's actually on the site.
     live_page_block = ""
-    if last_job_summary and last_job_summary.get("imported", 0) == 0:
-        seed_urls = _extract_seed_urls_from_yaml(current_yaml)
-        # Also try the university website URL from DB
-        if university_id and not seed_urls:
+    should_inspect = (
+        not last_job_summary  # never scraped
+        or last_job_summary.get("imported", 0) == 0  # zero staged
+        or last_job_summary.get("raw_discovered", 0) == 0  # zero discovered
+        or len(quality_issues) > 0  # any quality issues
+        or len(admin_config_issues) > 0  # any admin config issues
+    )
+    if should_inspect:
+        # Resolve best seed URL: YAML seed_urls first, then DB scrape_url / website
+        inspect_urls = _extract_seed_urls_from_yaml(current_yaml)
+        if university_id and not inspect_urls:
             try:
                 uni_row = (await db.execute(
                     text("SELECT COALESCE(scrape_url, website, '') AS url FROM universities WHERE id = :uid"),
                     {"uid": university_id}
                 )).one_or_none()
                 if uni_row and uni_row.url:
-                    seed_urls = [uni_row.url]
+                    inspect_urls = [uni_row.url]
             except Exception:
                 pass
-        if seed_urls:
-            fetch_url = seed_urls[0]
-            log.info("ai_diagnose: fetching live sample from %s (0 staged)", fetch_url)
-            page_text = await _fetch_live_page_sample(fetch_url, max_chars=4500)
-            if page_text and not page_text.startswith("[Could not"):
-                live_page_block = (
-                    f"\n=== LIVE PAGE SAMPLE (fetched from {fetch_url}) ===\n"
-                    "This is the actual text content of the university's seed URL. "
-                    "Use it to understand the site structure and why extraction is failing:\n\n"
-                    + page_text
-                    + "\n=== END LIVE PAGE SAMPLE ==="
-                )
-            else:
-                live_page_block = f"\n=== LIVE PAGE SAMPLE ===\n{page_text}\n=== END ==="
+        if inspect_urls:
+            fetch_url = inspect_urls[0]
+            log.info("ai_diagnose: running live website inspection on %s", fetch_url)
+            inspection_report = await _inspect_website_for_ai(fetch_url)
+            live_page_block = (
+                f"\n=== LIVE WEBSITE INSPECTION REPORT (fetched right now from {fetch_url}) ===\n"
+                "This is what the university's website ACTUALLY looks like today. "
+                "Use this evidence to make specific, accurate diagnosis and YAML fixes:\n\n"
+                + inspection_report
+                + "\n=== END LIVE WEBSITE INSPECTION ==="
+            )
 
     # ── Load successful YAML examples for AI context ───────────────────────────
     examples = await _load_example_yamls(db, exclude_slug=slug, max_examples=3)
@@ -1355,14 +1549,41 @@ One plain-English sentence: what was wrong and what the fix does.
 YAML:
 (complete updated YAML with all fixes applied — preserve all existing comments and keys)
 
+HOW TO USE THE LIVE WEBSITE INSPECTION REPORT:
+The inspection report above was fetched RIGHT NOW from the real website. It is ground truth.
+Read it carefully and use it to make SPECIFIC, ACCURATE fixes — not generic suggestions.
+
+1. JAVASCRIPT DETECTION:
+   If the inspection says "JAVASCRIPT RENDERING DETECTED" or body < 400 chars:
+   → Set: always_browser_discover: true, use_stealth_browser: true
+   → Do NOT suggest allow_url_patterns changes as the problem is rendering, not filtering.
+
+2. URL PATTERN ANALYSIS — use the EXACT patterns you see in the inspection output:
+   If the inspection lists "Top URL path patterns" with course-like paths (e.g., /courses/, /study/, /programs/):
+   → Set allow_url_patterns to match exactly those paths. Use the actual path prefix shown, e.g.:
+     allow_url_patterns: ["/courses/", "/study/"] 
+   → Remove block_url_patterns entries that would block those same paths.
+   If the sitemap step found course URLs, note the path prefix and set allow_url_patterns to match it.
+
+3. FIELD VISIBILITY — from the course detail page inspection:
+   If "international fee ($): NOT FOUND" → fee is on a separate fees page or behind JS. Suggest PDF fee extraction or browser.
+   If "IELTS score: NOT FOUND" → add extraction.hints for ielts_overall pointing to the requirements section.
+   If "intake months: NOT FOUND" → add extraction.hints for intake_months.
+
+4. SEED URL:
+   If the seed URL returned HTTP 4xx or was empty → update seed_urls to the correct course listing URL.
+   Look at the actual URL patterns found and pick the listing-level parent URL.
+
+5. SITEMAP:
+   If sitemap.xml was found AND has course URLs → add always_sitemap_supplement: true.
+   Use the actual path prefix from the sitemap course URLs for allow_url_patterns.
+
 Rules:
-- You MUST include every CRITICAL issue from "PROBLEMS DETECTED FROM DATA" in your DIAGNOSIS.
-- If 0 courses staged but URLs were found: block_url_patterns may be blocking course-detail pages, or the site needs browser rendering. Look at the LIVE PAGE SAMPLE if provided.
-- If the LIVE PAGE SAMPLE shows JavaScript-heavy content or empty body: set always_browser_discover: true and use_stealth_browser: true.
-- If the LIVE PAGE SAMPLE shows course links at specific URL patterns: update allow_url_patterns to match those patterns.
-- If field fill rates < 50%: add extraction.hints or extraction.ai config.
-- Only use YAML keys from the SETTINGS REFERENCE — do NOT invent keys.
-- Preserve all existing comments and structure unless replacing them with better ones."""
+- MUST include every CRITICAL issue from "PROBLEMS DETECTED FROM DATA" in your DIAGNOSIS.
+- Quote actual numbers from the stats and actual URL patterns from the inspection.
+- Never suggest a fix you cannot back up with evidence from the inspection report or the scrape stats.
+- Only use YAML keys that exist in the SETTINGS REFERENCE.
+- Preserve all existing YAML comments and structure."""
 
     try:
         raw_text = await _call_gemini_with_retry(client, gemini_prompt)
