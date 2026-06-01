@@ -32,6 +32,12 @@
 #      under the "English language requirements" heading (e.g. 6.5). Scoped
 #      extraction to the dedicated heading + capture overall AND min band
 #      via extraction.english below. (verified 2026-06-01)
+#   6. domestic_only filter was dropping legitimate INTERNATIONAL courses as
+#      domestic-only (~40 Bachelor/Master/PhD, e.g. Criminology, Arts, Visual
+#      Arts, Social Work). Root cause: /courses/* pages are JS-rendered, so the
+#      detector ran against the static nav/footer shell and never saw the
+#      international student-type data. Disabled the filter — see
+#      extraction.filters.domestic_only below. (2026-06-01)
 
 discovery:
   # allow-list OVERRIDE (Fix 4): Federation's real course-detail pages live
@@ -180,12 +186,35 @@ extraction:
 
   filters:
     domestic_only:
-      # Federation's VET / TAFE Certificate III, Certificate IV and Diploma
-      # pages render a "StudentTypeBlock" JSON with `"hasInternational": false`
-      # when the International tab is greyed out (course not offered to
-      # international students). The global _DOMESTIC_ONLY_RE pattern matches
-      # that exact JSON marker, so enabling this filter drops those pages at
-      # the staging gate. HE courses (Bachelor / Master / Postgrad) that DO
-      # accept international students either omit the block or set
-      # `hasInternational: true` and stage normally.
-      enabled: true
+      # DISABLED 2026-06-01 (Fix 6) — this filter was dropping legitimate
+      # INTERNATIONAL courses as domestic-only.
+      #
+      # The original assumption (below) was that only VET/TAFE pages carry
+      # `"hasInternational": false` and HE courses set it true. That breaks on
+      # Federation because every /courses/* page is fully JS-rendered: the
+      # static HTML the detector sees is just the global nav/footer shell
+      # (text_len=0), and the real student-type tab loads via JavaScript.
+      # _DOMESTIC_ONLY_RE therefore matches the shell's per-course marker
+      # WITHOUT the international data ever being present, and false-positives
+      # on Bachelor/Master/PhD courses (Criminology, Arts, Visual Arts, Music
+      # Theatre, Social Work, Midwifery, ~40 total). Those drops then cascaded
+      # into "missing_english_requirement" CRITICAL failures downstream.
+      #
+      # Turning the filter off stops the false positives. TRADE-OFF: genuinely
+      # domestic-only VET Cert III/IV courses are no longer dropped HERE and
+      # will flow into extraction — most still get caught as
+      # category_landing_page, but expect some VET noise in Publish: Review.
+      # NOTE: some placement-heavy degrees (Nursing, Midwifery, Social Work,
+      # Teaching, Criminology) may be genuinely domestic-only at Federation;
+      # verify a few on the live site (International tab) and prune by name if
+      # needed rather than re-enabling this shell-based detector.
+      #
+      # PROPER FIX (code, out of YAML scope): run domestic/international
+      # detection on the BROWSER-RENDERED DOM, not the static shell — or scope
+      # this filter to VET award levels only. Until then this stays off.
+      #
+      # Original (now-invalid) rationale:
+      #   Federation's VET / TAFE Certificate III/IV and Diploma pages render a
+      #   "StudentTypeBlock" JSON with `"hasInternational": false`; the global
+      #   _DOMESTIC_ONLY_RE matched that and dropped them at the staging gate.
+      enabled: false

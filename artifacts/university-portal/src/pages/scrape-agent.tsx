@@ -401,6 +401,7 @@ type RepairCandidate = {
   is_recommended: boolean;
   safety_gate_passed: boolean;
   expected_gain: number;
+  selection_reason: string;
 };
 
 type RepairCandidatesResult = {
@@ -546,6 +547,10 @@ export default function ScrapeAgentPage() {
   const [loadingCandidates, setLoadingCandidates] = useState(false);
   const [repairCandidates, setRepairCandidates] = useState<RepairCandidatesResult | null>(null);
   const [applyingCandidateId, setApplyingCandidateId] = useState<string | null>(null);
+  const [postRepairCandidate, setPostRepairCandidate] = useState<RepairCandidate | null>(null);
+  const [postRepairDiscovery, setPostRepairDiscovery] = useState<DiscoveryTest | null>(null);
+  const [runningPostRepair, setRunningPostRepair] = useState(false);
+  const [launchingFullScrape, setLaunchingFullScrape] = useState(false);
 
   const loadConfig = useCallback(async () => {
     setLoading(true);
@@ -709,31 +714,65 @@ export default function ScrapeAgentPage() {
     const jobId = config?.latest_job_id;
     if (!jobId) return;
     setApplyingCandidateId(candidate.id);
+    setPostRepairCandidate(null);
+    setPostRepairDiscovery(null);
     try {
+      // Step 1: Apply the config patch — do NOT trigger a full scrape yet
       const res = await fetch(`${BASE}/api/scrape/jobs/${jobId}/auto-repair-filter`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           recipe_patch: candidate.recipe_patch,
           filter_cleared: candidate.id,
+          trigger_scrape: false,
         }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      setAutoRepairResult(data);
+      await res.json();
       setRepairCandidates(null);
-      if (data.status === "ok") {
-        toast({ title: "Fix applied — new scrape started", description: candidate.label });
-        await loadConfig();
-      } else {
-        toast({ title: "Fix applied", description: data.message, variant: "destructive" });
+      setPostRepairCandidate(candidate);
+      toast({ title: "Fix applied", description: "Running fast Test Discovery to validate…" });
+
+      // Step 2: Auto-run fast Test Discovery to validate the fix immediately
+      setRunningPostRepair(true);
+      const discRes = await fetch(
+        `${BASE}/api/universities/${uniId}/test-discovery?fast_only=true`,
+        { method: "POST" },
+      );
+      if (discRes.ok) {
+        const discData: DiscoveryTest = await discRes.json();
+        setPostRepairDiscovery(discData);
+        setDiscoveryTest(discData);
       }
     } catch (err) {
       toast({ title: "Apply failed", description: String(err), variant: "destructive" });
     } finally {
       setApplyingCandidateId(null);
+      setRunningPostRepair(false);
+      await loadConfig();
     }
-  }, [config?.latest_job_id, toast, loadConfig]);
+  }, [config?.latest_job_id, uniId, toast, loadConfig]);
+
+  const launchFullScrapeAfterRepair = useCallback(async () => {
+    if (!uniId) return;
+    setLaunchingFullScrape(true);
+    try {
+      const res = await fetch(`${BASE}/api/scrape/start`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ university_id: uniId }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      toast({ title: "Full scrape started", description: "Monitor progress in Scraping Jobs." });
+      setPostRepairCandidate(null);
+      setPostRepairDiscovery(null);
+      await loadConfig();
+    } catch (err) {
+      toast({ title: "Failed to start scrape", description: String(err), variant: "destructive" });
+    } finally {
+      setLaunchingFullScrape(false);
+    }
+  }, [uniId, toast, loadConfig]);
 
   // Build admin_config dict from UI state
   const buildAdminConfig = () => {
@@ -2076,6 +2115,118 @@ export default function ScrapeAgentPage() {
                 </div>
               )}
 
+              {/* ── Post-repair validation panel ──────────────────────────── */}
+              {(postRepairCandidate || runningPostRepair) && !repairCandidates && (() => {
+                const disc = postRepairDiscovery;
+                const isSafe = disc && disc.safety_level === "safe" && disc.total_raw > 0;
+                const isWarning = disc && disc.safety_level === "warning";
+                const isDangerous = disc && (!isSafe && !isWarning);
+
+                return (
+                  <div className="border border-violet-300 rounded-xl p-3 bg-violet-50 space-y-3">
+                    {/* Header */}
+                    <div className="flex items-center gap-2">
+                      <Wrench className="w-4 h-4 text-violet-600 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-bold text-violet-900">Fix Applied — Validating</p>
+                        {postRepairCandidate && (
+                          <p className="text-[10px] text-violet-600 truncate">{postRepairCandidate.label}</p>
+                        )}
+                      </div>
+                      {disc && (
+                        <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold border ${
+                          isSafe ? "bg-green-50 border-green-300 text-green-800"
+                          : isWarning ? "bg-amber-50 border-amber-300 text-amber-800"
+                          : "bg-red-50 border-red-300 text-red-800"
+                        }`}>
+                          {isSafe ? <CheckCheck className="w-3 h-3" />
+                          : isWarning ? <AlertTriangle className="w-3 h-3" />
+                          : <ShieldAlert className="w-3 h-3" />}
+                          {isSafe ? "Safe to scrape" : isWarning ? "Warning" : "Fix didn't work"}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Discovery running */}
+                    {runningPostRepair && (
+                      <div className="flex items-center gap-2 text-violet-600 text-xs py-1">
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        Running fast Test Discovery to validate the fix…
+                      </div>
+                    )}
+
+                    {/* Discovery result */}
+                    {disc && !runningPostRepair && (
+                      <div className="grid grid-cols-3 gap-1.5 text-center text-[10px]">
+                        <div className="bg-white rounded border border-gray-200 p-2">
+                          <div className="font-bold text-gray-800 text-sm">{disc.total_raw}</div>
+                          <div className="text-gray-400">Links found</div>
+                        </div>
+                        <div className="bg-white rounded border border-gray-200 p-2">
+                          <div className="font-bold text-emerald-700 text-sm">{disc.total_passing}</div>
+                          <div className="text-gray-400">Pass filter</div>
+                        </div>
+                        <div className="bg-white rounded border border-gray-200 p-2">
+                          <div className={`font-bold text-sm ${isSafe ? "text-green-600" : isWarning ? "text-amber-600" : "text-red-600"}`}>
+                            {disc.safety_score}/100
+                          </div>
+                          <div className="text-gray-400">Safety score</div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Action buttons */}
+                    {disc && !runningPostRepair && (
+                      <div className="space-y-2">
+                        {isSafe && (
+                          <>
+                            <p className="text-[10px] text-green-700 font-medium">
+                              ✓ Test Discovery confirmed {disc.total_passing} course URLs are reachable. Safe to run full scrape.
+                            </p>
+                            <Button
+                              size="sm"
+                              onClick={launchFullScrapeAfterRepair}
+                              disabled={launchingFullScrape}
+                              className="w-full h-8 text-xs gap-1.5 bg-green-600 hover:bg-green-700 text-white"
+                            >
+                              {launchingFullScrape
+                                ? <><Loader2 className="w-3 h-3 animate-spin" /> Starting scrape…</>
+                                : <><Play className="w-3 h-3" /> Run Full Scrape</>}
+                            </Button>
+                          </>
+                        )}
+                        {!isSafe && (
+                          <>
+                            <p className="text-[10px] text-amber-700 font-medium">
+                              {disc.total_raw === 0
+                                ? "⚠ Test Discovery still found 0 links. This fix didn't help — try the next candidate."
+                                : `⚠ Only ${disc.total_passing} URLs pass the filter (score ${disc.safety_score}/100). Consider trying the next fix or adjusting the config manually.`}
+                            </p>
+                            <Button
+                              size="sm"
+                              onClick={generateRepairCandidates}
+                              disabled={loadingCandidates}
+                              variant="outline"
+                              className="w-full h-7 text-xs gap-1.5 border-violet-300 text-violet-700 hover:bg-violet-50"
+                            >
+                              {loadingCandidates ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                              Try Another Fix
+                            </Button>
+                          </>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => { setPostRepairCandidate(null); setPostRepairDiscovery(null); }}
+                          className="text-[10px] text-gray-400 hover:text-gray-600 w-full text-center"
+                        >
+                          Dismiss
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
               {/* ── Auto Repair: loading spinner ──────────────────────────── */}
               {loadingCandidates && (
                 <div className="flex items-center gap-2 py-4 text-violet-600 text-xs">
@@ -2212,6 +2363,18 @@ export default function ScrapeAgentPage() {
                               <li key={i} className="truncate">✓ {u}</li>
                             ))}
                           </ul>
+                        </div>
+                      )}
+
+                      {/* Why this fix was selected */}
+                      {c.selection_reason && (
+                        <div className={`rounded px-2 py-1.5 text-[9px] leading-relaxed flex items-start gap-1.5 ${
+                          isTop
+                            ? "bg-violet-100 border border-violet-200 text-violet-800"
+                            : "bg-gray-50 border border-gray-200 text-gray-600"
+                        }`}>
+                          <span className="font-semibold shrink-0">Why:</span>
+                          <span>{c.selection_reason}</span>
                         </div>
                       )}
 

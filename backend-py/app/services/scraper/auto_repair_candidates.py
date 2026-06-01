@@ -49,6 +49,7 @@ class RepairCandidate:
     is_recommended: bool = False
     safety_gate_passed: bool = False
     expected_gain: int = 0     # after_count - before_count
+    selection_reason: str = "" # human-readable explanation of why this fix was chosen / ranked here
 
     def to_dict(self) -> dict:
         d = asdict(self)
@@ -497,10 +498,29 @@ class AutoRepairEngine:
                 seen.add(c.id)
                 unique.append(c)
 
-        # Assign ranks and mark recommended
+        # Assign ranks, mark recommended, and populate selection_reason
         for i, c in enumerate(unique):
             c.rank = i + 1
             c.is_recommended = i == 0 and c.safety_gate_passed
+            if not c.safety_gate_passed:
+                c.selection_reason = (
+                    f"Safety gate failed: only {c.simulation.after_count} URLs would survive "
+                    f"with a {c.simulation.drop_rate_after_pct}% drop rate. "
+                    f"Applying this fix could cause the scraper to miss most courses."
+                )
+            elif i == 0:
+                c.selection_reason = (
+                    f"Ranked #1 because it rescues the most URLs "
+                    f"({c.simulation.after_count} from {c.simulation.before_count}) "
+                    f"at {c.confidence}% confidence, keeping the drop rate at "
+                    f"{c.simulation.drop_rate_after_pct}%. "
+                    f"Simulation method: {c.simulation.method.replace('_', ' ')}."
+                )
+            else:
+                c.selection_reason = (
+                    f"Ranked #{c.rank}: rescues {c.simulation.after_count} URLs "
+                    f"at {c.confidence}% confidence — fewer than the recommended fix."
+                )
 
         return unique
 

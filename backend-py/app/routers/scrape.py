@@ -5824,6 +5824,7 @@ async def auto_repair_filter(
     uni_id: int = job_row["university_id"]
     recipe_patch: dict = body.get("recipe_patch") or {}
     filter_cleared: str = body.get("filter_cleared") or "unknown"
+    trigger_scrape: bool = bool(body.get("trigger_scrape", True))
 
     if not recipe_patch:
         return {
@@ -5868,11 +5869,24 @@ async def auto_repair_filter(
         filter_cleared, uni_id, job_id,
     )
 
-    # ── 4. Trigger a fresh scrape ─────────────────────────────────────────────
+    # ── 4. Optionally trigger a fresh scrape ─────────────────────────────────
     scrape_url: str = uni_row.get("scrape_url") or ""
     uni_name: str = uni_row.get("name") or str(uni_id)
     new_job_id: str | None = None
     trigger_ok = False
+
+    if not trigger_scrape:
+        return {
+            "status": "applied",
+            "filter_cleared": filter_cleared,
+            "new_job_id": None,
+            "message": (
+                f"Config updated ({filter_cleared}). "
+                "Test Discovery is now running automatically to validate the fix. "
+                "You can start a full scrape once the test confirms URLs are reachable."
+            ),
+            "has_rollback": bool(existing),
+        }
 
     try:
         scrape_body = StartScrapeBody(
