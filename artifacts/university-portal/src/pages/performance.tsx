@@ -158,10 +158,12 @@ export default function PerformancePage() {
   const load = async (d: number) => {
     setLoading(true);
     setError(null);
+    // months shown in trend chart: 1 for 7d, 2 for 30d, 3 for 90d (min 1)
+    const trendMonths = Math.max(1, Math.ceil(d / 30));
     try {
       const [sum, trd, src, rec] = await Promise.all([
         fetchJSON<{ period_days: number } & Summary>(`/api/performance/summary?days=${d}`),
-        fetchJSON<{ months: TrendMonth[] }>(`/api/performance/trend?months=6`),
+        fetchJSON<{ months: TrendMonth[] }>(`/api/performance/trend?months=${trendMonths}`),
         fetchJSON<{ sources: SourceEntry[] }>(`/api/performance/sources?days=${d}`),
         fetchJSON<{ actions: RecoveryAction[] }>(`/api/performance/recovery?days=${d}`),
       ]);
@@ -175,6 +177,16 @@ export default function PerformancePage() {
       setLoading(false);
       setRefreshing(false);
     }
+  };
+
+  // Period changes use the refreshing=true pattern so the full-page skeleton
+  // is suppressed — the existing data stays visible while new data loads in.
+  // Without this, setDays(d) → useEffect → setLoading(true) with refreshing=false
+  // triggers the early-return skeleton that hides the period buttons entirely.
+  const handlePeriodChange = (d: number) => {
+    if (d === days) return;
+    setRefreshing(true);
+    setDays(d);
   };
 
   useEffect(() => { load(days); }, [days]);
@@ -261,7 +273,7 @@ export default function PerformancePage() {
               key={d}
               variant={days === d ? "default" : "outline"}
               size="sm"
-              onClick={() => setDays(d)}
+              onClick={() => handlePeriodChange(d)}
             >
               {d}d
             </Button>
