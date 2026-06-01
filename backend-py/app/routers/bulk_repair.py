@@ -168,6 +168,97 @@ async def bulk_repair_scan(
     }
 
 
+# ── Preview ───────────────────────────────────────────────────────────────────
+
+@router.post("/bulk-repair/preview")
+async def bulk_repair_preview(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _user: Annotated[dict, Depends(get_current_user)],
+    body: Annotated[dict, Body(...)],
+) -> dict[str, Any]:
+    """Dry-run preview for a bulk repair — returns issue breakdown and risk signals.
+
+    Body::
+
+        { "university_ids": [1, 2, 3] }
+
+    Returns per-university issue flags, repair target counts, risk signals
+    (no seed URL, no repair targets), and aggregated summary counts.
+    """
+    uni_ids: list[int] = body.get("university_ids") or []
+    if not uni_ids:
+        raise HTTPException(status_code=400, detail="No university IDs provided")
+
+    # Fetch university basics + repair target counts in one query
+    rows = (
+        await db.execute(
+            text(
+                """
+                SELECT
+                    u.id,
+                    u.name,
+                    u.scrape_url,
+                    COALESCE(u.certification_status, 'draft') AS certification_status,
+                    COUNT(c.id) FILTER (
+                        WHERE c.status = 'active'
+                          AND (
+                              c.duration IS NULL
+                              OR c.course_location IS NULL
+                              OR btrim(COALESCE(c.course_location, '')) = ''
+                              OR (SELECT COUNT(*) FROM english_requirements er
+                                  WHERE er.course_id = c.id) = 0
+                          )
+                          AND (c.course_website IS NOT NULL AND btrim(c.course_website) <> '')
+                    ) AS repair_target_count,
+                    COUNT(c.id) FILTER (WHERE c.status = 'active') AS active_course_count
+                FROM universities u
+                LEFT JOIN courses c ON c.university_id = u.id
+                WHERE u.id = ANY(:ids)
+                GROUP BY u.id
+                ORDER BY u.name
+                """
+            ),
+            {"ids": uni_ids},
+        )
+    ).mappings().all()
+
+    unis_out: list[dict] = []
+    risk_no_url: list[str] = []
+    risk_no_targets: list[str] = []
+    total_jobs = 0
+
+    for r in rows:
+        no_seed_url = not (r["scrape_url"] or "").strip()
+        repair_targets = int(r["repair_target_count"] or 0)
+        no_repair_targets = repair_targets == 0
+
+        if no_seed_url:
+            risk_no_url.append(r["name"])
+        if no_repair_targets:
+            risk_no_targets.append(r["name"])
+        if not no_repair_targets:
+            total_jobs += 1  # one job queued per uni that has targets
+
+        unis_out.append({
+            "id": r["id"],
+            "name": r["name"],
+            "no_seed_url": no_seed_url,
+            "no_repair_targets": no_repair_targets,
+            "repair_target_count": repair_targets,
+            "active_course_count": int(r["active_course_count"] or 0),
+        })
+
+    return {
+        "selected": len(uni_ids),
+        "estimated_jobs": total_jobs,
+        "universities": unis_out,
+        "risks": {
+            "no_seed_url": risk_no_url,
+            "no_repair_targets": risk_no_targets,
+        },
+    }
+
+
 # ── Apply ─────────────────────────────────────────────────────────────────────
 
 @router.post("/bulk-repair/apply")

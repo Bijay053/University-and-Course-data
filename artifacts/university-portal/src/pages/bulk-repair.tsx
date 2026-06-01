@@ -3,11 +3,14 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   Languages, DollarSign, TrendingUp, Search, CheckSquare, Square,
   RefreshCw, Wrench, FlaskConical, ChevronRight, AlertTriangle,
-  CheckCircle2, XCircle, ExternalLink, Bot, Info,
+  CheckCircle2, XCircle, ExternalLink, Bot, Info, ShieldAlert,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+} from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 
@@ -64,6 +67,25 @@ interface ApplyResult {
     marked_testing?: boolean;
     error?: string;
   }>;
+}
+
+interface PreviewUni {
+  id: number;
+  name: string;
+  no_seed_url: boolean;
+  no_repair_targets: boolean;
+  repair_target_count: number;
+  active_course_count: number;
+}
+
+interface PreviewData {
+  selected: number;
+  estimated_jobs: number;
+  universities: PreviewUni[];
+  risks: {
+    no_seed_url: string[];
+    no_repair_targets: string[];
+  };
 }
 
 // ── Issue config ─────────────────────────────────────────────────────────────
@@ -131,11 +153,25 @@ export default function BulkRepairPage() {
   const [markTesting, setMarkTesting] = useState(false);
   const [search, setSearch] = useState("");
   const [applyResult, setApplyResult] = useState<ApplyResult | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewData, setPreviewData] = useState<PreviewData | null>(null);
 
   const { data, isLoading, isError, refetch, isFetching } = useQuery<ScanData>({
     queryKey: ["bulk-repair-scan"],
     queryFn: () => apiFetch("/api/bulk-repair/scan"),
     staleTime: 120_000,
+  });
+
+  const previewMutation = useMutation({
+    mutationFn: (ids: number[]) =>
+      apiFetch("/api/bulk-repair/preview", { method: "POST", body: JSON.stringify({ university_ids: ids }) }),
+    onSuccess: (res: PreviewData) => {
+      setPreviewData(res);
+      setPreviewOpen(true);
+    },
+    onError: () => {
+      toast({ title: "Preview failed", description: "Could not load preview. Try again.", variant: "destructive" });
+    },
   });
 
   const applyMutation = useMutation({
@@ -144,10 +180,12 @@ export default function BulkRepairPage() {
     onSuccess: (res: ApplyResult) => {
       setApplyResult(res);
       setStep("results");
+      setPreviewOpen(false);
     },
     onError: () => {
       toast({ title: "Apply failed", variant: "destructive" });
       setStep("select");
+      setPreviewOpen(false);
     },
   });
 
@@ -193,6 +231,10 @@ export default function BulkRepairPage() {
 
   function handleApply() {
     if (selected.size === 0) return;
+    previewMutation.mutate([...selected]);
+  }
+
+  function handleConfirmApply() {
     setStep("applying");
     applyMutation.mutate({
       university_ids: [...selected],
@@ -502,6 +544,113 @@ export default function BulkRepairPage() {
           <p>Click an issue card above to scan for affected universities.</p>
         </div>
       )}
+
+      {/* ── Bulk Repair Preview Modal ─────────────────────────────────────── */}
+      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Wrench className="h-5 w-5 text-blue-600" />
+              Confirm Bulk Repair
+            </DialogTitle>
+            <DialogDescription>
+              Review what will be queued before confirming.
+            </DialogDescription>
+          </DialogHeader>
+
+          {previewData && (
+            <div className="space-y-4 py-1">
+              {/* Summary row */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-lg bg-gray-50 border px-4 py-3 text-center">
+                  <div className="text-2xl font-bold text-gray-900">{previewData.selected}</div>
+                  <div className="text-xs text-gray-500 mt-0.5">Universities selected</div>
+                </div>
+                <div className="rounded-lg bg-blue-50 border border-blue-200 px-4 py-3 text-center">
+                  <div className="text-2xl font-bold text-blue-700">{previewData.estimated_jobs}</div>
+                  <div className="text-xs text-blue-500 mt-0.5">Scrape jobs to queue</div>
+                </div>
+              </div>
+
+              {/* Issue breakdown — computed from scan data */}
+              {(() => {
+                const sel = data?.universities.filter(u => selected.has(u.id)) ?? [];
+                const ieltsCount = sel.filter(u => u.ielts_low).length;
+                const feeCount = sel.filter(u => u.fee_low).length;
+                const discCount = sel.filter(u => u.discovery_low).length;
+                return (
+                  <div className="rounded-lg border divide-y text-sm">
+                    <div className="px-4 py-2 font-medium text-gray-600 text-xs uppercase tracking-wide bg-gray-50">Expected fixes</div>
+                    {ieltsCount > 0 && (
+                      <div className="px-4 py-2.5 flex items-center justify-between">
+                        <span className="flex items-center gap-2 text-purple-700"><Languages className="h-3.5 w-3.5" />IELTS quality issue</span>
+                        <span className="font-semibold text-gray-900">{ieltsCount} {ieltsCount === 1 ? "university" : "universities"}</span>
+                      </div>
+                    )}
+                    {feeCount > 0 && (
+                      <div className="px-4 py-2.5 flex items-center justify-between">
+                        <span className="flex items-center gap-2 text-amber-700"><DollarSign className="h-3.5 w-3.5" />Fee quality issue</span>
+                        <span className="font-semibold text-gray-900">{feeCount} {feeCount === 1 ? "university" : "universities"}</span>
+                      </div>
+                    )}
+                    {discCount > 0 && (
+                      <div className="px-4 py-2.5 flex items-center justify-between">
+                        <span className="flex items-center gap-2 text-red-700"><TrendingUp className="h-3.5 w-3.5" />Discovery score issue</span>
+                        <span className="font-semibold text-gray-900">{discCount} {discCount === 1 ? "university" : "universities"}</span>
+                      </div>
+                    )}
+                    {ieltsCount === 0 && feeCount === 0 && discCount === 0 && (
+                      <div className="px-4 py-2.5 text-gray-400 text-xs">No specific issue filters active — all selected universities will be queued.</div>
+                    )}
+                  </div>
+                );
+              })()}
+
+              {/* Risk signals */}
+              {(previewData.risks.no_seed_url.length > 0 || previewData.risks.no_repair_targets.length > 0) && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 divide-y divide-amber-200 text-sm">
+                  <div className="px-4 py-2 font-medium text-amber-700 text-xs uppercase tracking-wide flex items-center gap-1.5">
+                    <ShieldAlert className="h-3.5 w-3.5" />Risk
+                  </div>
+                  {previewData.risks.no_seed_url.length > 0 && (
+                    <div className="px-4 py-2.5">
+                      <div className="font-medium text-amber-800">{previewData.risks.no_seed_url.length} {previewData.risks.no_seed_url.length === 1 ? "university has" : "universities have"} no seed URL</div>
+                      <div className="text-xs text-amber-600 mt-0.5 truncate">{previewData.risks.no_seed_url.join(", ")}</div>
+                    </div>
+                  )}
+                  {previewData.risks.no_repair_targets.length > 0 && (
+                    <div className="px-4 py-2.5">
+                      <div className="font-medium text-amber-800">{previewData.risks.no_repair_targets.length} {previewData.risks.no_repair_targets.length === 1 ? "university has" : "universities have"} no repair targets</div>
+                      <div className="text-xs text-amber-600 mt-0.5">These will be skipped — no active courses with missing fields and a page URL.</div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {markTesting && (
+                <div className="flex items-center gap-2 text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-4 py-2.5">
+                  <FlaskConical className="h-4 w-4 shrink-0" />
+                  All selected universities will also be moved to <strong>Testing</strong> status.
+                </div>
+              )}
+            </div>
+          )}
+
+          <DialogFooter className="gap-2 pt-2">
+            <Button variant="outline" onClick={() => setPreviewOpen(false)} disabled={applyMutation.isPending}>
+              Cancel
+            </Button>
+            <Button
+              className="bg-blue-600 hover:bg-blue-700 text-white gap-1.5"
+              onClick={handleConfirmApply}
+              disabled={applyMutation.isPending || (previewData?.estimated_jobs === 0)}
+            >
+              <Wrench className="h-4 w-4" />
+              {applyMutation.isPending ? "Queuing…" : `Confirm — Queue ${previewData?.estimated_jobs ?? 0} ${(previewData?.estimated_jobs ?? 0) === 1 ? "job" : "jobs"}`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
