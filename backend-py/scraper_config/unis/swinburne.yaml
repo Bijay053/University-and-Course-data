@@ -1,0 +1,28 @@
+# Swinburne University of Technology — www.swinburne.edu.au
+# Custom CMS (Cloudflare-protected, JS-rendered course listings).
+# 20+ category pages under /courses/find-a-course/<faculty>/.
+# Seed URLs cover the 5 key faculties supplied by the operator.
+# Increase bfs_page_budget if courses from unlisted faculties are missed.
+
+discovery:
+  always_browser_discover: true
+  always_sitemap_supplement: true
+  seed_urls:
+    - https://www.swinburne.edu.au/courses/find-a-course/business
+    - https://www.swinburne.edu.au/courses/find-a-course/engineering
+    - https://www.swinburne.edu.au/courses/find-a-course/health
+    - https://www.swinburne.edu.au/courses/find-a-course/information-technology
+    - https://www.swinburne.edu.au/courses/find-a-course/law
+  allow_url_patterns:
+    - /courses/
+  block_url_patterns:
+    - /courses/find-a-course/
+    - /courses/online/
+    - /courses/search
+  bfs_page_budget: 80
+  _min_expected_courses: 50
+
+extraction:
+  filters:
+    domestic_only:
+      enabled: false

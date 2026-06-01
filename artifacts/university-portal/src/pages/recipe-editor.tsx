@@ -16,7 +16,7 @@ import {
   Code2, DollarSign, BookOpen, MapPin, ShieldCheck, Zap, RefreshCw,
   FlaskConical, CheckCircle2, XCircle, AlertTriangle, ChevronDown, ChevronUp, Info,
   MousePointerClick, GripVertical, Link, Stethoscope, Loader2, Wand2, WifiOff,
-  TrendingUp, ExternalLink, Play, Type, Calendar, GitMerge,
+  TrendingUp, ExternalLink, Play, Type, Calendar, GitMerge, ClipboardList,
 } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -210,6 +210,8 @@ function StringListEditor({
   helpText?: string;
 }) {
   const [draft, setDraft] = useState("");
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkText, setBulkText] = useState("");
 
   const add = () => {
     const v = draft.trim();
@@ -217,6 +219,17 @@ function StringListEditor({
       onChange([...values, v]);
       setDraft("");
     }
+  };
+
+  const addBulk = () => {
+    const lines = bulkText
+      .split(/[\n\r,]+/)
+      .map(s => s.trim())
+      .filter(s => s && !values.includes(s));
+    const unique = [...new Set(lines)];
+    if (unique.length > 0) onChange([...values, ...unique]);
+    setBulkText("");
+    setBulkOpen(false);
   };
 
   return (
@@ -231,10 +244,40 @@ function StringListEditor({
           onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); add(); }}}
           className="text-sm"
         />
-        <Button type="button" variant="outline" size="sm" onClick={add}>
+        <Button type="button" variant="outline" size="sm" onClick={add} title="Add single URL">
           <Plus className="h-3 w-3" />
         </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => setBulkOpen(o => !o)}
+          title="Paste multiple URLs at once"
+          className={bulkOpen ? "bg-muted" : ""}
+        >
+          <ClipboardList className="h-3 w-3" />
+        </Button>
       </div>
+      {bulkOpen && (
+        <div className="space-y-2 rounded-md border border-dashed p-3 bg-muted/30">
+          <p className="text-xs text-muted-foreground font-medium">Paste multiple URLs — one per line</p>
+          <Textarea
+            value={bulkText}
+            onChange={e => setBulkText(e.target.value)}
+            placeholder={"https://example.com/courses/page-1\nhttps://example.com/courses/page-2\nhttps://example.com/courses/page-3"}
+            className="text-xs font-mono min-h-[100px] resize-y"
+            autoFocus
+          />
+          <div className="flex gap-2">
+            <Button type="button" size="sm" onClick={addBulk} disabled={!bulkText.trim()}>
+              Add All
+            </Button>
+            <Button type="button" size="sm" variant="ghost" onClick={() => { setBulkText(""); setBulkOpen(false); }}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      )}
       <div className="flex flex-wrap gap-1">
         {values.map((v, i) => (
           <Badge key={i} variant="secondary" className="flex items-center gap-1 max-w-full">
