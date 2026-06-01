@@ -3519,6 +3519,11 @@ async def get_course_quality_scores(
         "full_course_fee_no_duration":           "Full Course / No Duration",
         "full_course_fee_suspicious":            "Full Course Fee High",
         "full_course_fee_annual_ok":             "Annual Equiv. OK",
+        "possible_domestic_fee":                 "Possible Domestic Fee",
+        "annual_fee_too_low_critical":           "Fee Too Low",
+        "annual_fee_too_low_warning":            "Fee Below Min",
+        "annual_fee_too_high_critical":          "Fee Too High",
+        "annual_fee_too_high_warning":           "Fee Above Max",
         "missing_english_requirement":           "Missing IELTS",
         "english_coherence_toefl":               "IELTS/TOEFL Mismatch",
         "english_coherence_pte":                 "IELTS/PTE Mismatch",
@@ -3549,6 +3554,11 @@ async def get_course_quality_scores(
             "full_course_fee_no_duration",
             "full_course_fee_suspicious",
             "full_course_fee_annual_ok",
+            "possible_domestic_fee",
+            "annual_fee_too_low_critical",
+            "annual_fee_too_low_warning",
+            "annual_fee_too_high_critical",
+            "annual_fee_too_high_warning",
         },
         "ielts": {
             "missing_english_requirement",
@@ -4880,6 +4890,87 @@ async def extraction_quality_report(
                 "fee_term": "Annual",
             },
         })
+
+    # 5c. Annual fee outside expected degree-level range
+    # Detects domestic/CSP fees, partial fees, and total fees stored as annual.
+    # Uses the same thresholds as data_quality._annual_fee_range().
+    try:
+        from app.services.scraper.data_quality import (
+            _annual_fee_range as _dq_annual_range,
+            _ANNUAL_FEE_TERMS as _DQ_ANNUAL_TERMS,
+            _CSP_HECS_MAX as _DQ_CSP_MAX,
+        )
+        _FULL_COURSE_TERMS_LC = {"full course", "full", "total", "full program", "programme total"}
+        _suspicious_annual: list = []
+        for _r in rows:
+            _fee = _r.international_fee
+            _fterm = (_r.fee_term or "").strip().lower()
+            _dl = (_r.degree_level or "").lower()
+            if _fee is None:
+                continue
+            try:
+                _fval = float(_fee)
+            except (TypeError, ValueError):
+                continue
+            # Skip full-course-tagged fees (handled by check 5a above)
+            if _fterm in _FULL_COURSE_TERMS_LC:
+                continue
+            # Only check annual/per-year context
+            if _fterm and _fterm not in _DQ_ANNUAL_TERMS:
+                continue
+            _warn_min, _crit_min, _warn_max, _crit_max = _dq_annual_range(_dl)
+            if _fval < _crit_min or _fval > _crit_max:
+                _kind = (
+                    "domestic/CSP range" if _fval <= _DQ_CSP_MAX else
+                    "too low" if _fval < _crit_min else
+                    "too high (possible course total)"
+                )
+                _suspicious_annual.append((_r.course_name, _fval, _dl, _kind, _warn_min, _warn_max))
+        if _suspicious_annual:
+            _sn = len(_suspicious_annual)
+            _sp = round(_sn / n * 100, 1)
+            _examples = [
+                f"{name}: {val:,.0f}/yr ({kind})"
+                for name, val, _, kind, _wmin, _wmax in _suspicious_annual[:5]
+            ]
+            # Pick the most common issue type for the label
+            _low_cnt = sum(1 for _, v, dl, _, wmin, wmax in _suspicious_annual if v < wmin)
+            _high_cnt = sum(1 for _, v, dl, _, wmin, wmax in _suspicious_annual if v > wmax)
+            _label = (
+                "Fee values suspiciously low — domestic/partial/CSP fees stored as international annual fee"
+                if _low_cnt >= _high_cnt else
+                "Fee values suspiciously high — possible full-course total stored as annual fee"
+            )
+            issues.append({
+                "field": "international_fee",
+                "issue_type": "annual_fee_out_of_range",
+                "severity": "critical" if _sp > 20 else "high",
+                "count": _sn,
+                "pct": _sp,
+                "label": _label,
+                "detail": (
+                    f"{_sn} of {n} courses ({_sp:.0f}%) have annual fee values outside "
+                    f"the expected range for their degree level. "
+                    f"Low fees are typically domestic/CSP or partial charges; "
+                    f"very high fees may be full-course totals stored as annual. "
+                    f"Fee extraction is finding a value, but the value is likely wrong."
+                ),
+                "examples": _examples,
+                "fix_type": "recipe_fix",
+                "suggested_fix": (
+                    "In the Recipe Editor → Fee Rules: "
+                    "(1) Enable 'Prefer International Fee' to skip domestic/CSP sections; "
+                    "(2) Add CSP/domestic reject keywords (CSP, Commonwealth Supported, Domestic, HECS); "
+                    "(3) If fees are full-course totals, set 'Fee Calculation Mode' to "
+                    "'Source value only' and add the correct annual fee schedule URL."
+                ),
+                "suggested_recipe": {
+                    "fees.prefer_international": True,
+                    "fees.reject_keywords": ["CSP", "Commonwealth Supported", "Domestic", "HECS", "Local Student"],
+                },
+            })
+    except Exception as _exc_5c:
+        log.warning("diagnose: annual fee range check failed: %s", _exc_5c)
 
     # 6. Location: nav text contamination
     _nav_locs = [
@@ -6305,15 +6396,67 @@ async def get_certification_score(uni_id: int, db: AsyncSession = Depends(get_db
     avg_completeness = int(q["avg_completeness"] or 0)
     quality_score = round(at_threshold / total_courses * 100) if total_courses > 0 else 0
 
+    # Fee sanity check — count courses with annual fees outside expected degree-level
+    # range.  More than 10% suspicious fees downgrades the quality dimension and
+    # forces cert_level to at most "needs_review" regardless of overall score.
+    suspicious_fee_count = 0
+    suspicious_fee_pct = 0.0
+    fee_quality_penalty = 0
+    try:
+        from app.services.scraper.data_quality import (
+            _annual_fee_range as _crt_annual_range,
+            _ANNUAL_FEE_TERMS as _CRT_ANNUAL_TERMS,
+        )
+        _CRT_FULL_TERMS = {"full course", "full", "total", "full program", "programme total"}
+        fee_rows = (await db.execute(
+            _text("""
+            SELECT international_fee, fee_term, degree_level
+            FROM   scraped_courses
+            WHERE  university_id = :uid
+              AND  status IN ('pending','approved','ready','promoted')
+              AND  international_fee IS NOT NULL
+            """),
+            {"uid": uni_id},
+        )).mappings().all()
+        for _fr in fee_rows:
+            _ft = (_fr["fee_term"] or "").strip().lower()
+            if _ft in _CRT_FULL_TERMS:
+                continue
+            if _ft and _ft not in _CRT_ANNUAL_TERMS:
+                continue
+            try:
+                _fv = float(_fr["international_fee"])
+            except (TypeError, ValueError):
+                continue
+            _dl = (_fr["degree_level"] or "").lower()
+            _wmin, _cmin, _wmax, _cmax = _crt_annual_range(_dl)
+            if _fv < _cmin or _fv > _cmax:
+                suspicious_fee_count += 1
+        total_with_fee = len(fee_rows)
+        if total_with_fee > 0:
+            suspicious_fee_pct = round(suspicious_fee_count / total_with_fee * 100, 1)
+        # Penalise quality score: each suspicious fee % point above 10% reduces
+        # quality by 1 point, capped at 30 points (so 40%+ suspicious → -30).
+        if suspicious_fee_pct > 10:
+            fee_quality_penalty = min(30, round(suspicious_fee_pct - 10))
+            quality_score = max(0, quality_score - fee_quality_penalty)
+    except Exception as _fq_exc:
+        log.warning("certification-score: fee quality check failed: %s", _fq_exc)
+
     # Overall (weighted)
     overall = round(discovery_score * 0.25 + extraction_score * 0.40 + quality_score * 0.35)
 
-    cert_level = (
-        "certified" if overall >= 85 else
-        "good"      if overall >= 70 else
-        "needs_work" if overall >= 50 else
-        "poor"
-    )
+    # If >10% of fees are suspicious, cert cannot be "certified" or "good" —
+    # operators must fix fee quality before the university earns a clean score.
+    if suspicious_fee_pct > 10:
+        cert_level = "needs_review"
+    else:
+        cert_level = (
+            "certified" if overall >= 85 else
+            "good"      if overall >= 70 else
+            "needs_work" if overall >= 50 else
+            "poor"
+        )
 
     started = job["started_at"]
 
@@ -6347,6 +6490,9 @@ async def get_certification_score(uni_id: int, db: AsyncSession = Depends(get_db
                 "avg_completeness": avg_completeness,
                 "total_courses": total_courses,
                 "at_threshold": at_threshold,
+                "suspicious_fee_count": suspicious_fee_count,
+                "suspicious_fee_pct": suspicious_fee_pct,
+                "fee_quality_penalty": fee_quality_penalty,
             },
         },
         "last_scrape": {
