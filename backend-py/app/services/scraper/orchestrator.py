@@ -1148,17 +1148,21 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # URLs Wayback has ever crawled for this domain — completely free,
         # no API key, and cannot be blocked because we query archive.org.
         #
-        # Two firing modes:
-        #   - ``use_wayback=True`` in the per-uni discovery YAML: ALWAYS run
-        #     CDX after BFS+browser and merge the results.  Use for sites
-        #     where BFS+browser structurally undercount the catalogue (e.g.
-        #     QUT: Cloudflare-walled + JS-SPA listings yield ~56 / ~200).
-        #   - default (False): only fire when BFS+browser returned 0 links.
-        _use_wayback = getattr(_uni_cfg.discovery, "use_wayback", False)
+        # Three firing modes (tri-state use_wayback):
+        #   - True  → supplemental: ALWAYS run CDX after BFS+browser and merge.
+        #             Use for sites where BFS+browser structurally undercount
+        #             the catalogue (e.g. QUT: CF-walled + JS-SPA ~56/~200).
+        #   - None  → fallback-only (default): run CDX only when all other
+        #             discovery tiers returned 0 links.
+        #   - False → never: skip Wayback entirely, even when links==0.
+        #             Use for Cloudflare-blocked sites where archive.org has
+        #             no useful coverage and the 10s CDX query is pure waste
+        #             (e.g. JCU).
+        _use_wayback = _uni_cfg.discovery.use_wayback  # Optional[bool]: True/None/False
         # Short-circuit for MQ: when MQ-specific sweep produced links, skip
         # Wayback — archive.org has shallow coverage of this Cloudflare-
         # walled host and the tier would just add latency / noise.
-        if (not links or _use_wayback) and not (_is_mq_host and links):
+        if _use_wayback is not False and (not links or _use_wayback) and not (_is_mq_host and links):
             try:
                 from app.services.scraper.wayback_discover import wayback_discover
                 if links and _use_wayback:

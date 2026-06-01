@@ -43,9 +43,12 @@ discovery:
   # at /sitemap.xml or /sitemap_index.xml.
   sitemap_url: null
 
-  # Fall back to Wayback Machine CDX API when all live-site discovery fails.
-  # Only useful for universities whose sites are completely blocked by WAF.
-  use_wayback: false
+  # Wayback Machine CDX control (tri-state):
+  #   null / not set  — run Wayback only when all other discovery returns 0 links (default fallback behaviour).
+  #   true            — always run Wayback after BFS+browser and merge (supplemental mode, e.g. QUT).
+  #   false           — never run Wayback, even as a fallback (for sites archive.org can't index, e.g. JCU).
+  # Leave unset here so the schema default (null = fallback-only) applies to every university.
+  # use_wayback: null
 
   # Route failed HTTP/browser fetches through scrape.do residential proxy.
   # Enable when Cloudflare Enterprise Bot Management or similar WAF blocks all

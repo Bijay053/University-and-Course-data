@@ -389,9 +389,14 @@ class DiscoveryConfig(BaseModel):
         default=None,
         description="Explicit sitemap URL.  Overrides the auto-detected sitemap.",
     )
-    use_wayback: bool = Field(
-        default=False,
-        description="Fall back to Wayback Machine CDX when all other discovery fails.",
+    use_wayback: Optional[bool] = Field(
+        default=None,
+        description=(
+            "Tri-state Wayback Machine control. "
+            "null/unset (default) = run Wayback only when all other discovery returns 0 links (fallback-only mode). "
+            "true = always run Wayback after BFS+browser and merge results (supplemental mode, e.g. QUT). "
+            "false = never run Wayback, even as a fallback (use for Cloudflare-blocked sites where archive.org has no useful coverage, e.g. JCU)."
+        ),
     )
     skip_browser_discovery: bool = Field(
         default=False,
