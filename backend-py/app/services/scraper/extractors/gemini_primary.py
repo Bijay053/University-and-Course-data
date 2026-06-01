@@ -134,6 +134,14 @@ _HARD_FIELDS: dict[str, str] = {
         "return null — do NOT default to 'Science'. "
         "Null if none fit."
     ),
+    "study_load": (
+        "Study load/attendance type. Pick EXACTLY one: 'Full Time' or 'Part Time'. "
+        "Look for phrases like 'full-time', 'part-time', 'full time study', "
+        "'available part time', 'attendance: full time'. "
+        "Most on-campus postgraduate and undergraduate programs are 'Full Time'. "
+        "Only return 'Part Time' when the page explicitly states part-time availability. "
+        "Null if not mentioned at all."
+    ),
     "mode": (
         "Primary study mode. Pick EXACTLY one: 'On Campus', 'Online', 'Blended'. "
         "'Online'  — course is taught entirely or primarily online with no required "
@@ -613,7 +621,7 @@ def _coerce(field_key: str, value: Any) -> Any | None:
     }
     _STR_FIELDS = {
         "fee_term", "duration_unit", "duration_text",
-        "sub_category", "category", "mode", "intake_text", "location_text",
+        "sub_category", "category", "mode", "study_load", "intake_text", "location_text",
         "academic_level", "other_requirement",
     }
 
@@ -642,6 +650,7 @@ def _coerce(field_key: str, value: Any) -> Any | None:
 _VALID_FEE_TERMS = {"Annual", "Semester", "Trimester", "Full Course", "Per Unit"}
 _VALID_DURATION_UNITS = {"years", "months", "weeks"}
 _VALID_MODES = {"On Campus", "Online", "Blended"}
+_VALID_STUDY_LOADS = {"Full Time", "Part Time"}
 # academic_level is a controlled vocabulary; case- and apostrophe-insensitive
 # match (Gemini sometimes emits curly apostrophes or lowercased values) is
 # applied in _validate via a normalised lookup.
@@ -669,6 +678,9 @@ def _validate(field_key: str, value: Any) -> Any | None:
         return None
     if field_key == "mode" and value not in _VALID_MODES:
         log.debug("gemini_primary: invalid mode %r — discarding", value)
+        return None
+    if field_key == "study_load" and value not in _VALID_STUDY_LOADS:
+        log.debug("gemini_primary: invalid study_load %r — discarding", value)
         return None
     # Sanity-range checks
     if field_key == "ielts_overall" and not (4.0 <= value <= 9.0):

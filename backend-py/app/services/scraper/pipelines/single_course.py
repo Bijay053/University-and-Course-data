@@ -5725,6 +5725,39 @@ async def extract_course(
                 }
             )
 
+    # ── Study load (Full Time / Part Time) ───────────────────────────────────
+    # Only runs when no extractor (including Gemini primary) has set it yet.
+    # Checks duration_text first (most reliable signal: "2 years full-time"),
+    # then scans the first 3 KB of page text for explicit phrases.
+    if not payload.get("study_load"):
+        _sl_sources = [
+            (payload.get("duration_text") or "").lower(),
+            (rendered_html or html or "")[:3000].lower(),
+        ]
+        _sl_text = " ".join(_sl_sources)
+        if _re.search(r"\bpart[- ]time\b", _sl_text):
+            payload["study_load"] = "Part Time"
+            evidence.append({
+                "field_key": "study_load",
+                "value": "Part Time",
+                "confidence": 0.75,
+                "method": "regex:study_load",
+                "snippet": next(
+                    (s for s in _sl_sources if _re.search(r"\bpart[- ]time\b", s)), ""
+                )[:120],
+            })
+        elif _re.search(r"\bfull[- ]time\b", _sl_text):
+            payload["study_load"] = "Full Time"
+            evidence.append({
+                "field_key": "study_load",
+                "value": "Full Time",
+                "confidence": 0.70,
+                "method": "regex:study_load",
+                "snippet": next(
+                    (s for s in _sl_sources if _re.search(r"\bfull[- ]time\b", s)), ""
+                )[:120],
+            })
+
     # ── Host-specific fee_term correction ────────────────────────────────────
     # Some universities publish a FULL COURSE total on their course pages
     # without any "per year" / "per annum" qualifier in the surrounding text.

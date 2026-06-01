@@ -283,6 +283,8 @@ _SUB_CATEGORY_MAP: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("Science & Mathematics",     "Mathematics",            ("mathematics", "statistics")),
     ("Agriculture & Environmental Science", "Sustainability", ("sustainability",)),
     ("Agriculture & Environmental Science", "Agriculture",   ("agriculture", "agribusiness", "horticulture")),
+    ("Agriculture & Environmental Science", "Environmental Science", ("environmental science", "environmental management", "environmental studies", "ecology", "conservation")),
+    ("Agriculture & Environmental Science", "Marine Science", ("marine science", "marine biology", "ocean", "aquaculture")),
     # Issue 2: Trades & Construction sub-categories for AQF vocational courses.
     ("Trades & Construction", "Carpentry",           ("carpentry",)),
     ("Trades & Construction", "Plumbing",            ("plumbing",)),
@@ -290,6 +292,49 @@ _SUB_CATEGORY_MAP: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("Trades & Construction", "Welding & Fabrication", ("welding", "boilermaking", "fabrication")),
     ("Trades & Construction", "Cabinet Making",      ("cabinet making", "joinery")),
     ("Trades & Construction", "Refrigeration & HVAC", ("refrigeration", "air conditioning", "hvac")),
+    # ── Arts, Humanities & Social Sciences sub-categories ───────────────────
+    # Multi-word / more-specific phrases listed before bare single-word terms.
+    ("Arts, Humanities & Social Sciences", "International Relations", ("international relations", "global studies", "international studies", "diplomacy")),
+    ("Arts, Humanities & Social Sciences", "Political Science",       ("political science", "politics", "public policy", "public administration", "governance")),
+    ("Arts, Humanities & Social Sciences", "Sociology",               ("sociology", "social science", "social sciences", "criminology")),
+    ("Arts, Humanities & Social Sciences", "Anthropology",            ("anthropology",)),
+    ("Arts, Humanities & Social Sciences", "Philosophy",              ("philosophy",)),
+    ("Arts, Humanities & Social Sciences", "History",                 ("history", "historical",)),
+    ("Arts, Humanities & Social Sciences", "English & Literature",    ("english literature", "creative writing", "writing", "linguistics", "english language")),
+    ("Arts, Humanities & Social Sciences", "Geography",               ("geography", "urban planning", "regional planning")),
+    ("Arts, Humanities & Social Sciences", "Economics",               ("economics",)),
+    # ── Medicine & Health additional sub-categories ──────────────────────────
+    ("Medicine & Health", "Occupational Therapy",  ("occupational therapy",)),
+    ("Medicine & Health", "Speech Pathology",      ("speech pathology", "speech language", "audiology")),
+    ("Medicine & Health", "Paramedicine",          ("paramedicine", "paramedic", "paramedics")),
+    ("Medicine & Health", "Optometry",             ("optometry", "optics", "optical")),
+    ("Medicine & Health", "Health Management",     ("health management", "health administration", "health services management", "healthcare management")),
+    ("Medicine & Health", "Radiography",           ("radiography", "medical imaging", "diagnostic imaging")),
+    ("Medicine & Health", "Medical Laboratory",    ("medical laboratory", "medical science", "pathology science", "biomedical science")),
+    ("Medicine & Health", "Podiatry",              ("podiatry",)),
+    ("Medicine & Health", "Midwifery",             ("midwifery",)),
+    # ── Engineering & Technology additional sub-categories ───────────────────
+    ("Engineering & Technology", "Aerospace Engineering",     ("aerospace", "aeronautical", "aviation engineering")),
+    ("Engineering & Technology", "Environmental Engineering", ("environmental engineering",)),
+    ("Engineering & Technology", "Mining Engineering",        ("mining engineering", "resources engineering")),
+    ("Engineering & Technology", "Construction Management",   ("construction management",)),
+    ("Engineering & Technology", "Telecommunications",        ("telecommunications", "telecom",)),
+    # ── Business & Management general catchall ───────────────────────────────
+    # Listed last in its category so more-specific entries win first.
+    ("Business & Management", "Business",           ("bachelor of business", "graduate certificate of business", "graduate diploma of business")),
+    # ── Law & Legal Studies sub-categories ───────────────────────────────────
+    ("Law & Legal Studies", "Laws",                 ("bachelor of laws", "juris doctor", "llb",)),
+    ("Law & Legal Studies", "Legal Practice",       ("legal practice", "legal studies", "paralegal")),
+    # ── Science & Mathematics additional sub-categories ──────────────────────
+    ("Science & Mathematics", "Biology",            ("biology", "biological sciences", "microbiology", "molecular biology", "genetics")),
+    ("Science & Mathematics", "Earth Sciences",     ("geology", "earth science", "geoscience", "geophysics")),
+    ("Science & Mathematics", "Psychology",         ("applied psychology",)),  # clinical is already in Medicine & Health
+    # ── Computer Science & IT general catchall ───────────────────────────────
+    ("Computer Science & IT", "Information Technology", ("bachelor of information technology", "master of information technology", "graduate certificate of information technology")),
+    # ── Education sub-categories ─────────────────────────────────────────────
+    ("Education & Social Work", "Educational Leadership", ("educational leadership", "school leadership", "principal",)),
+    ("Education & Social Work", "Special Education",      ("special education", "inclusive education", "disability studies")),
+    ("Education & Social Work", "Counselling",            ("counselling", "counseling", "guidance counselling")),
 )
 
 
