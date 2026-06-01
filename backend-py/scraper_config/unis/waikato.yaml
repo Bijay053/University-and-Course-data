@@ -1,0 +1,43 @@
+# University of Waikato — www.waikato.ac.nz
+# CMS: SilverStripe (NZ university standard)
+# Country: New Zealand | Currency: NZD
+#
+# URL structure:
+#   /int/study/qualifications/               ← listing page (JS-rendered, static BFS finds no course links)
+#   /int/study/qualifications/<course-slug>/ ← individual course page (static HTML, has fee + IELTS)
+#   /int/study/options/undergraduate/         ← category listing (no course data)
+#   /int/study/options/postgraduate/          ← category listing (no course data)
+#
+# Discovery strategy: the qualification listing page loads course cards via JS so static BFS
+# only finds category-level nav links.  Browser discovery is required to follow JS-rendered links.
+# Individual course pages (/int/study/qualifications/<slug>/) ARE static HTML with fee + IELTS data.
+
+discovery:
+  always_browser_discover: true
+  bfs_page_budget: 80
+  seed_urls:
+    - https://www.waikato.ac.nz/int/study/qualifications/
+    - https://www.waikato.ac.nz/int/study/options/undergraduate/
+    - https://www.waikato.ac.nz/int/study/options/postgraduate/
+  allow_url_patterns:
+    - /int/study/qualifications/[^/]+
+  block_url_patterns:
+    - /int/study/qualifications/$
+    - /int/study/qualifications/\?
+    - /int/about/
+    - /int/research/
+    - /int/study/apply/
+    - /int/study/fees
+    - /int/study/scholarships
+    - /int/study/key-university
+    - /int/study/prospectus
+    - /int/study/why-choose
+    - /int/study/work-integrated
+    - /int/study/student-success
+
+extraction:
+  fees:
+    default_currency: NZD
+  filters:
+    domestic_only:
+      enabled: false

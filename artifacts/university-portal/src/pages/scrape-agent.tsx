@@ -3554,10 +3554,33 @@ function FixPreviewModal({
 function Phase3RecCard({ rec, jobId, uniId }: { rec: Phase3Rec; jobId: string | null; uniId: number }) {
   const [expanded, setExpanded] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [probing, setProbing] = useState(false);
+  const [probeStarted, setProbeStarted] = useState(false);
+  const { toast } = useToast();
   const isCritical = rec.severity === "critical";
   const hasEvidence = Boolean(rec.evidence?.detected_snippets?.length || rec.evidence?.sample_url);
   const hasRecipePatch = rec.fix?.recipe_patch && Object.keys(rec.fix.recipe_patch).length > 0;
-  const canPreview = Boolean(jobId && hasRecipePatch);
+  const isAutoConfigureRec = rec.fix?.type === "auto_configure";
+  const canPreview = Boolean(jobId && hasRecipePatch && !isAutoConfigureRec);
+
+  const BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
+
+  const runAutoConfig = async () => {
+    setProbing(true);
+    try {
+      const res = await fetch(`${BASE}/api/universities/${uniId}/probe`, { method: "POST" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setProbeStarted(true);
+      toast({
+        title: "Auto-Configure started",
+        description: "Gemini is probing the live site to derive URL patterns. Check the Intelligence tab in ~30 s.",
+      });
+    } catch (e) {
+      toast({ title: "Auto-Configure failed to start", description: String(e), variant: "destructive" });
+    } finally {
+      setProbing(false);
+    }
+  };
 
   const borderCls = isCritical
     ? "border-orange-400 bg-orange-50"
@@ -3593,7 +3616,7 @@ function Phase3RecCard({ rec, jobId, uniId }: { rec: Phase3Rec; jobId: string | 
             {/* Root cause */}
             <p className="text-[10px] text-gray-500 italic mt-1">{rec.root_cause}</p>
 
-            {/* Action row: Preview Fix button + details toggle */}
+            {/* Action row: Preview Fix / Auto-Configure button + details toggle */}
             <div className="flex items-center gap-3 mt-2 flex-wrap">
               {canPreview && (
                 <button
@@ -3605,13 +3628,31 @@ function Phase3RecCard({ rec, jobId, uniId }: { rec: Phase3Rec; jobId: string | 
                   Preview Fix
                 </button>
               )}
-              {(hasEvidence || hasRecipePatch) && (
+              {isAutoConfigureRec && !probeStarted && (
+                <button
+                  type="button"
+                  onClick={runAutoConfig}
+                  disabled={probing}
+                  className="flex items-center gap-1 text-[10px] font-semibold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-60 rounded px-2.5 py-1"
+                >
+                  {probing
+                    ? <><Loader2 className="w-3 h-3 animate-spin" /> Starting…</>
+                    : <><Zap className="w-3 h-3" /> Run Auto-Configure</>}
+                </button>
+              )}
+              {isAutoConfigureRec && probeStarted && (
+                <span className="flex items-center gap-1 text-[10px] text-blue-700 font-medium bg-blue-50 border border-blue-200 rounded px-2 py-0.5">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  Probing… check Intelligence tab in ~30 s
+                </span>
+              )}
+              {(hasEvidence || hasRecipePatch || rec.fix?.description) && (
                 <button
                   type="button"
                   onClick={() => setExpanded(e => !e)}
                   className="text-[10px] text-teal-600 hover:text-teal-800 flex items-center gap-0.5"
                 >
-                  {expanded ? "Hide details ▲" : `Show ${[hasEvidence && "evidence", hasRecipePatch && "recipe"].filter(Boolean).join(" + ")} ▼`}
+                  {expanded ? "Hide details ▲" : `Show ${[hasEvidence && "evidence", hasRecipePatch && "recipe", isAutoConfigureRec && !hasEvidence && "how to fix"].filter(Boolean).join(" + ")} ▼`}
                 </button>
               )}
             </div>

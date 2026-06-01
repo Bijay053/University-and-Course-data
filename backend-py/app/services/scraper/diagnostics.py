@@ -1114,6 +1114,48 @@ def _generate_recommendations(
 
     # ── 5. Zero / very low course count ─────────────────────────────────────────
     total_found = phase1.get("total_found", 0)
+    imported_count = phase1.get("imported", 0)
+
+    # ── 5a. Wrong pages — links found but 0 courses staged ───────────────────────
+    # total_found > 0 means BFS found links; imported == 0 means zero courses were
+    # successfully staged into scraped_courses — every discovered page was rejected
+    # (degree-qualifier guard, quality gate, or extraction error).
+    if total_found > 0 and imported_count == 0:
+        recs.insert(0, {
+            "severity": "critical",
+            "id": "wrong_pages_selected",
+            "title": f"{total_found} URL(s) found but all are category listing pages — 0 courses staged",
+            "description": (
+                f"The scraper discovered {total_found} URL(s) but extracted zero courses from them. "
+                "Every page was rejected because its URL slug or page title contains no degree "
+                "qualifier (Bachelor, Master, Diploma, etc.) — they are category/subject-area listing "
+                "pages, not individual course detail pages. "
+                "This is a discovery configuration problem: the correct individual course URL pattern "
+                "must be configured before any course data can be extracted."
+            ),
+            "root_cause": (
+                "No 'allow_url_patterns' filter is set, so all BFS-discovered links pass through — "
+                "including category hubs like /study/subjects/ and /study/options/. "
+                "Alternatively the listing pages render course links via JavaScript so static BFS "
+                "never reaches the individual course pages (which ARE accessible as static HTML). "
+                "Solution: run Auto-Configure so Gemini probes the live site, detects the CMS "
+                "platform, and writes the correct URL depth pattern and browser-discovery settings."
+            ),
+            "confidence": 0.97,
+            "fix": {
+                "type": "auto_configure",
+                "description": (
+                    "Click 'Run Auto-Configure' below to let Gemini analyse the live site and "
+                    "generate the correct 'allow_url_patterns' and (if needed) "
+                    "'always_browser_discover: true' settings. "
+                    "Auto-Configure probes the site, detects the CMS platform, fingerprints "
+                    "the URL structure, and writes a tested config — far more reliable than "
+                    "manually guessing URL patterns. After Auto-Configure completes, re-run the scrape."
+                ),
+                "recipe_patch": None,
+            },
+        })
+
     if total_found == 0:
         recs.append({
             "severity": "critical",
