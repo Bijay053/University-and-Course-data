@@ -227,6 +227,7 @@ type DiagnoseResult = {
   phase3_recommendations?: Phase3Rec[];
   course_probe_summary?: CourseProbeSummary;
   deterministic_issues?: DeterministicIssue[];
+  level_breakdown?: Record<string, number>;
 };
 
 type SimChange = { field: string; before: string | null; after: string | null };

@@ -5387,7 +5387,7 @@ async def test_url_filter(body: dict) -> dict:
             return {"ok": False, "error": f"Invalid block_url_patterns regex: {p!r} — {e}"}
 
     results: list[dict] = []
-    for url in urls[:50]:  # cap at 50 for safety
+    for url in urls[:200]:  # cap at 200
         passed = True
         drop_reason: str | None = None
         matching_allow: str | None = None

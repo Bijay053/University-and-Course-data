@@ -20,6 +20,7 @@ type ScrapeLog = {
   kind?: string; drop_pct?: number; dropped_sample?: string[];
   dropped?: number; kept?: number;
   category_count?: number; total_kept?: number; category_pct?: number;
+  pattern_breakdown?: Record<string, number>;
 };
 
 type QualityAction = {
@@ -233,6 +234,8 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
 
   type UrlFilterWarning = {
     kind: "high_drop_rate" | "category_pages";
+    ruleType?: "block" | "allow";
+    patternBreakdown?: Record<string, number>;
     dropPct?: number; dropped?: number; kept?: number;
     droppedSample?: string[];
     categoryPct?: number; categoryCount?: number; totalKept?: number;
@@ -559,15 +562,29 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
                 categoryCount: l.category_count,
                 totalKept: l.total_kept,
               });
-            } else if (l.kind === "extract_allow_url_filter" && (l.drop_pct ?? 0) > 50) {
+            } else if (l.kind === "extract_allow_url_filter" && (l.drop_pct ?? 0) > 40) {
               setUrlFilterWarning((prev) => {
                 if (prev?.kind === "category_pages") return prev;
                 return {
                   kind: "high_drop_rate",
+                  ruleType: "allow",
                   dropPct: l.drop_pct,
                   dropped: l.dropped,
                   kept: l.kept,
                   droppedSample: l.dropped_sample,
+                };
+              });
+            } else if (l.kind === "extract_block_url_filter" && (l.drop_pct ?? 0) > 40) {
+              setUrlFilterWarning((prev) => {
+                if (prev?.kind === "category_pages") return prev;
+                return {
+                  kind: "high_drop_rate",
+                  ruleType: "block",
+                  dropPct: l.drop_pct,
+                  dropped: l.dropped,
+                  kept: l.kept,
+                  droppedSample: l.dropped_sample,
+                  patternBreakdown: l.pattern_breakdown,
                 };
               });
             }
@@ -867,41 +884,56 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
 
             {/* ── URL filter warning banner (shown during run when filter drops too much) ── */}
             {urlFilterWarning && (
-              <div className={`rounded-lg border p-2.5 space-y-1.5 text-[11px] ${
-                urlFilterWarning.kind === "category_pages"
-                  ? "bg-red-50 border-red-300"
-                  : "bg-amber-50 border-amber-300"
+              <div className={`rounded-lg border p-2.5 space-y-2 text-[11px] ${
+                urlFilterWarning.kind === "category_pages" ? "bg-red-50 border-red-300" : "bg-amber-50 border-amber-300"
               }`}>
                 <div className="flex items-center gap-1.5 font-semibold">
                   <AlertTriangle className={`w-3.5 h-3.5 shrink-0 ${urlFilterWarning.kind === "category_pages" ? "text-red-500" : "text-amber-500"}`} />
                   {urlFilterWarning.kind === "category_pages" ? (
-                    <span className="text-red-800">
-                      Wrong pages selected — category pages only ({urlFilterWarning.categoryCount}/{urlFilterWarning.totalKept} URLs have no degree qualifier)
-                    </span>
+                    <span className="text-red-800">Wrong pages — category pages only ({urlFilterWarning.categoryCount}/{urlFilterWarning.totalKept} URLs have no degree qualifier)</span>
                   ) : (
-                    <span className="text-amber-800">
-                      URL filter is too restrictive — dropped {urlFilterWarning.dropPct?.toFixed(0)}% of discovered URLs
-                    </span>
+                    <span className="text-amber-800">URL filter removed {urlFilterWarning.dropPct?.toFixed(0)}% of discovered course pages</span>
                   )}
                 </div>
                 {urlFilterWarning.kind === "category_pages" ? (
                   <p className="text-red-700 leading-relaxed">
-                    The <code className="font-mono bg-red-100 px-0.5 rounded">allow_url_patterns</code> filter is keeping subject/category listing pages instead of individual course detail pages. Staged course count will be 0. Fix the regex to match degree-level course URLs.
+                    The <code className="font-mono bg-red-100 px-0.5 rounded">allow_url_patterns</code> filter is keeping subject/category listing pages, not individual course pages. Staged count will be 0.
                   </p>
                 ) : (
-                  <p className="text-amber-700 leading-relaxed">
-                    <code className="font-mono bg-amber-100 px-0.5 rounded">allow_url_patterns</code> dropped {urlFilterWarning.dropPct?.toFixed(0)}% of discovered URLs — this may be removing real course pages. Review the regex and ensure it matches individual course detail URLs, not just listing or category pages.
-                  </p>
-                )}
-                {urlFilterWarning.droppedSample && urlFilterWarning.droppedSample.length > 0 && (
-                  <div className="space-y-0.5">
-                    <p className="text-[10px] font-semibold text-amber-600 uppercase tracking-wide">Sample dropped URLs</p>
-                    <div className="bg-white border border-amber-200 rounded p-1.5 space-y-0.5 max-h-[90px] overflow-y-auto">
-                      {urlFilterWarning.droppedSample.map((u, i) => (
-                        <div key={i} className="font-mono text-[9px] text-gray-600 truncate" title={u}>{u}</div>
-                      ))}
-                    </div>
-                  </div>
+                  <>
+                    <p className="text-amber-700 leading-relaxed">
+                      {urlFilterWarning.ruleType === "block"
+                        ? <><code className="font-mono bg-amber-100 px-0.5 rounded">block_url_patterns</code> removed {urlFilterWarning.dropped} URLs — only {urlFilterWarning.kept} remain for extraction.</>
+                        : <><code className="font-mono bg-amber-100 px-0.5 rounded">allow_url_patterns</code> only matched {urlFilterWarning.kept} URLs — {urlFilterWarning.dropped} were not matched and dropped.</>
+                      }
+                    </p>
+                    {urlFilterWarning.patternBreakdown && Object.keys(urlFilterWarning.patternBreakdown).length > 0 && (
+                      <div className="space-y-1">
+                        <p className="text-[10px] font-semibold text-amber-700 uppercase tracking-wide">Problem rule</p>
+                        {Object.entries(urlFilterWarning.patternBreakdown).sort(([,a],[,b]) => b - a).map(([pat, count]) => (
+                          <div key={pat} className="flex items-center gap-1.5 bg-white border border-amber-200 rounded px-1.5 py-1">
+                            <code className="font-mono text-[9px] text-red-700 flex-1 min-w-0 truncate" title={pat}>{pat}</code>
+                            <span className="text-[9px] font-bold text-red-600 shrink-0">{count} URLs</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {urlFilterWarning.droppedSample && urlFilterWarning.droppedSample.length > 0 && (
+                      <div className="space-y-0.5">
+                        <p className="text-[10px] font-semibold text-amber-600 uppercase tracking-wide">Sample dropped</p>
+                        <div className="bg-white border border-amber-200 rounded p-1.5 space-y-0.5 max-h-[80px] overflow-y-auto">
+                          {urlFilterWarning.droppedSample.map((u, i) => (
+                            <div key={i} className="font-mono text-[9px] text-gray-600 truncate" title={u}>{u.replace(/^https?:\/\/[^/]+/, "")}</div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {selectedUni && !isNaN(parseInt(selectedUni)) && (
+                      <a href={`/universities/${selectedUni}/recipe`} className="inline-flex items-center gap-1 text-[10px] text-blue-600 hover:underline font-semibold">
+                        Fix in Recipe Editor →
+                      </a>
+                    )}
+                  </>
                 )}
               </div>
             )}
@@ -960,20 +992,46 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
                   {urlFilterWarning.kind === "category_pages" ? (
                     <span className="text-red-800">Discovery issue: category pages were selected instead of course pages</span>
                   ) : (
-                    <span className="text-amber-800">URL filter dropped {urlFilterWarning.dropPct?.toFixed(0)}% of discovered URLs — low staged count may result</span>
+                    <span className="text-amber-800">URL filter removed {urlFilterWarning.dropPct?.toFixed(0)}% of discovered course pages</span>
                   )}
                 </div>
-                <p className={`leading-relaxed ${urlFilterWarning.kind === "category_pages" ? "text-red-700" : "text-amber-700"}`}>
-                  {urlFilterWarning.kind === "category_pages"
-                    ? "Fix the allow_url_patterns regex to match individual course detail pages, then re-run."
-                    : "Review allow_url_patterns — it may be over-filtering real course pages. Fix the regex and re-run."}
-                </p>
-                {urlFilterWarning.droppedSample && urlFilterWarning.droppedSample.length > 0 && (
-                  <div className="bg-white border border-amber-200 rounded p-1.5 space-y-0.5 max-h-[60px] overflow-y-auto">
-                    {urlFilterWarning.droppedSample.map((u, i) => (
-                      <div key={i} className="font-mono text-[9px] text-gray-600 truncate" title={u}>{u}</div>
-                    ))}
-                  </div>
+                {urlFilterWarning.kind === "category_pages" ? (
+                  <p className="text-red-700 leading-relaxed">Fix the <code className="font-mono bg-red-100 px-0.5 rounded">allow_url_patterns</code> regex to match individual course detail pages, then re-run.</p>
+                ) : (
+                  <>
+                    <p className="text-amber-700 leading-relaxed">
+                      {urlFilterWarning.ruleType === "block"
+                        ? <><code className="font-mono bg-amber-100 px-0.5 rounded">block_url_patterns</code> removed {urlFilterWarning.dropped} course URLs. Only {urlFilterWarning.kept} were extracted.</>
+                        : <><code className="font-mono bg-amber-100 px-0.5 rounded">allow_url_patterns</code> only matched {urlFilterWarning.kept} URLs — {urlFilterWarning.dropped} valid course pages may have been dropped.</>
+                      }
+                    </p>
+                    {urlFilterWarning.patternBreakdown && Object.keys(urlFilterWarning.patternBreakdown).length > 0 && (
+                      <div className="space-y-1">
+                        <p className="text-[10px] font-semibold text-amber-700 uppercase tracking-wide">Problem rule</p>
+                        {Object.entries(urlFilterWarning.patternBreakdown).sort(([,a],[,b]) => b - a).map(([pat, count]) => (
+                          <div key={pat} className="flex items-center gap-1.5 bg-white border border-amber-200 rounded px-1.5 py-1">
+                            <code className="font-mono text-[9px] text-red-700 flex-1 min-w-0 truncate" title={pat}>{pat}</code>
+                            <span className="text-[9px] font-bold text-red-600 shrink-0">{count} URLs dropped</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {urlFilterWarning.droppedSample && urlFilterWarning.droppedSample.length > 0 && (
+                      <div className="space-y-0.5">
+                        <p className="text-[10px] font-semibold text-amber-600 uppercase tracking-wide">Sample dropped</p>
+                        <div className="bg-white border border-amber-200 rounded p-1.5 space-y-0.5 max-h-[60px] overflow-y-auto">
+                          {urlFilterWarning.droppedSample.map((u, i) => (
+                            <div key={i} className="font-mono text-[9px] text-gray-600 truncate" title={u}>{u.replace(/^https?:\/\/[^/]+/, "")}</div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {selectedUni && !isNaN(parseInt(selectedUni)) && (
+                      <a href={`/universities/${selectedUni}/recipe`} className="inline-flex items-center gap-1 text-[10px] text-blue-600 hover:underline font-semibold">
+                        Fix in Recipe Editor →
+                      </a>
+                    )}
+                  </>
                 )}
                 {/* URL filter test tool */}
                 {completedJobId && (

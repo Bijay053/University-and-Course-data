@@ -633,6 +633,16 @@ export default function RecipeEditorPage() {
   const [diagnoseResult, setDiagnoseResult] = useState<any | null>(null);
   const [beforeSnapshot, setBeforeSnapshot] = useState<Record<string, any> | null>(null);
 
+  // ── Filter Simulator ──
+  type FilterSimRow = { url: string; passed: boolean; drop_reason: string | null; matching_allow_pattern: string | null; blocking_block_pattern: string | null };
+  type FilterSimSummary = { total: number; kept_count: number; dropped_count: number; drop_pct: number };
+  const [filterSimUrls, setFilterSimUrls] = useState("");
+  const [filterSimLoading, setFilterSimLoading] = useState(false);
+  const [loadingFilterUrls, setLoadingFilterUrls] = useState(false);
+  const [filterSimResults, setFilterSimResults] = useState<{ results: FilterSimRow[]; summary: FilterSimSummary } | null>(null);
+  const [filterSimError, setFilterSimError] = useState<string | null>(null);
+  const [filterSimAllowPats, setFilterSimAllowPats] = useState<string[]>([]);
+
   // ── Load ──
   useEffect(() => {
     if (!id) return;
@@ -648,6 +658,56 @@ export default function RecipeEditorPage() {
       .catch(() => toast({ title: "Failed to load recipe", variant: "destructive" }))
       .finally(() => setLoading(false));
   }, [id]);
+
+  // ── Filter Simulator handlers ──
+  const loadFilterUrls = useCallback(async () => {
+    if (!id) return;
+    setLoadingFilterUrls(true);
+    setFilterSimError(null);
+    try {
+      const resp = await fetch(`/api/universities/${id}/filter-impact`, { credentials: "include" });
+      const data = await resp.json();
+      const urls: string[] = [...(data.kept_samples || []), ...(data.dropped_samples || [])];
+      if (!urls.length) {
+        setFilterSimError("No historical course URLs found — run a scrape first, or paste URLs below manually.");
+        return;
+      }
+      setFilterSimUrls(urls.join("\n"));
+      setFilterSimAllowPats(data.filter_config?.allow_url_patterns || []);
+    } catch (e: any) {
+      setFilterSimError(String(e));
+    } finally {
+      setLoadingFilterUrls(false);
+    }
+  }, [id]);
+
+  const runFilterSim = useCallback(async () => {
+    const urls = filterSimUrls.split("\n").map((u) => u.trim()).filter(Boolean);
+    if (!urls.length) return;
+    setFilterSimLoading(true);
+    setFilterSimError(null);
+    setFilterSimResults(null);
+    try {
+      const resp = await fetch("/api/scrape/test-url-filter", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          urls,
+          allow_url_patterns: filterSimAllowPats,
+          must_contain: recipe.must_contain,
+          block_url_patterns: recipe.block_url_patterns,
+        }),
+      });
+      const data = await resp.json();
+      if (!data?.ok) { setFilterSimError(data?.error || "Unknown error"); return; }
+      setFilterSimResults(data);
+    } catch (e: any) {
+      setFilterSimError(String(e));
+    } finally {
+      setFilterSimLoading(false);
+    }
+  }, [filterSimUrls, filterSimAllowPats, recipe.must_contain, recipe.block_url_patterns]);
 
   // ── Save ──
   const save = useCallback(async () => {
@@ -1978,6 +2038,152 @@ export default function RecipeEditorPage() {
                 placeholder="e.g. /apprenticeship"
                 helpText="Regex patterns — any URL matching one of these is dropped. E.g. /news, /events, /cpd."
               />
+              <Separator />
+
+              {/* ── Filter Simulator ─────────────────────────────────────── */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label className="font-semibold text-sm">Filter Simulator</Label>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Test your current filters against real URLs to see exactly which pages are kept or dropped, and why.
+                    </p>
+                  </div>
+                </div>
+
+                {filterSimAllowPats.length > 0 && (
+                  <div className="rounded-md border border-blue-200 bg-blue-50 p-2.5 space-y-1">
+                    <p className="text-xs font-semibold text-blue-700">Allow URL Patterns (from YAML config — applied first)</p>
+                    {filterSimAllowPats.map((p, i) => (
+                      <code key={i} className="block font-mono text-xs bg-blue-100 px-1.5 py-0.5 rounded text-blue-900">{p}</code>
+                    ))}
+                    <p className="text-[11px] text-blue-600">URLs must match at least one of these patterns, then your block/must_contain rules below are applied.</p>
+                  </div>
+                )}
+
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs text-muted-foreground">URLs to test (one per line)</Label>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs"
+                      onClick={loadFilterUrls}
+                      disabled={loadingFilterUrls}
+                    >
+                      {loadingFilterUrls ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Database className="h-3 w-3 mr-1" />}
+                      Load from last scrape
+                    </Button>
+                  </div>
+                  <Textarea
+                    value={filterSimUrls}
+                    onChange={e => { setFilterSimUrls(e.target.value); setFilterSimResults(null); }}
+                    placeholder={"https://www.swinburne.edu.au/courses/find-a-course/business/bachelor-of-business\nhttps://www.swinburne.edu.au/courses/find-a-course\nhttps://www.swinburne.edu.au/courses/find-a-course/engineering/bachelor-of-engineering"}
+                    className="font-mono text-xs h-28 resize-none"
+                  />
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      onClick={runFilterSim}
+                      disabled={filterSimLoading || !filterSimUrls.trim()}
+                    >
+                      {filterSimLoading ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Play className="h-3 w-3 mr-1" />}
+                      Test Filter
+                    </Button>
+                    {filterSimResults && (
+                      <span className="text-xs text-muted-foreground">
+                        {filterSimResults.summary.kept_count} kept · {filterSimResults.summary.dropped_count} dropped ({filterSimResults.summary.drop_pct}%)
+                      </span>
+                    )}
+                  </div>
+                  {filterSimError && (
+                    <p className="text-xs text-destructive">{filterSimError}</p>
+                  )}
+                </div>
+
+                {filterSimResults && (
+                  <div className="space-y-3">
+                    {/* Impact summary */}
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="rounded-lg border bg-gray-50 p-2.5 text-center">
+                        <div className="text-xl font-bold">{filterSimResults.summary.total}</div>
+                        <div className="text-xs text-muted-foreground">Total URLs</div>
+                      </div>
+                      <div className="rounded-lg border bg-green-50 p-2.5 text-center">
+                        <div className="text-xl font-bold text-green-700">{filterSimResults.summary.kept_count}</div>
+                        <div className="text-xs text-green-600">Kept ✓</div>
+                      </div>
+                      <div className={`rounded-lg border p-2.5 text-center ${filterSimResults.summary.drop_pct >= 50 ? "bg-red-50 border-red-300" : "bg-amber-50"}`}>
+                        <div className={`text-xl font-bold ${filterSimResults.summary.drop_pct >= 50 ? "text-red-700" : "text-amber-700"}`}>
+                          {filterSimResults.summary.dropped_count}
+                        </div>
+                        <div className={`text-xs ${filterSimResults.summary.drop_pct >= 50 ? "text-red-600" : "text-amber-600"}`}>
+                          Dropped ({filterSimResults.summary.drop_pct}%)
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* High-drop warning with per-rule breakdown */}
+                    {filterSimResults.summary.drop_pct >= 50 && (() => {
+                      const ruleCounts = new Map<string, number>();
+                      filterSimResults.results.filter(r => !r.passed).forEach(r => {
+                        const rule = r.drop_reason || "unknown";
+                        ruleCounts.set(rule, (ruleCounts.get(rule) ?? 0) + 1);
+                      });
+                      return (
+                        <div className="rounded-lg border border-red-300 bg-red-50 p-3 space-y-2">
+                          <div className="flex items-center gap-1.5 font-semibold text-red-800 text-sm">
+                            <AlertTriangle className="h-4 w-4 shrink-0" />
+                            This filter removes {filterSimResults.summary.drop_pct}% of URLs — check your rules
+                          </div>
+                          <div className="space-y-1">
+                            <p className="text-xs font-semibold text-red-700">Dropped by rule</p>
+                            {[...ruleCounts.entries()].sort(([,a],[,b]) => b - a).map(([rule, count]) => (
+                              <div key={rule} className="flex items-center gap-2 bg-white border border-red-200 rounded px-2 py-1">
+                                <code className="font-mono text-xs text-red-800 flex-1 min-w-0 truncate" title={rule}>{rule}</code>
+                                <span className="text-xs font-bold text-red-700 shrink-0">{count} URLs</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Per-URL results table */}
+                    <div className="rounded-md border overflow-hidden">
+                      <div className="bg-muted/60 px-3 py-1.5 flex items-center justify-between">
+                        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">URL Filter Results</span>
+                        <span className="text-xs text-muted-foreground">{filterSimResults.results.length} URLs tested</span>
+                      </div>
+                      <div className="divide-y max-h-[360px] overflow-y-auto">
+                        {filterSimResults.results.map((r, i) => {
+                          const path = r.url.replace(/^https?:\/\/[^/]+/, "") || r.url;
+                          return (
+                            <div key={i} className={`flex items-start gap-2 px-3 py-2 text-xs ${r.passed ? "bg-green-50" : "bg-red-50"}`}>
+                              <span className="shrink-0 mt-0.5">{r.passed ? "✅" : "❌"}</span>
+                              <div className="flex-1 min-w-0">
+                                <div className="font-mono truncate text-gray-800" title={r.url}>{path}</div>
+                                {r.passed && r.matching_allow_pattern && (
+                                  <div className="text-[11px] text-green-600 mt-0.5">
+                                    allow: <code className="font-mono bg-green-100 px-0.5 rounded">{r.matching_allow_pattern}</code>
+                                  </div>
+                                )}
+                                {!r.passed && r.drop_reason && (
+                                  <div className="text-[11px] text-red-600 mt-0.5">{r.drop_reason}</div>
+                                )}
+                              </div>
+                              <span className={`shrink-0 text-[11px] font-semibold ${r.passed ? "text-green-600" : "text-red-600"}`}>
+                                {r.passed ? "Kept" : "Dropped"}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <Separator />
               {/* ── URL Rewrites ──────────────────────────────────────────── */}
               <div>

@@ -984,8 +984,8 @@ async def get_filter_impact(
         "after_filter": len(passing),
         "dropped": len(dropped_urls),
         "drop_rate_pct": round(drop_rate * 100),
-        "kept_samples": passing[:8],
-        "dropped_samples": dropped_urls[:8],
+        "kept_samples": passing[:50],
+        "dropped_samples": dropped_urls[:50],
         "filter_config": {
             "allow_url_patterns": allow_pats,
             "must_contain": mc_patterns,

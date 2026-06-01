@@ -1741,12 +1741,28 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     )
             if _compiled_block_a5b:
                 _pre_block_a5b = len(links)
-                links = [
-                    _lk for _lk in links
-                    if not any(_bp.search(_lk.get("url") or "") for _bp in _compiled_block_a5b)
-                ]
-                _block_dropped_a5b = _pre_block_a5b - len(links)
+                _block_kept_lks: list[dict] = []
+                _block_dropped_detail: list[dict] = []
+                for _lk in links:
+                    _lk_url = _lk.get("url") or ""
+                    _drop_rule: str | None = None
+                    for _bp_str, _bp_re in zip(_block_pats_raw_a5b, _compiled_block_a5b):
+                        if _bp_re.search(_lk_url):
+                            _drop_rule = _bp_str
+                            break
+                    if _drop_rule:
+                        _block_dropped_detail.append({"url": _lk_url, "rule": _drop_rule})
+                    else:
+                        _block_kept_lks.append(_lk)
+                links = _block_kept_lks
+                _block_dropped_a5b = len(_block_dropped_detail)
                 if _block_dropped_a5b:
+                    _block_drop_pct = round(_block_dropped_a5b / _pre_block_a5b * 100, 1) if _pre_block_a5b else 0
+                    _block_pat_counts: dict[str, int] = {}
+                    for _bdd in _block_dropped_detail:
+                        _r = _bdd["rule"]
+                        _block_pat_counts[_r] = _block_pat_counts.get(_r, 0) + 1
+                    _block_dropped_sample = [_bdd["url"] for _bdd in _block_dropped_detail[:10]]
                     log.info(
                         "[EXTRACT] block_url_patterns: dropped %d / %d blocked URLs (%d remain)",
                         _block_dropped_a5b, _pre_block_a5b, len(links),
@@ -1759,6 +1775,9 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                         kind="extract_block_url_filter",
                         dropped=_block_dropped_a5b,
                         kept=len(links),
+                        drop_pct=_block_drop_pct,
+                        dropped_sample=_block_dropped_sample,
+                        pattern_breakdown=_block_pat_counts,
                     )
 
         # Phase A.5b — per-uni YAML allow_url_patterns whitelist.
