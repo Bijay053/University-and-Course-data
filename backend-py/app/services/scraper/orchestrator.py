@@ -1871,6 +1871,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 pass
         _cy_dup_key_r: str = _cy_cfg.get("duplicate_key", "none")
         _ignore_url_pats_r: list[str] = list(_recipe.get("ignore_urls_matching") or [])
+        _prefer_url_pats_r: list[str] = list(_recipe.get("prefer_urls_matching") or [])
 
         import re as _re_yr_r
         _YEAR_SEG_R = _re_yr_r.compile(r"[/_\-](\d{4})[/_\-\?]|[/_\-](\d{4})$")
@@ -1948,20 +1949,31 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 if len(_versions_r) == 1:
                     _kept_r.append(_versions_r[0][1])
                     continue
-                # Multiple year versions — pick winner
-                if _cy_mode_r == "keep_preferred_year" and _cy_preferred_r:
-                    _winner_r = next(
-                        (v for yr, v in _versions_r if yr == _cy_preferred_r), None
-                    )
-                    if _winner_r is None:
+                # Multiple year versions — pick winner.
+                # 1. If prefer_urls_matching patterns are set, try them first:
+                #    the first candidate whose URL contains any prefer pattern wins.
+                _winner_r = None
+                if _prefer_url_pats_r:
+                    for _yr_r2, _v_r2 in _versions_r:
+                        _u_r2 = _v_r2.get("url") or ""
+                        if any(pat in _u_r2 for pat in _prefer_url_pats_r):
+                            _winner_r = _v_r2
+                            break
+                # 2. Fall back to year-mode logic if no prefer pattern matched.
+                if _winner_r is None:
+                    if _cy_mode_r == "keep_preferred_year" and _cy_preferred_r:
+                        _winner_r = next(
+                            (v for yr, v in _versions_r if yr == _cy_preferred_r), None
+                        )
+                        if _winner_r is None:
+                            _winner_r = sorted(_versions_r, key=lambda x: x[0], reverse=True)[0][1]
+                    elif _cy_mode_r == "keep_latest":
                         _winner_r = sorted(_versions_r, key=lambda x: x[0], reverse=True)[0][1]
-                elif _cy_mode_r == "keep_latest":
-                    _winner_r = sorted(_versions_r, key=lambda x: x[0], reverse=True)[0][1]
-                elif _cy_mode_r == "keep_current":
-                    _cur_yr_r = _dt_yr_r.datetime.now().year
-                    _winner_r = min(_versions_r, key=lambda x: abs(x[0] - _cur_yr_r))[1]
-                else:
-                    _winner_r = _versions_r[0][1]
+                    elif _cy_mode_r == "keep_current":
+                        _cur_yr_r = _dt_yr_r.datetime.now().year
+                        _winner_r = min(_versions_r, key=lambda x: abs(x[0] - _cur_yr_r))[1]
+                    else:
+                        _winner_r = _versions_r[0][1]
                 _kept_r.append(_winner_r)
                 _dedup_dropped_r += len(_versions_r) - 1
 
