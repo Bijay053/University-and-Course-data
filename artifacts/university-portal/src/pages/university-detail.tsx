@@ -20,7 +20,26 @@ import {
   GitCompareArrows,
   Network,
   ChevronDown,
+  ShieldCheck, ShieldX, FlaskConical, FileEdit,
 } from "lucide-react";
+
+// ── Certification Status Badge ──────────────────────────────────────────────
+type CertStatus = "draft" | "testing" | "certified" | "needs_review" | "failed";
+const _CERT_CFG: Record<CertStatus, { label: string; bg: string; text: string; border: string; icon: React.ReactNode }> = {
+  certified:    { label: "Certified",    bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200", icon: <ShieldCheck className="w-3.5 h-3.5" /> },
+  testing:      { label: "Testing",      bg: "bg-blue-50",    text: "text-blue-700",    border: "border-blue-200",    icon: <FlaskConical className="w-3.5 h-3.5" /> },
+  needs_review: { label: "Needs Review", bg: "bg-amber-50",   text: "text-amber-700",   border: "border-amber-200",   icon: <AlertTriangle className="w-3.5 h-3.5" /> },
+  failed:       { label: "Failed",       bg: "bg-red-50",     text: "text-red-700",     border: "border-red-200",     icon: <ShieldX className="w-3.5 h-3.5" /> },
+  draft:        { label: "Draft",        bg: "bg-gray-50",    text: "text-gray-500",    border: "border-gray-200",    icon: <FileEdit className="w-3.5 h-3.5" /> },
+};
+function UniCertBadge({ status }: { status: string }) {
+  const cfg = _CERT_CFG[(status as CertStatus)] ?? _CERT_CFG.draft;
+  return (
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border ${cfg.bg} ${cfg.text} ${cfg.border}`}>
+      {cfg.icon}{cfg.label}
+    </span>
+  );
+}
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { CATEGORY_NAMES, DEGREE_LEVELS, STUDY_MODES, getSubCategories } from "@/lib/course-constants";
@@ -1859,6 +1878,7 @@ export default function UniversityDetail() {
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
             <h1 className="text-2xl font-bold tracking-tight">{uni.name}</h1>
+            <UniCertBadge status={((uni as unknown) as Record<string, unknown>).certificationStatus as string ?? "draft"} />
             <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={openEditUni} title="Edit university">
               <Pencil className="h-4 w-4" />
             </Button>

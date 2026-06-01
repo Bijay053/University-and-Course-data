@@ -96,6 +96,11 @@ class UniversityRead(BaseModel):
     probe_result: dict[str, Any] | None = None
     probe_updated_at: datetime | None = None
 
+    # ── Certification workflow fields ───────────────────────────────────────
+    certification_status: str = "draft"
+    last_certified_score: int | None = None
+    last_certified_at: datetime | None = None
+
     def model_dump(self, *args, **kwargs) -> dict:
         d = super().model_dump(*args, **kwargs)
         # camelCase aliases for UI compatibility
@@ -113,6 +118,9 @@ class UniversityRead(BaseModel):
             "probe_status": "probeStatus",
             "probe_result": "probeResult",
             "probe_updated_at": "probeUpdatedAt",
+            "certification_status": "certificationStatus",
+            "last_certified_score": "lastCertifiedScore",
+            "last_certified_at": "lastCertifiedAt",
         }
         for snake, camel in aliases.items():
             if snake in d and camel not in d:

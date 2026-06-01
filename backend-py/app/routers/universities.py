@@ -341,6 +341,66 @@ async def bulk_import_universities(
     return {"created": created, "skipped": skipped, "errors": errors}
 
 
+_CERT_STATUSES = ("draft", "testing", "certified", "needs_review", "failed")
+
+
+@router.get("/universities/{uni_id}/certification-status")
+async def get_certification_status(
+    uni_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _user: Annotated[dict, Depends(get_current_user)],
+) -> dict[str, Any]:
+    """Return current certification status + last certified score/date."""
+    u = await db.get(University, uni_id)
+    if not u:
+        raise HTTPException(status_code=404, detail="University not found")
+    return {
+        "university_id": uni_id,
+        "certification_status": u.certification_status,
+        "last_certified_score": u.last_certified_score,
+        "last_certified_at": u.last_certified_at.isoformat() if u.last_certified_at else None,
+        "available_statuses": list(_CERT_STATUSES),
+    }
+
+
+@router.patch("/universities/{uni_id}/certification-status")
+async def update_certification_status(
+    uni_id: int,
+    body: dict,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _user: Annotated[dict, Depends(get_current_user)],
+) -> dict[str, Any]:
+    """Manually set the certification status for a university.
+
+    Body: { "status": "certified" | "draft" | "testing" | "needs_review" | "failed",
+            "score": <int, optional — current certification score> }
+    """
+    from datetime import datetime, timezone
+
+    u = await db.get(University, uni_id)
+    if not u:
+        raise HTTPException(status_code=404, detail="University not found")
+    new_status: str = body.get("status", "")
+    if new_status not in _CERT_STATUSES:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Invalid status '{new_status}'. Must be one of: {', '.join(_CERT_STATUSES)}",
+        )
+    u.certification_status = new_status
+    if new_status == "certified":
+        score = body.get("score")
+        if score is not None:
+            u.last_certified_score = int(score)
+        u.last_certified_at = datetime.now(timezone.utc)
+    await db.commit()
+    return {
+        "university_id": uni_id,
+        "certification_status": u.certification_status,
+        "last_certified_score": u.last_certified_score,
+        "last_certified_at": u.last_certified_at.isoformat() if u.last_certified_at else None,
+    }
+
+
 @router.delete("/universities/{uni_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_university(
     uni_id: int,

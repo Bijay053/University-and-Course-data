@@ -6055,11 +6055,19 @@ _RECIPE_COVERAGE_REGISTRY: list[dict] = [
         "id": "study_mode_blended",
         "title": "Study mode — blended/online-only misclassification",
         "category": "study_mode",
-        "fix_type": "platform_bug",
-        "has_recipe_patch": False,
+        "fix_type": "recipe_fix",
+        "has_recipe_patch": True,
         "field": "study_mode",
-        "recipe_keys": [],
-        "description": "Study mode is showing as blended or online-only incorrectly. Requires a developer fix to the extractor.",
+        "recipe_keys": [
+            "extraction.prefer_blended_over_on_campus",
+            "extraction.study_mode_from_location",
+            "extraction.study_mode_online_keywords",
+        ],
+        "description": (
+            "Study mode is being classified as Blended or Online-only incorrectly. "
+            "Set prefer_blended_over_on_campus=false to enforce On-Campus when online confidence is low, "
+            "or enable study_mode_from_location with study_mode_online_keywords to derive mode from location text."
+        ),
     },
     # ── Discovery — config-fixable with recipe keys (2) ──────────────────────
     {
@@ -6082,36 +6090,48 @@ _RECIPE_COVERAGE_REGISTRY: list[dict] = [
         "recipe_keys": ["discovery.seed_urls"],
         "description": "Fewer courses discovered than expected. Adding catalogue listing seed URLs usually helps.",
     },
-    # ── Discovery — config-only, no recipe patch (3) ──────────────────────────
+    # ── Discovery — config-fixable via filter/seed keys (3) ──────────────────
     {
         "id": "all_filtered",
         "title": "All discovered URLs dropped by URL filter",
         "category": "discovery",
         "fix_type": "config",
-        "has_recipe_patch": False,
+        "has_recipe_patch": True,
         "field": None,
-        "recipe_keys": [],
-        "description": "must_contain or block_url_patterns is dropping all course candidate URLs before extraction.",
+        "recipe_keys": ["discovery.must_contain", "discovery.block_url_patterns"],
+        "description": (
+            "must_contain or block_url_patterns is dropping all course candidate URLs before extraction. "
+            "Clear or widen the must_contain list so actual course paths pass the filter, "
+            "and review block_url_patterns for accidental over-matching."
+        ),
     },
     {
         "id": "undergraduate_count_zero",
         "title": "Undergraduate catalogue missing",
         "category": "discovery",
         "fix_type": "config",
-        "has_recipe_patch": False,
+        "has_recipe_patch": True,
         "field": None,
-        "recipe_keys": [],
-        "description": "0 undergraduate courses staged despite postgraduate courses being found.",
+        "recipe_keys": ["discovery.seed_urls", "discovery.must_contain"],
+        "description": (
+            "0 undergraduate courses staged despite postgraduate courses being found. "
+            "Add the undergraduate catalogue listing page to discovery.seed_urls, "
+            "and ensure must_contain does not exclude undergraduate URL patterns."
+        ),
     },
     {
         "id": "postgraduate_count_zero",
         "title": "Postgraduate catalogue missing",
         "category": "discovery",
         "fix_type": "config",
-        "has_recipe_patch": False,
+        "has_recipe_patch": True,
         "field": None,
-        "recipe_keys": [],
-        "description": "0 postgraduate courses staged despite undergraduate courses being found.",
+        "recipe_keys": ["discovery.seed_urls", "discovery.must_contain"],
+        "description": (
+            "0 postgraduate courses staged despite undergraduate courses being found. "
+            "Add the postgraduate catalogue listing page to discovery.seed_urls, "
+            "and verify must_contain allows postgraduate URL patterns."
+        ),
     },
 ]
 

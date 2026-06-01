@@ -11,7 +11,80 @@ import {
   CheckCheck, X, Plus, Save, Settings2, Activity, Target, TrendingUp,
   ShieldAlert, Play, ExternalLink, FlaskConical, BarChart3, Wrench, RotateCcw,
   Search, Award, ListChecks, ArrowLeftRight, ChevronDown, ChevronUp,
+  ShieldCheck, Clock, FlaskRound, ShieldX, FileEdit,
 } from "lucide-react";
+
+// ── Certification Status Badge + Selector ─────────────────────────────────────
+type CertStatus = "draft" | "testing" | "certified" | "needs_review" | "failed";
+
+const CERT_CONFIG: Record<CertStatus, { label: string; bg: string; text: string; border: string; icon: React.ReactNode }> = {
+  certified:    { label: "Certified",    bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200", icon: <ShieldCheck className="w-3.5 h-3.5" /> },
+  testing:      { label: "Testing",      bg: "bg-blue-50",    text: "text-blue-700",    border: "border-blue-200",    icon: <FlaskRound className="w-3.5 h-3.5" /> },
+  needs_review: { label: "Needs Review", bg: "bg-amber-50",   text: "text-amber-700",   border: "border-amber-200",   icon: <AlertTriangle className="w-3.5 h-3.5" /> },
+  failed:       { label: "Failed",       bg: "bg-red-50",     text: "text-red-700",     border: "border-red-200",     icon: <ShieldX className="w-3.5 h-3.5" /> },
+  draft:        { label: "Draft",        bg: "bg-gray-50",    text: "text-gray-600",    border: "border-gray-200",    icon: <FileEdit className="w-3.5 h-3.5" /> },
+};
+
+function CertStatusBadge({ status, className = "" }: { status: CertStatus; className?: string }) {
+  const cfg = CERT_CONFIG[status] ?? CERT_CONFIG.draft;
+  return (
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border ${cfg.bg} ${cfg.text} ${cfg.border} ${className}`}>
+      {cfg.icon}
+      {cfg.label}
+    </span>
+  );
+}
+
+function CertStatusSelector({ uniId, currentStatus, currentScore, onUpdated }: {
+  uniId: number;
+  currentStatus: CertStatus;
+  currentScore: number | null;
+  onUpdated: (status: CertStatus) => void;
+}) {
+  const [saving, setSaving] = useState(false);
+  const { toast } = useToast();
+
+  const setStatus = async (next: CertStatus) => {
+    setSaving(true);
+    try {
+      const body: Record<string, unknown> = { status: next };
+      if (next === "certified" && currentScore != null) body.score = currentScore;
+      const res = await fetch(`${BASE}/api/universities/${uniId}/certification-status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      toast({ title: `Status set to "${CERT_CONFIG[next]?.label ?? next}"` });
+      onUpdated(next);
+    } catch (e) {
+      toast({ title: "Failed to update status", description: String(e), variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-wrap gap-1.5 items-center">
+      {(Object.keys(CERT_CONFIG) as CertStatus[]).map(s => (
+        <button
+          key={s}
+          disabled={saving || s === currentStatus}
+          onClick={() => setStatus(s)}
+          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border transition-all
+            ${s === currentStatus
+              ? `${CERT_CONFIG[s].bg} ${CERT_CONFIG[s].text} ${CERT_CONFIG[s].border} ring-2 ring-offset-1 ring-current opacity-100`
+              : "bg-white text-gray-500 border-gray-200 hover:border-gray-400 opacity-70 hover:opacity-100"
+            } disabled:opacity-40 disabled:cursor-not-allowed`}
+        >
+          {CERT_CONFIG[s].icon}
+          {CERT_CONFIG[s].label}
+        </button>
+      ))}
+      {saving && <Loader2 className="w-3.5 h-3.5 animate-spin text-gray-400" />}
+    </div>
+  );
+}
 import { useToast } from "@/hooks/use-toast";
 
 const BASE = "";
@@ -371,6 +444,8 @@ export default function ScrapeAgentPage() {
 
   const [config, setConfig] = useState<AgentConfig | null>(null);
   const [loading, setLoading] = useState(true);
+  const [certStatus, setCertStatus] = useState<CertStatus>("draft");
+  const [lastCertifiedScore, setLastCertifiedScore] = useState<number | null>(null);
 
   // Config editor state — flat fields built from admin_config
   const [rejectOnline, setRejectOnline] = useState(true);
@@ -421,10 +496,18 @@ export default function ScrapeAgentPage() {
   const loadConfig = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${BASE}/api/universities/${uniId}/agent-config`);
+      const [res, certRes] = await Promise.all([
+        fetch(`${BASE}/api/universities/${uniId}/agent-config`),
+        fetch(`${BASE}/api/universities/${uniId}/certification-status`),
+      ]);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data: AgentConfig = await res.json();
       setConfig(data);
+      if (certRes.ok) {
+        const certData = await certRes.json();
+        setCertStatus((certData.certification_status ?? "draft") as CertStatus);
+        setLastCertifiedScore(certData.last_certified_score ?? null);
+      }
 
       // Populate editor from admin_config
       const ac = data.admin_config || {};
@@ -755,13 +838,39 @@ export default function ScrapeAgentPage() {
             <Bot className="w-5 h-5 text-blue-600" />
             Scrape Fix Agent
           </h1>
-          <p className="text-sm text-gray-500">{config?.university_name}</p>
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className="text-sm text-gray-500">{config?.university_name}</p>
+            <CertStatusBadge status={certStatus} />
+          </div>
           {config?.scrape_url && (
             <a href={config.scrape_url} target="_blank" rel="noreferrer"
                className="text-xs text-blue-500 hover:underline flex items-center gap-1">
               {config.scrape_url} <ExternalLink className="w-2.5 h-2.5" />
             </a>
           )}
+        </div>
+      </div>
+
+      {/* ── Certification Status ──────────────────────────────────────────── */}
+      <div className="bg-white border rounded-xl p-4">
+        <h2 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+          <ShieldCheck className="w-4 h-4 text-emerald-600" /> Certification Status
+        </h2>
+        <div className="space-y-3">
+          <div className="flex items-center gap-3 text-sm text-gray-600">
+            <span>Current:</span>
+            <CertStatusBadge status={certStatus} className="text-sm px-3 py-1" />
+            {lastCertifiedScore != null && certStatus === "certified" && (
+              <span className="text-xs text-gray-400">Score at certification: <strong>{lastCertifiedScore}</strong></span>
+            )}
+          </div>
+          <p className="text-xs text-gray-400">Set status manually to track operator confidence in this university's scrape config.</p>
+          <CertStatusSelector
+            uniId={uniId}
+            currentStatus={certStatus}
+            currentScore={lastCertifiedScore}
+            onUpdated={(s) => setCertStatus(s)}
+          />
         </div>
       </div>
 
@@ -2819,6 +2928,10 @@ function FixPreviewModal({
     course_name_pipe_suffix: "course_name",
     zero_discovery: "discovery",
     low_course_count: "discovery",
+    study_mode_blended: "study_mode",
+    all_filtered: "discovery",
+    undergraduate_count_zero: "discovery",
+    postgraduate_count_zero: "discovery",
   };
   const field = fieldMap[rec.id] || "";
 

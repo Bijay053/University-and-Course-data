@@ -12,7 +12,24 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Plus, Search, Globe, Building2, Trash2, Pencil, MoreHorizontal, ExternalLink, BookOpen, Star, Upload, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Zap, Loader2 } from "lucide-react";
+import { Plus, Search, Globe, Building2, Trash2, Pencil, MoreHorizontal, ExternalLink, BookOpen, Star, Upload, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Zap, Loader2, ShieldCheck, FlaskConical as FlaskRound, AlertTriangle, ShieldX, FileEdit } from "lucide-react";
+
+type CertStatus = "draft" | "testing" | "certified" | "needs_review" | "failed";
+const CERT_CONFIG: Record<CertStatus, { label: string; bg: string; text: string; border: string; icon: React.ReactNode }> = {
+  certified:    { label: "Certified",    bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200", icon: <ShieldCheck className="w-3 h-3" /> },
+  testing:      { label: "Testing",      bg: "bg-blue-50",    text: "text-blue-700",    border: "border-blue-200",    icon: <FlaskRound className="w-3 h-3" /> },
+  needs_review: { label: "Needs Review", bg: "bg-amber-50",   text: "text-amber-700",   border: "border-amber-200",   icon: <AlertTriangle className="w-3 h-3" /> },
+  failed:       { label: "Failed",       bg: "bg-red-50",     text: "text-red-700",     border: "border-red-200",     icon: <ShieldX className="w-3 h-3" /> },
+  draft:        { label: "Draft",        bg: "bg-gray-50",    text: "text-gray-500",    border: "border-gray-200",    icon: <FileEdit className="w-3 h-3" /> },
+};
+function CertBadge({ status }: { status: string }) {
+  const cfg = CERT_CONFIG[(status as CertStatus)] ?? CERT_CONFIG.draft;
+  return (
+    <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold border ${cfg.bg} ${cfg.text} ${cfg.border}`}>
+      {cfg.icon}{cfg.label}
+    </span>
+  );
+}
 import { Checkbox } from "@/components/ui/checkbox";
 import { Can, useCan } from "@/components/can";
 import { useToast } from "@/hooks/use-toast";
@@ -401,6 +418,7 @@ export default function Universities() {
                     <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Institution</th>
                     <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Location</th>
                     <th className="w-24 px-4 py-2.5 text-center text-xs font-semibold text-gray-400 uppercase tracking-wider">Courses</th>
+                    <th className="w-28 px-4 py-2.5 text-center text-xs font-semibold text-gray-400 uppercase tracking-wider">Status</th>
                     <th className="w-28 px-4 py-2.5 text-center text-xs font-semibold text-gray-400 uppercase tracking-wider">Featured</th>
                     <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Website</th>
                     <th className="w-28 px-4 py-2.5 text-right text-xs font-semibold text-gray-400 uppercase tracking-wider">Actions</th>
@@ -450,6 +468,11 @@ export default function Universities() {
                           ) : (
                             <span className="text-xs text-gray-300">—</span>
                           )}
+                        </td>
+
+                        {/* Certification Status */}
+                        <td className="px-4 py-3 align-middle text-center">
+                          <CertBadge status={((uni as unknown) as Record<string, unknown>).certificationStatus as string ?? "draft"} />
                         </td>
 
                         {/* Featured */}

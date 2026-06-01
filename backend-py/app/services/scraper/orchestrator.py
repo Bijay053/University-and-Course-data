@@ -3061,6 +3061,22 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     runtime_job_id, _cr_exc,
                 )
 
+            # ── P3: Auto-Recertification Watchdog ─────────────────────────
+            # If the university is currently "certified" and its health score
+            # has dropped >15 pts below the recorded certification score,
+            # automatically downgrade to "needs_review".  Soft-fail: any
+            # exception is logged and never propagates to the job result.
+            try:
+                from app.services.scraper.cert_watchdog import (
+                    maybe_downgrade_certification as _cert_watchdog,
+                )
+                await _cert_watchdog(db, uni_id, runtime_job_id)
+            except Exception as _cw_exc:  # noqa: BLE001
+                log.warning(
+                    "[CERT_WATCHDOG] hook failed for run %s uni %s: %s",
+                    runtime_job_id, uni_id, _cw_exc,
+                )
+
             # ── Phase 10: Change Detection — snapshot then diff ───────────
             # Snapshot the staged courses for this run, then compare against
             # the previous snapshot for the same university to emit

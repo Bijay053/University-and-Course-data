@@ -37,6 +37,14 @@ class University(Base):
     )
     probe_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
+    # ── Certification workflow columns (migration: apply_migration_034.py) ─────
+    # certification_status: "draft" | "testing" | "certified" | "needs_review" | "failed"
+    certification_status: Mapped[str] = mapped_column(
+        Text, nullable=False, server_default="draft", default="draft"
+    )
+    last_certified_score: Mapped[int | None] = mapped_column(Integer)
+    last_certified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
