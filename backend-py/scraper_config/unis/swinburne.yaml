@@ -1,21 +1,24 @@
 # Swinburne University of Technology — www.swinburne.edu.au
-# Custom CMS (JS-rendered course listings under /courses/find-a-course/<faculty>/<slug>/).
-# BFS crawls category pages and collects individual course links from them.
+# Custom CMS (JS-rendered course listings under /courses/find-a-course/).
 #
-# URL structure:
-#   Category listing:  /courses/find-a-course/business
-#   Course detail:     /courses/find-a-course/business/bachelor-of-business
+# URL structure (3 levels):
+#   Level 1 — Faculty hub:    /courses/find-a-course/business
+#   Level 2 — Sub-category:   /courses/find-a-course/business/accounting
+#   Level 3 — Course detail:  /courses/find-a-course/business/accounting/bachelor-of-accounting-honours
 #
-# allow_url_patterns whitelists only depth-2+ paths under find-a-course so that
-# shallow category listing pages are excluded automatically.
+# The BFS seeds at level-1 pages, crawls level-2 sub-category pages (which
+# are link lists, NOT extractable), and lands on level-3 individual course
+# pages for extraction.
 #
-# DO NOT block /courses/find-a-course/ as a prefix — every course lives under it.
-# The old config had that block and it dropped 71% (135/189) of discovered courses.
+# allow_url_patterns requires 3 segments after find-a-course so that level-2
+# sub-category hub pages (/business/accounting) are NOT extracted as courses.
+# Previously the 2-segment pattern matched sub-category hubs and every course
+# had 0% field fill because the hub pages contain no individual course data.
 
 discovery:
   always_browser_discover: true
   always_sitemap_supplement: true
-  bfs_page_budget: 80
+  bfs_page_budget: 100
 
   seed_urls:
     - https://www.swinburne.edu.au/courses/find-a-course/business
@@ -29,11 +32,10 @@ discovery:
     - https://www.swinburne.edu.au/courses/find-a-course/built-environment-architecture
     - https://www.swinburne.edu.au/courses/find-a-course/aviation
 
-  # Require 2+ path segments after /find-a-course/ so shallow category listing
-  # pages (/find-a-course/business) are excluded; individual course detail pages
-  # (/find-a-course/business/bachelor-of-business) pass through.
+  # Require 3 path segments after /find-a-course/ so that level-2 sub-category
+  # listing pages are crawled for link discovery but NOT extracted as courses.
   allow_url_patterns:
-    - '/courses/find-a-course/[^/]+/[^/]'
+    - '/courses/find-a-course/[^/]+/[^/]+/[^/]'
 
   block_url_patterns:
     - /courses/online/

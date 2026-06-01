@@ -1974,7 +1974,7 @@ export default function Scraping() {
         return (
         <Card className="border-2 border-green-100">
           <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <Eye className="w-5 h-5 text-green-600" />
@@ -2000,7 +2000,7 @@ export default function Scraping() {
                   </p>
                 )}
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2 shrink-0">
                 {selectedUni && selectedUni !== ALL && (
                   <Button
                     size="sm"
@@ -2008,10 +2008,10 @@ export default function Scraping() {
                     className="text-teal-600 border-teal-200 hover:bg-teal-50"
                     onClick={handleCleanCourseNames}
                     disabled={cleaningNames}
-                    title="Strip university-name suffixes from course names (e.g. '| University of East London', '- UEL', 'at UEL')"
+                    title="Strip university-name suffixes from course names"
                   >
                     {cleaningNames ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : null}
-                    Clean course names
+                    Clean names
                   </Button>
                 )}
                 {selectedUni && selectedUni !== ALL && (
@@ -2020,9 +2020,9 @@ export default function Scraping() {
                     variant="outline"
                     className="text-orange-600 border-orange-200 hover:bg-orange-50"
                     onClick={handleDedupPending}
-                    title="Remove duplicate courses from previous scrape runs — keeps the newest copy of each course name"
+                    title="Remove duplicate courses — keeps the newest copy of each course name"
                   >
-                    Remove duplicates
+                    Dedup
                   </Button>
                 )}
                 {selectedUni && selectedUni !== ALL && (
@@ -2032,7 +2032,7 @@ export default function Scraping() {
                     className="text-purple-600 border-purple-200 hover:bg-purple-50"
                     onClick={handleClearRejected}
                     disabled={clearingRejected}
-                    title="Delete all rejected staged courses for this university so they can be re-staged on the next scrape"
+                    title="Delete all rejected staged courses so they can be re-staged on the next scrape"
                   >
                     {clearingRejected ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <XCircle className="w-3 h-3 mr-1" />}
                     Clear rejected
@@ -2058,13 +2058,12 @@ export default function Scraping() {
                   onClick={stagedCourses.length === 0 ? undefined : handleFixSelected}
                   disabled={selectedIds.size === 0 || fixingSelected || analyzingFix || approving}
                   title={stagedCourses.length === 0
-                    ? "Fix Selected is unavailable — discovery/filtering must succeed first (0 staged courses). Fix the URL filter or allow_url_patterns config, then re-run the scrape."
-                    : "Analyse selected courses for missing fields, then confirm before re-running AI extraction"
+                    ? "Fix Selected is unavailable — no staged courses yet."
+                    : "Analyse selected courses for missing fields, then re-run AI extraction"
                   }
                 >
                   {(fixingSelected || analyzingFix) ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Sparkles className="w-4 h-4 mr-1" />}
-                  Fix selected ({selectedIds.size})
-                  {stagedCourses.length === 0 && <span className="ml-1 text-[10px] text-gray-400">(unavailable)</span>}
+                  Fix ({selectedIds.size})
                 </Button>
                 <Button
                   size="sm"
@@ -2076,10 +2075,20 @@ export default function Scraping() {
                   <XCircle className="w-4 h-4 mr-1" />
                   Reject ({selectedIds.size})
                 </Button>
+                <Button
+                  size="sm"
+                  className="bg-green-600 hover:bg-green-700 text-white"
+                  onClick={handleApproveSelected}
+                  disabled={selectedIds.size === 0 || approving}
+                  title="Approve and publish selected courses"
+                >
+                  {approving ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-1" />}
+                  Approve ({selectedIds.size})
+                </Button>
               </div>
             </div>
             <p className="text-sm text-muted-foreground">
-              Review each course below. Edit any details or reject to discard. To approve and import, go to the university's <strong>Raw Data</strong> tab.
+              Tick courses, then use <strong>Approve</strong> to publish or <strong>Reject</strong> to discard. Use the ✓ icon on a row to approve one course, or ✗ to reject it.
             </p>
           </CardHeader>
           <CardContent>
@@ -2386,6 +2395,16 @@ export default function Scraping() {
                                 title="Edit"
                               >
                                 <Pencil className="w-3.5 h-3.5" />
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className={`h-7 w-7 ${qData && qData.score < 60 ? "text-gray-300 cursor-not-allowed" : "text-green-600 hover:bg-green-50"}`}
+                                onClick={qData && qData.score < 60 ? undefined : () => handleApproveSingle(course.id)}
+                                disabled={approvingId === course.id || (qData !== undefined && qData.score < 60)}
+                                title={qData && qData.score < 60 ? `Cannot approve — Data Quality Failure (score ${qData.score}%)` : "Approve and publish this course"}
+                              >
+                                {approvingId === course.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
                               </Button>
                               <Button
                                 size="icon"

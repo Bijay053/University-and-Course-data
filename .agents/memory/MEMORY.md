@@ -12,3 +12,5 @@
 - [JCU URL rewrite Cloudflare lesson](jcu-cloudflare-lesson.md) — ?international=true on static HTTP triggers Cloudflare bot challenge (0 staged); JS-tab universities need browser rescue, not URL rewrite.
 - [SCU year URL regex fix](scu-year-regex-fix.md) — 4-digit course codes (e.g. 5350) fool `\d{4}` regex; use `20\d{2}` to restrict to real years.
 - [JCU band_mapping flow fix](jcu-band-mapping-flow.md) — band_mapping must override central_page values; outer ielts_missing guard blocks it when central already filled the slot.
+- [Swinburne 3-level URL structure](swinburne-url-depth.md) — /courses/find-a-course/faculty/subject is sub-category hub (no course data); individual courses are at depth 3 (/faculty/subject/course-slug). allow_url_patterns must require 3 segments.
+- [Scraping review panel missing Approve button](scraping-approve-button.md) — handleApproveSelected/Single existed in scraping.tsx but had no UI button; operators saw "go to Raw Data tab". Added green Approve button bulk + per-row.
