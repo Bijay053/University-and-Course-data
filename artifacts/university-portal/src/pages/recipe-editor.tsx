@@ -16,7 +16,7 @@ import {
   Code2, DollarSign, BookOpen, MapPin, ShieldCheck, Zap, RefreshCw,
   FlaskConical, CheckCircle2, XCircle, AlertTriangle, ChevronDown, ChevronUp, Info,
   MousePointerClick, GripVertical, Link, Stethoscope, Loader2, Wand2, WifiOff,
-  TrendingUp, ExternalLink, Play
+  TrendingUp, ExternalLink, Play, Type
 } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -97,10 +97,22 @@ interface Recipe {
   };
   minimum_completeness: number;
   required_fields: string[];
+  block_publish_if: string[];
   follow_links: string[];
   band_reference_url: string;
   band_mapping: Record<string, BandSpecUI>;
   actions: BrowserAction[];
+  // Course name cleanup
+  course_name_remove_after: string[];
+  course_name_remove_year_suffix: boolean;
+  course_name_remove_patterns: string[];
+  // Location cleanup
+  location_replace: Record<string, string>;
+  location_allowed_values: string[];
+  location_reject_values: string[];
+  // Study mode
+  study_mode_from_location: boolean;
+  study_mode_online_keywords: string[];
 }
 
 const EMPTY_RECIPE: Recipe = {
@@ -123,10 +135,19 @@ const EMPTY_RECIPE: Recipe = {
   fee_follow_links: [],
   minimum_completeness: 85,
   required_fields: [],
+  block_publish_if: [],
   follow_links: [],
   band_reference_url: "",
   band_mapping: {},
   actions: [],
+  course_name_remove_after: [],
+  course_name_remove_year_suffix: false,
+  course_name_remove_patterns: [],
+  location_replace: {},
+  location_allowed_values: [],
+  location_reject_values: [],
+  study_mode_from_location: false,
+  study_mode_online_keywords: [],
 };
 
 const STANDARD_FIELDS = [
@@ -1528,7 +1549,8 @@ export default function RecipeEditorPage() {
           <TabsTrigger value="fees" className="flex items-center gap-1"><DollarSign className="h-3 w-3" /> Fee Rules</TabsTrigger>
           <TabsTrigger value="english" className="flex items-center gap-1"><BookOpen className="h-3 w-3" /> IELTS & Intake</TabsTrigger>
           <TabsTrigger value="browser" className="flex items-center gap-1"><MousePointerClick className="h-3 w-3" /> Browser Actions</TabsTrigger>
-          <TabsTrigger value="campus" className="flex items-center gap-1"><MapPin className="h-3 w-3" /> Campus</TabsTrigger>
+          <TabsTrigger value="names" className="flex items-center gap-1"><Type className="h-3 w-3" /> Course Names</TabsTrigger>
+          <TabsTrigger value="campus" className="flex items-center gap-1"><MapPin className="h-3 w-3" /> Campus & Location</TabsTrigger>
           <TabsTrigger value="quality" className="flex items-center gap-1"><ShieldCheck className="h-3 w-3" /> Quality</TabsTrigger>
         </TabsList>
 
@@ -2139,6 +2161,7 @@ export default function RecipeEditorPage() {
 
         {/* ── 7. Browser Actions ─────────────────────────────────────────── */}
         <TabsContent value="browser">
+
           <Card>
             <CardHeader>
               <CardTitle className="text-base flex items-center gap-2">
@@ -2184,11 +2207,50 @@ export default function RecipeEditorPage() {
           </Card>
         </TabsContent>
 
-        {/* ── 8. Campus ──────────────────────────────────────────────────── */}
-        <TabsContent value="campus">
+        {/* ── 8. Course Name Cleanup ──────────────────────────────────────── */}
+        <TabsContent value="names">
           <Card>
             <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2"><MapPin className="h-4 w-4" /> Campus & Location Rules</CardTitle>
+              <CardTitle className="text-base flex items-center gap-2"><Type className="h-4 w-4" /> Course Name Cleanup</CardTitle>
+              <CardDescription>
+                Fix course names that include site-name suffixes, year stamps, or other noise scraped from the page.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              <StringListEditor
+                label="Strip everything after… (remove_after)"
+                values={recipe.course_name_remove_after}
+                onChange={v => patchRecipe({ course_name_remove_after: v })}
+                placeholder='e.g. | or  - University Name'
+                helpText='Remove this string and everything following it from the course name. Applied left-to-right. E.g. "|" strips " | Southern Cross University".'
+              />
+              <div className="flex items-center gap-3">
+                <Switch
+                  checked={recipe.course_name_remove_year_suffix}
+                  onCheckedChange={v => patchRecipe({ course_name_remove_year_suffix: v })}
+                />
+                <div>
+                  <Label>Remove trailing year (e.g. "Master of Science 2025" → "Master of Science")</Label>
+                  <p className="text-xs text-muted-foreground">Strips a trailing 4-digit year when present.</p>
+                </div>
+              </div>
+              <StringListEditor
+                label="Regex patterns to strip (remove_patterns)"
+                values={recipe.course_name_remove_patterns}
+                onChange={v => patchRecipe({ course_name_remove_patterns: v })}
+                placeholder='e.g. \s*\(.*?\)\s*$'
+                helpText='Case-insensitive regex patterns. Each match is replaced with an empty string. E.g. strip trailing parenthetical suffixes.'
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ── 9. Campus & Location ────────────────────────────────────────── */}
+        <TabsContent value="campus">
+          <div className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2"><MapPin className="h-4 w-4" /> Campus Rules</CardTitle>
             </CardHeader>
             <CardContent className="space-y-5">
               <div className="grid grid-cols-2 gap-4">
@@ -2224,9 +2286,75 @@ export default function RecipeEditorPage() {
               />
             </CardContent>
           </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2"><MapPin className="h-4 w-4" /> Location Cleanup</CardTitle>
+              <CardDescription>
+                Fix garbled, over-long, or contaminated location values scraped from the page.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              <KeyValueEditor
+                label="Location replacements (location_replace)"
+                pairs={recipe.location_replace}
+                onChange={v => patchRecipe({ location_replace: v })}
+                keyPlaceholder="Text to replace"
+                valuePlaceholder="Replacement (blank to delete)"
+                helpText='Applied before allow/reject filtering. E.g. "SCU Online" → "Online", "Teaching period" → "" (delete it).'
+              />
+              <StringListEditor
+                label="Allowed location values (location_allowed_values)"
+                values={recipe.location_allowed_values}
+                onChange={v => patchRecipe({ location_allowed_values: v })}
+                placeholder="e.g. Gold Coast"
+                helpText="When non-empty, only locations matching one of these strings (case-insensitive substring) are kept. Non-matching values are cleared."
+              />
+              <StringListEditor
+                label="Reject location values (location_reject_values)"
+                values={recipe.location_reject_values}
+                onChange={v => patchRecipe({ location_reject_values: v })}
+                placeholder="e.g. How to Apply"
+                helpText="If any of these strings appears in the extracted location, the location is cleared entirely. Use to strip nav/footer contamination."
+              />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2"><Zap className="h-4 w-4" /> Study Mode Rules</CardTitle>
+              <CardDescription>
+                Control how study mode is derived when the page doesn't publish it explicitly.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              <div className="flex items-center gap-3">
+                <Switch
+                  checked={recipe.study_mode_from_location}
+                  onCheckedChange={v => patchRecipe({ study_mode_from_location: v })}
+                />
+                <div>
+                  <Label>Derive study mode from location</Label>
+                  <p className="text-xs text-muted-foreground">
+                    When study mode is blank, inspect the cleaned location value. Online keywords → Online; both campus + online keywords → Blended; campus only → On Campus.
+                  </p>
+                </div>
+              </div>
+              {recipe.study_mode_from_location && (
+                <StringListEditor
+                  label="Online keywords (study_mode_online_keywords)"
+                  values={recipe.study_mode_online_keywords}
+                  onChange={v => patchRecipe({ study_mode_online_keywords: v })}
+                  placeholder="e.g. online"
+                  helpText='Words that indicate online delivery when found in the location. Defaults to ["online", "distance", "virtual"] when empty.'
+                />
+              )}
+            </CardContent>
+          </Card>
+          </div>
         </TabsContent>
 
-        {/* ── 8. Quality ─────────────────────────────────────────────────── */}
+        {/* ── 10. Quality ─────────────────────────────────────────────────── */}
         <TabsContent value="quality">
           <Card>
             <CardHeader>
@@ -2260,6 +2388,24 @@ export default function RecipeEditorPage() {
                 placeholder="e.g. international_fee"
                 helpText="Fields that MUST be non-empty for a course to pass quality gate. Courses missing any required field are flagged."
               />
+              <div>
+                <StringListEditor
+                  label="Block auto-publish if… (block_publish_if)"
+                  values={recipe.block_publish_if}
+                  onChange={v => patchRecipe({ block_publish_if: v })}
+                  placeholder="e.g. fee_missing"
+                  helpText="Conditions that block auto-publish even if completeness is above threshold."
+                />
+                <div className="mt-2 p-3 rounded-md bg-muted text-xs text-muted-foreground space-y-1">
+                  <p className="font-medium">Available conditions:</p>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-0.5">
+                    {["fee_missing", "fee_term_wrong", "ielts_component_missing", "invalid_location",
+                      "online_only", "course_name_too_short", "course_name_too_long", "degree_level_missing"].map(c => (
+                      <code key={c} className="font-mono">{c}</code>
+                    ))}
+                  </div>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
