@@ -1971,6 +1971,17 @@ export default function RecipeEditorPage() {
 
               <Separator />
 
+              <KeyValueEditor
+                label="Authorization / Request Headers"
+                pairs={recipe.api?.headers || {}}
+                onChange={headers => patchApi({ headers })}
+                keyPlaceholder="Header name (e.g. Authorization)"
+                valuePlaceholder="Header value (e.g. Token abc123)"
+                helpText="HTTP headers sent with every API request. For token auth: key = Authorization, value = Token <your-token>."
+              />
+
+              <Separator />
+
               {/* Test button */}
               <div className="space-y-3">
                 <div className="flex items-center gap-3">
@@ -2077,17 +2088,6 @@ export default function RecipeEditorPage() {
                 keyPlaceholder="Standard field (e.g. course_name)"
                 valuePlaceholder="JSON key (e.g. Title)"
                 helpText="Map standard scraper field names → the actual JSON key names. Standard fields: course_name, degree_level, study_mode_raw, full_time, part_time, url_slug, duration, campus, description. Tip: run Test API above to see available JSON keys."
-              />
-
-              <Separator />
-
-              <KeyValueEditor
-                label="Request Headers"
-                pairs={recipe.api?.headers || {}}
-                onChange={headers => patchApi({ headers })}
-                keyPlaceholder="Header name (e.g. Authorization)"
-                valuePlaceholder="Header value"
-                helpText="Extra HTTP headers sent with every API request."
               />
 
               <Separator />
