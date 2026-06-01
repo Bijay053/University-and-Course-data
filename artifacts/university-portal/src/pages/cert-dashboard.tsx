@@ -1,0 +1,404 @@
+import { useState, useMemo } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  ShieldCheck, ShieldX, FlaskConical, FileEdit, AlertTriangle,
+  RefreshCw, ExternalLink, TrendingDown, Bot, Clock, ChevronDown, ChevronUp,
+  Search,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/hooks/use-toast";
+import { Link } from "wouter";
+
+const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+
+async function apiFetch(path: string, opts?: RequestInit) {
+  const res = await fetch(`${BASE}${path}`, {
+    credentials: "include",
+    headers: { "Content-Type": "application/json", ...(opts?.headers ?? {}) },
+    ...opts,
+  });
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  return res.json();
+}
+
+// ── Types ────────────────────────────────────────────────────────────────────
+type CertStatus = "certified" | "testing" | "needs_review" | "failed" | "draft";
+
+interface UniRow {
+  id: number;
+  name: string;
+  country: string | null;
+  scrape_url: string | null;
+  certification_status: CertStatus;
+  last_certified_score: number | null;
+  last_certified_at: string | null;
+  current_health_score: number;
+  score_drop: number | null;
+  last_scrape_at: string | null;
+  staged_courses: number;
+  total_found: number;
+}
+
+interface DashboardData {
+  summary: Record<CertStatus, number>;
+  universities: UniRow[];
+}
+
+// ── Status config ────────────────────────────────────────────────────────────
+const CERT_CFG: Record<CertStatus, {
+  label: string; bg: string; text: string; border: string;
+  cardBg: string; cardBorder: string; icon: React.ReactNode;
+}> = {
+  certified:    { label: "Certified",    bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200", cardBg: "bg-emerald-50", cardBorder: "border-emerald-200", icon: <ShieldCheck className="h-5 w-5 text-emerald-600" /> },
+  testing:      { label: "Testing",      bg: "bg-blue-50",    text: "text-blue-700",    border: "border-blue-200",    cardBg: "bg-blue-50",    cardBorder: "border-blue-200",    icon: <FlaskConical className="h-5 w-5 text-blue-600" /> },
+  needs_review: { label: "Needs Review", bg: "bg-amber-50",   text: "text-amber-700",   border: "border-amber-200",   cardBg: "bg-amber-50",   cardBorder: "border-amber-200",   icon: <AlertTriangle className="h-5 w-5 text-amber-600" /> },
+  failed:       { label: "Failed",       bg: "bg-red-50",     text: "text-red-700",     border: "border-red-200",     cardBg: "bg-red-50",     cardBorder: "border-red-200",     icon: <ShieldX className="h-5 w-5 text-red-600" /> },
+  draft:        { label: "Draft",        bg: "bg-gray-50",    text: "text-gray-500",    border: "border-gray-200",    cardBg: "bg-gray-50",    cardBorder: "border-gray-200",    icon: <FileEdit className="h-5 w-5 text-gray-400" /> },
+};
+
+const STATUS_ORDER: CertStatus[] = ["certified", "needs_review", "failed", "testing", "draft"];
+
+function CertBadge({ status }: { status: CertStatus | string }) {
+  const cfg = CERT_CFG[(status as CertStatus)] ?? CERT_CFG.draft;
+  return (
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border ${cfg.bg} ${cfg.text} ${cfg.border}`}>
+      {cfg.icon} {cfg.label}
+    </span>
+  );
+}
+
+function ScorePill({ score }: { score: number }) {
+  const color =
+    score >= 80 ? "bg-emerald-100 text-emerald-800" :
+    score >= 60 ? "bg-blue-100 text-blue-800" :
+    score >= 40 ? "bg-amber-100 text-amber-800" :
+    "bg-red-100 text-red-800";
+  return (
+    <span className={`inline-flex items-center justify-center w-10 h-10 rounded-full font-bold text-sm ${color}`}>
+      {score}
+    </span>
+  );
+}
+
+function DropBadge({ drop }: { drop: number | null }) {
+  if (drop === null) return <span className="text-xs text-gray-300">—</span>;
+  if (drop <= 0) return <span className="text-xs text-emerald-600 font-medium">+{Math.abs(drop)}</span>;
+  if (drop <= 10) return <span className="text-xs text-amber-600 font-semibold">−{drop}</span>;
+  return (
+    <span className="inline-flex items-center gap-0.5 text-xs text-red-600 font-bold">
+      <TrendingDown className="h-3 w-3" />−{drop}
+    </span>
+  );
+}
+
+function relativeTime(iso: string | null): string {
+  if (!iso) return "—";
+  const diff = Date.now() - new Date(iso).getTime();
+  const days = Math.floor(diff / 86400000);
+  if (days === 0) return "Today";
+  if (days === 1) return "Yesterday";
+  if (days < 7) return `${days}d ago`;
+  if (days < 30) return `${Math.floor(days / 7)}w ago`;
+  return `${Math.floor(days / 30)}mo ago`;
+}
+
+// ── Sortable table header ────────────────────────────────────────────────────
+type SortKey = "name" | "current_health_score" | "score_drop" | "staged_courses" | "last_scrape_at";
+
+function SortTh({
+  label, sortKey, current, dir, onSort,
+}: {
+  label: string; sortKey: SortKey;
+  current: SortKey; dir: "asc" | "desc";
+  onSort: (k: SortKey) => void;
+}) {
+  const active = current === sortKey;
+  return (
+    <th
+      className="px-4 py-2.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider cursor-pointer select-none hover:text-gray-600"
+      onClick={() => onSort(sortKey)}
+    >
+      <span className="inline-flex items-center gap-1">
+        {label}
+        {active ? (dir === "asc" ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />) : null}
+      </span>
+    </th>
+  );
+}
+
+// ── Main Page ────────────────────────────────────────────────────────────────
+export default function CertDashboardPage() {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const [tab, setTab] = useState<"all" | "queue">("all");
+  const [search, setSearch] = useState("");
+  const [sortKey, setSortKey] = useState<SortKey>("name");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const [filterStatus, setFilterStatus] = useState<CertStatus | "all">("all");
+
+  const { data, isLoading, isError, refetch, isFetching } = useQuery<DashboardData>({
+    queryKey: ["cert-dashboard"],
+    queryFn: () => apiFetch("/api/universities/cert-dashboard"),
+    staleTime: 60_000,
+  });
+
+  const patchMutation = useMutation({
+    mutationFn: ({ uniId, status }: { uniId: number; status: string }) =>
+      apiFetch(`/api/universities/${uniId}/certification-status`, {
+        method: "PATCH",
+        body: JSON.stringify({ status }),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["cert-dashboard"] });
+      toast({ title: "Status updated" });
+    },
+    onError: () => toast({ title: "Failed to update status", variant: "destructive" }),
+  });
+
+  function handleSort(key: SortKey) {
+    if (sortKey === key) setSortDir(d => d === "asc" ? "desc" : "asc");
+    else { setSortKey(key); setSortDir(key === "score_drop" ? "desc" : "asc"); }
+  }
+
+  const universities = useMemo(() => {
+    if (!data) return [];
+    let rows = data.universities;
+
+    if (tab === "queue") {
+      rows = rows.filter(r => r.score_drop !== null && r.score_drop > 0);
+    }
+    if (filterStatus !== "all") {
+      rows = rows.filter(r => r.certification_status === filterStatus);
+    }
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      rows = rows.filter(r => r.name.toLowerCase().includes(q) || (r.country ?? "").toLowerCase().includes(q));
+    }
+
+    return [...rows].sort((a, b) => {
+      let av: number | string, bv: number | string;
+      switch (sortKey) {
+        case "name":               av = a.name; bv = b.name; break;
+        case "current_health_score": av = a.current_health_score; bv = b.current_health_score; break;
+        case "score_drop":         av = a.score_drop ?? -999; bv = b.score_drop ?? -999; break;
+        case "staged_courses":     av = a.staged_courses; bv = b.staged_courses; break;
+        case "last_scrape_at":     av = a.last_scrape_at ?? ""; bv = b.last_scrape_at ?? ""; break;
+        default:                   av = a.name; bv = b.name;
+      }
+      if (av < bv) return sortDir === "asc" ? -1 : 1;
+      if (av > bv) return sortDir === "asc" ? 1 : -1;
+      return 0;
+    });
+  }, [data, tab, filterStatus, search, sortKey, sortDir]);
+
+  const summary = data?.summary ?? { certified: 0, testing: 0, needs_review: 0, failed: 0, draft: 0 };
+  const total = Object.values(summary).reduce((s, n) => s + n, 0);
+  const queueCount = (data?.universities ?? []).filter(r => r.score_drop !== null && r.score_drop > 0).length;
+
+  if (isError) return (
+    <div className="p-8 text-center text-red-500">
+      Failed to load dashboard. <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+    </div>
+  );
+
+  return (
+    <div className="p-6 max-w-screen-2xl mx-auto space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Certification Dashboard</h1>
+          <p className="text-sm text-gray-500 mt-0.5">
+            {total} universities — live cert status and quality scores
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => refetch()}
+          disabled={isFetching}
+          className="gap-1.5"
+        >
+          <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
+          Refresh
+        </Button>
+      </div>
+
+      {/* Summary Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        {STATUS_ORDER.map(st => {
+          const cfg = CERT_CFG[st];
+          const count = summary[st] ?? 0;
+          const isFiltered = filterStatus === st;
+          return (
+            <button
+              key={st}
+              onClick={() => setFilterStatus(isFiltered ? "all" : st)}
+              className={`text-left p-4 rounded-xl border-2 transition-all ${cfg.cardBg} ${
+                isFiltered ? `${cfg.cardBorder} shadow-md ring-2 ring-offset-1 ring-current` : "border-transparent hover:border-gray-200"
+              }`}
+            >
+              <div className="flex items-center gap-2 mb-1">
+                {cfg.icon}
+                <span className={`text-xs font-semibold uppercase tracking-wide ${cfg.text}`}>{cfg.label}</span>
+              </div>
+              <div className={`text-3xl font-bold ${cfg.text}`}>{isLoading ? "—" : count}</div>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Tabs + Filters */}
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 border-b pb-3">
+        <div className="flex gap-1 bg-gray-100 rounded-lg p-1 self-start">
+          <button
+            className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${tab === "all" ? "bg-white shadow text-gray-900" : "text-gray-500 hover:text-gray-700"}`}
+            onClick={() => setTab("all")}
+          >
+            All Universities
+          </button>
+          <button
+            className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors flex items-center gap-1.5 ${tab === "queue" ? "bg-white shadow text-gray-900" : "text-gray-500 hover:text-gray-700"}`}
+            onClick={() => setTab("queue")}
+          >
+            Certification Queue
+            {queueCount > 0 && (
+              <span className="inline-flex items-center justify-center h-5 min-w-[20px] px-1 rounded-full bg-amber-500 text-white text-xs font-bold">
+                {queueCount}
+              </span>
+            )}
+          </button>
+        </div>
+        <div className="flex-1" />
+        <div className="relative w-full sm:w-64">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+          <Input
+            placeholder="Search universities…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="pl-8 h-8 text-sm"
+          />
+        </div>
+      </div>
+
+      {/* Queue description */}
+      {tab === "queue" && (
+        <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-50 border border-amber-100 text-sm text-amber-800">
+          <TrendingDown className="h-4 w-4 mt-0.5 flex-shrink-0" />
+          <div>
+            <strong>Certification Queue</strong> — universities sorted by biggest score decline from their certified baseline.
+            Universities drop into this list automatically when the watchdog detects a drop &gt;15 points.
+          </div>
+        </div>
+      )}
+
+      {/* Table */}
+      <div className="rounded-xl border bg-white overflow-hidden shadow-sm">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b bg-gray-50/60">
+                <SortTh label="University"    sortKey="name"                 current={sortKey} dir={sortDir} onSort={handleSort} />
+                <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Status</th>
+                <SortTh label="Current Score" sortKey="current_health_score" current={sortKey} dir={sortDir} onSort={handleSort} />
+                <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Cert Score</th>
+                <SortTh label="Drop"          sortKey="score_drop"           current={sortKey} dir={sortDir} onSort={handleSort} />
+                <SortTh label="Last Scrape"   sortKey="last_scrape_at"       current={sortKey} dir={sortDir} onSort={handleSort} />
+                <SortTh label="Staged"        sortKey="staged_courses"       current={sortKey} dir={sortDir} onSort={handleSort} />
+                <th className="px-4 py-2.5 text-right text-xs font-semibold text-gray-400 uppercase tracking-wider">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {isLoading ? (
+                Array.from({ length: 6 }).map((_, i) => (
+                  <tr key={i} className="animate-pulse">
+                    {Array.from({ length: 8 }).map((__, j) => (
+                      <td key={j} className="px-4 py-3"><div className="h-4 bg-gray-100 rounded w-full" /></td>
+                    ))}
+                  </tr>
+                ))
+              ) : universities.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="px-4 py-12 text-center text-gray-400">
+                    {tab === "queue" ? "No universities in the certification queue." : "No universities match your filter."}
+                  </td>
+                </tr>
+              ) : (
+                universities.map(uni => (
+                  <tr key={uni.id} className="hover:bg-gray-50/60 transition-colors group">
+                    <td className="px-4 py-3 font-medium text-gray-900 max-w-[240px]">
+                      <div className="truncate">{uni.name}</div>
+                      {uni.country && <div className="text-xs text-gray-400">{uni.country}</div>}
+                    </td>
+                    <td className="px-4 py-3">
+                      <CertBadge status={uni.certification_status} />
+                    </td>
+                    <td className="px-4 py-3">
+                      <ScorePill score={uni.current_health_score} />
+                    </td>
+                    <td className="px-4 py-3">
+                      {uni.last_certified_score !== null ? (
+                        <span className="text-sm font-medium text-gray-700">{uni.last_certified_score}</span>
+                      ) : (
+                        <span className="text-xs text-gray-300">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <DropBadge drop={uni.score_drop} />
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-1 text-xs text-gray-500">
+                        <Clock className="h-3 w-3 flex-shrink-0" />
+                        {relativeTime(uni.last_scrape_at)}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-600">
+                      {uni.staged_courses > 0 ? (
+                        <span className="inline-flex items-center justify-center bg-blue-50 text-blue-700 border border-blue-100 text-xs font-semibold px-2 py-0.5 rounded-full">
+                          {uni.staged_courses}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-gray-300">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Link href={`/universities/${uni.id}/scrape-agent`}>
+                          <Button variant="outline" size="sm" className="h-7 px-2 gap-1 text-xs border-blue-200 text-blue-700 hover:bg-blue-50">
+                            <Bot className="h-3 w-3" />Agent
+                          </Button>
+                        </Link>
+                        <Link href={`/universities/${uni.id}`}>
+                          <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-gray-500">
+                            <ExternalLink className="h-3 w-3" />
+                          </Button>
+                        </Link>
+                        {uni.certification_status === "needs_review" && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 px-2 text-xs border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                            onClick={() => patchMutation.mutate({ uniId: uni.id, status: "certified" })}
+                            disabled={patchMutation.isPending}
+                          >
+                            <ShieldCheck className="h-3 w-3 mr-1" />Re-certify
+                          </Button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+        {!isLoading && universities.length > 0 && (
+          <div className="px-4 py-2 border-t bg-gray-50/40 text-xs text-gray-400">
+            Showing {universities.length} of {data?.universities.length ?? 0} universities
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
