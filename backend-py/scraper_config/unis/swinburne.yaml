@@ -1,25 +1,48 @@
 # Swinburne University of Technology — www.swinburne.edu.au
-# Custom CMS (Cloudflare-protected, JS-rendered course listings).
-# 20+ category pages under /courses/find-a-course/<faculty>/.
-# Seed URLs cover the 5 key faculties supplied by the operator.
-# Increase bfs_page_budget if courses from unlisted faculties are missed.
+# Custom CMS (JS-rendered course listings under /courses/find-a-course/<faculty>/<slug>/).
+# BFS crawls category pages and collects individual course links from them.
+#
+# URL structure:
+#   Category listing:  /courses/find-a-course/business
+#   Course detail:     /courses/find-a-course/business/bachelor-of-business
+#
+# allow_url_patterns whitelists only depth-2+ paths under find-a-course so that
+# shallow category listing pages are excluded automatically.
+#
+# DO NOT block /courses/find-a-course/ as a prefix — every course lives under it.
+# The old config had that block and it dropped 71% (135/189) of discovered courses.
 
 discovery:
   always_browser_discover: true
   always_sitemap_supplement: true
+  bfs_page_budget: 80
+
   seed_urls:
     - https://www.swinburne.edu.au/courses/find-a-course/business
     - https://www.swinburne.edu.au/courses/find-a-course/engineering
     - https://www.swinburne.edu.au/courses/find-a-course/health
     - https://www.swinburne.edu.au/courses/find-a-course/information-technology
     - https://www.swinburne.edu.au/courses/find-a-course/law
+    - https://www.swinburne.edu.au/courses/find-a-course/arts-humanities-social-sciences
+    - https://www.swinburne.edu.au/courses/find-a-course/design
+    - https://www.swinburne.edu.au/courses/find-a-course/science-mathematics
+    - https://www.swinburne.edu.au/courses/find-a-course/built-environment-architecture
+    - https://www.swinburne.edu.au/courses/find-a-course/aviation
+
+  # Require 2+ path segments after /find-a-course/ so shallow category listing
+  # pages (/find-a-course/business) are excluded; individual course detail pages
+  # (/find-a-course/business/bachelor-of-business) pass through.
   allow_url_patterns:
-    - /courses/
+    - '/courses/find-a-course/[^/]+/[^/]'
+
   block_url_patterns:
-    - /courses/find-a-course/
     - /courses/online/
     - /courses/search
-  bfs_page_budget: 80
+    - /courses/planning-your-future/
+    - /courses/study-levels-explained/
+    - /courses/how-to-apply/
+    - /courses/scholarships/
+
   _min_expected_courses: 50
 
 extraction:
