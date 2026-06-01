@@ -4367,6 +4367,46 @@ async def diagnose_scrape_job(
         except Exception as _cfg_err:
             log.debug("diagnose: could not load effective UniConfig: %s", _cfg_err)
 
+    # ── Inject recipe_patch into deterministic issues ─────────────────────────
+    # Now that _effective_disc is populated we know exactly what filters are
+    # configured, so we can attach a concrete, one-click-applicable patch to
+    # each issue instead of just text advice.
+    _eff_must_contain:  list = list(_effective_disc.get("must_contain")        or [])
+    _eff_block_pats:    list = list(_effective_disc.get("block_url_patterns")  or [])
+    _eff_allow_pats:    list = list(_effective_disc.get("allow_url_patterns")  or [])
+
+    for _di in deterministic_issues:
+        if _di.get("check") == "all_filtered":
+            if _eff_must_contain:
+                # must_contain is the most common cause of 100% URL drop
+                _di["recipe_patch"] = {"discovery": {"must_contain": []}}
+                _pat_preview = ", ".join(f'"{p}"' for p in _eff_must_contain[:3])
+                if len(_eff_must_contain) > 3:
+                    _pat_preview += " …"
+                _di["recipe_patch_description"] = (
+                    f"Clear {len(_eff_must_contain)} must_contain pattern(s) ({_pat_preview}) "
+                    "that are rejecting all discovered URLs. Re-run the scrape to verify, "
+                    "then add back a narrower pattern once you've confirmed the URL structure."
+                )
+            elif _eff_block_pats and _after_filter == 0 and _raw_discovered > 0:
+                # block_url_patterns dropped every discovered link
+                _di["recipe_patch"] = {"discovery": {"block_url_patterns": []}}
+                _di["recipe_patch_description"] = (
+                    f"Clear {len(_eff_block_pats)} block_url_patterns that are removing "
+                    "100% of discovered URLs. Re-run after clearing to confirm what pages "
+                    "are actually reachable, then re-add targeted block patterns."
+                )
+            elif _eff_allow_pats and _after_filter > 0 and (job.imported or 0) == 0:
+                # allow_url_patterns is passing category/listing pages, not course detail pages
+                _di["recipe_patch"] = {"discovery": {"allow_url_patterns": []}}
+                _di["recipe_patch_description"] = (
+                    "Remove the allow_url_patterns filter — the current regex matches "
+                    "category/listing pages rather than individual course detail pages, "
+                    "so 0 courses can be extracted. Clearing this lets the browser reach "
+                    "all reachable URLs; after the next scrape inspect the discovered URLs "
+                    "and write a more specific regex that targets course-detail pages only."
+                )
+
     # ── Run diagnostics in parallel with Gemini ──────────────────────────────
     _diag_result: dict = {}
     try:

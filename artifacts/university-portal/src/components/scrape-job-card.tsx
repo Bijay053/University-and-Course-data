@@ -83,6 +83,8 @@ type DeterministicIssue = {
   check: string;
   detail: string;
   potential_causes?: string[];
+  recipe_patch?: Record<string, unknown>;
+  recipe_patch_description?: string;
 };
 type DiagnoseResult = {
   ok: boolean;
@@ -1432,6 +1434,28 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
                                           </li>
                                         ))}
                                       </ul>
+                                    </div>
+                                  )}
+                                  {issue.recipe_patch && (
+                                    <div className="mt-1.5 pt-1.5 border-t border-red-200">
+                                      {issue.recipe_patch_description && (
+                                        <p className="text-[9px] text-red-600 mb-1 leading-snug">
+                                          <span className="font-semibold">Quick fix: </span>{issue.recipe_patch_description}
+                                        </p>
+                                      )}
+                                      <button
+                                        onClick={() => applyFix(diagnoseResult!.job_id, issue.recipe_patch!)}
+                                        disabled={applyingFix || fixApplied}
+                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                      >
+                                        {applyingFix ? (
+                                          <><Loader2 className="w-2.5 h-2.5 animate-spin" /> Applying…</>
+                                        ) : fixApplied ? (
+                                          <><CheckCheck className="w-2.5 h-2.5" /> Applied</>
+                                        ) : (
+                                          <>⚡ Apply Advanced Fix</>
+                                        )}
+                                      </button>
                                     </div>
                                   )}
                                 </div>

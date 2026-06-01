@@ -18,10 +18,33 @@
 #      form. Federation publishes the international fee schedule centrally;
 #      pointed there via extraction.fees.central_page so the existing
 #      central-pages prefetcher can join fees by course name.
+#   4. URL filter dropped 100% of discovered course pages.
+#      Federation's real course-detail pages live under /courses/, NOT
+#      /study/. With no per-uni allow_url_patterns, the inherited default
+#      (which assumes /study/-style course paths, as on most other unis)
+#      matched 0 of the 219 /courses/* URLs, so every course was dropped
+#      at the allow stage before block_url_patterns was even consulted.
+#      Fixed via discovery.allow_url_patterns below. (verified 2026-06-01)
 
 discovery:
+  # allow-list OVERRIDE (Fix 4): Federation's real course-detail pages live
+  # under /courses/, NOT /study/ (the inherited default allow pattern).
+  # Without this, every /courses/* URL fails the allow filter and all 219
+  # courses get dropped before block_url_patterns is consulted. Match-anywhere
+  # substring on "/courses/" — slugs vary: some end in "/", some don't
+  # (e.g. /courses/dhm4.cfh-graduate-diploma-of-health-child-and-family-health-nursing).
+  allow_url_patterns:
+    - "/courses/"
+
   # Drop info / pathway / general-information pages that BFS + sitemap
   # surface but are not actual course-detail pages.
+  #
+  # NOTE (post-Fix 4): with the /courses/ allow-list in place, /study/* info
+  # pages now fail the allow stage anyway, so these block patterns are
+  # belt-and-suspenders / documentation rather than load-bearing. Kept in
+  # case the global allow default ever changes. If non-course pages turn up
+  # UNDER /courses/ (e.g. /courses/search, /courses/how-to-apply), add them
+  # here — block_url_patterns overrides the /courses/ allow.
   block_url_patterns:
     - "/study/intakes/"
     - "/study/information/"

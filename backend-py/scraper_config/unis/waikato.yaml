@@ -4,26 +4,25 @@
 #
 # URL structure:
 #   /int/study/qualifications/               ← listing page (JS-rendered, static BFS finds no course links)
-#   /int/study/qualifications/<course-slug>/ ← individual course page (static HTML, has fee + IELTS)
-#   /int/study/options/undergraduate/         ← category listing (no course data)
-#   /int/study/options/postgraduate/          ← category listing (no course data)
+#   /int/study/qualifications/<degree-slug>  ← individual course page (201KB SPA shell, needs browser extract)
 #
 # Discovery strategy: the qualification listing page loads course cards via JS so static BFS
 # only finds category-level nav links.  Browser discovery is required to follow JS-rendered links.
-# Individual course pages (/int/study/qualifications/<slug>/) ARE static HTML with fee + IELTS data.
+# allow_url_patterns must require a degree keyword (bachelor/master/etc.) to exclude category pages
+# like /int/study/qualifications/undergraduate and /int/study/qualifications/postgraduate which
+# ARE served at /qualifications/ depth but contain no individual course data.
+#
+# Extraction: individual course pages are SPA shells; browser extraction is required to get
+# international fee, IELTS, and intake data rendered by client-side JS.
 
 discovery:
   always_browser_discover: true
   bfs_page_budget: 80
   seed_urls:
     - https://www.waikato.ac.nz/int/study/qualifications/
-    - https://www.waikato.ac.nz/int/study/options/undergraduate/
-    - https://www.waikato.ac.nz/int/study/options/postgraduate/
   allow_url_patterns:
-    - /int/study/qualifications/[^/]+
+    - /int/study/qualifications/(?:bachelor|master|doctor|diploma|certificate|graduate|conjoint|honours)[^/]*$
   block_url_patterns:
-    - /int/study/qualifications/$
-    - /int/study/qualifications/\?
     - /int/about/
     - /int/research/
     - /int/study/apply/
@@ -34,6 +33,11 @@ discovery:
     - /int/study/why-choose
     - /int/study/work-integrated
     - /int/study/student-success
+    - /int/study/options/
+    - /int/study/papers/
+    - /int/study/upskilling/
+    - /int/study/get-started/
+    - /int/study/subjects/
 
 extraction:
   fees:
