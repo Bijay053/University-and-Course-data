@@ -207,7 +207,7 @@ export default function BulkRepairPage() {
   // ── Results step ────────────────────────────────────────────────────────────
   if (step === "results" && applyResult) {
     return (
-      <div className="p-6 max-w-3xl mx-auto space-y-6">
+      <div className="space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold tracking-tight">Bulk Repair — Results</h1>
           <Button variant="outline" size="sm" onClick={() => { setStep("scan"); setSelected(new Set()); setApplyResult(null); refetch(); }}>
@@ -270,7 +270,7 @@ export default function BulkRepairPage() {
   // ── Applying step ───────────────────────────────────────────────────────────
   if (step === "applying") {
     return (
-      <div className="p-6 max-w-xl mx-auto flex flex-col items-center gap-6 pt-20">
+      <div className="flex flex-col items-center gap-6 pt-16">
         <div className="h-16 w-16 rounded-full bg-blue-50 flex items-center justify-center">
           <Wrench className="h-8 w-8 text-blue-500 animate-pulse" />
         </div>
@@ -284,7 +284,7 @@ export default function BulkRepairPage() {
 
   // ── Scan + Select steps ─────────────────────────────────────────────────────
   return (
-    <div className="p-6 max-w-screen-xl mx-auto space-y-6">
+    <div className="space-y-5">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -363,6 +363,47 @@ export default function BulkRepairPage() {
               <Input placeholder="Search…" value={search} onChange={e => setSearch(e.target.value)} className="pl-8 h-8 text-sm" />
             </div>
           </div>
+
+          {/* Action bar — above the table */}
+          {selected.size > 0 && (
+            <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-3">
+              <div className="flex items-center gap-3 flex-1">
+                <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+                  <Wrench className="h-4 w-4 text-blue-600" />
+                </div>
+                <div>
+                  <div className="font-semibold text-sm text-blue-900">{selected.size} {selected.size === 1 ? "university" : "universities"} selected</div>
+                  <div className="text-xs text-blue-600">Queue repair scrape — backfills missing IELTS, fees, duration, location</div>
+                </div>
+              </div>
+              <label className="flex items-center gap-2 cursor-pointer shrink-0">
+                <input
+                  type="checkbox"
+                  checked={markTesting}
+                  onChange={e => setMarkTesting(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300 accent-blue-600"
+                />
+                <span className="text-sm text-blue-800 flex items-center gap-1">
+                  <FlaskConical className="h-3.5 w-3.5 text-blue-500" />
+                  Move to Testing
+                </span>
+              </label>
+              <div className="flex gap-2 shrink-0">
+                <Button variant="ghost" size="sm" onClick={() => setSelected(new Set())} className="h-8 text-blue-700 hover:bg-blue-100">
+                  Clear
+                </Button>
+                <Button
+                  size="sm"
+                  className="h-8 gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-4"
+                  onClick={handleApply}
+                  disabled={applyMutation.isPending}
+                >
+                  <Wrench className="h-3.5 w-3.5" />
+                  Apply Repair to {selected.size}{markTesting ? " + Testing" : ""}
+                </Button>
+              </div>
+            </div>
+          )}
 
           <div className="rounded-xl border bg-white overflow-hidden shadow-sm">
             <div className="overflow-x-auto">
@@ -449,52 +490,6 @@ export default function BulkRepairPage() {
                   )}
                 </tbody>
               </table>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Sticky action bar */}
-      {selected.size > 0 && (
-        <div className="sticky bottom-4 z-20">
-          <div className="bg-white border border-gray-200 rounded-2xl shadow-xl px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-4">
-            <div className="flex items-center gap-3 flex-1">
-              <div className="h-9 w-9 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
-                <Wrench className="h-4 w-4 text-blue-600" />
-              </div>
-              <div>
-                <div className="font-semibold text-sm">{selected.size} {selected.size === 1 ? "university" : "universities"} selected</div>
-                <div className="text-xs text-gray-500">Queue repair scrape for each — backfills missing IELTS, fees, duration, location</div>
-              </div>
-            </div>
-
-            <label className="flex items-center gap-2 cursor-pointer shrink-0">
-              <input
-                type="checkbox"
-                checked={markTesting}
-                onChange={e => setMarkTesting(e.target.checked)}
-                className="h-4 w-4 rounded border-gray-300 accent-blue-600"
-              />
-              <span className="text-sm text-gray-600 flex items-center gap-1">
-                <FlaskConical className="h-3.5 w-3.5 text-blue-500" />
-                Move to Testing
-              </span>
-            </label>
-
-            <div className="flex gap-2">
-              <Button variant="ghost" size="sm" onClick={() => setSelected(new Set())} className="h-9">
-                Clear
-              </Button>
-              <Button
-                size="sm"
-                className="h-9 gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-5"
-                onClick={handleApply}
-                disabled={applyMutation.isPending}
-              >
-                <Wrench className="h-4 w-4" />
-                Apply Repair to {selected.size}
-                {markTesting && " + Testing"}
-              </Button>
             </div>
           </div>
         </div>
