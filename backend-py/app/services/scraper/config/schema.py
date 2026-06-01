@@ -585,6 +585,10 @@ class BandSpec(BaseModel):
         default=None,
         description="TOEFL iBT overall score for this band level.",
     )
+    cambridge_overall: Optional[int] = Field(
+        default=None,
+        description="Cambridge C1 Advanced (CAE) overall score for this band level.",
+    )
 
 
 class EnglishConfig(BaseModel):

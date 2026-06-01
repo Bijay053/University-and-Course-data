@@ -5387,6 +5387,86 @@ async def extract_course(
                         is_pathway=_is_pathway_course,
                     )
 
+            # ── Band Correction: align PTE / TOEFL / CAE to match per-course IELTS ──
+            # When a university uses an English band system (e.g. JCU Bands P→3c),
+            # the central page cache stores the institution minimum (typically Band P).
+            # A course page may extract a higher IELTS (e.g. 7.0 for Medicine) but
+            # TOEFL/PTE/CAE remain at the Band P values from the cache, triggering
+            # false "IELTS/TOEFL Mismatch" warnings.  This block reads the per-uni
+            # YAML band_mapping, finds the band whose ielts_overall matches the
+            # current payload value, then overwrites any central-page-sourced
+            # TOEFL/PTE/CAE with the correct band-specific equivalents.
+            # Only central_page and ai_fallback method fields are overridden —
+            # course-specific OCR / regex values are left untouched.
+            try:
+                _band_map: dict = getattr(_uc.extraction.english, "band_mapping", {}) or {}
+                _band_ref_url: str = (
+                    getattr(_uc.extraction.english, "band_reference_url", None) or url
+                )
+                _cur_ielts: float = float(payload.get("ielts_overall") or 0.0)
+                if _band_map and _cur_ielts > 0:
+                    _hit_band_name: str | None = None
+                    _hit_band_spec: dict | None = None
+                    for _bn, _bs in _band_map.items():
+                        _bsd = _bs.model_dump() if hasattr(_bs, "model_dump") else dict(_bs)
+                        _bi = float(_bsd.get("ielts_overall") or 0.0)
+                        if abs(_bi - _cur_ielts) < 0.05:
+                            _hit_band_name = _bn
+                            _hit_band_spec = _bsd
+                            break
+                    if _hit_band_name and _hit_band_spec:
+                        _BAND_FIELDS = ("pte_overall", "toefl_overall", "cambridge_overall")
+                        _BAND_OVERRIDE_METHODS = frozenset({
+                            "central_page:english", "central_page:english_level",
+                            "ai_fallback", "gemini_primary", "",
+                        })
+                        _band_applied: list[str] = []
+                        for _bfk in _BAND_FIELDS:
+                            _bfv = _hit_band_spec.get(_bfk)
+                            if not _bfv:
+                                continue
+                            _curr_bfv = payload.get(_bfk)
+                            if _curr_bfv not in (None, 0, ""):
+                                _curr_bfm = next(
+                                    (ev.get("method", "") for ev in reversed(evidence)
+                                     if ev.get("field_key") == _bfk),
+                                    "",
+                                )
+                                if _curr_bfm not in _BAND_OVERRIDE_METHODS:
+                                    continue  # Course-specific OCR/regex — don't touch
+                                if payload.get(_bfk) == _bfv:
+                                    continue  # Already at the correct value
+                                evidence[:] = [
+                                    ev for ev in evidence if ev.get("field_key") != _bfk
+                                ]
+                            payload[_bfk] = _bfv
+                            evidence.append({
+                                "field_key": _bfk,
+                                "value": _bfv,
+                                "confidence": 0.80,
+                                "method": "yaml_band_mapping",
+                                "source_url": _band_ref_url,
+                                "snippet": f"band_mapping {_hit_band_name}: {_bfk}={_bfv}",
+                            })
+                            _band_applied.append(_bfk)
+                        if emit and _band_applied:
+                            await emit(
+                                "status",
+                                f"[BAND ✓] {payload.get('course_name', url)[:40]} — "
+                                f"IELTS={_cur_ielts} → {_hit_band_name}: "
+                                + " ".join(
+                                    f"{k.replace('_overall','')}={payload.get(k)}"
+                                    for k in _band_applied
+                                ),
+                                phase="fallback",
+                                kind="band_mapping_applied",
+                                url=url,
+                                band=_hit_band_name,
+                                fields_applied=_band_applied,
+                            )
+            except Exception as _band_exc:
+                log.debug("[BAND] band_mapping correction skipped on %s: %s", url, _band_exc)
+
         except Exception as exc:  # noqa: BLE001 — never abort extraction
             log.warning("central_pages fallback errored on %s: %s", url, exc)
 
