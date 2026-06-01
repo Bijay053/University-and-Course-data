@@ -4,7 +4,10 @@
 discovery:
   always_browser_discover: true
   use_stealth_browser: true
-  use_wayback: true
+  # Wayback CDX for jcu.edu.au hits the 10,000-URL cap and returns 0 useful course
+  # URLs every time — pure overhead of 5+ minutes per run. Browser discovers ~109
+  # links directly from the seed URL, so Wayback adds nothing here.
+  use_wayback: false
 
   seed_urls:
     - https://www.jcu.edu.au/courses

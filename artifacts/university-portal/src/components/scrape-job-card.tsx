@@ -207,6 +207,11 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
   const [uniName, setUniName] = useState("");
   const [progress, setProgress] = useState<{ current: number; total: number } | null>(null);
   const [startTime, setStartTime] = useState<number | null>(null);
+  // Tracks when course *extraction* actually began (after discovery completes).
+  // Using startTime for ETA inflates it hugely — discovery can take 5-9 minutes
+  // and those minutes get divided into the per-course rate, making 5s/course
+  // look like 86s/course and producing wildly wrong ETAs like "134m left".
+  const extractionStartRef = useRef<number | null>(null);
   const [now, setNow] = useState(Date.now());
   const [resultSummary, setResultSummary] = useState<{ imported: number; skipped: number; errors: number } | null>(null);
   const [completedJobId, setCompletedJobId] = useState<string | null>(null);
@@ -292,6 +297,7 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
     setStopping(false);
     setProgress(null);
     setStartTime(null);
+    extractionStartRef.current = null;
     setActiveJobId(null);
     setPhase("idle");
     setJobStatus(null);
@@ -524,7 +530,16 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
           if (data.logIndex !== undefined) logIndexRef.current = data.logIndex;
 
           const progressLog = [...data.logs].reverse().find((l) => l.event === "progress" && l.total);
-          if (progressLog) setProgress({ current: progressLog.current ?? 0, total: progressLog.total! });
+          if (progressLog) {
+            const cur = progressLog.current ?? 0;
+            setProgress({ current: cur, total: progressLog.total! });
+            // Record the moment extraction actually starts (first course done).
+            // Discovery can take many minutes; using job startTime for ETA inflates
+            // per-course rate by the full discovery overhead.
+            if (cur > 0 && extractionStartRef.current === null) {
+              extractionStartRef.current = Date.now();
+            }
+          }
 
           const doneLog = data.logs.find((l) => l.event === "done");
           if (doneLog) {
@@ -634,6 +649,7 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
     setLogs([]);
     setProgress(null);
     setResultSummary(null);
+    extractionStartRef.current = null;
     const t0 = Date.now();
     setStartTime(t0);
     sessionStorage.setItem(startTimeKey, String(t0));
@@ -826,8 +842,9 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
             {progressLog && progressLog.total ? (() => {
               const pct = ((progressLog.current ?? 0) / progressLog.total!) * 100;
               const allDispatched = (progressLog.current ?? 0) >= progressLog.total!;
-              const remaining = !allDispatched && startTime && (progressLog.current ?? 0) > 0
-                ? fmt(((now - startTime) / (progressLog.current ?? 1)) * ((progressLog.total ?? 1) - (progressLog.current ?? 0)))
+              const extractionStart = extractionStartRef.current;
+              const remaining = !allDispatched && extractionStart && (progressLog.current ?? 0) > 0
+                ? fmt(((now - extractionStart) / (progressLog.current ?? 1)) * ((progressLog.total ?? 1) - (progressLog.current ?? 0)))
                 : null;
               return (
                 <div className="space-y-1">
