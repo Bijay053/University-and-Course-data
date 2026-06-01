@@ -11,3 +11,4 @@
 - [Year-based URL deduplication pipeline](year-dedup-pipeline.md) — Phase A.5c pre-extraction: ignore_urls→ignore_years→slug_without_year dedup; prefer_urls_matching is tiebreaker in Step 3.
 - [JCU URL rewrite Cloudflare lesson](jcu-cloudflare-lesson.md) — ?international=true on static HTTP triggers Cloudflare bot challenge (0 staged); JS-tab universities need browser rescue, not URL rewrite.
 - [SCU year URL regex fix](scu-year-regex-fix.md) — 4-digit course codes (e.g. 5350) fool `\d{4}` regex; use `20\d{2}` to restrict to real years.
+- [JCU band_mapping flow fix](jcu-band-mapping-flow.md) — band_mapping must override central_page values; outer ielts_missing guard blocks it when central already filled the slot.

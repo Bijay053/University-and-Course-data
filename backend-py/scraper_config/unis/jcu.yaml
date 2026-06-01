@@ -98,6 +98,50 @@ extraction:
     default_pte: 58
     default_toefl: 79
 
+    # Band → score lookup from JCU Admissions Policy Schedule II.
+    # Each course page says "Band 2" or "Band 3a" in Entry Requirements.
+    # The band_mapping code overrides any central_page-derived value with the
+    # correct per-course band score (more specific than the institution default).
+    # Source: https://www.jcu.edu.au/policy/academic-governance/student-experience/admissions-policy-schedule-ii
+    band_reference_url: https://www.jcu.edu.au/policy/academic-governance/student-experience/admissions-policy-schedule-ii
+    band_mapping:
+      # Band P: Foundation-level English (e.g. some pathway, foundation courses)
+      Band P:
+        ielts_overall: 5.5
+        ielts_each: 5.0
+        pte_overall: 46
+        toefl_overall: 56
+      # Band 1: General undergraduate entry
+      Band 1:
+        ielts_overall: 6.0
+        ielts_each: 6.0
+        pte_overall: 50
+        toefl_overall: 74
+      # Band 2: Standard undergraduate / most postgraduate programs
+      Band 2:
+        ielts_overall: 6.5
+        ielts_each: 6.0
+        pte_overall: 58
+        toefl_overall: 86
+      # Band 3a: Higher-requirement programs (e.g. Medicine, Psychology, Law)
+      Band 3a:
+        ielts_overall: 7.0
+        ielts_each: 6.5
+        pte_overall: 65
+        toefl_overall: 94
+      # Band 3b: Same overall as 3a but 7.0 required in 3 components (6.5 in 1)
+      Band 3b:
+        ielts_overall: 7.0
+        ielts_each: 6.5
+        pte_overall: 65
+        toefl_overall: 94
+      # Band 3c: Strictest — no IELTS component below 7.0
+      Band 3c:
+        ielts_overall: 7.0
+        ielts_each: 7.0
+        pte_overall: 65
+        toefl_overall: 94
+
   intake:
     rolling_enrollment_label: "Rolling"
 
