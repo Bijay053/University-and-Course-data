@@ -153,7 +153,45 @@ async def _fetch_links(
         return [], f"error: {type(exc).__name__}"
 
 
-# ── JSON API test ─────────────────────────────────────────────────────────────
+# ── JSON API test (internal, used by test_recipe) ─────────────────────────────
+
+_URL_KEYS = ("url", "link", "href", "course_url", "page_url", "courseUrl", "pageUrl",
+             "Url", "Link", "Href")
+
+
+def _navigate_path(obj: Any, path: str) -> Any:
+    if not path:
+        return obj
+    for part in path.split("."):
+        if isinstance(obj, dict):
+            obj = obj.get(part)
+        elif isinstance(obj, list) and part.isdigit():
+            obj = obj[int(part)]
+        else:
+            return None
+        if obj is None:
+            return None
+    return obj
+
+
+def _extract_names(items: list, field_map: dict) -> list[str]:
+    """Extract human-readable course names from a list of JSON items."""
+    name_keys = ("Title", "title", "name", "course_name", "courseName", "CourseName")
+    # Add mapped field
+    mapped_name_key = field_map.get("course_name")
+    if mapped_name_key:
+        name_keys = (mapped_name_key,) + name_keys
+    names = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        for key in name_keys:
+            val = item.get(key)
+            if val and isinstance(val, str) and len(val.strip()) > 2:
+                names.append(val.strip())
+                break
+    return names
+
 
 async def _test_json_api(
     client: httpx.AsyncClient,
@@ -163,24 +201,41 @@ async def _test_json_api(
 ) -> dict:
     endpoint = api_cfg.get("endpoint", "")
     root_path = api_cfg.get("root_path", "")
+    count_path = api_cfg.get("count_path", "")
     url_template = api_cfg.get("course_url_template", "")
     method = api_cfg.get("method", "GET").upper()
     extra_headers = dict(api_cfg.get("headers") or {})
+    query_params = dict(api_cfg.get("query_params") or {})
+    pagination = dict(api_cfg.get("pagination") or {})
+    page_param = pagination.get("page_param", "page")
+    page_size_raw = pagination.get("page_size")
+    size_param = pagination.get("size_param", "limit")
+    page_start = int(pagination.get("page_start", 0))
+    field_map = dict(api_cfg.get("fields") or {})
 
     if not endpoint:
         return {"status": "no_endpoint", "records_found": 0, "urls_generated": 0,
                 "urls": [], "sample_records": []}
 
+    # Build page-1 params
+    fetch_params: dict = dict(query_params)
+    if pagination.get("type") == "offset":
+        fetch_params[page_param] = page_start
+        if page_size_raw is not None:
+            fetch_params[size_param] = int(page_size_raw)
+
     try:
         if method == "POST":
-            resp = await client.post(endpoint, headers=extra_headers, timeout=_TIMEOUT_PER_URL)
+            resp = await client.post(endpoint, json=fetch_params or None,
+                                     headers=extra_headers, timeout=_TIMEOUT_PER_URL)
         else:
-            resp = await client.get(endpoint, headers=extra_headers, timeout=_TIMEOUT_PER_URL)
+            resp = await client.get(endpoint, params=fetch_params or None,
+                                    headers=extra_headers, timeout=_TIMEOUT_PER_URL)
 
         if resp.status_code != 200:
             warnings.append(f"API endpoint returned HTTP {resp.status_code}")
-            return {"status": f"http_{resp.status_code}", "records_found": 0,
-                    "urls_generated": 0, "urls": [], "sample_records": []}
+            return {"status": f"http_{resp.status_code}", "http_status": resp.status_code,
+                    "records_found": 0, "urls_generated": 0, "urls": [], "sample_records": []}
 
         data = resp.json()
     except httpx.TimeoutException:
@@ -192,7 +247,16 @@ async def _test_json_api(
         return {"status": f"error: {type(exc).__name__}", "records_found": 0,
                 "urls_generated": 0, "urls": [], "sample_records": []}
 
-    # Navigate root_path
+    # Read total count from count_path
+    total_from_api: int | None = None
+    if count_path:
+        total_raw = _navigate_path(data, count_path)
+        try:
+            total_from_api = int(total_raw)
+        except (TypeError, ValueError):
+            warnings.append(f"count_path '{count_path}' returned {type(total_raw).__name__}, expected int")
+
+    # Navigate root_path to course list
     items: Any = data
     if root_path:
         for part in root_path.split("."):
@@ -211,7 +275,30 @@ async def _test_json_api(
             "Check root_path in the JSON API config."
         )
         return {"status": "bad_root_path", "records_found": 0, "urls_generated": 0,
-                "urls": [], "sample_records": []}
+                "urls": [], "sample_records": [], "http_status": 200,
+                "total_from_api": total_from_api, "page1_count": 0}
+
+    page1_count = len(items)
+    page1_names = _extract_names(items, field_map)
+
+    # Optionally fetch page 2 to verify pagination
+    page2_count: int | None = None
+    if pagination.get("type") == "offset" and page1_count > 0:
+        p2_params = dict(fetch_params)
+        p2_params[page_param] = page_start + 1
+        try:
+            if method == "POST":
+                r2 = await client.post(endpoint, json=p2_params, headers=extra_headers,
+                                       timeout=_TIMEOUT_PER_URL)
+            else:
+                r2 = await client.get(endpoint, params=p2_params, headers=extra_headers,
+                                      timeout=_TIMEOUT_PER_URL)
+            if r2.status_code == 200:
+                d2 = r2.json()
+                its2 = _navigate_path(d2, root_path) if root_path else d2
+                page2_count = len(its2) if isinstance(its2, list) else 0
+        except Exception:
+            pass
 
     # Build course URLs
     urls: list[str] = []
@@ -247,13 +334,56 @@ async def _test_json_api(
 
     return {
         "status": "ok",
+        "http_status": 200,
         "records_found": len(items),
         "url_template": url_template or None,
         "urls_generated": len(urls),
         "urls": urls[:300],
         "sample_records": sample,
         "root_path_used": root_path or None,
+        "total_from_api": total_from_api,
+        "page1_count": page1_count,
+        "page2_count": page2_count,
+        "sample_names": page1_names[:8],
     }
+
+
+# ── Standalone JSON API test (called by the /recipe/test-api route) ────────────
+
+async def test_json_api_standalone(api_cfg: dict) -> dict:
+    """Test a JSON API endpoint configuration directly without needing a scrape_url.
+
+    Returns a rich result dict suitable for the Recipe Editor's Test API panel:
+      status          'ok' | 'no_endpoint' | 'timeout' | 'http_NNN' | 'bad_root_path' | 'error:…'
+      http_status     HTTP status code (int)
+      total_from_api  Total count from count_path if configured (int | null)
+      page1_count     Courses on page 1 (int)
+      page2_count     Courses on page 2 — only when pagination.type=offset (int | null)
+      sample_names    Up to 8 course names from page 1 (list[str])
+      all_keys        All top-level JSON keys from first item (list[str])
+      warnings        Non-fatal issues (list[str])
+    """
+    endpoint = (api_cfg.get("endpoint") or "").strip()
+    if not endpoint:
+        return {"status": "no_endpoint", "http_status": None, "total_from_api": None,
+                "page1_count": 0, "page2_count": None, "sample_names": [], "all_keys": [],
+                "warnings": ["No API endpoint configured"]}
+
+    parsed = urllib.parse.urlparse(endpoint)
+    origin = f"{parsed.scheme}://{parsed.netloc}"
+    warnings: list[str] = []
+
+    async with httpx.AsyncClient(follow_redirects=True) as client:
+        result = await _test_json_api(client, api_cfg, origin, warnings)
+
+    # Add all_keys from first sample record
+    all_keys: list[str] = []
+    if result.get("sample_records"):
+        all_keys = list(result["sample_records"][0].keys())
+
+    result["all_keys"] = all_keys
+    result["warnings"] = warnings
+    return result
 
 
 # ── Main entry point ──────────────────────────────────────────────────────────

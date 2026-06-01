@@ -5,11 +5,12 @@ the orchestrator calls this module instead of running BFS/browser/sitemap
 discovery.  The provider:
 
   1. Fetches ``api.endpoint`` (GET or POST, optional extra headers).
-  2. Navigates to ``api.root_path`` (dot-separated) to reach the course array.
-  3. For each item builds a course URL from ``api.course_url_template`` using
+  2. Merges ``api.query_params`` (static key/value pairs) with any pagination params.
+  3. Navigates to ``api.root_path`` (dot-separated) to reach the course array.
+  4. For each item builds a course URL from ``api.course_url_template`` using
      all JSON keys as template variables (Python str.format_map).
-  4. Applies ``api.fields`` to map JSON keys → standard scraper field names.
-  5. Returns a list of link dicts: {name, url, [json_result]} that feed the
+  5. Applies ``api.fields`` to map JSON keys → standard scraper field names.
+  6. Returns a list of link dicts: {name, url, [json_result]} that feed the
      normal dedup + staging loop in run_scrape.
 
 If ``api.course_url_template`` is absent, ``url`` is taken directly from the
@@ -19,12 +20,20 @@ Pagination is supported via an optional ``api.pagination`` block::
 
     pagination:
       type: offset          # only type currently supported
-      page_param: page      # query-param name for page number (0- or 1-based)
-      size_param: limit     # query-param name for page size
-      page_size: 100
+      page_param: p         # query-param name for page number
+      size_param: limit     # query-param name for page size (omit to skip)
+      page_size: 20         # items per page (omit to skip)
+      page_start: 1         # first page number (1 for Torrens/Sitecore, 0 for most)
       max_pages: 50         # safety cap
 
 When pagination is absent, the provider fetches the endpoint once.
+
+Static query params (e.g. Sitecore GUIDs, category filters) go in
+``api.query_params`` as a flat key→value dict.  They are sent with every
+request including paginated pages.
+
+``api.count_path`` (optional dot-separated path) reads the total course count
+from the first page response for logging/progress purposes.
 """
 from __future__ import annotations
 
@@ -39,7 +48,8 @@ import httpx
 log = logging.getLogger("scraper.json_api_discovery")
 
 _DEFAULT_TIMEOUT = 30.0
-_URL_KEYS = ("url", "link", "href", "course_url", "page_url", "courseUrl", "pageUrl")
+_URL_KEYS = ("url", "link", "href", "course_url", "page_url", "courseUrl", "pageUrl",
+             "Url", "Link", "Href")
 
 
 def _navigate(obj: Any, path: str) -> Any:
@@ -129,15 +139,22 @@ async def fetch_json_api_links(
     method: str = api_cfg.get("method", "GET").upper()
     headers: dict = dict(api_cfg.get("headers") or {})
     root_path: Optional[str] = api_cfg.get("root_path") or None
+    count_path: Optional[str] = api_cfg.get("count_path") or None
     url_template: Optional[str] = api_cfg.get("course_url_template") or None
     field_map: dict = dict(api_cfg.get("fields") or {})
+
+    # Static query params (e.g. Sitecore GUIDs, category=Course)
+    query_params: dict = dict(api_cfg.get("query_params") or {})
 
     pagination: dict = dict(api_cfg.get("pagination") or {})
     pag_type = pagination.get("type", "")
     page_param = pagination.get("page_param", "page")
     size_param = pagination.get("size_param", "limit")
-    page_size = int(pagination.get("page_size", 100))
+    page_size_raw = pagination.get("page_size")
+    page_size = int(page_size_raw) if page_size_raw is not None else 100
     max_pages = int(pagination.get("max_pages", 50))
+    # page_start: 0 = zero-indexed (default), 1 = one-indexed (e.g. Torrens/Sitecore)
+    page_start = int(pagination.get("page_start", 0))
 
     def _emit(msg: str) -> None:
         log.info("[JSON_API] %s", msg)
@@ -152,26 +169,43 @@ async def fetch_json_api_links(
 
     async with httpx.AsyncClient(follow_redirects=True) as client:
         if pag_type == "offset":
-            _emit(f"Paginating {endpoint} (up to {max_pages} pages of {page_size})")
+            _emit(f"Paginating {endpoint} (up to {max_pages} pages, start={page_start})")
             for page_num in range(max_pages):
-                extra_params = {page_param: page_num, size_param: page_size}
+                current_page = page_start + page_num
+                # Build params: static query_params + pagination params
+                extra_params = dict(query_params)
+                extra_params[page_param] = current_page
+                if page_size_raw is not None:
+                    extra_params[size_param] = page_size
                 data = await _fetch_page(client, method, endpoint, headers, extra_params)
                 if data is None:
                     break
+                # Log total count from count_path on first page
+                if page_num == 0 and count_path:
+                    total = _navigate(data, count_path)
+                    if total is not None:
+                        _emit(f"Total courses from API (count_path={count_path!r}): {total}")
                 items = _navigate(data, root_path) if root_path else data
                 if not isinstance(items, list) or not items:
-                    _emit(f"No items on page {page_num} — stopping pagination")
+                    _emit(f"No items on page {current_page} — stopping pagination")
                     break
                 before = len(links)
                 for item in items:
                     _process_item(item, url_template, field_map, links, seen_urls)
-                _emit(f"Page {page_num}: +{len(links) - before} courses (total {len(links)})")
+                _emit(f"Page {current_page}: +{len(links) - before} courses (total {len(links)})")
                 await asyncio.sleep(0.1)
         else:
+            # Single-page fetch — merge static query_params
+            fetch_params = dict(query_params) if query_params else {}
             _emit(f"Fetching {endpoint}")
-            data = await _fetch_page(client, method, endpoint, headers, {})
+            data = await _fetch_page(client, method, endpoint, headers, fetch_params or None)
             if data is None:
                 return []
+            # Log total count from count_path
+            if count_path:
+                total = _navigate(data, count_path)
+                if total is not None:
+                    _emit(f"Total courses from API (count_path={count_path!r}): {total}")
             items = _navigate(data, root_path) if root_path else data
             if not isinstance(items, list):
                 log.error(
@@ -209,6 +243,7 @@ def _process_item(
 
     name = (
         mapped.get("course_name")
+        or item.get("Title")
         or item.get("title")
         or item.get("name")
         or item.get("course_name")

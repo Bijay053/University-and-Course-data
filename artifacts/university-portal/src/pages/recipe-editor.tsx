@@ -36,7 +36,9 @@ interface FieldSelector {
 interface ApiConfig {
   endpoint: string;
   method: string;
+  query_params: Record<string, string>;
   root_path: string;
+  count_path: string;
   course_url_template: string;
   fields: Record<string, string>;
   headers: Record<string, string>;
@@ -45,8 +47,21 @@ interface ApiConfig {
     page_param: string;
     size_param: string;
     page_size: number;
+    page_start: number;
     max_pages: number;
   };
+}
+
+interface ApiTestResult {
+  status: string;
+  http_status?: number;
+  total_from_api?: number | null;
+  page1_count?: number;
+  page2_count?: number | null;
+  sample_names?: string[];
+  all_keys?: string[];
+  warnings?: string[];
+  error?: string;
 }
 
 interface BandSpecUI {
@@ -629,7 +644,7 @@ export default function RecipeEditorPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState<{ count: number; sample: any[] } | null>(null);
+  const [testResult, setTestResult] = useState<ApiTestResult | null>(null);
   const [testingDiscovery, setTestingDiscovery] = useState(false);
   const [discoveryResult, setDiscoveryResult] = useState<any | null>(null);
   const [showDropped, setShowDropped] = useState(false);
@@ -742,36 +757,36 @@ export default function RecipeEditorPage() {
     }
   }, [id, recipe]);
 
-  // ── Test JSON API ──
+  // ── Test JSON API (via backend to avoid CORS) ──
   const testApi = useCallback(async () => {
     const api = recipe.api;
     if (!api?.endpoint) {
-      toast({ title: "No endpoint", description: "Enter an API endpoint first.", variant: "destructive" });
+      toast({ title: "No endpoint", description: "Enter an API endpoint URL first.", variant: "destructive" });
       return;
     }
     setTesting(true);
     setTestResult(null);
     try {
-      const resp = await fetch(api.endpoint, { headers: api.headers || {} });
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      const data = await resp.json();
-
-      let items: any = data;
-      if (api.root_path) {
-        const parts = api.root_path.split(".");
-        for (const part of parts) {
-          items = items?.[part];
-        }
+      const resp = await fetch(`/api/universities/${id}/recipe/test-api`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ api }),
+      });
+      if (!resp.ok) throw new Error(await resp.text());
+      const data: ApiTestResult = await resp.json();
+      setTestResult(data);
+      if (data.status === "ok") {
+        toast({ title: `API OK — ${data.page1_count} courses on page 1${data.total_from_api != null ? `, ${data.total_from_api} total` : ""}` });
+      } else {
+        toast({ title: `API test: ${data.status}`, variant: "destructive" });
       }
-      if (!Array.isArray(items)) throw new Error(`root_path '${api.root_path}' did not resolve to an array`);
-      setTestResult({ count: items.length, sample: items.slice(0, 3) });
-      toast({ title: `API test OK — ${items.length} courses found` });
     } catch (e: any) {
       toast({ title: "API test failed", description: e.message, variant: "destructive" });
     } finally {
       setTesting(false);
     }
-  }, [recipe.api]);
+  }, [id, recipe.api]);
 
   // ── Diagnose ──
   const runDiagnose = useCallback(async () => {
@@ -1907,7 +1922,7 @@ export default function RecipeEditorPage() {
                   <Input
                     value={recipe.api?.root_path || ""}
                     onChange={e => patchApi({ root_path: e.target.value })}
-                    placeholder="e.g. courses  or  data.items  or  results"
+                    placeholder="e.g. Results  or  data.courses  or  Items"
                     className="mt-1 text-sm font-mono"
                   />
                   <p className="text-xs text-muted-foreground mt-1">
@@ -1915,45 +1930,143 @@ export default function RecipeEditorPage() {
                   </p>
                 </div>
                 <div>
-                  <Label>Course URL Template</Label>
+                  <Label>Total Count Path <span className="text-muted-foreground font-normal">(optional)</span></Label>
                   <Input
-                    value={recipe.api?.course_url_template || ""}
-                    onChange={e => patchApi({ course_url_template: e.target.value })}
-                    placeholder="https://courses.hud.ac.uk/2025-26/{study_mode}/{study_level}/{urltitle}"
+                    value={recipe.api?.count_path || ""}
+                    onChange={e => patchApi({ count_path: e.target.value })}
+                    placeholder="e.g. TotalCount  or  meta.total"
                     className="mt-1 text-sm font-mono"
                   />
                   <p className="text-xs text-muted-foreground mt-1">
-                    Python format string using JSON field names. E.g. <code>{"{urltitle}"}</code>
+                    Path to total record count in response — shown in Test API results.
                   </p>
                 </div>
               </div>
 
+              <div className="grid grid-cols-1 gap-4">
+                <div>
+                  <Label>Course URL Template <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                  <Input
+                    value={recipe.api?.course_url_template || ""}
+                    onChange={e => patchApi({ course_url_template: e.target.value })}
+                    placeholder="https://uni.edu/courses/{Url}  or  https://uni.edu/{slug}"
+                    className="mt-1 text-sm font-mono"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Python format string using JSON field names. E.g. <code>{"{Url}"}</code> or <code>{"{slug}"}</code>. Leave blank if items already contain a URL field.
+                  </p>
+                </div>
+              </div>
+
+              <Separator />
+
+              <KeyValueEditor
+                label="Query Parameters"
+                pairs={recipe.api?.query_params || {}}
+                onChange={query_params => patchApi({ query_params })}
+                keyPlaceholder="Param name (e.g. category)"
+                valuePlaceholder="Value (e.g. Course)"
+                helpText="Static query parameters sent with every request. For Sitecore SXA: add s, itemid, category, v, etc. The pagination page number is added automatically — do not add it here."
+              />
+
+              <Separator />
+
               {/* Test button */}
-              <div className="flex items-center gap-3">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={testApi}
-                  disabled={testing || !recipe.api?.endpoint}
-                >
-                  <RefreshCw className={`h-4 w-4 mr-2 ${testing ? "animate-spin" : ""}`} />
-                  {testing ? "Testing…" : "Test API Endpoint"}
-                </Button>
-                {testResult && (
-                  <div className="text-sm text-green-600 font-medium">
-                    ✓ {testResult.count} courses found
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={testApi}
+                    disabled={testing || !recipe.api?.endpoint}
+                  >
+                    <RefreshCw className={`h-4 w-4 mr-2 ${testing ? "animate-spin" : ""}`} />
+                    {testing ? "Testing…" : "Test API Endpoint"}
+                  </Button>
+                  {testResult && testResult.status === "ok" && (
+                    <div className="text-sm text-green-600 font-medium">
+                      ✓ HTTP {testResult.http_status} · {testResult.page1_count} courses on page 1
+                      {testResult.total_from_api != null && ` · ${testResult.total_from_api} total`}
+                    </div>
+                  )}
+                  {testResult && testResult.status !== "ok" && (
+                    <div className="text-sm text-destructive font-medium">
+                      ✗ {testResult.status}
+                    </div>
+                  )}
+                </div>
+
+                {testResult && testResult.status === "ok" && (
+                  <div className="rounded-md border bg-muted/50 p-3 space-y-3">
+                    {/* Stats row */}
+                    <div className="grid grid-cols-3 gap-3 text-sm">
+                      <div className="rounded bg-background p-2 text-center">
+                        <div className="text-lg font-bold text-green-600">{testResult.http_status}</div>
+                        <div className="text-xs text-muted-foreground">HTTP Status</div>
+                      </div>
+                      <div className="rounded bg-background p-2 text-center">
+                        <div className="text-lg font-bold">{testResult.page1_count ?? "—"}</div>
+                        <div className="text-xs text-muted-foreground">Page 1 courses</div>
+                      </div>
+                      <div className="rounded bg-background p-2 text-center">
+                        <div className="text-lg font-bold">
+                          {testResult.total_from_api != null ? testResult.total_from_api
+                            : testResult.page2_count != null ? `${testResult.page2_count} p2`
+                            : "—"}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {testResult.total_from_api != null ? "Total (from API)" : "Page 2 courses"}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Sample course names */}
+                    {testResult.sample_names && testResult.sample_names.length > 0 && (
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground mb-1">Sample courses:</p>
+                        <ul className="text-xs space-y-0.5">
+                          {testResult.sample_names.map((name, i) => (
+                            <li key={i} className="text-foreground">• {name}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {/* JSON keys for field mapping */}
+                    {testResult.all_keys && testResult.all_keys.length > 0 && (
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground mb-1">JSON keys (use in Field Mapping):</p>
+                        <p className="text-xs font-mono text-muted-foreground">
+                          {testResult.all_keys.join(", ")}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Warnings */}
+                    {testResult.warnings && testResult.warnings.length > 0 && (
+                      <div>
+                        {testResult.warnings.map((w, i) => (
+                          <p key={i} className="text-xs text-amber-600">⚠ {w}</p>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {testResult && testResult.status !== "ok" && (
+                  <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3">
+                    <p className="text-xs font-medium text-destructive mb-1">Test failed: {testResult.status}</p>
+                    {testResult.warnings && testResult.warnings.map((w, i) => (
+                      <p key={i} className="text-xs text-muted-foreground">{w}</p>
+                    ))}
+                    {testResult.http_status && testResult.http_status !== 200 && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        HTTP {testResult.http_status} — check endpoint URL, query parameters, or request headers.
+                      </p>
+                    )}
                   </div>
                 )}
               </div>
-
-              {testResult && testResult.sample.length > 0 && (
-                <div className="rounded-md bg-muted p-3 space-y-1">
-                  <p className="text-xs font-medium text-muted-foreground mb-2">Sample item (first result):</p>
-                  <pre className="text-xs font-mono overflow-auto max-h-40">
-                    {JSON.stringify(testResult.sample[0], null, 2)}
-                  </pre>
-                </div>
-              )}
 
               <Separator />
 
@@ -1962,8 +2075,8 @@ export default function RecipeEditorPage() {
                 pairs={recipe.api?.fields || {}}
                 onChange={fields => patchApi({ fields })}
                 keyPlaceholder="Standard field (e.g. course_name)"
-                valuePlaceholder="JSON key (e.g. title)"
-                helpText="Map your standard scraper field names → the actual JSON key names. Standard fields: course_name, degree_level, study_mode_raw, full_time, part_time, url_slug, duration, campus, description."
+                valuePlaceholder="JSON key (e.g. Title)"
+                helpText="Map standard scraper field names → the actual JSON key names. Standard fields: course_name, degree_level, study_mode_raw, full_time, part_time, url_slug, duration, campus, description. Tip: run Test API above to see available JSON keys."
               />
 
               <Separator />
@@ -1981,40 +2094,61 @@ export default function RecipeEditorPage() {
 
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <Label>Pagination</Label>
+                  <div>
+                    <Label>Pagination</Label>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Enable to page through results. The page number is added automatically to each request.
+                    </p>
+                  </div>
                   <Switch
                     checked={!!recipe.api?.pagination}
                     onCheckedChange={v => patchApi({
                       pagination: v
-                        ? { type: "offset", page_param: "page", size_param: "limit", page_size: 100, max_pages: 50 }
+                        ? { type: "offset", page_param: "p", size_param: "", page_size: 20, page_start: 1, max_pages: 50 }
                         : undefined
                     })}
                   />
                 </div>
                 {recipe.api?.pagination && (
-                  <div className="grid grid-cols-4 gap-3 pl-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pl-2">
                     <div>
                       <Label className="text-xs">Page Param</Label>
                       <Input
                         value={recipe.api.pagination.page_param}
                         onChange={e => patchApi({ pagination: { ...recipe.api!.pagination!, page_param: e.target.value } })}
-                        className="mt-1 text-sm"
+                        placeholder="p"
+                        className="mt-1 text-sm font-mono"
                       />
                     </div>
                     <div>
-                      <Label className="text-xs">Size Param</Label>
+                      <Label className="text-xs">First Page No.</Label>
+                      <Select
+                        value={String(recipe.api.pagination.page_start ?? 1)}
+                        onValueChange={v => patchApi({ pagination: { ...recipe.api!.pagination!, page_start: parseInt(v) } })}
+                      >
+                        <SelectTrigger className="mt-1 text-sm"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="1">1 (Sitecore, most)</SelectItem>
+                          <SelectItem value="0">0 (zero-indexed)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-xs">Size Param <span className="text-muted-foreground">(opt)</span></Label>
                       <Input
                         value={recipe.api.pagination.size_param}
                         onChange={e => patchApi({ pagination: { ...recipe.api!.pagination!, size_param: e.target.value } })}
-                        className="mt-1 text-sm"
+                        placeholder="limit"
+                        className="mt-1 text-sm font-mono"
                       />
                     </div>
                     <div>
-                      <Label className="text-xs">Page Size</Label>
+                      <Label className="text-xs">Page Size <span className="text-muted-foreground">(opt)</span></Label>
                       <Input
                         type="number"
-                        value={recipe.api.pagination.page_size}
-                        onChange={e => patchApi({ pagination: { ...recipe.api!.pagination!, page_size: parseInt(e.target.value) || 100 } })}
+                        value={recipe.api.pagination.page_size || ""}
+                        onChange={e => patchApi({ pagination: { ...recipe.api!.pagination!, page_size: parseInt(e.target.value) || 20 } })}
+                        placeholder="20"
                         className="mt-1 text-sm"
                       />
                     </div>
@@ -3335,7 +3469,9 @@ function buildYamlPreview(recipe: Recipe): string {
 const EMPTY_API: ApiConfig = {
   endpoint: "",
   method: "GET",
+  query_params: {},
   root_path: "",
+  count_path: "",
   course_url_template: "",
   fields: {},
   headers: {},

@@ -1906,6 +1906,55 @@ async def test_recipe(
     }
 
 
+@router.post("/universities/{uni_id}/recipe/test-api")
+async def test_json_api_endpoint(
+    uni_id: int,
+    body: dict,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[dict, Depends(get_current_user)],
+) -> dict:
+    """Standalone JSON API endpoint test — no staging, no Gemini, no DB writes.
+
+    Tests the JSON API config from the recipe editor directly via the backend
+    (avoids CORS issues with university APIs). Fetches page 1 and optionally
+    page 2 to verify pagination, reads total count from count_path, extracts
+    sample course names.
+
+    Body: the ``api`` object from the recipe editor, e.g.:
+      {
+        "endpoint": "https://...",
+        "method": "GET",
+        "query_params": {"category": "Course", "s": "{GUID}"},
+        "root_path": "Results",
+        "count_path": "TotalCount",
+        "course_url_template": "https://uni.edu/courses/{Url}",
+        "pagination": {"type": "offset", "page_param": "p", "page_start": 1, "page_size": 20},
+        "fields": {"course_name": "Title"},
+        "headers": {}
+      }
+
+    Returns:
+      status         'ok' | 'no_endpoint' | 'timeout' | 'http_NNN' | 'bad_root_path'
+      http_status    HTTP response code
+      total_from_api Total from count_path if configured
+      page1_count    Items on page 1
+      page2_count    Items on page 2 (pagination test)
+      sample_names   Up to 8 course names from page 1
+      all_keys       Top-level JSON keys in first item
+      warnings       Non-fatal issues
+    """
+    u: University | None = await db.get(University, uni_id)
+    if not u:
+        raise HTTPException(status_code=404, detail="University not found")
+
+    # Accept either full recipe body (with api key) or the api object directly
+    api_cfg: dict = body.get("api") or body
+
+    from app.services.scraper.recipe_tester import test_json_api_standalone
+    result = await test_json_api_standalone(api_cfg)
+    return result
+
+
 def _to_camel_uni(u) -> dict:
     """Add camelCase aliases UI expects: scrapeUrl, feePageUrl, etc."""
     if hasattr(u, '__table__'):
