@@ -12,6 +12,7 @@ import {
   ShieldAlert, Play, ExternalLink, FlaskConical, BarChart3, Wrench, RotateCcw,
   Search, Award, ListChecks, ArrowLeftRight, ChevronDown, ChevronUp,
   ShieldCheck, Clock, FlaskRound, ShieldX, FileEdit,
+  BookOpen, XCircle,
 } from "lucide-react";
 
 // ── Certification Status Badge + Selector ─────────────────────────────────────
@@ -1504,6 +1505,96 @@ export default function ScrapeAgentPage() {
                   <Stat label="Completeness" value={`${stats.avg_completeness_pct}%`} good={stats.avg_completeness_pct >= 85} />
                 </div>
               )}
+
+              {/* Discovery Health panel */}
+              {diagnoseResult.level_breakdown && (() => {
+                const lb = diagnoseResult.level_breakdown as Record<string, number>;
+                const staged = stats?.imported ?? 0;
+                const discoveryIssueChecks = new Set([
+                  "zero_courses_discovered", "low_course_count", "all_filtered",
+                  "undergraduate_count_zero", "postgraduate_count_zero",
+                ]);
+                const discoveryIssues = (diagnoseResult.deterministic_issues || []).filter(
+                  (di: any) => discoveryIssueChecks.has(di.check)
+                );
+                const hasDiscoveryIssue = discoveryIssues.length > 0;
+                const levels = [
+                  { key: "undergraduate", label: "Undergraduate", count: lb.undergraduate ?? 0 },
+                  { key: "postgraduate",  label: "Postgraduate",  count: lb.postgraduate ?? 0 },
+                  { key: "research",      label: "Research",      count: lb.research ?? 0 },
+                  { key: "other",         label: "Other/Unknown", count: (lb.other ?? 0) + (lb.unknown ?? 0) },
+                ];
+                return (
+                  <div className="rounded-lg border border-blue-100 bg-blue-50 p-3 space-y-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-semibold text-blue-800 uppercase tracking-wide flex items-center gap-1.5">
+                        <BookOpen className="w-3.5 h-3.5" />
+                        Discovery Health
+                      </span>
+                      {hasDiscoveryIssue && (
+                        <a
+                          href={`/universities/${diagnoseResult.university_id}/recipe`}
+                          className="text-[11px] font-semibold text-blue-700 hover:text-blue-900 flex items-center gap-1 px-2 py-0.5 rounded bg-blue-100 hover:bg-blue-200 transition-colors shrink-0"
+                        >
+                          Open Recipe Editor →
+                        </a>
+                      )}
+                    </div>
+
+                    {/* Expected vs found */}
+                    {minExpected > 0 && (
+                      <div className={`rounded px-3 py-2 text-xs flex items-start gap-2 ${
+                        staged < minExpected
+                          ? "bg-red-50 border border-red-200 text-red-800"
+                          : "bg-green-50 border border-green-200 text-green-800"
+                      }`}>
+                        {staged < minExpected
+                          ? <XCircle className="w-3.5 h-3.5 shrink-0 mt-0.5 text-red-500" />
+                          : <CheckCircle2 className="w-3.5 h-3.5 shrink-0 mt-0.5 text-green-500" />}
+                        <span>
+                          Only <strong>{staged}</strong> courses found, expected at least <strong>{minExpected}</strong>.
+                          {staged < minExpected && (
+                            <span className="ml-1">
+                              Likely causes: missing listing URL, URL filter too strict, or courses loaded via API.
+                            </span>
+                          )}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Level breakdown grid */}
+                    <div className="grid grid-cols-4 gap-2">
+                      {levels.map(({ key, label, count }) => (
+                        <div key={key} className={`rounded p-2 text-center border ${
+                          count === 0 ? "bg-red-50 border-red-200" : "bg-white border-gray-100"
+                        }`}>
+                          <div className={`text-base font-bold leading-tight ${count === 0 ? "text-red-600" : "text-gray-800"}`}>
+                            {count}
+                          </div>
+                          <div className="text-[9px] text-muted-foreground leading-tight mt-0.5">{label}</div>
+                          <div className="text-[11px] mt-0.5">{count === 0 ? "❌" : "✅"}</div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Recommended actions when discovery issues exist */}
+                    {hasDiscoveryIssue && (
+                      <div className="rounded bg-white border border-blue-200 p-3">
+                        <p className="text-[11px] font-semibold text-blue-800 mb-1.5">
+                          Recommended actions to fix missing courses:
+                        </p>
+                        <ol className="text-[11px] text-gray-600 space-y-1 list-decimal list-inside">
+                          <li>Add missing course listing URL — <strong>Recipe Editor → Discovery → Seed URLs</strong></li>
+                          <li>Run <strong>Test Discovery</strong> to see per-URL link counts</li>
+                          <li>Review <strong>dropped URL samples</strong> — filter may be removing valid courses</li>
+                          <li>Enable <strong>Sitemap supplement</strong> if the listing page misses some courses</li>
+                          <li>Add a <strong>JSON API endpoint</strong> if courses are served via API, not HTML</li>
+                        </ol>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
 
               {/* Error */}
               {diagnoseResult.error && (

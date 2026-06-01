@@ -939,10 +939,17 @@ export default function RecipeEditorPage() {
                       )}
                       {r.dropped_samples?.length > 0 && (
                         <div className="text-xs bg-white rounded p-2 border">
-                          <div className="font-medium mb-1">Sample dropped URLs:</div>
-                          {r.dropped_samples.slice(0, 5).map((u: string, i: number) => (
-                            <div key={i} className="font-mono text-xs truncate text-red-700">{u}</div>
-                          ))}
+                          <div className="font-medium mb-1">Sample dropped courses ({r.dropped_samples.length} total):</div>
+                          {r.dropped_samples.slice(0, 8).map((u: string, i: number) => {
+                            const seg = u.replace(/\/$/, "").split("/").filter(Boolean).pop() ?? u;
+                            const name = seg.replace(/[-_]/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase());
+                            return (
+                              <div key={i} className="flex items-baseline gap-2 py-0.5 border-b border-gray-50 last:border-0">
+                                <span className="text-red-700 font-medium shrink-0 min-w-0">{name}</span>
+                                <span className="font-mono text-[10px] text-gray-400 truncate">{u}</span>
+                              </div>
+                            );
+                          })}
                         </div>
                       )}
                       {r.kept_samples?.length > 0 && (
