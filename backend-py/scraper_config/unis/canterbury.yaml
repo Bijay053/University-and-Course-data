@@ -34,13 +34,16 @@
 # exists; it just needs to be forced here instead of BFS.)
 
 discovery:
-  # ---- LINCHPIN: force sitemap discovery (VERIFY key names) ----------------
-  # BFS cannot crawl the JS qualifications search, so seed discovery from the
-  # sitemap and let allow_url_patterns below keep only qualification pages.
-  # Without this, allow_url_patterns just filters the junk BFS set down to ~0
-  # and COVERAGE DOES NOT IMPROVE. Confirm the sitemap URL resolves before
-  # relying on it (UC is an AEM site; the sitemap may be split/indexed).
-  force_sitemap: true
+  # ---- LINCHPIN: sitemap supplement (feeds real qualification URLs) ----------
+  # BFS cannot crawl the JS Funnelback qualifications search, so the sitemap
+  # is the only reliable source for /study/academic-study/qualifications/<slug>
+  # URLs. always_sitemap_supplement merges sitemap results with BFS candidates
+  # before the allow/block filters run — so the qualification pages from the
+  # sitemap survive the allow_url_patterns filter below even when BFS misses them.
+  #
+  # NOTE: "force_sitemap" is NOT a recognised schema key (it was a placeholder).
+  # The correct key is always_sitemap_supplement. (fixed 2026-06-01)
+  always_sitemap_supplement: true
   sitemap_url: "https://www.canterbury.ac.nz/sitemap.xml"
 
   # ---- allow-list: keep ONLY real qualification detail + intl pathway pages -

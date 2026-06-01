@@ -21,7 +21,9 @@ discovery:
   seed_urls:
     - https://www.waikato.ac.nz/int/study/qualifications/
   allow_url_patterns:
-    - /int/study/qualifications/(?:bachelor|master|doctor|diploma|certificate|graduate|conjoint|honours)[^/]*$
+    # Trailing /? makes the anchor match both .../bachelor-of-science and .../bachelor-of-science/
+    # Without it the $ anchors before the trailing slash and drops every course URL.
+    - /int/study/qualifications/(?:bachelor|master|doctor|diploma|certificate|graduate|conjoint|honours)[^/]*/?$
   block_url_patterns:
     - /int/about/
     - /int/research/
