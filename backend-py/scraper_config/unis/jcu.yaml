@@ -1,153 +1,49 @@
 # James Cook University
 # Hostname: www.jcu.edu.au
-#
-# Discovery: Cloudflare WAF blocks plain HTTP (BFS/httpx always returns 403).
-#   Browser discovery (Playwright) is the only live-site path; it works
-#   intermittently and is slow (the browser challenges take time).  seed_urls
-#   points the browser directly at the course catalogue so it doesn't waste
-#   time crawling the homepage nav first.
-#
-#   Wayback CDX is kept as a final fallback but JCU is barely indexed there —
-#   expect 0 results most of the time.  CDX prefix override removed because
-#   no path prefix has useful course coverage in the Wayback archive.
-#
-# Extraction: per-course browser rescue is permanently disabled.  JCU course
-#   pages are Cloudflare-walled at datacenter IPs — the browser always times
-#   out (60 s × N courses = very slow run).  Wayback HTML + Gemini is
-#   sufficient for 85 %+ completeness without any browser call per course.
 
 discovery:
-  # ── allow_url_patterns ────────────────────────────────────────────────────
-  # Only keep discovered URLs whose path contains a degree-level qualifier
-  # immediately after /courses/.  This targets individual course detail pages
-  # (e.g. /courses/master-of-engineering-management) and filters out:
-  #   • category hubs  : /courses/postgraduate/linkassets/engineering
-  #   • level landings : /courses/postgraduate, /courses/undergraduate
-  #   • study-area nav : /courses/study/engineering-and-technology
-  #
-  # Pattern breakdown:
-  #   /courses/  — JCU course detail URLs always start with this prefix
-  #   (?:bachelor|master|…)  — the degree qualifier must follow immediately
-  #   [^/]  — one more char required so the qualifier is not the entire segment
-  #            (prevents /courses/master/ with a trailing slash from matching)
-  #
-  # If a legitimate JCU course URL does NOT match (e.g. a future course whose
-  # slug uses a non-standard prefix), remove allow_url_patterns and rely on
-  # block_url_patterns + the staging-gate name check instead.
-  allow_url_patterns:
-    - '/courses/(?:bachelor|master|graduate|doctor|diploma|certificate|associate|honours|juris)[^/]'
-
-  # ── block_url_patterns ────────────────────────────────────────────────────
-  # Explicit deny-list for known-bad JCU URL patterns.  Applied BEFORE
-  # allow_url_patterns so these are always dropped regardless of whitelisting.
-  block_url_patterns:
-    - '/linkassets/'           # category hubs: /courses/postgraduate/linkassets/engineering
-    - '/courses/study/'        # subject-area pages: /courses/study/engineering-and-technology
-    - '/courses/undergraduate$'  # level landing (trailing $: exact segment)
-    - '/courses/postgraduate$'   # level landing
-    - '/courses/research$'       # level landing
-
-  # Seed the browser crawler directly at the JCU course catalogue.
-  # /courses  — the main A–Z catalogue page; a single browser load returns
-  #   126+ individual course-detail links directly (no pagination needed).
-  #   All links match allow_url_patterns so they are accepted immediately.
-  #
-  # NOTE: /study/courses/find-a-course was removed — it returns 404 as of
-  #   2026-05-31 (JCU removed or relocated that page).  Using a 404 seed
-  #   wastes time-budget and can cause browser discovery to exit with 0 results.
-  seed_urls:
-    - 'https://www.jcu.edu.au/courses'
-
-  # 300 is more than enough — /courses already lists all ~126 course links
-  # in a single page load, so early_stop is just a safety ceiling.
-  browser_early_stop_courses: 300
-
-  # Keep Wayback as a safety net — no useful CDX coverage exists today
-  # but it may improve over time.
+  always_browser_discover: true
+  use_stealth_browser: true
   use_wayback: true
 
-extraction:
-  # Per-course browser rescue is disabled — JCU live pages are
-  # Cloudflare-walled for all datacenter IPs; the browser always returns
-  # 403 with a 60-second timeout.  Wayback HTML is the fetch path instead.
-  skip_browser_rescue: true
+  seed_urls:
+    - https://www.jcu.edu.au/courses
 
-  # Campus allowlist — any staged course whose location does not contain
-  # at least one of these strings is flagged as a data-quality failure.
-  # Source: https://www.jcu.edu.au/campuses-and-facilities
-  campus_allowlist:
-    - Townsville
-    - Cairns
-    - Brisbane
-    - Singapore
-    - Online
+  allow_url_patterns:
+    - '/courses/(?:bachelor|master|graduate|doctor|diploma|certificate|associate|honours|juris)[^/]*$'
+
+  block_url_patterns:
+    - '/linkassets/'
+    - '/courses/study/'
+    - '/courses/undergraduate$'
+    - '/courses/postgraduate$'
+    - '/courses/research$'
+    - '/news'
+    - '/events'
+    - '/staff/'
+    - '/about'
+    - '/contact'
+
+  browser_early_stop_courses: 160
+  bfs_page_budget: 0
+  max_candidates: 180
+
+extraction:
+  skip_browser_rescue: true
+  max_parallel_fetch: 2
 
   filters:
     domestic_only:
-      enabled: true
+      enabled: false
 
-  # ── English language requirements ─────────────────────────────────────────
-  #
-  # JCU course pages show "Band 2" / "Band 3" instead of direct IELTS scores.
-  # The band-to-score mapping is published at the admissions policy schedule
-  # linked from every course page.
-  #
-  # follow_links: when IELTS is still blank after main extraction, the scraper
-  #   follows any <a> whose text contains one of these phrases and re-runs the
-  #   English extractor on the linked page.
-  #
-  # band_mapping: if IELTS is still blank after follow_links (because the policy
-  #   page uses the same "Band N" label), the band label found in the course
-  #   HTML is resolved to concrete scores via this mapping.
-  #
-  # Source: https://www.jcu.edu.au/policy/academic-governance/student-experience/admissions-policy-schedule-ii
-  english:
-    follow_links:
-      - "minimum English language requirements"
-      - "English language requirements"
-      - "admissions policy schedule"
-    band_reference_url: "https://www.jcu.edu.au/policy/academic-governance/student-experience/admissions-policy-schedule-ii"
-    # All four test scores per band, sourced from JCU Admissions Policy
-    # Schedule II: https://www.jcu.edu.au/policy/academic-governance/
-    #   student-experience/admissions-policy-schedule-ii
-    # Using the full mapping here prevents the TOEFL/PTE extractors from
-    # picking up the wrong band's score when the Schedule II page lists
-    # all three bands in a table (extractors may latch on to the first row).
-    band_mapping:
-      "Band 1":
-        ielts_overall: 6.0
-        ielts_each: 6.0
-        pte_overall: 50
-        toefl_overall: 60
-      "Band 2":
-        ielts_overall: 6.5
-        ielts_each: 6.0
-        pte_overall: 58
-        toefl_overall: 79
-      "Band 3":
-        ielts_overall: 7.0
-        ielts_each: 7.0
-        pte_overall: 66
-        toefl_overall: 94
-
-  # ── Fee extraction ────────────────────────────────────────────────────────
-  #
-  # JCU pages show a Domestic tab by default.  International fees appear only
-  # after switching tabs or on a separate section.  The reject_keywords list
-  # discards any fee amount whose surrounding text contains domestic / CSP
-  # markers, ensuring only genuine international tuition fees are staged.
-  #
-  # prefer_international: when both a domestic and an international fee are
-  #   detected on the same page, always keep the international value.
-  # prefer_blended_over_on_campus: JCU courses are offered simultaneously
-  # online AND on-campus (the page shows "Online: Jan, May" and
-  # "Townsville: Jan, May" side by side).  When the study-mode rule extractor
-  # fires with low confidence (≤0.50) and a physical campus is also detected,
-  # set study_mode="Blended" rather than the default "On Campus".
-  prefer_blended_over_on_campus: true
+    online_only:
+      enabled: false
 
   fees:
+    default_currency: "AUD"
     prefer_international: true
+    prefer_annual_over_total: true
+
     reject_keywords:
       - "Commonwealth Supported"
       - "CSP"
@@ -155,14 +51,32 @@ extraction:
       - "HECS-HELP"
       - "Domestic students"
       - "Domestic fee"
-    # follow_links: when international_fee is blank after extraction and fee
-    # rejection (CSP amounts discarded), scan the course HTML for <a> tags
-    # whose text matches these phrases and fetch the linked fees page.
-    # JCU UG course pages show only CSP fees on the course page itself; the
-    # international fee is published on a separate "Fees and Scholarships"
-    # sub-page linked from within each course detail page.
+      - "estimated annual Commonwealth Supported Fee"
+
     follow_links:
       - "fees and scholarships"
       - "international student fees"
       - "fees for your course"
       - "view fees"
+
+    force_central_fee_stage: true
+
+  english:
+    central_page: https://www.jcu.edu.au/policy/academic-governance/student-experience/admissions-policy-schedule-ii
+
+    default_ielts: 6.5
+    default_pte: 58
+    default_toefl: 79
+
+  intake:
+    rolling_enrollment_label: "Rolling"
+
+  text_cleaning:
+    global_substring_blocklist:
+      - "Saved"
+      - "Apply"
+      - "Chat"
+
+  staging:
+    reject_if_missing:
+      - course_name
