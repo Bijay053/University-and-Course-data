@@ -2016,7 +2016,8 @@ async def auto_repair_filter_from_discovery(
     )
     await db.commit()
 
-    log.info(
+    import logging as _logging
+    _logging.getLogger(__name__).info(
         "auto_repair_filter(discovery): cleared %s for uni %s → saved admin_config",
         filter_cleared, uni_id,
     )
