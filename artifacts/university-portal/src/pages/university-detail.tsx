@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useRoute, Link } from "wouter";
+import { useRoute, Link, useLocation } from "wouter";
 import { useGetUniversity, getGetUniversityQueryKey, useListCourses, getListCoursesQueryKey } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -343,6 +343,7 @@ function CmpRow({ label, raw, bak }: { label: string; raw: unknown; bak: unknown
 
 export default function UniversityDetail() {
   const [, params] = useRoute("/universities/:id");
+  const [, navigate] = useLocation();
   const id = params?.id ? parseInt(params.id) : 0;
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -1897,7 +1898,7 @@ export default function UniversityDetail() {
               variant="outline"
               size="sm"
               className="h-7 px-2.5 border-blue-300 text-blue-700 hover:bg-blue-50 transition-colors"
-              onClick={() => window.location.href = `/universities/${id}/scrape-agent`}
+              onClick={() => navigate(`/universities/${id}/scrape-agent`)}
               title="Open Scrape Fix Agent — diagnose issues, edit rules, apply AI fixes without any code"
             >
               <Bot className="h-3.5 w-3.5 mr-1" />
@@ -1907,7 +1908,7 @@ export default function UniversityDetail() {
               variant="outline"
               size="sm"
               className="h-7 px-2.5 border-violet-300 text-violet-700 hover:bg-violet-50 transition-colors"
-              onClick={() => window.location.href = `/universities/${id}/recipe`}
+              onClick={() => navigate(`/universities/${id}/recipe`)}
               title="Advanced Recipe Editor — configure JSON API endpoints, field selectors, fee rules, and more"
             >
               <svg className="h-3.5 w-3.5 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18"/></svg>
