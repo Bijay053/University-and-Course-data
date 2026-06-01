@@ -2179,30 +2179,18 @@ export default function RecipeEditorPage() {
                 onChange={v => patchRecipe({ actions: v })}
               />
 
-              {recipe.actions.length > 0 && (
-                <>
-                  <Separator />
-                  <div className="space-y-2">
-                    <h3 className="text-sm font-semibold">Generated YAML Preview</h3>
-                    <pre className="text-xs bg-muted rounded-lg p-3 overflow-auto max-h-48 font-mono">
-{`extraction:\n  actions:\n${recipe.actions.map(a => {
-  if (a.action_type === "wait_for_text") return `    - wait_for:\n        text: "${a.value}"`;
-  if (a.action_type === "wait_for_selector") return `    - wait_for:\n        selector: "${a.value}"`;
-  const key = a.action_type === "click_text" ? "click_text"
-    : a.action_type === "click_css" ? "click_css"
-    : a.action_type === "expand_text" ? "expand_text"
-    : "scroll_to";
-  return `    - ${key}: "${a.value}"`;
-}).join("\n")}`}
-                    </pre>
-                    <p className="text-xs text-muted-foreground">
-                      Copy this into the university's YAML file under{" "}
-                      <code className="bg-muted px-1 rounded">scraper_config/unis/</code> to apply
-                      permanently, or save the recipe here for operator-level control.
-                    </p>
-                  </div>
-                </>
-              )}
+              <Separator />
+              <div className="space-y-2">
+                <h3 className="text-sm font-semibold">Generated YAML Preview</h3>
+                <p className="text-xs text-muted-foreground">
+                  Live snapshot of all non-default settings across every tab. Copy into{" "}
+                  <code className="bg-muted px-1 rounded">scraper_config/unis/&lt;slug&gt;.yaml</code>{" "}
+                  to bake these settings into the YAML file permanently.
+                </p>
+                <pre className="text-xs bg-muted rounded-lg p-3 overflow-auto max-h-72 font-mono whitespace-pre">
+                  {buildYamlPreview(recipe)}
+                </pre>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -2421,6 +2409,202 @@ export default function RecipeEditorPage() {
       </div>
     </div>
   );
+}
+
+// ── YAML preview generator ──────────────────────────────────────────────────
+
+function _yq(s: string) { return `"${String(s).replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`; }
+
+function buildYamlPreview(recipe: Recipe): string {
+  const lines: string[] = [];
+
+  // ── Discovery ─────────────────────────────────────────────────────────────
+  const discLines: string[] = [];
+  if (recipe.seed_urls.length > 0) {
+    discLines.push("  seed_urls:");
+    recipe.seed_urls.forEach(u => discLines.push(`    - ${_yq(u)}`));
+  }
+  if (recipe.block_url_patterns.length > 0) {
+    discLines.push("  block_url_patterns:");
+    recipe.block_url_patterns.forEach(p => discLines.push(`    - ${_yq(p)}`));
+  }
+  if (recipe.must_contain.length > 0) {
+    discLines.push("  allow_url_patterns:");
+    recipe.must_contain.forEach(p => discLines.push(`    - ${_yq(p)}`));
+  }
+  if (discLines.length > 0) {
+    lines.push("discovery:");
+    lines.push(...discLines);
+    lines.push("");
+  }
+
+  // ── Extraction ────────────────────────────────────────────────────────────
+  const extLines: string[] = [];
+
+  // Course name cleanup
+  if (
+    recipe.course_name_remove_after.length > 0 ||
+    recipe.course_name_remove_year_suffix ||
+    recipe.course_name_remove_patterns.length > 0
+  ) {
+    extLines.push("  course_name:");
+    if (recipe.course_name_remove_after.length > 0) {
+      extLines.push("    remove_after:");
+      recipe.course_name_remove_after.forEach(s => extLines.push(`      - ${_yq(s)}`));
+    }
+    if (recipe.course_name_remove_year_suffix) extLines.push("    remove_year_suffix: true");
+    if (recipe.course_name_remove_patterns.length > 0) {
+      extLines.push("    remove_patterns:");
+      recipe.course_name_remove_patterns.forEach(p => extLines.push(`      - ${_yq(p)}`));
+    }
+  }
+
+  // Fees
+  const hasFees =
+    recipe.fee_rules_undergraduate.length > 0 ||
+    recipe.fee_rules_postgraduate.length > 0 ||
+    recipe.fee_currency !== "AUD" ||
+    recipe.fee_year != null ||
+    recipe.fee_prefer_international ||
+    recipe.fee_reject_keywords.length > 0 ||
+    recipe.fee_follow_links.length > 0;
+  if (hasFees) {
+    extLines.push("  fees:");
+    if (recipe.fee_currency !== "AUD") extLines.push(`    default_currency: ${_yq(recipe.fee_currency)}`);
+    if (recipe.fee_year != null) extLines.push(`    fee_year: ${recipe.fee_year}`);
+    if (recipe.fee_prefer_international) extLines.push("    prefer_international: true");
+    if (recipe.fee_reject_keywords.length > 0) {
+      extLines.push("    reject_keywords:");
+      recipe.fee_reject_keywords.forEach(k => extLines.push(`      - ${_yq(k)}`));
+    }
+    if (recipe.fee_follow_links.length > 0) {
+      extLines.push("    follow_links:");
+      recipe.fee_follow_links.forEach(u => extLines.push(`      - ${_yq(u)}`));
+    }
+    if (recipe.fee_rules_undergraduate.length > 0) {
+      extLines.push("    rules_undergraduate:");
+      recipe.fee_rules_undergraduate.forEach(r => {
+        extLines.push(`      - amount: ${r.amount}`);
+        if (r.keywords.length > 0)
+          extLines.push(`        keywords: [${r.keywords.map(k => _yq(k)).join(", ")}]`);
+      });
+    }
+    if (recipe.fee_rules_postgraduate.length > 0) {
+      extLines.push("    rules_postgraduate:");
+      recipe.fee_rules_postgraduate.forEach(r => {
+        extLines.push(`      - amount: ${r.amount}`);
+        if (r.keywords.length > 0)
+          extLines.push(`        keywords: [${r.keywords.map(k => _yq(k)).join(", ")}]`);
+      });
+    }
+  }
+
+  // English / IELTS
+  const hasEnglish =
+    !!recipe.ielts?.overall_regex ||
+    !!recipe.ielts?.band_regex ||
+    !!recipe.ielts?.source_xpath ||
+    Object.keys(recipe.band_mapping).length > 0 ||
+    recipe.follow_links.length > 0;
+  if (hasEnglish) {
+    extLines.push("  english:");
+    if (recipe.ielts?.overall_regex) extLines.push(`    overall_regex: ${_yq(recipe.ielts.overall_regex)}`);
+    if (recipe.ielts?.band_regex) extLines.push(`    band_regex: ${_yq(recipe.ielts.band_regex)}`);
+    if (recipe.ielts?.source_xpath) extLines.push(`    source_xpath: ${_yq(recipe.ielts.source_xpath)}`);
+    if (recipe.follow_links.length > 0) {
+      extLines.push("    follow_links:");
+      recipe.follow_links.forEach(u => extLines.push(`      - ${_yq(u)}`));
+    }
+    if (Object.keys(recipe.band_mapping).length > 0) {
+      extLines.push("    band_mapping:");
+      Object.entries(recipe.band_mapping).forEach(([overall, spec]) => {
+        extLines.push(`      ${_yq(overall)}:`);
+        if (spec.ielts_overall) extLines.push(`        ielts_overall: ${spec.ielts_overall}`);
+        if (spec.ielts_each) extLines.push(`        ielts_each: ${spec.ielts_each}`);
+        if (spec.pte_overall) extLines.push(`        pte_overall: ${spec.pte_overall}`);
+        if (spec.toefl_overall) extLines.push(`        toefl_overall: ${spec.toefl_overall}`);
+      });
+    }
+  }
+
+  // Location rules
+  const hasLocation =
+    Object.keys(recipe.location_replace).length > 0 ||
+    recipe.location_allowed_values.length > 0 ||
+    recipe.location_reject_values.length > 0;
+  if (hasLocation) {
+    extLines.push("  location:");
+    if (Object.keys(recipe.location_replace).length > 0) {
+      extLines.push("    replace:");
+      Object.entries(recipe.location_replace).forEach(([k, v]) => {
+        extLines.push(`      ${_yq(k)}: ${_yq(v)}`);
+      });
+    }
+    if (recipe.location_allowed_values.length > 0) {
+      extLines.push("    allowed_values:");
+      recipe.location_allowed_values.forEach(v => extLines.push(`      - ${_yq(v)}`));
+    }
+    if (recipe.location_reject_values.length > 0) {
+      extLines.push("    reject_values:");
+      recipe.location_reject_values.forEach(v => extLines.push(`      - ${_yq(v)}`));
+    }
+  }
+
+  // Study mode
+  if (recipe.study_mode_from_location || recipe.study_mode_online_keywords.length > 0) {
+    extLines.push("  study_mode:");
+    if (recipe.study_mode_from_location) extLines.push("    from_location: true");
+    if (recipe.study_mode_online_keywords.length > 0) {
+      extLines.push("    online_keywords:");
+      recipe.study_mode_online_keywords.forEach(k => extLines.push(`      - ${_yq(k)}`));
+    }
+  }
+
+  // Browser actions
+  if (recipe.actions.length > 0) {
+    extLines.push("  actions:");
+    recipe.actions.forEach(a => {
+      if (a.action_type === "wait_for_text") {
+        extLines.push(`    - wait_for:`);
+        extLines.push(`        text: ${_yq(a.value)}`);
+      } else if (a.action_type === "wait_for_selector") {
+        extLines.push(`    - wait_for:`);
+        extLines.push(`        selector: ${_yq(a.value)}`);
+      } else {
+        const key = a.action_type === "click_text" ? "click_text"
+          : a.action_type === "click_css" ? "click_css"
+          : a.action_type === "expand_text" ? "expand_text"
+          : "scroll_to";
+        extLines.push(`    - ${key}: ${_yq(a.value)}`);
+      }
+    });
+  }
+
+  // Quality gates
+  if (
+    recipe.minimum_completeness !== 85 ||
+    recipe.required_fields.length > 0 ||
+    recipe.block_publish_if.length > 0
+  ) {
+    extLines.push("  quality:");
+    if (recipe.minimum_completeness !== 85)
+      extLines.push(`    minimum_completeness: ${recipe.minimum_completeness}`);
+    if (recipe.required_fields.length > 0) {
+      extLines.push("    required_fields:");
+      recipe.required_fields.forEach(f => extLines.push(`      - ${f}`));
+    }
+    if (recipe.block_publish_if.length > 0) {
+      extLines.push("    block_publish_if:");
+      recipe.block_publish_if.forEach(c => extLines.push(`      - ${c}`));
+    }
+  }
+
+  if (extLines.length > 0) {
+    lines.push("extraction:");
+    lines.push(...extLines);
+  }
+
+  return lines.length > 0 ? lines.join("\n") : "# No non-default settings configured yet.";
 }
 
 // ── Constant used in patchApi helper ──
