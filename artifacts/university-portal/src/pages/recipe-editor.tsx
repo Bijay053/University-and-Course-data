@@ -93,6 +93,7 @@ interface Recipe {
   fee_rules_postgraduate: FeeRule[];
   fee_reject_keywords: string[];
   fee_prefer_international: boolean;
+  fee_url_suffix: string;
   fee_follow_links: string[];
   campus?: {
     default_city: string;
@@ -105,6 +106,7 @@ interface Recipe {
   follow_links: string[];
   band_reference_url: string;
   band_mapping: Record<string, BandSpecUI>;
+  course_english_priority: boolean;
   actions: BrowserAction[];
   // Course name cleanup
   course_name_remove_after: string[];
@@ -151,6 +153,7 @@ const EMPTY_RECIPE: Recipe = {
   fee_rules_postgraduate: [],
   fee_reject_keywords: [],
   fee_prefer_international: false,
+  fee_url_suffix: "",
   fee_follow_links: [],
   minimum_completeness: 85,
   required_fields: [],
@@ -158,6 +161,7 @@ const EMPTY_RECIPE: Recipe = {
   follow_links: [],
   band_reference_url: "",
   band_mapping: {},
+  course_english_priority: false,
   actions: [],
   course_name_remove_after: [],
   course_name_remove_year_suffix: false,
@@ -2421,6 +2425,31 @@ export default function RecipeEditorPage() {
                   </div>
                 </div>
 
+                {/* ── Fee URL suffix ── */}
+                <div className="space-y-1.5">
+                  <Label>Course URL Suffix for Fee Fetch</Label>
+                  <Input
+                    value={recipe.fee_url_suffix}
+                    onChange={e => patchRecipe({ fee_url_suffix: e.target.value })}
+                    placeholder="e.g. ?international"
+                    className="font-mono text-sm"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Appended verbatim to every course URL before the scraper fetches it — use when
+                    international fees are only visible on a specific URL variant (e.g.{" "}
+                    <code className="font-mono bg-muted px-0.5 rounded">?international</code> on
+                    JCU). The suffix is added only if not already present. Leave blank if not needed.
+                  </p>
+                  {recipe.fee_url_suffix && (
+                    <div className="rounded-md bg-green-50 border border-green-200 p-2.5 text-xs text-green-700">
+                      Scraper will fetch each course page as{" "}
+                      <code className="font-mono bg-green-100 px-0.5 rounded">
+                        /courses/&lt;slug&gt;{recipe.fee_url_suffix}
+                      </code>
+                    </div>
+                  )}
+                </div>
+
                 <StringListEditor
                   label="Reject Domestic Fee Keywords"
                   values={recipe.fee_reject_keywords}
@@ -2464,6 +2493,38 @@ export default function RecipeEditorPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
+              {/* ── Course-page English priority ── */}
+              <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
+                <div className="flex items-start gap-3">
+                  <Switch
+                    checked={recipe.course_english_priority}
+                    onCheckedChange={v => patchRecipe({ course_english_priority: v })}
+                    className="mt-0.5"
+                  />
+                  <div>
+                    <Label className="font-semibold">Course Page English Priority</Label>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      When <strong>ON</strong>: IELTS/PTE/TOEFL extracted from the individual course
+                      page are never overwritten by the university-wide central page cache — the
+                      central page is used only as a true last-resort fallback for blank fields.
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      When <strong>OFF</strong> (default): the central page can override low-confidence
+                      per-course values (AI fallback, Gemini). Enable for universities like JCU where
+                      each course has a distinct IELTS band that differs from the institution-wide value.
+                    </p>
+                  </div>
+                </div>
+                {recipe.course_english_priority && (
+                  <div className="rounded-md bg-blue-50 border border-blue-200 p-2 text-xs text-blue-700">
+                    Central page English (e.g. IELTS 5.5) will only fill fields that are <em>completely blank</em> after
+                    course-page extraction. Per-course values are protected.
+                  </div>
+                )}
+              </div>
+
+              <Separator />
+
               <div className="space-y-4">
                 <h3 className="text-sm font-semibold">IELTS / English Requirements</h3>
                 <div className="grid grid-cols-2 gap-4">
@@ -3104,6 +3165,7 @@ function buildYamlPreview(recipe: Recipe): string {
     recipe.fee_currency !== "AUD" ||
     recipe.fee_year != null ||
     recipe.fee_prefer_international ||
+    recipe.fee_url_suffix.trim() !== "" ||
     recipe.fee_reject_keywords.length > 0 ||
     recipe.fee_follow_links.length > 0;
   if (hasFees) {
@@ -3111,6 +3173,7 @@ function buildYamlPreview(recipe: Recipe): string {
     if (recipe.fee_currency !== "AUD") extLines.push(`    default_currency: ${_yq(recipe.fee_currency)}`);
     if (recipe.fee_year != null) extLines.push(`    fee_year: ${recipe.fee_year}`);
     if (recipe.fee_prefer_international) extLines.push("    prefer_international: true");
+    if (recipe.fee_url_suffix.trim()) extLines.push(`    fee_url_suffix: ${_yq(recipe.fee_url_suffix.trim())}`);
     if (recipe.fee_reject_keywords.length > 0) {
       extLines.push("    reject_keywords:");
       recipe.fee_reject_keywords.forEach(k => extLines.push(`      - ${_yq(k)}`));
@@ -3143,9 +3206,11 @@ function buildYamlPreview(recipe: Recipe): string {
     !!recipe.ielts?.band_regex ||
     !!recipe.ielts?.source_xpath ||
     Object.keys(recipe.band_mapping).length > 0 ||
-    recipe.follow_links.length > 0;
+    recipe.follow_links.length > 0 ||
+    recipe.course_english_priority;
   if (hasEnglish) {
     extLines.push("  english:");
+    if (recipe.course_english_priority) extLines.push("    course_english_priority: true");
     if (recipe.ielts?.overall_regex) extLines.push(`    overall_regex: ${_yq(recipe.ielts.overall_regex)}`);
     if (recipe.ielts?.band_regex) extLines.push(`    band_regex: ${_yq(recipe.ielts.band_regex)}`);
     if (recipe.ielts?.source_xpath) extLines.push(`    source_xpath: ${_yq(recipe.ielts.source_xpath)}`);

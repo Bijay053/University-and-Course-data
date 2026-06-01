@@ -1219,6 +1219,18 @@ async def extract_course(
                 )
                 _parsed_url = urlparse(url)  # re-parse for any later rewrite
 
+    # ── YAML-driven fee_url_suffix ────────────────────────────────────────
+    # Some universities gate the international fee view behind a valueless
+    # query flag (e.g. jcu.edu.au/courses/X?international) that cannot be
+    # expressed as a key=value pair in url_rewrites.  fee_url_suffix is
+    # appended as-is only when the URL does not already contain it.
+    try:
+        _fee_suffix = (getattr(_uc.extraction.fees, "fee_url_suffix", None) or "").strip()
+    except Exception:  # noqa: BLE001
+        _fee_suffix = ""
+    if _fee_suffix and _fee_suffix not in url:
+        url = url + _fee_suffix
+
     # JCU note: The "Domestic / International" Fast Facts toggle at jcu.edu.au
     # is JS-driven — appending ?international=true to the static HTTP request
     # causes Cloudflare to return a bot-challenge page (no course HTML), so a
@@ -5187,6 +5199,12 @@ async def extract_course(
             _CENTRAL_ENGLISH_OVERRIDABLE: frozenset[str] = frozenset(
                 {"", "ai_fallback", "gemini_primary"}
             )
+            try:
+                _cfg_course_english_priority: bool = bool(
+                    getattr(_uc.extraction.english, "course_english_priority", False)
+                )
+            except Exception:  # noqa: BLE001
+                _cfg_course_english_priority = False
 
             # ── Week 2 P5: SKIP_CENTRAL_ENGLISH_PROPAGATION ──────────────
             # Operators can disable propagation entirely while keeping the
@@ -5220,6 +5238,8 @@ async def extract_course(
                     if _curr not in (None, "", 0):
                         # Allow override when existing value came from a
                         # low-authority source (AI guess, Gemini primary).
+                        if _cfg_course_english_priority:
+                            continue  # course page English always wins
                         _existing_method = next(
                             (
                                 ev.get("method", "")
@@ -5276,6 +5296,8 @@ async def extract_course(
                             continue
                         _curr = payload.get(_k)
                         if _curr not in (None, "", 0):
+                            if _cfg_course_english_priority:
+                                continue  # course page English always wins
                             _existing_method = next(
                                 (
                                     ev.get("method", "")

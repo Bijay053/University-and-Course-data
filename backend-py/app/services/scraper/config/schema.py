@@ -408,6 +408,17 @@ class FeesConfig(BaseModel):
             "``\"Full Course\"`` for whole-of-programme schedules."
         ),
     )
+    fee_url_suffix: Optional[str] = Field(
+        default=None,
+        description=(
+            "Raw string appended to each course URL before the static HTTP "
+            "fetch.  Use when the international-student fee view is gated "
+            "behind a query flag that cannot be expressed as a key=value pair "
+            "(e.g. '?international' on JCU — a valueless query flag that renders "
+            "the International Fast Facts panel).  The suffix is appended only "
+            "if the URL does not already contain it.  Empty / None = no change."
+        ),
+    )
     prefer_annual_over_total: bool = Field(
         default=False,
         description=(
@@ -584,6 +595,20 @@ class EnglishConfig(BaseModel):
     requirements_pdf_url: Optional[str] = Field(
         default=None,
         description="URL of the English requirements PDF.",
+    )
+    course_english_priority: bool = Field(
+        default=False,
+        description=(
+            "When True, the central-page English values are used ONLY as a "
+            "fallback — they never overwrite a value already extracted from the "
+            "individual course page, regardless of the extraction method. "
+            "Default (False) allows the central page to override low-confidence "
+            "per-course values (ai_fallback / gemini_primary). "
+            "Enable for universities (e.g. JCU) where individual course pages "
+            "carry per-course IELTS requirements that differ from the "
+            "institution-wide default — the central cached value (e.g. 5.5) "
+            "would otherwise silently overwrite per-course values (e.g. 7.0)."
+        ),
     )
     trust_vision_ocr: bool = Field(
         default=True,

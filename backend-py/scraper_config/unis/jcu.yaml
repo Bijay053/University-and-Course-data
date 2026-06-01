@@ -59,6 +59,12 @@ extraction:
     default_currency: "AUD"
     prefer_international: true
     prefer_annual_over_total: true
+    # JCU international fees are only on the ?international variant of each
+    # course page (e.g. /courses/bachelor-of-science?international). The
+    # valueless query flag cannot be expressed in url_rewrites.append_query
+    # so we use fee_url_suffix instead.  Cloudflare blocks ?international=true
+    # (static HTTP) but ?international (no value) renders the JS-free tab.
+    fee_url_suffix: "?international"
 
     reject_keywords:
       - "Commonwealth Supported"
@@ -82,7 +88,12 @@ extraction:
 
   english:
     central_page: https://www.jcu.edu.au/policy/academic-governance/student-experience/admissions-policy-schedule-ii
-
+    # Individual JCU course pages carry per-course IELTS bands (e.g. 6.0, 6.5,
+    # 7.0) that differ from the institution-wide default (5.5 on the central
+    # policy page). Setting course_english_priority prevents the cached central
+    # value from silently overwriting per-course values already extracted from
+    # the ?international page.
+    course_english_priority: true
     default_ielts: 6.5
     default_pte: 58
     default_toefl: 79
