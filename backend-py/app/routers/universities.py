@@ -1552,6 +1552,8 @@ async def put_recipe(
         fee_patch["follow_links"] = body["fee_follow_links"]
     if body.get("actions"):
         extraction_patch["actions"] = body["actions"]
+    if body.get("url_rewrites"):
+        extraction_patch["url_rewrites"] = body["url_rewrites"]
 
     if english_patch:
         extraction_patch["english"] = english_patch

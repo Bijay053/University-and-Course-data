@@ -123,6 +123,7 @@ interface Recipe {
   ignore_urls_matching: string[];
   prefer_urls_matching: string[];
   fee_reject_years: number[];
+  url_rewrites: { host: string; path_contains?: string; append_query: string }[];
 }
 
 const EMPTY_RECIPE: Recipe = {
@@ -167,6 +168,7 @@ const EMPTY_RECIPE: Recipe = {
   ignore_urls_matching: [],
   prefer_urls_matching: [],
   fee_reject_years: [],
+  url_rewrites: [],
 };
 
 const STANDARD_FIELDS = [
@@ -1867,6 +1869,94 @@ export default function RecipeEditorPage() {
                 placeholder="e.g. /apprenticeship"
                 helpText="Regex patterns — any URL matching one of these is dropped. E.g. /news, /events, /cpd."
               />
+              <Separator />
+              {/* ── URL Rewrites ──────────────────────────────────────────── */}
+              <div>
+                <Label className="font-semibold text-sm">URL Rewrites — Append Query Parameters</Label>
+                <p className="text-xs text-muted-foreground mt-0.5 mb-3">
+                  Append query parameters to every course URL before the scraper fetches it. Use this to switch a
+                  university site into its international-student view without editing code — e.g. adding{" "}
+                  <code className="font-mono bg-muted px-1 rounded">international=true</code> for JCU shows the
+                  International tab (fees, IELTS, intakes) instead of the domestic default.
+                  Each rule fires when the URL hostname matches <em>and</em> (if set) the path contains the given substring.
+                </p>
+                <div className="space-y-2">
+                  {(recipe.url_rewrites ?? []).map((rw, i) => (
+                    <div key={i} className="flex gap-2 items-end p-3 rounded-md border bg-muted/40">
+                      <div className="grid grid-cols-3 gap-3 flex-1">
+                        <div>
+                          <Label className="text-xs mb-1 block">Hostname</Label>
+                          <Input
+                            value={rw.host}
+                            onChange={e => {
+                              const next = [...(recipe.url_rewrites ?? [])];
+                              next[i] = { ...next[i], host: e.target.value };
+                              patchRecipe({ url_rewrites: next });
+                            }}
+                            placeholder="www.jcu.edu.au"
+                            className="text-sm h-8"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs mb-1 block">Path Contains <span className="text-muted-foreground">(optional)</span></Label>
+                          <Input
+                            value={rw.path_contains ?? ""}
+                            onChange={e => {
+                              const next = [...(recipe.url_rewrites ?? [])];
+                              next[i] = { ...next[i], path_contains: e.target.value || undefined };
+                              patchRecipe({ url_rewrites: next });
+                            }}
+                            placeholder="/courses/"
+                            className="text-sm h-8"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs mb-1 block">Append Query</Label>
+                          <Input
+                            value={rw.append_query}
+                            onChange={e => {
+                              const next = [...(recipe.url_rewrites ?? [])];
+                              next[i] = { ...next[i], append_query: e.target.value };
+                              patchRecipe({ url_rewrites: next });
+                            }}
+                            placeholder="international=true"
+                            className="text-sm h-8 font-mono"
+                          />
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-destructive hover:text-destructive shrink-0"
+                        onClick={() => {
+                          const next = (recipe.url_rewrites ?? []).filter((_, j) => j !== i);
+                          patchRecipe({ url_rewrites: next });
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-2"
+                  onClick={() => patchRecipe({ url_rewrites: [...(recipe.url_rewrites ?? []), { host: "", append_query: "" }] })}
+                >
+                  <Plus className="h-3 w-3 mr-1" /> Add URL Rewrite Rule
+                </Button>
+                {(recipe.url_rewrites ?? []).length > 0 && (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    <strong>Examples:</strong>{" "}
+                    <code className="font-mono bg-muted px-1 rounded">international=true</code> (JCU, UNE),{" "}
+                    <code className="font-mono bg-muted px-1 rounded">type=International</code> (ACU),{" "}
+                    <code className="font-mono bg-muted px-1 rounded">audience=INTERNATIONAL</code> (CQU),{" "}
+                    <code className="font-mono bg-muted px-1 rounded">studentType=international</code> (UniSQ).
+                    Keys already present in the URL are never overwritten.
+                  </p>
+                )}
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
