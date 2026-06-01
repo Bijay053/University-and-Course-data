@@ -11,7 +11,7 @@ const navigation: { name: string; href: string; icon: typeof LayoutDashboard; pe
   { name: "Universities", href: "/universities", icon: Building2, permission: "universities.view" },
   { name: "Cert Dashboard", href: "/cert-dashboard", icon: ShieldCheck, permission: "universities.view" },
   { name: "Scraping", href: "/scraping", icon: HardDrive, permission: "scraping.view" },
-  { name: "Bulk Upload", href: "/bulk", icon: UploadCloud, permission: "bulk.view" },
+  { name: "Bulk Upload & Repair", href: "/bulk", icon: UploadCloud, permission: "bulk.view" },
   { name: "Data Backup", href: "/backup", icon: Shield, permission: "backup.view" },
   { name: "Settings", href: "/settings/academic-levels", icon: Settings, permission: "settings.view" },
   { name: "Performance", href: "/performance", icon: BarChart2, permission: "scraping.view" },
