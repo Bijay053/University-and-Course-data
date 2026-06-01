@@ -446,7 +446,7 @@ export default function Bulk() {
 
   // ─────────────────────────────────────────────────────────────────────────
   return (
-    <div className="space-y-5 max-w-4xl">
+    <div className={`space-y-5 ${activeTab !== "repair" ? "max-w-4xl" : ""}`}>
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Bulk Operations</h1>
         <p className="text-muted-foreground text-sm">Scrape all universities sequentially, import course data from Excel, or repair quality issues in bulk.</p>
