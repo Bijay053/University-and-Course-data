@@ -29,11 +29,13 @@ discovery:
   max_candidates: 180
 
 extraction:
-  # skip_browser_rescue left false (default) so the per-course browser rescue
-  # runs for courses that still show no international_fee after the static fetch.
-  # JCU's ?international URL rewrite makes most courses resolve in static HTML,
-  # but research-degree courses redirect to a PDF — the browser can follow that.
-  skip_browser_rescue: false
+  # JCU's "International" tab is JS-driven — appending ?international=true
+  # to a static HTTP request triggers Cloudflare bot detection and returns a
+  # challenge page (no course content), so static URL rewrites cannot be used.
+  # skip_browser_rescue is true to avoid cascading 101 browser sessions; the
+  # browser actions below are available for future targeted use (e.g. repair
+  # passes or manual single-course re-scrapes that allow browser mode).
+  skip_browser_rescue: true
   max_parallel_fetch: 8
 
   # Browser actions: click the "International" tab on the Fast Facts panel.
