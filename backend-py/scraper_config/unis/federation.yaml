@@ -170,8 +170,58 @@ extraction:
     source_priority:
       - section: "English language requirements"
       - section: "Academic entry requirements"   # fallback only
-    overall_pattern: '(?i)overall\s+ielts\s+band\s+score\s+of\s+(?P<overall>\d+(?:\.\d+)?)'
-    min_band_pattern: '(?i)no\s+(?:individual\s+)?band\s+(?:score\s+)?(?:of\s+)?less\s+(?:than\s+)?(?P<min_band>\d+(?:\.\d+)?)'
+    # ---- Overall (broadened, Fix 9) — Federation phrases it 3+ ways --------
+    # "overall IELTS band score of 6.5" / "overall score of 7.0" /
+    # "Overall academic IELTS of 6.5 overall". Loose wording is safe because
+    # it's applied inside the scoped English section.
+    overall_pattern: '(?i)overall\s+(?:academic\s+)?(?:ielts\s+)?(?:band\s+)?(?:score\s+)?(?:of\s+)?(?P<overall>\d(?:\.\d)?)'
+
+    # ---- Per-skill bands (Fix 9) -------------------------------------------
+    # CORRECTION to Fix 8: Federation DOES publish per-skill bands, in the
+    # "English language requirements" block under Entry requirements. Three
+    # real shapes (skill->column: listening=L, reading=R, writing=W, speaking=S):
+    #
+    #  (A) value-then-skill-LIST — one number covers several named skills:
+    #      "...minimum score of 7 in listening, reading and speaking and a
+    #       minimum score of 6.5 in writing..."   -> L7 R7 S7 W6.5
+    #      Capture <val> + <skills>; the extractor SPLITS <skills> on
+    #      comma/"and"/"&" and assigns <val> to each named skill.
+    band_group_pattern: '(?i)(?:minimum\s+)?(?:score|band)\s+of\s+(?P<val>\d(?:\.\d)?)\s+in\s+(?P<skills>(?:listening|reading|writing|speaking)(?:\s*(?:,|and|&)\s*(?:listening|reading|writing|speaking))*)'
+    #
+    #  (B) skill-then-value — each skill carries its own number:
+    #      "IELTS score: Speaking 7.5, Listening 7.5, Reading 6.5, and Writing 6.5"
+    #      -> S7.5 L7.5 R6.5 W6.5. Apply per skill; collect all matches.
+    skill_value_pattern: '(?i)\b(?P<skill>listening|reading|writing|speaking)\b\s*[:=]?\s*(?P<val>\d(?:\.\d)?)'
+    #
+    #  (C) floor only — no per-skill breakdown:
+    #      "overall 6.5 with no band less than 6.0"  -> L=R=W=S=6.0
+    min_band_pattern: '(?i)no\s+(?:individual\s+)?band\s+(?:score\s+)?(?:of\s+)?less\s+(?:than\s+)?(?P<min_band>\d(?:\.\d)?)'
+
+    # ---- How L/R/W/S are filled (priority, highest first) ------------------
+    #   1. explicit per-skill value (band_group_pattern OR skill_value_pattern)
+    #   2. min_band floor — fills only the skills NOT set in step 1
+    #   3. leave blank — never substitute `overall` for a band (overall != band)
+    band_fill_priority: [explicit_skill, min_band]
+    #
+    # Merge routine the extractor must run (per course, in the English section):
+    #   bands = {L: None, R: None, W: None, S: None}
+    #   for m in band_group_pattern matches:          # shape (A)
+    #       for s in split(m.skills, /\s*(?:,|and|&)\s*/): bands[col(s)] = m.val
+    #   for m in skill_value_pattern matches:          # shape (B)
+    #       bands[col(m.skill)] = m.val
+    #   if min_band is not None:                        # shape (C) gap-fill
+    #       for k in bands where bands[k] is None: bands[k] = min_band
+    #   # col(): listening->L, reading->R, writing->W, speaking->S
+    #
+    # NEEDS EXTRACTOR SUPPORT: shape (A) expands one value across a split skill
+    # list, and every shape maps skill words -> L/R/W/S columns. If the English
+    # extractor is strictly one-regex-per-field today it can't do this merge —
+    # the regexes above are correct, the split/merge routine is the missing
+    # piece (small, but it is code, not YAML).
+    #
+    # STILL TRUE: the English block is JS-rendered. On pages where its text
+    # never reaches static/AI extraction, every pattern here has nothing to
+    # match — rendered-DOM extraction remains the root fix.
 
   text_cleaning:
     location:
@@ -185,8 +235,23 @@ extraction:
         # "Open Universities Australia" (a virtual partner, not a campus)
         - '(?:^|,)\s*open\s+universities\s+australia\s*(?=,|$)'
         # Trailing parentheticals like "Melbourne (Southbank)" → keep the
-        # city; only strip explicit (Online) / (Virtual) markers.
-        - '\s*\(\s*(?:online|virtual|distance|external)\s*\)'
+        # city; strip only study-MODE markers, not real campus sub-names.
+        # Covers (Online)/(Virtual)/(Distance)/(External) AND the study-load /
+        # delivery markers Federation appends to campus names:
+        # (flexible), (blended), (on campus), (in person). Added 2026-06-01.
+        - '\s*\(\s*(?:online|virtual|distance|external|flexible|blended|on[\s-]?campus|in[\s-]?person)\s*\)'
+      # AFTER stripping mode markers, identical campus names collapse into
+      # duplicates — e.g. "Gippsland (flexible), Gippsland" -> "Gippsland,
+      # Gippsland", and "Berwick (flexible), Berwick" -> "Berwick, Berwick".
+      # De-duplicate (case-insensitive, order-preserving) so each campus
+      # appears once. So the example
+      #   "Ballarat (flexible), Berwick, Gippsland (flexible), Gippsland, Mt Helen"
+      # becomes
+      #   "Ballarat, Berwick, Gippsland, Mt Helen".
+      # NOTE: confirm the location sanitiser actually de-duplicates; if it only
+      # applies strip_patterns, this needs a dedupe step in code — otherwise
+      # you'll see the doubled names above.
+      deduplicate: true
 
   filters:
     domestic_only:

@@ -840,6 +840,8 @@ export default function RecipeEditorPage() {
           method: recipe.api.method,
           fields: recipe.api.fields,
           headers: recipe.api.headers,
+          query_params: recipe.api.query_params,
+          pagination: recipe.api.pagination,
         };
       }
       const resp = await fetch(`/api/universities/${id}/recipe/test`, {

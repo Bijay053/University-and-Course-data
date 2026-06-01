@@ -1569,50 +1569,6 @@ async def put_agent_config(
     return {"ok": True, "university_id": uni_id, "admin_config": body}
 
 
-@router.put("/universities/{uni_id}/recipe")
-async def put_recipe_config(
-    uni_id: int,
-    body: dict,
-    db: Annotated[AsyncSession, Depends(get_db)],
-    _: Annotated[dict, Depends(get_current_user)],
-) -> dict:
-    """Save the operator Data Cleaning Recipe for a university.
-
-    The recipe is a set of no-code rules applied to every extracted course
-    payload BEFORE it is staged — covering fee term overrides, IELTS component
-    mapping, course name cleanup, location filtering, and study mode derivation.
-
-    Stored at ``scrape_config.recipe`` (JSONB) alongside ``admin_config``.
-    Applied by ``recipe_rules.apply_recipe_rules()`` in the orchestrator.
-
-    Example body::
-
-        {
-          "fee_source_urls": ["https://uni.edu.au/fees/international"],
-          "fee_term": "Annual",
-          "fee_prevent_full_course_rollup": true,
-          "ielts_component_mapping": {"6.0": 5.5, "6.5": 6.0, "7.0": 6.5},
-          "course_name_remove_after": ["|", " - Southern Cross University"],
-          "location_allowed_values": ["Gold Coast", "Lismore", "Online"],
-          "location_reject_values": ["How to Apply", "Teaching period"]
-        }
-    """
-    u: University | None = await db.get(University, uni_id)
-    if not u:
-        raise HTTPException(status_code=404, detail="University not found")
-
-    sc: dict = dict(u.scrape_config or {})
-    sc["recipe"] = body
-
-    await db.execute(
-        text("UPDATE universities SET scrape_config = CAST(:cfg AS jsonb) WHERE id = :id"),
-        {"cfg": json.dumps(sc), "id": uni_id},
-    )
-    await db.commit()
-
-    return {"ok": True, "university_id": uni_id, "recipe": body}
-
-
 @router.get("/universities/{uni_id}/recipe")
 async def get_recipe(
     uni_id: int,
