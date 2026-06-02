@@ -807,6 +807,14 @@ def probe_and_configure(  # noqa: ANN001
                         )
                 except Exception as _pex:
                     log.debug("[PROBE] pattern lookup non-fatal: %s", _pex)
+                    # lookup_patterns runs a DB query via the same session.
+                    # If it raises (e.g. missing table), the transaction is
+                    # left in a failed state. Roll back so the UPDATE below
+                    # does not crash with InFailedSQLTransactionError.
+                    try:
+                        await db.rollback()
+                    except Exception:
+                        pass
 
             # ── Stage 3: Generate the config ───────────────────────────────────
             try:
