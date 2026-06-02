@@ -93,6 +93,11 @@ extraction:
     prefer_year_one_over_total: true
     prefer_international: true
     max_annual_fee: 90000
+    # UC uses a standardised per-point rate: all programmes at the same
+    # degree level pay the same fee.  A bucket (degree-level-only) match
+    # from the central fee page IS the correct fee, so allow it with a
+    # scrape warning rather than leaving the field blank.
+    allow_bucket_match: true
 
     reject_keywords:
       - Domestic students

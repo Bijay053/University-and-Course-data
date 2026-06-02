@@ -5124,25 +5124,74 @@ async def extract_course(
                 if matched and _fee_confidence != "none":
                     _prog = matched.get("program_pattern", "?")
                     if _fee_confidence == "bucket":
-                        # Bucket fallback: degree-level match only — too imprecise
-                        # to apply silently.  Log a scrape warning and leave fee blank.
-                        _bucket_warn = (
-                            f"[FEE skip] course={_course_name_for_fee!r} — "
-                            f"only bucket match available (row={_prog!r}, "
-                            f"fee={matched.get('international_fee')}); "
-                            f"fee left blank to avoid wrong data"
-                        )
-                        payload.setdefault("scrape_warnings", [])
-                        payload["scrape_warnings"].append(_bucket_warn)
-                        if emit:
-                            await emit(
-                                "status",
-                                _bucket_warn,
-                                phase="fallback",
-                                kind="central_fee_bucket_skip",
-                                url=url,
-                                matched_program=_prog,
+                        # Check per-uni YAML opt-in: allow_bucket_match
+                        _allow_bucket = False
+                        try:
+                            _bucket_cfg = get_uni_config()
+                            if _bucket_cfg is not None:
+                                _allow_bucket = bool(
+                                    _bucket_cfg.extraction.fees.allow_bucket_match
+                                )
+                        except Exception:  # noqa: BLE001
+                            pass
+                        if _allow_bucket:
+                            # Bucket match applied — set fee with low confidence
+                            # and a scrape warning so reviewers know it's imprecise.
+                            _bv = matched.get("international_fee")
+                            if _bv not in (None, "", 0):
+                                payload["international_fee"] = _bv
+                                for _bk, _bsk in (
+                                    ("international_fee", "international_fee"),
+                                    ("currency", "currency"),
+                                    ("fee_term", "per"),
+                                ):
+                                    _bval = matched.get(_bsk)
+                                    if _bval not in (None, "", 0) and payload.get(_bk) in (None, "", 0):
+                                        payload[_bk] = _bval
+                                evidence.append({
+                                    "field_key": "international_fee",
+                                    "value": _bv,
+                                    "confidence": 0.30,
+                                    "method": "central_page:fees:bucket",
+                                    "source_url": _central_fee_url or url,
+                                    "snippet": f"central_page bucket fee (degree-level only): {_prog}",
+                                })
+                                _bucket_applied = (
+                                    f"[FEE bucket] course={_course_name_for_fee!r} — "
+                                    f"bucket fee applied (row={_prog!r}, fee={_bv}); "
+                                    f"allow_bucket_match=true in YAML"
+                                )
+                                payload.setdefault("scrape_warnings", [])
+                                payload["scrape_warnings"].append(_bucket_applied)
+                                if emit:
+                                    await emit(
+                                        "status",
+                                        _bucket_applied,
+                                        phase="fallback",
+                                        kind="central_fee_bucket_applied",
+                                        url=url,
+                                        matched_program=_prog,
+                                    )
+                        else:
+                            # Bucket fallback: degree-level match only — too imprecise
+                            # to apply silently.  Log a scrape warning and leave fee blank.
+                            _bucket_warn = (
+                                f"[FEE skip] course={_course_name_for_fee!r} — "
+                                f"only bucket match available (row={_prog!r}, "
+                                f"fee={matched.get('international_fee')}); "
+                                f"fee left blank to avoid wrong data"
                             )
+                            payload.setdefault("scrape_warnings", [])
+                            payload["scrape_warnings"].append(_bucket_warn)
+                            if emit:
+                                await emit(
+                                    "status",
+                                    _bucket_warn,
+                                    phase="fallback",
+                                    kind="central_fee_bucket_skip",
+                                    url=url,
+                                    matched_program=_prog,
+                                )
                     else:
                         # Confident name match (exact / high / medium) — apply fee.
                         _confidence_numeric = (

@@ -854,6 +854,19 @@ class FeesConfig(BaseModel):
             "Default False preserves the existing 'highest confidence wins' logic."
         ),
     )
+    allow_bucket_match: bool = Field(
+        default=False,
+        description=(
+            "When True, a degree-level-only (bucket) match from the central fee "
+            "page is applied to the course payload when no per-programme name "
+            "match is available.  The fee is set with confidence=0.30 and a "
+            "scrape warning is appended so reviewers know it is an imprecise "
+            "estimate.  Default False (skip bucket matches to avoid wrong data). "
+            "Enable for universities that use a standardised per-credit-point "
+            "rate for all programmes at the same level — e.g. University of "
+            "Canterbury (NZ) — where the bucket fee IS the correct fee."
+        ),
+    )
     follow_links: list[str] = Field(
         default_factory=list,
         description=(

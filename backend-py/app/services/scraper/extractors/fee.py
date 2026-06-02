@@ -440,6 +440,16 @@ def _extract_strong_label_value(
         value_text = value_text.lstrip(":-– ").strip()
         if not value_text:
             continue
+        # Clip at "See also" cross-reference sections that appear on UC-style
+        # pages immediately after the fee amount.  Without this clip the value
+        # text can include navigation phrases like "See also Domestic students"
+        # or "See also Domestic tuition fees" which then contaminate the
+        # evidence snippet and fire a false FEE_REJECT later in the pipeline.
+        _see_also_m = re.search(r"\bsee\s+also\b", value_text, re.IGNORECASE)
+        if _see_also_m:
+            value_text = value_text[: _see_also_m.start()].strip()
+        if not value_text:
+            continue
         # Salary-context guard: the label says "international tuition"
         # but if the value cell explicitly mentions salary/wages/income
         # we're looking at marketing copy ("graduate salary outcomes
