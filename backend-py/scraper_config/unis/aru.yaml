@@ -66,6 +66,20 @@ discovery:
     - 'levelofstudy=college'
     # Block non-degree study mode filters
     - 'modeofstudy=(?:Short\+course|English\+course|Workshop|Degree\+apprenticeship)'
+    # ── Research / MPhil / PhD pages: domestic fees only, no intl fee ────
+    # These live under /study/postgraduate/*-research and cause 39 false
+    # "no_international_fee" staging rejections.  Block them before extraction
+    # so they never burn a browser slot.  Pattern matches:
+    #   /study/postgraduate/biology-research
+    #   /study/postgraduate/art-and-design-research
+    #   /study/postgraduate/computer-science-research  etc.
+    - '/study/postgraduate/[^/]+-research$'
+    # MPhil/PhD pages grouped under /study/postgraduate/*-mphil-phd
+    - 'mphil'
+    # Professional doctorate pages (DProf, EdD, DBA, MD) — domestic fees only
+    - '/study/postgraduate/professional-doctorate'
+    - '/study/postgraduate/doctor-of'
+    - '/study/postgraduate/doctorate'
     # Block non-course sections
     - '/study/continuing-professional-development'
     - '/study/professional-and-short-courses'
@@ -101,12 +115,15 @@ extraction:
   skip_browser_rescue: false
   skip_per_course_browser: false
 
-  browser_wait_strategy: domcontentloaded
-  # ── KEY SPEED FIX: 3000 → 800 ─────────────────────────────────────────
-  # ARU is fully server-rendered — DCL fires in <200ms. The 3000ms settle
-  # was adding 3s to every browser session (≈170 sessions per run = +8 min).
-  # 800ms is ample for static content to stabilise.
-  browser_dcl_settle_ms: 800
+  # ARU has SPLIT rendering: MBA/BEng pages are server-rendered (fees in
+  # static HTML, text_len=9000+), but MSc/research pages are React SPAs
+  # (static HTML is a shell, text_len=0, fees loaded via API call after DCL).
+  # domcontentloaded + 800ms fired before the JS API calls completed →
+  # "Fee section detected but fee is blank" on all SPA-course pages.
+  # networkidle waits until no pending requests for 500ms, capturing the
+  # API-loaded fee values.  Safety settle of 1500ms after networkidle.
+  browser_wait_strategy: networkidle
+  browser_dcl_settle_ms: 1500
 
   fees:
     default_currency: GBP
