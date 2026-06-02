@@ -3,33 +3,38 @@
 # Country: Australia  |  Currency: AUD
 #
 # Discovery strategy:
-#   Primary: sitemap.xml (finds 200+ /courses/ pages reliably)
-#   Supplement: generic_search_api → /api/CourseApi/course-search?PageId=12&PageSize=20
-#     The API is Optimizely CMS session-bound — external callers always receive page 1
-#     (20 items). It still serves as a useful health-check (if it returns 0, the CMS is down).
-#   Browser discovery disabled — BFS+sitemap covers the full catalogue without it.
-#
-# Why browser was disabled: always_browser_discover was causing a 90-second Playwright
-# session against /study/search/ before BFS even started. BFS+sitemap alone finds
-# 219 candidate pages — browser adds nothing.
+#   Primary: generic_search_api with fetch_via_browser=true
+#     The API is Optimizely CMS session-bound — external callers (raw HTTP) always get
+#     page 1 (20 items) regardless of currentPage param.  By launching a headless browser,
+#     navigating to /study/course-search first (triggers session cookie), then calling
+#     the API via JS fetch() from within the browser context (cookies included), pagination
+#     works correctly and returns all 84 international courses across ~5 pages of 20.
+#   Fallback: sitemap supplement stays on as a safety net in case the API misses any course.
 
 discovery:
-  # Single-page API call — useful as a quick availability probe even though
-  # the external API caps at 20 items (session-bound Optimizely pagination).
   generic_search_api:
     url: "https://www.federation.edu.au/api/CourseApi/course-search"
     params:
       PageId: "12"
       PageSize: "20"
+    page_size: 20
+    page_size_param: "PageSize"
+    page_number_param: "currentPage"
+    has_next_field: "result.hasNextPage"
     root_path: "result.items"
     url_fields:
       - "link.href"
     title_fields:
       - "header"
+    normalize_relative_urls: true
+    base_url: "https://www.federation.edu.au"
     allow_url_patterns:
       - "/courses/"
-    # No pagination — external access is session-bound; API always returns page 1.
-    # The sitemap supplement below covers the remaining ~200 courses.
+    max_pages: 20
+    # fetch_via_browser: navigate to seed URL first so Optimizely sets its session cookie,
+    # then call the API via page.evaluate(fetch(...)) — inherits cookie → pagination works.
+    fetch_via_browser: true
+    browser_seed_url: "https://www.federation.edu.au/study/course-search"
 
   seed_urls:
     - https://www.federation.edu.au/study/course-search

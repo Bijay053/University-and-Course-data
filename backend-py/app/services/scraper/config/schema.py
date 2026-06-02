@@ -230,6 +230,25 @@ class GenericSearchApiConfig(BaseModel):
             "When false the orchestrator falls through to BFS/browser."
         ),
     )
+    fetch_via_browser: bool = Field(
+        default=False,
+        description=(
+            "When True, use a Playwright browser to call the API endpoint instead of "
+            "making raw HTTP requests. The browser navigates to the university homepage "
+            "first so the server sets its session cookies, then calls the API via "
+            "JavaScript fetch() — which inherits those cookies. This is required for "
+            "session-bound APIs (e.g. Optimizely CMS) whose pagination is tied to a "
+            "server-side session and ignores the page/offset params from external clients."
+        ),
+    )
+    browser_seed_url: Optional[str] = Field(
+        default=None,
+        description=(
+            "URL to navigate to before making API calls in browser mode. "
+            "Triggers the server's session-cookie handshake. Defaults to the "
+            "university's scrape_url (homepage) when not set."
+        ),
+    )
     method: str = Field(
         default="GET",
         description="HTTP method for the API request: GET or POST.",

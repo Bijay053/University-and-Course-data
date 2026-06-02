@@ -766,6 +766,139 @@ async def fetch_generic_api_links(
 
 # ── YAML-driven generic API (discovery.generic_search_api) ───────────────────
 
+async def _fetch_yaml_api_via_browser(
+    cfg: Any,
+    _emit: Callable,
+    _dig: Callable,
+    _first_field: Callable,
+    _keep_url: Callable,
+    _resolve_url: Callable,
+) -> list[dict]:
+    """Browser-based variant of ``fetch_yaml_api_links`` for session-bound APIs.
+
+    Launches a headless Playwright browser, navigates to the seed URL so the
+    server issues its session cookie, then calls the API endpoint repeatedly via
+    ``page.evaluate()`` JavaScript fetch — which inherits the browser's cookies.
+    This makes pagination work for CMSes that tie page numbers to server-side
+    sessions (e.g. Optimizely) and always return page 1 to cookieless clients.
+    """
+    from playwright.async_api import async_playwright
+
+    seed_url: str = getattr(cfg, "browser_seed_url", None) or cfg.url
+    page_size: int = cfg.page_size or int(cfg.params.get(cfg.page_size_param or "", "20") or 20)
+    page_num_param: str | None = getattr(cfg, "page_number_param", None)
+    has_next_field: str | None = getattr(cfg, "has_next_field", None)
+    max_pages: int = cfg.max_pages or 50
+
+    await _emit(f"browser mode — seeding session at {seed_url[:80]}")
+
+    links: list[dict] = []
+
+    async with async_playwright() as pw:
+        browser = await pw.chromium.launch(headless=True)
+        try:
+            page = await browser.new_page()
+            # Suppress heavy resource loads — we only need the cookie handshake.
+            await page.route(
+                "**/*.{png,jpg,jpeg,gif,webp,svg,woff,woff2,ttf,mp4,mp3}",
+                lambda route, _req: route.abort(),
+            )
+
+            await _emit(f"navigating to seed URL for session cookie …")
+            try:
+                await page.goto(seed_url, wait_until="domcontentloaded", timeout=30_000)
+            except Exception as seed_exc:
+                log.warning("[YAML_API_BROWSER] seed navigation failed: %s — proceeding anyway", seed_exc)
+
+            current_page = 1
+            for _iteration in range(max_pages):
+                # Build the full API URL with page params using JS (no httpx).
+                req_params: dict = dict(cfg.params)
+                req_params[cfg.page_size_param or "PageSize"] = str(page_size)
+                if page_num_param:
+                    req_params[page_num_param] = str(current_page)
+
+                qs = "&".join(f"{k}={v}" for k, v in req_params.items())
+                api_url = cfg.url + ("&" if "?" in cfg.url else "?") + qs
+
+                await _emit(f"page {current_page} → {api_url[:100]}")
+
+                try:
+                    raw_json = await page.evaluate(
+                        """async (url) => {
+                            const resp = await fetch(url, {
+                                credentials: 'include',
+                                headers: { 'Accept': 'application/json' }
+                            });
+                            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                            return await resp.json();
+                        }""",
+                        api_url,
+                    )
+                except Exception as fetch_exc:
+                    log.warning("[YAML_API_BROWSER] fetch error p%d: %s — stopping", current_page, fetch_exc)
+                    break
+
+                # Navigate to the list of items using root_path / items_path
+                data = raw_json
+                if cfg.root_path:
+                    data = _dig(data, cfg.root_path) or data
+                items_field = getattr(cfg, "items_path", None)
+                if items_field and isinstance(data, dict):
+                    data = _dig(data, items_field) or data
+                if not isinstance(data, list):
+                    # Wrap scalar result
+                    data = [data] if isinstance(data, dict) else []
+
+                if not data:
+                    await _emit(f"page {current_page}: 0 items — stopping")
+                    break
+
+                # Determine has_next_page before we lose the raw response shape
+                has_next = False
+                if has_next_field:
+                    # has_next_field may be a dot-path relative to the root response
+                    has_next_raw = _dig(raw_json, has_next_field)
+                    if has_next_raw is None and cfg.root_path:
+                        root_obj = _dig(raw_json, cfg.root_path)
+                        if isinstance(root_obj, dict):
+                            has_next_raw = _dig(root_obj, has_next_field.split(".")[-1])
+                    has_next = bool(has_next_raw)
+
+                new_count = 0
+                _url_fields: list[str] = list(cfg.url_fields or [])
+                _name_fields: list[str] = list(cfg.title_fields or [])
+                for item in data:
+                    if not isinstance(item, dict):
+                        continue
+                    raw_url = _first_field(item, _url_fields)
+                    raw_url = _resolve_url(raw_url)
+                    if not raw_url or not _keep_url(raw_url):
+                        continue
+                    name = _first_field(item, _name_fields) if _name_fields else ""
+                    links.append({"url": raw_url, "name": name})
+                    new_count += 1
+
+                await _emit(f"page {current_page}: {new_count} items (total so far: {len(links)})")
+
+                if not page_num_param:
+                    break  # no pagination configured — single-page mode
+                if has_next_field and not has_next:
+                    await _emit("hasNextPage=false — all pages fetched")
+                    break
+                if not has_next_field and len(data) < page_size:
+                    await _emit(f"last page (returned {len(data)} < {page_size}) — done")
+                    break
+
+                current_page += 1
+
+        finally:
+            await browser.close()
+
+    await _emit(f"browser mode complete — {len(links)} total links")
+    return links
+
+
 async def fetch_yaml_api_links(cfg: Any, emit: Callable[..., Any] | None = None) -> list[dict]:
     """Fetch course links from a YAML-configured JSON/REST API endpoint.
 
@@ -846,6 +979,15 @@ async def fetch_yaml_api_links(cfg: Any, emit: Callable[..., Any] | None = None)
             if v and isinstance(v, str):
                 return v.strip()
         return ""
+
+    # ── Browser-based fetch mode (session-bound APIs) ─────────────────────────
+    # Some CMSes (e.g. Optimizely) bind pagination to a server-side session.
+    # External HTTP clients always receive page 1 regardless of page/offset params.
+    # When fetch_via_browser=True we launch Playwright, navigate to the seed URL
+    # so the server sets its session cookie, then call the API from within the
+    # browser via JavaScript fetch() — which inherits those cookies.
+    if getattr(cfg, "fetch_via_browser", False):
+        return await _fetch_yaml_api_via_browser(cfg, _emit, _dig, _first_field, _keep_url, _resolve_url)
 
     # ── Pagination loop ───────────────────────────────────────────────────────
     links: list[dict] = []
