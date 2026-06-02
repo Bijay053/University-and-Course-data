@@ -339,6 +339,17 @@ extraction:
     default_pte: null      # e.g. 58
     default_toefl: null    # e.g. 79
 
+    # Per-degree-level English score overrides for universities where UG and PG
+    # requirements differ (e.g. Waikato: UG IELTS 6.0, PG IELTS 6.5).
+    # Keys: undergraduate / postgraduate / doctorate
+    # When a postgraduate tier is configured, PG courses automatically skip the
+    # flat central-page English values (pg_skip is auto-enabled) so the tier
+    # default applies instead of the UG-oriented central page.
+    # degree_level_defaults:
+    #   undergraduate: {ielts: 6.0, pte: 50, toefl: 80}
+    #   postgraduate:  {ielts: 6.5, pte: 58, toefl: 90}
+    #   doctorate:     {ielts: 6.5, pte: 58, toefl: 90}
+
     # Disable vision OCR for English test images.
     trust_vision_ocr: true
     trust_tier1_vision_ocr_english: true

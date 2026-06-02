@@ -71,6 +71,13 @@ interface BandSpecUI {
   toefl_overall?: number | string;
 }
 
+interface DegreeEnglishTier {
+  ielts?: number | null;
+  pte?: number | null;
+  toefl?: number | null;
+  duolingo?: number | null;
+}
+
 interface BrowserAction {
   action_type: "click_text" | "click_css" | "wait_for_text" | "wait_for_selector" | "expand_text" | "scroll_to";
   value: string;
@@ -145,6 +152,7 @@ interface Recipe {
   prefer_urls_matching: string[];
   fee_reject_years: number[];
   url_rewrites: { host: string; path_contains?: string; append_query: string }[];
+  degree_level_defaults: Record<string, DegreeEnglishTier>;
 }
 
 const EMPTY_RECIPE: Recipe = {
@@ -196,6 +204,7 @@ const EMPTY_RECIPE: Recipe = {
   prefer_urls_matching: [],
   fee_reject_years: [],
   url_rewrites: [],
+  degree_level_defaults: {},
 };
 
 const STANDARD_FIELDS = [
@@ -626,6 +635,89 @@ function BrowserActionsEditor({
           (e.g. JCU), actions are skipped — use <strong>English Follow Links</strong> or
           <strong> Fee Reject Keywords</strong> instead.
         </div>
+      )}
+    </div>
+  );
+}
+
+// ── Degree-Level English Defaults Editor ──────────────────────────────────
+
+const DEGREE_TIERS = ["undergraduate", "postgraduate", "doctorate"] as const;
+
+function DegreeLevelDefaultsEditor({
+  defaults,
+  onChange,
+}: {
+  defaults: Record<string, DegreeEnglishTier>;
+  onChange: (d: Record<string, DegreeEnglishTier>) => void;
+}) {
+  const patch = (tier: string, field: keyof DegreeEnglishTier, raw: string) => {
+    const parsed = raw === "" ? null : parseFloat(raw);
+    const current = defaults[tier] || {};
+    const next: DegreeEnglishTier = { ...current, [field]: raw === "" || isNaN(parsed as number) ? null : parsed };
+    const hasValues = Object.values(next).some(v => v != null);
+    const nextDefaults = { ...defaults };
+    if (hasValues) {
+      nextDefaults[tier] = next;
+    } else {
+      delete nextDefaults[tier];
+    }
+    onChange(nextDefaults);
+  };
+
+  const val = (tier: string, field: keyof DegreeEnglishTier): string => {
+    const v = defaults[tier]?.[field];
+    return v != null ? String(v) : "";
+  };
+
+  const activeCount = Object.keys(defaults).length;
+
+  return (
+    <div className="space-y-2">
+      <div className="rounded-lg border overflow-hidden">
+        <table className="w-full text-xs">
+          <thead className="bg-muted/50">
+            <tr>
+              <th className="px-3 py-2 text-left font-medium w-36">Tier</th>
+              <th className="px-3 py-2 text-left font-medium">IELTS Overall</th>
+              <th className="px-3 py-2 text-left font-medium">PTE Overall</th>
+              <th className="px-3 py-2 text-left font-medium">TOEFL iBT</th>
+              <th className="px-3 py-2 text-left font-medium">Duolingo</th>
+            </tr>
+          </thead>
+          <tbody>
+            {DEGREE_TIERS.map(tier => (
+              <tr key={tier} className="border-t">
+                <td className="px-3 py-2 font-mono font-semibold text-blue-700 capitalize">{tier}</td>
+                {(["ielts", "pte", "toefl", "duolingo"] as const).map(field => (
+                  <td key={field} className="px-2 py-1.5">
+                    <Input
+                      type="number"
+                      step={field === "ielts" ? "0.5" : "1"}
+                      value={val(tier, field)}
+                      onChange={e => patch(tier, field, e.target.value)}
+                      placeholder="—"
+                      className="h-7 text-xs w-20"
+                    />
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {activeCount > 0 && (
+          <div className="bg-muted/30 px-3 py-2 text-xs text-muted-foreground border-t">
+            <strong>Active:</strong>{" "}
+            {Object.entries(defaults)
+              .map(([tier, s]) =>
+                `${tier}: IELTS ${s.ielts ?? "—"} / PTE ${s.pte ?? "—"} / TOEFL ${s.toefl ?? "—"}`
+              )
+              .join(" · ")}
+          </div>
+        )}
+      </div>
+      {activeCount === 0 && (
+        <p className="text-xs text-muted-foreground italic">All tiers will use the flat institution default (default_ielts / default_pte / default_toefl).</p>
       )}
     </div>
   );
@@ -2739,6 +2831,28 @@ export default function RecipeEditorPage() {
 
               <Separator />
 
+              {/* ── Degree-level English defaults ── */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4 text-emerald-600" />
+                  Degree-Level English Defaults
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  Per-tier IELTS / PTE / TOEFL fallbacks for universities where UG and PG entry
+                  requirements differ (e.g. Waikato: UG IELTS 6.0, PG IELTS 6.5). When a{" "}
+                  <code className="bg-muted px-1 rounded">postgraduate</code> tier is configured,
+                  PG courses automatically skip the flat central-page values so the correct
+                  tier-specific defaults apply. Leave a row blank to inherit the institution-wide
+                  flat defaults instead.
+                </p>
+                <DegreeLevelDefaultsEditor
+                  defaults={recipe.degree_level_defaults}
+                  onChange={v => patchRecipe({ degree_level_defaults: v })}
+                />
+              </div>
+
+              <Separator />
+
               {/* ── Band mapping ── */}
               <div className="space-y-4">
                 <h3 className="text-sm font-semibold flex items-center gap-2">
@@ -3363,6 +3477,7 @@ function buildYamlPreview(recipe: Recipe): string {
     !!recipe.ielts?.band_regex ||
     !!recipe.ielts?.source_xpath ||
     Object.keys(recipe.band_mapping).length > 0 ||
+    Object.keys(recipe.degree_level_defaults).length > 0 ||
     recipe.follow_links.length > 0 ||
     recipe.course_english_priority;
   if (hasEnglish) {
@@ -3374,6 +3489,16 @@ function buildYamlPreview(recipe: Recipe): string {
     if (recipe.follow_links.length > 0) {
       extLines.push("    follow_links:");
       recipe.follow_links.forEach(u => extLines.push(`      - ${_yq(u)}`));
+    }
+    if (Object.keys(recipe.degree_level_defaults).length > 0) {
+      extLines.push("    degree_level_defaults:");
+      Object.entries(recipe.degree_level_defaults).forEach(([tier, spec]) => {
+        extLines.push(`      ${tier}:`);
+        if (spec.ielts != null) extLines.push(`        ielts: ${spec.ielts}`);
+        if (spec.pte != null) extLines.push(`        pte: ${spec.pte}`);
+        if (spec.toefl != null) extLines.push(`        toefl: ${spec.toefl}`);
+        if (spec.duolingo != null) extLines.push(`        duolingo: ${spec.duolingo}`);
+      });
     }
     if (Object.keys(recipe.band_mapping).length > 0) {
       extLines.push("    band_mapping:");

@@ -380,6 +380,30 @@ extraction:
     default_pte: null
     default_toefl: null
 
+    # Per-degree-level IELTS/PTE/TOEFL overrides for universities where UG and PG
+    # requirements differ (e.g. Waikato: UG IELTS 6.0, PG IELTS 6.5).
+    # Keys: undergraduate / postgraduate / doctorate
+    # Behaviour: the tier matching the course's degree_level overrides the flat
+    # default_ielts / default_pte / default_toefl values above.
+    # IMPORTANT: when a postgraduate tier is configured, PG courses automatically
+    # skip the flat central-page English values (pg_skip is auto-enabled in
+    # single_course.py Path 2) so this tier default applies instead of whatever
+    # the UG-oriented central page returned.
+    # Courses with an unmapped degree_level fall back to the flat defaults above.
+    # degree_level_defaults:
+    #   undergraduate:
+    #     ielts: 6.0
+    #     pte: 50
+    #     toefl: 80
+    #   postgraduate:
+    #     ielts: 6.5
+    #     pte: 58
+    #     toefl: 90
+    #   doctorate:
+    #     ielts: 6.5
+    #     pte: 58
+    #     toefl: 90
+
     # Per-uni English-test names to drop from results (case-insensitive).
     # Use when a marketing page incidentally mentions a test the uni doesn't accept.
     test_blocklist: []
