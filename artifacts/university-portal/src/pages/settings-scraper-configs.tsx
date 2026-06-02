@@ -82,6 +82,18 @@ discovery:
   #   offset_param: "start"             # use this OR page_number_param, not both
   #   max_pages: 20
   #
+  #   # Multiple API endpoints for the same university (e.g. UG and PG split across
+  #   # separate Funnelback models or separate search APIs).
+  #   # Links from every additional_url are merged with the primary url and deduplicated.
+  #   # additional_urls:
+  #   #   - url: "https://www.example.edu.au/api/search"
+  #   #     params:
+  #   #       q: "*"
+  #   #       rows: "250"
+  #   #       model: "coursefinder-pg"   # same keys as the primary; override only what differs
+  #   #     allow_url_patterns:          # per-endpoint inclusion filter (optional)
+  #   #       - /postgraduate/
+  #
   # ┌─ Sub-option B2: Browser-based fetch (session-bound / Optimizely CMS APIs) ─
   # Use when: DevTools shows the API works fine in-browser, but hitting the same
   # URL with curl/Python always returns the same page 1 regardless of page params.
@@ -373,6 +385,27 @@ extraction:
     # default_ielts: 6.5
     # default_pte: 58
     # default_toefl: 80
+    #
+    # Per-degree-level defaults (more precise than the flat defaults above).
+    # Applied when no per-course English value is found AND the course has a
+    # known degree_level.  Overrides default_ielts / default_pte / default_toefl
+    # for matched tiers.  Use when UG and PG have different published requirements.
+    #
+    # Supported tiers: undergraduate | postgraduate | doctorate
+    #
+    # degree_level_defaults:
+    #   undergraduate:
+    #     ielts: 6.0
+    #     pte: 50
+    #     toefl: 80
+    #   postgraduate:
+    #     ielts: 6.5
+    #     pte: 58
+    #     toefl: 90
+    #   doctorate:
+    #     ielts: 6.5
+    #     pte: 58
+    #     toefl: 90
 
     # Drop test names the university doesn't actually accept (suppress false positives):
     # test_blocklist:
@@ -448,6 +481,8 @@ extraction:
 # Page shows Year-1 fee; we want annual total    fees.prefer_year_one_over_total: true
 # IELTS hallucinated from decorative images      english.trust_vision_ocr: false
 # PTE/TOEFL on pages that do not list it         english.test_blocklist
+# UG/PG have different IELTS/PTE requirements    english.degree_level_defaults
+# API has separate UG and PG endpoints           generic_search_api.additional_urls
 # Duration shows max-candidature time            text_cleaning.duration.reject_sentence_patterns
 # Location panel blank on Cloudflare-heavy site  default_course_location
 # Location string has CMS junk suffix            text_cleaning.location.strip_patterns
