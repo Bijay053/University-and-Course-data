@@ -2810,14 +2810,20 @@ async def extract_course(
                     if _dur_owner and _is_structural_course_page_method(_dur_owner):
                         continue  # duration is structural → term is locked too
 
-                # Issue 3: Don't let Gemini PRIMARY override a regex-extracted
-                # intake_months.  The intake regex reads structured DOM text
-                # (e.g. "Intake Options: January, April, July, October") and is
-                # more reliable than Gemini reading prose where nearby months
-                # from other sections may leak in.  If regex already filled
-                # intake_months, keep it.
-                if _gp_k == "intake_months" and _best_ev_method("intake_months") == "regex":
-                    continue
+                # Issue 3: Don't let Gemini PRIMARY override a structured-pass
+                # intake_months (e.g. "intake.structural", "intake.start_dates_section",
+                # "rule:intake").  Those passes read clearly-labelled DOM sections
+                # and are more reliable than Gemini reading prose.
+                # EXCEPTION: the plain "regex" method is the intake extractor's
+                # lowest-quality fallback — a keyword-window scan that often picks
+                # up stray months from application timelines, related-course tiles,
+                # or admission-calendar tables unrelated to actual start dates.
+                # When only that fallback owns the field, allow Gemini's intake_text
+                # conversion to win (it reads the authoritative Start-dates section).
+                if _gp_k == "intake_months":
+                    _int_method = _best_ev_method("intake_months")
+                    if _int_method and _int_method != "regex":
+                        continue
 
                 # Issue 5: Don't let Gemini PRIMARY set fee_term when it
                 # didn't also find a fee amount.  fee_term without a fee is

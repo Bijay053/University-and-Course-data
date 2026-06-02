@@ -435,7 +435,14 @@ def apply_overrides(
 
     # Intake months from "Start dates" block — REPLACE so AI hallucinations
     # / stale regex hits never override Federation's authoritative list.
-    months, intake_raw = extract_intake_months(html)
+    # Use rendered_html in preference to static html: Federation course pages
+    # are React SPAs — the "Start dates" JSON block is only injected by the
+    # React runtime (same reason locations already use rendered_html here).
+    _intake_source = rendered_html if rendered_html else html
+    months, intake_raw = extract_intake_months(_intake_source)
+    if not months and _intake_source is not html:
+        # Fall back to static HTML if rendered HTML had no Start dates block
+        months, intake_raw = extract_intake_months(html)
     if months:
         prev_intake = payload.get("intake_months")
         payload["intake_months"] = months

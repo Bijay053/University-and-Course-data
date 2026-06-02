@@ -1,22 +1,66 @@
 # University of Waikato
 # Hostname: www.waikato.ac.nz
 # CMS: SilverStripe
-# Country: New Zealand
-# Currency: NZD
-#
-# Qualification pages:
-# https://www.waikato.ac.nz/int/study/qualifications/
-#
-# Important:
-# Waikato qualification pages are rendered via JS.
-# If your platform ignores seed_urls and starts browser discovery from
-# https://www.waikato.ac.nz then this is a code issue, not a YAML issue.
+# Country: New Zealand  |  Currency: NZD
 
 discovery:
+  auto_api_discovery: false
+
+  generic_search_api:
+    enabled: true
+    method: POST
+    url: "https://www.waikato.ac.nz/_search/api/as/v1/engines/--engine--/search.json"
+
+    headers:
+      authorization: "Bearer --search--"
+      content-type: "application/json"
+      x-swiftype-client: "elastic-app-search-javascript"
+      x-swiftype-client-version: "8.13.0"
+
+    body:
+      query: ""
+      page:
+        current: 1
+        size: 100
+      filters:
+        all:
+          - type: "qualification"
+
+    root_path: "results"
+
+    url_fields:
+      - "url.raw"
+      - "url"
+      - "link.raw"
+      - "path.raw"
+
+    title_fields:
+      - "title.raw"
+      - "title"
+      - "name.raw"
+      - "name"
+
+    normalize_relative_urls: true
+    base_url: "https://www.waikato.ac.nz"
+
+    page_size: 100
+    page_size_param: "page.size"
+    page_number_param: "page.current"
+    max_pages: 10
+
+    allow_url_patterns:
+      - "/int/study/qualifications/"
+
+    fetch_via_browser: true
+    browser_seed_url: "https://www.waikato.ac.nz/int/study/qualifications/?page=1"
+
   seed_urls:
     - https://www.waikato.ac.nz/int/study/qualifications/
 
-  bfs_page_budget: 100
+  always_sitemap_supplement: true
+  sitemap_url: https://www.waikato.ac.nz/sitemap.xml
+
+  bfs_page_budget: 80
   max_candidates: 500
   expected_min_courses: 100
 
@@ -24,7 +68,7 @@ discovery:
     - /int/study/qualifications/
 
   allow_url_patterns:
-    - '^https://www\.waikato\.ac\.nz/int/study/qualifications/(?:bachelor|master|doctor|phd|diploma|certificate|graduate|postgraduate|honours|conjoint)[a-z0-9-]*/?$'
+    - "/int/study/qualifications/"
 
   block_url_patterns:
     - '^https://www\.waikato\.ac\.nz/int/study/qualifications/?$'
@@ -32,7 +76,6 @@ discovery:
     - '/int/study/qualifications/postgraduate/?$'
     - '/int/study/qualifications/research/?$'
     - '/int/study/qualifications/certificates-and-diplomas/?$'
-
     - '/int/about/'
     - '/int/research/'
     - '/int/study/apply/'
@@ -54,12 +97,8 @@ discovery:
     - '\?'
     - '\.pdf$'
 
-  always_sitemap_supplement: true
-  sitemap_url: https://www.waikato.ac.nz/sitemap.xml
-
   always_browser_discover: false
   skip_browser_discovery: true
-
   use_wayback: false
 
 extraction:
@@ -70,6 +109,7 @@ extraction:
     default_ielts: 6.0
     default_pte: 50
     default_toefl: 80
+    trust_vision_ocr: false
 
   intake:
     start_dates_only: true

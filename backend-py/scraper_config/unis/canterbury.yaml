@@ -1,30 +1,54 @@
 # University of Canterbury
 # Hostname: www.canterbury.ac.nz
 # Country: New Zealand  |  Currency: NZD
-#
-# Bug history:
-#   Discovery finds 220 raw qualification links, so discovery is working.
-#   Main issues:
-#   - some fees are rejected because SSL / Student Services Levy appears near valid fees
-#   - default English values are filling IELTS/PTE/TOEFL even when course specific values are missing
-#   - static HTML has fees, but browser rendered content is 0B, so keep per-course browser skipped
 
 discovery:
+  auto_api_discovery: false
+
+  generic_search_api:
+    enabled: true
+    method: GET
+    url: "https://search.canterbury.ac.nz/s/search.json"
+    params:
+      s: "!PadreNull"
+      MBL: "300"
+      num_ranks: "300"
+      profile: "all-subjects-results-page"
+      collection: "uoc2~sp-aem-all-subjects"
+      sort: "title"
+    root_path: "response.resultPacket.results"
+    url_fields:
+      - "liveUrl"
+      - "url"
+      - "clickTrackingUrl"
+    title_fields:
+      - "title"
+      - "name"
+    normalize_relative_urls: true
+    base_url: "https://www.canterbury.ac.nz"
+    allow_url_patterns:
+      - "/study/academic-study/qualifications/"
+    max_pages: 1
+    fetch_via_browser: true
+    browser_seed_url: "https://www.canterbury.ac.nz/study/academic-study/subjects"
+
   seed_urls:
     - https://www.canterbury.ac.nz/study/academic-study/qualifications
+    - https://www.canterbury.ac.nz/study/academic-study/subjects?s=%21PadreNull&MBL=300&num_ranks=20&profile=all-subjects-results-page&f.Subject%20Level%7CucSubjectLevel=Undergraduate%20subject&collection=uoc2~sp-aem-all-subjects&sort=title
+    - https://www.canterbury.ac.nz/study/academic-study/subjects?s=%21PadreNull&MBL=300&num_ranks=20&profile=all-subjects-results-page&f.Subject%20Level%7CucSubjectLevel=Postgraduate%20subject&collection=uoc2~sp-aem-all-subjects&sort=title
 
   always_sitemap_supplement: true
   sitemap_url: https://www.canterbury.ac.nz/sitemap.xml
 
   bfs_page_budget: 80
-  max_candidates: 500
+  max_candidates: 700
   expected_min_courses: 200
 
   must_contain:
     - /study/academic-study/qualifications/
 
   allow_url_patterns:
-    - '^https://www\.canterbury\.ac\.nz/study/academic-study/qualifications/[a-z0-9-]+/?$'
+    - "/study/academic-study/qualifications/"
 
   block_url_patterns:
     - '^https://www\.canterbury\.ac\.nz/study/academic-study/qualifications/?$'
