@@ -14,3 +14,4 @@
 - [JCU band_mapping flow fix](jcu-band-mapping-flow.md) — band_mapping must override central_page values; outer ielts_missing guard blocks it when central already filled the slot.
 - [Swinburne 3-level URL structure](swinburne-url-depth.md) — /courses/find-a-course/faculty/subject is sub-category hub (no course data); individual courses are at depth 3 (/faculty/subject/course-slug). allow_url_patterns must require 3 segments.
 - [Scraping review panel missing Approve button](scraping-approve-button.md) — handleApproveSelected/Single existed in scraping.tsx but had no UI button; operators saw "go to Raw Data tab". Added green Approve button bulk + per-row.
+- [Waikato fee table patterns](waikato-fee-patterns.md) — Pattern A/B for degree-header tables; major-list annotation stripper needed for token_sort_ratio to work.

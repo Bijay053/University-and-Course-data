@@ -249,6 +249,53 @@ def _parse_fee_page_html(html: str, page_url: str) -> list[CentralFeeRecord]:
         elif unit_col is not None and intl_col is None:
             per_term = per_term or "Per Unit"
 
+        # ── Subject-table / degree-type-header detection ─────────────────────
+        # Some universities list fees by SUBJECT within a named degree tier
+        # rather than by full course name. Two patterns:
+        #
+        # Pattern A — first-column header IS the degree type:
+        #   e.g. "Graduate Diploma (GradDip) | 2026 Estimated Fees | ..."
+        #   Row "Accounting" → stored as "Graduate Diploma in Accounting"
+        #
+        # Pattern B — multiple degree-type columns (PGDip + PGCert):
+        #   e.g. "Subject | 2026 PGDip (120 pts) | 2026 PGCert (60 pts) | ..."
+        #   Row "Accounting" → two records emitted:
+        #     "Postgraduate Diploma in Accounting"  (PGDip col fee)
+        #     "Postgraduate Certificate in Accounting" (PGCert col fee)
+        _DEGREE_HDR_MAP = (
+            ("graduate diploma",        "Graduate Diploma in "),
+            ("grad dip",                "Graduate Diploma in "),
+            ("graddip",                 "Graduate Diploma in "),
+            ("postgraduate diploma",    "Postgraduate Diploma in "),
+            ("pg dip",                  "Postgraduate Diploma in "),
+            ("pgdip",                   "Postgraduate Diploma in "),
+            ("postgraduate certificate","Postgraduate Certificate in "),
+            ("pg cert",                 "Postgraduate Certificate in "),
+            ("pgcert",                  "Postgraduate Certificate in "),
+        )
+        _DEGREE_WORDS = frozenset((
+            "bachelor", "master", "doctor", "graduate", "postgraduate",
+            "diploma", "certificate", "honours", "degree",
+        ))
+        _row_name_prefix: str | None = None           # Pattern A
+        _multi_col_specs: list[tuple[int, str]] = []  # Pattern B: [(col_idx, prefix), ...]
+
+        _first_col_h = (effective_header_cells[0] if effective_header_cells else "").lower()
+        for _kw, _pfx in _DEGREE_HDR_MAP:
+            if _kw in _first_col_h:
+                _row_name_prefix = _pfx
+                break
+
+        if _row_name_prefix is None:
+            # Pattern B: scan non-first column headers for degree-type keywords.
+            for _ci, _ch in enumerate(effective_header_cells[1:], start=1):
+                _ch_lower = _ch.lower()
+                for _kw, _pfx in _DEGREE_HDR_MAP:
+                    if _kw in _ch_lower:
+                        _multi_col_specs.append((_ci, _pfx))
+                        break
+        # ─────────────────────────────────────────────────────────────────────
+
         for row in rows[data_start:]:
             cells = row.find_all(["td", "th"])
             if not cells:
@@ -264,6 +311,56 @@ def _parse_fee_page_html(html: str, page_url: str) -> list[CentralFeeRecord]:
             # Skip header-repeat rows.
             if any(k in prog_name.lower() for k in ("course", "program", "qualification")):
                 continue
+
+            # ── Strip verbose major-listing annotations ───────────────────────
+            # Some fee tables append long subject lists to degree names, e.g.:
+            #   "Bachelor of Business (BBus) All major subjects: Accounting, …"
+            # token_sort_ratio("Bachelor of Business", long_name) ≈ 14 (miss).
+            # Stripping the annotation → token_sort_ratio ≈ 85 (high confidence).
+            _cleaned = re.sub(
+                r"\s+All\s+(?:major\s+)?(?:subjects?|streams?|majors?|options?)\s*:.*$",
+                "",
+                prog_name,
+                flags=re.IGNORECASE,
+            ).strip()
+            if _cleaned and len(_cleaned) >= 3:
+                prog_name = _cleaned
+            # ─────────────────────────────────────────────────────────────────
+
+            # ── Pattern A: prepend degree-type prefix to bare subject names ──
+            # Guard: only prepend when prog_name looks like a bare subject (no
+            # degree-level keywords), preventing double-prefixing on rows that
+            # already carry the full degree name.
+            if _row_name_prefix and not any(w in prog_name.lower() for w in _DEGREE_WORDS):
+                prog_name = _row_name_prefix + prog_name
+
+            # ── Pattern B: multi-column degree-type tables ────────────────────
+            # Emit one record per degree-type column that has a fee value; then
+            # skip the normal single-record emission path for this row.
+            if _multi_col_specs:
+                _b_emitted = False
+                for _mc_col, _mc_pfx in _multi_col_specs:
+                    if _mc_col >= len(cell_texts):
+                        continue
+                    _mc_fee = _parse_fee_amount(cell_texts[_mc_col])
+                    if _mc_fee is None:
+                        continue
+                    _mc_name = _mc_pfx + prog_name
+                    _mc_row_text = " ".join(cell_texts)
+                    _mc_per = _infer_per_term(_mc_row_text) or per_term
+                    records.append({
+                        "program_pattern": _mc_name,
+                        "international_fee": _mc_fee,
+                        "domestic_fee": None,
+                        "currency": "AUD",  # default; improved below if USD/GBP detected
+                        "per": _mc_per,
+                        "bucket": _programme_bucket(_mc_name),
+                        "source_url": page_url,
+                    })
+                    _b_emitted = True
+                if _b_emitted:
+                    continue  # skip normal single-record path for this row
+            # ─────────────────────────────────────────────────────────────────
 
             intl_fee: float | None = None
             dom_fee: float | None = None
