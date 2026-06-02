@@ -3,53 +3,54 @@
 # Country: United Kingdom  |  Currency: GBP
 
 discovery:
-  auto_api_discovery: false
+  auto_api_discovery: true
 
   seed_urls:
-    - https://www.aru.ac.uk/study/course-search?keywords=&levelofstudy=Undergraduate
-    - https://www.aru.ac.uk/study/course-search?keywords=&levelofstudy=Postgraduate
+    - https://www.aru.ac.uk/study/course-search?keywords=&levelofstudy=undergraduate
+    - https://www.aru.ac.uk/study/course-search?keywords=&levelofstudy=postgraduate
 
-  bfs_page_budget: 120
+  bfs_page_budget: 80
   max_candidates: 700
   expected_min_courses: 250
 
-  must_contain:
-    - /study/undergraduate/
-    - /study/postgraduate/
-
   allow_url_patterns:
-    - "/study/undergraduate/"
-    - "/study/postgraduate/"
+    - "/study/course-search"
+    - "/study/undergraduate"
+    - "/study/postgraduate"
+    - "/courses/"
 
   block_url_patterns:
-    - "/study/course-search"
-    - "/study/undergraduate/?$"
-    - "/study/postgraduate/?$"
+    - "/study/continuing-professional-development"
+    - "/study/professional-and-short-courses"
+    - "/study/college-courses"
+    - "/study/degree-apprenticeships"
+    - "/research/postgraduate-research"
+    - "/schools-and-colleges"
+    - "/study/admissions"
+    - "/study/open-day"
+    - "/about"
+    - "/contact"
     - "/news"
     - "/events"
     - "/staff/"
-    - "/about"
-    - "/contact"
-    - "/linkassets/"
-    - "/international/"
     - "/student-life/"
     - "/business-employers/"
-    - "\\?"
+    - "/linkassets/"
     - "\\.pdf$"
 
   always_sitemap_supplement: true
   sitemap_url: https://www.aru.ac.uk/sitemap.xml
 
-  always_browser_discover: false
-  skip_browser_discovery: true
+  always_browser_discover: true
+  skip_browser_discovery: false
   use_wayback: false
 
 extraction:
-  max_parallel_fetch: 6
+  max_parallel_fetch: 4
   skip_browser_rescue: false
   skip_per_course_browser: false
   browser_wait_strategy: domcontentloaded
-  browser_dcl_settle_ms: 3000
+  browser_dcl_settle_ms: 4000
 
   fees:
     default_currency: GBP
