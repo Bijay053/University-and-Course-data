@@ -143,11 +143,23 @@ discovery:
   # The site runs a reverse proxy at /_search/ that maps a placeholder engine name
   # (e.g. --engine--) and placeholder token (--search--) to the real credentials
   # server-side.  The client (browser and scraper) never sees the real token.
+  #
   # Solution: use the placeholder URL as-is, NO Authorization header in YAML,
-  # set fetch_via_browser: true so the scraper sends the session cookies that
-  # authenticate the proxy (Incapsula/Imperva WAF requires a real browser session).
-  # Also copy the exact body filters/sort from the DevTools Payload tab — the
-  # source_class / type filter is essential or the API returns mixed content.
+  # set fetch_via_browser: true so the scraper obtains Incapsula/Imperva session
+  # cookies first (by navigating to browser_seed_url), then calls the API as POST.
+  #
+  # HOW THE BROWSER POST WORKS:
+  #   When body is set AND fetch_via_browser: true, the scraper does NOT build
+  #   a GET query-string URL.  Instead it runs a JS fetch() inside the browser:
+  #     fetch(url, { method:'POST', credentials:'include',
+  #                  headers: <cfg.headers>, body: JSON.stringify(<body>) })
+  #   The cfg.headers dict (content-type, x-swiftype-client, etc.) is forwarded
+  #   automatically.  body_pagination updates body["page"]["current"] per page.
+  #   Pagination stops when current_page >= meta.page.total_pages (total_pages_path).
+  #
+  # IMPORTANT: copy the EXACT body from DevTools Payload tab — the source_class /
+  # type filter is essential or the API returns mixed content types.
+  # Check the response to confirm which field holds the URL (url.raw vs page_link.raw).
   #
   # generic_search_api:
   #   enabled: true
@@ -165,30 +177,31 @@ discovery:
   #         - source_class:
   #             - "App\\Pages\\QualificationPage"  # YAML needs double-backslash
   #     page:
-  #       current: 1
-  #       size: 100
+  #       current: 1      # body_pagination.current_path increments this per page
+  #       size: 100       # body_pagination.size_path sets this to page_size
   #     sort:
   #       - _score: "desc"
   #       - title: "asc"
   #   page_size: 100
   #   body_pagination:
-  #     current_path: page.current          # sets body["page"]["current"] = 1, 2, 3...
-  #     size_path: page.size                # sets body["page"]["size"]
+  #     current_path: page.current          # dot-path into body dict; updated per page
+  #     size_path: page.size                # sets body["page"]["size"] = page_size
   #     total_pages_path: meta.page.total_pages      # stops when current >= total_pages
-  #     total_results_path: meta.page.total_results  # logged for diagnostics
-  #   root_path: "results"
+  #     total_results_path: meta.page.total_results  # logged for diagnostics only
+  #   root_path: "results"                  # Elastic App Search wraps items in "results"
   #   url_fields:
-  #     - "page_link.raw"     # SilverStripe sites often use page_link.raw
-  #     - "url.raw"           # fallback: standard Elastic App Search field
+  #     - "page_link.raw"     # SilverStripe sites often use page_link.raw (relative)
+  #     - "url.raw"           # fallback: standard Elastic App Search absolute URL
   #   title_fields:
   #     - "title.raw"
-  #   normalize_relative_urls: true   # page_link.raw returns relative paths
+  #   normalize_relative_urls: true   # needed when page_link.raw returns relative paths
   #   base_url: "https://www.example.ac.nz"
   #   allow_url_patterns:
   #     - "/qualifications/"
   #   max_pages: 10
-  #   fetch_via_browser: true         # required for Incapsula session cookies
+  #   fetch_via_browser: true         # REQUIRED: gets Incapsula cookies + sends body POST
   #   browser_seed_url: "https://www.example.ac.nz/study/qualifications/"
+  #                                   # navigated first to acquire session cookies
   #
   # ── VARIANT B: Real Bearer token (public search key, not a user credential) ──
   # How to recognise: DevTools shows a real "Bearer search-key-abc123xyz..." value.
