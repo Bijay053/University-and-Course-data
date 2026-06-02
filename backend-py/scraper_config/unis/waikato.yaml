@@ -1,16 +1,23 @@
 # University of Waikato
 # Hostname: www.waikato.ac.nz
-# CMS: SilverStripe / Elastic App Search
+# CMS: SilverStripe / Elastic App Search (via server-side proxy)
 # Country: New Zealand  |  Currency: NZD
 #
-# Discovery strategy: Elastic App Search (body-POST, not query-string params)
+# Discovery strategy: Elastic App Search via browser (session-bound proxy)
 #
-# HOW TO IDENTIFY engine name + Bearer token:
-#   1. DevTools → Network → filter XHR/Fetch
-#   2. Navigate to https://www.waikato.ac.nz/int/study/qualifications/
-#   3. Find POST to .../_search/api/as/v1/engines/<ENGINE>/search.json
-#   4. Copy <ENGINE> from the URL and the "Bearer <TOKEN>" from Authorization header
-#   5. Store token as WAIKATO_EAS_TOKEN secret — never commit literal tokens
+# HOW IT WORKS:
+#   The site runs a server-side reverse proxy at /_search/ that:
+#     1. Maps --engine-- → the real engine name (search-uow1-prod-main)
+#     2. Injects the real Authorization: Bearer token server-side
+#   The browser client uses --engine-- as a literal URL segment.
+#   No Bearer token secret is needed — the proxy adds it.
+#   Incapsula/Imperva session cookies ARE required, so fetch_via_browser: true.
+#
+# CONFIRMED via DevTools (2026-06-02):
+#   Engine: search-uow1-prod-main (from meta.engine.name in response)
+#   URL:    https://www.waikato.ac.nz/_search/api/as/v1/engines/--engine--/search.json
+#   Total:  110 qualifications (meta.page.total_results)
+#   URL field in response: page_link.raw (relative, e.g. /study/qualifications/bachelor-of-arts/)
 
 discovery:
   auto_api_discovery: false
@@ -21,52 +28,58 @@ discovery:
     url: "https://www.waikato.ac.nz/_search/api/as/v1/engines/--engine--/search.json"
 
     headers:
-      authorization: "Bearer ${WAIKATO_EAS_TOKEN}"
       content-type: "application/json"
       x-swiftype-client: "elastic-app-search-javascript"
       x-swiftype-client-version: "8.13.0"
 
-    # JSON body template — pagination fields are updated per request by body_pagination
+    # Exact body used by the site's JavaScript (confirmed via DevTools payload tab)
     body:
       query: ""
+      filters:
+        all:
+          - source_class:
+              - "App\\Pages\\QualificationPage"
       page:
         current: 1
         size: 100
-      filters:
-        all:
-          - type: "qualification"
+      sort:
+        - _score: "desc"
+        - title: "asc"
 
-    # Body-based pagination: page number and size live inside the JSON body,
-    # NOT as query-string parameters (which is what the old page_number_param
-    # approach produced — sending ?page.current=2 instead of body["page"]["current"]=2)
+    # Body-based pagination — updates body["page"]["current"] per request
     page_size: 100
     body_pagination:
-      current_path: page.current           # updates body["page"]["current"] per request
-      size_path: page.size                 # updates body["page"]["size"]
-      total_pages_path: meta.page.total_pages      # stop when current_page >= total
-      total_results_path: meta.page.total_results  # logged for diagnostics
+      current_path: page.current
+      size_path: page.size
+      total_pages_path: meta.page.total_pages
+      total_results_path: meta.page.total_results
 
     root_path: "results"
 
+    # Confirmed from real API response: URLs are in page_link.raw (relative paths)
     url_fields:
+      - "page_link.raw"
       - "url.raw"
-      - "url"
       - "link.raw"
-      - "path.raw"
 
     title_fields:
       - "title.raw"
       - "title"
-      - "name.raw"
-      - "name"
 
+    # page_link.raw returns relative paths like /study/qualifications/bachelor-of-arts/
     normalize_relative_urls: true
     base_url: "https://www.waikato.ac.nz"
 
+    allow_url_patterns:
+      - "/study/qualifications/"
+
     max_pages: 10
 
-    allow_url_patterns:
-      - "/int/study/qualifications/"
+    # Incapsula/Imperva session cookies are required — browser mode navigates
+    # to the qualifications page first so the server issues its session cookie,
+    # then calls the API via JS fetch (which inherits those cookies).
+    fetch_via_browser: true
+    browser_seed_url: "https://www.waikato.ac.nz/int/study/qualifications/"
 
   seed_urls:
     - https://www.waikato.ac.nz/int/study/qualifications/
@@ -79,17 +92,16 @@ discovery:
   expected_min_courses: 100
 
   must_contain:
-    - /int/study/qualifications/
+    - /study/qualifications/
 
   allow_url_patterns:
-    - "/int/study/qualifications/"
+    - "/study/qualifications/"
 
   block_url_patterns:
-    - '^https://www\.waikato\.ac\.nz/int/study/qualifications/?$'
-    - '/int/study/qualifications/undergraduate/?$'
-    - '/int/study/qualifications/postgraduate/?$'
-    - '/int/study/qualifications/research/?$'
-    - '/int/study/qualifications/certificates-and-diplomas/?$'
+    - '^https://www\.waikato\.ac\.nz/study/qualifications/?$'
+    - '/study/qualifications/undergraduate/?$'
+    - '/study/qualifications/postgraduate/?$'
+    - '/study/qualifications/research/?$'
     - '/int/about/'
     - '/int/research/'
     - '/int/study/apply/'
@@ -131,7 +143,6 @@ extraction:
   filters:
     domestic_only:
       enabled: false
-
     online_only:
       enabled: true
 
@@ -148,6 +159,7 @@ extraction:
       - " | University of Waikato"
       - " - University of Waikato"
       - " | Te Whare Wānanga o Waikato"
+      - " | Apply to Study"
 
   staging:
     reject_if_missing:
