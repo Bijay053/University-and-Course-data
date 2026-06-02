@@ -31,6 +31,7 @@ from app.services.scraper.extractors import (
     location,
     study_mode,
 )
+from app.services.scraper.extractors import course_name as course_name_extractor
 from app.services.scraper.extractors.base import ExtractionResult
 from app.services.scraper.extractors._text import compact, html_to_text
 
@@ -335,6 +336,19 @@ _FORCE_BROWSER_HOSTS: tuple[str, ...] = (
     # re-fire because duration IS in static HTML for all UWA pages.
     # _DCL_SETTLE_MS_OVERRIDES entry is kept for the rare pages that do
     # need a browser render (future per-uni toggle if needed).
+    # Anglia Ruskin University (ARU): course pages are a mixed-rendering site.
+    # MBA/BEng pages are server-rendered (text_len>0 from static HTML) while
+    # MSc/BSc/nursing/arts pages are React SPA shells (static text_len=0).
+    # For the SPA pages, Gemini sees empty text and returns all nulls including
+    # course_name=None. The staging gate then falls back to the discovery link
+    # title (e.g. "Nursing (Adult)", "Computer Games Art") which has no degree
+    # qualifier, causing false category_landing_page rejections fleet-wide.
+    # aru.yaml sets use_stealth_browser=true so browser_pool routes fetches
+    # through patchright+Xvfb. Adding ARU here forces a full browser refetch
+    # + extended extractor suite (including course_name from H1) against the
+    # rendered DOM, which gives "BSc (Hons) Nursing (Adult)" — a proper
+    # qualifier that passes the staging gate. Pair with _EXTENDED_EXTRACT_HOSTS.
+    "aru.ac.uk",
 )
 
 _NETWORKIDLE_SETTLE_MS = 3000
@@ -523,11 +537,21 @@ _EXTENDED_EXTRACT_HOSTS: frozenset[str] = frozenset({
     # Diploma of Education Studies, Master of Education, etc.
     "vu.edu.au",
     "www.vu.edu.au",
+    # Anglia Ruskin University (ARU): SPA-rendered course pages return
+    # text_len=0 from static HTML (Cloudflare-protected React shell). The
+    # per-course browser (stealth via patchright) renders the full page but
+    # without extended extraction, course_name stays NULL — the staging gate
+    # falls back to the bare link title (e.g. "Computer Games Art") which
+    # lacks a degree qualifier. Running the full extractor suite extracts the
+    # real H1 ("BA (Hons) Computer Games Art") + all other fields.
+    "aru.ac.uk",
+    "www.aru.ac.uk",
 })
 
 # Field slots that each extended extractor fills — used to guard against
 # overwriting a previously-populated value from the static pass.
 _EXTENDED_SLOTS: tuple[str, ...] = (
+    "course_name",
     "international_fee",
     "ielts_overall",
     "pte_overall",
@@ -620,6 +644,12 @@ async def _extended_extract(
     wrong static value with the authoritative browser-rendered value.
     """
     extractors = [
+        # course_name first so the H1 from the rendered DOM is captured before
+        # other extractors run — critical for SPA-shell pages (e.g. ARU) where
+        # static HTML gave text_len=0 and payload["course_name"] is None, which
+        # would otherwise cause the staging gate to fall back to the bare
+        # discovery link title and reject as category_landing_page.
+        (course_name_extractor, ["course_name"]),
         (fee, ["international_fee", "fee_currency", "fee_term", "fee_year"]),
         (english_test, list(_ENGLISH_SLOTS)),
         (intake, ["intake_months"]),
