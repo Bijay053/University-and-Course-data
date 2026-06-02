@@ -263,11 +263,18 @@ def _normalize_fee_term(ctx: str, *, prefer_year_one: bool = False) -> str:
         return "Session"
     if re.search(r"per\s*(?:credit\s*)?(?:unit|point|credit)", ctx, re.I):
         return "Per Unit"
-    # "for/per N points" → Annual. NZ/AU universities quote per-year fees as
-    # "$X for 120 points" (120 credit-points = 1 FTE year of full-time study).
-    # This must be checked BEFORE the Full Course block so that a fee page
-    # saying "for 120 points" is not accidentally tagged as Full Course.
-    if re.search(r"\b(?:for|per)\s+\d{2,4}\s+(?:credit\s+)?points?\b", ctx, re.I):
+    # "for/per N points" OR "(N points)" → Annual.
+    # NZ/AU universities quote per-year fees as "$X for 120 points" OR
+    # "$47,300 (120 points)" (120 credit-points = 1 FTE year of full-time
+    # study).  Both the preposition form and the parenthesised form must be
+    # caught BEFORE the Full Course block so they are never mis-tagged as a
+    # full-course total.
+    if re.search(
+        r"\b(?:for|per)\s+\d{2,4}\s+(?:credit\s+)?points?\b"
+        r"|\(\s*\d{2,4}\s+(?:credit\s+)?points?\s*\)",
+        ctx,
+        re.I,
+    ):
         return "Annual"
     # Explicit "annual" / "per year" / "per annum" label overrides any "total"
     # that may appear later in the same context window.  UTAS pages show:
@@ -527,12 +534,27 @@ def _candidates(text: str) -> Iterable[tuple[int, str, str]]:
         yield amount, cur, ctx
 
 
+_NZ_POINTS_IN_CTX = re.compile(
+    r"\(\s*(\d{2,4})\s+(?:credit\s+)?points?\s*\)", re.IGNORECASE
+)
+
+
 def _score(amount: int, ctx: str, *, prefer_year_one: bool = False) -> int:
     s = 0
     if _INTL_CTX.search(ctx):
         s += 5
     if _TUITION_CTX.search(ctx):
         s += 3
+    # NZ/AU credit-point fee format: "$47,300 (120 points)" / "$96,965 (240 points)".
+    # 120 credit-points = 1 FTE year — prefer that entry; penalise higher
+    # point counts which represent multi-year totals.
+    _pts_m = _NZ_POINTS_IN_CTX.search(ctx)
+    if _pts_m:
+        pts = int(_pts_m.group(1))
+        if pts == 120:
+            s += 3   # exact annual-year entry
+        elif pts > 120:
+            s -= 2   # multi-year total — deprioritise
     if prefer_year_one:
         # Per-uni override (e.g. Curtin): both labels typically appear in
         # the same 320-char window, so use proximity — whichever label is
