@@ -36,6 +36,46 @@ _ELASTIC_URL_RE = re.compile(
 _SOLR_URL_RE = re.compile(r"/solr/|/select\?|[?&]wt=json", re.I)
 _GRAPHQL_URL_RE = re.compile(r"/graphql\b|/api/graphql\b|/query\b", re.I)
 
+# ── Consent / tracking / analytics domain blocklist ───────────────────────────
+# APIs from these domains are never course APIs — skip them before classification
+# so they cannot score above threshold even if they return a valid JSON shape.
+#
+# Patterns matched against the full URL (hostname + path):
+#   usercentrics  — cookie consent management (api.usercentrics.eu/settings/...)
+#   cookiebot     — cookie consent (consent.cookiebot.com/...)
+#   onetrust      — consent platform (cdn.cookielaw.org, geolocation.onetrust.com)
+#   cookielaw     — OneTrust CDN
+#   analytics     — GA / Plausible / Matomo analytics endpoints
+#   tracking / tracker — any tracking pixel / session recording API
+#   gtm           — Google Tag Manager
+#   segment.io    — Segment analytics
+#   hotjar        — session recording
+#   sentry        — error reporting
+#   datadog       — APM
+_CONSENT_TRACKING_BLOCKLIST_RE = re.compile(
+    r"usercentrics\.eu|usercentrics\.com"
+    r"|cookiebot\.com|cookielaw\.org|onetrust\.com"
+    r"|google-analytics\.com|googletagmanager\.com|gtm\.js"
+    r"|segment\.io|segment\.com/v1"
+    r"|hotjar\.com|hj\.hotjar"
+    r"|sentry\.io|browser\.sentry-cdn\.com"
+    r"|datadoghq\.com|dd-rum"
+    r"|[/?&]tracking\b|[/?&]tracker\b"
+    r"|/analytics/|/collect\b|/beacon\b"
+    r"|clarity\.ms|mxpnl\.com|mixpanel\.com",
+    re.I,
+)
+
+# ── Course-URL presence heuristic ─────────────────────────────────────────────
+# Boost rest_json candidates whose response body contains URL values that look
+# like individual course/programme pages.  Downgrades configuration / consent /
+# settings blobs that happen to be valid JSON arrays-of-objects.
+_COURSE_URL_RE = re.compile(
+    r"/(?:course|programme|program|study|degree|undergraduate|postgraduate"
+    r"|masters?|bachelor|diploma|certificate|qualification)[s/\-]",
+    re.I,
+)
+
 
 @dataclass
 class ClassifiedAPI:
@@ -125,14 +165,42 @@ def _score_graphql(url: str, body: Any) -> float:
 
 
 def _score_rest_json(url: str, body: Any) -> float:
-    """Fallback: any JSON endpoint returning a list or object-with-array."""
+    """Fallback: any JSON endpoint returning a list or object-with-array.
+
+    A bonus is applied when the response body contains URL strings that look
+    like individual course/programme pages — this prioritises real course APIs
+    over configuration / consent / settings blobs that happen to be valid JSON.
+    """
+    base = 0.0
     if isinstance(body, list) and body and isinstance(body[0], dict):
-        return 0.55
-    if isinstance(body, dict):
+        base = 0.55
+    elif isinstance(body, dict):
         for v in body.values():
             if isinstance(v, list) and len(v) >= 2 and isinstance(v[0], dict):
-                return 0.50
-    return 0.0
+                base = 0.50
+                break
+    if base == 0.0:
+        return 0.0
+    # Check first 10 items for URL-like string values matching course paths.
+    sample_items: list[dict] = []
+    if isinstance(body, list):
+        sample_items = [x for x in body[:10] if isinstance(x, dict)]
+    elif isinstance(body, dict):
+        for v in body.values():
+            if isinstance(v, list):
+                sample_items = [x for x in v[:10] if isinstance(x, dict)]
+                break
+    course_url_hits = 0
+    for item in sample_items:
+        for val in item.values():
+            if isinstance(val, str) and _COURSE_URL_RE.search(val):
+                course_url_hits += 1
+                break
+    if course_url_hits >= 3:
+        base = min(base + 0.20, 1.0)   # clear course URLs in response → boost
+    elif course_url_hits == 0 and sample_items:
+        base = max(base - 0.15, 0.0)   # no course URLs at all → slight penalty
+    return base
 
 
 # Evaluated in order; first type that beats the previous score wins.
@@ -188,6 +256,18 @@ def classify_capture(capture: "XhrCapture") -> ClassifiedAPI | None:  # type: ig
     from .xhr_interceptor import XhrCapture
 
     if not isinstance(capture, XhrCapture) or not capture.sample_body:
+        return None
+
+    # ── Consent / tracking / analytics blocklist ──────────────────────────────
+    # These are never course APIs.  Reject immediately so they cannot score
+    # above threshold even if they return a structurally valid JSON array.
+    # Examples blocked: usercentrics.eu/settings/…, cookiebot.com/consent/…,
+    # google-analytics.com/collect, gtm.js
+    if _CONSENT_TRACKING_BLOCKLIST_RE.search(capture.url):
+        log.info(
+            "[API_CLASSIFIER] BLOCKED — consent/tracking/analytics URL skipped: %s",
+            capture.url[:120],
+        )
         return None
 
     best_type = ""
