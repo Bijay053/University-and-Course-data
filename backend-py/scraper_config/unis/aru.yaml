@@ -1,0 +1,115 @@
+# Anglia Ruskin University
+# Hostname: www.aru.ac.uk
+# Country: United Kingdom  |  Currency: GBP
+
+discovery:
+  auto_api_discovery: false
+
+  seed_urls:
+    - https://www.aru.ac.uk/study/course-search?keywords=&levelofstudy=Undergraduate
+    - https://www.aru.ac.uk/study/course-search?keywords=&levelofstudy=Postgraduate
+
+  bfs_page_budget: 120
+  max_candidates: 700
+  expected_min_courses: 250
+
+  must_contain:
+    - /study/undergraduate/
+    - /study/postgraduate/
+
+  allow_url_patterns:
+    - "/study/undergraduate/"
+    - "/study/postgraduate/"
+
+  block_url_patterns:
+    - "/study/course-search"
+    - "/study/undergraduate/?$"
+    - "/study/postgraduate/?$"
+    - "/news"
+    - "/events"
+    - "/staff/"
+    - "/about"
+    - "/contact"
+    - "/linkassets/"
+    - "/international/"
+    - "/student-life/"
+    - "/business-employers/"
+    - "\\?"
+    - "\\.pdf$"
+
+  always_sitemap_supplement: true
+  sitemap_url: https://www.aru.ac.uk/sitemap.xml
+
+  always_browser_discover: false
+  skip_browser_discovery: true
+  use_wayback: false
+
+extraction:
+  max_parallel_fetch: 6
+  skip_browser_rescue: false
+  skip_per_course_browser: false
+  browser_wait_strategy: domcontentloaded
+  browser_dcl_settle_ms: 3000
+
+  fees:
+    default_currency: GBP
+    prefer_international: true
+    prefer_annual_over_total: true
+    prefer_year_one_over_total: true
+    max_annual_fee: 35000
+
+    reject_keywords:
+      - Home student
+      - UK student
+      - Domestic
+      - England
+      - Student Finance England
+
+  english:
+    trust_vision_ocr: false
+    trust_tier1_vision_ocr_english: false
+
+    degree_level_defaults:
+      undergraduate:
+        ielts: 6.0
+        pte: 60
+        toefl: 80
+      postgraduate:
+        ielts: 6.5
+        pte: 61
+        toefl: 88
+
+  intake:
+    start_dates_only: true
+    start_dates_window_chars: 700
+
+  filters:
+    domestic_only:
+      enabled: false
+    online_only:
+      enabled: false
+
+  text_cleaning:
+    duration:
+      reject_sentence_patterns:
+        - "part-time for up to \\d+ years"
+        - "up to \\d+ years"
+
+    global_substring_blocklist:
+      - Apply now
+      - Book an open day
+      - Request information
+      - Contact us
+      - Download prospectus
+      - Chat to us
+
+  course_name:
+    strip_title_suffixes:
+      - " | ARU"
+      - " | Anglia Ruskin University"
+      - " - ARU"
+      - " - Anglia Ruskin University"
+
+  staging:
+    reject_if_missing:
+      - course_name
