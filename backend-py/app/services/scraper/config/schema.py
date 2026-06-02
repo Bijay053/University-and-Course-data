@@ -356,6 +356,28 @@ class DiscoveryConfig(BaseModel):
             "0 links returned. See GenericSearchApiConfig for full field docs."
         ),
     )
+    auto_api_discovery: bool = Field(
+        default=False,
+        description=(
+            "Enable autonomous XHR/Fetch API discovery. When true, and when all "
+            "preceding discovery tiers (YAML API, auto_config API, BFS, Scrapy) "
+            "return fewer than 10 course links, the scraper: "
+            "(1) opens the university's course-listing page in a headless browser, "
+            "(2) intercepts all JSON XHR/Fetch calls made during page load, "
+            "(3) classifies each call (SearchStax, Algolia, Elasticsearch, Solr, REST), "
+            "(4) generates a GenericSearchApiConfig for the best candidate (confidence ≥ 0.45), "
+            "(5) immediately uses that config to fetch course links for the current run, "
+            "(6) persists the discovered endpoint URL + auth hint to auto_config so "
+            "    future scrapes use it without re-running XHR capture. "
+            "Typically adds 15-25 s to the first scrape run; zero overhead on subsequent "
+            "runs (auto_config path bypasses discovery entirely). "
+            "The captured Authorization header value is stored in auto_config under "
+            "'_auto_api_auth' — it is a read-only public search key (SearchStax / Algolia), "
+            "NOT a user credential. Treat it as semi-public but rotate via the "
+            "provider console if the key is ever compromised. "
+            "When false (default), autonomous API detection never runs."
+        ),
+    )
     fallback_subdomains: list[str] = Field(
         default_factory=list,
         description=(

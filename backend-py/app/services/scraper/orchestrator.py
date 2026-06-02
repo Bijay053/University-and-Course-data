@@ -1259,6 +1259,61 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                         _deduped.append(_lnk)
                 links = _deduped
 
+        # ── Autonomous XHR/Fetch API discovery ───────────────────────────────
+        # When discovery.auto_api_discovery: true is set in the per-uni YAML
+        # AND all preceding tiers (YAML API, auto_config API, BFS, browser,
+        # Wayback) produced fewer than 10 course links, run the XHR bridge:
+        #   1. Open the listing page in Playwright and intercept JSON calls.
+        #   2. Classify the best candidate (SearchStax, Algolia, Solr, REST…).
+        #   3. Build a GenericSearchApiConfig and immediately fetch links.
+        #   4. Persist discovered endpoint to auto_config for future scrapes.
+        _auto_api_enabled = getattr(_uni_cfg.discovery, "auto_api_discovery", False)
+        _AUTO_API_THRESHOLD = 10
+        if _auto_api_enabled and len(links) < _AUTO_API_THRESHOLD:
+            log.info(
+                "[AUTO_API] auto_api_discovery=True and only %d links so far — "
+                "running XHR intercept on %s",
+                len(links), scrape_url,
+            )
+            await emit(
+                "status",
+                f"[AUTO DISCOVER] only {len(links)} course links from standard tiers "
+                f"— scanning XHR traffic to find search API…",
+                phase="discover",
+            )
+            try:
+                from app.services.scraper.auto_api_discovery import run_auto_api_discovery
+                _auto_links = await run_auto_api_discovery(
+                    listing_url=scrape_url,
+                    university_id=uni_id,
+                    db=db,
+                    emit=emit,
+                )
+                if _auto_links:
+                    log.info(
+                        "[AUTO_API] %d course links from auto-discovered API — "
+                        "replacing %d standard-tier links",
+                        len(_auto_links), len(links),
+                    )
+                    links = _auto_links
+                    await emit(
+                        "status",
+                        f"[AUTO DISCOVER] found {len(links)} course links via "
+                        f"auto-discovered API — skipping BFS/browser for next run",
+                        phase="discover",
+                    )
+                else:
+                    log.info(
+                        "[AUTO_API] no API found or 0 links returned — keeping "
+                        "%d links from standard tiers",
+                        len(links),
+                    )
+            except Exception as _aad_exc:
+                log.error(
+                    "[AUTO_API] auto_api_discovery failed: %s",
+                    _aad_exc, exc_info=True,
+                )
+
         # ── Extra course URLs (surgical YAML override) ───────────────────────
         # Explicit URLs listed under discovery.extra_course_urls in the per-uni
         # YAML are injected here, AFTER all discovery tiers, bypassing BFS /

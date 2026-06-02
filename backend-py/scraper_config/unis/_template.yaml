@@ -76,10 +76,38 @@ discovery:
   #   currency: "GBP"                         # NZD for NZ, AUD for AU, GBP for UK
   #   central_fee_page: null                  # URL used as source_url for fee evidence rows
 
-  # ── Tier 1: YAML-driven generic JSON/REST API ──────────────────────────────
+  # ── Tier 1a: Autonomous XHR/Fetch API discovery ────────────────────────────
+  # Set to true to enable the auto-discovery engine.
+  # When set, the scraper opens the listing page in Playwright, intercepts all
+  # JSON XHR/Fetch calls, classifies the best candidate (SearchStax, Algolia,
+  # Solr, Elasticsearch, REST JSON), and immediately uses it to fetch courses.
+  # The discovered endpoint + auth hint are persisted to auto_config so future
+  # scrapes use the API tier directly (zero overhead on subsequent runs).
+  #
+  # Use when:
+  #   - BFS / browser / Wayback find < 10 courses (JS SPA with hidden API)
+  #   - You don't yet know the API endpoint URL (JCU, RMIT, Deakin, Funnelback)
+  #   - The auth token is a stable read-only public search key (SearchStax,
+  #     Algolia) — auto_config stores it for reuse across scrapes
+  #
+  # Do NOT use when:
+  #   - BFS already finds ≥ 10 courses (adds 15-25s for no benefit)
+  #   - The auth token is a per-session credential (short-lived OAuth etc.)
+  #
+  # After a successful auto-discovery run, inspect auto_config in the DB:
+  #   SELECT scrape_config->'auto_config'->>'_api_provider',
+  #          scrape_config->'auto_config'->>'_auto_api_url'
+  #   FROM universities WHERE id = <uni_id>;
+  # Then optionally promote to YAML: copy the URL + token into generic_search_api
+  # and set auto_api_discovery: false (YAML tier runs before auto-discovery).
+  auto_api_discovery: false
+
+  # ── Tier 1b: YAML-driven generic JSON/REST API ─────────────────────────────
   # Query any JSON/REST API (SearchStax Solr, Algolia, custom endpoint) for
   # course links BEFORE BFS/browser. Runs after SearchStax tier.
   # When it returns ≥1 link, BFS and browser tiers are skipped entirely.
+  # Use when you already know the API endpoint (promoted from auto_api_discovery,
+  # or found via DevTools). Operator-configured YAML wins over auto-discovery.
   #
   # generic_search_api:
   #   enabled: true

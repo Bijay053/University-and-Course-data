@@ -67,11 +67,18 @@ class XhrCapture:
     body_size: int = 0
     # Parsed JSON body (first _MAX_BODY_BYTES); None if not valid JSON
     sample_body: Any = None
+    # Authorization header value — stored separately from request_headers so
+    # it is never accidentally logged.  Empty string when not present.
+    _auth_header: str = field(default="", repr=False)
 
     def is_json(self) -> bool:
         return "json" in self.content_type.lower() or isinstance(
             self.sample_body, (dict, list)
         )
+
+    def auth_token(self) -> str:
+        """Return the raw Authorization header value (may be empty string)."""
+        return self._auth_header
 
 
 async def capture_xhr_signals(
@@ -189,6 +196,9 @@ async def capture_xhr_signals(
                     for k, v in req_hdrs.items()
                     if k.lower() not in ("cookie", "authorization")
                 },
+                # auth stored separately so callers that need it can access it
+                # without accidentally logging it via the normal request_headers dict.
+                _auth_header=req_hdrs.get("authorization", ""),
             )
         )
 
