@@ -5327,6 +5327,22 @@ async def extract_course(
                 _pg_skip_configured = bool(
                     central_data.get("central_english_pg_skip", False)
                 )
+                # Also skip flat central English for PG courses when the YAML
+                # has per-level defaults configured.  In that case the central
+                # page is often UG-specific (e.g. Waikato's undergrad-only page
+                # at /study/apply/undergraduate-international/...) and the flat
+                # values it returns (e.g. IELTS 6.0) are wrong for PG courses.
+                # Skipping here lets the degree_level_defaults block below apply
+                # the correct tier-specific values (e.g. IELTS 6.5 for PG).
+                if not _pg_skip_configured and _course_dl in _CENTRAL_ENGLISH_PG_LEVELS:
+                    try:
+                        _yaml_uc2 = get_uni_config()
+                        _yaml_eng2 = getattr(getattr(_yaml_uc2, "extraction", None), "english", None)
+                        _yaml_dl2: dict = getattr(_yaml_eng2, "degree_level_defaults", {}) or {}
+                        if _yaml_dl2.get("postgraduate"):
+                            _pg_skip_configured = True
+                    except Exception:
+                        pass
                 _skip_central_english = (
                     _pg_skip_configured and _course_dl in _CENTRAL_ENGLISH_PG_LEVELS
                 ) or _is_pathway_course  # pathway: skip central English entirely

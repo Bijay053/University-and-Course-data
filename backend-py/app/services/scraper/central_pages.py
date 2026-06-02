@@ -315,13 +315,16 @@ def _parse_fee_page_html(html: str, page_url: str) -> list[CentralFeeRecord]:
             # ── Strip verbose major-listing annotations ───────────────────────
             # Some fee tables append long subject lists to degree names, e.g.:
             #   "Bachelor of Business (BBus) All major subjects: Accounting, …"
+            #   "Bachelor of Engineering with Honours (BE(Hons)) All major
+            #    subjects, years 1-3: Chemical …"   ← colon not immediately after keyword
             # token_sort_ratio("Bachelor of Business", long_name) ≈ 14 (miss).
             # Stripping the annotation → token_sort_ratio ≈ 85 (high confidence).
+            # [^:]* handles optional qualifiers like ", years 1-3" before the colon.
             _cleaned = re.sub(
-                r"\s+All\s+(?:major\s+)?(?:subjects?|streams?|majors?|options?)\s*:.*$",
+                r"\s+All\s+(?:major\s+)?(?:subjects?|streams?|majors?|options?)[^:]*:.*$",
                 "",
                 prog_name,
-                flags=re.IGNORECASE,
+                flags=re.IGNORECASE | re.DOTALL,
             ).strip()
             if _cleaned and len(_cleaned) >= 3:
                 prog_name = _cleaned
@@ -1913,6 +1916,17 @@ def match_central_fee(
 
     _norm_course = re.sub(r"\s+", " ", course_name).strip().lower()
 
+    # Trailing parenthetical abbreviation, e.g. "(BBus)", "(BHealth)", "(BE(Hons))".
+    # Stripping it from the fee-table pattern before fuzzy matching avoids a
+    # score penalty when the course name as scraped has no abbreviation.
+    # E.g. "Bachelor of Health (BHealth)" → 78.3 vs threshold 80 (miss);
+    # after strip → "Bachelor of Health" → 100 (exact hit).
+    # IGNORECASE required: _score lowercases both strings before applying this.
+    _ABBREV_TRAIL_RE = re.compile(
+        r"\s*\([a-zA-Z][a-zA-Z()\s]{0,25}\)\s*$",
+        re.IGNORECASE,
+    )
+
     def _score(pattern: str, name: str) -> float:
         p = re.sub(r"\s+", " ", pattern).strip().lower()
         n = re.sub(r"\s+", " ", name).strip().lower()
@@ -1927,7 +1941,13 @@ def match_central_fee(
             # include partial_token_set_ratio which rewards the common word
             # "of" being in both strings and inflates unrelated matches to
             # score ≥ 85, causing the same "all courses get one fee" bug.
-            return float(_rfuzz.token_sort_ratio(p, n))
+            s1 = float(_rfuzz.token_sort_ratio(p, n))
+            # Also try with trailing abbreviation stripped from the pattern.
+            # "Bachelor of Health (BHealth)" → after strip → "Bachelor of Health"
+            # → score 100 (exact) instead of 78.3 (miss).
+            p_no_abbrev = _ABBREV_TRAIL_RE.sub("", p).strip()
+            s2 = float(_rfuzz.token_sort_ratio(p_no_abbrev, n)) if p_no_abbrev != p else 0.0
+            return max(s1, s2)
         return 100.0 if p == n else (60.0 if p in n or n in p else 0.0)
 
     best_record: CentralFeeRecord | None = None
