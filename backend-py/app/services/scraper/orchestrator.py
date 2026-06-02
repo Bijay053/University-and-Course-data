@@ -886,10 +886,28 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             if _yaml_api_links:
                 links = _yaml_api_links
                 _always_browser = False
-                log.info("[YAML_API] %d links from YAML generic_search_api", len(links))
+                _yaml_api_wants_supplement = getattr(
+                    _uni_cfg.discovery, "always_sitemap_supplement", False
+                )
+                _yaml_api_expected_min = getattr(
+                    _uni_cfg.discovery, "expected_min_courses", None
+                )
+                _yaml_api_partial = (
+                    _yaml_api_wants_supplement
+                    or (_yaml_api_expected_min and len(links) < _yaml_api_expected_min)
+                )
+                log.info(
+                    "[YAML_API] %d links from YAML generic_search_api (supplement=%s)",
+                    len(links), _yaml_api_partial,
+                )
+                _suffix = (
+                    " — sitemap/BFS supplement will follow"
+                    if _yaml_api_partial
+                    else " — skipping browser discovery"
+                )
                 await emit(
                     "status",
-                    f"[DISCOVER] API: found {len(links)} course link(s) — skipping browser discovery",
+                    f"[DISCOVER] API: found {len(links)} course link(s){_suffix}",
                     phase="discover",
                 )
             else:
@@ -1082,7 +1100,11 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
 
         # Skip BFS when always_browser_discover=True — the browser step below
         # is the primary discovery mechanism for Cloudflare-protected sites.
-        if not links and not _always_browser:
+        # Also run when the YAML API returned a partial result and sitemap
+        # supplement is requested (_yaml_api_partial), merging the two sets.
+        _yaml_api_partial = locals().get("_yaml_api_partial", False)
+        if (not links or _yaml_api_partial) and not _always_browser:
+            _pre_bfs_links = list(links)
             links = await discover_course_links(
                 scrape_url,
                 max_pages=max_pages,
@@ -1091,6 +1113,17 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 _blocked_fee_urls_sink=_discover_blocked_fee_urls,
                 discovery_config=_uni_cfg.discovery,
             )
+            # Merge YAML API links (pre-BFS) with BFS/sitemap results.
+            # API links are kept as seed — BFS links are deduplicated on top.
+            if _yaml_api_partial and _pre_bfs_links:
+                _seen_urls: set[str] = {lk["url"] for lk in links}
+                _api_only = [lk for lk in _pre_bfs_links if lk["url"] not in _seen_urls]
+                if _api_only:
+                    links = links + _api_only
+                    log.info(
+                        "[YAML_API] merged %d API-only link(s) with %d BFS/sitemap link(s) → %d total",
+                        len(_api_only), len(links) - len(_api_only), len(links),
+                    )
 
         # ── Fallback 1 / Primary: Generic Playwright browser discovery ────────
         # When always_browser_discover=True: browser is the PRIMARY discovery
