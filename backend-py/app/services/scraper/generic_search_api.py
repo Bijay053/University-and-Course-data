@@ -839,7 +839,10 @@ async def fetch_yaml_api_links(cfg: Any, emit: Callable[..., Any] | None = None)
 
     def _first_field(item: dict, fields: list[str]) -> str:
         for f in fields:
+            # Try direct key first, then dot-path navigation (e.g. "link.href")
             v = item.get(f)
+            if v is None and "." in f:
+                v = _dig(item, f)
             if v and isinstance(v, str):
                 return v.strip()
         return ""
@@ -849,13 +852,18 @@ async def fetch_yaml_api_links(cfg: Any, emit: Callable[..., Any] | None = None)
     offset = 0
     page_size = cfg.page_size or int(cfg.params.get(cfg.page_size_param, "0") or 0)
     paginate = page_size > 0
+    use_page_numbers = paginate and bool(getattr(cfg, "page_number_param", None))
+    current_page = 1  # used only in page-number mode
 
     async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
         for page_num in range(cfg.max_pages):
             req_params = dict(cfg.params)
             if paginate:
                 req_params[cfg.page_size_param] = str(page_size)
-                req_params[cfg.offset_param] = str(offset)
+                if use_page_numbers:
+                    req_params[cfg.page_number_param] = str(current_page)
+                else:
+                    req_params[cfg.offset_param] = str(offset)
 
             # ── Make the HTTP request ────────────────────────────────────────
             resp = None
@@ -975,9 +983,23 @@ async def fetch_yaml_api_links(cfg: Any, emit: Callable[..., Any] | None = None)
                 detail += f", {no_url} items had no URL in fields {cfg.url_fields}"
             await _emit(f"page {page_num}: {detail} (running total: {len(links)})")
 
-            if not paginate or len(items) < page_size:
-                break  # last page
-            offset += page_size
+            if not paginate:
+                break  # single-request mode
+
+            # ── Check has_next_field before advancing ─────────────────────────
+            has_next_path = getattr(cfg, "has_next_field", None)
+            if has_next_path:
+                has_next = _dig(data, has_next_path)
+                if not has_next:
+                    await _emit(f"page {page_num}: has_next_field={has_next_path!r} → false, stopping")
+                    break
+            elif len(items) < page_size:
+                break  # last page (offset mode fallback)
+
+            if use_page_numbers:
+                current_page += 1
+            else:
+                offset += page_size
 
     # ── Deduplicate by URL (preserve order) ──────────────────────────────────
     seen_urls: set[str] = set()

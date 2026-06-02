@@ -316,6 +316,25 @@ class GenericSearchApiConfig(BaseModel):
         default="start",
         description="Query parameter name for offset / page start.",
     )
+    page_number_param: Optional[str] = Field(
+        default=None,
+        description=(
+            "When set, use 1-based page-number pagination instead of offset pagination. "
+            "The value is the query parameter name sent to the API (e.g. 'currentPage', "
+            "'page', 'PageNumber'). Requires page_size and page_size_param to also be set. "
+            "Use has_next_field to let the API signal the last page."
+        ),
+    )
+    has_next_field: Optional[str] = Field(
+        default=None,
+        description=(
+            "Dot-separated path into the JSON response (at root level, NOT inside root_path) "
+            "pointing to a boolean field that is true when more pages exist. "
+            "E.g. 'result.hasNextPage', 'meta.has_more'. "
+            "When set the paginator stops as soon as this field is false/absent, "
+            "regardless of page_size comparisons."
+        ),
+    )
     max_pages: int = Field(
         default=20,
         description="Hard ceiling on pagination rounds to prevent runaway loops.",
