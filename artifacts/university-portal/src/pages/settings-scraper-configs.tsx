@@ -93,8 +93,18 @@ discovery:
   # allow_url_patterns:
   #   - /courses/
   #   - /programs/
+  #
+  # IMPORTANT: allow_url_patterns is an INCLUSION filter — if no discovered URL
+  # matches at least one pattern, the scraper stages 0 courses:
+  #   Discovered 175 raw candidate course link(s)
+  #   URL filter dropped 175 / 175 URLs (100%)
+  #   Found: 0
+  # Always test your regex against a sample of real discovered URLs before enabling.
+  # Prefer must_contain (below) when a simple substring is enough.
 
-  # Require every URL to contain at least one substring (simpler than allow_url_patterns):
+  # Simpler and usually safer than allow_url_patterns.
+  # Use when a unique URL path segment reliably identifies course pages.
+  # Unlike allow_url_patterns, no regex knowledge needed — just a substring.
   # must_contain:
   #   - /courses/
 
