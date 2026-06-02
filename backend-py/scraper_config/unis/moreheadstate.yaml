@@ -1,19 +1,24 @@
 # Morehead State University
 # Hostname: www.moreheadstate.edu
-# Country: USA
-# Currency: USD
+# Country: USA  |  Currency: USD
 #
-# Reason:
-# Discovery finds valid course URLs under /academics/programs/
-# but URL filtering drops 100% of discovered URLs.
-#
-# Example valid course URLs:
-# https://www.moreheadstate.edu/academics/programs/agriculture-bs
-# https://www.moreheadstate.edu/academics/programs/agriculture-minor
+# Bug history / rationale:
+#   Discovery is working now. The latest run found 173 extractable course pages.
+#   Main issue is extraction quality:
+#   - per-course pages do not show course-specific international fees
+#   - central tuition page gives bucket-level tuition, not per-course fees
+#   - scraper was correctly skipping bucket match fees to avoid wrong values
+#   - many courses have no fixed intake on course page
+#   - browser rendered HTML is 0B, while static HTML already contains usable text
 
 discovery:
+  auto_api_discovery: false
+
   seed_urls:
     - https://www.moreheadstate.edu/academics/programs/
+
+  always_sitemap_supplement: true
+  sitemap_url: https://www.moreheadstate.edu/sitemap.xml
 
   must_contain:
     - /academics/programs/
@@ -36,36 +41,69 @@ discovery:
   max_candidates: 500
   expected_min_courses: 150
 
-  always_sitemap_supplement: true
   always_browser_discover: false
-  skip_browser_discovery: false
+  skip_browser_discovery: true
   use_wayback: false
 
 extraction:
+  skip_per_course_browser: true
+  skip_browser_rescue: true
+  max_parallel_fetch: 4
+
   fees:
-    central_page: https://www.moreheadstate.edu/admissions/tuition
     default_currency: USD
+    central_page: https://www.moreheadstate.edu/admissions/tuition
     force_central_fee_stage: true
+
+    reject_keywords:
+      - Kentucky residents
+      - Ohio reciprocating counties
+      - In-state
+      - Full-time
+      - credit hours
+      - Undergraduate online
+
+  english:
+    trust_vision_ocr: false
+    default_toefl: 70
+
+  intake:
+    rolling_enrollment_label: Rolling
+    rolling_enrollment_markers:
+      - Apply Now
+      - accepted to MSU
+      - standard undergraduate application process
+      - admission requirements
 
   filters:
     domestic_only:
-      enabled: true
-
+      enabled: false
     online_only:
-      enabled: true
-
-  staging:
-    reject_if_missing:
-      - course_name
+      enabled: false
 
   text_cleaning:
+    location:
+      strip_patterns:
+        - '\s*Apply Now.*$'
+        - '\s*Take the Next Step.*$'
+
+    duration:
+      reject_sentence_patterns:
+        - '\d+\s*Credit Hours'
+        - '\d+\s*hours'
+
     global_substring_blocklist:
       - Apply Now
-      - Request Information
-      - Visit Campus
+      - Take the Next Step
+      - Ready to be a Morehead State Eagle
+      - Course Requirements
+      - Related Programs
+      - See all Academic Programs
 
   course_name:
     strip_title_suffixes:
       - " | Morehead State University"
       - " - Morehead State University"
       - " : Morehead State University"
+
+  default_course_location: Morehead
