@@ -1741,16 +1741,40 @@ def _yaml_to_recipe(yaml_data: dict) -> dict:
             "headers":             dict(gsa.get("headers") or {}),
             "fields":              {},
         }
+        # enabled / browser mode
+        if gsa.get("enabled") is False:
+            api_block["enabled"] = False
+        if gsa.get("fetch_via_browser"):
+            api_block["fetch_via_browser"] = True
+        if gsa.get("browser_seed_url"):
+            api_block["browser_seed_url"] = gsa["browser_seed_url"]
+        # URL normalization
+        if gsa.get("base_url"):
+            api_block["base_url"] = gsa["base_url"]
+        if gsa.get("normalize_relative_urls") is False:
+            api_block["normalize_relative_urls"] = False
+        # URL field hints
         if gsa.get("url_fields"):
             api_block["url_fields"] = list(gsa["url_fields"])
         if gsa.get("title_fields"):
             api_block["title_fields"] = list(gsa["title_fields"])
+        # URL filters within this API provider
+        if gsa.get("allow_url_patterns"):
+            api_block["api_allow_url_patterns"] = list(gsa["allow_url_patterns"])
+        if gsa.get("block_url_patterns"):
+            api_block["api_block_url_patterns"] = list(gsa["block_url_patterns"])
+        # POST body
         if gsa.get("body") is not None:
             api_block["body"] = gsa["body"]
         if gsa.get("body_pagination"):
-            api_block["body_pagination"] = dict(gsa["body_pagination"])
-        # Pagination: map schema fields → recipe pagination object
-        if gsa.get("page_size"):
+            bp = gsa["body_pagination"]
+            api_block["body_pagination"] = dict(bp) if isinstance(bp, dict) else bp.model_dump(exclude_none=True)
+        # Additional URLs (UG+PG split endpoints)
+        if gsa.get("additional_urls"):
+            api_block["additional_urls"] = list(gsa["additional_urls"])
+        # Pagination — query-string only (when no body_pagination)
+        has_body_pag = bool(gsa.get("body_pagination"))
+        if gsa.get("page_size") and not has_body_pag:
             api_block["pagination"] = {
                 "type":       "offset",
                 "page_param": gsa.get("page_number_param") or gsa.get("offset_param") or "start",
@@ -1759,6 +1783,11 @@ def _yaml_to_recipe(yaml_data: dict) -> dict:
                 "page_start": 0,
                 "max_pages":  gsa.get("max_pages") or 20,
             }
+        # page_size + max_pages as standalone (used with body_pagination)
+        if gsa.get("page_size") and has_body_pag:
+            api_block["page_size"] = gsa["page_size"]
+        if gsa.get("max_pages") and gsa["max_pages"] != 20:
+            api_block["max_pages"] = gsa["max_pages"]
         recipe["api"] = api_block
 
     return recipe
@@ -1911,10 +1940,47 @@ def _recipe_to_yaml_patch(existing_yaml: dict, recipe: dict) -> dict:
             gsa["method"] = method
         elif "method" in gsa and gsa["method"] == "GET":
             del gsa["method"]
-        _set_or_del(gsa, "params",           dict(api.get("query_params") or {}) or None)
-        _set_or_del(gsa, "headers",          dict(api.get("headers") or {}) or None)
-        _set_or_del(gsa, "root_path",        api.get("root_path") or "")
+        # enabled
+        if api.get("enabled") is False:
+            gsa["enabled"] = False
+        elif "enabled" in gsa and gsa["enabled"] is False and api.get("enabled") is not False:
+            del gsa["enabled"]
+        # browser mode
+        if api.get("fetch_via_browser"):
+            gsa["fetch_via_browser"] = True
+        elif "fetch_via_browser" in gsa:
+            del gsa["fetch_via_browser"]
+        _set_or_del(gsa, "browser_seed_url", api.get("browser_seed_url") or "")
+        # URL normalization
+        _set_or_del(gsa, "base_url", api.get("base_url") or "")
+        if api.get("normalize_relative_urls") is False:
+            gsa["normalize_relative_urls"] = False
+        elif "normalize_relative_urls" in gsa and gsa["normalize_relative_urls"] is False:
+            del gsa["normalize_relative_urls"]
+        # params / headers / paths
+        _set_or_del(gsa, "params",              dict(api.get("query_params") or {}) or None)
+        _set_or_del(gsa, "headers",             dict(api.get("headers") or {}) or None)
+        _set_or_del(gsa, "root_path",           api.get("root_path") or "")
         _set_or_del(gsa, "course_url_template", api.get("course_url_template") or "")
+        # URL fields
+        if api.get("url_fields"):
+            gsa["url_fields"] = list(api["url_fields"])
+        elif "url_fields" in gsa:
+            del gsa["url_fields"]
+        if api.get("title_fields"):
+            gsa["title_fields"] = list(api["title_fields"])
+        elif "title_fields" in gsa:
+            del gsa["title_fields"]
+        # URL filters
+        if api.get("api_allow_url_patterns"):
+            gsa["allow_url_patterns"] = list(api["api_allow_url_patterns"])
+        elif "allow_url_patterns" in gsa:
+            del gsa["allow_url_patterns"]
+        if api.get("api_block_url_patterns"):
+            gsa["block_url_patterns"] = list(api["api_block_url_patterns"])
+        elif "block_url_patterns" in gsa:
+            del gsa["block_url_patterns"]
+        # POST body
         if api.get("body") is not None:
             gsa["body"] = api["body"]
         elif "body" in gsa:
@@ -1924,10 +1990,27 @@ def _recipe_to_yaml_patch(existing_yaml: dict, recipe: dict) -> dict:
             gsa["body_pagination"] = {k: v for k, v in bp.items() if v}
         elif "body_pagination" in gsa:
             del gsa["body_pagination"]
-        if api.get("url_fields"):
-            gsa["url_fields"] = list(api["url_fields"])
-        if api.get("title_fields"):
-            gsa["title_fields"] = list(api["title_fields"])
+        # Additional URLs
+        if api.get("additional_urls"):
+            gsa["additional_urls"] = list(api["additional_urls"])
+        elif "additional_urls" in gsa:
+            del gsa["additional_urls"]
+        # page_size / max_pages (standalone — used with body_pagination)
+        if api.get("page_size"):
+            gsa["page_size"] = int(api["page_size"])
+        elif "page_size" in gsa and not api.get("pagination"):
+            del gsa["page_size"]
+        if api.get("max_pages") and api["max_pages"] != 20:
+            gsa["max_pages"] = int(api["max_pages"])
+        elif "max_pages" in gsa and not api.get("pagination"):
+            del gsa["max_pages"]
+        # query-string pagination (only when body_pagination is absent)
+        pag = api.get("pagination") or {}
+        if pag.get("page_size") and not bp.get("current_path"):
+            gsa["page_size"]      = int(pag["page_size"])
+            gsa["max_pages"]      = int(pag.get("max_pages") or 20)
+            _set_or_del(gsa, "page_size_param",  pag.get("size_param") or "")
+            _set_or_del(gsa, "offset_param",     pag.get("page_param") or "")
     elif "generic_search_api" in disc:
         del disc["generic_search_api"]
 

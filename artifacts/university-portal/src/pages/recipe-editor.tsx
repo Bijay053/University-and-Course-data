@@ -42,8 +42,18 @@ interface ApiConfig {
   course_url_template: string;
   fields: Record<string, string>;
   headers: Record<string, string>;
+  enabled?: boolean;
+  fetch_via_browser?: boolean;
+  browser_seed_url?: string;
+  base_url?: string;
+  normalize_relative_urls?: boolean;
   url_fields?: string[];
   title_fields?: string[];
+  api_allow_url_patterns?: string[];
+  api_block_url_patterns?: string[];
+  additional_urls?: string[];
+  page_size?: number;
+  max_pages?: number;
   body?: Record<string, any> | null;
   body_pagination?: {
     current_path: string;
@@ -2002,11 +2012,22 @@ export default function RecipeEditorPage() {
         <TabsContent value="api">
           <Card>
             <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2"><Database className="h-4 w-4" /> JSON / REST API Endpoint</CardTitle>
-              <CardDescription>
-                Configure a known JSON feed that returns the full course catalogue.
-                Example: <code className="text-xs">https://courses.hud.ac.uk/json/2025-26/sort:title</code>
-              </CardDescription>
+              <div className="flex items-start justify-between">
+                <div>
+                  <CardTitle className="text-base flex items-center gap-2"><Database className="h-4 w-4" /> JSON / REST API Endpoint</CardTitle>
+                  <CardDescription className="mt-1">
+                    Configure a known JSON feed that returns the full course catalogue.
+                    Example: <code className="text-xs">https://courses.hud.ac.uk/json/2025-26/sort:title</code>
+                  </CardDescription>
+                </div>
+                <div className="flex items-center gap-2 shrink-0 ml-4">
+                  <span className="text-xs text-muted-foreground">{recipe.api?.enabled === false ? "Disabled" : "Enabled"}</span>
+                  <Switch
+                    checked={recipe.api?.enabled !== false}
+                    onCheckedChange={v => patchApi({ enabled: v ? undefined : false })}
+                  />
+                </div>
+              </div>
             </CardHeader>
             <CardContent className="space-y-5">
               <div className="grid grid-cols-3 gap-4">
@@ -2101,6 +2122,38 @@ export default function RecipeEditorPage() {
                 valuePlaceholder="Header value (e.g. Token abc123)"
                 helpText="HTTP headers sent with every API request. For token auth: key = Authorization, value = Token <your-token>."
               />
+
+              <Separator />
+
+              {/* Browser mode — needed for session-bound APIs */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label>Browser Mode</Label>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Use a Playwright browser to call the API so session cookies are inherited. Required for Incapsula/Imperva-protected endpoints (e.g. Waikato).
+                    </p>
+                  </div>
+                  <Switch
+                    checked={!!recipe.api?.fetch_via_browser}
+                    onCheckedChange={v => patchApi({ fetch_via_browser: v || undefined })}
+                  />
+                </div>
+                {recipe.api?.fetch_via_browser && (
+                  <div className="pl-2">
+                    <Label className="text-xs">Browser Seed URL <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                    <Input
+                      value={recipe.api?.browser_seed_url || ""}
+                      onChange={e => patchApi({ browser_seed_url: e.target.value || undefined })}
+                      placeholder="https://uni.edu/int/study/qualifications/"
+                      className="mt-1 text-sm font-mono"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Page to navigate before calling the API — triggers the server's session-cookie handshake. Defaults to the university homepage.
+                    </p>
+                  </div>
+                )}
+              </div>
 
               <Separator />
 
@@ -2277,9 +2330,159 @@ export default function RecipeEditorPage() {
                     )}
                   </div>
 
+                  {/* Page size + max pages for body-pagination mode */}
+                  <div className="grid grid-cols-2 gap-3 pl-2">
+                    <div>
+                      <Label className="text-xs">Page Size</Label>
+                      <Input
+                        type="number"
+                        value={recipe.api?.page_size || ""}
+                        onChange={e => patchApi({ page_size: parseInt(e.target.value) || undefined })}
+                        placeholder="100"
+                        className="mt-1 text-sm"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">Items per page (injected into body via Body Pagination paths above)</p>
+                    </div>
+                    <div>
+                      <Label className="text-xs">Max Pages</Label>
+                      <Input
+                        type="number"
+                        value={recipe.api?.max_pages || ""}
+                        onChange={e => patchApi({ max_pages: parseInt(e.target.value) || undefined })}
+                        placeholder="20"
+                        className="mt-1 text-sm"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">Hard ceiling on pagination rounds to prevent runaway loops</p>
+                    </div>
+                  </div>
+
                   <Separator />
                 </>
               )}
+
+              {/* URL normalization — needed when API returns relative URLs */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label>Relative URL Normalisation</Label>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Prepend a base URL to relative paths returned by the API (e.g. <code>/study/qualifications/ba-arts/</code> → full URL).
+                    </p>
+                  </div>
+                  <Switch
+                    checked={recipe.api?.normalize_relative_urls !== false && (!!recipe.api?.base_url || !!recipe.api?.normalize_relative_urls)}
+                    onCheckedChange={v => patchApi({ normalize_relative_urls: v ? true : false, base_url: v ? recipe.api?.base_url || "" : undefined })}
+                  />
+                </div>
+                {recipe.api?.normalize_relative_urls !== false && recipe.api?.base_url !== undefined && (
+                  <div className="pl-2">
+                    <Label className="text-xs">Base URL</Label>
+                    <Input
+                      value={recipe.api?.base_url || ""}
+                      onChange={e => patchApi({ base_url: e.target.value || undefined })}
+                      placeholder="https://www.uni.edu"
+                      className="mt-1 text-sm font-mono"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">Origin prepended to relative paths (e.g. <code>https://www.waikato.ac.nz</code>)</p>
+                  </div>
+                )}
+              </div>
+
+              <Separator />
+
+              {/* URL filters within API results */}
+              <div className="space-y-4">
+                <div>
+                  <Label>API URL Allow Patterns <span className="text-muted-foreground font-normal text-xs">(optional)</span></Label>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Regex whitelist applied to URLs extracted from API results — only matching URLs are kept. Leave blank to keep all.
+                  </p>
+                  {(recipe.api?.api_allow_url_patterns || [""]).map((pat, i) => (
+                    <div key={i} className="flex gap-2 mt-1">
+                      <Input
+                        value={pat}
+                        onChange={e => {
+                          const arr = [...(recipe.api?.api_allow_url_patterns || [""])];
+                          arr[i] = e.target.value;
+                          patchApi({ api_allow_url_patterns: arr.filter(Boolean) });
+                        }}
+                        placeholder="/study/qualifications/"
+                        className="text-sm font-mono flex-1"
+                      />
+                      <Button type="button" variant="ghost" size="sm" onClick={() => {
+                        const arr = (recipe.api?.api_allow_url_patterns || []).filter((_, j) => j !== i);
+                        patchApi({ api_allow_url_patterns: arr });
+                      }}>✕</Button>
+                    </div>
+                  ))}
+                  <Button type="button" variant="outline" size="sm" className="mt-2"
+                    onClick={() => patchApi({ api_allow_url_patterns: [...(recipe.api?.api_allow_url_patterns || []), ""] })}>
+                    + Add pattern
+                  </Button>
+                </div>
+                <div>
+                  <Label>API URL Block Patterns <span className="text-muted-foreground font-normal text-xs">(optional)</span></Label>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Regex blocklist applied to URLs extracted from API results — matching URLs are dropped.
+                  </p>
+                  {(recipe.api?.api_block_url_patterns || [""]).map((pat, i) => (
+                    <div key={i} className="flex gap-2 mt-1">
+                      <Input
+                        value={pat}
+                        onChange={e => {
+                          const arr = [...(recipe.api?.api_block_url_patterns || [""])];
+                          arr[i] = e.target.value;
+                          patchApi({ api_block_url_patterns: arr.filter(Boolean) });
+                        }}
+                        placeholder="^\\.pdf$"
+                        className="text-sm font-mono flex-1"
+                      />
+                      <Button type="button" variant="ghost" size="sm" onClick={() => {
+                        const arr = (recipe.api?.api_block_url_patterns || []).filter((_, j) => j !== i);
+                        patchApi({ api_block_url_patterns: arr });
+                      }}>✕</Button>
+                    </div>
+                  ))}
+                  <Button type="button" variant="outline" size="sm" className="mt-2"
+                    onClick={() => patchApi({ api_block_url_patterns: [...(recipe.api?.api_block_url_patterns || []), ""] })}>
+                    + Add pattern
+                  </Button>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Additional URLs — for UG+PG split endpoints */}
+              <div className="space-y-2">
+                <Label>Additional API URLs <span className="text-muted-foreground font-normal text-xs">(optional)</span></Label>
+                <p className="text-xs text-muted-foreground">
+                  Extra endpoints called with the same settings and merged. Use when a university splits its catalogue into separate UG / PG endpoints.
+                </p>
+                {(recipe.api?.additional_urls || [""]).map((url, i) => (
+                  <div key={i} className="flex gap-2">
+                    <Input
+                      value={url}
+                      onChange={e => {
+                        const arr = [...(recipe.api?.additional_urls || [""])];
+                        arr[i] = e.target.value;
+                        patchApi({ additional_urls: arr.filter(Boolean) });
+                      }}
+                      placeholder="https://api.uni.edu/courses/pg"
+                      className="text-sm font-mono flex-1"
+                    />
+                    <Button type="button" variant="ghost" size="sm" onClick={() => {
+                      const arr = (recipe.api?.additional_urls || []).filter((_, j) => j !== i);
+                      patchApi({ additional_urls: arr });
+                    }}>✕</Button>
+                  </div>
+                ))}
+                <Button type="button" variant="outline" size="sm"
+                  onClick={() => patchApi({ additional_urls: [...(recipe.api?.additional_urls || []), ""] })}>
+                  + Add URL
+                </Button>
+              </div>
+
+              <Separator />
 
               <KeyValueEditor
                 label="JSON Field Mapping"
