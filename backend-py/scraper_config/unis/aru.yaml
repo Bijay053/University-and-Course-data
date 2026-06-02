@@ -1,5 +1,5 @@
 # Anglia Ruskin University
-# Discovery: BFS from server-rendered course filter pages
+# Discovery: BFS from server-rendered course filter pages + sitemap supplement
 #
 # Key finding (2026-06-02):
 #   https://www.aru.ac.uk/study/course-search?levelofstudy=Undergraduate
@@ -7,11 +7,28 @@
 #   (e.g. /study/undergraduate/accounting-and-finance)
 #   No API or browser rendering required.
 #
-# Root causes of the earlier 0-course result:
-#   1. seed_urls pointed at bare /study/course-search (JS widget, no results in HTML)
-#   2. block_url_patterns had '\?' which blocked ALL query-string URLs including
-#      the filter pages that actually contain course listings
-#   3. BFS was starting from homepage (now fixed in orchestrator.py)
+# Speed optimisation (2026-06-02):
+#   Previous run: 27m 41s for 140/327 courses (projected ~50 min total)
+#   Target: ≤30 min for ~327 courses
+#
+#   Bottleneck 1 — Discovery: BFS was crawling all multi-filter query-param
+#     combinations (?levelofstudy=UG&modeofstudy=Full-time, &location=Cambridge,
+#     &startdate=September+2026, etc). These added 1-3 new candidates each but
+#     burned most of the 60-page budget. Fix: block any course-search URL that
+#     combines levelofstudy= with a second filter param. Sitemap supplement
+#     (always_sitemap_supplement: true) covers the courses they found.
+#     Budget reduced 60→20 — enough for the two seed pages + BFS from them.
+#
+#   Bottleneck 2 — Browser settle: domcontentloaded fires almost immediately
+#     on ARU's server-rendered pages. The 3000ms settle adds 3s to every
+#     browser rescue (≈170 sessions per 327-course run). Reduced to 800ms.
+#     Saves: 2.2s × 1.2 sessions/course × 327 = ~860s (~14 min).
+#
+#   Bottleneck 3 — Parallelism: max_parallel_fetch raised 6→12.
+#     ~2× extraction throughput for the HTTP + extraction phase.
+#
+#   Projected new total: (11.9 - 2.6) / 2 × 327 = ~24 min extraction
+#     + ~3 min discovery = ~27 min. Within target.
 
 discovery:
   auto_api_discovery: false
@@ -23,7 +40,7 @@ discovery:
   always_sitemap_supplement: true
   sitemap_url: https://www.aru.ac.uk/sitemap.xml
 
-  bfs_page_budget: 60
+  bfs_page_budget: 20
   max_candidates: 800
   expected_min_courses: 200
 
@@ -38,6 +55,12 @@ discovery:
   block_url_patterns:
     # Block the bare search widget (no results without JS)
     - '/study/course-search/?$'
+    # ── KEY SPEED FIX: block multi-filter course-search combinations ──────
+    # The BFS follows ?levelofstudy=UG&modeofstudy=Full-time, &location=Cambridge,
+    # &startdate=September+2026, etc. — each adds only 1-3 new courses while
+    # burning BFS budget. Block any course-search URL with a second filter param.
+    # The sitemap supplement covers all courses these pages would have found.
+    - 'course-search\?.*levelofstudy=.*&'
     # Block non-degree filter combinations
     - 'levelofstudy=(?:CPD|college-course|College\+course|Short\+course|Research|English\+language|Degree\+apprenticeship|Work-based)'
     - 'levelofstudy=college'
@@ -72,13 +95,18 @@ discovery:
     - '\.pdf$'
 
 extraction:
-  max_parallel_fetch: 6
+  # ── KEY SPEED FIX: doubled from 6 → ~2× extraction throughput ────────
+  max_parallel_fetch: 12
 
   skip_browser_rescue: false
   skip_per_course_browser: false
 
   browser_wait_strategy: domcontentloaded
-  browser_dcl_settle_ms: 3000
+  # ── KEY SPEED FIX: 3000 → 800 ─────────────────────────────────────────
+  # ARU is fully server-rendered — DCL fires in <200ms. The 3000ms settle
+  # was adding 3s to every browser session (≈170 sessions per run = +8 min).
+  # 800ms is ample for static content to stabilise.
+  browser_dcl_settle_ms: 800
 
   fees:
     default_currency: GBP
