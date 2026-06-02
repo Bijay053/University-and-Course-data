@@ -90,11 +90,36 @@ _ANNUAL_FEE_RANGES: list[tuple[list[str], float, float, float, float]] = [
 ]
 _ANNUAL_FEE_RANGE_DEFAULT: tuple[float, float, float, float] = (15_000, 8_000, 80_000, 120_000)
 
+# Approximate exchange rates to AUD for fee-range threshold normalisation.
+# These are intentionally conservative (rounded) — the quality check only
+# needs to avoid false positives on legitimate GBP/USD fees, not FX accuracy.
+# Update when rates drift by >15%.  AUD is 1.0 (no conversion).
+_CURRENCY_TO_AUD: dict[str, float] = {
+    "AUD": 1.00,
+    "GBP": 1.95,
+    "USD": 1.55,
+    "EUR": 1.65,
+    "NZD": 0.90,
+    "CAD": 1.12,
+    "SGD": 1.15,
+    "HKD": 0.20,
+    "JPY": 0.011,
+    "CNY": 0.22,
+    "INR": 0.019,
+    "MYR": 0.35,
+}
+
 def _annual_fee_range(dl: str) -> tuple[float, float, float, float]:
     for keywords, warn_min, crit_min, warn_max, crit_max in _ANNUAL_FEE_RANGES:
         if any(k in dl for k in keywords):
             return warn_min, crit_min, warn_max, crit_max
     return _ANNUAL_FEE_RANGE_DEFAULT
+
+
+def _fee_to_aud(value: float, currency: str) -> float:
+    """Convert a fee amount in *currency* to approximate AUD for threshold comparisons."""
+    rate = _CURRENCY_TO_AUD.get(currency.upper(), 1.0)
+    return value * rate
 
 # Fee terms that mean annual/per-year (empty = assume annual).
 _ANNUAL_FEE_TERMS: frozenset[str] = frozenset({
@@ -350,6 +375,7 @@ def _check_course(
     domestic_fee = payload.get("domestic_fee")
     has_central_fee = payload.get("has_central_fee_page")
     fee_term = (payload.get("fee_term") or "").strip()
+    fee_currency = (payload.get("fee_currency") or "AUD").strip().upper()
     duration_raw = payload.get("duration")
     duration_term_raw = (payload.get("duration_term") or "year").lower()
     degree_level_raw = (payload.get("degree_level") or "").lower()
@@ -488,15 +514,21 @@ def _check_course(
                     _warn_min, _crit_min, _warn_max, _crit_max = _annual_fee_range(
                         degree_level_raw
                     )
-                    _range_str = f"{_warn_min:,.0f}–{_warn_max:,.0f}/yr"
+                    # Normalise fee to AUD so GBP/USD/EUR fees are not falsely
+                    # flagged against AUD thresholds.  fee_val remains in
+                    # original currency for display; _fee_aud is used for logic.
+                    _fee_aud = _fee_to_aud(fee_val, fee_currency)
+                    _cur_label = fee_currency if fee_currency != "AUD" else "AUD"
+                    _range_str = f"{_warn_min:,.0f}–{_warn_max:,.0f}/yr (AUD)"
                     _dl_label = degree_level_raw or "this degree level"
-                    if fee_val < _crit_min:
-                        if fee_val <= _CSP_HECS_MAX:
+                    if _fee_aud < _crit_min:
+                        if _fee_aud <= _CSP_HECS_MAX:
                             add(
                                 "critical",
                                 "possible_domestic_fee",
-                                f"Fee {fee_val:,.0f} AUD/year is in the domestic/CSP fee range "
-                                f"(≤ {_CSP_HECS_MAX:,.0f}). "
+                                f"Fee {fee_val:,.0f} {_cur_label}/year "
+                                f"(≈ {_fee_aud:,.0f} AUD) is in the domestic/CSP fee range "
+                                f"(≤ {_CSP_HECS_MAX:,.0f} AUD). "
                                 "This is likely a Commonwealth Supported Place, HECS, or domestic "
                                 f"tuition fee — not an international annual fee. "
                                 f"Expected international range for {_dl_label}: {_range_str}.",
@@ -505,35 +537,39 @@ def _check_course(
                             add(
                                 "critical",
                                 "annual_fee_too_low_critical",
-                                f"Fee {fee_val:,.0f} AUD/year is critically below the expected "
-                                f"minimum for {_dl_label} (critical threshold: {_crit_min:,.0f}/yr). "
+                                f"Fee {fee_val:,.0f} {_cur_label}/year "
+                                f"(≈ {_fee_aud:,.0f} AUD) is critically below the expected "
+                                f"minimum for {_dl_label} (critical threshold: {_crit_min:,.0f} AUD/yr). "
                                 "Likely a domestic, partial, or incorrectly extracted international fee. "
                                 f"Expected range: {_range_str}.",
                             )
-                    elif fee_val < _warn_min:
+                    elif _fee_aud < _warn_min:
                         add(
                             "warning",
                             "annual_fee_too_low_warning",
-                            f"Fee {fee_val:,.0f} AUD/year is below the expected minimum for "
-                            f"{_dl_label} (warning threshold: {_warn_min:,.0f}/yr). "
+                            f"Fee {fee_val:,.0f} {_cur_label}/year "
+                            f"(≈ {_fee_aud:,.0f} AUD) is below the expected minimum for "
+                            f"{_dl_label} (warning threshold: {_warn_min:,.0f} AUD/yr). "
                             "May be a partial or incorrectly extracted fee. "
                             f"Expected range: {_range_str}.",
                         )
-                    elif fee_val > _crit_max:
+                    elif _fee_aud > _crit_max:
                         add(
                             "critical",
                             "annual_fee_too_high_critical",
-                            f"Fee {fee_val:,.0f} AUD/year exceeds the critical upper limit for "
-                            f"{_dl_label} (threshold: {_crit_max:,.0f}/yr). "
+                            f"Fee {fee_val:,.0f} {_cur_label}/year "
+                            f"(≈ {_fee_aud:,.0f} AUD) exceeds the critical upper limit for "
+                            f"{_dl_label} (threshold: {_crit_max:,.0f} AUD/yr). "
                             "This value is likely a full-course total stored as an annual fee, "
                             f"not the actual yearly charge. Expected annual range: {_range_str}.",
                         )
-                    elif fee_val > _warn_max:
+                    elif _fee_aud > _warn_max:
                         add(
                             "warning",
                             "annual_fee_too_high_warning",
-                            f"Fee {fee_val:,.0f} AUD/year is above the expected maximum for "
-                            f"{_dl_label} (warning threshold: {_warn_max:,.0f}/yr). "
+                            f"Fee {fee_val:,.0f} {_cur_label}/year "
+                            f"(≈ {_fee_aud:,.0f} AUD) is above the expected maximum for "
+                            f"{_dl_label} (warning threshold: {_warn_max:,.0f} AUD/yr). "
                             "Verify this is an annual fee and not a full-course total. "
                             f"Expected range: {_range_str}.",
                         )

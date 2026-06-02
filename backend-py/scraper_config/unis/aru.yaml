@@ -88,7 +88,10 @@ extraction:
 
     reject_keywords:
       - Home student
+      - Home fee
+      - Home fees
       - UK student
+      - UK fee
       - Domestic
       - England
       - Student Finance England

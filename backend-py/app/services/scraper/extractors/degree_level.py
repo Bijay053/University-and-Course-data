@@ -139,6 +139,16 @@ def classify_degree_level(course_name: str, page_text: str = "") -> tuple[str | 
         if hit:
             return hit, "label", label_match.group(0)[:200]
 
+    # Strategy 4: page-lead scan — degree abbreviation at the very start of the
+    # stripped page text (first 150 chars, no label required).  Catches UK
+    # universities like ARU where the qualification (e.g. "BEng (Hons)") is
+    # the first content element before any explicit "Degree level:" label, e.g.:
+    #   "BEng (Hons) With placement With foundation year 5 years part-time …"
+    page_lead = plain.lstrip()[:150]
+    hit = _classify_text(page_lead, _NAME_PATTERNS)
+    if hit:
+        return hit, "page_lead", page_lead.strip()[:150]
+
     return None, "unknown", None
 
 
@@ -151,7 +161,7 @@ async def extract(html: str, url: str, course_name: str | None = None) -> list[E
     degree, method, snippet = classify_degree_level(name, html)
     if not degree:
         return []
-    confidence = {"name": 0.9, "aqf": 0.8, "label": 0.75}.get(method, 0.5)
+    confidence = {"name": 0.9, "aqf": 0.8, "label": 0.75, "page_lead": 0.65}.get(method, 0.5)
     return [
         ExtractionResult(
             field_key=field_key,
