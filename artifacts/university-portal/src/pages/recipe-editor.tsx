@@ -998,7 +998,7 @@ export default function RecipeEditorPage() {
             {uniName} · <span className="font-mono text-xs">{scrapeUrl}</span>
             {yamlSlug && (
               <a
-                href={`/settings/scraper-configs/${yamlSlug}`}
+                href={`/settings/scraper-configs?slug=${yamlSlug}`}
                 className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-800 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-300 font-mono"
                 title="Open raw YAML editor for this university"
               >

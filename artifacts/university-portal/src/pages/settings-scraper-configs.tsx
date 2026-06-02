@@ -1445,6 +1445,17 @@ export default function SettingsScraperConfigs() {
 
   useEffect(() => { void fetchConfigs(); }, [fetchConfigs]);
 
+  // Auto-select slug from ?slug= query param (e.g. when linked from recipe editor)
+  useEffect(() => {
+    if (!configs.length) return;
+    const params = new URLSearchParams(window.location.search);
+    const slugParam = params.get("slug");
+    if (slugParam && configs.find(c => c.slug === slugParam)) {
+      selectConfig(slugParam);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [configs]);
+
   // Prune stale drafts once on mount
   useEffect(() => { pruneOldDrafts(); }, []);
 
