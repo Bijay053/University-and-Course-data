@@ -362,6 +362,75 @@ class GenericSearchApiConfig(BaseModel):
         default=None,
         description="Optional cap on extracted links (useful for debug runs).",
     )
+    body: Optional[dict] = Field(
+        default=None,
+        description=(
+            "JSON body template sent with every POST request. "
+            "Merged with pagination updates before each call. "
+            "Use this instead of params when the API expects application/json body "
+            "(e.g. Elastic App Search, Algolia, some Solr variants). "
+            "Example: {query: '', page: {current: 1, size: 100}}"
+        ),
+    )
+    body_pagination: Optional["BodyPaginationConfig"] = Field(
+        default=None,
+        description=(
+            "Configures pagination when page number / size must be embedded inside "
+            "the JSON request body rather than as query-string parameters. "
+            "Required for Elastic App Search and similar APIs. "
+            "See BodyPaginationConfig for field details."
+        ),
+    )
+
+
+class BodyPaginationConfig(BaseModel):
+    """Pagination config for APIs that embed page number/size in the request body.
+
+    Used with Elastic App Search, Algolia, and any REST endpoint where pagination
+    is controlled by nested JSON body fields rather than query-string params::
+
+        body_pagination:
+          current_path: page.current    # dot-path in body to set current page
+          size_path: page.size          # dot-path in body to set page size
+          total_pages_path: meta.page.total_pages  # dot-path in response for stop signal
+    """
+
+    current_path: str = Field(
+        description=(
+            "Dot-path inside the request body to update with the current page number. "
+            "E.g. 'page.current' → sets body['page']['current'] = 1, 2, 3 …"
+        ),
+    )
+    size_path: Optional[str] = Field(
+        default=None,
+        description=(
+            "Dot-path inside the request body to set the page size. "
+            "E.g. 'page.size'. Omit if page size is already in the body template "
+            "and should not be overridden."
+        ),
+    )
+    total_pages_path: Optional[str] = Field(
+        default=None,
+        description=(
+            "Dot-path in the API response pointing to the total number of pages. "
+            "E.g. 'meta.page.total_pages' (Elastic App Search). "
+            "When set the paginator stops as soon as current_page >= total_pages, "
+            "preventing extra empty requests."
+        ),
+    )
+    total_results_path: Optional[str] = Field(
+        default=None,
+        description=(
+            "Dot-path in the API response pointing to the total result count. "
+            "E.g. 'meta.page.total_results'. Informational only — used in log output."
+        ),
+    )
+
+
+# Resolve forward reference: GenericSearchApiConfig.body_pagination uses
+# BodyPaginationConfig which is defined AFTER it (alphabetical order would
+# require the reverse, but BodyPaginationConfig is logically subordinate).
+GenericSearchApiConfig.model_rebuild()
 
 
 class DiscoveryConfig(BaseModel):

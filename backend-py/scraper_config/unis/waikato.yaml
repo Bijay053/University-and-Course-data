@@ -1,7 +1,16 @@
 # University of Waikato
 # Hostname: www.waikato.ac.nz
-# CMS: SilverStripe
+# CMS: SilverStripe / Elastic App Search
 # Country: New Zealand  |  Currency: NZD
+#
+# Discovery strategy: Elastic App Search (body-POST, not query-string params)
+#
+# HOW TO IDENTIFY engine name + Bearer token:
+#   1. DevTools → Network → filter XHR/Fetch
+#   2. Navigate to https://www.waikato.ac.nz/int/study/qualifications/
+#   3. Find POST to .../_search/api/as/v1/engines/<ENGINE>/search.json
+#   4. Copy <ENGINE> from the URL and the "Bearer <TOKEN>" from Authorization header
+#   5. Store token as WAIKATO_EAS_TOKEN secret — never commit literal tokens
 
 discovery:
   auto_api_discovery: false
@@ -12,11 +21,12 @@ discovery:
     url: "https://www.waikato.ac.nz/_search/api/as/v1/engines/--engine--/search.json"
 
     headers:
-      authorization: "Bearer --search--"
+      authorization: "Bearer ${WAIKATO_EAS_TOKEN}"
       content-type: "application/json"
       x-swiftype-client: "elastic-app-search-javascript"
       x-swiftype-client-version: "8.13.0"
 
+    # JSON body template — pagination fields are updated per request by body_pagination
     body:
       query: ""
       page:
@@ -25,6 +35,16 @@ discovery:
       filters:
         all:
           - type: "qualification"
+
+    # Body-based pagination: page number and size live inside the JSON body,
+    # NOT as query-string parameters (which is what the old page_number_param
+    # approach produced — sending ?page.current=2 instead of body["page"]["current"]=2)
+    page_size: 100
+    body_pagination:
+      current_path: page.current           # updates body["page"]["current"] per request
+      size_path: page.size                 # updates body["page"]["size"]
+      total_pages_path: meta.page.total_pages      # stop when current_page >= total
+      total_results_path: meta.page.total_results  # logged for diagnostics
 
     root_path: "results"
 
@@ -43,21 +63,15 @@ discovery:
     normalize_relative_urls: true
     base_url: "https://www.waikato.ac.nz"
 
-    page_size: 100
-    page_size_param: "page.size"
-    page_number_param: "page.current"
     max_pages: 10
 
     allow_url_patterns:
       - "/int/study/qualifications/"
 
-    fetch_via_browser: true
-    browser_seed_url: "https://www.waikato.ac.nz/int/study/qualifications/?page=1"
-
   seed_urls:
     - https://www.waikato.ac.nz/int/study/qualifications/
 
-  always_sitemap_supplement: true
+  always_sitemap_supplement: false
   sitemap_url: https://www.waikato.ac.nz/sitemap.xml
 
   bfs_page_budget: 80

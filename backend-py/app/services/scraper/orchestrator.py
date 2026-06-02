@@ -911,6 +911,26 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     phase="discover",
                 )
             else:
+                # API returned 0 — use first configured seed_url as BFS start
+                # instead of the generic scrape_url (homepage).  seed_urls are
+                # set to the operator-verified course listing pages (e.g.
+                # /int/study/qualifications/) so BFS starts inside the catalogue
+                # rather than crawling from the homepage breadth-first.
+                _api_seed_urls = list(_uni_cfg.discovery.seed_urls or [])
+                if _api_seed_urls:
+                    _api_fallback_url = _api_seed_urls[0]
+                    log.info(
+                        "[YAML_API] API returned 0 — BFS will start from seed_url %s "
+                        "(not homepage %s)",
+                        _api_fallback_url, scrape_url,
+                    )
+                    # Inject this as the BFS starting URL by prepending to seed_urls
+                    # so discover_course_links uses it as primary entry point.
+                    # We don't change scrape_url (it's used for other purposes), but
+                    # the orchestrator will pass discovery_config (which includes
+                    # seed_urls) to discover_course_links.  The first seed_url wins
+                    # as the primary crawl target because discovery.py processes
+                    # seed_urls before scrape_url.
                 log.warning(
                     "[YAML_API] generic_search_api returned 0 links — "
                     "falling through to BFS/browser discovery"

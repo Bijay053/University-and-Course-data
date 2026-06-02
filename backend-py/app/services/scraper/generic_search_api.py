@@ -989,20 +989,41 @@ async def fetch_yaml_api_links(cfg: Any, emit: Callable[..., Any] | None = None)
     if getattr(cfg, "fetch_via_browser", False):
         return await _fetch_yaml_api_via_browser(cfg, _emit, _dig, _first_field, _keep_url, _resolve_url)
 
+    # ── Helpers for body-based pagination (Elastic App Search / Algolia) ─────
+    import copy
+
+    def _deep_set(obj: dict, path: str, value: Any) -> None:
+        """Set a value at a dot-path inside a nested dict, creating dicts as needed."""
+        parts = path.split(".")
+        for part in parts[:-1]:
+            obj = obj.setdefault(part, {})
+        obj[parts[-1]] = value
+
     # ── Pagination loop ───────────────────────────────────────────────────────
     links: list[dict] = []
     offset = 0
     page_size = cfg.page_size or int(cfg.params.get(cfg.page_size_param, "0") or 0)
     paginate = page_size > 0
     use_page_numbers = paginate and bool(getattr(cfg, "page_number_param", None))
-    current_page = 1  # used only in page-number mode
+    current_page = 1  # used only in page-number / body-pagination mode
+    _body_tpl: dict | None = getattr(cfg, "body", None)
+    _body_pag = getattr(cfg, "body_pagination", None)
+    # Body-pagination mode: page number + size live inside the JSON body.
+    # Overrides query-string pagination when body_pagination is configured.
+    use_body_pagination = bool(_body_tpl is not None and _body_pag is not None)
 
     async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
         for page_num in range(cfg.max_pages):
             req_params = dict(cfg.params)
+            req_body: dict | None = copy.deepcopy(_body_tpl) if _body_tpl else None
+
             if paginate:
-                req_params[cfg.page_size_param] = str(page_size)
-                if use_page_numbers:
+                if use_body_pagination and req_body is not None:
+                    # Elastic App Search / Algolia style: pagination in JSON body
+                    _deep_set(req_body, _body_pag.current_path, current_page)
+                    if _body_pag.size_path:
+                        _deep_set(req_body, _body_pag.size_path, page_size)
+                elif use_page_numbers:
                     req_params[cfg.page_number_param] = str(current_page)
                 else:
                     req_params[cfg.offset_param] = str(offset)
@@ -1011,7 +1032,11 @@ async def fetch_yaml_api_links(cfg: Any, emit: Callable[..., Any] | None = None)
             resp = None
             try:
                 if cfg.method.upper() == "POST":
-                    resp = await client.post(cfg.url, headers=cfg.headers, json=req_params)
+                    if req_body is not None:
+                        # Body-mode POST (Elastic App Search, Algolia JSON body)
+                        resp = await client.post(cfg.url, headers=cfg.headers, json=req_body)
+                    else:
+                        resp = await client.post(cfg.url, headers=cfg.headers, json=req_params)
                 else:
                     resp = await client.get(cfg.url, headers=cfg.headers, params=req_params)
             except Exception as exc:
@@ -1128,17 +1153,35 @@ async def fetch_yaml_api_links(cfg: Any, emit: Callable[..., Any] | None = None)
             if not paginate:
                 break  # single-request mode
 
-            # ── Check has_next_field before advancing ─────────────────────────
+            # ── Check stop conditions before advancing ─────────────────────────
+            # Body pagination: check total_pages_path (Elastic App Search style)
+            if use_body_pagination and _body_pag and _body_pag.total_pages_path:
+                _total_pages = _dig(data, _body_pag.total_pages_path)
+                if _total_pages is not None:
+                    _total_pages = int(_total_pages)
+                    if _body_pag.total_results_path:
+                        _total_res = _dig(data, _body_pag.total_results_path)
+                        if _total_res:
+                            await _emit(
+                                f"page {page_num}: total_results={_total_res}, "
+                                f"total_pages={_total_pages}"
+                            )
+                    if current_page >= _total_pages:
+                        await _emit(f"page {page_num}: reached last page ({_total_pages}) — done")
+                        break
+
             has_next_path = getattr(cfg, "has_next_field", None)
             if has_next_path:
                 has_next = _dig(data, has_next_path)
                 if not has_next:
                     await _emit(f"page {page_num}: has_next_field={has_next_path!r} → false, stopping")
                     break
-            elif len(items) < page_size:
+            elif not use_body_pagination and len(items) < page_size:
                 break  # last page (offset mode fallback)
+            elif use_body_pagination and len(items) < page_size:
+                break  # last page (body-pagination fallback when no total_pages_path)
 
-            if use_page_numbers:
+            if use_body_pagination or use_page_numbers:
                 current_page += 1
             else:
                 offset += page_size

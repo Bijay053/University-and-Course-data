@@ -123,6 +123,58 @@ discovery:
   #                                     # page to visit first — triggers session cookie
   #                                     # defaults to url if not set
 
+  # ┌─ Sub-option B3: JSON body POST (Elastic App Search / Algolia) ─────────────
+  # Use when: the API requires application/json body for BOTH the request payload AND
+  # pagination — NOT query-string parameters.  Elastic App Search and Algolia both work
+  # this way: pagination is { "page": { "current": 2, "size": 100 } } in the JSON body,
+  # not ?page.current=2 in the URL.
+  #
+  # HOW TO IDENTIFY AN ELASTIC APP SEARCH API:
+  #   1. DevTools → Network → filter XHR/Fetch
+  #   2. Find a POST to .../_search/api/as/v1/engines/<engine>/search.json
+  #   3. Click it → Payload tab — you will see JSON body with "query" + "page" keys
+  #   4. Authorization: Bearer <token> header (this is a public search key, not a
+  #      user credential — safe to store as a Replit secret and rotate periodically)
+  #   5. Response has { results: [...], meta: { page: { total_pages, total_results } } }
+  #
+  # IMPORTANT: Replace --engine-- in the url with the actual engine name from the URL
+  # (e.g. "waikato-courses-prod").  Store the Bearer token as a Replit secret.
+  #
+  # generic_search_api:
+  #   enabled: true
+  #   method: POST
+  #   url: "https://www.example.ac.nz/_search/api/as/v1/engines/--engine--/search.json"
+  #   headers:
+  #     authorization: "Bearer \${MY_UNI_EAS_TOKEN}"  # Replit secret name
+  #     content-type: "application/json"
+  #   # JSON body template — body_pagination updates page.current per request
+  #   body:
+  #     query: ""
+  #     page:
+  #       current: 1
+  #       size: 100
+  #   page_size: 100
+  #   body_pagination:
+  #     current_path: page.current          # sets body["page"]["current"] = 1, 2, 3...
+  #     size_path: page.size                # sets body["page"]["size"]
+  #     total_pages_path: meta.page.total_pages      # stops when current >= total_pages
+  #     total_results_path: meta.page.total_results  # logged for diagnostics
+  #   root_path: "results"                  # Elastic App Search wraps items in "results"
+  #   url_fields:
+  #     - "url.raw"                         # Elastic App Search nested field (dot-path)
+  #   title_fields:
+  #     - "title.raw"
+  #   normalize_relative_urls: true
+  #   base_url: "https://www.example.ac.nz"
+  #   allow_url_patterns:
+  #     - "/int/study/qualifications/"
+  #   max_pages: 10
+  #
+  # seed_urls:
+  #   - https://www.example.ac.nz/int/study/qualifications/
+  # # When API returns 0 links (token expired / wrong engine name), BFS falls back
+  # # to seed_urls[0] instead of the homepage, starting inside the catalogue.
+
   # Option C — SearchStax Solr provider (Huddersfield-style, full provider).
   # Use when the site is a JS SPA that queries Solr client-side.
   # searchstax:
