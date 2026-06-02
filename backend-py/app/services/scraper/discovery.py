@@ -227,6 +227,21 @@ _NON_COURSE_URL_PATTERNS: tuple[str, ...] = (
     "/study/postgraduate",
 )
 
+# Host-specific exceptions for _NON_COURSE_URL_PATTERNS.
+# Maps hostname → frozenset of pattern strings to skip for that host.
+# Use this when a pattern was added for one university's structure but
+# falsely blocks real course pages on another university with a similar
+# path convention.
+_NON_COURSE_URL_HOST_EXCEPTIONS: dict[str, frozenset[str]] = {
+    # ARU (Anglia Ruskin University) publishes real degree pages at
+    # /study/undergraduate/<slug> and /study/postgraduate/<slug>.
+    # The two patterns below were added for UTAS (/study/undergraduate
+    # = discipline hub) and Flinders (/study/postgraduate = hub), but
+    # they falsely block every ARU course URL at both the sitemap and
+    # BFS link-sweep stages.
+    "www.aru.ac.uk": frozenset({"/study/undergraduate", "/study/postgraduate"}),
+}
+
 # Last-segment junk suffix regex (Node routes/scrape.ts:5540) — even
 # under a "course-y" parent path, segments ending in these words are
 # always info pages, not real courses (e.g. /courses/scholarships,
@@ -366,7 +381,15 @@ def _is_known_non_course_url(url: str) -> bool:
     # corresponding clean URL — drop them at discovery time (Bug 2).
     if _DRUPAL_NODE_RE.search(url):
         return True
-    if any(p in lurl for p in _NON_COURSE_URL_PATTERNS):
+    # Host-specific exceptions: some patterns were added for one university
+    # but falsely block real course pages on other universities with similar
+    # path conventions. Skip those patterns for the host in question.
+    try:
+        _exc_host = urlparse(url).netloc.lower()
+        _host_exc = _NON_COURSE_URL_HOST_EXCEPTIONS.get(_exc_host, frozenset())
+    except Exception:
+        _host_exc = frozenset()
+    if any(p in lurl for p in _NON_COURSE_URL_PATTERNS if p not in _host_exc):
         return True
     try:
         path = urlparse(url).path.lower()
