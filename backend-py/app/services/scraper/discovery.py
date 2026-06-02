@@ -814,6 +814,24 @@ async def discover_course_links(
             kind="crawl_start",
         )
 
+    # Compile YAML allow_url_patterns once before the BFS loop so we can
+    # check them cheaply against every queued URL.  These patterns act as an
+    # explicit override for the hardcoded global block rules in guards.py —
+    # if a URL matches a YAML allow pattern it is NEVER blocked by the global
+    # list, regardless of which guard substring triggered.
+    # Safety constraint: the override only fires when the URL's netloc matches
+    # the start_url's netloc (prevents a rogue YAML from bypassing blocks on
+    # unrelated hostnames).
+    _uni_netloc = parsed.netloc  # already computed above: parsed = urlparse(start_url)
+    _yaml_allow_compiled: list[tuple[str, re.Pattern]] = []  # (raw_pat, compiled)
+    if discovery_config is not None:
+        _ap_raw = list(getattr(discovery_config, "allow_url_patterns", None) or [])
+        for _raw in _ap_raw:
+            try:
+                _yaml_allow_compiled.append((_raw, re.compile(_raw)))
+            except re.error:
+                log.warning("[DISCOVER] invalid allow_url_patterns regex %r — skipped", _raw)
+
     while queue and len(visited) < max_pages and len(found) < max_courses:
         url, depth = queue.pop(0)
         # Dedup on normalized URL so ?studentType=international and the bare
@@ -831,28 +849,56 @@ async def discover_course_links(
         # / _JUNK_LAST_SEG_RE checks; both must say "ok" for the URL to
         # be fetched.  Cheaper than a network round-trip and surfaces a
         # clean reason in the discovery log.
-        try:
-            from app.services.scraper.guards import is_blocked_page
+        #
+        # YAML allow_url_patterns override: if the URL matches any pattern
+        # declared in the per-university YAML config AND is on the same
+        # hostname, skip the global block check entirely.  This lets operators
+        # fix unusual URL structures (e.g. Bath Spa's /student-life/…/course)
+        # via YAML without a developer change to guards.py.
+        _yaml_allow_override = False
+        if _yaml_allow_compiled:
+            _url_parsed = urlparse(url)
+            if _url_parsed.netloc == _uni_netloc:
+                for _raw_pat, _compiled_pat in _yaml_allow_compiled:
+                    if _compiled_pat.search(_url_parsed.path):
+                        _yaml_allow_override = True
+                        if emit:
+                            await emit(
+                                "status",
+                                f"[DISCOVER] YAML allow override: {_url_parsed.path} bypassed global block (pattern: {_raw_pat!r})",
+                                phase="discover",
+                                kind="yaml_allow_override",
+                            )
+                        log.info(
+                            "[DISCOVER] YAML allow override: %s bypassed global block (pattern: %r)",
+                            _url_parsed.path,
+                            _raw_pat,
+                        )
+                        break
 
-            _blocked, _block_reason = is_blocked_page(url, None)
-        except Exception:  # noqa: BLE001 — never let the safety net abort discovery
-            _blocked, _block_reason = (False, "")
-        if _blocked:
-            if emit:
-                await emit(
-                    "status",
-                    f"[DISCOVER] blocked {_block_reason}: {url}",
-                    phase="discover",
-                    kind="page_blocked",
-                    reason=_block_reason,
-                )
-            # Bug 7: when discovery blocks a fee_page URL, pass it back to
-            # the caller so it can be used as a central-fee-parser candidate
-            # instead of being silently discarded.  The caller supplies an
-            # empty list as `_blocked_fee_urls_sink`; we append here.
-            if _block_reason == "fee_page" and _blocked_fee_urls_sink is not None:
-                _blocked_fee_urls_sink.append(url)
-            continue
+        if not _yaml_allow_override:
+            try:
+                from app.services.scraper.guards import is_blocked_page
+
+                _blocked, _block_reason = is_blocked_page(url, None)
+            except Exception:  # noqa: BLE001 — never let the safety net abort discovery
+                _blocked, _block_reason = (False, "")
+            if _blocked:
+                if emit:
+                    await emit(
+                        "status",
+                        f"[DISCOVER] blocked {_block_reason}: {url}",
+                        phase="discover",
+                        kind="page_blocked",
+                        reason=_block_reason,
+                    )
+                # Bug 7: when discovery blocks a fee_page URL, pass it back to
+                # the caller so it can be used as a central-fee-parser candidate
+                # instead of being silently discarded.  The caller supplies an
+                # empty list as `_blocked_fee_urls_sink`; we append here.
+                if _block_reason == "fee_page" and _blocked_fee_urls_sink is not None:
+                    _blocked_fee_urls_sink.append(url)
+                continue
 
         # Discovery-level fetch: one shot (retries=0) so that this loop —
         # not the inner http_fetcher retry loop — controls the retry policy.

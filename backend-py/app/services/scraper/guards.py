@@ -1060,14 +1060,10 @@ _BLOCK_URL_SUBSTRINGS_HOST_EXCEPTIONS: dict[str, frozenset[str]] = {
         "/study/undergraduate",
         "/study/postgraduate/",
     }),
-    # Bath Spa: course subject pages live under /student-life/undergraduate-study/
-    # and /student-life/postgraduate-study/ — same prefix as the global
-    # /student-life campus-lifestyle block but these are legitimate course
-    # listing pages, not student-news/events pages.
-    "www.bathspa.ac.uk": frozenset({
-        "/student-life/undergraduate-study/",
-        "/student-life/postgraduate-study/",
-    }),
+    # NOTE: Bath Spa was here but has been moved to bathspa.yaml
+    # allow_url_patterns.  The YAML-override mechanism in discovery.py now
+    # checks allow_url_patterns BEFORE is_blocked_page(), so per-university
+    # URL exceptions no longer require a developer change to this dict.
 }
 
 

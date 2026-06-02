@@ -4,9 +4,10 @@
 #
 # Discovery: Course subject pages live at /student-life/undergraduate-study/<subject>/
 # and /student-life/postgraduate-study/<subject>/ — the global /student-life
-# campus-lifestyle block must be overridden via _BLOCK_URL_SUBSTRINGS_HOST_EXCEPTIONS
-# in guards.py (already done).  Seed the two top-level subject listing pages so BFS
-# fans out into every subject area and collects individual course links.
+# campus-lifestyle block is overridden by allow_url_patterns below (checked in
+# discovery.py BFS loop before is_blocked_page()).  No guards.py change required.
+# Seed the two top-level subject listing pages so BFS fans out into every subject
+# area and collects individual course links.
 
 discovery:
   seed_urls:
