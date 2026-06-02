@@ -152,6 +152,11 @@ extraction:
       - Fees estimator
       - Student Services Levy
       - SSL
+      # "UC Online" is Canterbury's online learning brand — appears in the site
+      # navigation on every page. Without this block, the \bonline\b regex in
+      # the study_mode extractor fires on the nav text and falsely marks all
+      # bachelor programmes as mode='Online'.
+      - UC Online
 
   course_name:
     strip_title_suffixes:

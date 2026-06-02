@@ -545,6 +545,14 @@ def derive_mode_from_location(location_str: str | None) -> str | None:
 _STUDY_MODE_RULE_SUPPRESSED_HOSTS: frozenset[str] = frozenset({
     "www.uel.ac.uk",
     "uel.ac.uk",
+    # Canterbury (UC): "UC Online Staff" appears in the site-wide nav on
+    # EVERY page inside a non-<nav> element, so _NOISE_BLOCK_RE cannot strip
+    # it.  The bare \bonline\b fallback (confidence 0.5) fires on that nav
+    # text and the structural protection in single_course.py then blocks
+    # Gemini from overriding it.  Suppress the rule pass so Gemini reads the
+    # actual course content and classifies correctly.
+    "www.canterbury.ac.nz",
+    "canterbury.ac.nz",
 })
 
 

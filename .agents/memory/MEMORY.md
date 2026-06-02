@@ -15,3 +15,4 @@
 - [Swinburne 3-level URL structure](swinburne-url-depth.md) — /courses/find-a-course/faculty/subject is sub-category hub (no course data); individual courses are at depth 3 (/faculty/subject/course-slug). allow_url_patterns must require 3 segments.
 - [Scraping review panel missing Approve button](scraping-approve-button.md) — handleApproveSelected/Single existed in scraping.tsx but had no UI button; operators saw "go to Raw Data tab". Added green Approve button bulk + per-row.
 - [Waikato fee table patterns](waikato-fee-patterns.md) — Pattern A/B for degree-header tables; major-list annotation stripper needed for token_sort_ratio to work.
+- [Canterbury UC staging bug & study_mode fix](canterbury-study-mode-bug.md) — admin_config (HIGHEST priority) silently overrode YAML online_only; nav "UC Online Staff" in non-<nav> div → add host to _STUDY_MODE_RULE_SUPPRESSED_HOSTS.

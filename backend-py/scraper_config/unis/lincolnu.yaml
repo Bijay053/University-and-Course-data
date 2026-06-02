@@ -1,0 +1,63 @@
+# Lincoln University
+# Hostname: www.lincoln.ac.nz
+# Country: New Zealand | Currency: NZD
+# Bug history:
+#   Lincoln course pages can appear as root-level URLs, for example:
+#   https://www.lincoln.ac.nz/master-of-tourism-management-2/
+#   Do not use strict allow_url_patterns for /study/study-programmes/.
+#   Previous filters dropped valid course pages and staged 0 courses.
+
+discovery:
+  seed_urls:
+    - https://www.lincoln.ac.nz/study/courses-2/course-search/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/
+    - https://www.lincoln.ac.nz/study/study-programmes/programmes-starting-soon/
+
+  always_sitemap_supplement: true
+
+  # Do not add allow_url_patterns or must_contain.
+  # Lincoln valid course URLs can be root-level slugs.
+  block_url_patterns:
+    - '/news-and-events/'
+    - '/study/apply-and-enrol/'
+    - '/study/scholarships/'
+    - '/study/key-dates-2/'
+    - '/study/fees/'
+    - '/study/study-programmes/academic-pathways/'
+    - '/study/study-programmes/programme-search/?$'
+    - '/study/study-programmes/programmes-starting-soon/?$'
+    - '\.pdf$'
+
+  bfs_page_budget: 80
+  max_candidates: 500
+  expected_min_courses: 50
+
+extraction:
+  fees:
+    default_currency: "NZD"
+    central_page: "https://www.lincoln.ac.nz/study/fees/international-fees/"
+    force_central_fee_stage: true
+    prefer_international: true
+    prefer_annual_over_total: true
+
+  english:
+    central_page: "https://www.lincoln.ac.nz/study/apply-and-enrol/apply/english-language-requirements/"
+    degree_level_defaults:
+      undergraduate:
+        ielts: 6.0
+        pte: 50
+        toefl: 60
+      postgraduate:
+        ielts: 6.5
+        pte: 58
+        toefl: 80
+      doctorate:
+        ielts: 6.5
+        pte: 58
+        toefl: 80
+
+  filters:
+    domestic_only:
+      enabled: false
+    online_only:
+      enabled: true
