@@ -60,6 +60,8 @@ discovery:
   # Option B — YAML-driven API (use after auto_api_discovery found the endpoint,
   # OR when you already know the URL from DevTools).
   # Runs before BFS/browser; if it returns ≥1 link those tiers are skipped.
+  #
+  # ┌─ Sub-option B1: Direct HTTP (works for public/open APIs) ─────────────────
   # generic_search_api:
   #   enabled: true
   #   method: GET
@@ -77,8 +79,49 @@ discovery:
   #   base_url: "https://www.example.edu.au"
   #   page_size: 250
   #   page_size_param: "rows"
-  #   offset_param: "start"
+  #   offset_param: "start"             # use this OR page_number_param, not both
   #   max_pages: 20
+  #
+  # ┌─ Sub-option B2: Browser-based fetch (session-bound / Optimizely CMS APIs) ─
+  # Use when: DevTools shows the API works fine in-browser, but hitting the same
+  # URL with curl/Python always returns the same page 1 regardless of page params.
+  # Root cause: the CMS ties pagination to a server-side session — the session
+  # cookie is only issued when a real browser visits the site first.
+  # Fix: fetch_via_browser: true — launches a headless browser, navigates to
+  # browser_seed_url (triggers the cookie), then calls the API via JS fetch()
+  # from inside the browser (inherits the cookie) so pagination works correctly.
+  #
+  # HOW TO IDENTIFY A SESSION-BOUND API:
+  #   1. Open DevTools → Network tab → filter XHR/Fetch
+  #   2. Find the course-search API call — copy the URL
+  #   3. Paste into a new tab or run: curl "<url>" — if it only ever returns
+  #      page 1 (same 20 items regardless of currentPage param) → session-bound.
+  #   4. Set fetch_via_browser: true below.
+  #
+  # generic_search_api:
+  #   enabled: true
+  #   url: "https://www.example.edu.au/api/CourseApi/course-search"
+  #   params:
+  #     PageId: "12"          # CMS content node ID — copy from DevTools, do NOT guess
+  #     PageSize: "20"
+  #   page_size: 20
+  #   page_size_param: "PageSize"       # query-string param that sets items-per-page
+  #   page_number_param: "currentPage"  # query-string param that advances the page
+  #   has_next_field: "result.hasNextPage"  # dot-path to the boolean stop signal
+  #   root_path: "result.items"         # dot-path to the array of course objects
+  #   url_fields:
+  #     - "link.href"                   # dot-path supported: item.link.href
+  #   title_fields:
+  #     - "header"
+  #   normalize_relative_urls: true
+  #   base_url: "https://www.example.edu.au"
+  #   allow_url_patterns:
+  #     - "/courses/"
+  #   max_pages: 20
+  #   fetch_via_browser: true           # ← enables browser-mode for session-bound APIs
+  #   browser_seed_url: "https://www.example.edu.au/study/course-search"
+  #                                     # page to visit first — triggers session cookie
+  #                                     # defaults to url if not set
 
   # Option C — SearchStax Solr provider (Huddersfield-style, full provider).
   # Use when the site is a JS SPA that queries Solr client-side.
