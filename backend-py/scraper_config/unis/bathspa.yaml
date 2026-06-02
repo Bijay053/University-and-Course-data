@@ -1,0 +1,64 @@
+# Bath Spa University
+# Hostname: www.bathspa.ac.uk
+# Country: UK  |  Currency: GBP
+#
+# Discovery: Course subject pages live at /student-life/undergraduate-study/<subject>/
+# and /student-life/postgraduate-study/<subject>/ — the global /student-life
+# campus-lifestyle block must be overridden via _BLOCK_URL_SUBSTRINGS_HOST_EXCEPTIONS
+# in guards.py (already done).  Seed the two top-level subject listing pages so BFS
+# fans out into every subject area and collects individual course links.
+
+discovery:
+  seed_urls:
+    - https://www.bathspa.ac.uk/student-life/undergraduate-study/
+    - https://www.bathspa.ac.uk/student-life/postgraduate-study/
+
+  must_contain:
+    - /student-life/undergraduate-study/
+    - /student-life/postgraduate-study/
+
+  allow_url_patterns:
+    - '/student-life/undergraduate-study/'
+    - '/student-life/postgraduate-study/'
+
+  block_url_patterns:
+    # Block the top-level listing pages themselves (category hubs, not courses)
+    - '^https://www\.bathspa\.ac\.uk/student-life/undergraduate-study/?$'
+    - '^https://www\.bathspa\.ac\.uk/student-life/postgraduate-study/?$'
+    - '/news/'
+    - '/events/'
+    - '/scholarships'
+    - '\?'
+    - '\.pdf$'
+
+  bfs_page_budget: 60
+  max_candidates: 400
+  expected_min_courses: 50
+
+  always_sitemap_supplement: false
+  use_wayback: false
+
+extraction:
+  max_parallel_fetch: 6
+
+  fees:
+    central_page: https://www.bathspa.ac.uk/students/student-finance/tuition-fees/international-fees/
+    default_currency: GBP
+    reject_keywords:
+      - Home/EU
+      - UK students
+      - UK fee
+      - domestic fee
+      - Welsh Government
+
+  course_name:
+    strip_title_suffixes:
+      - " | Bath Spa University"
+      - " - Bath Spa University"
+      - " | Bath Spa"
+
+  staging:
+    reject_if_missing:
+      - course_name
+
+  default_course_location: Bath

@@ -1060,6 +1060,14 @@ _BLOCK_URL_SUBSTRINGS_HOST_EXCEPTIONS: dict[str, frozenset[str]] = {
         "/study/undergraduate",
         "/study/postgraduate/",
     }),
+    # Bath Spa: course subject pages live under /student-life/undergraduate-study/
+    # and /student-life/postgraduate-study/ — same prefix as the global
+    # /student-life campus-lifestyle block but these are legitimate course
+    # listing pages, not student-news/events pages.
+    "www.bathspa.ac.uk": frozenset({
+        "/student-life/undergraduate-study/",
+        "/student-life/postgraduate-study/",
+    }),
 }
 
 
