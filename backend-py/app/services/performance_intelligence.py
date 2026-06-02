@@ -94,7 +94,7 @@ async def _compute(job_id: str, db: Any) -> dict:
              " WHERE scrape_job_id = :j AND completeness IS NOT NULL"),
         {"j": job_id},
     )).scalar()
-    final_comp = float(avg_scalar or 0.0)
+    final_comp = float(avg_scalar or 0.0) / 100.0
 
     # 3. P7 data — gives us first_completeness before inline improvement
     uni_cfg_row = (await db.execute(

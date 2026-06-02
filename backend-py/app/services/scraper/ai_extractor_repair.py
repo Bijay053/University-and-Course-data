@@ -78,7 +78,7 @@ async def compute_field_fill_rates(
             fill_rates[field_key] = round(filled_count / total, 3)
 
         log.info(
-            "[EXTRACTOR_REPAIR] fill rates for run %d (total=%d): %s",
+            "[EXTRACTOR_REPAIR] fill rates for run %s (total=%d): %s",
             scrape_run_id, total,
             {k: f"{v:.0%}" for k, v in sorted(fill_rates.items())},
         )
