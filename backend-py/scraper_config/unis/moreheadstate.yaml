@@ -1,0 +1,71 @@
+# Morehead State University
+# Hostname: www.moreheadstate.edu
+# Country: USA
+# Currency: USD
+#
+# Reason:
+# Discovery finds valid course URLs under /academics/programs/
+# but URL filtering drops 100% of discovered URLs.
+#
+# Example valid course URLs:
+# https://www.moreheadstate.edu/academics/programs/agriculture-bs
+# https://www.moreheadstate.edu/academics/programs/agriculture-minor
+
+discovery:
+  seed_urls:
+    - https://www.moreheadstate.edu/academics/programs/
+
+  must_contain:
+    - /academics/programs/
+
+  allow_url_patterns:
+    - '^https://www\.moreheadstate\.edu/academics/programs/[a-z0-9-]+/?$'
+
+  block_url_patterns:
+    - '^https://www\.moreheadstate\.edu/academics/programs/?$'
+    - '/academics/programs/index$'
+    - '/academics/colleges/'
+    - '/student-support/'
+    - '/academics/research/'
+    - '/academics/academic-affairs/'
+    - '/admissions/'
+    - '/apply'
+    - '\.pdf$'
+
+  bfs_page_budget: 50
+  max_candidates: 500
+  expected_min_courses: 150
+
+  always_sitemap_supplement: true
+  always_browser_discover: false
+  skip_browser_discovery: false
+  use_wayback: false
+
+extraction:
+  fees:
+    central_page: https://www.moreheadstate.edu/admissions/tuition
+    default_currency: USD
+    force_central_fee_stage: true
+
+  filters:
+    domestic_only:
+      enabled: true
+
+    online_only:
+      enabled: true
+
+  staging:
+    reject_if_missing:
+      - course_name
+
+  text_cleaning:
+    global_substring_blocklist:
+      - Apply Now
+      - Request Information
+      - Visit Campus
+
+  course_name:
+    strip_title_suffixes:
+      - " | Morehead State University"
+      - " - Morehead State University"
+      - " : Morehead State University"

@@ -430,10 +430,14 @@ async def list_scraper_configs(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> JSONResponse:
     # Build config list from YAML files
+    # Skip internal files that start with _ (e.g. _template.yaml — it's a
+    # developer reference, not a real university config, so hide it from the UI).
     configs = []
     hostnames: list[str] = []
     for f in sorted(_UNIS_DIR.glob("*.yaml")):
         slug = f.stem
+        if slug.startswith("_"):
+            continue
         raw = _read_yaml_raw(f)
         data = _parse_yaml_safe(raw)
         comment_lines = [ln.lstrip("# ").strip() for ln in raw.splitlines() if ln.startswith("#") and ln.strip() != "#"]
