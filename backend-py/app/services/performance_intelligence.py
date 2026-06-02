@@ -12,9 +12,26 @@ Computes per-job performance metrics and upserts them into
 from __future__ import annotations
 
 import logging
+from datetime import timezone as _tz
 from typing import Any
 
 log = logging.getLogger(__name__)
+
+
+def _as_utc(dt: object) -> object:
+    """Return *dt* with UTC tzinfo attached if it is timezone-naive.
+
+    asyncpg rejects naive datetimes for TIMESTAMPTZ columns — scrape_runtime_jobs
+    stores timestamps without tzinfo on some installations, causing
+    'can't subtract offset-naive and offset-aware datetimes' at INSERT time.
+    """
+    from datetime import datetime
+    if dt is None or not isinstance(dt, datetime):
+        return dt
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=_tz.utc)
+    return dt
+
 
 
 # ── Extraction method → source category ───────────────────────────────────────
@@ -254,7 +271,8 @@ async def _compute(job_id: str, db: Any) -> dict:
             "gcalls": gemini_calls, "gcost": gemini_cost,
             "preuse": patterns_reused,
             "p7imp": p7_inline_improved, "p7cel": p7_dispatched,
-            "started": job_row.get("started_at"), "completed": job_row.get("completed_at"),
+            "started": _as_utc(job_row.get("started_at")),
+            "completed": _as_utc(job_row.get("completed_at")),
         },
     )
     await db.commit()
