@@ -1041,6 +1041,28 @@ def _last_path_segment(path: str) -> str:
     return p.rsplit("/", 1)[-1]
 
 
+# Host-specific exceptions to _BLOCK_URL_SUBSTRINGS Pass 1.
+#
+# Some universities publish real course detail pages at URL structures that
+# are globally blocked as category hubs for *other* universities.  Adding the
+# hostname here bypasses the named pattern(s) only for that host.
+#
+# Pattern → why it needs an exception
+# ─────────────────────────────────────────────────────────────────────────────
+# "/study/undergraduate"  — UTAS discipline hubs (correct global block).
+#                           ARU publishes individual degree pages at
+#                           /study/undergraduate/<slug> — real courses.
+# "/study/postgraduate/"  — Flinders category hub (correct global block).
+#                           ARU also uses /study/postgraduate/<slug> for real
+#                           degree pages that must not be suppressed.
+_BLOCK_URL_SUBSTRINGS_HOST_EXCEPTIONS: dict[str, frozenset[str]] = {
+    "www.aru.ac.uk": frozenset({
+        "/study/undergraduate",
+        "/study/postgraduate/",
+    }),
+}
+
+
 def is_blocked_page(url: str | None, title: str | None = None) -> tuple[bool, str]:
     """Return ``(True, reason)`` when this URL/title is definitely not a
     course detail or course listing page; ``(False, "")`` otherwise.
@@ -1079,8 +1101,13 @@ def is_blocked_page(url: str | None, title: str | None = None) -> tuple[bool, st
             query = ""
         if path:
             # Pass 1: substring match
+            _host_exceptions = _BLOCK_URL_SUBSTRINGS_HOST_EXCEPTIONS.get(
+                parsed.netloc.lower(), frozenset()
+            )
             for pat, reason in _BLOCK_URL_SUBSTRINGS:
                 if pat in path:
+                    if pat in _host_exceptions:
+                        continue  # host-specific exception — skip this block
                     return (True, reason)
             # Pass 2: last-segment exact match (stricter than substring)
             last = _last_path_segment(path)
