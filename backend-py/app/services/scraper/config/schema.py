@@ -256,6 +256,15 @@ class GenericSearchApiConfig(BaseModel):
     url: str = Field(
         description="Full URL of the JSON/REST API endpoint.",
     )
+    additional_urls: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Extra API URLs to call with the same settings (method, headers, params, "
+            "root_path, url_fields, pagination, etc.). Results are merged and "
+            "deduplicated. Use when a university splits its catalogue across separate "
+            "UG and PG endpoints. Each URL gets its own full pagination cycle."
+        ),
+    )
     headers: dict[str, str] = Field(
         default_factory=dict,
         description=(

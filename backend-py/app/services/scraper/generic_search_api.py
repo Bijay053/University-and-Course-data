@@ -1076,190 +1076,197 @@ async def fetch_yaml_api_links(cfg: Any, emit: Callable[..., Any] | None = None)
 
     # ── Pagination loop ───────────────────────────────────────────────────────
     links: list[dict] = []
-    offset = 0
     page_size = cfg.page_size or int(cfg.params.get(cfg.page_size_param, "0") or 0)
     paginate = page_size > 0
     use_page_numbers = paginate and bool(getattr(cfg, "page_number_param", None))
-    current_page = 1  # used only in page-number / body-pagination mode
     _body_tpl: dict | None = getattr(cfg, "body", None)
     _body_pag = getattr(cfg, "body_pagination", None)
     # Body-pagination mode: page number + size live inside the JSON body.
     # Overrides query-string pagination when body_pagination is configured.
     use_body_pagination = bool(_body_tpl is not None and _body_pag is not None)
 
+    # additional_urls: call each URL in turn with the same config; merge results.
+    _all_api_urls = [cfg.url] + list(getattr(cfg, "additional_urls", []))
+
     async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
-        for page_num in range(cfg.max_pages):
-            req_params = dict(cfg.params)
-            req_body: dict | None = copy.deepcopy(_body_tpl) if _body_tpl else None
+        for _api_url_idx, _api_url in enumerate(_all_api_urls):
+            if len(_all_api_urls) > 1:
+                await _emit(f"URL {_api_url_idx + 1}/{len(_all_api_urls)}: {_api_url[:100]}")
+            # Reset per-URL pagination state
+            offset = 0
+            current_page = 1
+            for page_num in range(cfg.max_pages):
+                req_params = dict(cfg.params)
+                req_body: dict | None = copy.deepcopy(_body_tpl) if _body_tpl else None
 
-            if paginate:
-                if use_body_pagination and req_body is not None:
-                    # Elastic App Search / Algolia style: pagination in JSON body
-                    _deep_set(req_body, _body_pag.current_path, current_page)
-                    if _body_pag.size_path:
-                        _deep_set(req_body, _body_pag.size_path, page_size)
-                elif use_page_numbers:
-                    req_params[cfg.page_number_param] = str(current_page)
-                else:
-                    req_params[cfg.offset_param] = str(offset)
-
-            # ── Make the HTTP request ────────────────────────────────────────
-            resp = None
-            try:
-                if cfg.method.upper() == "POST":
-                    if req_body is not None:
-                        # Body-mode POST (Elastic App Search, Algolia JSON body)
-                        resp = await client.post(cfg.url, headers=cfg.headers, json=req_body)
+                if paginate:
+                    if use_body_pagination and req_body is not None:
+                        # Elastic App Search / Algolia style: pagination in JSON body
+                        _deep_set(req_body, _body_pag.current_path, current_page)
+                        if _body_pag.size_path:
+                            _deep_set(req_body, _body_pag.size_path, page_size)
+                    elif use_page_numbers:
+                        req_params[cfg.page_number_param] = str(current_page)
                     else:
-                        resp = await client.post(cfg.url, headers=cfg.headers, json=req_params)
-                else:
-                    resp = await client.get(cfg.url, headers=cfg.headers, params=req_params)
-            except Exception as exc:
-                await _emit(
-                    f"request failed (page {page_num}, network error): {exc}"
-                )
-                log.error("[YAML_API] network error page=%d: %s", page_num, exc, exc_info=True)
-                break
+                        req_params[cfg.offset_param] = str(offset)
 
-            # ── Check HTTP status ────────────────────────────────────────────
-            if resp.status_code != 200:
-                snippet = resp.text[:200].replace("\n", " ")
-                await _emit(
-                    f"HTTP {resp.status_code} from {cfg.url[:60]} — "
-                    f"check URL, headers/token, or network. "
-                    f"Response snippet: {snippet!r}"
-                )
-                log.error(
-                    "[YAML_API] HTTP %d page=%d url=%s body_start=%r",
-                    resp.status_code, page_num, cfg.url, snippet,
-                )
-                break
-
-            # ── Parse JSON ───────────────────────────────────────────────────
-            try:
-                data = resp.json()
-            except Exception as exc:
-                snippet = resp.text[:200].replace("\n", " ")
-                await _emit(
-                    f"JSON decode failed: {exc} — "
-                    f"response snippet: {snippet!r}"
-                )
-                log.error("[YAML_API] JSON decode failed: %s body=%r", exc, snippet)
-                break
-
-            # ── Extract items from configured root_path ──────────────────────
-            items: list[dict] = []
-            if cfg.root_path:
-                raw = _dig(data, cfg.root_path)
-                items = raw if isinstance(raw, list) else []
-                if not isinstance(raw, list):
-                    # Show operator the actual top-level keys so they can fix root_path
-                    top_keys = list(data.keys())[:10] if isinstance(data, dict) else type(data).__name__
+                # ── Make the HTTP request ────────────────────────────────────────
+                resp = None
+                try:
+                    if cfg.method.upper() == "POST":
+                        if req_body is not None:
+                            # Body-mode POST (Elastic App Search, Algolia JSON body)
+                            resp = await client.post(_api_url, headers=cfg.headers, json=req_body)
+                        else:
+                            resp = await client.post(_api_url, headers=cfg.headers, json=req_params)
+                    else:
+                        resp = await client.get(_api_url, headers=cfg.headers, params=req_params)
+                except Exception as exc:
                     await _emit(
-                        f"root_path={cfg.root_path!r} → {type(raw).__name__} "
-                        f"(expected list). Top-level keys: {top_keys}. "
-                        f"Fix root_path in YAML."
+                        f"request failed (page {page_num}, network error): {exc}"
                     )
-            elif isinstance(data, list):
-                items = data
-            else:
-                # Try common wrapper keys
-                for k in ("results", "items", "data", "courses", "docs", "response"):
-                    v = data.get(k) if isinstance(data, dict) else None
-                    if isinstance(v, list):
-                        items = v
-                        break
-                    # Handle Solr-style: response.docs
-                    if isinstance(v, dict):
-                        docs = v.get("docs")
-                        if isinstance(docs, list):
-                            items = docs
+                    log.error("[YAML_API] network error page=%d: %s", page_num, exc, exc_info=True)
+                    break
+
+                # ── Check HTTP status ────────────────────────────────────────────
+                if resp.status_code != 200:
+                    snippet = resp.text[:200].replace("\n", " ")
+                    await _emit(
+                        f"HTTP {resp.status_code} from {_api_url[:60]} — "
+                        f"check URL, headers/token, or network. "
+                        f"Response snippet: {snippet!r}"
+                    )
+                    log.error(
+                        "[YAML_API] HTTP %d page=%d url=%s body_start=%r",
+                        resp.status_code, page_num, _api_url, snippet,
+                    )
+                    break
+
+                # ── Parse JSON ───────────────────────────────────────────────────
+                try:
+                    data = resp.json()
+                except Exception as exc:
+                    snippet = resp.text[:200].replace("\n", " ")
+                    await _emit(
+                        f"JSON decode failed: {exc} — "
+                        f"response snippet: {snippet!r}"
+                    )
+                    log.error("[YAML_API] JSON decode failed: %s body=%r", exc, snippet)
+                    break
+
+                # ── Extract items from configured root_path ──────────────────────
+                items: list[dict] = []
+                if cfg.root_path:
+                    raw = _dig(data, cfg.root_path)
+                    items = raw if isinstance(raw, list) else []
+                    if not isinstance(raw, list):
+                        # Show operator the actual top-level keys so they can fix root_path
+                        top_keys = list(data.keys())[:10] if isinstance(data, dict) else type(data).__name__
+                        await _emit(
+                            f"root_path={cfg.root_path!r} → {type(raw).__name__} "
+                            f"(expected list). Top-level keys: {top_keys}. "
+                            f"Fix root_path in YAML."
+                        )
+                elif isinstance(data, list):
+                    items = data
+                else:
+                    # Try common wrapper keys
+                    for k in ("results", "items", "data", "courses", "docs", "response"):
+                        v = data.get(k) if isinstance(data, dict) else None
+                        if isinstance(v, list):
+                            items = v
+                            break
+                        # Handle Solr-style: response.docs
+                        if isinstance(v, dict):
+                            docs = v.get("docs")
+                            if isinstance(docs, list):
+                                items = docs
+                                break
+
+                if page_num == 0:
+                    await _emit(
+                        f"HTTP 200 — {len(items)} items in page 0"
+                        + (f" (root_path={cfg.root_path!r})" if cfg.root_path else "")
+                    )
+
+                if not items:
+                    if page_num == 0:
+                        top_keys = list(data.keys())[:10] if isinstance(data, dict) else type(data).__name__
+                        await _emit(
+                            f"0 items found — response top-level keys: {top_keys}. "
+                            f"Verify root_path in YAML matches the API response structure."
+                        )
+                    else:
+                        await _emit(f"page {page_num}: 0 items — end of pagination")
+                    break
+
+                # ── Extract URLs ─────────────────────────────────────────────────
+                page_links = 0
+                filtered_out = 0
+                no_url = 0
+                for item in items:
+                    if not isinstance(item, dict):
+                        continue
+                    raw_url = _first_field(item, cfg.url_fields)
+                    name = _first_field(item, cfg.title_fields) or raw_url
+                    if not raw_url:
+                        no_url += 1
+                        continue
+                    url = _resolve_url(raw_url)
+                    if not _keep_url(url):
+                        filtered_out += 1
+                        continue
+                    links.append({"name": name, "url": url})
+                    page_links += 1
+
+                    if cfg.max_courses and len(links) >= cfg.max_courses:
+                        await _emit(f"reached max_courses cap ({cfg.max_courses})")
+                        # Deduplicate and return early
+                        seen: set[str] = set()
+                        return [lk for lk in links if not (lk["url"] in seen or seen.add(lk["url"]))]  # type: ignore[func-returns-value]
+
+                detail = f"{page_links} links kept"
+                if filtered_out:
+                    detail += f", {filtered_out} dropped by allow/block patterns"
+                if no_url:
+                    detail += f", {no_url} items had no URL in fields {cfg.url_fields}"
+                await _emit(f"page {page_num}: {detail} (running total: {len(links)})")
+
+                if not paginate:
+                    break  # single-request mode
+
+                # ── Check stop conditions before advancing ─────────────────────────
+                # Body pagination: check total_pages_path (Elastic App Search style)
+                if use_body_pagination and _body_pag and _body_pag.total_pages_path:
+                    _total_pages = _dig(data, _body_pag.total_pages_path)
+                    if _total_pages is not None:
+                        _total_pages = int(_total_pages)
+                        if _body_pag.total_results_path:
+                            _total_res = _dig(data, _body_pag.total_results_path)
+                            if _total_res:
+                                await _emit(
+                                    f"page {page_num}: total_results={_total_res}, "
+                                    f"total_pages={_total_pages}"
+                                )
+                        if current_page >= _total_pages:
+                            await _emit(f"page {page_num}: reached last page ({_total_pages}) — done")
                             break
 
-            if page_num == 0:
-                await _emit(
-                    f"HTTP 200 — {len(items)} items in page 0"
-                    + (f" (root_path={cfg.root_path!r})" if cfg.root_path else "")
-                )
-
-            if not items:
-                if page_num == 0:
-                    top_keys = list(data.keys())[:10] if isinstance(data, dict) else type(data).__name__
-                    await _emit(
-                        f"0 items found — response top-level keys: {top_keys}. "
-                        f"Verify root_path in YAML matches the API response structure."
-                    )
-                else:
-                    await _emit(f"page {page_num}: 0 items — end of pagination")
-                break
-
-            # ── Extract URLs ─────────────────────────────────────────────────
-            page_links = 0
-            filtered_out = 0
-            no_url = 0
-            for item in items:
-                if not isinstance(item, dict):
-                    continue
-                raw_url = _first_field(item, cfg.url_fields)
-                name = _first_field(item, cfg.title_fields) or raw_url
-                if not raw_url:
-                    no_url += 1
-                    continue
-                url = _resolve_url(raw_url)
-                if not _keep_url(url):
-                    filtered_out += 1
-                    continue
-                links.append({"name": name, "url": url})
-                page_links += 1
-
-                if cfg.max_courses and len(links) >= cfg.max_courses:
-                    await _emit(f"reached max_courses cap ({cfg.max_courses})")
-                    # Deduplicate and return early
-                    seen: set[str] = set()
-                    return [lk for lk in links if not (lk["url"] in seen or seen.add(lk["url"]))]  # type: ignore[func-returns-value]
-
-            detail = f"{page_links} links kept"
-            if filtered_out:
-                detail += f", {filtered_out} dropped by allow/block patterns"
-            if no_url:
-                detail += f", {no_url} items had no URL in fields {cfg.url_fields}"
-            await _emit(f"page {page_num}: {detail} (running total: {len(links)})")
-
-            if not paginate:
-                break  # single-request mode
-
-            # ── Check stop conditions before advancing ─────────────────────────
-            # Body pagination: check total_pages_path (Elastic App Search style)
-            if use_body_pagination and _body_pag and _body_pag.total_pages_path:
-                _total_pages = _dig(data, _body_pag.total_pages_path)
-                if _total_pages is not None:
-                    _total_pages = int(_total_pages)
-                    if _body_pag.total_results_path:
-                        _total_res = _dig(data, _body_pag.total_results_path)
-                        if _total_res:
-                            await _emit(
-                                f"page {page_num}: total_results={_total_res}, "
-                                f"total_pages={_total_pages}"
-                            )
-                    if current_page >= _total_pages:
-                        await _emit(f"page {page_num}: reached last page ({_total_pages}) — done")
+                has_next_path = getattr(cfg, "has_next_field", None)
+                if has_next_path:
+                    has_next = _dig(data, has_next_path)
+                    if not has_next:
+                        await _emit(f"page {page_num}: has_next_field={has_next_path!r} → false, stopping")
                         break
+                elif not use_body_pagination and len(items) < page_size:
+                    break  # last page (offset mode fallback)
+                elif use_body_pagination and len(items) < page_size:
+                    break  # last page (body-pagination fallback when no total_pages_path)
 
-            has_next_path = getattr(cfg, "has_next_field", None)
-            if has_next_path:
-                has_next = _dig(data, has_next_path)
-                if not has_next:
-                    await _emit(f"page {page_num}: has_next_field={has_next_path!r} → false, stopping")
-                    break
-            elif not use_body_pagination and len(items) < page_size:
-                break  # last page (offset mode fallback)
-            elif use_body_pagination and len(items) < page_size:
-                break  # last page (body-pagination fallback when no total_pages_path)
-
-            if use_body_pagination or use_page_numbers:
-                current_page += 1
-            else:
-                offset += page_size
+                if use_body_pagination or use_page_numbers:
+                    current_page += 1
+                else:
+                    offset += page_size
 
     # ── Deduplicate by URL (preserve order) ──────────────────────────────────
     seen_urls: set[str] = set()
