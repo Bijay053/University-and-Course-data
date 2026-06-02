@@ -515,10 +515,34 @@ class BrowserPool:
             return None
 
     async def close(self) -> None:
-        if self._browser:
-            await self._browser.close()
-        if self._pw:
-            await self._pw.stop()
+        """Close the Playwright browser and stop the Playwright instance.
+
+        Also resets ``_browser`` / ``_pw`` to ``None`` so that the next
+        ``_ensure()`` call re-initialises the pool on a fresh event loop.
+        This matters because Playwright objects are bound to the event loop
+        in which they were created; if the loop is replaced (new asyncio.run()
+        call after SoftTimeLimitExceeded) the old objects must not be reused.
+        """
+        _b, _p = self._browser, self._pw
+        # Reset first so _ensure() always creates fresh objects on the next
+        # asyncio.run() even if the close calls below raise.
+        self._browser = None
+        self._pw = None
+        # Also reset the asyncio primitives so they bind to the new event
+        # loop when next awaited (avoids "Future attached to different loop").
+        self._sem = asyncio.Semaphore(settings.max_browser_concurrency)
+        self._lock = asyncio.Lock()
+        self._host_sems = {}
+        if _b:
+            try:
+                await _b.close()
+            except Exception:  # noqa: BLE001 — closing is best-effort
+                pass
+        if _p:
+            try:
+                await _p.stop()
+            except Exception:  # noqa: BLE001
+                pass
 
 
 pool = BrowserPool()

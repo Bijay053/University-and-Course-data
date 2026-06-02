@@ -26,6 +26,28 @@ from app.tasks.celery_app import celery_app
 log = logging.getLogger(__name__)
 
 
+def _run_in_fresh_loop(coro) -> None:  # noqa: ANN001
+    """Run *coro* in a brand-new event loop and then close that loop.
+
+    Used in exception-handler paths (SoftTimeLimitExceeded, BaseException)
+    where ``asyncio.run()`` can fail because the interrupted event loop left
+    Python's current-loop thread-local in a dirty state.  Creating an
+    explicit loop bypasses ``asyncio.run()``'s "is there already a running
+    loop?" guard and guarantees a clean execution context for the failure-mark
+    DB write.
+    """
+    asyncio.set_event_loop(None)
+    _loop = asyncio.new_event_loop()
+    try:
+        _loop.run_until_complete(coro)
+    finally:
+        try:
+            _loop.close()
+        except Exception:  # noqa: BLE001
+            pass
+        asyncio.set_event_loop(None)
+
+
 def _sync_dispose() -> None:
     """Synchronously invalidate the SQLAlchemy connection pool before
     starting a fresh ``asyncio.run()`` event loop inside a Celery task.
@@ -93,8 +115,21 @@ def set_initial_dispatch_lock(job_id: str) -> None:
 
 
 async def _async_scrape(runtime_job_id: str) -> None:
-    async with AsyncSessionLocal() as db:
-        await run_scrape(db, runtime_job_id)
+    from app.services.scraper.browser_pool import pool as _browser_pool
+    try:
+        async with AsyncSessionLocal() as db:
+            await run_scrape(db, runtime_job_id)
+    finally:
+        # Always close the Playwright browser pool before the event loop
+        # tears down.  Without this, when SoftTimeLimitExceeded (or any
+        # other exception) propagates, Playwright callbacks try to call
+        # call_soon() on a closing/closed loop and raise
+        # RuntimeError: Event loop is closed — which chains over the real
+        # exception and can prevent _mark_failed from being called correctly.
+        try:
+            await _browser_pool.close()
+        except Exception:  # noqa: BLE001 — best-effort cleanup
+            pass
 
 
 async def _async_repair(runtime_job_id: str) -> None:
@@ -178,7 +213,7 @@ def scrape_university(self, runtime_job_id: str) -> dict:  # noqa: ANN001
         asyncio.run(_async_scrape(runtime_job_id))
         return {"ok": True, "id": runtime_job_id}
     except SoftTimeLimitExceeded:
-        # 2-hour ceiling hit. Mark the job failed so the UI shows a real
+        # 45-min ceiling hit. Mark the job failed so the UI shows a real
         # error instead of spinning forever, then let Celery clean up.
         log.error(
             "scrape_university soft time limit exceeded for job %s — marking failed",
@@ -186,7 +221,13 @@ def scrape_university(self, runtime_job_id: str) -> dict:  # noqa: ANN001
         )
         try:
             _sync_dispose()
-            asyncio.run(_mark_failed(runtime_job_id, "Scrape exceeded 2-hour time limit"))
+            # Do NOT use asyncio.run() here — SoftTimeLimitExceeded interrupts
+            # the event loop mid-flight and can leave the current-loop thread-
+            # local in a dirty state, causing the next asyncio.run() to raise
+            # RuntimeError: Event loop is closed (chained over the real error).
+            # _run_in_fresh_loop() creates an explicit new loop that bypasses
+            # these guards and guarantees _mark_failed actually writes to DB.
+            _run_in_fresh_loop(_mark_failed(runtime_job_id, "Scrape exceeded 45-min time limit"))
         except Exception:
             pass
         return {"ok": False, "id": runtime_job_id, "error": "soft_time_limit_exceeded"}
@@ -196,14 +237,14 @@ def scrape_university(self, runtime_job_id: str) -> dict:  # noqa: ANN001
         # issue won't fix itself on retry.
         try:
             _sync_dispose()
-            asyncio.run(_mark_failed(runtime_job_id, str(exc)))
+            _run_in_fresh_loop(_mark_failed(runtime_job_id, str(exc)))
         except Exception:
             pass
         return {"ok": False, "id": runtime_job_id, "error": str(exc)}
     except BaseException as exc:
         # asyncio.CancelledError is BaseException (not Exception) in Python
         # 3.8+.  Without this block it escapes silently and the Celery slot
-        # appears stuck until the 2-hour soft-time-limit fires.  Reraise
+        # appears stuck until the soft-time-limit fires.  Reraise
         # SystemExit / KeyboardInterrupt so Celery can still shut down cleanly.
         if isinstance(exc, (SystemExit, KeyboardInterrupt)):
             raise
@@ -213,7 +254,7 @@ def scrape_university(self, runtime_job_id: str) -> dict:  # noqa: ANN001
         )
         try:
             _sync_dispose()
-            asyncio.run(_mark_failed(runtime_job_id, f"BaseException: {exc}"))
+            _run_in_fresh_loop(_mark_failed(runtime_job_id, f"BaseException: {exc}"))
         except Exception:
             pass
         return {"ok": False, "id": runtime_job_id, "error": f"BaseException: {exc}"}
@@ -239,7 +280,7 @@ def repair_university(self, runtime_job_id: str) -> dict:  # noqa: ANN001
         log.exception("Repair task failed id=%s: %s", runtime_job_id, exc)
         try:
             _sync_dispose()
-            asyncio.run(_mark_failed(runtime_job_id, str(exc)))
+            _run_in_fresh_loop(_mark_failed(runtime_job_id, str(exc)))
         except Exception:
             pass
         return {"ok": False, "id": runtime_job_id, "error": str(exc)}
@@ -249,7 +290,7 @@ def repair_university(self, runtime_job_id: str) -> dict:  # noqa: ANN001
         log.error("repair_university BaseException id=%s: %s", runtime_job_id, exc)
         try:
             _sync_dispose()
-            asyncio.run(_mark_failed(runtime_job_id, f"BaseException: {exc}"))
+            _run_in_fresh_loop(_mark_failed(runtime_job_id, f"BaseException: {exc}"))
         except Exception:
             pass
         return {"ok": False, "id": runtime_job_id, "error": f"BaseException: {exc}"}
