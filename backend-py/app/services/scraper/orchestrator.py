@@ -1123,10 +1123,29 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # Also run when the YAML API returned a partial result and sitemap
         # supplement is requested (_yaml_api_partial), merging the two sets.
         _yaml_api_partial = locals().get("_yaml_api_partial", False)
+        # When the YAML API returned 0 links and seed_urls are configured, start
+        # BFS from the first seed_url (the operator-verified course listing page)
+        # rather than scrape_url (the university homepage).  Crawling from the
+        # homepage wastes page budget on info pages and generates false candidates
+        # (e.g. /study/fees/, /communities/future-students/).
+        _yaml_api_returned_zero = (
+            locals().get("_yaml_api_links") is not None
+            and len(locals().get("_yaml_api_links", [])) == 0
+        )
+        _bfs_seed_urls: list[str] = list(_uni_cfg.discovery.seed_urls or [])
+        if _yaml_api_returned_zero and _bfs_seed_urls:
+            _bfs_start_url = _bfs_seed_urls[0]
+            log.info(
+                "[YAML_API] API returned 0 — BFS starting from seed_urls[0]=%s "
+                "(overriding homepage %s)",
+                _bfs_start_url, scrape_url,
+            )
+        else:
+            _bfs_start_url = scrape_url
         if (not links or _yaml_api_partial) and not _always_browser:
             _pre_bfs_links = list(links)
             links = await discover_course_links(
-                scrape_url,
+                _bfs_start_url,
                 max_pages=max_pages,
                 max_courses=max_courses,
                 emit=emit,

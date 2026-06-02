@@ -810,18 +810,29 @@ async def _fetch_yaml_api_via_browser(
             except Exception as seed_exc:
                 log.warning("[YAML_API_BROWSER] seed navigation failed: %s — proceeding anyway", seed_exc)
 
+            # Pagination is active only when page_size > 0 AND a page-number param
+            # is configured.  For single-request APIs (max_pages=1, no page_number_param)
+            # we must NOT inject the page_size_param into the URL — it would add an
+            # unexpected query parameter (e.g. &rows=20) that the API doesn't recognise.
+            _browser_paginate: bool = page_size > 0 and bool(page_num_param)
+
             current_page = 1
             for _iteration in range(max_pages):
                 # Build the full API URL with page params using JS (no httpx).
                 req_params: dict = dict(cfg.params)
-                req_params[cfg.page_size_param or "PageSize"] = str(page_size)
-                if page_num_param:
-                    req_params[page_num_param] = str(current_page)
+                if _browser_paginate:
+                    req_params[cfg.page_size_param or "PageSize"] = str(page_size)
+                    if page_num_param:
+                        req_params[page_num_param] = str(current_page)
 
                 qs = "&".join(f"{k}={v}" for k, v in req_params.items())
                 api_url = cfg.url + ("&" if "?" in cfg.url else "?") + qs
 
-                await _emit(f"page {current_page} → {api_url[:100]}")
+                # Log the COMPLETE URL — do not truncate.  Operators need to verify
+                # every parameter (including long values with hyphens, tildes, etc.)
+                # is present and correct.
+                log.info("[YAML_API_BROWSER] page %d full URL: %s", current_page, api_url)
+                await _emit(f"page {current_page} → {api_url}")
 
                 try:
                     raw_json = await page.evaluate(
