@@ -146,6 +146,9 @@ async def capture_xhr_signals(
                     if len(body) < _MIN_BODY_BYTES:
                         return
                     body_capped = body[:_MAX_BODY_BYTES]
+                    # Capture request headers — cookies are stripped below before
+                    # the XhrCapture is constructed.  The raw dict is only used
+                    # transiently inside _on_response and never stored anywhere.
                     req_headers = dict(response.request.headers or {})
                     # Deduplicate: keep the larger body if same URL seen twice
                     existing = response_bodies.get(r_url)
