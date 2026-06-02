@@ -1728,6 +1728,39 @@ def _yaml_to_recipe(yaml_data: dict) -> dict:
     if quality.get("block_publish_if"):
         recipe["block_publish_if"] = list(quality["block_publish_if"])
 
+    # JSON/REST API discovery (generic_search_api)
+    gsa = disc.get("generic_search_api") or {}
+    if gsa.get("url"):
+        api_block: dict = {
+            "endpoint":            gsa["url"],
+            "method":              gsa.get("method") or "GET",
+            "root_path":           gsa.get("root_path") or "",
+            "count_path":          "",
+            "course_url_template": gsa.get("course_url_template") or "",
+            "query_params":        dict(gsa.get("params") or {}),
+            "headers":             dict(gsa.get("headers") or {}),
+            "fields":              {},
+        }
+        if gsa.get("url_fields"):
+            api_block["url_fields"] = list(gsa["url_fields"])
+        if gsa.get("title_fields"):
+            api_block["title_fields"] = list(gsa["title_fields"])
+        if gsa.get("body") is not None:
+            api_block["body"] = gsa["body"]
+        if gsa.get("body_pagination"):
+            api_block["body_pagination"] = dict(gsa["body_pagination"])
+        # Pagination: map schema fields → recipe pagination object
+        if gsa.get("page_size"):
+            api_block["pagination"] = {
+                "type":       "offset",
+                "page_param": gsa.get("page_number_param") or gsa.get("offset_param") or "start",
+                "size_param": gsa.get("page_size_param") or "rows",
+                "page_size":  gsa["page_size"],
+                "page_start": 0,
+                "max_pages":  gsa.get("max_pages") or 20,
+            }
+        recipe["api"] = api_block
+
     return recipe
 
 
@@ -1867,6 +1900,36 @@ def _recipe_to_yaml_patch(existing_yaml: dict, recipe: dict) -> dict:
         ext["quality"] = {k: v for k, v in qual.items() if k not in _RECIPE_QUAL_KEYS} or None
         if not ext["quality"]:
             del ext["quality"]
+
+    # JSON/REST API discovery — write back to generic_search_api
+    api = recipe.get("api") or {}
+    if api.get("endpoint"):
+        gsa = disc.setdefault("generic_search_api", {})
+        gsa["url"] = api["endpoint"]
+        method = api.get("method") or "GET"
+        if method and method != "GET":
+            gsa["method"] = method
+        elif "method" in gsa and gsa["method"] == "GET":
+            del gsa["method"]
+        _set_or_del(gsa, "params",           dict(api.get("query_params") or {}) or None)
+        _set_or_del(gsa, "headers",          dict(api.get("headers") or {}) or None)
+        _set_or_del(gsa, "root_path",        api.get("root_path") or "")
+        _set_or_del(gsa, "course_url_template", api.get("course_url_template") or "")
+        if api.get("body") is not None:
+            gsa["body"] = api["body"]
+        elif "body" in gsa:
+            del gsa["body"]
+        bp = api.get("body_pagination") or {}
+        if bp.get("current_path"):
+            gsa["body_pagination"] = {k: v for k, v in bp.items() if v}
+        elif "body_pagination" in gsa:
+            del gsa["body_pagination"]
+        if api.get("url_fields"):
+            gsa["url_fields"] = list(api["url_fields"])
+        if api.get("title_fields"):
+            gsa["title_fields"] = list(api["title_fields"])
+    elif "generic_search_api" in disc:
+        del disc["generic_search_api"]
 
     # Clean up empty top-level sections
     if not disc:

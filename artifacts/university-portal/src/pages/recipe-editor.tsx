@@ -42,6 +42,15 @@ interface ApiConfig {
   course_url_template: string;
   fields: Record<string, string>;
   headers: Record<string, string>;
+  url_fields?: string[];
+  title_fields?: string[];
+  body?: Record<string, any> | null;
+  body_pagination?: {
+    current_path: string;
+    size_path?: string;
+    total_pages_path?: string;
+    total_results_path?: string;
+  };
   pagination?: {
     type: string;
     page_param: string;
@@ -2194,6 +2203,84 @@ export default function RecipeEditorPage() {
 
               <Separator />
 
+              {/* POST Body — shown when method is POST */}
+              {recipe.api?.method === "POST" && (
+                <>
+                  <div className="space-y-2">
+                    <Label>POST Body (JSON)</Label>
+                    <p className="text-xs text-muted-foreground">
+                      JSON body template sent with every POST request. For Elastic App Search, Algolia, and Solr APIs that accept <code>application/json</code> bodies instead of query params.
+                      The pagination fields inside it are updated automatically per page.
+                    </p>
+                    <textarea
+                      className="w-full min-h-[160px] rounded-md border border-input bg-background px-3 py-2 text-sm font-mono ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-y"
+                      placeholder={'{\n  "query": "",\n  "page": { "current": 1, "size": 100 }\n}'}
+                      value={recipe.api?.body != null ? JSON.stringify(recipe.api.body, null, 2) : ""}
+                      onChange={e => {
+                        const raw = e.target.value.trim();
+                        if (!raw) { patchApi({ body: null }); return; }
+                        try { patchApi({ body: JSON.parse(raw) }); } catch { /* keep as-is while typing */ }
+                      }}
+                    />
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label>Body Pagination</Label>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Configure how the page number is updated inside the JSON body on each paginated request (Elastic App Search style).
+                        </p>
+                      </div>
+                      <Switch
+                        checked={!!recipe.api?.body_pagination?.current_path}
+                        onCheckedChange={v => patchApi({
+                          body_pagination: v
+                            ? { current_path: "page.current", size_path: "page.size", total_pages_path: "" }
+                            : undefined
+                        })}
+                      />
+                    </div>
+                    {recipe.api?.body_pagination?.current_path !== undefined && (
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pl-2">
+                        <div>
+                          <Label className="text-xs">Current Page Path</Label>
+                          <Input
+                            value={recipe.api.body_pagination?.current_path || ""}
+                            onChange={e => patchApi({ body_pagination: { ...recipe.api!.body_pagination!, current_path: e.target.value } })}
+                            placeholder="page.current"
+                            className="mt-1 text-sm font-mono"
+                          />
+                          <p className="text-xs text-muted-foreground mt-1">Dot-path in body to set page number (e.g. <code>page.current</code>)</p>
+                        </div>
+                        <div>
+                          <Label className="text-xs">Page Size Path <span className="text-muted-foreground">(opt)</span></Label>
+                          <Input
+                            value={recipe.api.body_pagination?.size_path || ""}
+                            onChange={e => patchApi({ body_pagination: { ...recipe.api!.body_pagination!, size_path: e.target.value } })}
+                            placeholder="page.size"
+                            className="mt-1 text-sm font-mono"
+                          />
+                          <p className="text-xs text-muted-foreground mt-1">Dot-path to set page size (e.g. <code>page.size</code>)</p>
+                        </div>
+                        <div>
+                          <Label className="text-xs">Total Pages Path <span className="text-muted-foreground">(opt)</span></Label>
+                          <Input
+                            value={recipe.api.body_pagination?.total_pages_path || ""}
+                            onChange={e => patchApi({ body_pagination: { ...recipe.api!.body_pagination!, total_pages_path: e.target.value } })}
+                            placeholder="meta.page.total_pages"
+                            className="mt-1 text-sm font-mono"
+                          />
+                          <p className="text-xs text-muted-foreground mt-1">Dot-path in response for stop signal (e.g. <code>meta.page.total_pages</code>)</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <Separator />
+                </>
+              )}
+
               <KeyValueEditor
                 label="JSON Field Mapping"
                 pairs={recipe.api?.fields || {}}
@@ -2205,12 +2292,42 @@ export default function RecipeEditorPage() {
 
               <Separator />
 
+              {/* URL / Title field extraction */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>URL Fields <span className="text-muted-foreground font-normal">(priority order)</span></Label>
+                  <Input
+                    value={(recipe.api?.url_fields || []).join(", ")}
+                    onChange={e => patchApi({ url_fields: e.target.value.split(",").map(s => s.trim()).filter(Boolean) })}
+                    placeholder="url, course_url, page_url, link"
+                    className="mt-1 text-sm font-mono"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    JSON keys tried in order to extract the course page URL from each API item.
+                  </p>
+                </div>
+                <div>
+                  <Label>Title Fields <span className="text-muted-foreground font-normal">(priority order)</span></Label>
+                  <Input
+                    value={(recipe.api?.title_fields || []).join(", ")}
+                    onChange={e => patchApi({ title_fields: e.target.value.split(",").map(s => s.trim()).filter(Boolean) })}
+                    placeholder="title, name, course_name"
+                    className="mt-1 text-sm font-mono"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    JSON keys tried in order to extract the course name from each API item.
+                  </p>
+                </div>
+              </div>
+
+              <Separator />
+
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <div>
-                    <Label>Pagination</Label>
+                    <Label>Query-String Pagination</Label>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      Enable to page through results. The page number is added automatically to each request.
+                      Enable to page through results using query parameters. For POST APIs with body-embedded pagination, use Body Pagination above instead.
                     </p>
                   </div>
                   <Switch
@@ -3621,4 +3738,7 @@ const EMPTY_API: ApiConfig = {
   course_url_template: "",
   fields: {},
   headers: {},
+  url_fields: [],
+  title_fields: [],
+  body: null,
 };
