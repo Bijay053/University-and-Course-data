@@ -187,3 +187,11 @@ extraction:
   staging:
     reject_if_missing:
       - course_name
+    # ARU/Writtle SPA pages surface course_name from JSON metadata without
+    # the degree prefix (e.g. "Nursing (Children)" instead of "BSc (Hons)
+    # Nursing (Children)").  URL block_url_patterns already gates non-course
+    # pages, so the name-based qualifier check is redundant here.
+    skip_degree_qualifier_check: true
+    # ARU fees live on JS tabs that the static extractor cannot always reach.
+    # Stage fee-missing courses for human review rather than auto-rejecting.
+    require_international_fee: false

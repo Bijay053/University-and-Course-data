@@ -454,7 +454,23 @@ def should_stage_course(
     # the discovery-link name (passed as course_name param) — the H1 is the
     # canonical page title and the most reliable signal.
     effective_name = (payload.get("course_name") or course_name or "").strip()
-    if effective_name and not _name_has_degree_qualifier(effective_name):
+    # Per-uni YAML opt-out: skip_degree_qualifier_check=true disables the
+    # name-based check for universities (e.g. ARU/Writtle) whose SPA pages
+    # surface course_name from JSON metadata without the degree prefix.
+    # URL-based block_url_patterns already gates non-course pages for those unis.
+    _skip_dq = False
+    try:
+        from app.services.scraper.config.context import (  # noqa: PLC0415
+            get_uni_config as _get_uni_config_dq,
+        )
+        _dq_cfg = _get_uni_config_dq()
+        if _dq_cfg is not None and _dq_cfg.extraction is not None:
+            _skip_dq = bool(
+                getattr(_dq_cfg.extraction.staging, "skip_degree_qualifier_check", False)
+            )
+    except Exception:  # noqa: BLE001
+        pass
+    if not _skip_dq and effective_name and not _name_has_degree_qualifier(effective_name):
         return (False, "category_landing_page")
 
     # Explicit domestic-only flag: set by extractors when the page text
@@ -588,7 +604,33 @@ def should_stage_course(
     if payload.get("international_fee") is None:
         if payload.get("has_central_fee_page"):
             return (True, "accepted")
-        return (False, "no_international_fee")
+        # Per-uni YAML opt-out: require_international_fee=false lets courses
+        # without a fee through for human review (e.g. ARU where fees are on
+        # JS tabs that the extractor cannot always render).
+        _req_fee = True
+        try:
+            from app.services.scraper.config.context import (  # noqa: PLC0415
+                get_uni_config as _get_uni_config_fee,
+            )
+            _fee_cfg = _get_uni_config_fee()
+            if _fee_cfg is not None and _fee_cfg.extraction is not None:
+                _req_fee = bool(
+                    getattr(
+                        _fee_cfg.extraction.staging,
+                        "require_international_fee",
+                        True,
+                    )
+                )
+        except Exception:  # noqa: BLE001
+            pass
+        if _req_fee:
+            return (False, "no_international_fee")
+        log.info(
+            "[STAGE-OK] course=%r — staged without fee "
+            "(require_international_fee=false in YAML)",
+            effective_name,
+        )
+        return (True, "accepted")
 
     return (True, "accepted")
 

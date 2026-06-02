@@ -1374,6 +1374,26 @@ class StagingConfig(BaseModel):
             "A course missing any of these fields is rejected at the staging gate."
         ),
     )
+    skip_degree_qualifier_check: bool = Field(
+        default=False,
+        description=(
+            "When True, the name-based degree-qualifier check (category_landing_page "
+            "rejection) is skipped.  Use for universities (e.g. ARU/Writtle) whose "
+            "SPA pages populate course_name from JSON metadata without the degree "
+            "prefix in the name — the URL-based block_url_patterns already filters "
+            "non-course pages so the name check is redundant."
+        ),
+    )
+    require_international_fee: bool = Field(
+        default=True,
+        description=(
+            "When False, courses without an international_fee are staged for human "
+            "review instead of being auto-rejected (no_international_fee).  Use when "
+            "the fee is reliably published on the institution's website but the "
+            "extractor cannot reach it (e.g. fee behind a JS tab that stealth browser "
+            "hasn't rendered yet)."
+        ),
+    )
 
 
 # ── Top-level ExtractionConfig ───────────────────────────────────────────────
