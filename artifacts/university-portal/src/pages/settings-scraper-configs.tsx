@@ -18,6 +18,21 @@ const SAMPLE_YAML = `# University Full Name
 # Bug history / rationale:
 #   (add notes here as you discover site-specific quirks)
 
+# ── BEFORE WRITING ANY YAML ──────────────────────────────────────────────────
+#
+# 1. Run a scrape first with NO custom YAML.
+# 2. Check the discovery count (Discovered N raw candidate course link(s)).
+# 3. Check the staged courses — look for 0 results or missing fields.
+# 4. Identify the ACTUAL symptom before touching any setting.
+# 5. Apply the smallest possible override that fixes only that symptom.
+#
+# Most universities need only 1–3 custom settings. Avoid adding fields
+# 'just in case' — every extra setting adds a new failure mode.
+#
+# Biggest mistake: fixing a discovery problem with extraction settings,
+# or fixing an extraction problem by changing discovery filters.
+# Fix the layer where the symptom appears, not a neighbouring layer.
+#
 # ── WHEN TO EDIT THIS FILE ────────────────────────────────────────────────────
 # Edit when a scrape of THIS university produces wrong or missing data.
 # Safe pattern:
