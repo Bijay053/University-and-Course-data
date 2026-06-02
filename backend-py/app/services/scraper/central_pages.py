@@ -1946,8 +1946,56 @@ def match_central_fee(
             # "Bachelor of Health (BHealth)" → after strip → "Bachelor of Health"
             # → score 100 (exact) instead of 78.3 (miss).
             p_no_abbrev = _ABBREV_TRAIL_RE.sub("", p).strip()
-            s2 = float(_rfuzz.token_sort_ratio(p_no_abbrev, n)) if p_no_abbrev != p else 0.0
-            return max(s1, s2)
+            # Use fuzz.ratio (position-aware) NOT token_sort_ratio here.
+            # After stripping a trailing abbreviation the remaining name is
+            # already in the canonical order, so there is no need for token
+            # reordering.  token_sort_ratio would sort tokens alphabetically
+            # and then compare — this causes cross-discipline false positives
+            # when two degrees share structure but differ in one subject word:
+            #   "Bachelor of Engineering with Honours" (stripped) scores 81 via
+            #   token_sort_ratio against "Bachelor of Business with Honours"
+            #   because sorted tokens share 4/5 tokens and the 81% threshold
+            #   is exceeded.  fuzz.ratio (SequenceMatcher / Indel) keeps the
+            #   words in position and correctly scores ~74 for that pair.
+            # s2 is only used when the stripped pattern is an ALMOST-EXACT match.
+            # The purpose of stripping the trailing abbreviation is to handle
+            # fee-table rows of the form "Course Name (Abbrev)" where the name
+            # AFTER stripping should equal the course name exactly (score=100)
+            # or near-exactly (e.g. "&" vs "and", score≈96).
+            # Requiring s2 ≥ 90 rejects cross-discipline false positives like:
+            #   "Bachelor of Engineering with Honours" (stripped) vs
+            #   "Bachelor of Business with Honours" → fuzz.ratio ≈ 81 → rejected.
+            _s2_raw = float(_rfuzz.ratio(p_no_abbrev, n)) if p_no_abbrev != p else 0.0
+            s2 = _s2_raw if _s2_raw >= 90 else 0.0
+            # Also try partial_ratio when the query (course name) is strictly
+            # shorter than the fee-table pattern.  This catches fee-table rows
+            # where extra description follows the programme name, e.g.:
+            #   "Bachelor of Laws (LLB) Single Major, Double Major, or with Honours"
+            #   "Bachelor of Teaching (BTchg) All BTchg streams: Early childhood, Primary"
+            #   "Master of Pharmacy Practice (available from 2026)"
+            # In each case the course name appears verbatim at the start of the
+            # longer row, so partial_ratio(query, row) = 100.
+            #
+            # Guard: only apply when len(n) < len(p) to avoid the reverse case
+            # where the FEE TABLE row is shorter than the course name.  Without
+            # this guard, "Bachelor of Business with Honours" (32 chars) would
+            # score ≥80 against "Bachelor of Business (BBus)" (26 chars) because
+            # the shorter row is found inside the longer course name — a false
+            # positive that would assign the wrong fee.  Similarly "Master of
+            # Philosophy" (19) would score ≥80 against "Master of Laws" (14).
+            # Guard: only apply when the fee-table row STARTS WITH the course
+            # name.  This correctly handles:
+            #   "Bachelor of Laws" → startswith → True (pattern starts with name)
+            #   "Bachelor of Business with Honours" vs "Bachelor of Engineering
+            #     with Honours (BE(Hons))" → startswith → False (no false match)
+            #   "Master of Philosophy" vs "Postgraduate Certificate in Philosophy"
+            #     → startswith → False (no false match)
+            s3 = (
+                float(_rfuzz.partial_ratio(n, p))
+                if p.startswith(n)
+                else 0.0
+            )
+            return max(s1, s2, s3)
         return 100.0 if p == n else (60.0 if p in n or n in p else 0.0)
 
     best_record: CentralFeeRecord | None = None
