@@ -33,6 +33,14 @@
 discovery:
   auto_api_discovery: false
 
+  # ARU's course pages are a React SPA. The regular headless Playwright pool
+  # gets 0B rendered because Cloudflare's bot-detection blocks it (same
+  # behaviour as Macquarie). Stealth routes each fetch through patchright +
+  # Xvfb which bypasses the CF challenge and gets the fully-hydrated HTML.
+  # Without this: text_len=0 → no H1 → no degree qualifier → 237 false
+  # category_landing_page rejections at the staging gate.
+  use_stealth_browser: true
+
   seed_urls:
     - https://www.aru.ac.uk/study/course-search?levelofstudy=Undergraduate
     - https://www.aru.ac.uk/study/course-search?levelofstudy=Postgraduate
