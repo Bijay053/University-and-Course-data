@@ -158,6 +158,20 @@ extraction:
     # Column-aware PDF parser (for PDFs with multi-line course names in fee tables):
     # pdf_parser: "columnar"
 
+    # Per-course fee keyword rejection — discard an extracted fee when its evidence
+    # snippet contains any listed keyword (e.g. to avoid staging domestic rates):
+    # reject_keywords:
+    #   - "Kentucky residents"    # precise domestic marker — safe
+    #   - "In-state"              # precise domestic marker — safe
+    #   - "Commonwealth Supported"
+    #   - "CSP"
+    #   - "HECS"
+    #
+    # IMPORTANT: Avoid broad words like "Full-time" or "credit hours" because
+    # they can also appear beside valid international fees (e.g.
+    # "Full-time international student: $28,000/year") and will silently discard
+    # the fee you actually want. Use the most specific domestic phrase possible.
+
   # ── English requirements ───────────────────────────────────────────────────
   english:
     # University-wide English requirements page:
@@ -182,6 +196,13 @@ extraction:
     # rolling_enrollment_label: "Rolling"
     # rolling_enrollment_markers:
     #   - "enrolment shall be continuous"
+    #   - "rolling admission"
+    #   - "applications accepted year-round"
+    #
+    # IMPORTANT: Only use phrases that specifically mean continuous/rolling intake.
+    # Do NOT use generic page text like "Apply Now", "Admission Requirements",
+    # or "accepted to university" — those appear on normal fixed-intake pages too
+    # and will stamp "Rolling" on every course that has no detected intake dates.
 
   # ── Filters ───────────────────────────────────────────────────────────────
   filters:
@@ -199,10 +220,10 @@ extraction:
   text_cleaning:
     location:
       # strip_patterns:
-      #   - '\bDelivery\s*method\b'
+      #   - '\\bDelivery\\s*method\\b'
     duration:
       # reject_sentence_patterns:
-      #   - 'up to \d+ years to complete'
+      #   - 'up to \\d+ years to complete'
     # global_substring_blocklist:
     #   - "Apply Now"
     #   - "Find out more"

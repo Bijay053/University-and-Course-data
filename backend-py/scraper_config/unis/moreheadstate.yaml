@@ -2,14 +2,12 @@
 # Hostname: www.moreheadstate.edu
 # Country: USA  |  Currency: USD
 #
-# Bug history / rationale:
-#   Discovery is working now. The latest run found 173 extractable course pages.
+# Bug history:
+#   Discovery works. Latest run found 173 extractable course pages.
 #   Main issue is extraction quality:
-#   - per-course pages do not show course-specific international fees
-#   - central tuition page gives bucket-level tuition, not per-course fees
-#   - scraper was correctly skipping bucket match fees to avoid wrong values
-#   - many courses have no fixed intake on course page
-#   - browser rendered HTML is 0B, while static HTML already contains usable text
+#   - course pages do not publish per-course international fees
+#   - central tuition page is bucket-level, not course-level
+#   - browser rendered HTML returns 0B while static HTML has usable text
 
 discovery:
   auto_api_discovery: false
@@ -59,7 +57,6 @@ extraction:
       - Kentucky residents
       - Ohio reciprocating counties
       - In-state
-      - Full-time
       - credit hours
       - Undergraduate online
 
@@ -67,13 +64,7 @@ extraction:
     trust_vision_ocr: false
     default_toefl: 70
 
-  intake:
-    rolling_enrollment_label: Rolling
-    rolling_enrollment_markers:
-      - Apply Now
-      - accepted to MSU
-      - standard undergraduate application process
-      - admission requirements
+  intake: {}
 
   filters:
     domestic_only:
