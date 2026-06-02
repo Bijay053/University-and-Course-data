@@ -816,36 +816,82 @@ async def _fetch_yaml_api_via_browser(
             # unexpected query parameter (e.g. &rows=20) that the API doesn't recognise.
             _browser_paginate: bool = page_size > 0 and bool(page_num_param)
 
+            # Body-POST pagination (Elastic App Search / JSON-body APIs).
+            # When cfg.body is set the browser fetches via POST with a JSON body
+            # instead of building a query-string GET URL.
+            import copy as _copy
+            _bpag = getattr(cfg, "body_pagination", None)
+            _body_tpl = _copy.deepcopy(cfg.body) if getattr(cfg, "body", None) else None
+            _use_body_post = bool(_body_tpl is not None)
+
+            def _br_deep_set(obj: dict, path: str, value: Any) -> None:
+                """Set a dot-path key inside a nested dict (browser-mode helper)."""
+                parts = path.split(".")
+                for part in parts[:-1]:
+                    obj = obj.setdefault(part, {})
+                obj[parts[-1]] = value
+
             current_page = 1
             for _iteration in range(max_pages):
-                # Build the full API URL with page params using JS (no httpx).
-                req_params: dict = dict(cfg.params)
-                if _browser_paginate:
-                    req_params[cfg.page_size_param or "PageSize"] = str(page_size)
-                    if page_num_param:
-                        req_params[page_num_param] = str(current_page)
+                if _use_body_post:
+                    # Body-POST mode: URL stays clean; pagination lives in the JSON body.
+                    api_url = cfg.url
+                    req_body = _copy.deepcopy(_body_tpl)
+                    if _bpag:
+                        _br_deep_set(req_body, _bpag.current_path, current_page)
+                        if _bpag.size_path and page_size:
+                            _br_deep_set(req_body, _bpag.size_path, page_size)
+                    log.info("[YAML_API_BROWSER] page %d POST %s body=%s", current_page, api_url, req_body)
+                    await _emit(f"page {current_page} → {api_url} (POST)")
+                else:
+                    # Query-string GET mode.
+                    req_body = None
+                    req_params: dict = dict(cfg.params)
+                    if _browser_paginate:
+                        req_params[cfg.page_size_param or "PageSize"] = str(page_size)
+                        if page_num_param:
+                            req_params[page_num_param] = str(current_page)
 
-                qs = "&".join(f"{k}={v}" for k, v in req_params.items())
-                api_url = cfg.url + ("&" if "?" in cfg.url else "?") + qs
-
-                # Log the COMPLETE URL — do not truncate.  Operators need to verify
-                # every parameter (including long values with hyphens, tildes, etc.)
-                # is present and correct.
-                log.info("[YAML_API_BROWSER] page %d full URL: %s", current_page, api_url)
-                await _emit(f"page {current_page} → {api_url}")
+                    qs = "&".join(f"{k}={v}" for k, v in req_params.items())
+                    api_url = cfg.url + ("&" if "?" in cfg.url else "?") + qs if qs else cfg.url
+                    # Log the COMPLETE URL — do not truncate.  Operators need to verify
+                    # every parameter (including long values with hyphens, tildes, etc.)
+                    # is present and correct.
+                    log.info("[YAML_API_BROWSER] page %d full URL: %s", current_page, api_url)
+                    await _emit(f"page {current_page} → {api_url}")
 
                 try:
-                    raw_json = await page.evaluate(
-                        """async (url) => {
-                            const resp = await fetch(url, {
-                                credentials: 'include',
-                                headers: { 'Accept': 'application/json' }
-                            });
-                            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-                            return await resp.json();
-                        }""",
-                        api_url,
-                    )
+                    if _use_body_post:
+                        # Collect extra headers from cfg (content-type etc.) to pass
+                        # into the JS fetch alongside the JSON body.
+                        extra_headers: dict = dict(getattr(cfg, "headers", None) or {})
+                        extra_headers.setdefault("content-type", "application/json")
+                        extra_headers["accept"] = "application/json"
+                        raw_json = await page.evaluate(
+                            """async ([url, body, headers]) => {
+                                const resp = await fetch(url, {
+                                    method: 'POST',
+                                    credentials: 'include',
+                                    headers: headers,
+                                    body: JSON.stringify(body)
+                                });
+                                if (!resp.ok) throw new Error('HTTP ' + resp.status + ' ' + resp.statusText);
+                                return await resp.json();
+                            }""",
+                            [api_url, req_body, extra_headers],
+                        )
+                    else:
+                        raw_json = await page.evaluate(
+                            """async (url) => {
+                                const resp = await fetch(url, {
+                                    credentials: 'include',
+                                    headers: { 'Accept': 'application/json' }
+                                });
+                                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                                return await resp.json();
+                            }""",
+                            api_url,
+                        )
                 except Exception as fetch_exc:
                     log.warning("[YAML_API_BROWSER] fetch error p%d: %s — stopping", current_page, fetch_exc)
                     break
@@ -892,14 +938,32 @@ async def _fetch_yaml_api_via_browser(
 
                 await _emit(f"page {current_page}: {new_count} items (total so far: {len(links)})")
 
-                if not page_num_param:
-                    break  # no pagination configured — single-page mode
-                if has_next_field and not has_next:
-                    await _emit("hasNextPage=false — all pages fetched")
-                    break
-                if not has_next_field and len(data) < page_size:
-                    await _emit(f"last page (returned {len(data)} < {page_size}) — done")
-                    break
+                if _use_body_post:
+                    # Body-POST mode stopping: use total_pages_path when available.
+                    if _bpag and _bpag.total_pages_path:
+                        _total_results = None
+                        if _bpag.total_results_path:
+                            _total_results = _dig(raw_json, _bpag.total_results_path)
+                        _total_pages_val = _dig(raw_json, _bpag.total_pages_path)
+                        if _total_pages_val is not None:
+                            _tp = int(_total_pages_val)
+                            _tr_str = f", total_results={_total_results}" if _total_results is not None else ""
+                            await _emit(f"page {current_page}: total_pages={_tp}{_tr_str}")
+                            if current_page >= _tp:
+                                await _emit(f"reached last page ({_tp}) — done")
+                                break
+                    elif len(data) < page_size:
+                        await _emit(f"last page (returned {len(data)} < {page_size}) — done")
+                        break
+                else:
+                    if not page_num_param:
+                        break  # no pagination configured — single-page mode
+                    if has_next_field and not has_next:
+                        await _emit("hasNextPage=false — all pages fetched")
+                        break
+                    if not has_next_field and len(data) < page_size:
+                        await _emit(f"last page (returned {len(data)} < {page_size}) — done")
+                        break
 
                 current_page += 1
 

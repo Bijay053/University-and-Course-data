@@ -123,31 +123,86 @@ discovery:
   #                                     # page to visit first — triggers session cookie
   #                                     # defaults to url if not set
 
-  # ┌─ Sub-option B3: JSON body POST (Elastic App Search / Algolia) ─────────────
+  # ┌─ Sub-option B3: JSON body POST (Elastic App Search / SilverStripe) ──────────
   # Use when: the API requires application/json body for BOTH the request payload AND
-  # pagination — NOT query-string parameters.  Elastic App Search and Algolia both work
-  # this way: pagination is { "page": { "current": 2, "size": 100 } } in the JSON body,
+  # pagination — NOT query-string parameters.  Elastic App Search works this way:
+  # pagination is { "page": { "current": 2, "size": 100 } } in the JSON body,
   # not ?page.current=2 in the URL.
   #
   # HOW TO IDENTIFY AN ELASTIC APP SEARCH API:
   #   1. DevTools → Network → filter XHR/Fetch
   #   2. Find a POST to .../_search/api/as/v1/engines/<engine>/search.json
   #   3. Click it → Payload tab — you will see JSON body with "query" + "page" keys
-  #   4. Authorization: Bearer <token> header (this is a public search key, not a
-  #      user credential — safe to store as a Replit secret and rotate periodically)
-  #   5. Response has { results: [...], meta: { page: { total_pages, total_results } } }
+  #   4. Check the Authorization header carefully (see TWO VARIANTS below)
+  #   5. Response: { results: [...], meta: { engine: { name }, page: { total_pages } } }
+  #   6. Check which field holds the course URL (common: url.raw, page_link.raw, link.raw)
+  #      Look at the Payload tab's response to find the right field name.
   #
-  # IMPORTANT: Replace --engine-- in the url with the actual engine name from the URL
-  # (e.g. "waikato-courses-prod").  Store the Bearer token as a Replit secret.
+  # ── VARIANT A: Server-side proxy alias (most SilverStripe / Incapsula sites) ──
+  # How to recognise: DevTools shows "Bearer --search--" or "Bearer <placeholder>".
+  # The site runs a reverse proxy at /_search/ that maps a placeholder engine name
+  # (e.g. --engine--) and placeholder token (--search--) to the real credentials
+  # server-side.  The client (browser and scraper) never sees the real token.
+  # Solution: use the placeholder URL as-is, NO Authorization header in YAML,
+  # set fetch_via_browser: true so the scraper sends the session cookies that
+  # authenticate the proxy (Incapsula/Imperva WAF requires a real browser session).
+  # Also copy the exact body filters/sort from the DevTools Payload tab — the
+  # source_class / type filter is essential or the API returns mixed content.
   #
   # generic_search_api:
   #   enabled: true
   #   method: POST
   #   url: "https://www.example.ac.nz/_search/api/as/v1/engines/--engine--/search.json"
   #   headers:
-  #     authorization: "Bearer \${MY_UNI_EAS_TOKEN}"  # Replit secret name
   #     content-type: "application/json"
-  #   # JSON body template — body_pagination updates page.current per request
+  #     x-swiftype-client: "elastic-app-search-javascript"  # copy from DevTools
+  #     x-swiftype-client-version: "8.13.0"
+  #   # COPY EXACT BODY from DevTools Payload tab — do not guess filters/sort
+  #   body:
+  #     query: ""
+  #     filters:
+  #       all:
+  #         - source_class:
+  #             - "App\\Pages\\QualificationPage"  # YAML needs double-backslash
+  #     page:
+  #       current: 1
+  #       size: 100
+  #     sort:
+  #       - _score: "desc"
+  #       - title: "asc"
+  #   page_size: 100
+  #   body_pagination:
+  #     current_path: page.current          # sets body["page"]["current"] = 1, 2, 3...
+  #     size_path: page.size                # sets body["page"]["size"]
+  #     total_pages_path: meta.page.total_pages      # stops when current >= total_pages
+  #     total_results_path: meta.page.total_results  # logged for diagnostics
+  #   root_path: "results"
+  #   url_fields:
+  #     - "page_link.raw"     # SilverStripe sites often use page_link.raw
+  #     - "url.raw"           # fallback: standard Elastic App Search field
+  #   title_fields:
+  #     - "title.raw"
+  #   normalize_relative_urls: true   # page_link.raw returns relative paths
+  #   base_url: "https://www.example.ac.nz"
+  #   allow_url_patterns:
+  #     - "/qualifications/"
+  #   max_pages: 10
+  #   fetch_via_browser: true         # required for Incapsula session cookies
+  #   browser_seed_url: "https://www.example.ac.nz/study/qualifications/"
+  #
+  # ── VARIANT B: Real Bearer token (public search key, not a user credential) ──
+  # How to recognise: DevTools shows a real "Bearer search-key-abc123xyz..." value.
+  # This is a read-only public search key — safe to store as a Replit secret.
+  # Set fetch_via_browser: false (plain httpx POST is enough).
+  # Replace <engine> in the URL with the actual name from DevTools.
+  #
+  # generic_search_api:
+  #   enabled: true
+  #   method: POST
+  #   url: "https://api.example.com/api/as/v1/engines/<engine>/search.json"
+  #   headers:
+  #     authorization: "Bearer \${MY_UNI_EAS_TOKEN}"  # set as Replit secret
+  #     content-type: "application/json"
   #   body:
   #     query: ""
   #     page:
@@ -155,25 +210,20 @@ discovery:
   #       size: 100
   #   page_size: 100
   #   body_pagination:
-  #     current_path: page.current          # sets body["page"]["current"] = 1, 2, 3...
-  #     size_path: page.size                # sets body["page"]["size"]
-  #     total_pages_path: meta.page.total_pages      # stops when current >= total_pages
-  #     total_results_path: meta.page.total_results  # logged for diagnostics
-  #   root_path: "results"                  # Elastic App Search wraps items in "results"
+  #     current_path: page.current
+  #     size_path: page.size
+  #     total_pages_path: meta.page.total_pages
+  #   root_path: "results"
   #   url_fields:
-  #     - "url.raw"                         # Elastic App Search nested field (dot-path)
+  #     - "url.raw"
   #   title_fields:
   #     - "title.raw"
-  #   normalize_relative_urls: true
-  #   base_url: "https://www.example.ac.nz"
-  #   allow_url_patterns:
-  #     - "/int/study/qualifications/"
+  #   normalize_relative_urls: false  # hosted Elastic returns absolute URLs
   #   max_pages: 10
   #
   # seed_urls:
-  #   - https://www.example.ac.nz/int/study/qualifications/
-  # # When API returns 0 links (token expired / wrong engine name), BFS falls back
-  # # to seed_urls[0] instead of the homepage, starting inside the catalogue.
+  #   - https://www.example.ac.nz/study/qualifications/
+  # # When API returns 0 links, BFS starts from seed_urls[0] instead of homepage.
 
   # Option C — SearchStax Solr provider (Huddersfield-style, full provider).
   # Use when the site is a JS SPA that queries Solr client-side.
