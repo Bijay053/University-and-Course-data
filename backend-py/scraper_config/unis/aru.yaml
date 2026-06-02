@@ -1,21 +1,31 @@
 # Anglia Ruskin University
-# Temporary Discovery YAML
-# Purpose:
-# Stop browser wandering into CPD, short courses, cookie APIs and category pages
-# until the real ARU course API is identified.
+# Discovery: BFS from server-rendered course filter pages
+#
+# Key finding (2026-06-02):
+#   https://www.aru.ac.uk/study/course-search?levelofstudy=Undergraduate
+#   returns 33+ real course links in static HTML
+#   (e.g. /study/undergraduate/accounting-and-finance)
+#   No API or browser rendering required.
+#
+# Root causes of the earlier 0-course result:
+#   1. seed_urls pointed at bare /study/course-search (JS widget, no results in HTML)
+#   2. block_url_patterns had '\?' which blocked ALL query-string URLs including
+#      the filter pages that actually contain course listings
+#   3. BFS was starting from homepage (now fixed in orchestrator.py)
 
 discovery:
   auto_api_discovery: false
 
   seed_urls:
-    - https://www.aru.ac.uk/study/course-search
+    - https://www.aru.ac.uk/study/course-search?levelofstudy=Undergraduate
+    - https://www.aru.ac.uk/study/course-search?levelofstudy=Postgraduate
 
   always_sitemap_supplement: true
   sitemap_url: https://www.aru.ac.uk/sitemap.xml
 
-  bfs_page_budget: 250
-  max_candidates: 1500
-  expected_min_courses: 300
+  bfs_page_budget: 60
+  max_candidates: 800
+  expected_min_courses: 200
 
   always_browser_discover: false
   skip_browser_discovery: true
@@ -24,18 +34,25 @@ discovery:
   allow_url_patterns:
     - '/study/undergraduate/'
     - '/study/postgraduate/'
-    - '/courses/'
-    - '/course/'
-    - '/study/course-search'
 
   block_url_patterns:
+    # Block the bare search widget (no results without JS)
     - '/study/course-search/?$'
+    # Block non-degree filter combinations
+    - 'levelofstudy=(?:CPD|college-course|College\+course|Short\+course|Research|English\+language|Degree\+apprenticeship|Work-based)'
+    - 'levelofstudy=college'
+    # Block non-degree study mode filters
+    - 'modeofstudy=(?:Short\+course|English\+course|Workshop|Degree\+apprenticeship)'
+    # Block non-course sections
     - '/study/continuing-professional-development'
     - '/study/professional-and-short-courses'
     - '/study/college-courses'
     - '/study/degree-apprenticeships'
     - '/research/postgraduate-research'
     - '/schools-and-colleges'
+    - '/study/admissions'
+    - '/study/open-day'
+    - '/study/starting-at'
     - '/about'
     - '/contact'
     - '/news'
@@ -52,7 +69,6 @@ discovery:
     - '/international/'
     - '/subjects/'
     - '/search'
-    - '\?'
     - '\.pdf$'
 
 extraction:
