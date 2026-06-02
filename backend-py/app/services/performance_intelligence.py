@@ -19,17 +19,20 @@ log = logging.getLogger(__name__)
 
 
 def _as_utc(dt: object) -> object:
-    """Return *dt* with UTC tzinfo attached if it is timezone-naive.
+    """Return *dt* as a timezone-naive UTC datetime.
 
-    asyncpg rejects naive datetimes for TIMESTAMPTZ columns — scrape_runtime_jobs
-    stores timestamps without tzinfo on some installations, causing
-    'can't subtract offset-naive and offset-aware datetimes' at INSERT time.
+    ``scrape_performance_ledger.job_started_at / job_completed_at`` are plain
+    TIMESTAMP (no time-zone) columns.  asyncpg raises DataError /
+    "can't subtract offset-naive and offset-aware datetimes" when a
+    TZ-aware datetime is passed for a naive TIMESTAMP column.  Strip the
+    tzinfo after normalising to UTC so asyncpg receives a plain naive value.
     """
     from datetime import datetime
     if dt is None or not isinstance(dt, datetime):
         return dt
-    if dt.tzinfo is None:
-        return dt.replace(tzinfo=_tz.utc)
+    if dt.tzinfo is not None:
+        # Normalise to UTC then strip tzinfo for the naive TIMESTAMP column
+        return dt.astimezone(_tz.utc).replace(tzinfo=None)
     return dt
 
 

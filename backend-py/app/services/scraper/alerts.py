@@ -414,11 +414,11 @@ async def _detect_url_pattern_anomalies(
     from app.models.scraped_course import ScrapedCourse
     from app.models.scrape_runtime import ScrapeRuntimeJob
 
-    # Current-run staged URLs
+    # Current-run staged URLs  (ScrapedCourse.course_website is the per-course URL)
     current_rows = await db.execute(
-        select(ScrapedCourse.source_url)
+        select(ScrapedCourse.course_website)
         .where(ScrapedCourse.scrape_job_id == scrape_run_id)
-        .where(ScrapedCourse.source_url.isnot(None))
+        .where(ScrapedCourse.course_website.isnot(None))
     )
     current_counts: dict[str, int] = {}
     for (src_url,) in current_rows.all():
@@ -447,9 +447,9 @@ async def _detect_url_pattern_anomalies(
 
     # Historical staged URLs
     hist_rows = await db.execute(
-        select(ScrapedCourse.source_url)
+        select(ScrapedCourse.course_website)
         .where(ScrapedCourse.scrape_job_id.in_(historical_job_ids))
-        .where(ScrapedCourse.source_url.isnot(None))
+        .where(ScrapedCourse.course_website.isnot(None))
     )
     hist_prefixes: set[str] = set()
     for (src_url,) in hist_rows.all():

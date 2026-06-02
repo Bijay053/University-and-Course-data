@@ -3181,6 +3181,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                             _qi_pages["requirementsPdf"] = _qi_url
                     _qi_pdf_data = await load_university_pdf_data(_qi_cfg, uni_country, emit=emit)
                     _qi_backfilled = 0
+                    _qi_er = {}
                     if _qi_pdf_data:
                         _qi_er = _qi_pdf_data.get("entry_requirements") or {}
                         _qi_fee_data = _qi_pdf_data.get("fee") or {}
@@ -3520,9 +3521,9 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     )
                 )).scalar()
                 _p12_avg_conf_row = (await db.execute(
-                    _p12sel(_p12func.avg(_P12FVR.confidence)).where(
-                        _P12FVR.scrape_run_id == runtime_job_id,
-                    )
+                    _p12sel(_p12func.avg(_P12FVR.confidence))
+                    .join(_P12SC, _P12FVR.scraped_course_id == _P12SC.id)
+                    .where(_P12SC.scrape_job_id == runtime_job_id)
                 )).scalar()
                 if _p12_avg_row is not None:
                     from app.services.country_intelligence import update_country_stats
@@ -3541,7 +3542,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             # courses, record the field mapping in scraper_patterns so future
             # universities on the same API platform reuse it without re-probing.
             try:
-                _ac = auto_config or {}
+                _ac = (uni_scrape_config or {}).get("auto_config") or {}
                 _api_type_p4b = _ac.get("_api_type") or ""
                 _field_mapping_p4b = _ac.get("_field_mapping") or {}
                 if _api_type_p4b and _field_mapping_p4b:
