@@ -148,6 +148,12 @@ extraction:
 
     # Mark all courses as having a central fee page (staging gate won't reject them):
     # force_central_fee_stage: true
+    #
+    # NOTE: This only lets courses pass staging when no per-course fee is found.
+    # It does NOT copy the central fee to every course record.
+    # If the central page publishes only broad tuition buckets (e.g. "UG: $18k/yr"),
+    # leave international_fee blank rather than forcing a possibly wrong amount.
+    # Use reject_keywords (below) to discard domestic rates from the central page.
 
     # Per-unit fee multiplier (null = auto-extract credit points from course page):
     # credit_points_per_unit: 6
