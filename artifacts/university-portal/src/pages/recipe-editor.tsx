@@ -732,6 +732,7 @@ export default function RecipeEditorPage() {
 
   const [uniName, setUniName] = useState("");
   const [scrapeUrl, setScrapeUrl] = useState("");
+  const [yamlSlug, setYamlSlug] = useState<string | null>(null);
   const [recipe, setRecipe] = useState<Recipe>(EMPTY_RECIPE);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -768,6 +769,7 @@ export default function RecipeEditorPage() {
       .then(data => {
         setUniName(data.university_name || "");
         setScrapeUrl(data.scrape_url || "");
+        if (data.yaml_slug) setYamlSlug(data.yaml_slug);
         if (data.recipe && Object.keys(data.recipe).length > 0) {
           const loaded: Recipe = { ...EMPTY_RECIPE, ...data.recipe };
           setRecipe(loaded);
@@ -841,7 +843,14 @@ export default function RecipeEditorPage() {
         body: JSON.stringify(recipe),
       });
       if (!resp.ok) throw new Error(await resp.text());
-      toast({ title: "Recipe saved", description: "The scraping recipe has been saved to the database." });
+      const data = await resp.json();
+      if (data.yaml_slug) setYamlSlug(data.yaml_slug);
+      const yamlMsg = data.yaml_slug
+        ? `Saved to database and synced to ${data.yaml_slug}.yaml`
+        : data.yaml_write_error
+          ? `Saved to database (YAML write failed: ${data.yaml_write_error})`
+          : "Saved to database (no YAML file found for this university)";
+      toast({ title: "Recipe saved", description: yamlMsg });
     } catch (e: any) {
       toast({ title: "Save failed", description: e.message, variant: "destructive" });
     } finally {
@@ -985,8 +994,18 @@ export default function RecipeEditorPage() {
             <ArrowLeft className="h-4 w-4" /> Back to university
           </button>
           <h1 className="text-2xl font-bold">Advanced Scraping Recipe</h1>
-          <p className="text-muted-foreground text-sm">
+          <p className="text-muted-foreground text-sm flex items-center gap-2 flex-wrap">
             {uniName} · <span className="font-mono text-xs">{scrapeUrl}</span>
+            {yamlSlug && (
+              <a
+                href={`/settings/scraper-configs/${yamlSlug}`}
+                className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-800 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-300 font-mono"
+                title="Open raw YAML editor for this university"
+              >
+                <Code2 className="h-3 w-3" />
+                {yamlSlug}.yaml
+              </a>
+            )}
           </p>
         </div>
         <div className="flex items-center gap-2">

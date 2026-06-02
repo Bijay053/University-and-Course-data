@@ -1,9 +1,15 @@
 """University CRUD endpoints. Path layout mirrors the Node API exactly."""
 from __future__ import annotations
 
+import copy
 import csv
 import io
+import re
+from pathlib import Path
 from typing import Annotated, Any
+from urllib.parse import urlparse
+
+import yaml as _yaml_mod
 
 from fastapi import APIRouter, Body, Depends, File, HTTPException, Query, UploadFile, status
 from fastapi.responses import JSONResponse
@@ -1569,25 +1575,382 @@ async def put_agent_config(
     return {"ok": True, "university_id": uni_id, "admin_config": body}
 
 
+# ── YAML ↔ Recipe Editor helpers ─────────────────────────────────────────────
+
+_UNIS_YAML_DIR = Path(__file__).parent.parent.parent / "scraper_config" / "unis"
+
+
+def _slug_for_uni(scrape_url: str) -> str | None:
+    """Return the YAML slug for a university given its scrape_url.
+
+    1. Extracts hostname, strips www.
+    2. Fast-path: if ``{first_segment}.yaml`` exists, return it.
+    3. Scan all YAML files and return the stem of the first file whose
+       content contains the bare hostname.
+    Returns None if no matching YAML file exists.
+    """
+    if not scrape_url:
+        return None
+    try:
+        parsed = urlparse(scrape_url.strip())
+        host = parsed.netloc or urlparse("https://" + scrape_url.strip()).netloc
+        host = re.sub(r"^www\.", "", (host or "").lower().split(":")[0])
+        if not host:
+            return None
+        first = host.split(".")[0]
+        if first and (_UNIS_YAML_DIR / f"{first}.yaml").exists():
+            return first
+        for f in sorted(_UNIS_YAML_DIR.glob("*.yaml")):
+            try:
+                if host in f.read_text(encoding="utf-8", errors="replace"):
+                    return f.stem
+            except OSError:
+                pass
+    except Exception:
+        pass
+    return None
+
+
+def _yaml_to_recipe(yaml_data: dict) -> dict:
+    """Convert a parsed YAML config dict into recipe-editor compatible fields."""
+    recipe: dict = {}
+    disc = yaml_data.get("discovery") or {}
+    ext  = yaml_data.get("extraction") or {}
+
+    # Discovery
+    if disc.get("seed_urls"):
+        recipe["seed_urls"] = list(disc["seed_urls"])
+    if disc.get("block_url_patterns"):
+        recipe["block_url_patterns"] = list(disc["block_url_patterns"])
+    if disc.get("allow_url_patterns"):
+        recipe["must_contain"] = list(disc["allow_url_patterns"])
+    for key in ("bfs_page_budget", "max_candidates", "expected_min_courses",
+                "expected_max_courses", "browser_time_budget_s", "browser_early_stop_courses"):
+        if disc.get(key) is not None:
+            recipe[key] = disc[key]
+
+    # course_name cleanup
+    cn = ext.get("course_name") or {}
+    if cn.get("remove_after"):
+        recipe["course_name_remove_after"] = list(cn["remove_after"])
+    if cn.get("remove_year_suffix"):
+        recipe["course_name_remove_year_suffix"] = True
+    if cn.get("remove_patterns"):
+        recipe["course_name_remove_patterns"] = list(cn["remove_patterns"])
+
+    # fees
+    fees = ext.get("fees") or {}
+    if fees.get("default_currency"):
+        recipe["fee_currency"] = fees["default_currency"]
+    if fees.get("fee_year") is not None:
+        recipe["fee_year"] = fees["fee_year"]
+    if fees.get("prefer_international"):
+        recipe["fee_prefer_international"] = bool(fees["prefer_international"])
+    if fees.get("fee_url_suffix"):
+        recipe["fee_url_suffix"] = fees["fee_url_suffix"]
+    if fees.get("reject_keywords"):
+        recipe["fee_reject_keywords"] = list(fees["reject_keywords"])
+    if fees.get("follow_links"):
+        recipe["fee_follow_links"] = list(fees["follow_links"])
+    if fees.get("rules_undergraduate"):
+        recipe["fee_rules_undergraduate"] = list(fees["rules_undergraduate"])
+    if fees.get("rules_postgraduate"):
+        recipe["fee_rules_postgraduate"] = list(fees["rules_postgraduate"])
+
+    # english
+    eng = ext.get("english") or {}
+    if eng.get("course_english_priority"):
+        recipe["course_english_priority"] = True
+    ielts_vals = {k: eng.get(k, "") for k in ("overall_regex", "band_regex", "source_xpath")}
+    if any(ielts_vals.values()):
+        recipe["ielts"] = ielts_vals
+    if eng.get("follow_links"):
+        recipe["follow_links"] = list(eng["follow_links"])
+    if eng.get("degree_level_defaults"):
+        recipe["degree_level_defaults"] = dict(eng["degree_level_defaults"])
+    if eng.get("band_mapping"):
+        recipe["band_mapping"] = dict(eng["band_mapping"])
+    if eng.get("band_reference_url"):
+        recipe["band_reference_url"] = eng["band_reference_url"]
+
+    # location
+    loc = ext.get("location") or {}
+    if loc.get("replace"):
+        recipe["location_replace"] = dict(loc["replace"])
+    if loc.get("allowed_values"):
+        recipe["location_allowed_values"] = list(loc["allowed_values"])
+    if loc.get("reject_values"):
+        recipe["location_reject_values"] = list(loc["reject_values"])
+
+    # study_mode
+    sm = ext.get("study_mode") or {}
+    if sm.get("from_location"):
+        recipe["study_mode_from_location"] = True
+    if sm.get("online_keywords"):
+        recipe["study_mode_online_keywords"] = list(sm["online_keywords"])
+
+    # intake
+    intake = ext.get("intake") or {}
+    intake_recipe: dict = {}
+    if intake.get("xpath"):
+        intake_recipe["xpath"] = intake["xpath"]
+    if intake.get("regex"):
+        intake_recipe["regex"] = intake["regex"]
+    if intake.get("month_map"):
+        intake_recipe["month_map"] = dict(intake["month_map"])
+    if intake_recipe:
+        recipe["intake"] = {"xpath": "", "regex": "", "month_map": {}, **intake_recipe}
+
+    # browser actions
+    raw_actions = ext.get("actions") or []
+    actions: list[dict] = []
+    for a in raw_actions:
+        if not isinstance(a, dict):
+            continue
+        if "click_text"   in a: actions.append({"action_type": "click_text",        "value": str(a["click_text"])})
+        elif "click_css"  in a: actions.append({"action_type": "click_css",         "value": str(a["click_css"])})
+        elif "expand_text" in a: actions.append({"action_type": "expand_text",       "value": str(a["expand_text"])})
+        elif "scroll_to"  in a: actions.append({"action_type": "scroll_to",         "value": str(a["scroll_to"])})
+        elif "wait_for"   in a:
+            wf = a["wait_for"]
+            if isinstance(wf, dict):
+                if "text"     in wf: actions.append({"action_type": "wait_for_text",     "value": str(wf["text"])})
+                elif "selector" in wf: actions.append({"action_type": "wait_for_selector", "value": str(wf["selector"])})
+    if actions:
+        recipe["actions"] = actions
+
+    # quality gates
+    quality = ext.get("quality") or {}
+    if quality.get("minimum_completeness") is not None:
+        recipe["minimum_completeness"] = quality["minimum_completeness"]
+    if quality.get("required_fields"):
+        recipe["required_fields"] = list(quality["required_fields"])
+    if quality.get("block_publish_if"):
+        recipe["block_publish_if"] = list(quality["block_publish_if"])
+
+    return recipe
+
+
+def _recipe_to_yaml_patch(existing_yaml: dict, recipe: dict) -> dict:
+    """Patch an existing parsed YAML config dict with recipe-editor fields.
+
+    Only touches keys that the recipe editor manages.  YAML-only keys
+    (``use_stealth_browser``, ``browser_wait_strategy``, ``max_parallel_fetch``,
+    ``filters``, ``text_cleaning``, etc.) are left untouched.
+    Empty lists / falsy scalars remove the key so the YAML stays clean.
+    """
+    out  = copy.deepcopy(existing_yaml)
+    disc = out.setdefault("discovery", {})
+    ext  = out.setdefault("extraction", {})
+
+    def _set_or_del(d: dict, key: str, val: Any) -> None:
+        if val:
+            d[key] = val
+        elif key in d:
+            del d[key]
+
+    # Discovery
+    _set_or_del(disc, "seed_urls",           recipe.get("seed_urls") or [])
+    _set_or_del(disc, "block_url_patterns",  recipe.get("block_url_patterns") or [])
+    _set_or_del(disc, "allow_url_patterns",  recipe.get("must_contain") or [])
+    for key in ("bfs_page_budget", "max_candidates", "expected_min_courses",
+                "expected_max_courses", "browser_time_budget_s", "browser_early_stop_courses"):
+        if recipe.get(key) is not None:
+            disc[key] = recipe[key]
+
+    # course_name — patch recipe-managed keys, keep YAML-only keys (e.g. strip_title_suffixes)
+    cn_after = recipe.get("course_name_remove_after") or []
+    cn_year  = bool(recipe.get("course_name_remove_year_suffix"))
+    cn_pats  = recipe.get("course_name_remove_patterns") or []
+    _RECIPE_CN_KEYS = {"remove_after", "remove_year_suffix", "remove_patterns"}
+    cn = ext.setdefault("course_name", {})
+    _set_or_del(cn, "remove_after",       cn_after)
+    _set_or_del(cn, "remove_year_suffix", cn_year or None)
+    _set_or_del(cn, "remove_patterns",    cn_pats)
+    if not cn:
+        del ext["course_name"]
+
+    # fees — preserve YAML-only keys (prefer_annual_over_total, prefer_year_one_over_total, etc.)
+    fees = ext.setdefault("fees", {})
+    fc = recipe.get("fee_currency") or ""
+    if fc and fc != "AUD":
+        fees["default_currency"] = fc
+    elif "default_currency" in fees and not fc:
+        del fees["default_currency"]
+    if recipe.get("fee_year") is not None:
+        fees["fee_year"] = recipe["fee_year"]
+    _set_or_del(fees, "prefer_international", recipe.get("fee_prefer_international") or None)
+    _set_or_del(fees, "fee_url_suffix",        recipe.get("fee_url_suffix") or "")
+    _set_or_del(fees, "reject_keywords",       recipe.get("fee_reject_keywords") or [])
+    _set_or_del(fees, "follow_links",          recipe.get("fee_follow_links") or [])
+    _set_or_del(fees, "rules_undergraduate",   recipe.get("fee_rules_undergraduate") or [])
+    _set_or_del(fees, "rules_postgraduate",    recipe.get("fee_rules_postgraduate") or [])
+    if not fees:
+        del ext["fees"]
+
+    # english — preserve YAML-only keys (trust_vision_ocr, default_ielts, etc.)
+    eng = ext.setdefault("english", {})
+    _set_or_del(eng, "course_english_priority", bool(recipe.get("course_english_priority")) or None)
+    ielts = recipe.get("ielts") or {}
+    for field in ("overall_regex", "band_regex", "source_xpath"):
+        _set_or_del(eng, field, ielts.get(field) or "")
+    _set_or_del(eng, "follow_links",             recipe.get("follow_links") or [])
+    _set_or_del(eng, "degree_level_defaults",    recipe.get("degree_level_defaults") or {})
+    _set_or_del(eng, "band_mapping",             recipe.get("band_mapping") or {})
+    _set_or_del(eng, "band_reference_url",       recipe.get("band_reference_url") or "")
+    if not eng:
+        del ext["english"]
+
+    # location
+    loc_replace  = recipe.get("location_replace") or {}
+    loc_allowed  = recipe.get("location_allowed_values") or []
+    loc_reject   = recipe.get("location_reject_values") or []
+    if loc_replace or loc_allowed or loc_reject:
+        loc = ext.setdefault("location", {})
+        _set_or_del(loc, "replace",        loc_replace)
+        _set_or_del(loc, "allowed_values", loc_allowed)
+        _set_or_del(loc, "reject_values",  loc_reject)
+    elif "location" in ext:
+        loc = ext["location"]
+        _RECIPE_LOC_KEYS = {"replace", "allowed_values", "reject_values"}
+        ext["location"] = {k: v for k, v in loc.items() if k not in _RECIPE_LOC_KEYS} or None
+        if not ext["location"]:
+            del ext["location"]
+
+    # study_mode
+    sm_from_loc = bool(recipe.get("study_mode_from_location"))
+    sm_keywords = recipe.get("study_mode_online_keywords") or []
+    if sm_from_loc or sm_keywords:
+        sm = ext.setdefault("study_mode", {})
+        _set_or_del(sm, "from_location",    sm_from_loc or None)
+        _set_or_del(sm, "online_keywords",  sm_keywords)
+    elif "study_mode" in ext:
+        del ext["study_mode"]
+
+    # intake — only patch recipe-managed keys, keep YAML-only keys
+    intake_cfg = recipe.get("intake") or {}
+    if intake_cfg.get("xpath") or intake_cfg.get("regex") or intake_cfg.get("month_map"):
+        intake = ext.setdefault("intake", {})
+        _set_or_del(intake, "xpath",      intake_cfg.get("xpath") or "")
+        _set_or_del(intake, "regex",      intake_cfg.get("regex") or "")
+        _set_or_del(intake, "month_map",  intake_cfg.get("month_map") or {})
+
+    # browser actions
+    recipe_actions = recipe.get("actions") or []
+    yaml_actions: list[dict] = []
+    for a in recipe_actions:
+        at  = a.get("action_type") or ""
+        val = a.get("value") or ""
+        if at == "click_text":          yaml_actions.append({"click_text": val})
+        elif at == "click_css":         yaml_actions.append({"click_css": val})
+        elif at == "expand_text":       yaml_actions.append({"expand_text": val})
+        elif at == "scroll_to":         yaml_actions.append({"scroll_to": val})
+        elif at == "wait_for_text":     yaml_actions.append({"wait_for": {"text": val}})
+        elif at == "wait_for_selector": yaml_actions.append({"wait_for": {"selector": val}})
+    _set_or_del(ext, "actions", yaml_actions)
+
+    # quality gates
+    min_comp   = recipe.get("minimum_completeness")
+    req_fields = recipe.get("required_fields") or []
+    block_if   = recipe.get("block_publish_if") or []
+    if (min_comp is not None and min_comp != 85) or req_fields or block_if:
+        qual = ext.setdefault("quality", {})
+        if min_comp is not None and min_comp != 85:
+            qual["minimum_completeness"] = min_comp
+        elif "minimum_completeness" in qual:
+            del qual["minimum_completeness"]
+        _set_or_del(qual, "required_fields", req_fields)
+        _set_or_del(qual, "block_publish_if", block_if)
+    elif "quality" in ext:
+        qual = ext["quality"]
+        _RECIPE_QUAL_KEYS = {"minimum_completeness", "required_fields", "block_publish_if"}
+        ext["quality"] = {k: v for k, v in qual.items() if k not in _RECIPE_QUAL_KEYS} or None
+        if not ext["quality"]:
+            del ext["quality"]
+
+    # Clean up empty top-level sections
+    if not disc:
+        out.pop("discovery", None)
+    if not ext:
+        out.pop("extraction", None)
+
+    return out
+
+
+def _load_yaml_recipe(scrape_url: str) -> tuple[str | None, dict]:
+    """Load and parse the YAML file for a university.
+
+    Returns ``(slug, yaml_as_recipe_dict)`` — slug is None if no file found.
+    """
+    slug = _slug_for_uni(scrape_url)
+    if not slug:
+        return None, {}
+    path = _UNIS_YAML_DIR / f"{slug}.yaml"
+    if not path.exists():
+        return slug, {}
+    try:
+        raw = path.read_text(encoding="utf-8", errors="replace")
+        data = _yaml_mod.safe_load(raw) or {}
+        return slug, _yaml_to_recipe(data)
+    except Exception:
+        return slug, {}
+
+
+def _write_yaml_from_recipe(slug: str, recipe: dict) -> None:
+    """Patch the YAML file for *slug* with fields from the recipe editor.
+
+    Preserves YAML-only keys (use_stealth_browser, browser_wait_strategy, …).
+    Creates the file if it does not yet exist.
+    """
+    path = _UNIS_YAML_DIR / f"{slug}.yaml"
+    existing: dict = {}
+    if path.exists():
+        try:
+            existing = _yaml_mod.safe_load(
+                path.read_text(encoding="utf-8", errors="replace")
+            ) or {}
+        except Exception:
+            existing = {}
+
+    updated = _recipe_to_yaml_patch(existing, recipe)
+    path.write_text(
+        _yaml_mod.dump(updated, default_flow_style=False, allow_unicode=True, sort_keys=False),
+        encoding="utf-8",
+    )
+
+
+# ── Recipe endpoints ──────────────────────────────────────────────────────────
+
 @router.get("/universities/{uni_id}/recipe")
 async def get_recipe(
     uni_id: int,
     db: Annotated[AsyncSession, Depends(get_db)],
     _: Annotated[dict, Depends(get_current_user)],
 ) -> dict:
-    """Return the advanced scraping recipe for a university."""
+    """Return the advanced scraping recipe for a university.
+
+    Merges the per-university YAML config (base) with any recipe values
+    previously saved via the recipe editor (DB overlay wins field-by-field).
+    """
     u: University | None = await db.get(University, uni_id)
     if not u:
         raise HTTPException(status_code=404, detail="University not found")
 
     sc: dict = u.scrape_config or {}
-    recipe: dict = sc.get("recipe") or {}
+    db_recipe: dict = sc.get("recipe") or {}
+
+    # Load YAML and convert to recipe fields
+    slug, yaml_recipe = _load_yaml_recipe(u.scrape_url or "")
+
+    # Merge: YAML is the base; DB recipe overrides field-by-field
+    merged = {**yaml_recipe, **db_recipe}
 
     return {
         "university_id": uni_id,
         "university_name": u.name,
         "scrape_url": u.scrape_url or "",
-        "recipe": recipe,
+        "recipe": merged,
+        "yaml_slug": slug,
     }
 
 
@@ -1669,7 +2032,26 @@ async def put_recipe(
     )
     await db.commit()
 
-    return {"ok": True, "university_id": uni_id, "recipe": body}
+    # ── Also write recipe fields back to the per-university YAML file ─────────
+    yaml_slug: str | None = None
+    yaml_write_error: str | None = None
+    try:
+        slug = _slug_for_uni(u.scrape_url or "")
+        if slug:
+            _write_yaml_from_recipe(slug, body)
+            yaml_slug = slug
+    except Exception as _ye:
+        yaml_write_error = str(_ye)
+        import logging as _log
+        _log.getLogger(__name__).warning("put_recipe: YAML write failed for uni %s: %s", uni_id, _ye)
+
+    return {
+        "ok": True,
+        "university_id": uni_id,
+        "recipe": body,
+        "yaml_slug": yaml_slug,
+        **({"yaml_write_error": yaml_write_error} if yaml_write_error else {}),
+    }
 
 
 @router.post("/universities/{uni_id}/recipe/simulate")
