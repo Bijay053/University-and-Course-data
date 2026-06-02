@@ -1,63 +1,74 @@
 # Anglia Ruskin University
-# Hostname: www.aru.ac.uk
-# Country: United Kingdom  |  Currency: GBP
+# Temporary Discovery YAML
+# Purpose:
+# Stop browser wandering into CPD, short courses, cookie APIs and category pages
+# until the real ARU course API is identified.
 
 discovery:
-  auto_api_discovery: true
+  auto_api_discovery: false
 
   seed_urls:
-    - https://www.aru.ac.uk/study/course-search?keywords=&levelofstudy=undergraduate
-    - https://www.aru.ac.uk/study/course-search?keywords=&levelofstudy=postgraduate
-
-  bfs_page_budget: 80
-  max_candidates: 700
-  expected_min_courses: 250
-
-  allow_url_patterns:
-    - "/study/course-search"
-    - "/study/undergraduate"
-    - "/study/postgraduate"
-    - "/courses/"
-
-  block_url_patterns:
-    - "/study/continuing-professional-development"
-    - "/study/professional-and-short-courses"
-    - "/study/college-courses"
-    - "/study/degree-apprenticeships"
-    - "/research/postgraduate-research"
-    - "/schools-and-colleges"
-    - "/study/admissions"
-    - "/study/open-day"
-    - "/about"
-    - "/contact"
-    - "/news"
-    - "/events"
-    - "/staff/"
-    - "/student-life/"
-    - "/business-employers/"
-    - "/linkassets/"
-    - "\\.pdf$"
+    - https://www.aru.ac.uk/study/course-search
 
   always_sitemap_supplement: true
   sitemap_url: https://www.aru.ac.uk/sitemap.xml
 
-  always_browser_discover: true
-  skip_browser_discovery: false
+  bfs_page_budget: 250
+  max_candidates: 1500
+  expected_min_courses: 300
+
+  always_browser_discover: false
+  skip_browser_discovery: true
   use_wayback: false
 
+  allow_url_patterns:
+    - '/study/undergraduate/'
+    - '/study/postgraduate/'
+    - '/courses/'
+    - '/course/'
+    - '/study/course-search'
+
+  block_url_patterns:
+    - '/study/course-search/?$'
+    - '/study/continuing-professional-development'
+    - '/study/professional-and-short-courses'
+    - '/study/college-courses'
+    - '/study/degree-apprenticeships'
+    - '/research/postgraduate-research'
+    - '/schools-and-colleges'
+    - '/about'
+    - '/contact'
+    - '/news'
+    - '/events'
+    - '/staff/'
+    - '/student-life/'
+    - '/business-employers/'
+    - '/linkassets/'
+    - '/open-days'
+    - '/clearing'
+    - '/how-to-apply'
+    - '/fees-and-funding'
+    - '/accommodation'
+    - '/international/'
+    - '/subjects/'
+    - '/search'
+    - '\?'
+    - '\.pdf$'
+
 extraction:
-  max_parallel_fetch: 4
+  max_parallel_fetch: 6
+
   skip_browser_rescue: false
   skip_per_course_browser: false
+
   browser_wait_strategy: domcontentloaded
-  browser_dcl_settle_ms: 4000
+  browser_dcl_settle_ms: 3000
 
   fees:
     default_currency: GBP
     prefer_international: true
     prefer_annual_over_total: true
     prefer_year_one_over_total: true
-    max_annual_fee: 35000
 
     reject_keywords:
       - Home student
@@ -70,15 +81,9 @@ extraction:
     trust_vision_ocr: false
     trust_tier1_vision_ocr_english: false
 
-    degree_level_defaults:
-      undergraduate:
-        ielts: 6.0
-        pte: 60
-        toefl: 80
-      postgraduate:
-        ielts: 6.5
-        pte: 61
-        toefl: 88
+    default_ielts: 6.0
+    default_pte: 60
+    default_toefl: 80
 
   intake:
     start_dates_only: true
@@ -87,15 +92,11 @@ extraction:
   filters:
     domestic_only:
       enabled: false
+
     online_only:
       enabled: false
 
   text_cleaning:
-    duration:
-      reject_sentence_patterns:
-        - "part-time for up to \\d+ years"
-        - "up to \\d+ years"
-
     global_substring_blocklist:
       - Apply now
       - Book an open day
