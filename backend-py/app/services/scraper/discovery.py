@@ -765,6 +765,23 @@ async def discover_course_links(
             if _aut_seed not in visited:
                 queue.append((_aut_seed, 0))
 
+    # Generic: pre-seed all discovery_config.seed_urls into the BFS queue.
+    # seed_urls[0] is already the start_url (first queue entry above), so we
+    # skip it here to avoid double-visiting.  seed_urls[1:] are additional
+    # operator-verified entry points (e.g. separate UG and PG search pages)
+    # that the BFS must visit even if the crawl from seed_urls[0] wouldn't
+    # naturally reach them within the page budget.
+    #
+    # This is the generic companion to the per-host pre-seeding above (UOW,
+    # Flinders, UniSQ, AUT).  Any YAML with multiple seed_urls benefits
+    # automatically without needing a per-host hardcoded block.
+    if discovery_config is not None:
+        _cfg_seeds = list(getattr(discovery_config, "seed_urls", None) or [])
+        for _extra_seed in _cfg_seeds[1:]:  # skip [0] — already start_url
+            if _extra_seed and _extra_seed not in visited:
+                queue.append((_extra_seed, 0))
+                log.info("[SEED_URL] Pre-seeded BFS queue with extra seed: %s", _extra_seed)
+
     if emit:
         await emit(
             "status",

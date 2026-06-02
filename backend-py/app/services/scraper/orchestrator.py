@@ -1123,21 +1123,27 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # Also run when the YAML API returned a partial result and sitemap
         # supplement is requested (_yaml_api_partial), merging the two sets.
         _yaml_api_partial = locals().get("_yaml_api_partial", False)
-        # When the YAML API returned 0 links and seed_urls are configured, start
-        # BFS from the first seed_url (the operator-verified course listing page)
-        # rather than scrape_url (the university homepage).  Crawling from the
-        # homepage wastes page budget on info pages and generates false candidates
-        # (e.g. /study/fees/, /communities/future-students/).
+        # When seed_urls are configured in the YAML, ALWAYS use seed_urls[0]
+        # as the BFS start URL — regardless of whether a YAML API was configured
+        # or returned results.  The old condition (_yaml_api_returned_zero) only
+        # honoured seed_urls when a YAML API was present and returned 0 links,
+        # which meant universities with auto_api_discovery=false (like ARU) had
+        # their seed_urls silently ignored and BFS started from scrape_url
+        # (the marketing homepage) instead.
+        #
+        # Precedence: seed_urls[0] > scrape_url (homepage).
+        # All seed_urls are pre-seeded into the BFS queue inside discover_course_links
+        # via the discovery_config argument, so only the first URL needs to be passed
+        # as start_url here; the rest are injected generically in discovery.py.
         _yaml_api_returned_zero = (
             locals().get("_yaml_api_links") is not None
             and len(locals().get("_yaml_api_links", [])) == 0
         )
         _bfs_seed_urls: list[str] = list(_uni_cfg.discovery.seed_urls or [])
-        if _yaml_api_returned_zero and _bfs_seed_urls:
+        if _bfs_seed_urls:
             _bfs_start_url = _bfs_seed_urls[0]
             log.info(
-                "[YAML_API] API returned 0 — BFS starting from seed_urls[0]=%s "
-                "(overriding homepage %s)",
+                "[SEED_URL] BFS starting from seed_urls[0]=%s (overriding homepage %s)",
                 _bfs_start_url, scrape_url,
             )
         else:
