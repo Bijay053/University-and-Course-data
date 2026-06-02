@@ -132,10 +132,31 @@ extraction:
     default_currency: NZD
 
   english:
-    default_ielts: 6.0
-    default_pte: 50
-    default_toefl: 80
+    # Central English requirements page — used by the extractor to look up
+    # per-course IELTS when the individual course page doesn't list it.
+    central_page: https://www.waikato.ac.nz/study/apply/undergraduate-international/entry-requirements-for-international-students/
+    course_english_priority: true
     trust_vision_ocr: false
+
+    # Degree-level-aware defaults (verified 2026-06-02 from Waikato entry requirements page):
+    #   UG  — IELTS 6.0 overall, no bands below 5.5
+    #   PG  — IELTS 6.5 overall, no bands below 6.0 (incl. Graduate Cert/Dip)
+    #   Doctorate falls back to postgraduate tier (same 6.5 requirement)
+    # Flat defaults below are the fallback when degree_level cannot be determined.
+    degree_level_defaults:
+      undergraduate:
+        ielts: 6.0
+        pte: 50
+        toefl: 80
+      postgraduate:
+        ielts: 6.5
+        pte: 58
+        toefl: 90
+
+    # Flat fallback (used when degree_level is unknown / not yet determined)
+    default_ielts: 6.5
+    default_pte: 58
+    default_toefl: 90
 
   intake:
     start_dates_only: true

@@ -5585,10 +5585,41 @@ async def extract_course(
     try:
         _eng_cfg = getattr(getattr(get_uni_config(), "extraction", None), "english", None)
         if _eng_cfg is not None and not bool(payload.get("is_pathway")):
+            # Resolve degree-level tier for per-level defaults (e.g. UG 6.0 / PG 6.5).
+            _dl_raw = (payload.get("degree_level") or "").lower().strip()
+            _dl_tier: str | None = None
+            if _dl_raw:
+                if any(k in _dl_raw for k in ("bachelor", "honours", "honor")):
+                    _dl_tier = "undergraduate"
+                elif any(k in _dl_raw for k in ("master",)):
+                    _dl_tier = "postgraduate"
+                elif any(k in _dl_raw for k in ("doctor", "phd", "dphil")):
+                    _dl_tier = "doctorate"
+                elif _dl_raw.startswith("graduate") or "postgraduate" in _dl_raw:
+                    # "Graduate Diploma", "Graduate Certificate", "Postgraduate Diploma" → PG
+                    _dl_tier = "postgraduate"
+                elif any(k in _dl_raw for k in ("diploma", "certificate")):
+                    # Plain diploma/cert without graduate/postgraduate prefix → UG tier
+                    _dl_tier = "undergraduate"
+            # Look up per-tier config; fall back to flat defaults if tier not found.
+            _dl_defaults_map: dict = getattr(_eng_cfg, "degree_level_defaults", {}) or {}
+            _tier_cfg = None
+            if _dl_tier and _dl_defaults_map:
+                _tier_cfg = _dl_defaults_map.get(_dl_tier)
+                # "doctorate" key optional — fall back to "postgraduate" if missing
+                if _tier_cfg is None and _dl_tier == "doctorate":
+                    _tier_cfg = _dl_defaults_map.get("postgraduate")
+            def _pick(tier_attr: str, flat_attr: str):
+                """Return tier value if set, else flat default, else None."""
+                if _tier_cfg is not None:
+                    v = getattr(_tier_cfg, tier_attr, None)
+                    if v not in (None, 0):
+                        return v
+                return getattr(_eng_cfg, flat_attr, None)
             _defaults = (
-                ("ielts_overall",     getattr(_eng_cfg, "default_ielts",  None)),
-                ("pte_overall",       getattr(_eng_cfg, "default_pte",    None)),
-                ("toefl_overall",     getattr(_eng_cfg, "default_toefl",  None)),
+                ("ielts_overall",     _pick("ielts",  "default_ielts")),
+                ("pte_overall",       _pick("pte",    "default_pte")),
+                ("toefl_overall",     _pick("toefl",  "default_toefl")),
             )
             # Build a set of slots that have at least one "proven" evidence row
             # (both source_url AND snippet populated).  guards.enforce_source_evidence

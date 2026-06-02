@@ -942,6 +942,26 @@ class BandSpec(BaseModel):
     )
 
 
+class DegreeEnglishDefaults(BaseModel):
+    """Per-degree-level English score defaults for universities whose UG and PG
+    entry requirements differ (e.g. Waikato: UG IELTS 6.0, PG IELTS 6.5).
+
+    Keys under ``extraction.english.degree_level_defaults`` in the YAML are
+    normalised degree tiers:
+      - ``undergraduate``  — Bachelors, Honours, Diploma, Certificate (non-graduate)
+      - ``postgraduate``   — Masters, Graduate Diploma, Graduate Certificate
+      - ``doctorate``      — Doctorate / PhD
+
+    Any tier NOT listed falls back to the flat ``default_ielts`` / ``default_pte``
+    / ``default_toefl`` fields on :class:`EnglishConfig`.
+    """
+
+    ielts: Optional[float] = Field(default=None, description="IELTS Academic overall score default for this tier.")
+    pte: Optional[int] = Field(default=None, description="PTE Academic overall score default for this tier.")
+    toefl: Optional[int] = Field(default=None, description="TOEFL iBT overall score default for this tier.")
+    duolingo: Optional[int] = Field(default=None, description="Duolingo English Test score default for this tier.")
+
+
 class EnglishConfig(BaseModel):
     central_page: Optional[str] = Field(
         default=None,
@@ -991,7 +1011,9 @@ class EnglishConfig(BaseModel):
         default=None,
         description=(
             "Institutional IELTS default to apply when no per-course value is found. "
-            "Only set when the university publicly states a single entry standard."
+            "Only set when the university publicly states a single entry standard. "
+            "Used as a fallback when degree_level_defaults is set but the course's "
+            "degree level does not match any key."
         ),
     )
     default_pte: Optional[int] = Field(
@@ -1001,6 +1023,21 @@ class EnglishConfig(BaseModel):
     default_toefl: Optional[int] = Field(
         default=None,
         description="Institutional TOEFL iBT default.",
+    )
+    degree_level_defaults: dict[str, DegreeEnglishDefaults] = Field(
+        default_factory=dict,
+        description=(
+            "Per-degree-level English score defaults. Keys are normalised tiers: "
+            "``undergraduate``, ``postgraduate``, ``doctorate``. "
+            "When set, the tier matching the course's degree_level overrides the "
+            "flat default_ielts / default_pte / default_toefl values. "
+            "Courses whose degree_level cannot be mapped to a tier fall back to "
+            "the flat defaults. Example::\n\n"
+            "  degree_level_defaults:\n"
+            "    undergraduate: {ielts: 6.0, pte: 50, toefl: 80}\n"
+            "    postgraduate:  {ielts: 6.5, pte: 58, toefl: 90}\n"
+            "    doctorate:     {ielts: 6.5, pte: 58, toefl: 90}\n"
+        ),
     )
     test_blocklist: list[str] = Field(
         default_factory=list,
