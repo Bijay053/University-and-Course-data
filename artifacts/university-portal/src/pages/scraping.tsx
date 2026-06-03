@@ -916,9 +916,12 @@ export default function Scraping() {
   useEffect(() => { reviewJobIdRef.current = reviewJobId; }, [reviewJobId]);
 
   const handleReviewReady = useCallback((jobId: string, _uniName?: string, force?: boolean) => {
-    // Auto-trigger: don't replace a review the user is actively reading with a
-    // different job's results. Only auto-open when no review is already visible.
-    // Explicit user clicks (force=true) always load immediately.
+    // BEHAVIOUR CONTRACT (see shouldLoadForBackgroundJob in scraping-poll-guard.ts):
+    // Background polling must NEVER replace an already open review panel for a
+    // different job. Only a deliberate user action (force=true) may switch the
+    // review table to another job. This prevents silent table switching when
+    // another scrape finishes in the background or another browser tab resumes
+    // an active job while the operator is reading staged courses here.
     if (!shouldLoadForBackgroundJob(jobId, { showReview: showReviewRef.current, reviewJobId: reviewJobIdRef.current }, force)) {
       console.debug("[SCRAPE_UI] ignored background staged-course load because review panel is open for another job", { backgroundJobId: jobId, openJobId: reviewJobIdRef.current });
       return;
@@ -1093,10 +1096,15 @@ export default function Scraping() {
           setAwaitingApproval(null);
           if (pollRef.current) { clearTimeout(pollRef.current); pollRef.current = null; }
           if ((data.status === "completed" || data.status === "completed_with_errors" || data.status === "stopped") && (data.imported ?? 0) > 0) {
-            // Guard: don't replace an already-visible review panel for a
-            // *different* job (e.g. cross-tab sync picked up another uni's
-            // job and its poll just finished).  Mirror handleReviewReady's
-            // guard so the two code paths are consistent.
+            // BEHAVIOUR CONTRACT (mirrors handleReviewReady above):
+            // Background polling must NEVER replace an already open review
+            // panel for a different job. Only a deliberate user action with
+            // force=true may switch the review table. This call site is a
+            // background poll completion event (no user gesture), so force
+            // is intentionally omitted — the guard will block the switch if
+            // the operator has another job's review panel open (including
+            // when another browser tab resumed an active job and its poll
+            // finished here).
             if (shouldLoadForBackgroundJob(jobId, { showReview: showReviewRef.current, reviewJobId: reviewJobIdRef.current })) {
               loadStagedCourses(jobId);
             } else {
