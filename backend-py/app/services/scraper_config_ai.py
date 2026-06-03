@@ -119,6 +119,11 @@ async def generate_scraper_yaml(
     yaml_text, cost1 = await _call_gemini(base_prompt, call_type="config_gen")
     error = _validate_uni_yaml(yaml_text)
     if error is None:
+        try:
+            _parsed = yaml.safe_load(yaml_text) or {}
+            warnings.extend(_yaml_improvement_warnings(_parsed))
+        except Exception:
+            pass
         return {
             "content": yaml_text,
             "cost_usd": cost1,
@@ -142,6 +147,11 @@ async def generate_scraper_yaml(
         raise GenerationError(
             f"Gemini output failed schema validation after retry: {error2}"
         )
+    try:
+        _parsed2 = yaml.safe_load(yaml_text2) or {}
+        warnings.extend(_yaml_improvement_warnings(_parsed2))
+    except Exception:
+        pass
     return {
         "content": yaml_text2,
         "cost_usd": cost1 + cost2,
@@ -192,6 +202,51 @@ def _validate_uni_yaml(text: str) -> str | None:
     except ValidationError as e:
         return f"extraction section invalid: {_first_pydantic_error(e)}"
     return None
+
+
+# Broad patterns that can accidentally admit search/listing pages into extraction.
+# When allow_url_patterns matches these but course_detail_url_patterns is empty,
+# the operator is warned to add the post-discovery gate.
+_BROAD_ALLOW_PATTERNS: tuple[str, ...] = (
+    "/courses/", "/course/", "/study/", "/programs/", "/programme/",
+    "/degrees/", "/undergraduate/", "/postgraduate/",
+)
+
+# Regex-metachar check: if a pattern contains any of these it is already
+# specific enough that the broad-path warning should NOT fire.
+_HAS_REGEX_CHARS = re.compile(r'[\[\]()+*?\\]|\.\d|\|')
+
+
+def _yaml_improvement_warnings(parsed: dict) -> list[str]:
+    """Return human-readable warnings for valid but potentially risky YAML configs.
+
+    These are *soft* advisories, not errors — the YAML will still be accepted.
+    Called after schema validation passes so the parsed dict is already trusted.
+    """
+    warnings: list[str] = []
+    disc = parsed.get("discovery") or {}
+
+    allow_pats = list(disc.get("allow_url_patterns") or [])
+    cdp = list(disc.get("course_detail_url_patterns") or [])
+
+    # Warn when allow_url_patterns is broad but course_detail_url_patterns is absent.
+    # Only flag patterns that are plain path prefixes (no regex metacharacters) — a
+    # pattern like `/courses/[^/]+-\d` is already specific enough and doesn't need
+    # the extra post-discovery gate.
+    if allow_pats and not cdp:
+        broad = [
+            p for p in allow_pats
+            if any(b in p for b in _BROAD_ALLOW_PATTERNS)
+            and not _HAS_REGEX_CHARS.search(p)
+        ]
+        if broad:
+            warnings.append(
+                "Broad allow_url_patterns may allow search/listing pages into extraction "
+                f"(e.g. {broad[0]!r}). Add discovery.course_detail_url_patterns to restrict "
+                "extraction to genuine course-detail URLs and avoid fake-course staging."
+            )
+
+    return warnings
 
 
 def _first_pydantic_error(e: ValidationError) -> str:

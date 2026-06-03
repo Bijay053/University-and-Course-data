@@ -4774,6 +4774,49 @@ async def extract_course(
             method=_mode_method,
         )
 
+    # ── prefer_location_over_online_keyword safety gate ──────────────────────
+    # When YAML sets extraction.study_mode.prefer_location_over_online_keyword:
+    # true, a bare-keyword "Online" result is suppressed if a non-empty
+    # course_location was also found (implying the course has a physical campus).
+    # This prevents courses whose page incidentally says "available online"
+    # in a side-bar from being staged with study_mode=Online while also
+    # carrying a concrete campus location.
+    if payload.get("study_mode") == "Online" and payload.get("course_location", "").strip():
+        try:
+            from app.services.scraper.config.context import get_uni_config as _get_polok
+            _polok_uc = _get_polok()
+            if _polok_uc is not None:
+                _polok_sm = getattr(
+                    getattr(_polok_uc, "extraction", None), "study_mode", None
+                )
+                if _polok_sm is not None and getattr(
+                    _polok_sm, "prefer_location_over_online_keyword", False
+                ):
+                    # Only suppress low-confidence / bare-keyword Online results.
+                    _sm_ev = [e for e in evidence if e.get("field_key") == "study_mode"]
+                    _sm_conf = _sm_ev[-1].get("confidence") if _sm_ev else None
+                    if _sm_conf is None or _sm_conf < 0.7:
+                        _old_mode = payload.pop("study_mode", None)
+                        log.info(
+                            "[STUDY_MODE] prefer_location_over_online_keyword: "
+                            "suppressed %r → None (location=%r, confidence=%s) %s",
+                            _old_mode,
+                            payload.get("course_location"),
+                            _sm_conf,
+                            url,
+                        )
+                        if emit:
+                            await emit(
+                                "status",
+                                f"[STUDY_MODE] prefer_location_over_online_keyword: "
+                                f"suppressed bare Online (location={payload.get('course_location')!r}) {url}",
+                                phase="extract",
+                                kind="study_mode_location_override",
+                                url=url,
+                            )
+        except Exception:
+            pass
+
     # ── CRICOS code extraction from the course page ──────────────────────────
     # Extract CRICOS code early so it is available during PDF row matching.
     # ``cricos_code`` is stored in the payload and mapped to the DB column by

@@ -2119,9 +2119,17 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 for _lk in links:
                     _lk_url = _lk.get("url") or ""
                     if any(_cp.search(_lk_url) for _cp in _compiled_cdp):
-                        log.debug(
+                        log.info(
                             "[DISCOVER] YAML course detail filter: kept %s", _lk_url
                         )
+                        if emit:
+                            await emit(
+                                "status",
+                                f"[DISCOVER] YAML course detail filter: kept {_lk_url}",
+                                phase="discover",
+                                kind="course_detail_kept",
+                                url=_lk_url,
+                            )
                         _cdp_kept.append(_lk)
                     else:
                         log.info(

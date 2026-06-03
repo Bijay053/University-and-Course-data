@@ -40,7 +40,30 @@ STRICT RULES:
    b. "set_admin_override": a small config change in admin_config can fix it → key = dot-notation path, value = the new value
    Never suggest safe_fix for issues that require code changes.
 5. risk_label = "developer_required" when fix needs: changing Python extractors/regex, adding a new provider, fixing a runtime exception, or changing discovery browser logic.
-6. fix_yaml_snippet: only YAML that belongs in the per-uni YAML config file (discovery or extraction section). Max 10 lines. null if not applicable.
+6. fix_yaml_snippet: only YAML that belongs in the per-uni YAML config file (discovery or extraction section). Max 15 lines. null if not applicable.
+   Use these fields to fix specific problem categories:
+   DISCOVERY problems (too few courses found, wrong pages crawled):
+     discovery:
+       allow_blocked_listing_patterns: ['/student-life/', '/about/']   # allow BFS through normally-blocked paths
+       listing_only_patterns: ['/student-life/undergraduate-study/']   # crawl for links but do NOT extract as a course
+       course_detail_url_patterns: ['/courses/[^/]+-[0-9]']           # only extract URLs matching this regex
+       allow_url_patterns: ['/courses/']                               # URLs that must match to be visited
+       block_url_patterns: ['\\?keyword=', '\\?page=', '/search']     # URL patterns to reject
+   FEE problems (domestic fees staged as international, or fees missing):
+     extraction:
+       international_fee_keywords: ['International Student Fee', 'Overseas Tuition']  # trust these as intl fee
+   STUDY MODE problems (campus courses wrongly staged as Online):
+     extraction:
+       study_mode:
+         online_only_requires_strong_evidence: true    # suppress bare "online" keyword matches
+         prefer_location_over_online_keyword: true     # if location is found, do not mark as Online
+   INTAKE problems (intake_months missing for many courses):
+     extraction:
+       intake:
+         use_default_when_missing: true
+         default_by_level:
+           Undergraduate: [2, 7]     # Feb + Jul
+           Postgraduate: [2, 7, 11]  # Feb + Jul + Nov
 
 OPERATIONAL DATA:
 {context_doc}

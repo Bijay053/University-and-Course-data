@@ -2487,7 +2487,51 @@ export default function ScrapeAgentPage() {
               {/* Suggested config + Apply Fix — hidden when auto-repair already handled the issue */}
               {hasSuggestions && !autoRepairResult && (() => {
                 const sugDisc = (suggestedConfig.discovery ?? {}) as Record<string, unknown>;
+                const sugExt = (suggestedConfig.extraction ?? {}) as Record<string, unknown>;
                 const hasMustContain = Array.isArray(sugDisc.must_contain) && (sugDisc.must_contain as string[]).length > 0;
+
+                // Build grouped sections so each concern area is clearly labelled
+                type YamlGroup = { label: string; color: string; keys: Record<string, unknown> };
+                const groups: YamlGroup[] = [];
+
+                if (Object.keys(sugDisc).length > 0)
+                  groups.push({ label: "Discovery fix", color: "blue", keys: { discovery: sugDisc } });
+
+                const feeKws = sugExt.international_fee_keywords;
+                if (feeKws) groups.push({ label: "Fee fix", color: "green", keys: { extraction: { international_fee_keywords: feeKws } } });
+
+                const smOpts = sugExt.study_mode;
+                if (smOpts) groups.push({ label: "Study mode fix", color: "purple", keys: { extraction: { study_mode: smOpts } } });
+
+                const intakeOpts = sugExt.intake;
+                if (intakeOpts) groups.push({ label: "Intake fix", color: "amber", keys: { extraction: { intake: intakeOpts } } });
+
+                const engOpts = sugExt.english;
+                if (engOpts) groups.push({ label: "English requirements fix", color: "red", keys: { extraction: { english: engOpts } } });
+
+                const filtersOpts = sugExt.filters;
+                if (filtersOpts) groups.push({ label: "Filter fix", color: "orange", keys: { extraction: { filters: filtersOpts } } });
+
+                const knownExtKeys = new Set(["international_fee_keywords", "study_mode", "intake", "english", "filters"]);
+                const otherExt = Object.fromEntries(Object.entries(sugExt).filter(([k]) => !knownExtKeys.has(k)));
+                if (Object.keys(otherExt).length > 0)
+                  groups.push({ label: "Extraction fix", color: "gray", keys: { extraction: otherExt } });
+
+                // Fallback: show raw if no group matched anything meaningful
+                const showRaw = groups.length === 0;
+
+                const groupBorder: Record<string, string> = {
+                  blue: "border-blue-200 bg-blue-50", green: "border-green-200 bg-green-50",
+                  purple: "border-purple-200 bg-purple-50", amber: "border-amber-200 bg-amber-50",
+                  red: "border-red-200 bg-red-50", orange: "border-orange-200 bg-orange-50",
+                  gray: "border-gray-200 bg-gray-50",
+                };
+                const groupText: Record<string, string> = {
+                  blue: "text-blue-800", green: "text-green-800", purple: "text-purple-800",
+                  amber: "text-amber-800", red: "text-red-800", orange: "text-orange-800",
+                  gray: "text-gray-700",
+                };
+
                 return (
                   <div className="border border-green-200 rounded-lg p-3 bg-green-50 space-y-3">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -2499,9 +2543,27 @@ export default function ScrapeAgentPage() {
                         </span>
                       )}
                     </div>
-                    <pre className="text-[10px] bg-white border border-green-100 rounded p-2 overflow-auto max-h-[200px] text-gray-700 font-mono leading-relaxed">
-                      {JSON.stringify(suggestedConfig, null, 2)}
-                    </pre>
+
+                    {/* Grouped YAML sections by concern area */}
+                    {!showRaw && (
+                      <div className="space-y-2">
+                        {groups.map((g, i) => (
+                          <div key={i} className={`border rounded p-2 ${groupBorder[g.color]}`}>
+                            <p className={`text-[10px] font-semibold mb-1 ${groupText[g.color]}`}>{g.label}</p>
+                            <pre className="text-[10px] bg-white border border-gray-100 rounded px-2 py-1 overflow-auto max-h-[120px] text-gray-700 font-mono leading-relaxed">
+                              {JSON.stringify(g.keys, null, 2)}
+                            </pre>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Fallback: raw JSON when no section matched */}
+                    {showRaw && (
+                      <pre className="text-[10px] bg-white border border-green-100 rounded p-2 overflow-auto max-h-[200px] text-gray-700 font-mono leading-relaxed">
+                        {JSON.stringify(suggestedConfig, null, 2)}
+                      </pre>
+                    )}
 
                     {/* FixBlock: shown when backend blocked the apply due to high drop rate */}
                     {fixBlock && (
