@@ -1,0 +1,149 @@
+# Chulalongkorn University
+# Hostname: www.chula.ac.th
+# Country: Thailand  |  Currency: THB
+# Discovery: Chula program listing page with 458 programs.
+# Notes:
+#   Course pages use /en/programs/<id>/.
+#   Program language can be Thai, English, or International.
+#   English scores are course specific, so no degree_level_defaults are used.
+#   Tuition is central and shown in THB per semester.
+
+discovery:
+  auto_api_discovery: false
+
+  seed_urls:
+    - https://www.chula.ac.th/en/academics/programs/
+    - https://www.chula.ac.th/en/academics/admissions/undergraduate-admission/
+    - https://www.chula.ac.th/en/academics/admissions/graduate-admission/
+
+  always_sitemap_supplement: true
+  sitemap_url: https://www.chula.ac.th/sitemap.xml
+
+  bfs_page_budget: 100
+  max_candidates: 700
+  expected_min_courses: 150
+
+  must_contain:
+    - /en/programs/
+
+  allow_url_patterns:
+    - '/en/programs/[0-9]+/?$'
+
+  block_url_patterns:
+    - '/th/'
+    - '/news/'
+    - '/events/'
+    - '/event/'
+    - '/about/'
+    - '/research/'
+    - '/life-at-chula/'
+    - '/services/'
+    - '/faculties-and-schools/'
+    - '/colleges-and-institutes/'
+    - '/academics/admissions/'
+    - '/academics/programs/?$'
+    - '/scholarship'
+    - '/tuition-and-fees'
+    - '/contact'
+    - '/search'
+    - '\?'
+    - '\.pdf$'
+
+  always_browser_discover: false
+  skip_browser_discovery: false
+  use_wayback: false
+
+extraction:
+  max_parallel_fetch: 4
+  skip_browser_rescue: false
+  skip_per_course_browser: false
+  browser_wait_strategy: domcontentloaded
+  browser_dcl_settle_ms: 2000
+
+  fees:
+    central_page: https://www.chula.ac.th/en/academics/admissions/tuition-and-fees/
+    default_currency: THB
+    prefer_international: true
+    prefer_annual_over_total: false
+    prefer_year_one_over_total: false
+    max_annual_fee: 1500000
+    allow_bucket_match: true
+    force_central_fee_stage: true
+
+    reject_keywords:
+      - Thai student
+      - Thai students
+      - Thai-student
+      - Thai Citizen
+      - Domestic
+      - Non-Degree-Seeking Student
+      - Exchange students
+
+  english:
+    course_english_priority: true
+    trust_vision_ocr: false
+    trust_tier1_vision_ocr_english: false
+
+    test_blocklist:
+      - pte
+      - kite
+      - duolingo
+
+  intake:
+    start_dates_only: true
+    start_dates_window_chars: 700
+
+  filters:
+    domestic_only:
+      enabled: true
+      text_must_appear_in: "International"
+
+    online_only:
+      enabled: false
+
+  text_cleaning:
+    location:
+      strip_patterns:
+        - '\s*Visit Website.*$'
+        - '\s*Search Chula\.ac\.th.*$'
+        - '\s*No results found.*$'
+        - '\s*Accessibility Preferences.*$'
+        - '\s*Popular Searches.*$'
+
+    duration:
+      reject_sentence_patterns:
+        - 'Accreditation'
+        - 'Duration: \d+ years \([A-Za-z]{3} \d{4} - [A-Za-z]{3} \d{4}\)'
+        - 'up to \d+ years'
+        - 'maximum of \d+ years'
+
+    global_substring_blocklist:
+      - Search Chula.ac.th
+      - No results found
+      - Recent Searches
+      - Popular Searches
+      - Accessibility Preferences
+      - Font Size
+      - High Contrast Mode
+      - Visit Website
+      - Apply Now
+      - Discover life at Chula
+      - Related pages
+      - Departments
+      - Online Reporting System
+
+  course_name:
+    strip_title_suffixes:
+      - " | Chulalongkorn University"
+      - " - Chulalongkorn University"
+      - " : Chulalongkorn University"
+      - " | Chula"
+      - " - Chula"
+
+  staging:
+    reject_if_missing:
+      - course_name
+    require_international_fee: false
+
+  default_course_location: Bangkok
+  prefer_blended_over_on_campus: true
