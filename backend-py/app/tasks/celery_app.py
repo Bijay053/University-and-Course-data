@@ -50,6 +50,7 @@ celery_app = Celery(
         "app.tasks.scrape_tasks",
         "app.tasks.snapshot_tasks",
         "app.tasks.monitoring_tasks",
+        "app.tasks.health_snapshot",
     ],
 )
 
@@ -139,6 +140,15 @@ celery_app.conf.update(
         "monitoring-check-watchers": {
             "task": "monitoring.check_watchers",
             "schedule": 1800.0,  # every 30 minutes
+            "args": (),
+            "options": {"queue": "beat"},
+        },
+        # Daily health snapshot: upserts v_university_health into
+        # university_health_snapshots at 01:30 UTC — after overnight
+        # scrapes finish, before the 02:00 regression sweep reads them.
+        "snapshot-university-health-daily": {
+            "task": "health.snapshot_daily",
+            "schedule": crontab(hour=1, minute=30),
             "args": (),
             "options": {"queue": "beat"},
         },

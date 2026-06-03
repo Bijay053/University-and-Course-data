@@ -531,19 +531,78 @@ async def get_scraper_health(
     health: dict[str, dict] = {}
     for row in res.mappings():
         uid = str(row["university_id"])
+        d = row["discovery_health"]
+        e = row["extraction_health"]
+        f = row["fee_coverage"]
+        g = row["english_coverage"]
+        i = row["intake_coverage"]
+        o = row["overall_health"]
+        # Top issue: lowest sub-score that is below Watch threshold (70)
+        sub = {"Discovery": (d, "discovery"), "Extraction": (e, "extraction"),
+               "Fee Coverage": (f, "fee"), "English Coverage": (g, "english"),
+               "Intake Coverage": (i, "intake")}
+        worst_label = min(sub, key=lambda k: sub[k][0])
+        worst_score, worst_key = sub[worst_label]
+        top_issue = (
+            {"metric": worst_key, "score": worst_score, "label": worst_label}
+            if worst_score < 70 else None
+        )
         health[uid] = {
-            "university_id": row["university_id"],
-            "total_courses":   row["total_courses"],
-            "last_imported":   row["last_imported"],
+            "university_id":    row["university_id"],
+            "total_courses":    row["total_courses"],
+            "last_imported":    row["last_imported"],
             "last_total_found": row["last_total_found"],
-            "last_job_at":     row["last_job_at"].isoformat() if row["last_job_at"] else None,
-            "discovery_health":   row["discovery_health"],
-            "extraction_health":  row["extraction_health"],
-            "fee_coverage":       row["fee_coverage"],
-            "english_coverage":   row["english_coverage"],
-            "intake_coverage":    row["intake_coverage"],
-            "overall_health":     row["overall_health"],
+            "last_job_at":      row["last_job_at"].isoformat() if row["last_job_at"] else None,
+            "discovery_health": d,
+            "extraction_health": e,
+            "fee_coverage":     f,
+            "english_coverage": g,
+            "intake_coverage":  i,
+            "overall_health":   o,
+            "top_issue":        top_issue,
+            # Trend fields populated below after snapshot query
+            "trend_overall":    None,
+            "trend_discovery":  None,
+            "trend_extraction": None,
+            "trend_fee":        None,
+            "trend_english":    None,
+            "trend_intake":     None,
+            "trend_snapshot_date": None,
         }
+
+    # ── Populate trends from most recent prior-day snapshot ──────────────────
+    if health:
+        snap_res = await db.execute(
+            text("""
+                SELECT DISTINCT ON (university_id)
+                    university_id,
+                    snapshot_date::text,
+                    overall_health,
+                    discovery_health,
+                    extraction_health,
+                    fee_coverage,
+                    english_coverage,
+                    intake_coverage
+                FROM university_health_snapshots
+                WHERE university_id = ANY(:ids)
+                  AND snapshot_date < CURRENT_DATE
+                ORDER BY university_id, snapshot_date DESC
+            """),
+            {"ids": ids},
+        )
+        for snap in snap_res.mappings():
+            uid = str(snap["university_id"])
+            if uid not in health:
+                continue
+            h = health[uid]
+            h["trend_overall"]    = h["overall_health"]    - snap["overall_health"]
+            h["trend_discovery"]  = h["discovery_health"]  - (snap["discovery_health"]  or 0)
+            h["trend_extraction"] = h["extraction_health"] - (snap["extraction_health"] or 0)
+            h["trend_fee"]        = h["fee_coverage"]      - (snap["fee_coverage"]      or 0)
+            h["trend_english"]    = h["english_coverage"]  - (snap["english_coverage"]  or 0)
+            h["trend_intake"]     = h["intake_coverage"]   - (snap["intake_coverage"]   or 0)
+            h["trend_snapshot_date"] = snap["snapshot_date"]
+
     return JSONResponse(content={"health": health})
 
 

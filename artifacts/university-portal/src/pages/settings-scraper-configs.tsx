@@ -529,6 +529,14 @@ interface UniversityHealth {
   english_coverage: number;
   intake_coverage: number;
   overall_health: number;
+  top_issue: { metric: string; score: number; label: string } | null;
+  trend_overall: number | null;
+  trend_discovery: number | null;
+  trend_extraction: number | null;
+  trend_fee: number | null;
+  trend_english: number | null;
+  trend_intake: number | null;
+  trend_snapshot_date: string | null;
 }
 
 function healthScoreMeta(score: number) {
@@ -3576,35 +3584,72 @@ export default function SettingsScraperConfigs() {
               {selectedConfig?.university_id != null && healthData[String(selectedConfig.university_id)] && (() => {
                 const h = healthData[String(selectedConfig.university_id!)]!;
                 const { label, textCls, bgCls } = healthScoreMeta(h.overall_health);
-                const metrics: [string, number, string][] = [
-                  ["Discovery",  h.discovery_health,  "Discovery health: how many courses were staged in the last scrape (20+ staged = 100%)"],
-                  ["Extraction", h.extraction_health,  "Extraction health: average completeness score across staged courses"],
-                  ["Fee",        h.fee_coverage,       "Fee coverage: % of courses with international fee filled"],
-                  ["English",    h.english_coverage,   "English coverage: % of courses with IELTS / PTE / TOEFL score"],
-                  ["Intake",     h.intake_coverage,    "Intake coverage: % of courses with intake months filled"],
+                // Metric → [display label, value, trend value, debug tab, tooltip]
+                type DebugTabId = "config" | "overrides" | "rejections" | "extraction" | "discovery" | "ai_analysis";
+                const metrics: [string, number, number | null, DebugTabId, string][] = [
+                  ["Discovery",  h.discovery_health,  h.trend_discovery,  "discovery",  "How many courses were staged in the last scrape vs. historical median (≥median = 100%)"],
+                  ["Extraction", h.extraction_health, h.trend_extraction, "extraction", "Average completeness score across all staged courses for this university"],
+                  ["Fee",        h.fee_coverage,      h.trend_fee,        "extraction", "% of courses with an international_fee value filled"],
+                  ["English",    h.english_coverage,  h.trend_english,    "extraction", "% of courses with IELTS / PTE / TOEFL score populated"],
+                  ["Intake",     h.intake_coverage,   h.trend_intake,     "extraction", "% of courses with at least one intake month recorded"],
                 ];
+                const trendChip = (delta: number | null) => {
+                  if (delta === null) return null;
+                  if (delta === 0) return <span className="text-[9px] text-muted-foreground ml-0.5">—</span>;
+                  const up = delta > 0;
+                  return (
+                    <span className={cn("text-[9px] font-medium ml-0.5", up ? "text-green-600 dark:text-green-400" : "text-red-500 dark:text-red-400")}>
+                      {up ? "▲" : "▼"}{Math.abs(delta)}
+                    </span>
+                  );
+                };
                 return (
                   <div className={cn("px-4 py-2 border-b flex items-center gap-4", bgCls)}>
-                    <div className="flex-shrink-0 text-center min-w-[60px]">
+                    {/* Overall score */}
+                    <div className="flex-shrink-0 text-center min-w-[64px]">
                       <div className={cn("text-[10px] uppercase tracking-wide font-semibold", textCls)}>{label}</div>
-                      <div className={cn("text-xl font-bold leading-tight tabular-nums", textCls)}>
-                        {h.overall_health}<span className="text-xs font-normal opacity-70">/100</span>
+                      <div className={cn("text-xl font-bold leading-tight tabular-nums flex items-end justify-center gap-0.5", textCls)}>
+                        {h.overall_health}
+                        <span className="text-xs font-normal opacity-70">/100</span>
+                        {trendChip(h.trend_overall)}
                       </div>
                       <div className="text-[9px] text-muted-foreground">{h.total_courses} courses</div>
+                      {/* Top issue */}
+                      {h.top_issue && (
+                        <button
+                          className={cn(
+                            "mt-1 text-[9px] leading-tight px-1.5 py-0.5 rounded border w-full text-left truncate",
+                            "border-orange-300 dark:border-orange-700 text-orange-700 dark:text-orange-400",
+                            "bg-orange-50 dark:bg-orange-950/40 hover:bg-orange-100 dark:hover:bg-orange-950/60",
+                          )}
+                          title={`Top issue: ${h.top_issue.label} ${h.top_issue.score}% — click to open Debugger`}
+                          onClick={() => setDebugTab(h.top_issue!.metric === "discovery" ? "discovery" : "extraction")}
+                        >
+                          ⚠ {h.top_issue.label} {h.top_issue.score}%
+                        </button>
+                      )}
                     </div>
-                    <div className="flex-1 grid grid-cols-5 gap-x-4 gap-y-0">
-                      {metrics.map(([name, val, tip]) => {
+                    {/* Five metric bars */}
+                    <div className="flex-1 grid grid-cols-5 gap-x-4">
+                      {metrics.map(([name, val, trend, tab, tip]) => {
                         const { barCls: mb, textCls: mc } = healthScoreMeta(val);
                         return (
-                          <div key={name} title={tip}>
+                          <button
+                            key={name}
+                            title={`${tip}\n\nClick to open ${tab} tab in Debugger`}
+                            className="text-left group cursor-pointer"
+                            onClick={() => setDebugTab(tab)}
+                          >
                             <div className="flex justify-between items-center mb-0.5">
-                              <span className="text-[10px] text-muted-foreground">{name}</span>
-                              <span className={cn("text-[10px] font-semibold tabular-nums", mc)}>{val}%</span>
+                              <span className="text-[10px] text-muted-foreground group-hover:text-foreground transition-colors">{name}</span>
+                              <span className={cn("text-[10px] font-semibold tabular-nums flex items-center", mc)}>
+                                {val}%{trendChip(trend)}
+                              </span>
                             </div>
-                            <div className="h-1.5 rounded-full bg-background/60 border border-border/40 overflow-hidden">
+                            <div className="h-1.5 rounded-full bg-background/60 border border-border/40 overflow-hidden group-hover:border-border transition-colors">
                               <div className={cn("h-full rounded-full transition-all duration-500", mb)} style={{ width: `${val}%` }} />
                             </div>
-                          </div>
+                          </button>
                         );
                       })}
                     </div>
