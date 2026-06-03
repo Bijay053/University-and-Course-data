@@ -41,6 +41,9 @@ STRICT RULES:
    Never suggest safe_fix for issues that require code changes.
 5. risk_label = "developer_required" when fix needs: changing Python extractors/regex, adding a new provider, fixing a runtime exception, or changing discovery browser logic.
 6. fix_yaml_snippet: only YAML that belongs in the per-uni YAML config file (discovery or extraction section). Max 15 lines. null if not applicable.
+   FORBIDDEN — NEVER include these in fix_yaml_snippet under any circumstances:
+     extraction.filters.online_only.enabled: true   ← this system NEVER wants online-only courses;
+                                                        suggesting it will cause all campus courses to vanish.
    Use these fields to fix specific problem categories:
    DISCOVERY problems (too few courses found, wrong pages crawled):
      discovery:
@@ -83,6 +86,73 @@ Return ONLY a valid JSON object:
 }}
 
 Include 3-8 evidence items. safe_fix and fix_yaml_snippet may be null."""
+
+# Values that must NEVER appear in an AI-suggested fix_yaml_snippet.
+# Each entry is (key_path_tuple, forbidden_value).
+# Defence-in-depth: the prompt already forbids these; this sanitizer
+# enforces the rule even if the model ignores the instruction.
+_FORBIDDEN_YAML_VALUES: list[tuple[tuple[str, ...], object]] = [
+    # online_only: enabled: true silently drops every campus course.
+    # enabled: false is fine — it just turns the filter off.
+    (("extraction", "filters", "online_only", "enabled"), True),
+]
+
+def _sanitize_fix_yaml(snippet: str | None) -> str | None:
+    """
+    Remove any forbidden keys from an AI-generated fix_yaml_snippet and
+    prune any empty parent dicts left behind.
+
+    Returns the sanitised YAML string, or None if the snippet becomes
+    empty after removal (or was None to begin with).
+
+    Forbidden keys (see _FORBIDDEN_YAML_KEYS):
+      - extraction.filters.online_only.enabled  — NEVER filter to online-only
+        courses; this system always wants all delivery modes.
+    """
+    if not snippet:
+        return snippet
+    try:
+        import yaml as _yaml
+
+        def _prune_empty(d: dict) -> dict:
+            """Recursively remove keys whose value is an empty dict."""
+            result = {}
+            for k, v in d.items():
+                if isinstance(v, dict):
+                    v = _prune_empty(v)
+                    if not v:        # skip now-empty parent
+                        continue
+                result[k] = v
+            return result
+
+        patch: dict = _yaml.safe_load(snippet) or {}
+        changed = False
+        for key_path, forbidden_value in _FORBIDDEN_YAML_VALUES:
+            # Walk to the parent node of the forbidden leaf.
+            node = patch
+            for part in key_path[:-1]:
+                if not isinstance(node, dict) or part not in node:
+                    node = None
+                    break
+                node = node[part]
+            leaf = key_path[-1]
+            if isinstance(node, dict) and node.get(leaf) == forbidden_value:
+                log.warning(
+                    "auto_repair: sanitized forbidden value %r for key '%s' from AI fix_yaml_snippet",
+                    forbidden_value,
+                    ".".join(key_path),
+                )
+                del node[leaf]
+                changed = True
+        if not changed:
+            return snippet
+        # Prune empty parent dicts left behind, then re-serialise.
+        patch = _prune_empty(patch)
+        cleaned = _yaml.dump(patch, default_flow_style=False).strip() if patch else None
+        return cleaned or None
+    except Exception:
+        # If YAML can't be parsed, return as-is (validation will catch it later).
+        return snippet
 
 
 # ── Context gathering ──────────────────────────────────────────────────────────
@@ -291,6 +361,9 @@ async def gather_and_diagnose(uni_id: int, db: AsyncSession) -> dict[str, Any]:
             if raw.endswith("```"):
                 raw = raw[:-3].rstrip()
         parsed = json.loads(raw)
+        # Sanitize AI output — strip any forbidden keys even if the model
+        # ignored the prompt instruction (e.g. online_only: enabled: true).
+        parsed["fix_yaml_snippet"] = _sanitize_fix_yaml(parsed.get("fix_yaml_snippet"))
         parsed["_candidate_info"] = candidate_info
         return parsed
     except json.JSONDecodeError as exc:
@@ -525,7 +598,9 @@ async def run_auto_repair_pipeline(
 
         risk_label = diagnosis.get("risk_label") or "low"
         safe_fix = diagnosis.get("safe_fix")
-        fix_yaml = diagnosis.get("fix_yaml_snippet")
+        # Sanitize again here as a second line of defence (e.g. if diagnosis
+        # came from a cached or replayed path that bypassed gather_and_diagnose).
+        fix_yaml = _sanitize_fix_yaml(diagnosis.get("fix_yaml_snippet"))
         root_cause_category = diagnosis.get("root_cause_category", "unknown")
 
         # ── Step 2: Developer-required path ─────────────────────────────────
