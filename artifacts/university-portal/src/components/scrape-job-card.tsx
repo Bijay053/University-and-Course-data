@@ -6,7 +6,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import {
   Play, StopCircle, Loader2, Globe, CheckCircle2, AlertCircle,
   ChevronsUpDown, Search, Eye, RefreshCw, ChevronDown, X, Zap, TrendingUp,
-  Bot, AlertTriangle, CheckCheck,
+  Bot, AlertTriangle, CheckCheck, Copy, Check,
 } from "lucide-react";
 import { getFetchErrorMessage, readResponseJson } from "@/lib/readResponseJson";
 import { CountrySelect } from "@/components/country-select";
@@ -206,6 +206,7 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
   const [scraping, setScraping] = useState(false);
   const [stopping, setStopping] = useState(false);
   const [logs, setLogs] = useState<ScrapeLog[]>([]);
+  const [copiedLogs, setCopiedLogs] = useState(false);
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [uniName, setUniName] = useState("");
   const [progress, setProgress] = useState<{ current: number; total: number } | null>(null);
@@ -320,6 +321,14 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
     setUrlTestError(null);
     setShowUrlTestPanel(false);
   }, [slotKey, startTimeKey]);
+
+  const handleCopyLogs = useCallback(() => {
+    const text = logs.map(l => l.message || l.event).join("\n");
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedLogs(true);
+      setTimeout(() => setCopiedLogs(false), 2000);
+    });
+  }, [logs]);
 
   const handleTestUrlFilter = useCallback(async (jobId: string) => {
     const lines = urlTestInput.split("\n").map(l => l.trim()).filter(Boolean);
@@ -941,22 +950,33 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
             )}
 
             {/* Compact log stream */}
-            <div ref={logContainerRef} className="flex-1 min-h-[160px] max-h-[420px] overflow-y-auto bg-gray-950 rounded-lg p-2 font-mono text-[10px] leading-relaxed">
-              {logs.length === 0 ? (
-                jobStatus === "queued" ? (
-                  <div className="flex flex-col gap-1.5 pt-2">
-                    <span className="text-amber-400 font-medium">⏳ Queued — waiting for a worker to pick up this job</span>
-                    <span className="text-gray-500">This job is in the queue and will start automatically once a worker slot is available.</span>
+            <div className="relative">
+              <div ref={logContainerRef} className="flex-1 min-h-[160px] max-h-[420px] overflow-y-auto bg-gray-950 rounded-lg p-2 font-mono text-[10px] leading-relaxed">
+                {logs.length === 0 ? (
+                  jobStatus === "queued" ? (
+                    <div className="flex flex-col gap-1.5 pt-2">
+                      <span className="text-amber-400 font-medium">⏳ Queued — waiting for a worker to pick up this job</span>
+                      <span className="text-gray-500">This job is in the queue and will start automatically once a worker slot is available.</span>
+                    </div>
+                  ) : (
+                    <span className="text-gray-500">Starting…</span>
+                  )
+                ) : logs.map((l, i) => (
+                  <div key={i} className={`${logColor(l.event, l.phase)} break-words`}>
+                    {l.message || l.event}
                   </div>
-                ) : (
-                  <span className="text-gray-500">Starting…</span>
-                )
-              ) : logs.map((l, i) => (
-                <div key={i} className={`${logColor(l.event, l.phase)} break-words`}>
-                  {l.message || l.event}
-                </div>
-              ))}
-              <div ref={logEndRef} />
+                ))}
+                <div ref={logEndRef} />
+              </div>
+              {logs.length > 0 && (
+                <button
+                  onClick={handleCopyLogs}
+                  title="Copy all logs"
+                  className="absolute top-1.5 right-1.5 p-1 rounded text-gray-500 hover:text-white hover:bg-gray-700 transition-colors"
+                >
+                  {copiedLogs ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+                </button>
+              )}
             </div>
 
             <div className="flex gap-2">
@@ -1612,10 +1632,21 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
             )}
 
             {/* Full log (scrollable) */}
-            <div className="max-h-[400px] overflow-y-auto bg-gray-950 rounded-lg p-2 font-mono text-[10px] leading-relaxed">
-              {logs.map((l, i) => (
-                <div key={i} className={`${logColor(l.event, l.phase)} break-words`}>{l.message || l.event}</div>
-              ))}
+            <div className="relative">
+              <div className="max-h-[400px] overflow-y-auto bg-gray-950 rounded-lg p-2 font-mono text-[10px] leading-relaxed">
+                {logs.map((l, i) => (
+                  <div key={i} className={`${logColor(l.event, l.phase)} break-words`}>{l.message || l.event}</div>
+                ))}
+              </div>
+              {logs.length > 0 && (
+                <button
+                  onClick={handleCopyLogs}
+                  title="Copy all logs"
+                  className="absolute top-1.5 right-1.5 p-1 rounded text-gray-500 hover:text-white hover:bg-gray-700 transition-colors"
+                >
+                  {copiedLogs ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+                </button>
+              )}
             </div>
 
             <div className="flex gap-2">
