@@ -1,89 +1,92 @@
 # Bath Spa University
 # Hostname: www.bathspa.ac.uk
-# Country: UK  |  Currency: GBP
+# Country: United Kingdom | Currency: GBP
 #
-# URL STRUCTURE (verified 2026-06-03):
-#   OLD (404): /student-life/undergraduate-study/<subject>/...
-#   NEW (200): /courses/<slug>/           — individual courses (187 total)
+# Bath Spa uses subject landing pages under:
+# /student-life/undergraduate-study/
+# /student-life/postgraduate-study/
 #
-# All individual course pages sit exactly ONE slug deep under /courses/.
-# Hub/category pages are either the bare /courses/ root, known named
-# sub-directories (/courses/interest-areas/, /courses/types-of-courses/, …),
-# or go two levels deep (/courses/interest-areas/primary-teaching/).
-# allow_url_patterns anchors to the trailing slash so /courses/<slug>/ passes
-# but /courses/interest-areas/primary-teaching/ does NOT (two slashes after /courses/).
-#
-# Community-learning courses (cl-*) are blocked — they are CPD/community
-# workshops, not internationally-eligible degree programmes.
-#
-# NOTE: the Gemini circuit-breaker tripping during Bath Spa scrapes indicates
-# genuine Gemini quota exhaustion (HTTP 429). Reduce max_parallel_fetch or
-# add a per-job Gemini budget cap (cost_ceiling.py) if this recurs frequently.
+# These pages contain links to real courses and must be crawled.
 
 discovery:
+  auto_api_discovery: false
+
   seed_urls:
     - https://www.bathspa.ac.uk/courses/course-index-a-z/
-    - https://www.bathspa.ac.uk/courses/
+    - https://www.bathspa.ac.uk/student-life/undergraduate-study/
+    - https://www.bathspa.ac.uk/student-life/postgraduate-study/
 
-  # Post-filter: only keep URLs that contain /courses/
-  must_contain:
-    - /courses/
+  always_sitemap_supplement: true
+  sitemap_url: https://www.bathspa.ac.uk/sitemap.xml
 
-  # Individual course pages: exactly one slug after /courses/.
-  # Regex: /courses/<one-segment>/ — the [^/]+ matches the slug, /?$ matches
-  # trailing slash. This passes /courses/pg-creative-writing/ but rejects
-  # /courses/interest-areas/primary-teaching/ (which has an extra segment).
+  bfs_page_budget: 120
+  max_candidates: 1200
+  expected_min_courses: 120
+
   allow_url_patterns:
-    - 'bathspa\.ac\.uk/courses/[^/]+/?$'
+    - '/courses/'
+    - '/student-life/undergraduate-study/'
+    - '/student-life/postgraduate-study/'
+
+  must_contain:
+    - '/courses/'
 
   block_url_patterns:
-    # Hub/category pages — root listing and known named directories
-    - 'bathspa\.ac\.uk/courses/?$'
-    - '/courses/interest-areas'
-    - '/courses/types-of-courses'
-    - '/courses/short-courses'
-    - '/courses/community-learning'
-    - '/courses/course-index-a-z'
-    - '/courses/course-documents'
-    - '/courses/new-courses'
-    # Community-learning course slugs (cl-*) — CPD/community workshops,
-    # not internationally-eligible degree programmes
-    - '/courses/cl-'
-    # Generic noise
     - '/news/'
     - '/events/'
-    - '/scholarships'
-    - '\?'
+    - '/open-days/'
+    - '/how-to-apply/'
+    - '/research/'
+    - '/staff/'
+    - '/contact/'
+    - '/accommodation/'
+    - '/fees-and-funding/'
+    - '/scholarships/'
     - '\.pdf$'
 
-  bfs_page_budget: 60
-  max_candidates: 400
-  expected_min_courses: 80
-
-  always_sitemap_supplement: false
+  always_browser_discover: false
+  skip_browser_discovery: true
   use_wayback: false
 
 extraction:
-  max_parallel_fetch: 4    # reduced from 6 — Gemini circuit-breaker was tripping
+  max_parallel_fetch: 8
 
   fees:
     central_page: https://www.bathspa.ac.uk/students/student-finance/tuition-fees/international-fees/
     default_currency: GBP
+
+    prefer_international: true
+    prefer_annual_over_total: true
+    prefer_year_one_over_total: true
+
     reject_keywords:
-      - Home/EU
-      - UK students
+      - Home student
+      - Home fee
+      - UK student
       - UK fee
-      - domestic fee
-      - Welsh Government
+      - Domestic
+
+  english:
+    trust_vision_ocr: false
+    trust_tier1_vision_ocr_english: false
+
+  intake:
+    start_dates_only: true
+
+  filters:
+    domestic_only:
+      enabled: false
+
+    online_only:
+      enabled: false
 
   course_name:
     strip_title_suffixes:
       - " | Bath Spa University"
       - " - Bath Spa University"
-      - " | Bath Spa"
 
   staging:
     reject_if_missing:
       - course_name
 
-  default_course_location: Bath
+    require_international_fee: false
