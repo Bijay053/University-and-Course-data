@@ -289,15 +289,16 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
   // read earlier lines in peace. Auto-scroll resumes as soon as they scroll
   // back to within 40 px of the bottom.
   const userScrolledUpRef = useRef(false);
+  // Set to true just before a programmatic scroll so the resulting onScroll
+  // event doesn't mistakenly reset userScrolledUpRef to false.
+  const skipNextScrollEventRef = useRef(false);
 
-
-  // Scroll logs to bottom — use direct container scrollTop to avoid
-  // scrollIntoView pulling the whole page up when the user is reading above.
-  // Skipped when the user has manually scrolled up to read earlier lines.
+  // Scroll logs to bottom — skipped when the user has manually scrolled up.
   useEffect(() => {
-    if (logContainerRef.current && !userScrolledUpRef.current) {
-      logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
-    }
+    const el = logContainerRef.current;
+    if (!el || userScrolledUpRef.current) return;
+    skipNextScrollEventRef.current = true;
+    el.scrollTop = el.scrollHeight;
   }, [logs]);
 
   // When transitioning to done, scroll the done-state log panel to the bottom
@@ -972,6 +973,11 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
                 ref={logContainerRef}
                 className="flex-1 min-h-[160px] max-h-[420px] overflow-y-auto bg-gray-950 rounded-lg p-2 font-mono text-[10px] leading-relaxed"
                 onScroll={(e) => {
+                  // Ignore scroll events we triggered ourselves (programmatic scrollTop=).
+                  if (skipNextScrollEventRef.current) {
+                    skipNextScrollEventRef.current = false;
+                    return;
+                  }
                   const el = e.currentTarget;
                   userScrolledUpRef.current = el.scrollHeight - el.scrollTop - el.clientHeight > 40;
                 }}
