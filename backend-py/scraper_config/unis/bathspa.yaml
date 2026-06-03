@@ -2,30 +2,54 @@
 # Hostname: www.bathspa.ac.uk
 # Country: UK  |  Currency: GBP
 #
-# Discovery: Course subject pages live at /student-life/undergraduate-study/<subject>/
-# and /student-life/postgraduate-study/<subject>/ — the global /student-life
-# campus-lifestyle block is overridden by allow_url_patterns below (checked in
-# discovery.py BFS loop before is_blocked_page()).  No guards.py change required.
-# Seed the two top-level subject listing pages so BFS fans out into every subject
-# area and collects individual course links.
+# URL STRUCTURE (verified 2026-06-03):
+#   OLD (404): /student-life/undergraduate-study/<subject>/...
+#   NEW (200): /courses/<slug>/           — individual courses (187 total)
+#
+# All individual course pages sit exactly ONE slug deep under /courses/.
+# Hub/category pages are either the bare /courses/ root, known named
+# sub-directories (/courses/interest-areas/, /courses/types-of-courses/, …),
+# or go two levels deep (/courses/interest-areas/primary-teaching/).
+# allow_url_patterns anchors to the trailing slash so /courses/<slug>/ passes
+# but /courses/interest-areas/primary-teaching/ does NOT (two slashes after /courses/).
+#
+# Community-learning courses (cl-*) are blocked — they are CPD/community
+# workshops, not internationally-eligible degree programmes.
+#
+# NOTE: the Gemini circuit-breaker tripping during Bath Spa scrapes indicates
+# genuine Gemini quota exhaustion (HTTP 429). Reduce max_parallel_fetch or
+# add a per-job Gemini budget cap (cost_ceiling.py) if this recurs frequently.
 
 discovery:
   seed_urls:
-    - https://www.bathspa.ac.uk/student-life/undergraduate-study/
-    - https://www.bathspa.ac.uk/student-life/postgraduate-study/
+    - https://www.bathspa.ac.uk/courses/course-index-a-z/
+    - https://www.bathspa.ac.uk/courses/
 
+  # Post-filter: only keep URLs that contain /courses/
   must_contain:
-    - /student-life/undergraduate-study/
-    - /student-life/postgraduate-study/
+    - /courses/
 
+  # Individual course pages: exactly one slug after /courses/.
+  # Regex: /courses/<one-segment>/ — the [^/]+ matches the slug, /?$ matches
+  # trailing slash. This passes /courses/pg-creative-writing/ but rejects
+  # /courses/interest-areas/primary-teaching/ (which has an extra segment).
   allow_url_patterns:
-    - '/student-life/undergraduate-study/'
-    - '/student-life/postgraduate-study/'
+    - 'bathspa\.ac\.uk/courses/[^/]+/?$'
 
   block_url_patterns:
-    # Block the top-level listing pages themselves (category hubs, not courses)
-    - '^https://www\.bathspa\.ac\.uk/student-life/undergraduate-study/?$'
-    - '^https://www\.bathspa\.ac\.uk/student-life/postgraduate-study/?$'
+    # Hub/category pages — root listing and known named directories
+    - 'bathspa\.ac\.uk/courses/?$'
+    - '/courses/interest-areas'
+    - '/courses/types-of-courses'
+    - '/courses/short-courses'
+    - '/courses/community-learning'
+    - '/courses/course-index-a-z'
+    - '/courses/course-documents'
+    - '/courses/new-courses'
+    # Community-learning course slugs (cl-*) — CPD/community workshops,
+    # not internationally-eligible degree programmes
+    - '/courses/cl-'
+    # Generic noise
     - '/news/'
     - '/events/'
     - '/scholarships'
@@ -34,13 +58,13 @@ discovery:
 
   bfs_page_budget: 60
   max_candidates: 400
-  expected_min_courses: 50
+  expected_min_courses: 80
 
   always_sitemap_supplement: false
   use_wayback: false
 
 extraction:
-  max_parallel_fetch: 6
+  max_parallel_fetch: 4    # reduced from 6 — Gemini circuit-breaker was tripping
 
   fees:
     central_page: https://www.bathspa.ac.uk/students/student-finance/tuition-fees/international-fees/
