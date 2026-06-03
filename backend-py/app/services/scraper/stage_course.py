@@ -440,15 +440,20 @@ async def stage_course(
     if _cat_for_match and _sub_for_match:
         try:
             from app.services.sub_category_matcher import resolve_sub_category
+            # Wrap in a nested transaction (SAVEPOINT) so that any DB error
+            # (e.g. "relation course_sub_categories does not exist" on a
+            # fresh clone that hasn't run migration 040 yet) rolls back only
+            # this lookup — not the outer staging INSERT.  Without the
+            # savepoint, a ProgrammingError here poisons the whole asyncpg
+            # connection and the subsequent INSERT INTO scraped_courses also
+            # fails with "current transaction is aborted".
+            #
             # auto_add=False — the staging transaction may still roll back
-            # later, so we must not INSERT new taxonomy rows here. We only
-            # *snap* Gemini's value to an existing canonical row when there
-            # is a confident fuzzy match; otherwise the raw value flows
-            # through and approve_course.py will INSERT (commit-safely) if
-            # the row is ever promoted.
-            canonical = await resolve_sub_category(
-                db, _cat_for_match, _sub_for_match, auto_add=False,
-            )
+            # later, so we must not INSERT new taxonomy rows here.
+            async with db.begin_nested():
+                canonical = await resolve_sub_category(
+                    db, _cat_for_match, _sub_for_match, auto_add=False,
+                )
             if canonical and canonical != _sub_for_match:
                 log.info(
                     "stage_course: snapped sub_category %r → %r for %r (cat=%s)",
