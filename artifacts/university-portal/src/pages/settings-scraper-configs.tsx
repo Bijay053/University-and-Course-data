@@ -896,6 +896,13 @@ interface TestDiscoveryUrlResult {
   warning?: string;
 }
 
+interface ConfigConflict {
+  field: string;
+  location: "discovery";
+  yaml_values: string[];
+  admin_value: [];
+}
+
 interface TestDiscoveryResult {
   ok: boolean;
   error?: string;
@@ -909,6 +916,8 @@ interface TestDiscoveryResult {
   agg_status: "ok" | "warning" | "critical";
   seed_results: TestDiscoveryUrlResult[];
   filter_config: { allow_url_patterns: string[]; must_contain: string[]; block_url_patterns: string[] };
+  config_conflicts?: ConfigConflict[];
+  admin_config_raw?: Record<string, unknown>;
 }
 
 interface FullValidationUrlResult {
@@ -1852,6 +1861,8 @@ interface DebuggerPanelProps {
   fullValidationResult: FullValidationResult | null;
   fullValidationLoading: boolean;
   onRunFullValidation: (urls: string[]) => void;
+  // Config override conflict clearing
+  onClearConflict: (conflict: ConfigConflict, adminRaw: Record<string, unknown>) => void;
 }
 
 function DebuggerPanel({
@@ -1866,6 +1877,7 @@ function DebuggerPanel({
   onRunAiAnalysis, onApplySafeFix,
   testDiscoveryResult, testDiscoveryLoading, onRunTestDiscovery,
   fullValidationResult, fullValidationLoading, onRunFullValidation,
+  onClearConflict,
 }: DebuggerPanelProps) {
   const [aiEvidenceExpanded, setAiEvidenceExpanded] = useState(false);
   const [tdExpandedSeeds, setTdExpandedSeeds] = useState<Record<number, boolean>>({});
@@ -2517,6 +2529,8 @@ function DebuggerPanel({
               )}
               {!testDiscoveryLoading && testDiscoveryResult && (() => {
                 const td = testDiscoveryResult;
+                const conflicts = td.config_conflicts ?? [];
+                const adminRaw = td.admin_config_raw ?? {};
                 const safetyColors = {
                   safe: "bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-300",
                   warning: "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300",
@@ -2524,6 +2538,44 @@ function DebuggerPanel({
                 };
                 return (
                   <div className="divide-y">
+                    {/* ── Configuration Override Conflict warning ── */}
+                    {conflicts.length > 0 && (
+                      <div className="px-3 py-2.5 bg-red-50 dark:bg-red-950/30 border-b border-red-200 dark:border-red-800 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-red-600 dark:text-red-400 text-sm font-semibold">⚠ Configuration Override Conflict</span>
+                          <span className="text-[10px] bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 px-1.5 py-0.5 rounded font-mono">admin_config</span>
+                        </div>
+                        <p className="text-xs text-red-700 dark:text-red-300">
+                          The database <code className="font-mono text-[11px]">admin_config</code> contains empty <code className="font-mono text-[11px]">[]</code> values for fields that your YAML defines. These stale empty overrides previously silenced YAML patterns entirely.
+                        </p>
+                        <div className="space-y-1.5">
+                          {conflicts.map((c) => (
+                            <div key={c.field} className="flex items-start justify-between gap-2 bg-red-100/60 dark:bg-red-900/30 rounded px-2 py-1.5">
+                              <div className="space-y-0.5 min-w-0">
+                                <div className="flex items-center gap-1.5">
+                                  <code className="font-mono text-[11px] text-red-800 dark:text-red-200 font-semibold">{c.location}.{c.field}</code>
+                                  <span className="text-[10px] text-red-600 dark:text-red-400">admin_config: [] overrides YAML: [{c.yaml_values.length} pattern{c.yaml_values.length !== 1 ? "s" : ""}]</span>
+                                </div>
+                                <div className="flex flex-wrap gap-1 mt-0.5">
+                                  {c.yaml_values.slice(0, 3).map((v, i) => (
+                                    <code key={i} className="text-[10px] bg-white/60 dark:bg-black/20 text-red-700 dark:text-red-300 px-1 py-0.5 rounded border border-red-200 dark:border-red-700 truncate max-w-[200px]">{v}</code>
+                                  ))}
+                                  {c.yaml_values.length > 3 && (
+                                    <span className="text-[10px] text-red-500">+{c.yaml_values.length - 3} more</span>
+                                  )}
+                                </div>
+                              </div>
+                              <button
+                                className="flex-shrink-0 text-[11px] font-medium text-white bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-600 rounded px-2 py-1 transition-colors"
+                                onClick={() => onClearConflict(c, adminRaw)}
+                              >
+                                Clear override
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     {/* Aggregated totals */}
                     <div className="px-3 py-2 flex flex-wrap gap-3 text-xs">
                       <span className="font-medium">{td.total_raw} raw</span>
@@ -3355,6 +3407,30 @@ export default function SettingsScraperConfigs() {
       toast({ title: "Test discovery failed", description: (err as Error).message, variant: "destructive" });
     } finally {
       setTestDiscoveryLoading(false);
+    }
+  }, [toast]);
+
+  const clearConfigConflict = useCallback(async (uniId: number, conflict: ConfigConflict, currentAdminRaw: Record<string, unknown>) => {
+    try {
+      const cleaned = JSON.parse(JSON.stringify(currentAdminRaw));
+      const disc = (cleaned.discovery ?? {}) as Record<string, unknown>;
+      delete disc[conflict.field];
+      if (Object.keys(disc).length === 0) delete cleaned.discovery;
+      else cleaned.discovery = disc;
+      const res = await fetchWithAuth(`${BASE}/api/universities/${uniId}/agent-config`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(cleaned),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      toast({ title: "Override cleared", description: `Removed empty admin_config.discovery.${conflict.field} — YAML values are now active.` });
+      setTestDiscoveryResult(prev => prev ? {
+        ...prev,
+        config_conflicts: (prev.config_conflicts ?? []).filter(c => c.field !== conflict.field),
+        admin_config_raw: cleaned,
+      } : prev);
+    } catch (err) {
+      toast({ title: "Failed to clear override", description: (err as Error).message, variant: "destructive" });
     }
   }, [toast]);
 
@@ -5042,6 +5118,9 @@ export default function SettingsScraperConfigs() {
                   fullValidationLoading={fullValidationLoading}
                   onRunFullValidation={(urls) => {
                     if (selectedConfig?.university_id) void runFullValidation(selectedConfig.university_id, urls);
+                  }}
+                  onClearConflict={(conflict, adminRaw) => {
+                    if (selectedConfig?.university_id) void clearConfigConflict(selectedConfig.university_id, conflict, adminRaw);
                   }}
                 />
               ) : (

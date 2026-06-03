@@ -1588,6 +1588,53 @@ async def post_test_discovery(
 
     safety_score = historical_pts + seed_pts + config_pts
 
+    # ── Config Override Conflict detection ───────────────────────────────────
+    # Compare the admin_config (DB highest-priority layer) against the YAML
+    # baseline for list-type fields.  An empty list [] in admin_config used to
+    # silently clear YAML-defined patterns (now fixed in _deep_merge), but the
+    # stale empty override still exists in the DB and should be flagged.
+    config_conflicts: list[dict] = []
+    _raw_admin_cfg: dict = {}
+    try:
+        _LIST_CONFLICT_KEYS = ("allow_url_patterns", "block_url_patterns",
+                               "must_contain", "seed_urls")
+        _raw_db = dict(u.scrape_config or {})
+        _raw_admin_cfg = _raw_db.get("admin_config") or {}
+        if isinstance(_raw_admin_cfg, dict):
+            _admin_disc = _raw_admin_cfg.get("discovery", {})
+            if isinstance(_admin_disc, dict):
+                # Load YAML-only config (empty DB config) to get baseline values
+                from app.services.scraper.config.loader import (
+                    get_config_for_host as _gcfh_cfl,
+                )
+                _uc_yaml = _gcfh_cfl(
+                    hostname=_h, name=u.name or "",
+                    scrape_url=u.scrape_url or "",
+                    university_id=u.id,
+                    db_scrape_config={},  # no DB config → YAML + defaults only
+                )
+                _yaml_disc_vals: dict[str, list] = {
+                    "allow_url_patterns": list(_uc_yaml.discovery.allow_url_patterns or []),
+                    "block_url_patterns": list(_uc_yaml.discovery.block_url_patterns or []),
+                    "must_contain":       list(_uc_yaml.discovery.must_contain or []),
+                    "seed_urls":          list(_uc_yaml.discovery.seed_urls or []),
+                }
+                for _ck in _LIST_CONFLICT_KEYS:
+                    _adm_val = _admin_disc.get(_ck)
+                    _yaml_val = _yaml_disc_vals.get(_ck, [])
+                    if (
+                        isinstance(_adm_val, list) and len(_adm_val) == 0
+                        and len(_yaml_val) > 0
+                    ):
+                        config_conflicts.append({
+                            "field": _ck,
+                            "location": "discovery",
+                            "yaml_values": _yaml_val,
+                            "admin_value": [],
+                        })
+    except Exception:
+        pass  # conflict detection is best-effort; never break discovery
+
     return {
         "ok": True,
         "seed_results": seed_results,
@@ -1620,6 +1667,8 @@ async def post_test_discovery(
             "must_contain": mc_patterns,
             "block_url_patterns": block_pats,
         },
+        "config_conflicts": config_conflicts,
+        "admin_config_raw": _raw_admin_cfg,
     }
 
 
