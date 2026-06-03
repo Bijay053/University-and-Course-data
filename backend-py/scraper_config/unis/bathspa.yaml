@@ -1,12 +1,7 @@
 # Bath Spa University
 # Hostname: www.bathspa.ac.uk
 # Country: United Kingdom | Currency: GBP
-#
-# Bath Spa uses subject landing pages under:
-# /student-life/undergraduate-study/
-# /student-life/postgraduate-study/
-#
-# These pages contain links to real courses and must be crawled.
+# Fix: crawl subject landing pages, but extract only real course detail pages.
 
 discovery:
   auto_api_discovery: false
@@ -19,19 +14,29 @@ discovery:
   always_sitemap_supplement: true
   sitemap_url: https://www.bathspa.ac.uk/sitemap.xml
 
-  bfs_page_budget: 120
+  bfs_page_budget: 160
   max_candidates: 1200
-  expected_min_courses: 120
+  expected_min_courses: 180
 
   allow_url_patterns:
-    - '/courses/'
-    - '/student-life/undergraduate-study/'
-    - '/student-life/postgraduate-study/'
+    - '^https://www\.bathspa\.ac\.uk/courses/(ug|pg|ify|phd|edd)-[a-z0-9-]+/?$'
+    - '^https://www\.bathspa\.ac\.uk/student-life/undergraduate-study/'
+    - '^https://www\.bathspa\.ac\.uk/student-life/postgraduate-study/'
 
   must_contain:
     - '/courses/'
 
   block_url_patterns:
+    - '\?'
+    - '^https://www\.bathspa\.ac\.uk/courses/?$'
+    - '^https://www\.bathspa\.ac\.uk/courses/course-index-a-z/?$'
+    - '/courses/types-of-courses/'
+    - '/courses/new-courses/'
+    - '/courses/interest-areas/'
+    - '/courses/course-documents/'
+    - '/courses/short-courses/'
+    - '/courses/community-learning/'
+    - '/schools/'
     - '/news/'
     - '/events/'
     - '/open-days/'
@@ -50,11 +55,12 @@ discovery:
 
 extraction:
   max_parallel_fetch: 8
+  skip_browser_rescue: false
+  skip_per_course_browser: false
 
   fees:
     central_page: https://www.bathspa.ac.uk/students/student-finance/tuition-fees/international-fees/
     default_currency: GBP
-
     prefer_international: true
     prefer_annual_over_total: true
     prefer_year_one_over_total: true
@@ -76,7 +82,6 @@ extraction:
   filters:
     domestic_only:
       enabled: false
-
     online_only:
       enabled: false
 
@@ -88,5 +93,7 @@ extraction:
   staging:
     reject_if_missing:
       - course_name
-
     require_international_fee: false
+
+  default_course_location: Bath
+  prefer_blended_over_on_campus: true
