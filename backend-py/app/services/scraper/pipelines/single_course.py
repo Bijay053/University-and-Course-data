@@ -1670,6 +1670,27 @@ async def extract_course(
             # very first thing in the visible body, so adding it here
             # is enough to catch the entire family.
             "page not found | victoria university",
+            # ── Generic soft-404 / wrong-page markers ──────────────────
+            # Bath Spa University (www.bathspa.ac.uk) returns a branded
+            # 200-OK page whose h1 is literally "Course Not Found" for
+            # dead or moved course slugs.  The course-name extractor then
+            # returns "Course Not Found" as the course name, producing
+            # junk review rows.  "course not found" appears within the
+            # first few hundred chars of compacted body text so the
+            # _broken_visible tier catches it reliably.
+            "course not found",
+            # General "page not found" soft-404 title used by many CMS
+            # platforms (WordPress, Drupal, Umbraco, etc.) where the
+            # <h1> or <title> is "Page Not Found" and the rest of the
+            # body is brand chrome.
+            "page not found",
+            # Variations used by some Australian unis and UK providers.
+            "sorry, the page you were looking for",
+            "the page you requested could not be found",
+            "page could not be found",
+            "this page does not exist",
+            "this page couldn't be found",
+            "oops! that page can",
         )
         _broken_visible = any(m in _lower[:500] for m in _BROKEN_MARKERS)
         _broken_short = (
