@@ -11,6 +11,7 @@ This project provides a centralized administrative portal for universities to ma
 - When schema changes are needed, explicitly provide the `pnpm --filter @workspace/db push --force` command before builds.
 - The Node.js API server has been deleted. Python FastAPI is now the sole API server in both dev and production.
 - Provide verification commands to confirm commit deployment, new bundle serving, and correct PM2 environment variables.
+- **GitHub push target**: Always push to `Studyinfocentre/University-and-course-managment` using `STUDYINFO_GITHUB_PAT`. Command: `git push "https://Studyinfocentre:${STUDYINFO_GITHUB_PAT}@github.com/Studyinfocentre/University-and-course-managment.git" HEAD:main`
 
 ## System Architecture
 
