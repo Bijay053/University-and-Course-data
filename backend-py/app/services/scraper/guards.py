@@ -315,16 +315,34 @@ _QUAL_CODE_PREFIX_RE = re.compile(r"^[A-Za-z]{2,6}\d{4,6}\s+", re.I)
 # or "Business Management MBA". These are genuine degree pages whose H1
 # puts the subject first and the award last. Match trailing abbreviations
 # to prevent false category_landing_page rejections.
-# Requires the abbreviation to be the last word (possibly after whitespace
-# and closing parentheses/brackets) so "Learn about MBA programmes" doesn't
-# match — that has words after the abbreviation.
+#
+# UK universities (e.g. Coventry) commonly append "(Hons)" after the award:
+#   "Acting for Stage and Screen BA (Hons)"
+#   "Aerospace Engineering MEng/BEng (Hons)"
+#   "Computer Games Programming MSci/BSc (Hons)"
+# The optional `(?:\(\s*hons\s*\))?` group handles that suffix so the
+# abbreviation before it is still recognised as a degree qualifier.
+#
+# Requires the abbreviation (+ optional Hons) to be the last word so that
+# "Learn about MBA programmes" doesn't match — it has words after.
 _TRAILING_QUALIFIER_RE = re.compile(
+    r"(?:"
+    # "Foundation Degree" as a full trailing phrase (no abbreviation form).
+    r"\bfoundation\s+degree"
+    r"|"
+    # Abbreviations that may be followed by optional "(Hons)" and/or "Top-up".
+    # Examples (all real Coventry course names):
+    #   "Acting for Stage and Screen BA (Hons)"
+    #   "Aerospace Engineering MEng/BEng (Hons)"
+    #   "International Business BA (Hons) Top-up"
+    #   "Applied Mechanical Engineering BEng (Hons) Top-up"
     r"\b(?:"
     r"pgce|pgcert|pgdip|"
-    r"mba|mbs|mpa|mph|med|mit|msc|mcom|mres|mfin|mfin|"
+    r"mba|mbs|mpa|mph|med|mit|msc|msci|meng|mcom|mres|mfin|"
     r"phd|ph\.d|dba|"
     r"bba|bbs|bcom|bbus|bit|bsw|bsc|beng|"
     r"ba|llb|llm|mbbs|bds|mpharm"
+    r")\s*(?:\(\s*hons\.?\s*\))?\s*(?:top[\s\-]up)?"
     r")\s*[\)\]]*\s*$",
     re.IGNORECASE,
 )
