@@ -517,6 +517,69 @@ interface ConfigEntry {
   university_name: string | null;
 }
 
+interface RegressionAlert {
+  id: number;
+  university_id: number;
+  job_id: string | null;
+  alert_type: string;
+  severity: "critical" | "high" | "medium";
+  previous_value: number | null;
+  current_value: number | null;
+  delta: number | null;
+  probable_causes: string[];
+  status: "open" | "acknowledged" | "resolved";
+  snapshot_date: string | null;
+  created_at: string;
+  acknowledged_at: string | null;
+  resolved_at: string | null;
+}
+
+const ALERT_TYPE_LABELS: Record<string, string> = {
+  course_count_drop:     "Course Count Drop",
+  overall_health_drop:   "Overall Health Drop",
+  discovery_health_drop: "Discovery Health Drop",
+  extraction_health_drop:"Extraction Health Drop",
+  fee_coverage_drop:     "Fee Coverage Drop",
+  english_coverage_drop: "English Coverage Drop",
+  intake_coverage_drop:  "Intake Coverage Drop",
+};
+
+function alertSeverityMeta(severity: "critical" | "high" | "medium") {
+  if (severity === "critical") return {
+    bgCls:    "bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800",
+    badgeCls: "bg-red-100 dark:bg-red-900/60 text-red-700 dark:text-red-300 border-red-300 dark:border-red-700",
+    textCls:  "text-red-800 dark:text-red-200",
+    dotCls:   "bg-red-500",
+    iconCls:  "text-red-600 dark:text-red-400",
+  };
+  if (severity === "high") return {
+    bgCls:    "bg-orange-50 dark:bg-orange-950/30 border-orange-200 dark:border-orange-800",
+    badgeCls: "bg-orange-100 dark:bg-orange-900/60 text-orange-700 dark:text-orange-300 border-orange-300 dark:border-orange-700",
+    textCls:  "text-orange-800 dark:text-orange-200",
+    dotCls:   "bg-orange-500",
+    iconCls:  "text-orange-600 dark:text-orange-400",
+  };
+  return {
+    bgCls:    "bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800",
+    badgeCls: "bg-amber-100 dark:bg-amber-900/60 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700",
+    textCls:  "text-amber-800 dark:text-amber-200",
+    dotCls:   "bg-amber-500",
+    iconCls:  "text-amber-600 dark:text-amber-400",
+  };
+}
+
+function alertChangeLine(alert: RegressionAlert): string {
+  const label = ALERT_TYPE_LABELS[alert.alert_type] ?? alert.alert_type;
+  const prev = alert.previous_value ?? 0;
+  const cur  = alert.current_value  ?? 0;
+  if (alert.alert_type === "course_count_drop") {
+    const pct = prev > 0 ? Math.round(100 * (prev - cur) / prev) : 0;
+    return `Course count dropped ${pct}%: ${prev} → ${cur} courses`;
+  }
+  const pts = Math.round(Math.abs(alert.delta ?? 0));
+  return `${label}: ${prev}% → ${cur}% (−${pts} pts)`;
+}
+
 interface UniversityHealth {
   university_id: number;
   total_courses: number;
@@ -2524,6 +2587,7 @@ export default function SettingsScraperConfigs() {
   const [configs, setConfigs] = useState<ConfigEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [healthData, setHealthData] = useState<Record<string, UniversityHealth>>({});
+  const [regressionAlerts, setRegressionAlerts] = useState<Record<string, RegressionAlert[]>>({});
   const [selected, setSelected] = useState<string | null>(null);
   const [editorYaml, setEditorYaml] = useState("");
   const [savedYaml, setSavedYaml] = useState("");
@@ -2612,13 +2676,18 @@ export default function SettingsScraperConfigs() {
       const data = await res.json();
       const cfgs: ConfigEntry[] = data.configs ?? [];
       setConfigs(cfgs);
-      // Fire-and-forget health fetch for all linked universities
+      // Fire-and-forget health + alerts fetch for all linked universities
       const ids = cfgs.map(c => c.university_id).filter((id): id is number => id != null);
       if (ids.length > 0) {
-        fetchWithAuth(`${BASE}/api/settings/scraper-health?university_ids=${ids.join(",")}`)
+        const idStr = ids.join(",");
+        fetchWithAuth(`${BASE}/api/settings/scraper-health?university_ids=${idStr}`)
           .then(r => r.ok ? r.json() : null)
           .then(d => { if (d?.health) setHealthData(d.health as Record<string, UniversityHealth>); })
           .catch(() => { /* health is non-critical */ });
+        fetchWithAuth(`${BASE}/api/settings/regression-alerts?university_ids=${idStr}&status=open,acknowledged`)
+          .then(r => r.ok ? r.json() : null)
+          .then(d => { if (d?.alerts) setRegressionAlerts(d.alerts as Record<string, RegressionAlert[]>); })
+          .catch(() => { /* alerts are non-critical */ });
       }
     } catch (err) {
       toast({ title: "Failed to load configs", description: (err as Error).message, variant: "destructive" });
@@ -3330,6 +3399,22 @@ export default function SettingsScraperConfigs() {
                           </div>
                         );
                       })()}
+                      {/* Regression alert indicator */}
+                      {cfg.university_id != null && (() => {
+                        const alerts = regressionAlerts[String(cfg.university_id!)] ?? [];
+                        const open = alerts.filter(a => a.status === "open");
+                        if (open.length === 0) return null;
+                        const worst = open.find(a => a.severity === "critical") ?? open.find(a => a.severity === "high") ?? open[0];
+                        const { dotCls, textCls } = alertSeverityMeta(worst.severity);
+                        return (
+                          <div className="flex items-center gap-1 mt-0.5">
+                            <span className={cn("inline-block w-1.5 h-1.5 rounded-full flex-shrink-0 animate-pulse", dotCls)} />
+                            <span className={cn("text-[10px] font-medium", textCls)}>
+                              {open.length} regression alert{open.length > 1 ? "s" : ""}
+                            </span>
+                          </div>
+                        );
+                      })()}
                     </button>
                     {/* Per-card trigger button */}
                     <button
@@ -3579,6 +3664,124 @@ export default function SettingsScraperConfigs() {
                   )}
                 </div>
               </div>
+
+              {/* ── Regression Alert Banners ───────────────────────────────────── */}
+              {selectedConfig?.university_id != null && (() => {
+                const allAlerts = regressionAlerts[String(selectedConfig.university_id!)] ?? [];
+                const visible = allAlerts.filter(a => a.status === "open" || a.status === "acknowledged");
+                if (visible.length === 0) return null;
+
+                const refreshAlerts = (uniId: number) => {
+                  fetchWithAuth(`${BASE}/api/settings/regression-alerts?university_ids=${uniId}&status=open,acknowledged`)
+                    .then(r => r.ok ? r.json() : null)
+                    .then(d => {
+                      if (d?.alerts) {
+                        setRegressionAlerts(prev => ({ ...prev, ...d.alerts }));
+                      }
+                    })
+                    .catch(() => {});
+                };
+
+                const doAcknowledge = async (alertId: number, uniId: number) => {
+                  const r = await fetchWithAuth(`${BASE}/api/settings/regression-alerts/${alertId}/acknowledge`, { method: "POST" });
+                  if (r.ok) { refreshAlerts(uniId); toast({ title: "Alert acknowledged" }); }
+                };
+                const doResolve = async (alertId: number, uniId: number) => {
+                  const r = await fetchWithAuth(`${BASE}/api/settings/regression-alerts/${alertId}/resolve`, { method: "POST" });
+                  if (r.ok) { refreshAlerts(uniId); toast({ title: "Alert resolved" }); }
+                };
+
+                return (
+                  <div className="border-b">
+                    {visible.map(alert => {
+                      const { bgCls, badgeCls, textCls, iconCls } = alertSeverityMeta(alert.severity);
+                      const debTab = alert.alert_type === "discovery_health_drop" ? "discovery" : "extraction";
+                      return (
+                        <div key={alert.id} className={cn("px-4 py-3 border-b last:border-b-0 flex flex-col gap-2", bgCls)}>
+                          {/* Header row */}
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <TriangleAlert className={cn("h-4 w-4 flex-shrink-0", iconCls)} />
+                              <span className={cn("text-xs font-bold flex-shrink-0", textCls)}>Regression Detected</span>
+                              <span className={cn("text-[10px] font-semibold px-1.5 py-0.5 rounded border flex-shrink-0", badgeCls)}>
+                                {alert.severity.toUpperCase()}
+                              </span>
+                              {alert.status === "acknowledged" && (
+                                <span className="text-[10px] text-muted-foreground flex-shrink-0 italic">acknowledged</span>
+                              )}
+                              <span className="text-[10px] text-muted-foreground truncate">
+                                {alert.snapshot_date}
+                              </span>
+                            </div>
+                            {/* Dismiss actions */}
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                              {alert.status === "open" && (
+                                <button
+                                  onClick={() => doAcknowledge(alert.id, selectedConfig.university_id!)}
+                                  className="text-[10px] px-2 py-0.5 rounded border border-border bg-background hover:bg-muted transition-colors"
+                                >
+                                  Acknowledge
+                                </button>
+                              )}
+                              <button
+                                onClick={() => doResolve(alert.id, selectedConfig.university_id!)}
+                                className="text-[10px] px-2 py-0.5 rounded border border-border bg-background hover:bg-muted transition-colors"
+                              >
+                                Resolve
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Change description */}
+                          <div className={cn("text-xs font-medium", textCls)}>
+                            {alertChangeLine(alert)}
+                          </div>
+
+                          {/* Probable causes */}
+                          {alert.probable_causes.length > 0 && (
+                            <div>
+                              <div className="text-[10px] font-semibold text-muted-foreground mb-0.5">Probable causes:</div>
+                              <ul className="space-y-0.5">
+                                {alert.probable_causes.map((cause, i) => (
+                                  <li key={i} className="flex items-start gap-1.5 text-[11px] text-muted-foreground">
+                                    <span className="flex-shrink-0 mt-0.5">•</span>
+                                    <span>{cause}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+
+                          {/* Action buttons */}
+                          <div className="flex items-center gap-2 pt-0.5">
+                            <button
+                              onClick={() => setDebugTab(debTab as "discovery" | "extraction")}
+                              className={cn(
+                                "flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded border transition-colors",
+                                "border-border bg-background hover:bg-muted",
+                              )}
+                            >
+                              <Bug className="h-3 w-3" />
+                              Open Debugger
+                            </button>
+                            <button
+                              onClick={() => setDebugTab("ai_analysis")}
+                              className={cn(
+                                "flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded border transition-colors",
+                                "border-violet-300 dark:border-violet-700 bg-violet-50 dark:bg-violet-950/30",
+                                "text-violet-700 dark:text-violet-300 hover:bg-violet-100 dark:hover:bg-violet-950/50",
+                              )}
+                            >
+                              <Bot className="h-3 w-3" />
+                              Run AI Analysis
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
 
               {/* ── Scrape Health Card ─────────────────────────────────────────── */}
               {selectedConfig?.university_id != null && healthData[String(selectedConfig.university_id)] && (() => {

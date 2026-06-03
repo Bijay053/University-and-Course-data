@@ -1,30 +1,38 @@
-"""Celery task: daily university health snapshot.
+"""Celery task: daily university health snapshot + regression detection.
 
-Reads v_university_health and upserts one row per university into
-university_health_snapshots. Idempotent — re-running on the same day
-overwrites the existing row (ON CONFLICT DO UPDATE).
+Beat schedule: 01:30 UTC daily (after overnight scrapes, before 02:00 regression sweep).
 
-Beat schedule: 01:30 UTC daily (after scrapes finish, before the 02:00
-nightly regression sweep so the sweep can reference fresh snapshots).
+Steps:
+  1. Upsert v_university_health → university_health_snapshots (idempotent per day).
+  2. Run regression detector — compares current vs previous snapshot and
+     writes any new alerts to university_regression_alerts.
 """
+
+from __future__ import annotations
 
 import asyncio
 import logging
 
 from sqlalchemy import text
 
-from app.database import AsyncSessionLocal
+from app.database import AsyncSessionLocal, engine
+from app.tasks.celery_app import celery_app
 
-logger = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 
 
-def snapshot_health_daily() -> dict:
-    """Synchronous entry point called by Celery."""
-    return asyncio.run(_run())
+def _sync_dispose() -> None:
+    try:
+        engine.sync_engine.dispose(close=False)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("health_snapshot _sync_dispose: %s", exc)
 
 
 async def _run() -> dict:
+    from app.services.regression_detector import run_regression_detection
+
     async with AsyncSessionLocal() as db:
+        # Step 1 — snapshot current health scores
         result = await db.execute(text("""
             INSERT INTO university_health_snapshots
                 (university_id, snapshot_date, overall_health, discovery_health,
@@ -53,7 +61,24 @@ async def _run() -> dict:
                 created_at        = NOW()
         """))
         await db.commit()
+        upserted = result.rowcount
+        log.info("health_snapshot: upserted %d rows", upserted)
 
-        rows = result.rowcount
-        logger.info("health_snapshot: upserted %d rows for %s", rows, "CURRENT_DATE")
-        return {"upserted": rows}
+        # Step 2 — regression detection
+        regression_result = await run_regression_detection(db)
+
+    return {"upserted": upserted, **regression_result}
+
+
+@celery_app.task(name="health.snapshot_daily", bind=True, max_retries=0)
+def snapshot_health_daily(self) -> dict:  # noqa: ANN001
+    """Snapshot university health scores and detect regressions."""
+    log.info("health.snapshot_daily: starting")
+    _sync_dispose()
+    try:
+        result = asyncio.run(_run())
+        log.info("health.snapshot_daily: %s", result)
+        return result
+    except Exception as exc:  # noqa: BLE001
+        log.error("health.snapshot_daily: failed: %s", exc)
+        return {"error": str(exc)}
