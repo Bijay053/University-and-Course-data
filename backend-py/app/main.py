@@ -31,6 +31,7 @@ from app.routers import (
     performance,
     per_course_resources,
     publishing,
+    auto_repair,
     regression_alerts,
     reviews,
     scrape,
@@ -100,6 +101,7 @@ app.include_router(dashboard.router, prefix="/api/dashboard", tags=["dashboard"]
 app.include_router(acronyms.router, prefix="/api/settings", tags=["settings"])
 app.include_router(scraper_configs.router, prefix="/api/settings", tags=["settings"])
 app.include_router(regression_alerts.router, prefix="/api/settings", tags=["settings"])
+app.include_router(auto_repair.router, prefix="/api/settings", tags=["settings"])
 app.include_router(_import_routes.router, prefix="/api")
 app.include_router(_backup.router, prefix="/api", tags=["backup"])
 app.include_router(assessment_notes.router, prefix="/api", tags=["assessment-notes"])

@@ -226,6 +226,7 @@ async def run_regression_detection(db: AsyncSession) -> dict[str, int]:
 
     unis_checked = 0
     alerts_created = 0
+    alert_university_ids: set[int] = set()
 
     for uid, data in pairs.items():
         if 1 not in data or 2 not in data:
@@ -270,9 +271,14 @@ async def run_regression_detection(db: AsyncSession) -> dict[str, int]:
                 "sdate":  snapshot_date,
             })
             alerts_created += 1
+            alert_university_ids.add(uid)
 
     if alerts_created > 0:
         await db.commit()
 
     log.info("regression_detection: checked=%d alerts_created=%d", unis_checked, alerts_created)
-    return {"universities_checked": unis_checked, "alerts_created": alerts_created}
+    return {
+        "universities_checked": unis_checked,
+        "alerts_created":       alerts_created,
+        "affected_university_ids": list(alert_university_ids),
+    }

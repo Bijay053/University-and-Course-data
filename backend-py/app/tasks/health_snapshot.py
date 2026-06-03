@@ -67,6 +67,20 @@ async def _run() -> dict:
         # Step 2 — regression detection
         regression_result = await run_regression_detection(db)
 
+    # Step 3 — trigger auto-repair for any universities with new alerts
+    affected = regression_result.get("affected_university_ids", [])
+    if affected:
+        for uid in affected:
+            try:
+                celery_app.send_task(
+                    "auto_repair.generate_suggestion",
+                    args=[uid, None],
+                    queue="scrape",
+                )
+                log.info("health_snapshot: queued auto_repair for uni %d", uid)
+            except Exception as exc:  # noqa: BLE001
+                log.warning("health_snapshot: could not queue auto_repair for uni %d: %s", uid, exc)
+
     return {"upserted": upserted, **regression_result}
 
 

@@ -580,6 +580,41 @@ function alertChangeLine(alert: RegressionAlert): string {
   return `${label}: ${prev}% → ${cur}% (−${pts} pts)`;
 }
 
+interface ValidationMetrics {
+  completeness:    number;
+  fee_coverage:    number;
+  english_coverage:number;
+  intake_coverage: number;
+  sample_count:    number;
+}
+
+interface AutoRepairSuggestion {
+  id:                    number;
+  university_id:         number;
+  regression_alert_id:   number | null;
+  issue_summary:         string | null;
+  root_cause_category:   string | null;
+  fix_recommendation:    string | null;
+  fix_yaml_snippet:      string | null;
+  safe_fix:              { type: string; key: string; value?: unknown } | null;
+  risk_label:            "low" | "medium" | "developer_required" | null;
+  developer_note:        string | null;
+  evidence:              { type: string; label: string; value: string; source: string }[];
+  validation_result:     {
+    before?: ValidationMetrics;
+    after?:  ValidationMetrics;
+    production_completeness?: number;
+    confidence?: string;
+    method?: string;
+    skip_reason?: string | null;
+  } | null;
+  confidence:   "high" | "medium" | "low" | null;
+  status:       "pending" | "ready" | "developer_required" | "applied" | "dismissed" | "failed";
+  created_at:   string;
+  applied_at:   string | null;
+  dismissed_at: string | null;
+}
+
 interface UniversityHealth {
   university_id: number;
   total_courses: number;
@@ -2587,7 +2622,10 @@ export default function SettingsScraperConfigs() {
   const [configs, setConfigs] = useState<ConfigEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [healthData, setHealthData] = useState<Record<string, UniversityHealth>>({});
-  const [regressionAlerts, setRegressionAlerts] = useState<Record<string, RegressionAlert[]>>({});
+  const [regressionAlerts, setRegressionAlerts]   = useState<Record<string, RegressionAlert[]>>({});
+  const [repairSuggestions, setRepairSuggestions] = useState<Record<string, AutoRepairSuggestion[]>>({});
+  const [repairEvidenceOpen, setRepairEvidenceOpen] = useState<Record<number, boolean>>({});
+  const [repairApplying, setRepairApplying] = useState<Record<number, boolean>>({});
   const [selected, setSelected] = useState<string | null>(null);
   const [editorYaml, setEditorYaml] = useState("");
   const [savedYaml, setSavedYaml] = useState("");
@@ -2688,6 +2726,10 @@ export default function SettingsScraperConfigs() {
           .then(r => r.ok ? r.json() : null)
           .then(d => { if (d?.alerts) setRegressionAlerts(d.alerts as Record<string, RegressionAlert[]>); })
           .catch(() => { /* alerts are non-critical */ });
+        fetchWithAuth(`${BASE}/api/settings/auto-repair?university_ids=${idStr}&status=pending,ready,developer_required`)
+          .then(r => r.ok ? r.json() : null)
+          .then(d => { if (d?.suggestions) setRepairSuggestions(d.suggestions as Record<string, AutoRepairSuggestion[]>); })
+          .catch(() => { /* repair suggestions are non-critical */ });
       }
     } catch (err) {
       toast({ title: "Failed to load configs", description: (err as Error).message, variant: "destructive" });
@@ -3779,6 +3821,260 @@ export default function SettingsScraperConfigs() {
                         </div>
                       );
                     })}
+                  </div>
+                );
+              })()}
+
+              {/* ── Auto Repair Panel ──────────────────────────────────────────── */}
+              {selectedConfig?.university_id != null && (() => {
+                const uidStr = String(selectedConfig.university_id!);
+                const suggestions = (repairSuggestions[uidStr] ?? []).filter(
+                  s => s.status === "pending" || s.status === "ready" || s.status === "developer_required"
+                );
+                if (suggestions.length === 0) return null;
+                const suggestion = suggestions[0]!;
+
+                const confidenceMeta = (c: string | null) => {
+                  if (c === "high")   return { label: "HIGH",   cls: "bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300 border-green-300 dark:border-green-700" };
+                  if (c === "medium") return { label: "MED",    cls: "bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700" };
+                  return                      { label: "LOW",   cls: "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-300 dark:border-slate-600" };
+                };
+
+                const refreshRepair = () => {
+                  fetchWithAuth(`${BASE}/api/settings/auto-repair?university_ids=${selectedConfig.university_id!}&status=pending,ready,developer_required`)
+                    .then(r => r.ok ? r.json() : null)
+                    .then(d => { if (d?.suggestions) setRepairSuggestions(prev => ({ ...prev, ...d.suggestions })); })
+                    .catch(() => {});
+                };
+
+                const doApply = async (sid: number) => {
+                  setRepairApplying(p => ({ ...p, [sid]: true }));
+                  try {
+                    const r = await fetchWithAuth(`${BASE}/api/settings/auto-repair/${sid}/apply`, { method: "POST" });
+                    if (r.ok) {
+                      toast({ title: "Repair applied", description: "Config updated — trigger a new scrape to verify." });
+                      refreshRepair();
+                      void fetchConfigs();
+                    } else {
+                      const msg = await r.json().catch(() => ({ detail: "Unknown error" }));
+                      toast({ title: "Apply failed", description: msg.detail ?? "Unknown error", variant: "destructive" });
+                    }
+                  } finally {
+                    setRepairApplying(p => ({ ...p, [sid]: false }));
+                  }
+                };
+
+                const doDismiss = async (sid: number) => {
+                  const r = await fetchWithAuth(`${BASE}/api/settings/auto-repair/${sid}/dismiss`, { method: "POST" });
+                  if (r.ok) { refreshRepair(); toast({ title: "Suggestion dismissed" }); }
+                };
+
+                // ── PENDING ───────────────────────────────────────────────────────
+                if (suggestion.status === "pending") {
+                  return (
+                    <div className="border-b px-4 py-3 bg-violet-50 dark:bg-violet-950/20 flex items-center gap-2.5">
+                      <div className="h-3.5 w-3.5 rounded-full border-2 border-violet-400 border-t-transparent animate-spin flex-shrink-0" />
+                      <span className="text-xs text-violet-700 dark:text-violet-300 font-medium">Analysing regression and generating repair suggestion…</span>
+                      <button onClick={refreshRepair} className="ml-auto text-[10px] px-2 py-0.5 rounded border border-border bg-background hover:bg-muted transition-colors flex-shrink-0">Refresh</button>
+                    </div>
+                  );
+                }
+
+                // ── DEVELOPER REQUIRED ────────────────────────────────────────────
+                if (suggestion.status === "developer_required") {
+                  return (
+                    <div className="border-b bg-slate-50 dark:bg-slate-900/40">
+                      <div className="px-4 py-3 flex flex-col gap-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold text-slate-700 dark:text-slate-300">🔧 Developer Intervention Required</span>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded border font-semibold bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-600">DEV ONLY</span>
+                          </div>
+                          <button onClick={() => doDismiss(suggestion.id)} className="text-[10px] px-2 py-0.5 rounded border border-border bg-background hover:bg-muted transition-colors flex-shrink-0">Dismiss</button>
+                        </div>
+                        {suggestion.issue_summary && (
+                          <p className="text-xs text-muted-foreground">{suggestion.issue_summary}</p>
+                        )}
+                        {suggestion.fix_recommendation && (
+                          <p className="text-xs text-slate-600 dark:text-slate-400 font-medium">{suggestion.fix_recommendation}</p>
+                        )}
+                        {suggestion.developer_note && (
+                          <div className="bg-slate-100 dark:bg-slate-800 rounded px-2.5 py-2 text-[11px] text-muted-foreground border border-slate-200 dark:border-slate-700">
+                            <span className="font-semibold text-slate-600 dark:text-slate-300">Dev note: </span>{suggestion.developer_note}
+                          </div>
+                        )}
+                        {suggestion.evidence.length > 0 && (
+                          <div>
+                            <button
+                              onClick={() => setRepairEvidenceOpen(p => ({ ...p, [suggestion.id]: !p[suggestion.id] }))}
+                              className="text-[10px] text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+                            >
+                              {repairEvidenceOpen[suggestion.id] ? "▾" : "▸"} {suggestion.evidence.length} evidence item{suggestion.evidence.length !== 1 ? "s" : ""}
+                            </button>
+                            {repairEvidenceOpen[suggestion.id] && (
+                              <div className="mt-1.5 space-y-1">
+                                {suggestion.evidence.map((ev, i) => (
+                                  <div key={i} className="flex items-start gap-2 text-[11px]">
+                                    <span className="text-muted-foreground flex-shrink-0 mt-0.5">•</span>
+                                    <span className="font-medium text-foreground flex-shrink-0">{ev.label}:</span>
+                                    <span className="text-muted-foreground break-all">{ev.value}</span>
+                                    <span className="text-muted-foreground/60 italic flex-shrink-0 ml-auto">{ev.source}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                }
+
+                // ── READY ─────────────────────────────────────────────────────────
+                const vr = suggestion.validation_result;
+                const before = vr?.before;
+                const after  = vr?.after;
+                const { label: confLabel, cls: confCls } = confidenceMeta(suggestion.confidence);
+                const safeFix = suggestion.safe_fix;
+
+                return (
+                  <div className="border-b bg-emerald-50 dark:bg-emerald-950/20">
+                    <div className="px-4 py-3 flex flex-col gap-2.5">
+                      {/* Header */}
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs font-bold text-emerald-800 dark:text-emerald-200">🔧 Auto Repair Available</span>
+                          {suggestion.root_cause_category && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded border font-medium bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700 capitalize">
+                              {suggestion.root_cause_category.replace(/_/g, " ")}
+                            </span>
+                          )}
+                          <span className={cn("text-[10px] px-1.5 py-0.5 rounded border font-bold", confCls)}>
+                            {confLabel} CONFIDENCE
+                          </span>
+                        </div>
+                        <button onClick={() => doDismiss(suggestion.id)} className="text-[10px] px-2 py-0.5 rounded border border-border bg-background hover:bg-muted transition-colors flex-shrink-0">Dismiss</button>
+                      </div>
+
+                      {/* Issue summary */}
+                      {suggestion.issue_summary && (
+                        <p className="text-xs text-emerald-800 dark:text-emerald-200">{suggestion.issue_summary}</p>
+                      )}
+
+                      {/* Before / After metrics table */}
+                      {before && after && (
+                        <div className="rounded border border-emerald-200 dark:border-emerald-800 overflow-hidden text-[11px]">
+                          <div className="grid grid-cols-4 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 font-semibold">
+                            <div className="px-2.5 py-1.5 border-r border-emerald-200 dark:border-emerald-800">Metric</div>
+                            <div className="px-2.5 py-1.5 border-r border-emerald-200 dark:border-emerald-800 text-center">Before</div>
+                            <div className="px-2.5 py-1.5 border-r border-emerald-200 dark:border-emerald-800 text-center">After (est.)</div>
+                            <div className="px-2.5 py-1.5 text-center">Δ</div>
+                          </div>
+                          {([
+                            ["Completeness", before.completeness,    after.completeness,    "%"],
+                            ["Fee Coverage", before.fee_coverage,    after.fee_coverage,    "%"],
+                            ["English",      before.english_coverage,after.english_coverage,"%"],
+                            ["Intake",       before.intake_coverage, after.intake_coverage, "%"],
+                          ] as [string, number, number, string][]).map(([metric, bv, av, unit]) => {
+                            const delta = av - bv;
+                            return (
+                              <div key={metric} className="grid grid-cols-4 border-t border-emerald-200 dark:border-emerald-800">
+                                <div className="px-2.5 py-1.5 border-r border-emerald-200 dark:border-emerald-800 font-medium text-foreground">{metric}</div>
+                                <div className="px-2.5 py-1.5 border-r border-emerald-200 dark:border-emerald-800 text-center text-muted-foreground">{bv}{unit}</div>
+                                <div className="px-2.5 py-1.5 border-r border-emerald-200 dark:border-emerald-800 text-center font-semibold text-emerald-700 dark:text-emerald-300">{av}{unit}</div>
+                                <div className={cn("px-2.5 py-1.5 text-center font-bold", delta > 0 ? "text-green-600 dark:text-green-400" : delta < 0 ? "text-red-500 dark:text-red-400" : "text-muted-foreground")}>
+                                  {delta > 0 ? "+" : ""}{delta}{unit}
+                                </div>
+                              </div>
+                            );
+                          })}
+                          {vr?.production_completeness != null && (
+                            <div className="grid grid-cols-1 border-t border-emerald-200 dark:border-emerald-800 px-2.5 py-1.5 text-muted-foreground italic">
+                              Current production completeness (with AI): {vr.production_completeness}% — est. uses rule-based only (conservative lower bound)
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Fix recommendation */}
+                      {suggestion.fix_recommendation && (
+                        <div className="text-xs text-slate-700 dark:text-slate-300 font-medium">
+                          <span className="text-muted-foreground">Fix: </span>{suggestion.fix_recommendation}
+                        </div>
+                      )}
+
+                      {/* Safe fix description */}
+                      {safeFix && (
+                        <div className="bg-emerald-100/60 dark:bg-emerald-900/30 rounded px-2.5 py-1.5 text-[11px] text-emerald-800 dark:text-emerald-200 border border-emerald-200 dark:border-emerald-800">
+                          <span className="font-semibold">Config change: </span>
+                          {safeFix.type === "clear_admin_override"
+                            ? `Remove admin override: ${safeFix.key}`
+                            : `Set ${safeFix.key} = ${JSON.stringify(safeFix.value)}`
+                          }
+                        </div>
+                      )}
+                      {suggestion.fix_yaml_snippet && !safeFix && (
+                        <div className="bg-emerald-100/60 dark:bg-emerald-900/30 rounded px-2.5 py-1.5 text-[11px] text-emerald-800 dark:text-emerald-200 border border-emerald-200 dark:border-emerald-800">
+                          <span className="font-semibold">YAML change </span>
+                          <span className="font-mono text-[10px]">(written to per-uni YAML file)</span>
+                        </div>
+                      )}
+
+                      {/* Evidence toggle */}
+                      {suggestion.evidence.length > 0 && (
+                        <div>
+                          <button
+                            onClick={() => setRepairEvidenceOpen(p => ({ ...p, [suggestion.id]: !p[suggestion.id] }))}
+                            className="text-[10px] text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+                          >
+                            {repairEvidenceOpen[suggestion.id] ? "▾" : "▸"} View {suggestion.evidence.length} evidence item{suggestion.evidence.length !== 1 ? "s" : ""}
+                          </button>
+                          {repairEvidenceOpen[suggestion.id] && (
+                            <div className="mt-1.5 space-y-1 pl-1">
+                              {suggestion.evidence.map((ev, i) => (
+                                <div key={i} className="flex items-start gap-2 text-[11px]">
+                                  <span className="text-muted-foreground flex-shrink-0 mt-0.5">•</span>
+                                  <span className="font-medium text-foreground flex-shrink-0">{ev.label}:</span>
+                                  <span className="text-muted-foreground break-all">{ev.value}</span>
+                                  <span className="text-muted-foreground/60 italic flex-shrink-0 ml-auto">{ev.source}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Action buttons */}
+                      <div className="flex items-center gap-2 pt-0.5 flex-wrap">
+                        {(safeFix != null || suggestion.fix_yaml_snippet) && (
+                          <button
+                            onClick={() => doApply(suggestion.id)}
+                            disabled={repairApplying[suggestion.id]}
+                            className={cn(
+                              "flex items-center gap-1.5 text-[11px] font-medium px-3 py-1.5 rounded border transition-colors",
+                              "bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-700 disabled:opacity-50",
+                            )}
+                          >
+                            {repairApplying[suggestion.id] ? (
+                              <><div className="h-3 w-3 rounded-full border-2 border-white border-t-transparent animate-spin" />Applying…</>
+                            ) : (
+                              <>✓ Apply Repair</>
+                            )}
+                          </button>
+                        )}
+                        <button
+                          onClick={() => setDebugTab("ai_analysis")}
+                          className={cn(
+                            "flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1.5 rounded border transition-colors",
+                            "border-violet-300 dark:border-violet-700 bg-violet-50 dark:bg-violet-950/30",
+                            "text-violet-700 dark:text-violet-300 hover:bg-violet-100 dark:hover:bg-violet-950/50",
+                          )}
+                        >
+                          <Bot className="h-3 w-3" />
+                          Full AI Analysis
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 );
               })()}

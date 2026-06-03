@@ -51,6 +51,7 @@ celery_app = Celery(
         "app.tasks.snapshot_tasks",
         "app.tasks.monitoring_tasks",
         "app.tasks.health_snapshot",
+        "app.tasks.auto_repair_task",
     ],
 )
 
