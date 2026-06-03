@@ -164,6 +164,12 @@ extraction:
         - Distance learning
 
   course_name:
+    # Bath Spa CMS puts only the bare subject name in H1 ("Business and
+    # Management") while the full degree name ("Business and Management
+    # degree - BA (Hons)") is in the page <title>.  prefer_title_over_h1
+    # swaps the candidate order so we get the qualified name.
+    # strip_title_suffixes then removes " - Bath Spa University" from the title.
+    prefer_title_over_h1: true
     strip_title_suffixes:
       - " | Bath Spa University"
       - " - Bath Spa University"
@@ -172,6 +178,15 @@ extraction:
     reject_if_missing:
       - course_name
     require_international_fee: false
+    # Bath Spa H1s are bare subject names ("Music", "Business and Management")
+    # without degree qualifiers — the qualifier appears only in the <title>.
+    # prefer_title_over_h1 above ensures the title is used for the name, but
+    # skip_degree_qualifier_check prevents the guard from firing on any course
+    # where the title-cleaned name still doesn't start with a qualifier word.
+    # The allow_url_patterns already gate the extraction set to genuine
+    # /courses/(ug|pg|ify|phd|edd|pgce)- URLs, making the URL-based guard
+    # sufficient to exclude non-course pages.
+    skip_degree_qualifier_check: true
 
   default_course_location: Bath
   prefer_blended_over_on_campus: true

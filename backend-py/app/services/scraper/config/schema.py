@@ -1504,6 +1504,17 @@ class CourseNameConfig(BaseModel):
             "Example (UWA): [' : the University of Western Australia']"
         ),
     )
+    prefer_title_over_h1: bool = Field(
+        default=False,
+        description=(
+            "When True, prefer the cleaned page <title> over the <h1> as the "
+            "primary course-name candidate.  Use for universities (e.g. Bath Spa) "
+            "whose CMS puts only the bare subject name in H1 ('Business and "
+            "Management') while the full degree title ('Business and Management "
+            "degree - BA (Hons)') appears only in the page <title>.  Combine with "
+            "strip_title_suffixes to remove the provider suffix from the title."
+        ),
+    )
     university_aliases: list[str] = Field(
         default_factory=list,
         description=(

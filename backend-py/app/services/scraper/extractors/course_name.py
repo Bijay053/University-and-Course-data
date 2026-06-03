@@ -244,13 +244,36 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:  # noqa: ARG00
     if title:
         candidates.append(("title", title.get_text(" ", strip=True), 0.6))
 
-    # When both H1 and title are found: if the title (after cleaning) starts
-    # with a degree qualifier (e.g. "MBA – ...") but the H1 does not, the page
-    # is a specialisation sub-page where JS adds the parent degree prefix only
-    # to the <title> (e.g. KBS MBA specialisations). Promote the title so the
-    # full name like "MBA – Tourism and Hospitality Leadership" is used instead
-    # of the bare "Tourism and Hospitality Leadership" from the H1.
-    if len(candidates) == 2:
+    # Per-uni YAML option: prefer_title_over_h1 — use the page <title> as the
+    # primary name source for universities (e.g. Bath Spa) whose CMS places
+    # only a bare subject name in H1 ("Business and Management") while the full
+    # degree name ("Business and Management degree - BA (Hons)") appears only in
+    # the <title>.  When True, swap title to front before any other promotion
+    # logic runs.  strip_title_suffixes in YAML removes the provider suffix.
+    _prefer_title = False
+    try:
+        from app.services.scraper.config.context import (  # noqa: PLC0415
+            get_uni_config as _get_uni_config_cn,
+        )
+        _cn_cfg = _get_uni_config_cn()
+        if _cn_cfg is not None and _cn_cfg.extraction is not None:
+            _prefer_title = bool(
+                getattr(_cn_cfg.extraction.course_name, "prefer_title_over_h1", False)
+            )
+    except Exception:  # noqa: BLE001
+        pass
+
+    if _prefer_title and len(candidates) == 2:
+        # Promote title (conf 0.85) over H1 (conf 0.6) so the full degree name
+        # from the <title> is returned instead of the bare subject H1.
+        candidates = [("title", candidates[1][1], 0.85), ("h1", candidates[0][1], 0.6)]
+    elif len(candidates) == 2:
+        # When both H1 and title are found: if the title (after cleaning) starts
+        # with a degree qualifier (e.g. "MBA – ...") but the H1 does not, the
+        # page is a specialisation sub-page where JS adds the parent degree prefix
+        # only to the <title> (e.g. KBS MBA specialisations). Promote the title
+        # so the full name like "MBA – Tourism and Hospitality Leadership" is used
+        # instead of the bare "Tourism and Hospitality Leadership" from the H1.
         h1_raw, title_raw = candidates[0][1], candidates[1][1]
         h1_clean = _clean(h1_raw) or ""
         title_clean = _clean(title_raw) or ""
