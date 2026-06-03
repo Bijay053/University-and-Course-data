@@ -1089,7 +1089,14 @@ export default function Scraping() {
           setAwaitingApproval(null);
           if (pollRef.current) { clearTimeout(pollRef.current); pollRef.current = null; }
           if ((data.status === "completed" || data.status === "completed_with_errors" || data.status === "stopped") && (data.imported ?? 0) > 0) {
-            loadStagedCourses(jobId);
+            // Guard: don't replace an already-visible review panel for a
+            // *different* job (e.g. cross-tab sync picked up another uni's
+            // job and its poll just finished).  Mirror handleReviewReady's
+            // guard so the two code paths are consistent.
+            const reviewAlreadyOpen = showReviewRef.current && reviewJobIdRef.current && reviewJobIdRef.current !== jobId;
+            if (!reviewAlreadyOpen) {
+              loadStagedCourses(jobId);
+            }
           }
           // ETA tracking: clear start time when this URL finishes (next URL will reset it).
           if (urlQueueRef.current.length === 0) setScrapeStartTime(null);
