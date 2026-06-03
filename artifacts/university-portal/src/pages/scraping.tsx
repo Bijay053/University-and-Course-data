@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useState, useRef, useCallback, useMemo } from "react";
+import { shouldLoadForBackgroundJob } from "@/utils/scraping-poll-guard";
 import { useListUniversities } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
@@ -918,7 +919,10 @@ export default function Scraping() {
     // Auto-trigger: don't replace a review the user is actively reading with a
     // different job's results. Only auto-open when no review is already visible.
     // Explicit user clicks (force=true) always load immediately.
-    if (!force && showReviewRef.current && reviewJobIdRef.current && reviewJobIdRef.current !== jobId) return;
+    if (!shouldLoadForBackgroundJob(jobId, { showReview: showReviewRef.current, reviewJobId: reviewJobIdRef.current }, force)) {
+      console.debug("[SCRAPE_UI] ignored background staged-course load because review panel is open for another job", { backgroundJobId: jobId, openJobId: reviewJobIdRef.current });
+      return;
+    }
     loadStagedCourses(jobId);
   }, [loadStagedCourses]);
 
@@ -1093,9 +1097,10 @@ export default function Scraping() {
             // *different* job (e.g. cross-tab sync picked up another uni's
             // job and its poll just finished).  Mirror handleReviewReady's
             // guard so the two code paths are consistent.
-            const reviewAlreadyOpen = showReviewRef.current && reviewJobIdRef.current && reviewJobIdRef.current !== jobId;
-            if (!reviewAlreadyOpen) {
+            if (shouldLoadForBackgroundJob(jobId, { showReview: showReviewRef.current, reviewJobId: reviewJobIdRef.current })) {
               loadStagedCourses(jobId);
+            } else {
+              console.debug("[SCRAPE_UI] ignored background staged-course load because review panel is open for another job", { backgroundJobId: jobId, openJobId: reviewJobIdRef.current });
             }
           }
           // ETA tracking: clear start time when this URL finishes (next URL will reset it).
