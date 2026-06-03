@@ -478,6 +478,48 @@ def should_stage_course(
     if payload.get("domestic_only"):
         return (False, "domestic_only")
 
+    # Slug-name + empty-data rejection: catches pages that silently redirected
+    # to a "course not found" 404 during extraction.  When that happens the
+    # page has no useful H1/title, the course_name extractor returns [] and
+    # the orchestrator falls back to the URL slug ("ug-computing" →
+    # "Ug Computing"), and no other fields are populated.
+    # Enabled per-uni via staging.reject_slug_name_with_no_data: true.
+    # PGCE / PhD courses whose pages *did* load correctly also have slug-style
+    # prefixes but carry real fee/mode/duration data — they are kept because
+    # at least one of the four "any-data" fields will be non-null.
+    _reject_slug_empty = False
+    try:
+        from app.services.scraper.config.context import (  # noqa: PLC0415
+            get_uni_config as _get_uni_config_se,
+        )
+        _se_cfg = _get_uni_config_se()
+        if _se_cfg is not None and _se_cfg.extraction is not None:
+            _reject_slug_empty = bool(
+                getattr(_se_cfg.extraction.staging, "reject_slug_name_with_no_data", False)
+            )
+    except Exception:  # noqa: BLE001
+        pass
+    if _reject_slug_empty:
+        _SLUG_PREFIX_RE = re.compile(
+            r"^(?:ug|pg|ify|phd|edd|pgce)\s",
+            re.IGNORECASE,
+        )
+        if _SLUG_PREFIX_RE.match(effective_name):
+            _has_any_data = any([
+                payload.get("international_fee"),
+                payload.get("study_mode"),
+                payload.get("duration"),
+                payload.get("degree_level"),
+            ])
+            if not _has_any_data:
+                log.info(
+                    "[REJECT] course=%r url=%r — rejected (url_redirect_not_found): "
+                    "slug-derived name with no fee/mode/duration/degree_level; "
+                    "page likely redirected to a 404/course-not-found page.",
+                    effective_name, source_url,
+                )
+                return (False, "url_redirect_not_found")
+
     # Step 6 — Virtual-delivery location sanitisation.
     # "Online", "Distance Learning", "Remote", "Virtual" are study modes,
     # not physical campuses.  Clear course_location when it is purely a

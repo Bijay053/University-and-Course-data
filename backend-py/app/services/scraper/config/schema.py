@@ -1595,6 +1595,19 @@ class StagingConfig(BaseModel):
             "hasn't rendered yet)."
         ),
     )
+    reject_slug_name_with_no_data: bool = Field(
+        default=False,
+        description=(
+            "When True, reject courses whose name is clearly slug-derived (starts with "
+            "a URL-level prefix such as 'Ug ', 'Pg ', 'Ify ', 'Pgce ', 'Phd ', 'Edd ') "
+            "AND have zero meaningful data (international_fee, study_mode, duration, "
+            "and degree_level are all null).  This catches courses whose page silently "
+            "redirected to a '404 / course-not-found' page during extraction — the "
+            "extractor found no title/H1, the name fell back to the URL slug, and "
+            "nothing else was populated.  Courses that have even one data field "
+            "(e.g. PGCE courses with a fee) are kept."
+        ),
+    )
 
 
 # ── Top-level ExtractionConfig ───────────────────────────────────────────────

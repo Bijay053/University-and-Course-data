@@ -187,6 +187,14 @@ extraction:
     # /courses/(ug|pg|ify|phd|edd|pgce)- URLs, making the URL-based guard
     # sufficient to exclude non-course pages.
     skip_degree_qualifier_check: true
+    # Some Bath Spa course URLs in the sitemap resolve to
+    # /site-map/course-not-found/ at fetch time (discontinued courses).
+    # Those pages yield no fee/mode/duration/degree and the name falls back
+    # to the URL slug ("Ug Computing", "Pg Performance Directing" etc.).
+    # This flag rejects any course whose name starts with a slug-level prefix
+    # AND has zero data — PGCE/PhD courses that did load correctly still have
+    # a fee and are kept.
+    reject_slug_name_with_no_data: true
 
   default_course_location: Bath
   prefer_blended_over_on_campus: true
