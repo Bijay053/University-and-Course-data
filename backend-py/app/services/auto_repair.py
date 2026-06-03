@@ -304,13 +304,19 @@ def build_patched_config(
 
 # ── Applying the fix to the university (operator action) ──────────────────────
 
-async def apply_fix_to_university(suggestion_id: int, db: AsyncSession) -> dict:
-    """Apply the suggested fix to the university's config and mark the suggestion applied."""
-    from datetime import datetime, timezone
+async def apply_fix_to_university(
+    suggestion_id: int,
+    db: AsyncSession,
+    applied_by: str | None = None,
+) -> dict:
+    """Apply the suggested fix to the university's config and mark the suggestion applied.
 
+    Records a full audit trail: who applied it, the old and new scrape_config snapshots,
+    and the linked regression_alert_id for traceability.
+    """
     # 1. Load suggestion
     s_res = await db.execute(text("""
-        SELECT id, university_id, safe_fix, fix_yaml_snippet, status
+        SELECT id, university_id, safe_fix, fix_yaml_snippet, status, regression_alert_id
         FROM auto_repair_suggestions WHERE id = :sid
     """), {"sid": suggestion_id})
     s = dict(s_res.mappings().first() or {})
@@ -327,34 +333,55 @@ async def apply_fix_to_university(suggestion_id: int, db: AsyncSession) -> dict:
     if not uni_row:
         raise ValueError(f"University {s['university_id']} not found")
 
-    db_scrape_config = dict(uni_row.get("scrape_config") or {})
+    # Snapshot the old config BEFORE making any changes
+    old_config: dict = dict(uni_row.get("scrape_config") or {})
+    new_config: dict = dict(old_config)  # will be mutated below
 
     # 3. Apply safe_fix to admin_config in DB
     safe_fix = s.get("safe_fix")
     if safe_fix:
-        db_scrape_config = _apply_safe_fix_in_memory(db_scrape_config, safe_fix)
+        new_config = _apply_safe_fix_in_memory(old_config, safe_fix)
         await db.execute(text("""
             UPDATE universities SET scrape_config = :cfg WHERE id = :uid
-        """), {"cfg": json.dumps(db_scrape_config), "uid": s["university_id"]})
+        """), {"cfg": json.dumps(new_config), "uid": s["university_id"]})
 
     # 4. Apply YAML snippet to per-uni YAML file
     fix_yaml = s.get("fix_yaml_snippet")
     if fix_yaml and uni_row.get("scrape_url"):
         try:
             _apply_yaml_snippet_to_file(uni_row["scrape_url"], fix_yaml)
+            # Record the YAML patch in new_config for audit visibility
+            new_config["_yaml_patch_applied"] = fix_yaml
         except Exception as exc:
             log.warning("apply_fix: could not write YAML file: %s", exc)
 
-    # 5. Mark suggestion as applied
+    # 5. Mark suggestion as applied with full audit trail
     await db.execute(text("""
         UPDATE auto_repair_suggestions
-        SET status = 'applied', applied_at = NOW()
+        SET status      = 'applied',
+            applied_at  = NOW(),
+            applied_by  = :by,
+            old_config  = CAST(:old AS jsonb),
+            new_config  = CAST(:new AS jsonb)
         WHERE id = :sid
-    """), {"sid": suggestion_id})
+    """), {
+        "sid": suggestion_id,
+        "by":  applied_by or "admin",
+        "old": json.dumps(old_config),
+        "new": json.dumps(new_config),
+    })
 
     await db.commit()
-    log.info("auto_repair: applied suggestion %d for uni %d", suggestion_id, s["university_id"])
-    return {"id": suggestion_id, "status": "applied", "university_id": s["university_id"]}
+    log.info(
+        "auto_repair: applied suggestion %d for uni %d by %s",
+        suggestion_id, s["university_id"], applied_by or "admin",
+    )
+    return {
+        "id":           suggestion_id,
+        "status":       "applied",
+        "university_id": s["university_id"],
+        "applied_by":   applied_by or "admin",
+    }
 
 
 def _apply_yaml_snippet_to_file(scrape_url: str, snippet_yaml: str) -> None:
@@ -445,7 +472,7 @@ async def run_auto_repair_pipeline(
                     fix_recommendation = :rec,
                     risk_label = 'developer_required',
                     developer_note = :dnote,
-                    evidence = :evidence::jsonb,
+                    evidence = CAST(:evidence AS jsonb),
                     confidence = :conf
                 WHERE id = :sid
             """), {
@@ -496,10 +523,10 @@ async def run_auto_repair_pipeline(
                 root_cause_category = :category,
                 fix_recommendation = :rec,
                 fix_yaml_snippet = :fyaml,
-                safe_fix = :sfx::jsonb,
+                safe_fix = CAST(:sfx AS jsonb),
                 risk_label = :rlabel,
-                evidence = :evidence::jsonb,
-                validation_result = :vresult::jsonb,
+                evidence = CAST(:evidence AS jsonb),
+                validation_result = CAST(:vresult AS jsonb),
                 confidence = :conf
             WHERE id = :sid
         """), {
@@ -520,10 +547,20 @@ async def run_auto_repair_pipeline(
 
     except Exception as exc:
         log.error("auto_repair: pipeline failed for uni %d suggestion %d: %s", university_id, suggestion_id, exc)
+        fail_reason = str(exc)
+        # Classify the failure for the UI
+        if "GEMINI_API_KEY" in fail_reason or "Gemini" in fail_reason or "gemini" in fail_reason:
+            ui_summary = "Gemini AI call failed"
+        elif "validation" in fail_reason.lower():
+            ui_summary = "Validation failed"
+        else:
+            ui_summary = "Pipeline error"
         await db.execute(text("""
             UPDATE auto_repair_suggestions
-            SET status = 'failed', issue_summary = :msg
+            SET status       = 'failed',
+                issue_summary = :summary,
+                fail_reason  = :reason
             WHERE id = :sid
-        """), {"sid": suggestion_id, "msg": f"Pipeline error: {exc}"})
+        """), {"sid": suggestion_id, "summary": ui_summary, "reason": fail_reason})
         await db.commit()
         return suggestion_id

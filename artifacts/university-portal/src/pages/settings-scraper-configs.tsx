@@ -599,6 +599,7 @@ interface AutoRepairSuggestion {
   safe_fix:              { type: string; key: string; value?: unknown } | null;
   risk_label:            "low" | "medium" | "developer_required" | null;
   developer_note:        string | null;
+  fail_reason:           string | null;
   evidence:              { type: string; label: string; value: string; source: string }[];
   validation_result:     {
     before?: ValidationMetrics;
@@ -613,6 +614,9 @@ interface AutoRepairSuggestion {
   created_at:   string;
   applied_at:   string | null;
   dismissed_at: string | null;
+  applied_by:   string | null;
+  old_config:   Record<string, unknown> | null;
+  new_config:   Record<string, unknown> | null;
 }
 
 interface UniversityHealth {
@@ -2626,6 +2630,7 @@ export default function SettingsScraperConfigs() {
   const [repairSuggestions, setRepairSuggestions] = useState<Record<string, AutoRepairSuggestion[]>>({});
   const [repairEvidenceOpen, setRepairEvidenceOpen] = useState<Record<number, boolean>>({});
   const [repairApplying, setRepairApplying] = useState<Record<number, boolean>>({});
+  const [repairConfirmSid, setRepairConfirmSid] = useState<number | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [editorYaml, setEditorYaml] = useState("");
   const [savedYaml, setSavedYaml] = useState("");
@@ -2726,7 +2731,7 @@ export default function SettingsScraperConfigs() {
           .then(r => r.ok ? r.json() : null)
           .then(d => { if (d?.alerts) setRegressionAlerts(d.alerts as Record<string, RegressionAlert[]>); })
           .catch(() => { /* alerts are non-critical */ });
-        fetchWithAuth(`${BASE}/api/settings/auto-repair?university_ids=${idStr}&status=pending,ready,developer_required`)
+        fetchWithAuth(`${BASE}/api/settings/auto-repair?university_ids=${idStr}&status=pending,ready,developer_required,failed`)
           .then(r => r.ok ? r.json() : null)
           .then(d => { if (d?.suggestions) setRepairSuggestions(d.suggestions as Record<string, AutoRepairSuggestion[]>); })
           .catch(() => { /* repair suggestions are non-critical */ });
@@ -3829,7 +3834,7 @@ export default function SettingsScraperConfigs() {
               {selectedConfig?.university_id != null && (() => {
                 const uidStr = String(selectedConfig.university_id!);
                 const suggestions = (repairSuggestions[uidStr] ?? []).filter(
-                  s => s.status === "pending" || s.status === "ready" || s.status === "developer_required"
+                  s => s.status === "pending" || s.status === "ready" || s.status === "developer_required" || s.status === "failed"
                 );
                 if (suggestions.length === 0) return null;
                 const suggestion = suggestions[0]!;
@@ -3841,18 +3846,23 @@ export default function SettingsScraperConfigs() {
                 };
 
                 const refreshRepair = () => {
-                  fetchWithAuth(`${BASE}/api/settings/auto-repair?university_ids=${selectedConfig.university_id!}&status=pending,ready,developer_required`)
+                  fetchWithAuth(`${BASE}/api/settings/auto-repair?university_ids=${selectedConfig.university_id!}&status=pending,ready,developer_required,failed`)
                     .then(r => r.ok ? r.json() : null)
                     .then(d => { if (d?.suggestions) setRepairSuggestions(prev => ({ ...prev, ...d.suggestions })); })
                     .catch(() => {});
                 };
 
                 const doApply = async (sid: number) => {
+                  setRepairConfirmSid(null);
                   setRepairApplying(p => ({ ...p, [sid]: true }));
                   try {
-                    const r = await fetchWithAuth(`${BASE}/api/settings/auto-repair/${sid}/apply`, { method: "POST" });
+                    const r = await fetchWithAuth(`${BASE}/api/settings/auto-repair/${sid}/apply`, {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ applied_by: "admin" }),
+                    });
                     if (r.ok) {
-                      toast({ title: "Repair applied", description: "Config updated — trigger a new scrape to verify." });
+                      toast({ title: "Repair applied", description: "Config updated — trigger a new scrape to verify. Rollback available via old_config in audit log." });
                       refreshRepair();
                       void fetchConfigs();
                     } else {
@@ -3868,6 +3878,54 @@ export default function SettingsScraperConfigs() {
                   const r = await fetchWithAuth(`${BASE}/api/settings/auto-repair/${sid}/dismiss`, { method: "POST" });
                   if (r.ok) { refreshRepair(); toast({ title: "Suggestion dismissed" }); }
                 };
+
+                // ── FAILED ────────────────────────────────────────────────────────
+                if (suggestion.status === "failed") {
+                  const failLabel =
+                    suggestion.fail_reason?.includes("GEMINI_API_KEY") || suggestion.fail_reason?.includes("Gemini")
+                      ? "Gemini response failed"
+                      : suggestion.fail_reason?.toLowerCase().includes("validation")
+                        ? "Validation failed"
+                        : "Developer required — code fix needed";
+                  return (
+                    <div className="border-b bg-red-50 dark:bg-red-950/20">
+                      <div className="px-4 py-3 flex flex-col gap-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold text-red-700 dark:text-red-300">⚠ Auto Repair Failed</span>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded border font-semibold bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-400 border-red-300 dark:border-red-700">FAILED</span>
+                          </div>
+                          <button onClick={() => doDismiss(suggestion.id)} className="text-[10px] px-2 py-0.5 rounded border border-border bg-background hover:bg-muted transition-colors flex-shrink-0">Dismiss</button>
+                        </div>
+                        <div className="text-xs text-red-800 dark:text-red-200">
+                          <span className="font-semibold">Reason: </span>{failLabel}
+                        </div>
+                        {suggestion.fail_reason && (
+                          <div className="bg-red-100/70 dark:bg-red-900/30 rounded px-2.5 py-1.5 text-[10px] font-mono text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800 break-all line-clamp-3">
+                            {suggestion.fail_reason}
+                          </div>
+                        )}
+                        <button
+                          onClick={() => {
+                            fetchWithAuth(`${BASE}/api/settings/auto-repair/trigger`, {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ university_id: selectedConfig.university_id }),
+                            }).then(r => r.ok ? r.json() : null).then(d => {
+                              if (d?.task_id) {
+                                toast({ title: "AI Analysis queued", description: "Check back in ~30 seconds." });
+                                setTimeout(refreshRepair, 8000);
+                              }
+                            }).catch(() => {});
+                          }}
+                          className="self-start text-[11px] font-medium px-2.5 py-1 rounded border border-red-300 dark:border-red-700 bg-background hover:bg-red-50 dark:hover:bg-red-950/40 text-red-700 dark:text-red-300 transition-colors flex items-center gap-1"
+                        >
+                          <RotateCcw className="h-3 w-3" /> Run AI Analysis manually
+                        </button>
+                      </div>
+                    </div>
+                  );
+                }
 
                 // ── PENDING ───────────────────────────────────────────────────────
                 if (suggestion.status === "pending") {
@@ -4048,7 +4106,7 @@ export default function SettingsScraperConfigs() {
                       <div className="flex items-center gap-2 pt-0.5 flex-wrap">
                         {(safeFix != null || suggestion.fix_yaml_snippet) && (
                           <button
-                            onClick={() => doApply(suggestion.id)}
+                            onClick={() => setRepairConfirmSid(suggestion.id)}
                             disabled={repairApplying[suggestion.id]}
                             className={cn(
                               "flex items-center gap-1.5 text-[11px] font-medium px-3 py-1.5 rounded border transition-colors",
@@ -4058,7 +4116,7 @@ export default function SettingsScraperConfigs() {
                             {repairApplying[suggestion.id] ? (
                               <><div className="h-3 w-3 rounded-full border-2 border-white border-t-transparent animate-spin" />Applying…</>
                             ) : (
-                              <>✓ Apply Repair</>
+                              <>✓ Preview &amp; Apply</>
                             )}
                           </button>
                         )}
@@ -4075,6 +4133,121 @@ export default function SettingsScraperConfigs() {
                         </button>
                       </div>
                     </div>
+
+                    {/* ── Confirm Apply Modal ─────────────────────────────────── */}
+                    {repairConfirmSid === suggestion.id && (
+                      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" onClick={e => { if (e.target === e.currentTarget) setRepairConfirmSid(null); }}>
+                        <div className="bg-background border rounded-lg shadow-xl w-full max-w-lg max-h-[85vh] overflow-y-auto flex flex-col">
+                          <div className="px-5 py-4 border-b flex items-center justify-between">
+                            <div>
+                              <h3 className="text-sm font-semibold text-foreground">Confirm Repair Application</h3>
+                              <p className="text-[11px] text-muted-foreground mt-0.5">Review all changes before applying. This will modify the live university config.</p>
+                            </div>
+                            <button onClick={() => setRepairConfirmSid(null)} className="text-muted-foreground hover:text-foreground p-1"><X className="h-4 w-4" /></button>
+                          </div>
+
+                          <div className="px-5 py-4 space-y-4 flex-1">
+                            {/* Confidence + Risk */}
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className={cn("text-[10px] px-1.5 py-0.5 rounded border font-bold", confCls)}>{confLabel} CONFIDENCE</span>
+                              {suggestion.risk_label && suggestion.risk_label !== "developer_required" && (
+                                <span className={cn("text-[10px] px-1.5 py-0.5 rounded border font-semibold",
+                                  suggestion.risk_label === "low"
+                                    ? "bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300 border-green-300 dark:border-green-700"
+                                    : "bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700"
+                                )}>
+                                  {suggestion.risk_label.toUpperCase()} RISK
+                                </span>
+                              )}
+                              {suggestion.root_cause_category && (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded border bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-600 capitalize">
+                                  {suggestion.root_cause_category.replace(/_/g, " ")}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* What will change */}
+                            <div>
+                              <p className="text-[11px] font-semibold text-foreground mb-1.5">What will change</p>
+                              {safeFix && (
+                                <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded px-3 py-2 text-[11px] text-amber-800 dark:text-amber-200">
+                                  <span className="font-semibold">DB config change: </span>
+                                  {safeFix.type === "clear_admin_override"
+                                    ? `Remove admin override key: ${safeFix.key}`
+                                    : `Set ${safeFix.key} = ${JSON.stringify(safeFix.value)}`}
+                                </div>
+                              )}
+                              {suggestion.fix_yaml_snippet && (
+                                <div className="mt-1.5">
+                                  <p className="text-[10px] text-muted-foreground mb-1">YAML file change <span className="italic">(written to per-uni .yaml config)</span>:</p>
+                                  <pre className="bg-slate-900 text-green-400 text-[10px] rounded p-2.5 overflow-x-auto font-mono leading-relaxed whitespace-pre-wrap">{suggestion.fix_yaml_snippet}</pre>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Before / After */}
+                            {before && after && (
+                              <div>
+                                <p className="text-[11px] font-semibold text-foreground mb-1.5">Before → After (rule-based estimate)</p>
+                                <div className="rounded border overflow-hidden text-[11px]">
+                                  <div className="grid grid-cols-4 bg-muted text-muted-foreground font-semibold">
+                                    {["Metric","Before","After (est.)","Δ"].map(h => (
+                                      <div key={h} className="px-2.5 py-1.5 border-r last:border-r-0 border-border">{h}</div>
+                                    ))}
+                                  </div>
+                                  {([
+                                    ["Completeness", before.completeness,     after.completeness,    ],
+                                    ["Fee Coverage", before.fee_coverage,     after.fee_coverage,    ],
+                                    ["English",      before.english_coverage, after.english_coverage,],
+                                    ["Intake",       before.intake_coverage,  after.intake_coverage, ],
+                                  ] as [string, number, number][]).map(([m, bv, av]) => {
+                                    const d = av - bv;
+                                    return (
+                                      <div key={m} className="grid grid-cols-4 border-t border-border">
+                                        <div className="px-2.5 py-1.5 border-r border-border font-medium">{m}</div>
+                                        <div className="px-2.5 py-1.5 border-r border-border text-center text-muted-foreground">{bv}%</div>
+                                        <div className="px-2.5 py-1.5 border-r border-border text-center font-semibold text-emerald-700 dark:text-emerald-300">{av}%</div>
+                                        <div className={cn("px-2.5 py-1.5 text-center font-bold", d > 0 ? "text-green-600 dark:text-green-400" : d < 0 ? "text-red-500" : "text-muted-foreground")}>
+                                          {d > 0 ? "+" : ""}{d}%
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Rollback note */}
+                            <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded px-3 py-2 text-[11px] text-blue-800 dark:text-blue-200">
+                              <span className="font-semibold">Rollback: </span>
+                              The previous config snapshot is saved to <code className="font-mono bg-blue-100 dark:bg-blue-900/40 px-1 rounded">old_config</code> in the audit log.
+                              To roll back, paste the <code className="font-mono bg-blue-100 dark:bg-blue-900/40 px-1 rounded">old_config</code> JSON back into the university's <code className="font-mono bg-blue-100 dark:bg-blue-900/40 px-1 rounded">scrape_config</code> field.
+                            </div>
+                          </div>
+
+                          {/* Footer */}
+                          <div className="px-5 py-3 border-t flex items-center justify-end gap-2 bg-muted/30">
+                            <button
+                              onClick={() => setRepairConfirmSid(null)}
+                              className="text-[11px] px-3 py-1.5 rounded border border-border bg-background hover:bg-muted transition-colors"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              onClick={() => doApply(suggestion.id)}
+                              disabled={repairApplying[suggestion.id]}
+                              className="flex items-center gap-1.5 text-[11px] font-medium px-3 py-1.5 rounded border transition-colors bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-700 disabled:opacity-50"
+                            >
+                              {repairApplying[suggestion.id] ? (
+                                <><div className="h-3 w-3 rounded-full border-2 border-white border-t-transparent animate-spin" />Applying…</>
+                              ) : (
+                                <>✓ Confirm Apply</>
+                              )}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })()}

@@ -12,8 +12,9 @@ from __future__ import annotations
 import logging
 from typing import Annotated
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -24,6 +25,15 @@ log = logging.getLogger(__name__)
 router = APIRouter()
 
 _DEFAULT_STATUSES = "pending,ready,developer_required"
+
+
+class _ApplyBody(BaseModel):
+    applied_by: str | None = None
+
+
+class _TriggerBody(BaseModel):
+    university_id: int
+    regression_alert_id: int | None = None
 
 
 def _row_to_dict(row: dict) -> dict:
@@ -39,6 +49,7 @@ def _row_to_dict(row: dict) -> dict:
         "safe_fix":            row["safe_fix"],
         "risk_label":          row["risk_label"],
         "developer_note":      row["developer_note"],
+        "fail_reason":         row.get("fail_reason"),
         "evidence":            row["evidence"] if isinstance(row["evidence"], list) else [],
         "validation_result":   vr,
         "confidence":          row["confidence"],
@@ -46,6 +57,9 @@ def _row_to_dict(row: dict) -> dict:
         "created_at":          row["created_at"].isoformat() if row["created_at"] else None,
         "applied_at":          row["applied_at"].isoformat()   if row["applied_at"]   else None,
         "dismissed_at":        row["dismissed_at"].isoformat() if row["dismissed_at"] else None,
+        "applied_by":          row.get("applied_by"),
+        "old_config":          row.get("old_config"),
+        "new_config":          row.get("new_config"),
     }
 
 
@@ -74,8 +88,9 @@ async def list_auto_repair(
             id, university_id, regression_alert_id,
             issue_summary, root_cause_category, fix_recommendation,
             fix_yaml_snippet, safe_fix, risk_label, developer_note,
-            evidence, validation_result, confidence,
-            status, created_at, applied_at, dismissed_at
+            fail_reason, evidence, validation_result, confidence,
+            status, created_at, applied_at, dismissed_at,
+            applied_by, old_config, new_config
         FROM auto_repair_suggestions
         WHERE university_id = ANY(:ids)
           AND status        = ANY(:statuses)
@@ -97,11 +112,17 @@ async def apply_repair(
     suggestion_id: int,
     _user: Annotated[dict, Depends(require_permission("settings.edit"))],
     db: Annotated[AsyncSession, Depends(get_db)],
+    body: _ApplyBody = _ApplyBody(),
 ) -> JSONResponse:
-    """Apply the proposed fix to the university's config."""
+    """Apply the proposed fix to the university's config.
+
+    Pass ``{"applied_by": "..."}`` in the JSON body to record who triggered the apply.
+    Falls back to the session user email if omitted.
+    """
     from app.services.auto_repair import apply_fix_to_university
+    actor = body.applied_by or (_user.get("email") if isinstance(_user, dict) else None) or "admin"
     try:
-        result = await apply_fix_to_university(suggestion_id, db)
+        result = await apply_fix_to_university(suggestion_id, db, applied_by=actor)
         return JSONResponse(content=result)
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
@@ -128,13 +149,12 @@ async def dismiss_repair(
 
 @router.post("/auto-repair/trigger")
 async def trigger_repair(
+    body: _TriggerBody,
     _user: Annotated[dict, Depends(require_permission("settings.edit"))],
     db: Annotated[AsyncSession, Depends(get_db)],
-    university_id: int = Body(...),
-    regression_alert_id: int | None = Body(default=None),
 ) -> JSONResponse:
     """Manually trigger the auto-repair pipeline for a university (runs async)."""
     from app.tasks.auto_repair_task import generate_repair_suggestion
 
-    task = generate_repair_suggestion.delay(university_id, regression_alert_id)
-    return JSONResponse(content={"task_id": task.id, "university_id": university_id, "status": "queued"})
+    task = generate_repair_suggestion.delay(body.university_id, body.regression_alert_id)
+    return JSONResponse(content={"task_id": task.id, "university_id": body.university_id, "status": "queued"})
