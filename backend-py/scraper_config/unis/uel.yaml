@@ -91,11 +91,41 @@ discovery:
     - "/undergraduate/"
     - "/postgraduate/courses/"
 
+  # Block specific UEL URL segments that pass the must_contain filter but are
+  # NOT individual course detail pages:
+  #   - /funding, /scholarships, /bursaries  → money-info hub pages
+  #     (e.g. "Funding for Undergraduate Students", "Funding for Postgraduate Students")
+  #   - /fees                                → tuition-fee overview page
+  #   - /entry-requirements                  → generic requirements hub
+  #   - /study-online                        → online study landing page
+  # These are blocked HERE (rather than in block_nav_patterns) because they
+  # pass the /undergraduate/ or /postgraduate/courses/ must_contain filter
+  # and only get caught later at staging_gate. Blocking them at URL level is
+  # cheaper and keeps staging_gate logs clean.
+  block_url_patterns:
+    - "/funding"
+    - "/scholarships"
+    - "/bursaries"
+    - "/fees"
+    - "/entry-requirements$"
+    - "/study-online"
+
 extraction:
   course_name:
     university_aliases:
       - "University of East London"
       - "UEL"
+
+  staging:
+    # UEL course pages surface the course name from JSON metadata (SPA-style
+    # rendering) WITHOUT a leading degree qualifier. Examples:
+    #   "Accounting and Finance"           (BSc implied by URL /undergraduate/...)
+    #   "Bcs Foundation Certificate in Agile"  (BCS = British Computer Society qual)
+    #   "Primary with Early Years (3-7) Pgce"  (trailing abbreviation)
+    # The standard _name_has_degree_qualifier check rejects these as
+    # category_landing_page. The block_url_patterns above gate non-course pages
+    # instead; this check is redundant and causes false positives for UEL.
+    skip_degree_qualifier_check: true
 
   filters:
     domestic_only:
