@@ -1,0 +1,121 @@
+# Coventry University Group
+# Hostname: www.coventry.ac.uk
+# Country: United Kingdom | Currency: GBP
+#
+# Campus structure (5 sub-sitemaps in sitemapindex.xml):
+#   cul     — CU London     (Dagenham / Greenwich)
+#   cuc     — CU Coventry   (Coventry, shared city campus)
+#   cus     — CU Scarborough
+#   london  — Coventry University London (separate entity, Goswell Road)
+#   wroclaw — Coventry University Wroclaw (Poland)
+#
+# Discovery problem (observed 2026-06-03):
+#   Every sub-sitemap mixes real course pages with outreach pages, staff
+#   directories, student stories, events, news, FAQs, legal docs, and
+#   scholarship/finance pages.  Without this config the scraper spent
+#   Gemini tokens + browser rescues on pages like:
+#     /cul/study/outreach/future-grads/
+#     /cul/study/outreach/widening-participation/
+#     /cul/study/outreach/parents-and-supporters/
+#     /cul/study/order-a-prospectus/
+#     /cul/study/programme-specifications/
+#     /london/study/staff-directory/dept/person-name/
+#     /wroclaw/study/talent-team/book-an-appointment/
+#     …and ~130 similar non-course URLs.
+#
+# Fix: every genuine course page across ALL campuses lives under
+# /course-structure/ — this is true for main, cul, cuc, cus, and wroclaw.
+# allow_url_patterns restricts extraction to those URLs only.
+# block_url_patterns adds an extra safety net for any edge cases.
+#
+# London campus note: the /london/ sub-sitemap exposes only support/staff
+# pages (no /london/course-structure/ URLs found in the sitemap).  London
+# campus courses appear to be served exclusively through the main
+# Coventry course finder (course-finder/?course_categories) which already
+# produces /course-structure/ URLs.  If London-specific URLs are later
+# identified, add them to allow_url_patterns below.
+
+discovery:
+  auto_api_discovery: false
+  always_sitemap_supplement: true
+  bfs_page_budget: 30
+  max_candidates: 500
+  expected_min_courses: 80
+
+  # Only extract URLs that sit under /course-structure/ — covers:
+  #   /course-structure/ug/<faculty>/<slug>/     (main Coventry campus)
+  #   /course-structure/pg/<faculty>/<slug>/     (main Coventry campus)
+  #   /course-structure/pg-research/<slug>/      (main Coventry campus)
+  #   /cul/course-structure/<level>/<slug>/      (CU London)
+  #   /cuc/course-structure/<level>/<slug>/      (CU Coventry)
+  #   /cus/course-structure/<level>/<slug>/      (CU Scarborough)
+  #   /wroclaw/course-structure/<level>/<slug>/  (CU Wroclaw)
+  allow_url_patterns:
+    - /course-structure/
+
+  # Belt-and-suspenders blocks for the most common non-course sections.
+  # These are already excluded by allow_url_patterns but kept here so a
+  # future removal of allow_url_patterns does not silently re-admit them.
+  block_url_patterns:
+    - /study/outreach/
+    - /study/order-a-prospectus/
+    - /study/download-your-prospectus/
+    - /study/programme-specifications/
+    - /study/enrolment
+    - /study/funding-and-finance/
+    - /study/fees-and-finance/
+    - /study/the-financial-bits
+    - /study/sports-scholarships
+    - /study/your-offer/
+    - /study/when-you-arrive/
+    - /study/welcome-students/
+    - /study/meet-us/
+    - /study/virtual-tour/
+    - /study/5-reasons-to-choose
+    - /study/what-is-the-cu
+    - /study/what-is-cu-
+    - /study/get-qualified/
+    - /study/study-a-part-time-degree/
+    - /study/part-time/
+    - /study/full-time/
+    - /study/professional-courses/
+    - /study/higher-technical-qualifications/
+    - /study/top-up-degrees/
+    - /study/foundation-years/
+    - /study/courses-designed-to-suit-you/
+    - /study/faqs/
+    - /study/case-studies/
+    - /study/academic-timetable/
+    - /study/talent-team/
+    - /study/employability/
+    - /study/apply-for-a-scholarship/
+    - /study/staff-directory/
+    - /study/staff-profiles/
+    - /study/student-stories/
+    - /study/our-courses/guide-to-ucas
+    - /study/our-courses/pre-sessional-english
+    - /study/our-courses/ug-september-
+    - /about-us/
+    - /life-at-cul/
+    - /life-at-cuc/
+    - /news/
+    - /news-and-events/
+    - /cu-london-news/
+    - /events/
+    - /events-calendar
+    - /legal-documents/
+    - /international/visas
+    - /about-scarborough-campus/
+
+extraction:
+  fees:
+    default_currency: GBP
+    prefer_international: true
+    prefer_annual_over_total: true
+
+  intake:
+    start_dates_only: true
+
+  staging:
+    reject_if_missing:
+      - course_name
