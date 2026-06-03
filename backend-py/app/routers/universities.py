@@ -1209,6 +1209,31 @@ async def post_test_discovery(
                     return True
         return False
 
+    _LISTING_HINTS_TD = (
+        "/courses", "/programmes", "/programs", "/find-a-course",
+        "/browse-courses", "/search-courses", "/study-areas",
+        "/our-courses", "/all-courses", "/course-search",
+        "courses.html", "courses.aspx",
+    )
+    _CATEGORY_HINTS_TD = (
+        "/faculty/", "/faculties/", "/school/", "/schools/",
+        "/department/", "/departments/", "/subject/",
+        "/discipline/", "/area-of-study/", "/college/",
+    )
+
+    def _classify_url_type(url: str) -> str:
+        lurl = url.lower().split("?")[0].rstrip("/")
+        # Listing: broad course-index pages
+        if any(lurl.endswith(h.rstrip("/")) or h in lurl for h in _LISTING_HINTS_TD):
+            return "listing"
+        # Category: faculty/school/department hub pages
+        if any(h in lurl for h in _CATEGORY_HINTS_TD):
+            return "category"
+        # Course: individual course-detail URL patterns
+        if _quick_course(url, ""):
+            return "course"
+        return "other"
+
     u: University | None = await db.get(University, uni_id)
     if not u:
         raise HTTPException(status_code=404, detail="University not found")
@@ -1309,6 +1334,14 @@ async def post_test_discovery(
                 all_raw_set.update(candidates)
                 all_pass_set.update(passing)
 
+                # Classify passing URLs by page type
+                _type_groups: dict[str, list[str]] = {
+                    "course": [], "listing": [], "category": [], "other": []
+                }
+                for _pu in passing:
+                    _type_groups[_classify_url_type(_pu)].append(_pu)
+                _classified_passing = {k: v[:8] for k, v in _type_groups.items() if v}
+
                 sr: dict = {
                     "seed_url": seed_url,
                     "status_code": resp.status_code,
@@ -1318,6 +1351,10 @@ async def post_test_discovery(
                     "drop_rate_pct": round(drop_r * 100),
                     "sample_passing": passing[:6],
                     "sample_dropped": dropped[:6],
+                    "classified_passing": _classified_passing,
+                    "course_count": len(_type_groups["course"]),
+                    "listing_count": len(_type_groups["listing"]),
+                    "category_count": len(_type_groups["category"]),
                     "ok": resp.status_code < 400,
                 }
 
@@ -1535,6 +1572,155 @@ async def post_test_discovery(
             "allow_url_patterns": allow_pats,
             "must_contain": mc_patterns,
             "block_url_patterns": block_pats,
+        },
+    }
+
+
+@router.post("/universities/{uni_id}/full-validation")
+async def post_full_validation(
+    uni_id: int,
+    body: dict,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[dict, Depends(get_current_user)],
+) -> dict:
+    """Test up to 5 URLs through the full filter→classify→extract pipeline (read-only).
+
+    Takes a JSON body ``{"urls": ["https://...", ...]}`` (max 5 URLs).
+    For each URL fetches the page, applies the current effective filter config,
+    classifies the page type, and probes for course-data keywords to estimate
+    how extractable the page is.  Nothing is written to the database.
+    """
+    import httpx as _httpx_fv
+    import re as _re_fv
+    from urllib.parse import urlparse as _up_fv
+
+    urls: list[str] = [
+        u for u in (body.get("urls") or [])
+        if isinstance(u, str) and u.strip()
+    ][:5]
+    if not urls:
+        return {"ok": False, "error": "No URLs provided"}
+
+    u_obj: University | None = await db.get(University, uni_id)
+    if not u_obj:
+        raise HTTPException(status_code=404, detail="University not found")
+
+    allow_pats: list[str] = []
+    block_pats: list[str] = []
+    mc_patterns: list[str] = []
+    try:
+        from app.services.scraper.config.loader import get_config_for_host as _gcfh_fv
+        _h_fv = (_up_fv(u_obj.scrape_url or "").hostname or "")
+        _uc_fv = _gcfh_fv(
+            hostname=_h_fv, name=u_obj.name or "",
+            scrape_url=u_obj.scrape_url or "",
+            university_id=u_obj.id,
+            db_scrape_config=dict(u_obj.scrape_config or {}),
+        )
+        allow_pats = list(_uc_fv.discovery.allow_url_patterns or [])
+        block_pats = list(_uc_fv.discovery.block_url_patterns or [])
+        mc_patterns = list(_uc_fv.discovery.must_contain or [])
+    except Exception:
+        pass
+
+    c_allow = [_re_fv.compile(p, _re_fv.IGNORECASE) for p in allow_pats if p]
+    c_block = [_re_fv.compile(p, _re_fv.IGNORECASE) for p in block_pats if p]
+    c_mc = [m.lower() for m in mc_patterns if m]
+
+    def _fv_passes(url: str) -> bool:
+        ul = url.lower()
+        if c_allow and not any(pat.search(url) for pat in c_allow):
+            return False
+        if c_mc and not any(m in ul for m in c_mc):
+            return False
+        if c_block and any(pat.search(url) for pat in c_block):
+            return False
+        return True
+
+    _COURSE_KWS = [
+        "bachelor", "master", "doctor", "phd", "diploma", "certificate",
+        "degree", "graduate", "undergraduate", "ielts", "tuition fee",
+        "intake", "duration", "study mode", "full-time", "part-time",
+        "international student", "credit point",
+    ]
+
+    _LISTING_P = ("/courses", "/programmes", "/programs", "/find-a-course")
+    _CATEGORY_P = ("/faculty/", "/school/", "/department/", "/discipline/")
+
+    def _fv_classify(url: str, kws_found: list[str]) -> str:
+        lurl = url.lower().split("?")[0]
+        if any(lurl.rstrip("/").endswith(h.rstrip("/")) or h in lurl for h in _LISTING_P):
+            return "listing"
+        if any(h in lurl for h in _CATEGORY_P):
+            return "category"
+        degree_kws = {"bachelor", "master", "doctor", "phd", "diploma", "certificate", "degree"}
+        if any(kw in lurl for kw in degree_kws):
+            return "course"
+        if len(kws_found) >= 4:
+            return "course"
+        return "unknown"
+
+    results = []
+    async with _httpx_fv.AsyncClient(
+        headers={"User-Agent": "Mozilla/5.0 (compatible; UniPortalBot/1.0)"},
+        follow_redirects=True,
+        timeout=12.0,
+    ) as _cl:
+        for url in urls:
+            passes = _fv_passes(url)
+            blocked_by: str | None = None
+            if c_allow and not any(pat.search(url) for pat in c_allow):
+                blocked_by = "allow_url_patterns"
+            elif c_mc and not any(m in url.lower() for m in c_mc):
+                blocked_by = "must_contain"
+            elif c_block and any(pat.search(url) for pat in c_block):
+                blocked_by = "block_url_patterns"
+
+            try:
+                resp_fv = await _cl.get(url)
+                text_lc = resp_fv.text.lower()[:60000]
+                kws_found = [kw for kw in _COURSE_KWS if kw in text_lc]
+                page_type = _fv_classify(url, kws_found)
+                completeness_est = min(100, int(len(kws_found) / len(_COURSE_KWS) * 100 * 1.6))
+                results.append({
+                    "url": url,
+                    "passes_filter": passes,
+                    "blocked_by": blocked_by,
+                    "status_code": resp_fv.status_code,
+                    "page_type": page_type,
+                    "keywords_found": kws_found,
+                    "estimated_completeness_pct": completeness_est,
+                    "ok": resp_fv.status_code < 400,
+                    "text_length": len(resp_fv.text),
+                })
+            except Exception as _exc_fv:
+                results.append({
+                    "url": url,
+                    "passes_filter": passes,
+                    "blocked_by": blocked_by,
+                    "status_code": 0,
+                    "page_type": "unknown",
+                    "keywords_found": [],
+                    "estimated_completeness_pct": 0,
+                    "ok": False,
+                    "error": str(_exc_fv)[:120],
+                    "text_length": 0,
+                })
+
+    course_results = [r for r in results if r["page_type"] == "course" and r["ok"]]
+    avg_comp = (
+        round(sum(r["estimated_completeness_pct"] for r in course_results) / len(course_results))
+        if course_results else 0
+    )
+    return {
+        "ok": True,
+        "results": results,
+        "summary": {
+            "total": len(results),
+            "passed_filter": sum(1 for r in results if r["passes_filter"]),
+            "course_pages": sum(1 for r in results if r["page_type"] == "course"),
+            "listing_pages": sum(1 for r in results if r["page_type"] == "listing"),
+            "avg_course_completeness_pct": avg_comp,
         },
     }
 
@@ -3423,6 +3609,57 @@ async def ai_root_cause_analysis(
     except Exception as _e:
         eff_cfg_summary = {"load_error": str(_e)}
 
+    # ── 9. Historical URL simulation against CURRENT config ──────────────────
+    # Simulates the current active filter against historical course URLs so the
+    # AI sees whether the *current* config's filter is the problem — even if the
+    # last scrape ran with a different (older) config.
+    hist_sim_summary: dict = {}
+    try:
+        import re as _re_sim
+
+        _sim_allow = [
+            _re_sim.compile(p, _re_sim.IGNORECASE)
+            for p in eff_cfg_summary.get("allow_url_patterns", [])
+            if p
+        ]
+        _sim_block = [
+            _re_sim.compile(p, _re_sim.IGNORECASE)
+            for p in eff_cfg_summary.get("block_url_patterns", [])
+            if p
+        ]
+        _sim_mc = [m.lower() for m in eff_cfg_summary.get("must_contain", []) if m]
+
+        def _sim_passes(url: str) -> bool:
+            ul = url.lower()
+            if _sim_allow and not any(pat.search(url) for pat in _sim_allow):
+                return False
+            if _sim_mc and not any(m in ul for m in _sim_mc):
+                return False
+            if _sim_block and any(pat.search(url) for pat in _sim_block):
+                return False
+            return True
+
+        _hist_url_res = await db.execute(
+            text(
+                "SELECT DISTINCT course_website FROM scraped_courses "
+                "WHERE university_id = :uid AND course_website IS NOT NULL LIMIT 200"
+            ),
+            {"uid": uni_id},
+        )
+        _hist_urls = [r[0] for r in _hist_url_res if r[0]]
+        if _hist_urls:
+            _hist_pass = sum(1 for _hu in _hist_urls if _sim_passes(_hu))
+            _hist_pass_pct = round(_hist_pass / len(_hist_urls) * 100)
+            hist_sim_summary = {
+                "total": len(_hist_urls),
+                "passing": _hist_pass,
+                "blocked": len(_hist_urls) - _hist_pass,
+                "pass_pct": _hist_pass_pct,
+                "has_filters": bool(_sim_allow or _sim_block or _sim_mc),
+            }
+    except Exception as _sim_e:
+        hist_sim_summary = {"error": str(_sim_e)[:100]}
+
     # ── Build context document ───────────────────────────────────────────────
     lines: list[str] = []
 
@@ -3494,6 +3731,36 @@ async def ai_root_cause_analysis(
             lines.append(f"  Version {h['id']} saved {h['saved_at']} by {h.get('saved_by') or 'system'}:")
             lines.append(f"  {h['yaml_preview']!r}")
 
+    # Staleness note — config saved after the last scrape ran
+    _last_job_ts = str(jobs[0]["created_at"])[:19] if jobs else None
+    _cfg_saved_ts = str(config_history[0]["saved_at"])[:19] if config_history else None
+    _config_is_stale = bool(_last_job_ts and _cfg_saved_ts and _cfg_saved_ts > _last_job_ts)
+    if _config_is_stale:
+        lines.append(
+            f"\n=== CONFIG STALENESS WARNING ===\n"
+            f"The last scrape ran at {_last_job_ts} but the config was last saved at {_cfg_saved_ts} — "
+            f"AFTER the scrape. All scrape statistics above reflect the OLD config.\n"
+            f"The CURRENT FILTER SIMULATION below shows what the current config actually does. "
+            f"Weight that evidence heavily and be explicit that the job data is stale."
+        )
+
+    # Current filter simulation (always include when historical URLs are available)
+    if hist_sim_summary and "error" not in hist_sim_summary and hist_sim_summary.get("total", 0) > 0:
+        _pct = hist_sim_summary["pass_pct"]
+        _verdict = (
+            f"IMPORTANT: {_pct}% of historical course URLs PASS the current filter — "
+            "the filter is NOT causing the problem. Root cause is in extraction, staging gate, or "
+            "JS rendering, NOT in URL filtering."
+            if _pct >= 60 else
+            f"IMPORTANT: Only {_pct}% of historical course URLs pass the current filter — "
+            "the current filter is likely blocking too many courses."
+        )
+        lines.append(
+            f"\n=== CURRENT FILTER SIMULATION (current config vs {hist_sim_summary['total']} historical URLs) ===\n"
+            f"  Passing: {hist_sim_summary['passing']}  Blocked: {hist_sim_summary['blocked']}  ({_pct}% pass rate)\n"
+            f"  {_verdict}"
+        )
+
     context_doc = "\n".join(lines)
 
     # ── Call Gemini ──────────────────────────────────────────────────────────
@@ -3520,6 +3787,8 @@ STRICT RULES:
    Never suggest safe_fix for issues that require code changes.
 5. risk_label = "developer_required" when the fix needs: changing Python extractors/regex, adding a new provider, fixing a runtime exception, or changing discovery browser logic.
 6. fix_yaml_snippet: only include YAML that belongs in the per-uni YAML config file (discovery or extraction section). Keep it under 10 lines. null if not applicable.
+7. CURRENT FILTER SIMULATION is ground truth for the active config. If it shows ≥60% pass rate, the filter is working — do NOT set root_cause_category to "filtering". Focus on extraction (missing selectors, JS rendering), staging gate (completeness threshold), or config conflicts instead.
+8. If CONFIG STALENESS WARNING is present, the job statistics reflect an old config. Rely on CURRENT FILTER SIMULATION for filter behaviour and be explicit that the job data is stale.
 
 OPERATIONAL DATA:
 {context_doc}
@@ -3568,9 +3837,15 @@ Include 3-8 evidence items. safe_fix and fix_yaml_snippet may be null. developer
         else:
             raise HTTPException(status_code=502, detail=f"Gemini returned non-JSON: {raw_text[:300]}")
 
-    result["university_id"]   = uni_id
-    result["university_name"] = uni.name
-    result["last_job_id"]     = last_job_id
+    result["university_id"]        = uni_id
+    result["university_name"]      = uni.name
+    result["last_job_id"]          = last_job_id
+    result["last_job_created_at"]  = _last_job_ts
+    result["config_last_saved_at"] = _cfg_saved_ts
+    result["config_is_stale"]      = _config_is_stale
+    result["filter_sim"]           = (
+        hist_sim_summary if hist_sim_summary and "error" not in hist_sim_summary else None
+    )
     result["context_used"]    = [
         "university_info", "last_scrape_job", "scraped_courses_summary",
         "rejection_log", "discovery_events", "scrape_run_alerts",

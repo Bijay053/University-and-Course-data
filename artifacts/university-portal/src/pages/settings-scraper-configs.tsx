@@ -868,6 +868,69 @@ interface AiRootCauseResult {
   university_id: number;
   university_name: string;
   last_job_id: string | null;
+  last_job_created_at: string | null;
+  config_last_saved_at: string | null;
+  config_is_stale: boolean;
+  filter_sim: { total: number; passing: number; blocked: number; pass_pct: number; has_filters: boolean } | null;
+}
+
+interface TestDiscoveryUrlResult {
+  seed_url: string;
+  status_code: number;
+  raw_candidates: number;
+  after_filter: number;
+  dropped: number;
+  drop_rate_pct: number;
+  sample_passing: string[];
+  sample_dropped: string[];
+  classified_passing: Record<string, string[]>;
+  course_count: number;
+  listing_count: number;
+  category_count: number;
+  ok: boolean;
+  error?: string;
+  warning?: string;
+}
+
+interface TestDiscoveryResult {
+  ok: boolean;
+  error?: string;
+  total_raw: number;
+  total_passing: number;
+  total_dropped: number;
+  agg_drop_rate_pct: number;
+  warnings: string[];
+  safety_score: number;
+  safety_level: "safe" | "warning" | "dangerous";
+  agg_status: "ok" | "warning" | "critical";
+  seed_results: TestDiscoveryUrlResult[];
+  filter_config: { allow_url_patterns: string[]; must_contain: string[]; block_url_patterns: string[] };
+}
+
+interface FullValidationUrlResult {
+  url: string;
+  passes_filter: boolean;
+  blocked_by: string | null;
+  status_code: number;
+  page_type: "course" | "listing" | "category" | "unknown";
+  keywords_found: string[];
+  estimated_completeness_pct: number;
+  ok: boolean;
+  error?: string;
+  text_length?: number;
+}
+
+interface FullValidationResult {
+  ok: boolean;
+  error?: string;
+  results: FullValidationUrlResult[];
+  summary: {
+    total: number;
+    passed_filter: number;
+    course_pages: number;
+    listing_pages: number;
+    avg_course_completeness_pct: number;
+  };
 }
 
 const TERMINAL_STATUSES: JobStatus[] = ["done", "awaiting_approval", "failed", "cancelled"];
@@ -1762,8 +1825,17 @@ interface DebuggerPanelProps {
   aiAnalysis: AiRootCauseResult | null;
   aiAnalysisLoading: boolean;
   aiAnalysisApplying: boolean;
+  fixJustApplied: boolean;
   onRunAiAnalysis: () => void;
   onApplySafeFix: (fix: AiSafeFix) => void;
+  // Live Test Discovery (Item 4)
+  testDiscoveryResult: TestDiscoveryResult | null;
+  testDiscoveryLoading: boolean;
+  onRunTestDiscovery: () => void;
+  // Full Validation (Item 3)
+  fullValidationResult: FullValidationResult | null;
+  fullValidationLoading: boolean;
+  onRunFullValidation: (urls: string[]) => void;
 }
 
 function DebuggerPanel({
@@ -1774,9 +1846,13 @@ function DebuggerPanel({
   scrapedCourses, scrapedCoursesLoading, extractionTrace, extractionTraceLoading,
   selectedCourseId, setSelectedCourseId, onLoadExtractionTrace,
   discoveryStats, discoveryStatsLoading, testUrl, setTestUrl, urlTestResult, urlTestLoading, onTestUrl,
-  aiAnalysis, aiAnalysisLoading, aiAnalysisApplying, onRunAiAnalysis, onApplySafeFix,
+  aiAnalysis, aiAnalysisLoading, aiAnalysisApplying, fixJustApplied,
+  onRunAiAnalysis, onApplySafeFix,
+  testDiscoveryResult, testDiscoveryLoading, onRunTestDiscovery,
+  fullValidationResult, fullValidationLoading, onRunFullValidation,
 }: DebuggerPanelProps) {
   const [aiEvidenceExpanded, setAiEvidenceExpanded] = useState(false);
+  const [tdExpandedSeeds, setTdExpandedSeeds] = useState<Record<number, boolean>>({});
 
   if (!uniId) {
     return (
@@ -2395,6 +2471,207 @@ function DebuggerPanel({
                 )}
               </div>
             )}
+
+            {/* ── Live Test Discovery ───────────────────────────────────────── */}
+            <div className="border rounded-md overflow-hidden">
+              <div className="flex items-center justify-between px-3 py-2 border-b bg-muted/30 text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
+                <span className="flex items-center gap-1.5"><Search className="h-3.5 w-3.5" /> Live Test Discovery</span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 text-xs px-3"
+                  onClick={onRunTestDiscovery}
+                  disabled={testDiscoveryLoading}
+                >
+                  {testDiscoveryLoading
+                    ? <><Loader2 className="h-3 w-3 mr-1 animate-spin" />Testing…</>
+                    : <><Play className="h-3 w-3 mr-1" />Run Test</>}
+                </Button>
+              </div>
+              {!testDiscoveryResult && !testDiscoveryLoading && (
+                <p className="text-xs text-muted-foreground px-3 py-3">
+                  Fetches seed URLs using the <em>current</em> config and classifies found links as course / listing / category pages.
+                </p>
+              )}
+              {testDiscoveryLoading && (
+                <div className="px-3 py-4 flex items-center gap-2 text-xs text-muted-foreground">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Fetching seed pages…
+                </div>
+              )}
+              {!testDiscoveryLoading && testDiscoveryResult && (() => {
+                const td = testDiscoveryResult;
+                const safetyColors = {
+                  safe: "bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-300",
+                  warning: "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300",
+                  dangerous: "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300",
+                };
+                return (
+                  <div className="divide-y">
+                    {/* Aggregated totals */}
+                    <div className="px-3 py-2 flex flex-wrap gap-3 text-xs">
+                      <span className="font-medium">{td.total_raw} raw</span>
+                      <span className="text-green-700 dark:text-green-400 font-medium">→ {td.total_passing} passed filter</span>
+                      {td.total_dropped > 0 && (
+                        <span className="text-red-600 dark:text-red-400">{td.agg_drop_rate_pct}% dropped</span>
+                      )}
+                      <span className={cn("ml-auto inline-flex items-center rounded px-2 py-0.5 text-[11px] font-medium", safetyColors[td.safety_level])}>
+                        {td.safety_level === "safe" ? "✅" : td.safety_level === "warning" ? "⚠️" : "🛑"} Score {td.safety_score}
+                      </span>
+                    </div>
+                    {/* Per-seed results */}
+                    {td.seed_results.map((sr, i) => (
+                      <div key={i} className="px-3 py-2 text-xs space-y-1.5">
+                        <div
+                          className="flex items-center justify-between cursor-pointer"
+                          onClick={() => setTdExpandedSeeds(s => ({ ...s, [i]: !s[i] }))}
+                        >
+                          <code className="font-mono text-[11px] truncate flex-1 text-muted-foreground max-w-xs">{sr.seed_url}</code>
+                          <div className="flex items-center gap-2 ml-2 flex-shrink-0">
+                            <span className="text-green-600 dark:text-green-400">{sr.after_filter} pass</span>
+                            {sr.drop_rate_pct > 0 && <span className="text-orange-600">{sr.drop_rate_pct}% drop</span>}
+                            {/* Page type counts */}
+                            {sr.course_count > 0 && <span className="px-1.5 py-0.5 bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 rounded text-[10px]">{sr.course_count} course</span>}
+                            {sr.listing_count > 0 && <span className="px-1.5 py-0.5 bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 rounded text-[10px]">{sr.listing_count} listing</span>}
+                            {sr.category_count > 0 && <span className="px-1.5 py-0.5 bg-purple-100 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 rounded text-[10px]">{sr.category_count} cat</span>}
+                            {tdExpandedSeeds[i]
+                              ? <ChevronUp className="h-3 w-3 text-muted-foreground" />
+                              : <ChevronDown className="h-3 w-3 text-muted-foreground" />}
+                          </div>
+                        </div>
+                        {tdExpandedSeeds[i] && (
+                          <div className="space-y-1.5 pl-2 border-l border-muted">
+                            {Object.entries(sr.classified_passing).map(([type, urls]) => (
+                              <div key={type}>
+                                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-0.5 capitalize">{type} ({urls.length})</p>
+                                <div className="space-y-0.5">
+                                  {urls.map((url, j) => (
+                                    <div key={j} className="flex items-center gap-1.5 group">
+                                      <code className="font-mono text-[10px] truncate flex-1 text-muted-foreground">{url}</code>
+                                      <button
+                                        className="opacity-0 group-hover:opacity-100 text-[10px] text-blue-600 hover:underline flex-shrink-0"
+                                        onClick={() => setTestUrl(url)}
+                                      >test ↑</button>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
+                            {sr.sample_dropped.length > 0 && (
+                              <div>
+                                <p className="text-[10px] font-semibold uppercase tracking-wide text-red-500 mb-0.5">Dropped ({sr.dropped})</p>
+                                <div className="space-y-0.5">
+                                  {sr.sample_dropped.slice(0, 4).map((url, j) => (
+                                    <code key={j} className="block font-mono text-[10px] truncate text-muted-foreground/70">{url}</code>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                    {td.warnings && td.warnings.length > 0 && (
+                      <div className="px-3 py-2 space-y-1">
+                        {td.warnings.map((w, i) => (
+                          <p key={i} className="text-[11px] text-amber-700 dark:text-amber-400 flex items-start gap-1">
+                            <TriangleAlert className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />{w}
+                          </p>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* ── Full Validation ───────────────────────────────────────────── */}
+            {testDiscoveryResult && testDiscoveryResult.total_passing > 0 && (
+              <div className="border rounded-md overflow-hidden">
+                <div className="flex items-center justify-between px-3 py-2 border-b bg-muted/30 text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
+                  <span className="flex items-center gap-1.5"><Layers className="h-3.5 w-3.5" /> Full Validation (up to 5 URLs)</span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-xs px-3"
+                    disabled={fullValidationLoading}
+                    onClick={() => {
+                      const courseUrls = testDiscoveryResult.seed_results
+                        .flatMap(sr => sr.classified_passing?.course ?? []);
+                      const anyUrls = testDiscoveryResult.seed_results
+                        .flatMap(sr => sr.sample_passing ?? []);
+                      const urlsToTest = (courseUrls.length ? courseUrls : anyUrls).slice(0, 5);
+                      onRunFullValidation(urlsToTest);
+                    }}
+                  >
+                    {fullValidationLoading
+                      ? <><Loader2 className="h-3 w-3 mr-1 animate-spin" />Validating…</>
+                      : <><Play className="h-3 w-3 mr-1" />Validate</>}
+                  </Button>
+                </div>
+                {!fullValidationResult && !fullValidationLoading && (
+                  <p className="text-xs text-muted-foreground px-3 py-3">
+                    Fetches up to 5 sample course pages from the live test above, applies the current filter, and estimates extractability.
+                  </p>
+                )}
+                {fullValidationLoading && (
+                  <div className="px-3 py-4 flex items-center gap-2 text-xs text-muted-foreground">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Fetching and analysing pages…
+                  </div>
+                )}
+                {!fullValidationLoading && fullValidationResult && (() => {
+                  const fv = fullValidationResult;
+                  return (
+                    <div className="divide-y">
+                      {/* Summary row */}
+                      <div className="px-3 py-2 flex flex-wrap gap-3 text-xs">
+                        <span><strong>{fv.summary.passed_filter}</strong>/{fv.summary.total} pass filter</span>
+                        <span className="text-blue-600 dark:text-blue-400"><strong>{fv.summary.course_pages}</strong> course pages</span>
+                        {fv.summary.avg_course_completeness_pct > 0 && (
+                          <span className={cn(
+                            "font-medium",
+                            fv.summary.avg_course_completeness_pct >= 60 ? "text-green-600 dark:text-green-400" : "text-orange-600 dark:text-orange-400",
+                          )}>
+                            ~{fv.summary.avg_course_completeness_pct}% avg extractability
+                          </span>
+                        )}
+                      </div>
+                      {/* Per-URL results */}
+                      {fv.results.map((r, i) => (
+                        <div key={i} className="px-3 py-2 text-xs">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className={cn(
+                              "inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium",
+                              r.page_type === "course" ? "bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300" :
+                              r.page_type === "listing" ? "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300" :
+                              "bg-muted text-muted-foreground",
+                            )}>{r.page_type}</span>
+                            <span className={cn(
+                              "inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium",
+                              r.passes_filter ? "bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-300" : "bg-red-100 text-red-600 dark:bg-red-950/40 dark:text-red-400",
+                            )}>{r.passes_filter ? "✓ passes filter" : `✗ blocked by ${r.blocked_by ?? "filter"}`}</span>
+                            {r.ok && (
+                              <span className={cn(
+                                "inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium ml-auto",
+                                r.estimated_completeness_pct >= 60 ? "bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-300" : "bg-orange-100 text-orange-700 dark:bg-orange-950/40 dark:text-orange-300",
+                              )}>~{r.estimated_completeness_pct}% extractable</span>
+                            )}
+                          </div>
+                          <code className="font-mono text-[10px] text-muted-foreground truncate block">{r.url}</code>
+                          {r.error && <p className="text-[10px] text-red-500 mt-0.5">{r.error}</p>}
+                          {r.keywords_found && r.keywords_found.length > 0 && (
+                            <p className="text-[10px] text-muted-foreground/70 mt-0.5 truncate">
+                              Fields detected: {r.keywords_found.slice(0, 6).join(", ")}{r.keywords_found.length > 6 ? "…" : ""}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
           </div>
         )}
 
@@ -2419,6 +2696,17 @@ function DebuggerPanel({
                 </p>
               )}
             </div>
+
+            {/* Fix just applied — persists until operator manually re-runs analysis */}
+            {fixJustApplied && !aiAnalysisLoading && (
+              <div className="flex items-start gap-2.5 p-3 rounded-md border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/20 text-xs">
+                <CheckCircle2 className="h-4 w-4 flex-shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+                <div>
+                  <p className="font-semibold text-amber-800 dark:text-amber-200 mb-0.5">Fix saved but not validated yet</p>
+                  <p className="text-amber-700 dark:text-amber-400">The config change has been saved. Trigger a new scrape to confirm the fix worked — the analysis below reflects the <em>previous</em> scrape run.</p>
+                </div>
+              </div>
+            )}
 
             {/* Loading skeleton */}
             {aiAnalysisLoading && (
@@ -2466,6 +2754,20 @@ function DebuggerPanel({
 
               return (
                 <div className="space-y-3">
+                  {/* Stale config warning — last scrape ran before config was saved */}
+                  {aiAnalysis.config_is_stale && (
+                    <div className="flex items-start gap-2.5 p-3 rounded-md border border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-950/20 text-xs">
+                      <TriangleAlert className="h-4 w-4 flex-shrink-0 mt-0.5 text-yellow-600 dark:text-yellow-400" />
+                      <div className="min-w-0">
+                        <p className="font-semibold text-yellow-800 dark:text-yellow-200 mb-0.5">Analysis may reflect old config</p>
+                        <p className="text-yellow-700 dark:text-yellow-400">
+                          Last scrape: <strong>{aiAnalysis.last_job_created_at}</strong> · Config last saved: <strong>{aiAnalysis.config_last_saved_at}</strong>.{" "}
+                          The config changed after the last scrape — job statistics may not match the current config. The AI used a live filter simulation to compensate.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Issue summary banner */}
                   <div className={cn(
                     "border rounded-md p-4",
@@ -2703,6 +3005,13 @@ export default function SettingsScraperConfigs() {
   const [aiAnalysis, setAiAnalysis] = useState<AiRootCauseResult | null>(null);
   const [aiAnalysisLoading, setAiAnalysisLoading] = useState(false);
   const [aiAnalysisApplying, setAiAnalysisApplying] = useState(false);
+  const [fixJustApplied, setFixJustApplied] = useState(false);
+  // Live Test Discovery
+  const [testDiscoveryResult, setTestDiscoveryResult] = useState<TestDiscoveryResult | null>(null);
+  const [testDiscoveryLoading, setTestDiscoveryLoading] = useState(false);
+  // Full Validation
+  const [fullValidationResult, setFullValidationResult] = useState<FullValidationResult | null>(null);
+  const [fullValidationLoading, setFullValidationLoading] = useState(false);
 
   // ── AI Diagnose & Fix ─────────────────────────────────────────────────────
   const [diagnosing, setDiagnosing] = useState(false);
@@ -2939,6 +3248,7 @@ export default function SettingsScraperConfigs() {
         });
         if (!res.ok) throw new Error(await res.text());
         toast({ title: "Fix applied", description: fix.description });
+        setFixJustApplied(true);
         await fetchEffectiveConfig(uniId);
         await runAiRootCause(uniId);
       } else if (fix.action === "set_admin_override") {
@@ -2960,6 +3270,7 @@ export default function SettingsScraperConfigs() {
         });
         if (!res.ok) throw new Error(await res.text());
         toast({ title: "Fix applied", description: fix.description });
+        setFixJustApplied(true);
         await fetchEffectiveConfig(uniId);
         await runAiRootCause(uniId);
       }
@@ -2969,6 +3280,42 @@ export default function SettingsScraperConfigs() {
       setAiAnalysisApplying(false);
     }
   }, [toast, fetchEffectiveConfig, runAiRootCause]);
+
+  const runTestDiscovery = useCallback(async (uniId: number) => {
+    setTestDiscoveryLoading(true);
+    setTestDiscoveryResult(null);
+    setFullValidationResult(null);
+    try {
+      const res = await fetchWithAuth(`${BASE}/api/universities/${uniId}/test-discovery`, {
+        method: "POST",
+      });
+      if (!res.ok) throw new Error(await res.text());
+      setTestDiscoveryResult(await res.json());
+    } catch (err) {
+      toast({ title: "Test discovery failed", description: (err as Error).message, variant: "destructive" });
+    } finally {
+      setTestDiscoveryLoading(false);
+    }
+  }, [toast]);
+
+  const runFullValidation = useCallback(async (uniId: number, urls: string[]) => {
+    if (!urls.length) return;
+    setFullValidationLoading(true);
+    setFullValidationResult(null);
+    try {
+      const res = await fetchWithAuth(`${BASE}/api/universities/${uniId}/full-validation`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ urls }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      setFullValidationResult(await res.json());
+    } catch (err) {
+      toast({ title: "Full validation failed", description: (err as Error).message, variant: "destructive" });
+    } finally {
+      setFullValidationLoading(false);
+    }
+  }, [toast]);
 
   const handleClearOverrideKey = useCallback(async (uniId: number, key: string) => {
     setClearingOverrideKey(key);
@@ -4618,11 +4965,23 @@ export default function SettingsScraperConfigs() {
                   aiAnalysis={aiAnalysis}
                   aiAnalysisLoading={aiAnalysisLoading}
                   aiAnalysisApplying={aiAnalysisApplying}
+                  fixJustApplied={fixJustApplied}
                   onRunAiAnalysis={() => {
+                    setFixJustApplied(false);
                     if (selectedConfig?.university_id) void runAiRootCause(selectedConfig.university_id);
                   }}
                   onApplySafeFix={(fix) => {
                     if (selectedConfig?.university_id) void handleApplySafeFix(selectedConfig.university_id, fix);
+                  }}
+                  testDiscoveryResult={testDiscoveryResult}
+                  testDiscoveryLoading={testDiscoveryLoading}
+                  onRunTestDiscovery={() => {
+                    if (selectedConfig?.university_id) void runTestDiscovery(selectedConfig.university_id);
+                  }}
+                  fullValidationResult={fullValidationResult}
+                  fullValidationLoading={fullValidationLoading}
+                  onRunFullValidation={(urls) => {
+                    if (selectedConfig?.university_id) void runFullValidation(selectedConfig.university_id, urls);
                   }}
                 />
               ) : (
