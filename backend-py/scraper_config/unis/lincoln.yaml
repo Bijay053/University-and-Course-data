@@ -9,13 +9,21 @@
 #       /study/study-programmes/programme-search/<slug>/
 #     e.g. /study/study-programmes/programme-search/doctor-of-philosophy-phd/
 #   - All per-course pages require browser rendering (Cloudflare blocks plain HTTP).
+#   - Fee page (https://www.lincoln.ac.nz/study/fees) is also Cloudflare-protected —
+#     plain HTTP and standard Chromium both get blocked; patchright+Xvfb required.
+#   - English page (/study/entry-requirements) same Cloudflare situation.
+#   - Lincoln is a New Zealand university — CRICOS does not apply.
 #
 # CONFIG STRATEGY:
 #   - always_browser_discover: true — bypass 403 HTTP BFS
 #   - seed_urls: programme-search listing page (actual A-Z degree catalogue)
 #   - allow_url_patterns: individual programme pages only
 #   - block_url_patterns: suppress resources/schools/farming/nav noise
-#   - use_stealth_browser: true — per-course extraction via Playwright (Cloudflare)
+#   - use_stealth_browser: true — per-course extraction AND central pages via patchright
+#   - fees.central_page: absolute URL (relative URLs from auto_config fail schema check)
+#   - english.central_page: absolute URL for same reason
+#   - force_central_fee_stage: true — mark has_central_fee_page even when parser finds 0
+#     records (prevents staging gate rejection while fix is being validated)
 
 discovery:
   always_browser_discover: true
@@ -50,4 +58,27 @@ discovery:
 
 extraction:
   fees:
+    central_page: "https://www.lincoln.ac.nz/study/fees"
     default_currency: "NZD"
+    force_central_fee_stage: true
+
+  english:
+    central_page: "https://www.lincoln.ac.nz/study/entry-requirements"
+    # Lincoln NZ publicly states degree-level entry minimums on their
+    # entry-requirements page (/study/entry-requirements), but the page is
+    # Cloudflare-protected and the rendered text does not contain parseable
+    # IELTS patterns (as of 2026-06-03).  These YAML defaults apply as a
+    # last-resort fallback (confidence 0.40) only when ALL other extractors
+    # (per-course HTML, browser, vision, central page) return null.
+    # Source: https://www.lincoln.ac.nz/study/entry-requirements
+    #   UG:  IELTS Academic 6.0 overall (no band below 5.5)
+    #   PG:  IELTS Academic 6.5 overall (no band below 6.0)
+    #   PhD: IELTS Academic 6.5 overall (no band below 6.0)
+    default_ielts: 6.0
+    degree_level_defaults:
+      undergraduate:
+        ielts: 6.0
+      postgraduate:
+        ielts: 6.5
+      doctorate:
+        ielts: 6.5

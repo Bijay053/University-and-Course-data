@@ -19,3 +19,4 @@
 - [Self-debugging UI debugger panel](debugger-panel-arch.md) — 5-tab panel in settings-scraper-configs.tsx; scraped_courses.scrape_job_id = runtime_job_id string; get_config_for_host() is keyword-only.
 - [admin_config empty list overrides YAML patterns](admin-config-empty-list-override.md) — empty [] in admin_config.discovery clears YAML allow/block; fixed in _deep_merge + DB cleanup pattern.
 - [_fv_classify listing hint endswith-only fix](fv-classify-endswith-fix.md) — listing hints must use endswith, not substring; /study mid-path misclassifies course pages as listing.
+- [Lincoln fee matching + IELTS defaults](lincoln-fee-ielts-fixes.md) — s3b/s5/s6 scoring in _score(); degree_level_defaults YAML for IELTS when central page is Cloudflare-blocked. scrape_runtime_jobs PK = runtime_job_id.

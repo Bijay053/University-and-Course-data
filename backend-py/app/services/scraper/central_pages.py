@@ -536,6 +536,29 @@ async def _fetch_english_with_browser(url: str) -> str | None:
     import asyncio as _asyncio
 
     async def _browser_fetch() -> str | None:
+        # Stealth-first: sites with use_stealth_browser=true (e.g. Cloudflare-protected)
+        # block standard Playwright; use patchright+Xvfb / curl_cffi instead.
+        try:
+            from app.services.scraper.stealth_browser import (
+                stealth_fetch_html,
+                stealth_required,
+            )
+            if stealth_required():
+                stealth_html = await stealth_fetch_html(url, timeout_ms=30_000)
+                if stealth_html:
+                    return stealth_html
+                log.info(
+                    "central_pages: stealth fetch (english) returned None for %s"
+                    " — trying regular pool",
+                    url,
+                )
+        except Exception as _stealth_exc:
+            log.warning(
+                "central_pages: stealth fetch (english) wrapper failed for %s: %s",
+                url,
+                _stealth_exc,
+            )
+
         from app.services.scraper.browser_pool import pool as browser_pool
 
         async with browser_pool.page() as page:
@@ -895,6 +918,31 @@ async def _fetch_with_browser_fallback(url: str) -> str | None:
     _extra_wait_ms = 6_000 if _host in _SLOW_SPA_HOSTS else 3_000
 
     async def _browser_fetch() -> str | None:
+        # Stealth-first: sites with use_stealth_browser=true (Cloudflare-protected) block
+        # standard Playwright just as they block plain HTTP.  Use patchright+Xvfb /
+        # curl_cffi instead so the same stealth stack that solves per-course pages also
+        # solves the central fee page.  Falls through to the regular pool on failure.
+        try:
+            from app.services.scraper.stealth_browser import (
+                stealth_fetch_html,
+                stealth_required,
+            )
+            if stealth_required():
+                stealth_html = await stealth_fetch_html(url, timeout_ms=30_000)
+                if stealth_html:
+                    return stealth_html
+                log.info(
+                    "central_pages: stealth fetch (fee) returned None for %s"
+                    " — trying regular pool",
+                    url,
+                )
+        except Exception as _stealth_exc:
+            log.warning(
+                "central_pages: stealth fetch (fee) wrapper failed for %s: %s",
+                url,
+                _stealth_exc,
+            )
+
         from app.services.scraper.browser_pool import pool as browser_pool
         async with browser_pool.page() as page:
             await page.goto(url, wait_until="domcontentloaded", timeout=25_000)
@@ -1132,6 +1180,19 @@ async def prefetch_central_pages(
     # the PG clear-out pass regardless of whether any central pages exist.
     _pg_skip = bool(scrape_config.get("central_english_pg_skip", False))
 
+    # For Cloudflare-protected sites (use_stealth_browser=true) plain HTTP will
+    # return a 403 challenge page before any JS-signal is detectable.  Skip the
+    # plain-HTTP attempt entirely and go straight to the stealth browser — the
+    # same patchright+Xvfb stack that solves per-course pages also solves the
+    # central English-requirements page.  No global impact: only fires when the
+    # per-uni YAML sets discovery.use_stealth_browser=true.
+    _stealth_for_english = False
+    try:
+        from app.services.scraper.stealth_browser import stealth_required as _stealth_req_eng
+        _stealth_for_english = _stealth_req_eng()
+    except Exception:
+        pass
+
     if not fee_url and not english_url:
         return {**empty, "central_english_pg_skip": _pg_skip}
 
@@ -1325,6 +1386,32 @@ async def prefetch_central_pages(
                         error=str(exc)[:200],
                     )
 
+    # ── Apply default_currency from per-uni YAML ───────────────────────────
+    # _parse_fee_page_html defaults to "AUD" for all records.  Universities
+    # in other currency zones (e.g. Lincoln NZ → NZD) must set
+    # extraction.fees.default_currency in their per-uni YAML.  Apply the
+    # override here — after both the cache-hit and fresh-parse paths — so
+    # the correction is visible in every code path.
+    if result["fees"]:
+        _default_currency = "AUD"
+        try:
+            from app.services.scraper.config.context import get_uni_config as _get_cfg_curr
+            _curr_yaml = _get_cfg_curr()
+            if _curr_yaml:
+                _default_currency = _curr_yaml.extraction.fees.default_currency
+        except Exception:  # noqa: BLE001
+            pass
+        if _default_currency != "AUD":
+            for _fee_rec in result["fees"]:
+                if _fee_rec.get("currency") == "AUD":
+                    _fee_rec["currency"] = _default_currency
+            log.info(
+                "central_pages: applied default_currency=%r to %d fee record(s) for uni %s",
+                _default_currency,
+                len(result["fees"]),
+                university_id,
+            )
+
     # ── Fetch English-requirements page ────────────────────────────────────
     # Default: plain HTTP only, bounded at 45 s.  Some servers (ASA, etc.)
     # accept the TCP handshake but never send data — the wait_for cap
@@ -1337,7 +1424,10 @@ async def prefetch_central_pages(
     # The level-keyed dict is stored in ``result["english_by_level"]`` and
     # consumed by single_course.py to apply the correct values per degree
     # level instead of falling back to the "same for all" flat dict.
-    _use_browser_for_english = _pg_skip
+    # Use browser for English when: pg_skip (JS-rendered PG section) OR stealth
+    # mode is active (Cloudflare-protected — plain HTTP returns a 403 challenge
+    # before any JS-signal can be detected, so no point trying HTTP first).
+    _use_browser_for_english = _pg_skip or _stealth_for_english
 
     if english_url and not english_url.endswith(".pdf"):
         # Check cache first when university_id is known
@@ -1522,7 +1612,15 @@ async def prefetch_central_pages(
                             values=english_vals,
                             url=english_url,
                         )
-                    log.info("central_pages: english slots from %s: %s", english_url, english_vals)
+                    if english_vals:
+                        log.info("central_pages: english slots from %s: %s", english_url, english_vals)
+                    else:
+                        log.warning(
+                            "central_pages: english page fetched (%d chars) but no IELTS/PTE "
+                            "slots extracted from %s — check page format",
+                            len(eng_html or ""),
+                            english_url,
+                        )
 
                     # Store in cache
                     if university_id is not None:
@@ -1926,6 +2024,12 @@ def match_central_fee(
         r"\s*\([a-zA-Z][a-zA-Z()\s]{0,25}\)\s*$",
         re.IGNORECASE,
     )
+    # Strip "with Honours" / "with Distinction" suffix from course names before
+    # comparing with the base-degree fee-table row.
+    _HONOURS_TRAIL_RE = re.compile(
+        r"\s+with\s+honours\s*$",
+        re.IGNORECASE,
+    )
 
     def _score(pattern: str, name: str) -> float:
         p = re.sub(r"\s+", " ", pattern).strip().lower()
@@ -1995,7 +2099,47 @@ def match_central_fee(
                 if p.startswith(n)
                 else 0.0
             )
-            return max(s1, s2, s3)
+            # s4: strip " - <major>" suffix from the COURSE NAME then compare.
+            # Handles "Bachelor of Commerce - Hotel and Tourism Management Major"
+            # → stripped to "Bachelor of Commerce" → fuzz.ratio against
+            # fee-table "Bachelor of Commerce" → 100 (exact hit).
+            # Only fires when " - " is present in the course name and stripping
+            # actually shortens it (avoids double-counting when no dash present).
+            _n_no_major = re.sub(r"\s+-\s+.+$", "", n).strip()
+            s4 = (
+                float(_rfuzz.ratio(p_no_abbrev if p_no_abbrev != p else p, _n_no_major))
+                if _n_no_major != n and _n_no_major
+                else 0.0
+            )
+            # s5: paren-normalized token_sort_ratio.
+            # rapidfuzz token_sort_ratio does NOT strip parentheses before tokenising,
+            # so "(Finance)" stays as one token and scores poorly against "in Finance".
+            # Normalising converts "Master of Business (Finance)" → "master of business
+            # finance" so the token sort can align "finance" with "finance" in the
+            # course name "Master of Business in Finance" → s5 ≈ 94.5.
+            _p_pnorm = re.sub(r"\s*\(([^)]+)\)", r" \1", p).strip()
+            _n_pnorm = re.sub(r"\s*\(([^)]+)\)", r" \1", n).strip()
+            s5 = float(_rfuzz.token_sort_ratio(_p_pnorm, _n_pnorm))
+            # s6: strip "with Honours" from the course name, then require ratio ≥ 90.
+            # Honours variants share the base-degree fee row in Lincoln's fee table.
+            # The ≥ 90 guard (same as s2) prevents "Bachelor of Commerce" from
+            # falsely matching "Bachelor of Science with Honours" (raw ratio ≈ 82).
+            _n_no_hon = _HONOURS_TRAIL_RE.sub("", n).strip()
+            _s6_raw = (
+                float(_rfuzz.ratio(p_no_abbrev if p_no_abbrev != p else p, _n_no_hon))
+                if _n_no_hon != n
+                else 0.0
+            )
+            s6 = _s6_raw if _s6_raw >= 90 else 0.0
+            # s3b: reverse of s3 — course name starts with the fee-table pattern.
+            # Handles "Master of Science (Research)" vs fee row "Master of Science":
+            # s1 gives only 75.6 (parens reduce token match); s3b gives 100.
+            # Guard: the char immediately after p in n must be space or '(' so we
+            # do not match "Master of Agricultural Science" against "Master of Science".
+            _n_after_p = n[len(p):]
+            _s3b_valid = n.startswith(p) and (not _n_after_p or _n_after_p[0] in " (")
+            s3b = float(_rfuzz.partial_ratio(p, n)) if _s3b_valid else 0.0
+            return max(s1, s2, s3, s4, s5, s6, s3b)
         return 100.0 if p == n else (60.0 if p in n or n in p else 0.0)
 
     best_record: CentralFeeRecord | None = None
