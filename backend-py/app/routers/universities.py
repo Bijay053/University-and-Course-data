@@ -2827,6 +2827,402 @@ async def get_rejection_log(
     }
 
 
+# ── Feature: Extraction Debugger ─────────────────────────────────────────────
+
+# Human-readable field labels for the UI
+_FIELD_LABELS: dict[str, str] = {
+    "course_name": "Course Name", "degree_level": "Degree Level",
+    "category": "Category", "sub_category": "Sub-category",
+    "study_mode": "Study Mode", "course_location": "Location",
+    "duration": "Duration", "duration_term": "Duration Term",
+    "international_fee": "Int'l Fee", "fee_term": "Fee Term", "currency": "Currency",
+    "ielts_overall": "IELTS Overall", "ielts_listening": "IELTS Listening",
+    "ielts_speaking": "IELTS Speaking", "ielts_writing": "IELTS Writing",
+    "ielts_reading": "IELTS Reading",
+    "pte_overall": "PTE Overall", "toefl_overall": "TOEFL Overall",
+    "cambridge_overall": "Cambridge Overall", "duolingo_overall": "Duolingo Overall",
+    "intake_months": "Intakes", "academic_level": "Academic Level",
+    "academic_score": "Academic Score", "description": "Description",
+    "other_requirement": "Other Requirement", "cricos_code": "CRICOS Code",
+    "scholarship": "Scholarship", "student_market": "Student Market",
+    "eligibility_status": "Eligibility", "international_eligible": "Intl Eligible",
+}
+
+
+@router.get("/universities/{uni_id}/scraped-courses")
+async def list_scraped_courses(
+    uni_id: int,
+    job_id: str | None = None,
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_user),
+) -> dict:
+    """Return courses from the last scrape job with completeness + extraction methods."""
+    if not job_id:
+        row = (await db.execute(
+            text("""
+                SELECT runtime_job_id FROM scrape_runtime_jobs
+                WHERE university_id = :uid AND status IN ('completed','done','failed')
+                ORDER BY created_at DESC LIMIT 1
+            """), {"uid": uni_id},
+        )).mappings().first()
+        if not row:
+            return {"university_id": uni_id, "job_id": None, "courses": []}
+        job_id = row["runtime_job_id"]
+
+    # scraped_courses.scrape_job_id IS the runtime_job_id string directly
+    courses = (await db.execute(
+        text("""
+            SELECT id, course_name, status, completeness, auto_publish_status,
+                   study_mode, degree_level, international_fee, ielts_overall,
+                   course_website, extraction_method
+            FROM scraped_courses
+            WHERE university_id = :uid
+              AND scrape_job_id = :jid
+            ORDER BY completeness DESC NULLS LAST, course_name ASC
+            LIMIT 200
+        """), {"uid": uni_id, "jid": job_id},
+    )).mappings().all()
+
+    return {
+        "university_id": uni_id,
+        "job_id": job_id,
+        "courses": [
+            {
+                "id": c["id"],
+                "course_name": c["course_name"],
+                "status": c["status"],
+                "completeness": c["completeness"],
+                "auto_publish_status": c["auto_publish_status"],
+                "study_mode": c["study_mode"],
+                "degree_level": c["degree_level"],
+                "international_fee": c["international_fee"],
+                "ielts_overall": c["ielts_overall"],
+                "course_website": c["course_website"],
+                "extraction_method": c["extraction_method"],
+            }
+            for c in courses
+        ],
+    }
+
+
+@router.get("/universities/{uni_id}/scraped-courses/{course_id}/extraction-trace")
+async def get_extraction_trace(
+    uni_id: int,
+    course_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_user),
+) -> dict:
+    """Return the full extraction pipeline trace for one staged course.
+
+    For each field: lists all candidate evidence rows (raw → method → normalised),
+    marks which was selected, and shows the final value actually stored.
+    """
+    # Load the course
+    course_row = (await db.execute(
+        text("""
+            SELECT id, course_name, study_mode, degree_level, category, sub_category,
+                   course_location, duration, duration_term, international_fee,
+                   fee_term, currency, ielts_overall, ielts_listening, ielts_speaking,
+                   ielts_writing, ielts_reading, pte_overall, toefl_overall,
+                   cambridge_overall, duolingo_overall, intake_months, academic_level,
+                   academic_score, description, other_requirement, cricos_code,
+                   completeness, status, auto_publish_status, course_website,
+                   extraction_method, eligibility_status, international_eligible,
+                   student_market, scholarship
+            FROM scraped_courses
+            WHERE id = :cid AND university_id = :uid
+        """), {"cid": course_id, "uid": uni_id},
+    )).mappings().first()
+    if not course_row:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    # Load all evidence rows for this course
+    evidence_rows = (await db.execute(
+        text("""
+            SELECT field_key, candidate_value, normalized_value, extraction_method,
+                   confidence, selected, raw_text, snippet, source_url, page_type,
+                   decision_score, validation_status
+            FROM scraped_field_evidence
+            WHERE scraped_course_id = :cid
+            ORDER BY field_key, selected DESC, confidence DESC NULLS LAST
+        """), {"cid": course_id},
+    )).mappings().all()
+
+    # Build per-field pipeline map from evidence
+    fields_with_evidence: set[str] = set()
+    evidence_by_field: dict[str, list[dict]] = {}
+    for ev in evidence_rows:
+        fk = ev["field_key"]
+        fields_with_evidence.add(fk)
+        evidence_by_field.setdefault(fk, []).append({
+            "candidate_value": ev["candidate_value"],
+            "normalized_value": ev["normalized_value"],
+            "extraction_method": ev["extraction_method"],
+            "confidence": ev["confidence"],
+            "selected": ev["selected"],
+            "snippet": (ev["snippet"] or "")[:300],
+            "source_url": ev["source_url"],
+            "page_type": ev["page_type"],
+            "validation_status": ev["validation_status"],
+        })
+
+    # Build final-values dict from scraped_courses columns
+    course_d = dict(course_row)
+    _FINAL_FIELDS = [
+        "course_name", "degree_level", "category", "sub_category", "study_mode",
+        "course_location", "duration", "duration_term", "international_fee", "fee_term",
+        "currency", "ielts_overall", "ielts_listening", "ielts_speaking", "ielts_writing",
+        "ielts_reading", "pte_overall", "toefl_overall", "cambridge_overall",
+        "duolingo_overall", "intake_months", "academic_level", "academic_score",
+        "description", "other_requirement", "cricos_code", "scholarship",
+        "student_market", "eligibility_status", "international_eligible",
+    ]
+
+    extraction_method_map: dict[str, str] = course_d.get("extraction_method") or {}
+
+    pipeline: list[dict] = []
+    all_fields = set(_FINAL_FIELDS) | fields_with_evidence
+    for field in sorted(all_fields):
+        final_val = course_d.get(field)
+        if final_val is None and field not in fields_with_evidence:
+            continue  # skip fully absent fields with no evidence
+        method = extraction_method_map.get(field)
+        ev_list = evidence_by_field.get(field, [])
+        # Find the selected (winning) evidence
+        selected_ev = next((e for e in ev_list if e["selected"]), None)
+        # Determine if the value was actually used
+        final_display = (
+            json.dumps(final_val) if isinstance(final_val, (list, dict))
+            else str(final_val) if final_val is not None else None
+        )
+        pipeline.append({
+            "field_key": field,
+            "field_label": _FIELD_LABELS.get(field, field.replace("_", " ").title()),
+            "final_value": final_display,
+            "extraction_method": method or (selected_ev["extraction_method"] if selected_ev else None),
+            "confidence": selected_ev["confidence"] if selected_ev else None,
+            "snippet": selected_ev["snippet"] if selected_ev else None,
+            "source_url": selected_ev["source_url"] if selected_ev else None,
+            "candidates_count": len(ev_list),
+            "candidates": ev_list[:8],  # cap for response size
+            "has_conflict": len(ev_list) > 1 and not selected_ev,
+            "missing": final_val is None,
+        })
+
+    return {
+        "university_id": uni_id,
+        "course_id": course_id,
+        "course_name": course_d["course_name"],
+        "completeness": course_d["completeness"],
+        "status": course_d["status"],
+        "course_website": course_d["course_website"],
+        "pipeline": pipeline,
+    }
+
+
+# ── Feature: Discovery Debugger ───────────────────────────────────────────────
+
+@router.get("/universities/{uni_id}/discovery-stats")
+async def get_discovery_stats(
+    uni_id: int,
+    job_id: str | None = None,
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_user),
+) -> dict:
+    """Return URL filter stats for a scrape job.
+
+    Reads scrape_runtime_logs events:
+      block_url_filter / extract_block_url_filter — block patterns
+      extract_allow_url_filter                   — allow-list filter
+      must_contain_filter / extract_must_contain_filter — substring filter
+      page_classified                            — BFS page classification
+    """
+    if not job_id:
+        row = (await db.execute(
+            text("""
+                SELECT runtime_job_id FROM scrape_runtime_jobs
+                WHERE university_id = :uid AND status IN ('completed','done','failed')
+                ORDER BY created_at DESC LIMIT 1
+            """), {"uid": uni_id},
+        )).mappings().first()
+        if not row:
+            return {"university_id": uni_id, "job_id": None, "events": [], "summary": {}}
+        job_id = row["runtime_job_id"]
+
+    rows = (await db.execute(
+        text("""
+            SELECT payload
+            FROM scrape_runtime_logs
+            WHERE runtime_job_id = :jid
+              AND payload->>'kind' IN (
+                'block_url_filter','extract_block_url_filter',
+                'extract_allow_url_filter',
+                'must_contain_filter','extract_must_contain_filter',
+                'page_classified','discovery_failed'
+              )
+            ORDER BY sequence ASC
+            LIMIT 500
+        """), {"jid": job_id},
+    )).mappings().all()
+
+    events: list[dict] = []
+    summary = {
+        "total_blocked_by_block_patterns": 0,
+        "total_blocked_by_allow_patterns": 0,
+        "total_blocked_by_must_contain": 0,
+        "pages_classified": 0,
+        "pattern_breakdown": {},
+        "blocked_samples": [],
+        "allow_dropped_samples": [],
+        "must_contain_dropped_samples": [],
+    }
+
+    for r in rows:
+        p = r["payload"] or {}
+        kind = p.get("kind", "")
+        events.append({
+            "kind": kind,
+            "phase": p.get("phase", ""),
+            "dropped": p.get("dropped", 0),
+            "kept": p.get("kept", 0),
+            "drop_pct": p.get("drop_pct"),
+            "message": p.get("message", ""),
+            "dropped_sample": p.get("dropped_sample", []),
+            "pattern_breakdown": p.get("pattern_breakdown", {}),
+        })
+        if kind in ("block_url_filter", "extract_block_url_filter"):
+            d = p.get("dropped", 0)
+            summary["total_blocked_by_block_patterns"] += d
+            for pat, cnt in (p.get("pattern_breakdown") or {}).items():
+                summary["pattern_breakdown"][pat] = summary["pattern_breakdown"].get(pat, 0) + cnt
+            summary["blocked_samples"].extend(p.get("dropped_sample") or [])
+        elif kind == "extract_allow_url_filter":
+            summary["total_blocked_by_allow_patterns"] += p.get("dropped", 0)
+            summary["allow_dropped_samples"].extend(p.get("dropped_sample") or [])
+        elif kind in ("must_contain_filter", "extract_must_contain_filter"):
+            summary["total_blocked_by_must_contain"] += p.get("dropped", 0)
+            summary["must_contain_dropped_samples"].extend(p.get("dropped_sample") or [])
+        elif kind == "page_classified":
+            summary["pages_classified"] += 1
+
+    # Trim sample lists
+    summary["blocked_samples"] = list(dict.fromkeys(summary["blocked_samples"]))[:20]
+    summary["allow_dropped_samples"] = list(dict.fromkeys(summary["allow_dropped_samples"]))[:20]
+    summary["must_contain_dropped_samples"] = list(dict.fromkeys(summary["must_contain_dropped_samples"]))[:20]
+    # Sort pattern breakdown
+    summary["pattern_breakdown"] = dict(
+        sorted(summary["pattern_breakdown"].items(), key=lambda x: -x[1])
+    )
+
+    return {
+        "university_id": uni_id,
+        "job_id": job_id,
+        "summary": summary,
+        "events": events,
+    }
+
+
+@router.post("/universities/{uni_id}/test-url")
+async def test_url_against_config(
+    uni_id: int,
+    body: dict = Body(...),
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_user),
+) -> dict:
+    """Test a URL against the university's current config patterns.
+
+    Body: { "url": "https://example.edu/courses/master-of-science" }
+    Returns: { accepted, blocked_by, matched_pattern, reason }
+    """
+    import re as _re3
+    url: str = (body.get("url") or "").strip()
+    if not url:
+        raise HTTPException(status_code=422, detail="url is required")
+
+    u = await db.get(University, uni_id)
+    if not u:
+        raise HTTPException(status_code=404, detail="University not found")
+
+    from app.services.scraper.config.loader import get_config_for_host
+    from urllib.parse import urlparse as _up3
+
+    hostname = _up3(u.scrape_url or "").hostname or ""
+    cfg = get_config_for_host(
+        hostname=hostname,
+        name=u.name or "",
+        scrape_url=u.scrape_url or "",
+        university_id=int(u.id),
+        db_scrape_config=dict(u.scrape_config or {}),
+    )
+
+    disc = cfg.discovery
+    block_patterns: list[str] = list(disc.block_url_patterns or [])
+    allow_patterns: list[str] = list(disc.allow_url_patterns or [])
+    must_contain: list[str] = list(disc.must_contain or [])
+
+    test_url_lower = url.lower()
+
+    # Check block patterns first
+    for pat in block_patterns:
+        try:
+            if _re3.search(pat, url, _re3.IGNORECASE):
+                return {
+                    "accepted": False,
+                    "blocked_by": "block_url_patterns",
+                    "matched_pattern": pat,
+                    "reason": f"URL matches block pattern: {pat}",
+                    "block_patterns": block_patterns,
+                    "allow_patterns": allow_patterns,
+                    "must_contain": must_contain,
+                }
+        except _re3.error:
+            pass
+
+    # Check allow patterns (if any — URL must match at least one)
+    if allow_patterns:
+        matched_allow = None
+        for pat in allow_patterns:
+            try:
+                if _re3.search(pat, url, _re3.IGNORECASE):
+                    matched_allow = pat
+                    break
+            except _re3.error:
+                pass
+        if not matched_allow:
+            return {
+                "accepted": False,
+                "blocked_by": "allow_url_patterns",
+                "matched_pattern": None,
+                "reason": "URL does not match any allow_url_patterns (whitelist is active)",
+                "block_patterns": block_patterns,
+                "allow_patterns": allow_patterns,
+                "must_contain": must_contain,
+            }
+
+    # Check must_contain (URL must contain ALL substrings)
+    for sub in must_contain:
+        if sub.lower() not in test_url_lower:
+            return {
+                "accepted": False,
+                "blocked_by": "must_contain",
+                "matched_pattern": sub,
+                "reason": f"URL is missing required substring: {sub}",
+                "block_patterns": block_patterns,
+                "allow_patterns": allow_patterns,
+                "must_contain": must_contain,
+            }
+
+    return {
+        "accepted": True,
+        "blocked_by": None,
+        "matched_pattern": None,
+        "reason": "URL passes all filters",
+        "block_patterns": block_patterns,
+        "allow_patterns": allow_patterns,
+        "must_contain": must_contain,
+    }
+
+
 def _to_camel_uni(u) -> dict:
     """Add camelCase aliases UI expects: scrapeUrl, feePageUrl, etc."""
     if hasattr(u, '__table__'):

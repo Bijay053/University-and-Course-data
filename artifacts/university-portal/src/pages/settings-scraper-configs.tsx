@@ -589,6 +589,96 @@ interface RejectionLogResult {
   rejections: RejectionItem[];
 }
 
+// ── Extraction Debugger types ────────────────────────────────────────────────
+interface EvidenceCandidate {
+  candidate_value: string | null;
+  normalized_value: string | null;
+  extraction_method: string | null;
+  confidence: number | null;
+  selected: boolean;
+  snippet: string | null;
+  source_url: string | null;
+  page_type: string | null;
+  validation_status: string | null;
+}
+interface ExtractionPipelineField {
+  field_key: string;
+  field_label: string;
+  final_value: string | null;
+  extraction_method: string | null;
+  confidence: number | null;
+  snippet: string | null;
+  source_url: string | null;
+  candidates_count: number;
+  candidates: EvidenceCandidate[];
+  has_conflict: boolean;
+  missing: boolean;
+}
+interface ScrapedCourseItem {
+  id: number;
+  course_name: string;
+  status: string;
+  completeness: number | null;
+  auto_publish_status: string | null;
+  study_mode: string | null;
+  degree_level: string | null;
+  international_fee: number | null;
+  ielts_overall: number | null;
+  course_website: string | null;
+  extraction_method: Record<string, string> | null;
+}
+interface ScrapedCoursesResult {
+  university_id: number;
+  job_id: string | null;
+  courses: ScrapedCourseItem[];
+}
+interface ExtractionTraceResult {
+  university_id: number;
+  course_id: number;
+  course_name: string;
+  completeness: number | null;
+  status: string;
+  course_website: string | null;
+  pipeline: ExtractionPipelineField[];
+}
+
+// ── Discovery Debugger types ──────────────────────────────────────────────────
+interface DiscoveryEventItem {
+  kind: string;
+  phase: string;
+  dropped: number;
+  kept: number;
+  drop_pct: number | null;
+  message: string;
+  dropped_sample: string[];
+  pattern_breakdown: Record<string, number>;
+}
+interface DiscoverySummary {
+  total_blocked_by_block_patterns: number;
+  total_blocked_by_allow_patterns: number;
+  total_blocked_by_must_contain: number;
+  pages_classified: number;
+  pattern_breakdown: Record<string, number>;
+  blocked_samples: string[];
+  allow_dropped_samples: string[];
+  must_contain_dropped_samples: string[];
+}
+interface DiscoveryStatsResult {
+  university_id: number;
+  job_id: string | null;
+  summary: DiscoverySummary;
+  events: DiscoveryEventItem[];
+}
+interface UrlTestResult {
+  accepted: boolean;
+  blocked_by: string | null;
+  matched_pattern: string | null;
+  reason: string;
+  block_patterns: string[];
+  allow_patterns: string[];
+  must_contain: string[];
+}
+
 interface DiagnosisIssue {
   severity: "critical" | "warning" | "info";
   title: string;
@@ -1480,8 +1570,8 @@ interface DebuggerPanelProps {
   rejectionLogLoading: boolean;
   rejectionFilter: string | null;
   setRejectionFilter: (v: string | null) => void;
-  debugTab: "config" | "overrides" | "rejections";
-  setDebugTab: (v: "config" | "overrides" | "rejections") => void;
+  debugTab: "config" | "overrides" | "rejections" | "extraction" | "discovery";
+  setDebugTab: (v: "config" | "overrides" | "rejections" | "extraction" | "discovery") => void;
   cfgExpandedSections: Record<string, boolean>;
   setCfgExpandedSections: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
   clearingOverrideKey: string | null;
@@ -1489,6 +1579,22 @@ interface DebuggerPanelProps {
   onClearOverrideKey: (key: string) => void;
   onClearAllOverrides: () => void;
   onRefresh: () => void;
+  // Extraction Debugger
+  scrapedCourses: ScrapedCoursesResult | null;
+  scrapedCoursesLoading: boolean;
+  extractionTrace: ExtractionTraceResult | null;
+  extractionTraceLoading: boolean;
+  selectedCourseId: number | null;
+  setSelectedCourseId: (id: number | null) => void;
+  onLoadExtractionTrace: (courseId: number) => void;
+  // Discovery Debugger
+  discoveryStats: DiscoveryStatsResult | null;
+  discoveryStatsLoading: boolean;
+  testUrl: string;
+  setTestUrl: (v: string) => void;
+  urlTestResult: UrlTestResult | null;
+  urlTestLoading: boolean;
+  onTestUrl: () => void;
 }
 
 function DebuggerPanel({
@@ -1496,6 +1602,9 @@ function DebuggerPanel({
   rejectionLog, rejectionLogLoading, rejectionFilter, setRejectionFilter,
   debugTab, setDebugTab, cfgExpandedSections, setCfgExpandedSections,
   clearingOverrideKey, clearingAllOverrides, onClearOverrideKey, onClearAllOverrides, onRefresh,
+  scrapedCourses, scrapedCoursesLoading, extractionTrace, extractionTraceLoading,
+  selectedCourseId, setSelectedCourseId, onLoadExtractionTrace,
+  discoveryStats, discoveryStatsLoading, testUrl, setTestUrl, urlTestResult, urlTestLoading, onTestUrl,
 }: DebuggerPanelProps) {
   if (!uniId) {
     return (
@@ -1516,7 +1625,7 @@ function DebuggerPanel({
     ? (rejectionLog?.rejections ?? []).filter(r => r.reason === rejectionFilter)
     : (rejectionLog?.rejections ?? []);
 
-  const TAB_BUTTONS: { id: "config" | "overrides" | "rejections"; label: string; icon: React.ReactNode; badge?: number; badgeColor?: string }[] = [
+  const TAB_BUTTONS: { id: "config" | "overrides" | "rejections" | "extraction" | "discovery"; label: string; icon: React.ReactNode; badge?: number; badgeColor?: string }[] = [
     { id: "config",     label: "Effective Config", icon: <Layers className="h-3.5 w-3.5" /> },
     { id: "overrides",  label: "Admin Overrides",  icon: <ShieldAlert className="h-3.5 w-3.5" />,
       badge: effectiveCfg?.admin_overrides_flat?.length,
@@ -1524,6 +1633,12 @@ function DebuggerPanel({
     { id: "rejections", label: "Rejection Log",    icon: <Filter className="h-3.5 w-3.5" />,
       badge: rejectionLog?.total,
       badgeColor: (rejectionLog?.total ?? 0) > 0 ? "bg-red-500" : undefined },
+    { id: "extraction", label: "Extraction",       icon: <Code className="h-3.5 w-3.5" />,
+      badge: scrapedCourses?.courses?.length,
+      badgeColor: (scrapedCourses?.courses?.length ?? 0) > 0 ? "bg-blue-500" : undefined },
+    { id: "discovery",  label: "Discovery",        icon: <Search className="h-3.5 w-3.5" />,
+      badge: discoveryStats ? (discoveryStats.summary.total_blocked_by_block_patterns + discoveryStats.summary.total_blocked_by_allow_patterns) : undefined,
+      badgeColor: discoveryStats && (discoveryStats.summary.total_blocked_by_block_patterns + discoveryStats.summary.total_blocked_by_allow_patterns) > 0 ? "bg-amber-500" : undefined },
   ];
 
   return (
@@ -1810,6 +1925,299 @@ function DebuggerPanel({
             )}
           </>
         )}
+
+        {/* ── Tab: Extraction Debugger ───────────────────────────────────── */}
+        {debugTab === "extraction" && (
+          <div className="space-y-4">
+            {/* Course list pane */}
+            {!selectedCourseId ? (
+              <>
+                {scrapedCoursesLoading && (
+                  <div className="flex flex-col gap-2 animate-pulse">
+                    {[1,2,3,4,5].map(i => (
+                      <div key={i} className="h-10 bg-muted rounded w-full" />
+                    ))}
+                  </div>
+                )}
+                {!scrapedCoursesLoading && !scrapedCourses && (
+                  <div className="text-center py-8">
+                    <Code className="h-8 w-8 mx-auto mb-2 opacity-30" />
+                    <p className="text-sm text-muted-foreground">No data — click Refresh to load courses.</p>
+                  </div>
+                )}
+                {!scrapedCoursesLoading && scrapedCourses && scrapedCourses.courses.length === 0 && (
+                  <div className="text-center py-8">
+                    <CheckCircle2 className="h-8 w-8 mx-auto mb-2 text-green-500 opacity-60" />
+                    <p className="text-sm text-muted-foreground">No staged courses found for this university.</p>
+                    <p className="text-xs text-muted-foreground mt-1">Job: <code className="font-mono">{scrapedCourses.job_id ?? "—"}</code></p>
+                  </div>
+                )}
+                {scrapedCourses && scrapedCourses.courses.length > 0 && (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">
+                        {scrapedCourses.courses.length} course{scrapedCourses.courses.length !== 1 ? "s" : ""} from last scrape job
+                        {scrapedCourses.job_id && <> · <code className="font-mono">{scrapedCourses.job_id.slice(0, 12)}…</code></>}
+                      </span>
+                    </div>
+                    <div className="border rounded-md overflow-hidden">
+                      {scrapedCourses.courses.map((c, i) => {
+                        const pct = c.completeness ?? 0;
+                        const pctColor = pct >= 85 ? "text-green-600 dark:text-green-400" : pct >= 60 ? "text-amber-600 dark:text-amber-400" : "text-red-600 dark:text-red-400";
+                        return (
+                          <button
+                            key={c.id}
+                            onClick={() => { setSelectedCourseId(c.id); onLoadExtractionTrace(c.id); }}
+                            className={cn(
+                              "w-full text-left flex items-center gap-3 px-3 py-2 text-xs border-b last:border-b-0 hover:bg-blue-50/60 dark:hover:bg-blue-950/20 transition-colors",
+                              i % 2 === 0 ? "" : "bg-muted/10",
+                            )}
+                          >
+                            <div className="flex-1 min-w-0">
+                              <span className="font-medium truncate block">{c.course_name}</span>
+                              <span className="text-muted-foreground text-[11px]">{c.degree_level} · {c.study_mode ?? "—"} · {c.international_fee ? `$${c.international_fee.toLocaleString()}` : "no fee"}</span>
+                            </div>
+                            <span className={cn("text-[11px] font-mono font-semibold flex-shrink-0", pctColor)}>{pct}%</span>
+                            <ChevronDown className="h-3 w-3 text-muted-foreground flex-shrink-0 rotate-[-90deg]" />
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
+              </>
+            ) : (
+              /* Trace detail pane */
+              <>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => { setSelectedCourseId(null); }}
+                    className="flex items-center gap-1 text-xs text-blue-600 hover:underline"
+                  >
+                    <ChevronDown className="h-3 w-3 rotate-90" /> Back to course list
+                  </button>
+                </div>
+                {extractionTraceLoading && (
+                  <div className="flex flex-col gap-2 animate-pulse">
+                    {[1,2,3,4,5,6].map(i => (
+                      <div key={i} className="h-12 bg-muted rounded w-full" />
+                    ))}
+                  </div>
+                )}
+                {!extractionTraceLoading && extractionTrace && (
+                  <>
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div>
+                        <p className="font-medium text-sm">{extractionTrace.course_name}</p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">
+                          Completeness: <span className={cn(
+                            "font-semibold",
+                            (extractionTrace.completeness ?? 0) >= 85 ? "text-green-600" : (extractionTrace.completeness ?? 0) >= 60 ? "text-amber-600" : "text-red-600",
+                          )}>{extractionTrace.completeness ?? "?"}%</span>
+                          {" · "}Status: <code className="font-mono">{extractionTrace.status}</code>
+                          {extractionTrace.course_website && (
+                            <> · <a href={extractionTrace.course_website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline truncate max-w-[20ch] inline-block align-bottom">source page ↗</a></>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="border rounded-md overflow-hidden">
+                      <div className="grid grid-cols-[160px_1fr_1fr_90px] text-[10px] font-semibold text-muted-foreground uppercase tracking-wide px-3 py-1.5 border-b bg-muted/30">
+                        <span>Field</span>
+                        <span>Rule / Method</span>
+                        <span>Final Value</span>
+                        <span>Confidence</span>
+                      </div>
+                      <div className="max-h-[420px] overflow-y-auto">
+                        {extractionTrace.pipeline.map((f, i) => {
+                          const methodColor = f.extraction_method?.startsWith("gemini") ? "text-purple-600 dark:text-purple-400"
+                            : f.extraction_method?.startsWith("regex") ? "text-blue-600 dark:text-blue-400"
+                            : f.extraction_method?.startsWith("ai_") ? "text-indigo-600 dark:text-indigo-400"
+                            : "text-slate-600 dark:text-slate-400";
+                          return (
+                            <div
+                              key={f.field_key}
+                              className={cn(
+                                "grid grid-cols-[160px_1fr_1fr_90px] items-start gap-1 px-3 py-2 text-xs border-b last:border-b-0",
+                                f.missing ? "bg-red-50/60 dark:bg-red-950/20" : i % 2 === 0 ? "" : "bg-muted/10",
+                              )}
+                              title={f.snippet ? `Snippet: ${f.snippet}` : undefined}
+                            >
+                              <span className={cn("font-medium text-[11px]", f.missing && "text-red-600 dark:text-red-400")}>
+                                {f.field_label}
+                                {f.candidates_count > 1 && (
+                                  <span className="ml-1 text-[10px] text-muted-foreground">({f.candidates_count})</span>
+                                )}
+                              </span>
+                              <span className={cn("font-mono text-[11px] truncate", methodColor)}>
+                                {f.extraction_method ?? <span className="text-muted-foreground italic">—</span>}
+                              </span>
+                              <span className={cn("font-mono text-[11px] truncate", f.missing ? "text-muted-foreground italic" : "")}>
+                                {f.missing ? "missing" : (f.final_value ?? "—")}
+                              </span>
+                              <span className="text-[11px] text-muted-foreground text-right">
+                                {f.confidence != null ? `${Math.round(f.confidence * 100)}%` : "—"}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">
+                      Hover a row to see the raw snippet. <span className="font-mono text-purple-600">gemini</span> = AI extraction · <span className="font-mono text-blue-600">regex</span> = pattern · <span className="font-mono text-slate-600">*.rule</span> = rule-based.
+                    </p>
+                  </>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
+        {/* ── Tab: Discovery Debugger ────────────────────────────────────── */}
+        {debugTab === "discovery" && (
+          <div className="space-y-4">
+            {/* URL Tester */}
+            <div className="border rounded-md overflow-hidden">
+              <div className="px-3 py-2 border-b bg-muted/20 text-[11px] font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+                <Search className="h-3.5 w-3.5" /> URL Tester
+              </div>
+              <div className="p-3 space-y-2">
+                <p className="text-xs text-muted-foreground">Test any URL against this university's current block, allow, and must_contain patterns.</p>
+                <div className="flex gap-2">
+                  <input
+                    type="url"
+                    value={testUrl}
+                    onChange={e => setTestUrl(e.target.value)}
+                    onKeyDown={e => e.key === "Enter" && onTestUrl()}
+                    placeholder="https://www.university.edu.au/courses/master-of-science"
+                    className="flex-1 h-8 rounded-md border px-3 text-xs bg-background focus:outline-none focus:ring-1 focus:ring-ring font-mono"
+                  />
+                  <Button size="sm" className="h-8 text-xs px-3" onClick={onTestUrl} disabled={urlTestLoading || !testUrl.trim()}>
+                    {urlTestLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5 mr-1" />}
+                    Test
+                  </Button>
+                </div>
+                {urlTestResult && (
+                  <div className={cn(
+                    "border rounded-md p-3 mt-2 text-xs",
+                    urlTestResult.accepted ? "bg-green-50 border-green-200 dark:bg-green-950/30 dark:border-green-800" : "bg-red-50 border-red-200 dark:bg-red-950/30 dark:border-red-800",
+                  )}>
+                    <div className="flex items-center gap-2 font-semibold mb-1">
+                      {urlTestResult.accepted
+                        ? <CheckCircle2 className="h-4 w-4 text-green-600" />
+                        : <AlertCircle className="h-4 w-4 text-red-600" />}
+                      <span className={urlTestResult.accepted ? "text-green-700 dark:text-green-300" : "text-red-700 dark:text-red-300"}>
+                        {urlTestResult.accepted ? "ACCEPTED — URL passes all filters" : `BLOCKED by ${urlTestResult.blocked_by}`}
+                      </span>
+                    </div>
+                    <p className="text-muted-foreground">{urlTestResult.reason}</p>
+                    {urlTestResult.matched_pattern && (
+                      <p className="mt-1">Pattern: <code className="font-mono bg-muted px-1 rounded">{urlTestResult.matched_pattern}</code></p>
+                    )}
+                    <div className="mt-2 grid grid-cols-3 gap-2 text-[11px]">
+                      <div><span className="text-muted-foreground">Block patterns:</span> <strong>{urlTestResult.block_patterns.length}</strong></div>
+                      <div><span className="text-muted-foreground">Allow patterns:</span> <strong>{urlTestResult.allow_patterns.length}</strong></div>
+                      <div><span className="text-muted-foreground">Must contain:</span> <strong>{urlTestResult.must_contain.length}</strong></div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Stats from last job */}
+            {discoveryStatsLoading && (
+              <div className="flex flex-col gap-2 animate-pulse">
+                {[1,2,3].map(i => <div key={i} className="h-10 bg-muted rounded w-full" />)}
+              </div>
+            )}
+            {!discoveryStatsLoading && !discoveryStats && (
+              <p className="text-sm text-muted-foreground">No discovery stats — click Refresh to load.</p>
+            )}
+            {!discoveryStatsLoading && discoveryStats && (
+              <div className="space-y-3">
+                <div className="text-xs text-muted-foreground">
+                  Job: <code className="font-mono">{discoveryStats.job_id?.slice(0, 16) ?? "—"}…</code>
+                </div>
+
+                {/* Summary tiles */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {[
+                    { label: "Blocked (block patterns)", value: discoveryStats.summary.total_blocked_by_block_patterns, color: "text-red-600 dark:text-red-400" },
+                    { label: "Blocked (allow whitelist)", value: discoveryStats.summary.total_blocked_by_allow_patterns, color: "text-amber-600 dark:text-amber-400" },
+                    { label: "Blocked (must_contain)", value: discoveryStats.summary.total_blocked_by_must_contain, color: "text-orange-600 dark:text-orange-400" },
+                    { label: "Pages classified", value: discoveryStats.summary.pages_classified, color: "text-blue-600 dark:text-blue-400" },
+                  ].map(t => (
+                    <div key={t.label} className="border rounded-md p-3 bg-background">
+                      <div className={cn("text-2xl font-bold leading-none", t.color)}>{t.value}</div>
+                      <div className="text-[11px] text-muted-foreground mt-1">{t.label}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Pattern breakdown */}
+                {Object.keys(discoveryStats.summary.pattern_breakdown).length > 0 && (
+                  <div className="border rounded-md overflow-hidden">
+                    <div className="px-3 py-1.5 border-b bg-muted/20 text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
+                      Block Pattern Breakdown
+                    </div>
+                    <div className="divide-y max-h-48 overflow-y-auto">
+                      {Object.entries(discoveryStats.summary.pattern_breakdown).map(([pat, cnt]) => (
+                        <div key={pat} className="flex items-center gap-3 px-3 py-1.5 text-xs">
+                          <code className="font-mono text-[11px] flex-1 truncate text-red-700 dark:text-red-400">{pat}</code>
+                          <span className="font-semibold text-red-600 dark:text-red-400 flex-shrink-0">{cnt} blocked</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Sample blocked URLs */}
+                {discoveryStats.summary.blocked_samples.length > 0 && (
+                  <div className="border rounded-md overflow-hidden">
+                    <div className="px-3 py-1.5 border-b bg-muted/20 text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
+                      Sample Blocked URLs (block_url_patterns)
+                    </div>
+                    <div className="divide-y max-h-40 overflow-y-auto">
+                      {discoveryStats.summary.blocked_samples.slice(0, 15).map((url, i) => (
+                        <div key={i} className="flex items-center gap-2 px-3 py-1 text-xs group">
+                          <code className="font-mono text-[11px] flex-1 truncate text-muted-foreground">{url}</code>
+                          <button
+                            className="opacity-0 group-hover:opacity-100 text-xs text-blue-600 hover:underline flex-shrink-0"
+                            onClick={() => setTestUrl(url)}
+                          >
+                            test ↑
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Allow-pattern drops */}
+                {discoveryStats.summary.allow_dropped_samples.length > 0 && (
+                  <div className="border rounded-md overflow-hidden">
+                    <div className="px-3 py-1.5 border-b bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800 text-[11px] font-semibold text-amber-700 dark:text-amber-300 uppercase tracking-wide">
+                      Dropped by allow_url_patterns whitelist ({discoveryStats.summary.allow_dropped_samples.length} sample)
+                    </div>
+                    <div className="divide-y max-h-40 overflow-y-auto">
+                      {discoveryStats.summary.allow_dropped_samples.slice(0, 10).map((url, i) => (
+                        <div key={i} className="flex items-center gap-2 px-3 py-1 text-xs group">
+                          <code className="font-mono text-[11px] flex-1 truncate text-muted-foreground">{url}</code>
+                          <button
+                            className="opacity-0 group-hover:opacity-100 text-xs text-blue-600 hover:underline flex-shrink-0"
+                            onClick={() => setTestUrl(url)}
+                          >
+                            test ↑
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1869,7 +2277,7 @@ export default function SettingsScraperConfigs() {
   const [aiFixPrev, setAiFixPrev] = useState<string | null>(null);
 
   // ── Debugger panel state ──────────────────────────────────────────────────
-  const [debugTab, setDebugTab] = useState<"config" | "overrides" | "rejections">("config");
+  const [debugTab, setDebugTab] = useState<"config" | "overrides" | "rejections" | "extraction" | "discovery">("config");
   const [effectiveCfg, setEffectiveCfg] = useState<EffectiveConfigResult | null>(null);
   const [effectiveCfgLoading, setEffectiveCfgLoading] = useState(false);
   const [rejectionLog, setRejectionLog] = useState<RejectionLogResult | null>(null);
@@ -1878,6 +2286,18 @@ export default function SettingsScraperConfigs() {
   const [clearingOverrideKey, setClearingOverrideKey] = useState<string | null>(null);
   const [clearingAllOverrides, setClearingAllOverrides] = useState(false);
   const [cfgExpandedSections, setCfgExpandedSections] = useState<Record<string, boolean>>({});
+  // Extraction Debugger
+  const [scrapedCourses, setScrapedCourses] = useState<ScrapedCoursesResult | null>(null);
+  const [scrapedCoursesLoading, setScrapedCoursesLoading] = useState(false);
+  const [extractionTrace, setExtractionTrace] = useState<ExtractionTraceResult | null>(null);
+  const [extractionTraceLoading, setExtractionTraceLoading] = useState(false);
+  const [selectedCourseId, setSelectedCourseId] = useState<number | null>(null);
+  // Discovery Debugger
+  const [discoveryStats, setDiscoveryStats] = useState<DiscoveryStatsResult | null>(null);
+  const [discoveryStatsLoading, setDiscoveryStatsLoading] = useState(false);
+  const [testUrl, setTestUrl] = useState("");
+  const [urlTestResult, setUrlTestResult] = useState<UrlTestResult | null>(null);
+  const [urlTestLoading, setUrlTestLoading] = useState(false);
 
   // ── AI Diagnose & Fix ─────────────────────────────────────────────────────
   const [diagnosing, setDiagnosing] = useState(false);
@@ -1970,6 +2390,8 @@ export default function SettingsScraperConfigs() {
       if (cfg?.university_id) {
         void fetchEffectiveConfig(cfg.university_id);
         void fetchRejectionLog(cfg.university_id);
+        void fetchScrapedCourses(cfg.university_id);
+        void fetchDiscoveryStats(cfg.university_id);
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -2001,6 +2423,69 @@ export default function SettingsScraperConfigs() {
       toast({ title: "Failed to load rejection log", description: (err as Error).message, variant: "destructive" });
     } finally {
       setRejectionLogLoading(false);
+    }
+  }, [toast]);
+
+  const fetchScrapedCourses = useCallback(async (uniId: number) => {
+    setScrapedCoursesLoading(true);
+    setScrapedCourses(null);
+    setSelectedCourseId(null);
+    setExtractionTrace(null);
+    try {
+      const res = await fetchWithAuth(`${BASE}/api/universities/${uniId}/scraped-courses`);
+      if (!res.ok) throw new Error(await res.text());
+      setScrapedCourses(await res.json());
+    } catch (err) {
+      toast({ title: "Failed to load courses", description: (err as Error).message, variant: "destructive" });
+    } finally {
+      setScrapedCoursesLoading(false);
+    }
+  }, [toast]);
+
+  const fetchExtractionTrace = useCallback(async (uniId: number, courseId: number) => {
+    setExtractionTraceLoading(true);
+    setExtractionTrace(null);
+    try {
+      const res = await fetchWithAuth(`${BASE}/api/universities/${uniId}/scraped-courses/${courseId}/extraction-trace`);
+      if (!res.ok) throw new Error(await res.text());
+      setExtractionTrace(await res.json());
+    } catch (err) {
+      toast({ title: "Failed to load extraction trace", description: (err as Error).message, variant: "destructive" });
+    } finally {
+      setExtractionTraceLoading(false);
+    }
+  }, [toast]);
+
+  const fetchDiscoveryStats = useCallback(async (uniId: number) => {
+    setDiscoveryStatsLoading(true);
+    setDiscoveryStats(null);
+    try {
+      const res = await fetchWithAuth(`${BASE}/api/universities/${uniId}/discovery-stats`);
+      if (!res.ok) throw new Error(await res.text());
+      setDiscoveryStats(await res.json());
+    } catch (err) {
+      toast({ title: "Failed to load discovery stats", description: (err as Error).message, variant: "destructive" });
+    } finally {
+      setDiscoveryStatsLoading(false);
+    }
+  }, [toast]);
+
+  const handleTestUrl = useCallback(async (uniId: number, url: string) => {
+    if (!url.trim()) return;
+    setUrlTestLoading(true);
+    setUrlTestResult(null);
+    try {
+      const res = await fetchWithAuth(`${BASE}/api/universities/${uniId}/test-url`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      setUrlTestResult(await res.json());
+    } catch (err) {
+      toast({ title: "URL test failed", description: (err as Error).message, variant: "destructive" });
+    } finally {
+      setUrlTestLoading(false);
     }
   }, [toast]);
 
@@ -2980,7 +3465,27 @@ export default function SettingsScraperConfigs() {
                     if (selectedConfig?.university_id) {
                       void fetchEffectiveConfig(selectedConfig.university_id);
                       void fetchRejectionLog(selectedConfig.university_id);
+                      void fetchScrapedCourses(selectedConfig.university_id);
+                      void fetchDiscoveryStats(selectedConfig.university_id);
                     }
+                  }}
+                  scrapedCourses={scrapedCourses}
+                  scrapedCoursesLoading={scrapedCoursesLoading}
+                  extractionTrace={extractionTrace}
+                  extractionTraceLoading={extractionTraceLoading}
+                  selectedCourseId={selectedCourseId}
+                  setSelectedCourseId={setSelectedCourseId}
+                  onLoadExtractionTrace={(courseId) => {
+                    if (selectedConfig?.university_id) void fetchExtractionTrace(selectedConfig.university_id, courseId);
+                  }}
+                  discoveryStats={discoveryStats}
+                  discoveryStatsLoading={discoveryStatsLoading}
+                  testUrl={testUrl}
+                  setTestUrl={setTestUrl}
+                  urlTestResult={urlTestResult}
+                  urlTestLoading={urlTestLoading}
+                  onTestUrl={() => {
+                    if (selectedConfig?.university_id) void handleTestUrl(selectedConfig.university_id, testUrl);
                   }}
                 />
               ) : (
