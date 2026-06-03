@@ -2517,6 +2517,316 @@ async def auto_repair_filter_from_discovery(
     }
 
 
+# ── Feature: Effective Config Viewer ─────────────────────────────────────────
+
+@router.get("/universities/{uni_id}/effective-config")
+async def get_effective_config(
+    uni_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[dict, Depends(get_current_user)],
+) -> dict:
+    """Return the final merged config with per-field source attribution.
+
+    Builds the config step-by-step through the priority chain and annotates
+    every leaf value with the source layer that last set it:
+      system_default | defaults_yaml | db_legacy | db_auto | yaml | admin_config
+    """
+    u: University | None = await db.get(University, uni_id)
+    if not u:
+        raise HTTPException(status_code=404, detail="University not found")
+
+    from app.services.scraper.config.loader import (
+        _load_yaml_file, _deep_merge, _translate_db_scrape_config,
+        _extract_auto_config, _extract_admin_config,
+        _DEFAULTS_FILE, _UNIS_DIR, _hostname_to_slug,
+    )
+    from urllib.parse import urlparse as _up2
+
+    sc: dict = dict(u.scrape_config or {})
+    _h2 = _up2(u.scrape_url or "").hostname or ""
+    slug = _hostname_to_slug(_h2) if _h2 else (u.name or "").lower().split()[0]
+
+    layers: list[tuple[str, dict]] = []
+
+    # 1 defaults.yaml
+    d = _load_yaml_file(_DEFAULTS_FILE)
+    if d:
+        layers.append(("defaults_yaml", d))
+
+    # 2 legacy DB uniPages
+    db_t = _translate_db_scrape_config(sc)
+    if db_t:
+        layers.append(("db_legacy", db_t))
+
+    # 3 auto_config
+    auto = _extract_auto_config(sc)
+    if auto:
+        layers.append(("db_auto", auto))
+
+    # 4 per-uni YAML
+    uni_id_yaml = _UNIS_DIR / f"{slug}_{uni_id}.yaml"
+    yaml_path = uni_id_yaml if uni_id_yaml.exists() else _UNIS_DIR / f"{slug}.yaml"
+    y = _load_yaml_file(yaml_path)
+    if y:
+        layers.append(("yaml", y))
+
+    # 5 admin_config (highest priority)
+    adm = _extract_admin_config(sc)
+    if adm:
+        layers.append(("admin_config", adm))
+
+    # Build annotated tree: walk each layer and record which source set each leaf
+    def _annotate(base_ann: dict, layer_dict: dict, source: str) -> dict:
+        result = dict(base_ann)
+        for k, v in layer_dict.items():
+            if isinstance(v, dict) and isinstance(result.get(k), dict) and not isinstance(result[k], dict):
+                result[k] = _annotate(result.get(k, {}), v, source)
+            elif isinstance(v, dict) and isinstance(result.get(k, {}), dict):
+                result[k] = _annotate(result.get(k, {}), v, source)
+            else:
+                result[k] = {"value": v, "source": source}
+        return result
+
+    annotated: dict = {}
+    for src_name, layer_data in layers:
+        annotated = _annotate(annotated, layer_data, src_name)
+
+    # Also produce a flat "overrides only" summary for the admin_config panel
+    admin_flat: list[dict] = []
+
+    def _flatten_admin(d2: dict, prefix: str = "") -> None:
+        for k, v in d2.items():
+            path = f"{prefix}.{k}" if prefix else k
+            if isinstance(v, dict) and not k.startswith("_"):
+                _flatten_admin(v, path)
+            else:
+                admin_flat.append({"path": path, "value": v})
+
+    if adm:
+        _flatten_admin(adm)
+
+    has_yaml = bool(y)
+    yaml_slug = yaml_path.name if yaml_path.exists() else None
+
+    return {
+        "university_id": uni_id,
+        "university_name": u.name,
+        "slug": slug,
+        "yaml_slug": yaml_slug,
+        "has_yaml": has_yaml,
+        "layers_present": [l[0] for l in layers],
+        "annotated_config": annotated,
+        "admin_config_raw": adm,
+        "admin_overrides_flat": admin_flat,
+        "has_admin_overrides": bool(adm),
+    }
+
+
+@router.delete("/universities/{uni_id}/admin-config")
+async def clear_admin_config(
+    uni_id: int,
+    body: dict = Body(default={}),
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_user),
+) -> dict:
+    """Clear admin_config overrides for a university.
+
+    Body (optional):
+      { "keys": ["extraction.filters.online_only"] }  → clear specific dotted paths
+      {}                                               → clear ALL admin_config
+    """
+    u: University | None = await db.get(University, uni_id)
+    if not u:
+        raise HTTPException(status_code=404, detail="University not found")
+
+    sc: dict = dict(u.scrape_config or {})
+    keys_to_clear: list[str] = body.get("keys") or []
+
+    if not keys_to_clear:
+        # Clear everything — preserve _prev_admin_config for rollback
+        old = sc.get("admin_config") or {}
+        if old:
+            sc["_prev_admin_config"] = old
+        sc["admin_config"] = {}
+        cleared = "all"
+    else:
+        adm: dict = dict(sc.get("admin_config") or {})
+        sc["_prev_admin_config"] = copy.deepcopy(adm)
+        for dotted_key in keys_to_clear:
+            parts = dotted_key.split(".")
+            node = adm
+            for p in parts[:-1]:
+                if isinstance(node.get(p), dict):
+                    node = node[p]
+                else:
+                    node = None
+                    break
+            if node is not None and parts[-1] in node:
+                del node[parts[-1]]
+        sc["admin_config"] = adm
+        cleared = keys_to_clear
+
+    await db.execute(
+        text("UPDATE universities SET scrape_config = CAST(:cfg AS jsonb) WHERE id = :id"),
+        {"cfg": json.dumps(sc), "id": uni_id},
+    )
+    await db.commit()
+
+    return {"ok": True, "university_id": uni_id, "cleared": cleared}
+
+
+# ── Feature: Rejection Log ────────────────────────────────────────────────────
+
+@router.get("/universities/{uni_id}/rejection-log")
+async def get_rejection_log(
+    uni_id: int,
+    job_id: str | None = None,
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_user),
+) -> dict:
+    """Return every skipped/rejected URL and course for a scrape job.
+
+    If job_id is omitted, uses the most recent completed job for this university.
+    Reads scrape_runtime_logs rows with kind='skipped' and aggregates by reason.
+    """
+    # Resolve job_id
+    if not job_id:
+        row = (await db.execute(
+            text("""
+                SELECT runtime_job_id FROM scrape_runtime_jobs
+                WHERE university_id = :uid AND status IN ('completed','done','failed')
+                ORDER BY created_at DESC LIMIT 1
+            """),
+            {"uid": uni_id},
+        )).mappings().first()
+        if not row:
+            return {"university_id": uni_id, "job_id": None, "rejections": [], "summary": {}, "total": 0}
+        job_id = row["runtime_job_id"]
+
+    rows = (await db.execute(
+        text("""
+            SELECT payload, created_at
+            FROM scrape_runtime_logs
+            WHERE runtime_job_id = :jid
+              AND payload->>'kind' = 'skipped'
+            ORDER BY sequence ASC
+            LIMIT 1000
+        """),
+        {"jid": job_id},
+    )).mappings().all()
+
+    REASON_LABELS: dict[str, dict] = {
+        "online_only": {
+            "label": "Online-only filter",
+            "description": "Study mode was detected as 'Online'. If this is wrong, add the host to _STUDY_MODE_RULE_SUPPRESSED_HOSTS or set extraction.filters.online_only.enabled: false.",
+            "config_key": "extraction.filters.online_only.enabled",
+            "severity": "warning",
+        },
+        "domestic_only": {
+            "label": "Domestic-only course",
+            "description": "The course was flagged as domestic-only (no international pricing). Set extraction.filters.domestic_only.enabled: false to disable this filter.",
+            "config_key": "extraction.filters.domestic_only.enabled",
+            "severity": "warning",
+        },
+        "category_landing_page": {
+            "label": "Category/landing page",
+            "description": "URL looks like a subject category or faculty index page, not an individual course. Add discovery.allow_url_patterns to restrict to course-level URLs.",
+            "config_key": "discovery.allow_url_patterns",
+            "severity": "info",
+        },
+        "generic_category_page": {
+            "label": "Generic category page",
+            "description": "URL matched a generic category pattern (no degree-level qualifier in the title). Add discovery.allow_url_patterns to restrict to course-level URLs.",
+            "config_key": "discovery.allow_url_patterns",
+            "severity": "info",
+        },
+        "no_international_fee": {
+            "label": "No international fee",
+            "description": "No international fee was found. If fees are on a central page, set extraction.fees.central_page.",
+            "config_key": "extraction.fees.central_page",
+            "severity": "warning",
+        },
+        "missing_mandatory_field": {
+            "label": "Missing mandatory field",
+            "description": "A field listed in staging.reject_if_missing was absent.",
+            "config_key": "extraction.staging.reject_if_missing",
+            "severity": "critical",
+        },
+        "duplicate": {
+            "label": "Duplicate course",
+            "description": "A course with the same name was already staged in this run.",
+            "config_key": None,
+            "severity": "info",
+        },
+        "recently_rejected": {
+            "label": "Recently rejected (within 7d)",
+            "description": "This URL was manually rejected in the last 7 days and is being suppressed automatically.",
+            "config_key": None,
+            "severity": "info",
+        },
+    }
+
+    rejections: list[dict] = []
+    summary: dict[str, int] = {}
+
+    for r in rows:
+        p = r["payload"] or {}
+        reason_raw: str = (p.get("reason") or "unknown").strip()
+        # Normalise: strip "rejected: " prefix (actual DB format is "rejected: domestic_only")
+        _rn = reason_raw.lower()
+        if _rn.startswith("rejected:"):
+            _rn = _rn[len("rejected:"):].strip()
+        elif _rn.startswith("recently rejected"):
+            _rn = "recently_rejected"
+        reason_key = _rn.replace(" ", "_").replace("-", "_")[:40]
+        meta = REASON_LABELS.get(reason_key, {
+            "label": reason_raw.replace("_", " ").title(),
+            "description": "The course or URL was rejected by the staging gate.",
+            "config_key": None,
+            "severity": "info",
+        })
+        # Extract name/url from the event text in the payload
+        event_text: str = p.get("message") or p.get("event") or ""
+        url: str = p.get("url") or ""
+        course_name: str = p.get("name") or ""
+        if not course_name and event_text:
+            import re as _re2
+            m2 = _re2.search(r"skipped (.+?):", event_text)
+            if m2:
+                course_name = m2.group(1).strip()
+
+        rejections.append({
+            "reason": reason_key,
+            "reason_label": meta["label"],
+            "description": meta["description"],
+            "config_key": meta["config_key"],
+            "severity": meta["severity"],
+            "course_name": course_name,
+            "url": url,
+            "ts": r["created_at"].isoformat() if r["created_at"] else None,
+        })
+        summary[reason_key] = summary.get(reason_key, 0) + 1
+
+    summary_display = [
+        {
+            "reason": k,
+            "reason_label": REASON_LABELS.get(k, {"label": k.replace("_"," ").title()})["label"],
+            "count": v,
+            "severity": REASON_LABELS.get(k, {"severity": "info"})["severity"],
+            "config_key": REASON_LABELS.get(k, {"config_key": None})["config_key"],
+        }
+        for k, v in sorted(summary.items(), key=lambda x: -x[1])
+    ]
+
+    return {
+        "university_id": uni_id,
+        "job_id": job_id,
+        "total": len(rejections),
+        "summary": summary_display,
+        "rejections": rejections,
+    }
+
+
 def _to_camel_uni(u) -> dict:
     """Add camelCase aliases UI expects: scrapeUrl, feePageUrl, etc."""
     if hasattr(u, '__table__'):

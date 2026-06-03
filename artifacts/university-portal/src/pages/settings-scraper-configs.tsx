@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { SettingsTabs } from "@/components/settings-tabs";
-import { Plus, Save, Trash2, Sparkles, Search, RefreshCw, X, Play, Loader2, CheckCircle2, AlertCircle, Clock, GitCompare, Code, History, RotateCcw, Download, Clipboard, Check, Wand2, Undo2, Bot, ShieldAlert, TriangleAlert, Info, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, Save, Trash2, Sparkles, Search, RefreshCw, X, Play, Loader2, CheckCircle2, AlertCircle, Clock, GitCompare, Code, History, RotateCcw, Download, Clipboard, Check, Wand2, Undo2, Bot, ShieldAlert, TriangleAlert, Info, ChevronDown, ChevronUp, Bug, Layers, Filter, Trash } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { fetchWithAuth } from "@/lib/api";
 import { CountrySelect } from "@/components/country-select";
@@ -544,7 +544,50 @@ interface HistoryEntry {
   saved_at: string | null;
 }
 
-type EditorView = "editor" | "diff" | "history";
+type EditorView = "editor" | "diff" | "history" | "debugger";
+
+// ── Debugger types ─────────────────────────────────────────────────────────
+interface EffectiveConfigLayer {
+  value: unknown;
+  source: "defaults_yaml" | "db_legacy" | "db_auto" | "yaml" | "admin_config";
+}
+interface AdminOverrideFlat { path: string; value: unknown; }
+interface EffectiveConfigResult {
+  university_id: number;
+  university_name: string;
+  slug: string;
+  yaml_slug: string | null;
+  has_yaml: boolean;
+  layers_present: string[];
+  annotated_config: Record<string, unknown>;
+  admin_config_raw: Record<string, unknown>;
+  admin_overrides_flat: AdminOverrideFlat[];
+  has_admin_overrides: boolean;
+}
+interface RejectionSummaryItem {
+  reason: string;
+  reason_label: string;
+  count: number;
+  severity: "critical" | "warning" | "info";
+  config_key: string | null;
+}
+interface RejectionItem {
+  reason: string;
+  reason_label: string;
+  description: string;
+  config_key: string | null;
+  severity: "critical" | "warning" | "info";
+  course_name: string;
+  url: string;
+  ts: string | null;
+}
+interface RejectionLogResult {
+  university_id: number;
+  job_id: string | null;
+  total: number;
+  summary: RejectionSummaryItem[];
+  rejections: RejectionItem[];
+}
 
 interface DiagnosisIssue {
   severity: "critical" | "warning" | "info";
@@ -1342,6 +1385,436 @@ function HistoryPanel({ history, loading, hasMore, loadingMore, savedYaml, selec
   );
 }
 
+// ── Debugger Panel ────────────────────────────────────────────────────────────
+
+const SOURCE_META: Record<string, { label: string; color: string; dot: string }> = {
+  defaults_yaml:  { label: "defaults.yaml",  color: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",   dot: "bg-slate-400" },
+  db_legacy:      { label: "DB (legacy)",     color: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",       dot: "bg-blue-400" },
+  db_auto:        { label: "DB (auto)",       color: "bg-cyan-100 text-cyan-700 dark:bg-cyan-900 dark:text-cyan-300",       dot: "bg-cyan-500" },
+  yaml:           { label: "YAML file",       color: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",   dot: "bg-green-500" },
+  admin_config:   { label: "Admin override",  color: "bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300", dot: "bg-orange-500" },
+};
+
+const SEVERITY_META = {
+  critical: { color: "text-red-600 dark:text-red-400",    bg: "bg-red-50 border-red-200 dark:bg-red-950/30 dark:border-red-800",    icon: <AlertCircle className="h-3.5 w-3.5 text-red-500 flex-shrink-0" /> },
+  warning:  { color: "text-amber-600 dark:text-amber-400", bg: "bg-amber-50 border-amber-200 dark:bg-amber-950/30 dark:border-amber-800", icon: <TriangleAlert className="h-3.5 w-3.5 text-amber-500 flex-shrink-0" /> },
+  info:     { color: "text-blue-600 dark:text-blue-400",  bg: "bg-blue-50 border-blue-200 dark:bg-blue-950/30 dark:border-blue-800",  icon: <Info className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" /> },
+};
+
+function AnnotatedConfigTree({
+  data,
+  depth = 0,
+  expandedSections,
+  setExpandedSections,
+  path = "",
+}: {
+  data: Record<string, unknown>;
+  depth?: number;
+  expandedSections: Record<string, boolean>;
+  setExpandedSections: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
+  path?: string;
+}) {
+  return (
+    <div className={cn("space-y-0.5", depth > 0 && "ml-4 border-l border-muted/50 pl-2")}>
+      {Object.entries(data).map(([k, v]) => {
+        const fullPath = path ? `${path}.${k}` : k;
+        // Leaf: {value, source}
+        if (v !== null && typeof v === "object" && "value" in (v as object) && "source" in (v as object)) {
+          const leaf = v as { value: unknown; source: string };
+          const sm = SOURCE_META[leaf.source] ?? SOURCE_META.defaults_yaml;
+          const displayVal = typeof leaf.value === "object" ? JSON.stringify(leaf.value) : String(leaf.value ?? "");
+          return (
+            <div key={k} className="flex items-baseline gap-2 py-0.5 hover:bg-muted/30 rounded px-1 group">
+              <span className="font-mono text-[11px] text-muted-foreground w-40 flex-shrink-0 truncate" title={k}>{k}</span>
+              <span className={cn("inline-flex items-center gap-1 rounded px-1.5 py-0 text-[10px] font-medium flex-shrink-0", sm.color)}>
+                <span className={cn("w-1.5 h-1.5 rounded-full flex-shrink-0", sm.dot)} />
+                {sm.label}
+              </span>
+              <span className="font-mono text-[11px] flex-1 truncate" title={displayVal}>{displayVal}</span>
+            </div>
+          );
+        }
+        // Section: nested dict
+        if (v !== null && typeof v === "object" && !Array.isArray(v)) {
+          const isOpen = expandedSections[fullPath] !== false; // default open
+          return (
+            <div key={k}>
+              <button
+                className="flex items-center gap-1 py-0.5 px-1 w-full text-left hover:bg-muted/30 rounded group"
+                onClick={() => setExpandedSections(prev => ({ ...prev, [fullPath]: !isOpen }))}
+              >
+                {isOpen ? <ChevronDown className="h-3 w-3 text-muted-foreground" /> : <ChevronUp className="h-3 w-3 text-muted-foreground" style={{ transform: "rotate(180deg)" }} />}
+                <span className="font-mono text-[11px] font-semibold text-foreground">{k}</span>
+                <span className="text-[10px] text-muted-foreground ml-1">{Object.keys(v as object).length} keys</span>
+              </button>
+              {isOpen && (
+                <AnnotatedConfigTree
+                  data={v as Record<string, unknown>}
+                  depth={depth + 1}
+                  expandedSections={expandedSections}
+                  setExpandedSections={setExpandedSections}
+                  path={fullPath}
+                />
+              )}
+            </div>
+          );
+        }
+        // Fallback scalar
+        return (
+          <div key={k} className="flex items-baseline gap-2 py-0.5 px-1">
+            <span className="font-mono text-[11px] text-muted-foreground w-40 flex-shrink-0 truncate">{k}</span>
+            <span className="font-mono text-[11px]">{String(v ?? "")}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+interface DebuggerPanelProps {
+  uniId: number | null;
+  uniName: string;
+  effectiveCfg: EffectiveConfigResult | null;
+  effectiveCfgLoading: boolean;
+  rejectionLog: RejectionLogResult | null;
+  rejectionLogLoading: boolean;
+  rejectionFilter: string | null;
+  setRejectionFilter: (v: string | null) => void;
+  debugTab: "config" | "overrides" | "rejections";
+  setDebugTab: (v: "config" | "overrides" | "rejections") => void;
+  cfgExpandedSections: Record<string, boolean>;
+  setCfgExpandedSections: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
+  clearingOverrideKey: string | null;
+  clearingAllOverrides: boolean;
+  onClearOverrideKey: (key: string) => void;
+  onClearAllOverrides: () => void;
+  onRefresh: () => void;
+}
+
+function DebuggerPanel({
+  uniId, uniName, effectiveCfg, effectiveCfgLoading,
+  rejectionLog, rejectionLogLoading, rejectionFilter, setRejectionFilter,
+  debugTab, setDebugTab, cfgExpandedSections, setCfgExpandedSections,
+  clearingOverrideKey, clearingAllOverrides, onClearOverrideKey, onClearAllOverrides, onRefresh,
+}: DebuggerPanelProps) {
+  if (!uniId) {
+    return (
+      <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm p-8 text-center">
+        <div>
+          <Bug className="h-8 w-8 mx-auto mb-3 opacity-30" />
+          <p>This config is not linked to a university.</p>
+          <p className="text-xs mt-1">Add <code className="font-mono bg-muted px-1 rounded">{'# Hostname: www.example.edu.au'}</code> to the YAML to enable the debugger.</p>
+        </div>
+      </div>
+    );
+  }
+
+  const loading = effectiveCfgLoading || rejectionLogLoading;
+
+  // Filtered rejections
+  const visibleRejections = rejectionFilter
+    ? (rejectionLog?.rejections ?? []).filter(r => r.reason === rejectionFilter)
+    : (rejectionLog?.rejections ?? []);
+
+  const TAB_BUTTONS: { id: "config" | "overrides" | "rejections"; label: string; icon: React.ReactNode; badge?: number; badgeColor?: string }[] = [
+    { id: "config",     label: "Effective Config", icon: <Layers className="h-3.5 w-3.5" /> },
+    { id: "overrides",  label: "Admin Overrides",  icon: <ShieldAlert className="h-3.5 w-3.5" />,
+      badge: effectiveCfg?.admin_overrides_flat?.length,
+      badgeColor: effectiveCfg?.has_admin_overrides ? "bg-orange-500" : undefined },
+    { id: "rejections", label: "Rejection Log",    icon: <Filter className="h-3.5 w-3.5" />,
+      badge: rejectionLog?.total,
+      badgeColor: (rejectionLog?.total ?? 0) > 0 ? "bg-red-500" : undefined },
+  ];
+
+  return (
+    <div className="flex-1 flex flex-col overflow-hidden bg-orange-50/30 dark:bg-orange-950/10">
+      {/* Header */}
+      <div className="px-4 py-2 border-b bg-orange-50 dark:bg-orange-950/30 flex items-center gap-3">
+        <Bug className="h-4 w-4 text-orange-600 flex-shrink-0" />
+        <div className="flex-1 min-w-0">
+          <span className="text-xs font-semibold text-orange-900 dark:text-orange-200">Config Debugger</span>
+          <span className="text-xs text-muted-foreground ml-2">→ {uniName}</span>
+        </div>
+        {/* Source legend */}
+        <div className="hidden lg:flex items-center gap-2 flex-wrap">
+          {Object.values(SOURCE_META).map(m => (
+            <span key={m.label} className={cn("inline-flex items-center gap-1 rounded px-1.5 py-0 text-[10px] font-medium", m.color)}>
+              <span className={cn("w-1.5 h-1.5 rounded-full", m.dot)} />{m.label}
+            </span>
+          ))}
+        </div>
+        <button onClick={onRefresh} className="ml-2 p-1 rounded hover:bg-orange-100 dark:hover:bg-orange-900/40 text-orange-700 dark:text-orange-400" title="Refresh">
+          <RefreshCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
+        </button>
+      </div>
+
+      {/* Sub-tabs */}
+      <div className="flex border-b bg-background">
+        {TAB_BUTTONS.map(tb => (
+          <button
+            key={tb.id}
+            onClick={() => setDebugTab(tb.id)}
+            className={cn(
+              "flex items-center gap-1.5 px-4 py-2 text-xs border-b-2 transition-colors",
+              debugTab === tb.id
+                ? "border-orange-500 text-orange-700 dark:text-orange-300 font-medium"
+                : "border-transparent text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {tb.icon}
+            {tb.label}
+            {tb.badge != null && tb.badge > 0 && (
+              <span className={cn("ml-0.5 inline-flex items-center justify-center rounded-full text-white text-[10px] px-1.5 min-w-[18px] h-[18px]", tb.badgeColor ?? "bg-muted-foreground")}>
+                {tb.badge}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* Content area */}
+      <div className="flex-1 overflow-y-auto p-4">
+
+        {/* ── Tab: Effective Config ─────────────────────────────────────── */}
+        {debugTab === "config" && (
+          <>
+            {effectiveCfgLoading && (
+              <div className="flex flex-col gap-3 animate-pulse">
+                {[1,2,3,4].map(i => (
+                  <div key={i} className="flex gap-3">
+                    <div className="h-3 bg-muted rounded w-1/4" />
+                    <div className="h-3 bg-muted rounded w-1/6" />
+                    <div className="h-3 bg-muted/60 rounded w-1/3" />
+                  </div>
+                ))}
+              </div>
+            )}
+            {!effectiveCfgLoading && !effectiveCfg && (
+              <p className="text-sm text-muted-foreground">No data — click Refresh to load.</p>
+            )}
+            {effectiveCfg && !effectiveCfgLoading && (
+              <div className="space-y-4">
+                {/* Layers present */}
+                <div className="flex flex-wrap gap-1.5 items-center">
+                  <span className="text-xs text-muted-foreground mr-1">Active layers:</span>
+                  {effectiveCfg.layers_present.map(l => {
+                    const sm = SOURCE_META[l] ?? SOURCE_META.defaults_yaml;
+                    return (
+                      <span key={l} className={cn("inline-flex items-center gap-1 rounded px-2 py-0.5 text-[11px] font-medium", sm.color)}>
+                        <span className={cn("w-1.5 h-1.5 rounded-full", sm.dot)} />{sm.label}
+                      </span>
+                    );
+                  })}
+                  {effectiveCfg.has_yaml && (
+                    <span className="text-[11px] text-muted-foreground ml-1">· YAML: <code className="font-mono">{effectiveCfg.yaml_slug}</code></span>
+                  )}
+                </div>
+                {/* Tree */}
+                <div className="border rounded-md bg-background overflow-hidden">
+                  <div className="px-3 py-2 border-b bg-muted/20 text-[11px] text-muted-foreground font-medium tracking-wide">
+                    MERGED SETTINGS (hover for source)
+                  </div>
+                  <div className="p-2 overflow-x-auto">
+                    {Object.keys(effectiveCfg.annotated_config).length === 0
+                      ? <p className="text-xs text-muted-foreground px-2 py-1">No settings found — only system defaults apply.</p>
+                      : <AnnotatedConfigTree
+                          data={effectiveCfg.annotated_config}
+                          expandedSections={cfgExpandedSections}
+                          setExpandedSections={setCfgExpandedSections}
+                        />
+                    }
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* ── Tab: Admin Overrides ──────────────────────────────────────── */}
+        {debugTab === "overrides" && (
+          <>
+            {effectiveCfgLoading && (
+              <div className="flex flex-col gap-3 animate-pulse">
+                {[1,2].map(i => (
+                  <div key={i} className="h-10 bg-muted rounded w-full" />
+                ))}
+              </div>
+            )}
+            {!effectiveCfgLoading && effectiveCfg && (
+              <>
+                {!effectiveCfg.has_admin_overrides ? (
+                  <div className="text-center py-8">
+                    <CheckCircle2 className="h-8 w-8 mx-auto mb-2 text-green-500 opacity-60" />
+                    <p className="text-sm text-muted-foreground">No admin overrides active.</p>
+                    <p className="text-xs text-muted-foreground mt-1">Admin overrides are emergency fixes applied via the API — they take the highest priority and override the YAML file.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs text-muted-foreground">
+                        Admin overrides take the <strong>highest priority</strong> — they override the YAML file and all other layers. Clear them when the underlying YAML has been fixed.
+                      </p>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs text-red-600 border-red-300 hover:bg-red-50 flex-shrink-0 ml-4"
+                        onClick={onClearAllOverrides}
+                        disabled={clearingAllOverrides}
+                      >
+                        {clearingAllOverrides ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Trash className="h-3.5 w-3.5 mr-1" />}
+                        Clear all
+                      </Button>
+                    </div>
+                    <div className="border rounded-md overflow-hidden">
+                      {effectiveCfg.admin_overrides_flat.map((ov, i) => (
+                        <div
+                          key={ov.path}
+                          className={cn(
+                            "flex items-center gap-3 px-3 py-2.5 text-sm",
+                            i > 0 && "border-t",
+                            "hover:bg-orange-50/60 dark:hover:bg-orange-950/20",
+                          )}
+                        >
+                          <div className="flex-1 min-w-0">
+                            <code className="font-mono text-xs text-orange-700 dark:text-orange-400">{ov.path}</code>
+                            <span className="ml-3 text-xs text-muted-foreground font-mono truncate">
+                              = {typeof ov.value === "object" ? JSON.stringify(ov.value) : String(ov.value ?? "")}
+                            </span>
+                          </div>
+                          <button
+                            className={cn(
+                              "flex-shrink-0 text-muted-foreground hover:text-red-600 p-1 rounded transition-colors",
+                              clearingOverrideKey === ov.path && "opacity-50 cursor-not-allowed",
+                            )}
+                            onClick={() => onClearOverrideKey(ov.path)}
+                            disabled={clearingOverrideKey !== null}
+                            title={`Remove "${ov.path}" override`}
+                          >
+                            {clearingOverrideKey === ov.path
+                              ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              : <X className="h-3.5 w-3.5" />}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">
+                      After clearing, run a fresh scrape to confirm the YAML-only config behaves as expected.
+                    </p>
+                  </div>
+                )}
+              </>
+            )}
+          </>
+        )}
+
+        {/* ── Tab: Rejection Log ────────────────────────────────────────── */}
+        {debugTab === "rejections" && (
+          <>
+            {rejectionLogLoading && (
+              <div className="flex flex-col gap-3 animate-pulse">
+                {[1,2,3].map(i => (
+                  <div key={i} className="h-14 bg-muted rounded w-full" />
+                ))}
+              </div>
+            )}
+            {!rejectionLogLoading && rejectionLog && (
+              <>
+                {rejectionLog.total === 0 ? (
+                  <div className="text-center py-8">
+                    <CheckCircle2 className="h-8 w-8 mx-auto mb-2 text-green-500 opacity-60" />
+                    <p className="text-sm text-muted-foreground">No rejections in the last scrape job.</p>
+                    <p className="text-xs text-muted-foreground mt-1">Job ID: <code className="font-mono">{rejectionLog.job_id ?? "—"}</code></p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <span className="text-xs text-muted-foreground">
+                        Job: <code className="font-mono">{rejectionLog.job_id ?? "—"}</code> · {rejectionLog.total} rejection{rejectionLog.total !== 1 ? "s" : ""}
+                      </span>
+                      {rejectionFilter && (
+                        <button
+                          className="text-xs text-blue-600 hover:underline flex items-center gap-1"
+                          onClick={() => setRejectionFilter(null)}
+                        >
+                          <X className="h-3 w-3" /> Clear filter
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Summary cards */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {rejectionLog.summary.map(s => {
+                        const sm2 = SEVERITY_META[s.severity] ?? SEVERITY_META.info;
+                        const isActive = rejectionFilter === s.reason;
+                        return (
+                          <button
+                            key={s.reason}
+                            onClick={() => setRejectionFilter(isActive ? null : s.reason)}
+                            className={cn(
+                              "text-left border rounded-lg p-3 transition-all",
+                              sm2.bg,
+                              isActive && "ring-2 ring-orange-400",
+                              "hover:opacity-90",
+                            )}
+                          >
+                            <div className="flex items-center gap-2 mb-1">
+                              {sm2.icon}
+                              <span className={cn("text-xs font-semibold", sm2.color)}>{s.reason_label}</span>
+                              <span className={cn("ml-auto text-lg font-bold leading-none", sm2.color)}>{s.count}</span>
+                            </div>
+                            {s.config_key && (
+                              <div className="text-[11px] text-muted-foreground mt-1">
+                                Fix: <code className="font-mono text-[11px]">{s.config_key}</code>
+                              </div>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Detail list */}
+                    {visibleRejections.length > 0 && (
+                      <div className="border rounded-md overflow-hidden">
+                        <div className="px-3 py-1.5 border-b bg-muted/20 text-[11px] text-muted-foreground font-medium">
+                          {rejectionFilter ? `Showing: ${rejectionLog.summary.find(s => s.reason === rejectionFilter)?.reason_label ?? rejectionFilter}` : "All rejections"} ({visibleRejections.length})
+                        </div>
+                        <div className="max-h-80 overflow-y-auto">
+                          {visibleRejections.map((r, i) => {
+                            const sm2 = SEVERITY_META[r.severity] ?? SEVERITY_META.info;
+                            return (
+                              <div key={i} className={cn("flex items-start gap-2 px-3 py-2 text-xs border-b last:border-b-0 hover:bg-muted/30")}>
+                                {sm2.icon}
+                                <div className="flex-1 min-w-0">
+                                  {r.course_name && <div className="font-medium truncate">{r.course_name}</div>}
+                                  {r.url && <div className="text-muted-foreground truncate font-mono text-[11px]">{r.url}</div>}
+                                  <div className="text-muted-foreground mt-0.5">{r.description}</div>
+                                  {r.config_key && (
+                                    <div className="mt-0.5 text-[11px]">
+                                      Fix key: <code className="font-mono bg-muted px-1 rounded">{r.config_key}</code>
+                                    </div>
+                                  )}
+                                </div>
+                                {r.ts && <span className="text-muted-foreground text-[10px] flex-shrink-0">{new Date(r.ts).toLocaleTimeString()}</span>}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+            {!rejectionLogLoading && !rejectionLog && (
+              <p className="text-sm text-muted-foreground">No data — click Refresh to load.</p>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 
@@ -1394,6 +1867,17 @@ export default function SettingsScraperConfigs() {
   const [aiFixPrompt, setAiFixPrompt] = useState("");
   const [aiFixing, setAiFixing] = useState(false);
   const [aiFixPrev, setAiFixPrev] = useState<string | null>(null);
+
+  // ── Debugger panel state ──────────────────────────────────────────────────
+  const [debugTab, setDebugTab] = useState<"config" | "overrides" | "rejections">("config");
+  const [effectiveCfg, setEffectiveCfg] = useState<EffectiveConfigResult | null>(null);
+  const [effectiveCfgLoading, setEffectiveCfgLoading] = useState(false);
+  const [rejectionLog, setRejectionLog] = useState<RejectionLogResult | null>(null);
+  const [rejectionLogLoading, setRejectionLogLoading] = useState(false);
+  const [rejectionFilter, setRejectionFilter] = useState<string | null>(null);
+  const [clearingOverrideKey, setClearingOverrideKey] = useState<string | null>(null);
+  const [clearingAllOverrides, setClearingAllOverrides] = useState(false);
+  const [cfgExpandedSections, setCfgExpandedSections] = useState<Record<string, boolean>>({});
 
   // ── AI Diagnose & Fix ─────────────────────────────────────────────────────
   const [diagnosing, setDiagnosing] = useState(false);
@@ -1478,6 +1962,83 @@ export default function SettingsScraperConfigs() {
       void fetchHistory(selected);
     }
   }, [view, selected, fetchHistory]);
+
+  // Load debugger data when switching to debugger view
+  useEffect(() => {
+    if (view === "debugger" && selected) {
+      const cfg = configs.find(c => c.slug === selected);
+      if (cfg?.university_id) {
+        void fetchEffectiveConfig(cfg.university_id);
+        void fetchRejectionLog(cfg.university_id);
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, selected]);
+
+  const fetchEffectiveConfig = useCallback(async (uniId: number) => {
+    setEffectiveCfgLoading(true);
+    setEffectiveCfg(null);
+    try {
+      const res = await fetchWithAuth(`${BASE}/api/universities/${uniId}/effective-config`);
+      if (!res.ok) throw new Error(await res.text());
+      setEffectiveCfg(await res.json());
+    } catch (err) {
+      toast({ title: "Failed to load effective config", description: (err as Error).message, variant: "destructive" });
+    } finally {
+      setEffectiveCfgLoading(false);
+    }
+  }, [toast]);
+
+  const fetchRejectionLog = useCallback(async (uniId: number) => {
+    setRejectionLogLoading(true);
+    setRejectionLog(null);
+    setRejectionFilter(null);
+    try {
+      const res = await fetchWithAuth(`${BASE}/api/universities/${uniId}/rejection-log`);
+      if (!res.ok) throw new Error(await res.text());
+      setRejectionLog(await res.json());
+    } catch (err) {
+      toast({ title: "Failed to load rejection log", description: (err as Error).message, variant: "destructive" });
+    } finally {
+      setRejectionLogLoading(false);
+    }
+  }, [toast]);
+
+  const handleClearOverrideKey = useCallback(async (uniId: number, key: string) => {
+    setClearingOverrideKey(key);
+    try {
+      const res = await fetchWithAuth(`${BASE}/api/universities/${uniId}/admin-config`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ keys: [key] }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      toast({ title: "Override cleared", description: `Removed "${key}" from admin overrides.` });
+      await fetchEffectiveConfig(uniId);
+    } catch (err) {
+      toast({ title: "Failed to clear override", description: (err as Error).message, variant: "destructive" });
+    } finally {
+      setClearingOverrideKey(null);
+    }
+  }, [toast, fetchEffectiveConfig]);
+
+  const handleClearAllOverrides = useCallback(async (uniId: number) => {
+    setClearingAllOverrides(true);
+    try {
+      const res = await fetchWithAuth(`${BASE}/api/universities/${uniId}/admin-config`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      toast({ title: "All overrides cleared", description: "Admin config overrides have been removed." });
+      await fetchEffectiveConfig(uniId);
+    } catch (err) {
+      toast({ title: "Failed to clear overrides", description: (err as Error).message, variant: "destructive" });
+    } finally {
+      setClearingAllOverrides(false);
+    }
+  }, [toast, fetchEffectiveConfig]);
 
   // Clear history entry selection whenever the active config slug changes
   useEffect(() => {
@@ -2083,6 +2644,19 @@ export default function SettingsScraperConfigs() {
                         History
                       </button>
                     )}
+                    {selected && selectedConfig?.university_id != null && (
+                      <button
+                        onClick={() => setView("debugger")}
+                        className={cn(
+                          "flex items-center gap-1 px-2.5 py-1 text-xs border-l transition-colors",
+                          view === "debugger" ? "bg-orange-600 text-white" : "hover:bg-muted/50 text-orange-700 dark:text-orange-400"
+                        )}
+                        title="Debug this university's config — effective settings, admin overrides, rejection log"
+                      >
+                        <Bug className="h-3.5 w-3.5" />
+                        Debugger
+                      </button>
+                    )}
                   </div>
 
                   <Button
@@ -2380,6 +2954,35 @@ export default function SettingsScraperConfigs() {
                 />
               ) : view === "diff" ? (
                 <DiffViewer oldYaml={savedYaml} newYaml={editorYaml} />
+              ) : view === "debugger" ? (
+                <DebuggerPanel
+                  uniId={selectedConfig?.university_id ?? null}
+                  uniName={selectedConfig?.university_name ?? selected ?? ""}
+                  effectiveCfg={effectiveCfg}
+                  effectiveCfgLoading={effectiveCfgLoading}
+                  rejectionLog={rejectionLog}
+                  rejectionLogLoading={rejectionLogLoading}
+                  rejectionFilter={rejectionFilter}
+                  setRejectionFilter={setRejectionFilter}
+                  debugTab={debugTab}
+                  setDebugTab={setDebugTab}
+                  cfgExpandedSections={cfgExpandedSections}
+                  setCfgExpandedSections={setCfgExpandedSections}
+                  clearingOverrideKey={clearingOverrideKey}
+                  clearingAllOverrides={clearingAllOverrides}
+                  onClearOverrideKey={(key) => {
+                    if (selectedConfig?.university_id) void handleClearOverrideKey(selectedConfig.university_id, key);
+                  }}
+                  onClearAllOverrides={() => {
+                    if (selectedConfig?.university_id) void handleClearAllOverrides(selectedConfig.university_id);
+                  }}
+                  onRefresh={() => {
+                    if (selectedConfig?.university_id) {
+                      void fetchEffectiveConfig(selectedConfig.university_id);
+                      void fetchRejectionLog(selectedConfig.university_id);
+                    }
+                  }}
+                />
               ) : (
                 <textarea
                   ref={textareaRef}
@@ -2394,6 +2997,11 @@ export default function SettingsScraperConfigs() {
               <div className="px-4 py-1.5 border-t bg-muted/30 text-xs text-muted-foreground flex items-center gap-4">
                 {view === "history" ? (
                   <span>{history.length} saved version{history.length !== 1 ? "s" : ""}</span>
+                ) : view === "debugger" ? (
+                  <span className="text-orange-600 dark:text-orange-400 flex items-center gap-1">
+                    <Bug className="h-3 w-3" />
+                    Debugger — read-only view of runtime config &amp; rejection log
+                  </span>
                 ) : view === "diff" ? (
                   <>
                     <span>Diff: saved → current edit</span>
