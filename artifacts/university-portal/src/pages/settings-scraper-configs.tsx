@@ -878,6 +878,10 @@ interface TestDiscoveryUrlResult {
   seed_url: string;
   status_code: number;
   raw_candidates: number;
+  raw_course_count: number;
+  raw_listing_count: number;
+  raw_category_count: number;
+  raw_other_count: number;
   after_filter: number;
   dropped: number;
   drop_rate_pct: number;
@@ -913,8 +917,20 @@ interface FullValidationUrlResult {
   blocked_by: string | null;
   status_code: number;
   page_type: "course" | "listing" | "category" | "unknown";
-  keywords_found: string[];
-  estimated_completeness_pct: number;
+  course_name_extracted: boolean;
+  course_name_value: string | null;
+  fee_extracted: boolean;
+  fee_value: string | null;
+  english_extracted: boolean;
+  english_value: string | null;
+  intake_extracted: boolean;
+  duration_extracted: boolean;
+  degree_level_extracted: boolean;
+  fields_found: number;
+  fields_total: number;
+  completeness_pct: number;
+  will_stage: boolean;
+  rejection_reason: string | null;
   ok: boolean;
   error?: string;
   text_length?: number;
@@ -2527,13 +2543,18 @@ function DebuggerPanel({
                           onClick={() => setTdExpandedSeeds(s => ({ ...s, [i]: !s[i] }))}
                         >
                           <code className="font-mono text-[11px] truncate flex-1 text-muted-foreground max-w-xs">{sr.seed_url}</code>
-                          <div className="flex items-center gap-2 ml-2 flex-shrink-0">
-                            <span className="text-green-600 dark:text-green-400">{sr.after_filter} pass</span>
-                            {sr.drop_rate_pct > 0 && <span className="text-orange-600">{sr.drop_rate_pct}% drop</span>}
-                            {/* Page type counts */}
-                            {sr.course_count > 0 && <span className="px-1.5 py-0.5 bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 rounded text-[10px]">{sr.course_count} course</span>}
-                            {sr.listing_count > 0 && <span className="px-1.5 py-0.5 bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 rounded text-[10px]">{sr.listing_count} listing</span>}
-                            {sr.category_count > 0 && <span className="px-1.5 py-0.5 bg-purple-100 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 rounded text-[10px]">{sr.category_count} cat</span>}
+                          <div className="flex items-center gap-2 ml-2 flex-shrink-0 flex-wrap">
+                            {/* Raw breakdown — all discovered URLs by type */}
+                            <span className="text-muted-foreground text-[10px]">{sr.raw_candidates} raw</span>
+                            {(sr.raw_course_count ?? 0) > 0 && <span className="px-1.5 py-0.5 bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 rounded text-[10px]">{sr.raw_course_count} course</span>}
+                            {(sr.raw_listing_count ?? 0) > 0 && <span className="px-1.5 py-0.5 bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 rounded text-[10px]">{sr.raw_listing_count} listing</span>}
+                            {(sr.raw_category_count ?? 0) > 0 && <span className="px-1.5 py-0.5 bg-purple-100 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 rounded text-[10px]">{sr.raw_category_count} cat</span>}
+                            {/* After-filter count */}
+                            <span className="text-[10px]">→</span>
+                            <span className={cn("text-[10px] font-medium", sr.after_filter > 0 ? "text-green-600 dark:text-green-400" : "text-red-500")}>
+                              {sr.after_filter} pass filter
+                            </span>
+                            {sr.drop_rate_pct > 0 && <span className="text-orange-600 text-[10px]">{sr.drop_rate_pct}% dropped</span>}
                             {tdExpandedSeeds[i]
                               ? <ChevronUp className="h-3 w-3 text-muted-foreground" />
                               : <ChevronDown className="h-3 w-3 text-muted-foreground" />}
@@ -2638,35 +2659,69 @@ function DebuggerPanel({
                         )}
                       </div>
                       {/* Per-URL results */}
-                      {fv.results.map((r, i) => (
-                        <div key={i} className="px-3 py-2 text-xs">
-                          <div className="flex items-center gap-2 mb-1">
+                      {fv.results.map((r, i) => {
+                        const fieldRows: { label: string; ok: boolean; value?: string | null }[] = [
+                          { label: "Course name", ok: r.course_name_extracted, value: r.course_name_value },
+                          { label: "Fee", ok: r.fee_extracted, value: r.fee_value },
+                          { label: "English req", ok: r.english_extracted, value: r.english_value },
+                          { label: "Intake month", ok: r.intake_extracted },
+                          { label: "Duration", ok: r.duration_extracted },
+                          { label: "Degree level", ok: r.degree_level_extracted },
+                        ];
+                        return (
+                        <div key={i} className="px-3 py-2.5 text-xs space-y-1.5">
+                          <code className="font-mono text-[10px] text-muted-foreground truncate block mb-1">{r.url}</code>
+                          {r.error && <p className="text-[10px] text-red-500">{r.error}</p>}
+                          {/* Summary badges row */}
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className={cn(
+                              "inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium",
+                              r.passes_filter ? "bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-300" : "bg-red-100 text-red-600 dark:bg-red-950/40 dark:text-red-400",
+                            )}>{r.passes_filter ? "✓ Passes URL filter" : `✗ Blocked (${r.blocked_by ?? "filter"})`}</span>
                             <span className={cn(
                               "inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium",
                               r.page_type === "course" ? "bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300" :
                               r.page_type === "listing" ? "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300" :
                               "bg-muted text-muted-foreground",
-                            )}>{r.page_type}</span>
-                            <span className={cn(
-                              "inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium",
-                              r.passes_filter ? "bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-300" : "bg-red-100 text-red-600 dark:bg-red-950/40 dark:text-red-400",
-                            )}>{r.passes_filter ? "✓ passes filter" : `✗ blocked by ${r.blocked_by ?? "filter"}`}</span>
+                            )}>Page: {r.page_type}</span>
                             {r.ok && (
                               <span className={cn(
-                                "inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium ml-auto",
-                                r.estimated_completeness_pct >= 60 ? "bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-300" : "bg-orange-100 text-orange-700 dark:bg-orange-950/40 dark:text-orange-300",
-                              )}>~{r.estimated_completeness_pct}% extractable</span>
+                                "inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium",
+                                r.completeness_pct >= 67 ? "bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-300" : r.completeness_pct >= 33 ? "bg-orange-100 text-orange-700 dark:bg-orange-950/40 dark:text-orange-300" : "bg-red-100 text-red-600",
+                              )}>{r.fields_found}/{r.fields_total} fields</span>
                             )}
                           </div>
-                          <code className="font-mono text-[10px] text-muted-foreground truncate block">{r.url}</code>
-                          {r.error && <p className="text-[10px] text-red-500 mt-0.5">{r.error}</p>}
-                          {r.keywords_found && r.keywords_found.length > 0 && (
-                            <p className="text-[10px] text-muted-foreground/70 mt-0.5 truncate">
-                              Fields detected: {r.keywords_found.slice(0, 6).join(", ")}{r.keywords_found.length > 6 ? "…" : ""}
-                            </p>
+                          {/* Field extraction grid */}
+                          {r.ok && (
+                            <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 pl-1 border-l-2 border-muted">
+                              {fieldRows.map(f => (
+                                <div key={f.label} className="flex items-center gap-1 text-[10px]">
+                                  <span className={f.ok ? "text-green-600 dark:text-green-400" : "text-muted-foreground/50"}>
+                                    {f.ok ? "✓" : "✗"}
+                                  </span>
+                                  <span className={f.ok ? "text-foreground" : "text-muted-foreground/60"}>{f.label}</span>
+                                  {f.ok && f.value && (
+                                    <span className="text-muted-foreground/70 truncate ml-0.5 italic">{f.value}</span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
                           )}
+                          {/* Will stage verdict */}
+                          <div className={cn(
+                            "flex items-start gap-1.5 px-2 py-1 rounded text-[10px] font-medium",
+                            r.will_stage ? "bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-300" : "bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400",
+                          )}>
+                            <span className="flex-shrink-0">{r.will_stage ? "✅" : "❌"}</span>
+                            <span>
+                              {r.will_stage
+                                ? "Will stage — passes filter, is a course page, has enough fields"
+                                : `Will not stage${r.rejection_reason ? `: ${r.rejection_reason}` : ""}`}
+                            </span>
+                          </div>
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   );
                 })()}

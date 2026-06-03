@@ -1334,6 +1334,14 @@ async def post_test_discovery(
                 all_raw_set.update(candidates)
                 all_pass_set.update(passing)
 
+                # Classify ALL raw candidates by page type so operator sees
+                # full breakdown: "26 raw (12 course, 8 listing, 6 other)"
+                _raw_type_groups: dict[str, list[str]] = {
+                    "course": [], "listing": [], "category": [], "other": []
+                }
+                for _cu in candidates:
+                    _raw_type_groups[_classify_url_type(_cu)].append(_cu)
+
                 # Classify passing URLs by page type
                 _type_groups: dict[str, list[str]] = {
                     "course": [], "listing": [], "category": [], "other": []
@@ -1346,6 +1354,10 @@ async def post_test_discovery(
                     "seed_url": seed_url,
                     "status_code": resp.status_code,
                     "raw_candidates": len(candidates),
+                    "raw_course_count": len(_raw_type_groups["course"]),
+                    "raw_listing_count": len(_raw_type_groups["listing"]),
+                    "raw_category_count": len(_raw_type_groups["category"]),
+                    "raw_other_count": len(_raw_type_groups["other"]),
                     "after_filter": len(passing),
                     "dropped": len(dropped),
                     "drop_rate_pct": round(drop_r * 100),
@@ -1637,28 +1649,45 @@ async def post_full_validation(
             return False
         return True
 
-    _COURSE_KWS = [
-        "bachelor", "master", "doctor", "phd", "diploma", "certificate",
-        "degree", "graduate", "undergraduate", "ielts", "tuition fee",
-        "intake", "duration", "study mode", "full-time", "part-time",
-        "international student", "credit point",
-    ]
+    _LISTING_P_FV = ("/courses", "/programmes", "/programs", "/find-a-course", "/study")
+    _CATEGORY_P_FV = ("/faculty/", "/school/", "/department/", "/discipline/", "/area-of-study/")
 
-    _LISTING_P = ("/courses", "/programmes", "/programs", "/find-a-course")
-    _CATEGORY_P = ("/faculty/", "/school/", "/department/", "/discipline/")
+    # Field extraction regexes — used to simulate what the extractor would find
+    _H1_RE_FV = _re_fv.compile(r'<h1[^>]*>(.*?)</h1>', _re_fv.IGNORECASE | _re_fv.DOTALL)
+    _TITLE_RE_FV = _re_fv.compile(r'<title[^>]*>(.*?)</title>', _re_fv.IGNORECASE | _re_fv.DOTALL)
+    _FEE_RE_FV = _re_fv.compile(
+        r'(?:NZD|AUD|USD|GBP|£|\$)\s*[\d,]+|[\d,]+\s*(?:NZD|AUD|USD|per\s+year)',
+        _re_fv.IGNORECASE,
+    )
+    _ENGLISH_RE_FV = _re_fv.compile(
+        r'\b(?:IELTS|PTE Academic|PTE|TOEFL|TOEIC|Cambridge English|Duolingo)\b',
+        _re_fv.IGNORECASE,
+    )
+    _INTAKE_RE_FV = _re_fv.compile(
+        r'\b(?:January|February|March|April|May|June|July|August|September|October|November|December)\b',
+        _re_fv.IGNORECASE,
+    )
+    _DURATION_RE_FV = _re_fv.compile(r'\d+(?:\.\d+)?\s*(?:year|month|semester|week)s?', _re_fv.IGNORECASE)
+    _DEGREE_RE_FV = _re_fv.compile(
+        r'\b(?:bachelor|master|doctorate|doctor|phd|diploma|certificate|graduate certificate|postgraduate diploma)\b',
+        _re_fv.IGNORECASE,
+    )
 
-    def _fv_classify(url: str, kws_found: list[str]) -> str:
+    def _fv_classify(url: str, has_degree_kw: bool) -> str:
         lurl = url.lower().split("?")[0]
-        if any(lurl.rstrip("/").endswith(h.rstrip("/")) or h in lurl for h in _LISTING_P):
+        if any(lurl.rstrip("/").endswith(h.rstrip("/")) or h in lurl for h in _LISTING_P_FV):
             return "listing"
-        if any(h in lurl for h in _CATEGORY_P):
+        if any(h in lurl for h in _CATEGORY_P_FV):
             return "category"
-        degree_kws = {"bachelor", "master", "doctor", "phd", "diploma", "certificate", "degree"}
-        if any(kw in lurl for kw in degree_kws):
+        degree_url_kws = {"bachelor", "master", "doctor", "phd", "diploma", "certificate", "degree", "graduate"}
+        if any(kw in lurl for kw in degree_url_kws):
             return "course"
-        if len(kws_found) >= 4:
+        if has_degree_kw:
             return "course"
         return "unknown"
+
+    def _strip_tags(s: str) -> str:
+        return _re_fv.sub(r'<[^>]+>', '', s).strip()
 
     results = []
     async with _httpx_fv.AsyncClient(
@@ -1678,18 +1707,85 @@ async def post_full_validation(
 
             try:
                 resp_fv = await _cl.get(url)
-                text_lc = resp_fv.text.lower()[:60000]
-                kws_found = [kw for kw in _COURSE_KWS if kw in text_lc]
-                page_type = _fv_classify(url, kws_found)
-                completeness_est = min(100, int(len(kws_found) / len(_COURSE_KWS) * 100 * 1.6))
+                raw_html = resp_fv.text[:80000]
+
+                # ── Extract individual fields ──────────────────────────────
+                # Course name: h1 > title tag
+                _h1m = _H1_RE_FV.search(raw_html[:30000])
+                _h1_text = _strip_tags(_h1m.group(1)) if _h1m else ""
+                if not _h1_text or len(_h1_text) < 4:
+                    _titlem = _TITLE_RE_FV.search(raw_html[:5000])
+                    _h1_text = _strip_tags(_titlem.group(1)).split("|")[0].strip() if _titlem else ""
+                course_name_extracted = len(_h1_text) >= 4
+
+                fee_match = _FEE_RE_FV.search(raw_html)
+                fee_extracted = bool(fee_match)
+                fee_value = fee_match.group(0)[:30] if fee_match else None
+
+                english_match = _ENGLISH_RE_FV.search(raw_html)
+                english_extracted = bool(english_match)
+                english_value = english_match.group(0)[:20] if english_match else None
+
+                intake_extracted = bool(_INTAKE_RE_FV.search(raw_html))
+                duration_extracted = bool(_DURATION_RE_FV.search(raw_html))
+                degree_match = _DEGREE_RE_FV.search(raw_html[:40000])
+                degree_level_extracted = bool(degree_match)
+
+                # Classify page type using both URL and content signals
+                page_type = _fv_classify(url, degree_level_extracted)
+
+                # Completeness simulation (6 key fields)
+                _fields = {
+                    "course_name": course_name_extracted,
+                    "fee": fee_extracted,
+                    "english_requirement": english_extracted,
+                    "intake": intake_extracted,
+                    "duration": duration_extracted,
+                    "degree_level": degree_level_extracted,
+                }
+                fields_found = sum(_fields.values())
+                completeness_pct = round(fields_found / len(_fields) * 100)
+
+                # Will stage?  needs: passes filter + course page + ≥4/6 fields
+                will_stage = passes and page_type == "course" and fields_found >= 4
+
+                # Rejection reason
+                rejection_reason: str | None = None
+                if not will_stage:
+                    if not passes:
+                        rejection_reason = f"Blocked by URL filter ({blocked_by or 'filter'})"
+                    elif page_type != "course":
+                        rejection_reason = f"Not a course page (classified as '{page_type}')"
+                    else:
+                        missing = [k.replace("_", " ") for k, v in _fields.items() if not v]
+                        rejection_reason = (
+                            f"Too few fields extracted ({fields_found}/6). "
+                            f"Missing: {', '.join(missing[:3])}"
+                            + ("…" if len(missing) > 3 else "")
+                        )
+
                 results.append({
                     "url": url,
                     "passes_filter": passes,
                     "blocked_by": blocked_by,
                     "status_code": resp_fv.status_code,
                     "page_type": page_type,
-                    "keywords_found": kws_found,
-                    "estimated_completeness_pct": completeness_est,
+                    # Field-level extraction
+                    "course_name_extracted": course_name_extracted,
+                    "course_name_value": _h1_text[:80] if course_name_extracted else None,
+                    "fee_extracted": fee_extracted,
+                    "fee_value": fee_value,
+                    "english_extracted": english_extracted,
+                    "english_value": english_value,
+                    "intake_extracted": intake_extracted,
+                    "duration_extracted": duration_extracted,
+                    "degree_level_extracted": degree_level_extracted,
+                    "fields_found": fields_found,
+                    "fields_total": len(_fields),
+                    "completeness_pct": completeness_pct,
+                    # Staging decision
+                    "will_stage": will_stage,
+                    "rejection_reason": rejection_reason,
                     "ok": resp_fv.status_code < 400,
                     "text_length": len(resp_fv.text),
                 })
@@ -1700,18 +1796,31 @@ async def post_full_validation(
                     "blocked_by": blocked_by,
                     "status_code": 0,
                     "page_type": "unknown",
-                    "keywords_found": [],
-                    "estimated_completeness_pct": 0,
+                    "course_name_extracted": False,
+                    "course_name_value": None,
+                    "fee_extracted": False,
+                    "fee_value": None,
+                    "english_extracted": False,
+                    "english_value": None,
+                    "intake_extracted": False,
+                    "duration_extracted": False,
+                    "degree_level_extracted": False,
+                    "fields_found": 0,
+                    "fields_total": 6,
+                    "completeness_pct": 0,
+                    "will_stage": False,
+                    "rejection_reason": f"Fetch error: {str(_exc_fv)[:80]}",
                     "ok": False,
-                    "error": str(_exc_fv)[:120],
                     "text_length": 0,
+                    "error": str(_exc_fv)[:120],
                 })
 
     course_results = [r for r in results if r["page_type"] == "course" and r["ok"]]
     avg_comp = (
-        round(sum(r["estimated_completeness_pct"] for r in course_results) / len(course_results))
+        round(sum(r["completeness_pct"] for r in course_results) / len(course_results))
         if course_results else 0
     )
+    will_stage_count = sum(1 for r in results if r.get("will_stage"))
     return {
         "ok": True,
         "results": results,
@@ -1720,6 +1829,7 @@ async def post_full_validation(
             "passed_filter": sum(1 for r in results if r["passes_filter"]),
             "course_pages": sum(1 for r in results if r["page_type"] == "course"),
             "listing_pages": sum(1 for r in results if r["page_type"] == "listing"),
+            "will_stage": will_stage_count,
             "avg_course_completeness_pct": avg_comp,
         },
     }
