@@ -87,7 +87,7 @@ Include 3-8 evidence items. safe_fix and fix_yaml_snippet may be null."""
 
 # ── Context gathering ──────────────────────────────────────────────────────────
 
-async def _gather_context(uni_id: int, db: AsyncSession) -> tuple[dict[str, Any], str]:
+async def _gather_context(uni_id: int, db: AsyncSession) -> tuple[dict[str, Any], str, dict[str, Any]]:
     """Gather key operational signals and return (uni_row_dict, context_doc_str)."""
     from collections import Counter
 
@@ -214,7 +214,50 @@ async def _gather_context(uni_id: int, db: AsyncSession) -> tuple[dict[str, Any]
         lines.append("\n=== ADMIN OVERRIDES ===\nNone active.")
     lines.append(f"\n=== EFFECTIVE CONFIG (key fields) ===\n{json.dumps(eff_cfg, indent=2)}")
 
-    return uni_row, "\n".join(lines)
+    # ── Candidate URL pool for URL-filter simulation ────────────────────────
+    candidate_info: dict[str, Any] = {
+        "all_urls":      [],
+        "sample_dropped": [],
+        "total_raw":     int((jobs[0].get("total_found") or 0) if jobs else 0),
+    }
+    if last_job_id:
+        staged_url_res = await db.execute(text("""
+            SELECT course_website FROM scraped_courses
+            WHERE university_id = :uid AND scrape_job_id = :jid
+              AND course_website IS NOT NULL AND length(course_website) > 10
+            LIMIT 60
+        """), {"uid": uni_id, "jid": last_job_id})
+        for r in staged_url_res:
+            if r[0]:
+                candidate_info["all_urls"].append(r[0])
+
+        blocked_log_res = await db.execute(text("""
+            SELECT payload->'dropped_sample' AS arr
+            FROM scrape_runtime_logs
+            WHERE runtime_job_id = :jid
+              AND payload->>'kind' = 'extract_block_url_filter'
+            LIMIT 10
+        """), {"jid": last_job_id})
+        for row in blocked_log_res:
+            arr = row[0]
+            if arr is None:
+                continue
+            parsed: list = arr if isinstance(arr, list) else (
+                json.loads(arr) if isinstance(arr, str) else []
+            )
+            for u in parsed:
+                if u and isinstance(u, str) and len(u) > 10:
+                    candidate_info["all_urls"].append(u)
+                    if len(candidate_info["sample_dropped"]) < 5:
+                        candidate_info["sample_dropped"].append(u)
+
+    if candidate_info["sample_dropped"]:
+        lines.append(
+            "\n=== SAMPLE URLs DROPPED BY CURRENT FILTER ===\n"
+            + "\n".join(f"  - {u}" for u in candidate_info["sample_dropped"])
+        )
+
+    return uni_row, "\n".join(lines), candidate_info
 
 
 async def gather_and_diagnose(uni_id: int, db: AsyncSession) -> dict[str, Any]:
@@ -227,7 +270,7 @@ async def gather_and_diagnose(uni_id: int, db: AsyncSession) -> dict[str, Any]:
     if not _api_key:
         raise RuntimeError("GEMINI_API_KEY not configured")
 
-    uni_row, context_doc = await _gather_context(uni_id, db)
+    uni_row, context_doc, candidate_info = await _gather_context(uni_id, db)
 
     try:
         from google import genai as _gai
@@ -247,7 +290,9 @@ async def gather_and_diagnose(uni_id: int, db: AsyncSession) -> dict[str, Any]:
             raw = "\n".join(raw.split("\n")[1:])
             if raw.endswith("```"):
                 raw = raw[:-3].rstrip()
-        return json.loads(raw)
+        parsed = json.loads(raw)
+        parsed["_candidate_info"] = candidate_info
+        return parsed
     except json.JSONDecodeError as exc:
         raise RuntimeError(f"Gemini returned invalid JSON: {exc}") from exc
     except Exception as exc:
@@ -473,6 +518,10 @@ async def run_auto_repair_pipeline(
     try:
         # ── Step 1: AI diagnosis ─────────────────────────────────────────────
         diagnosis = await gather_and_diagnose(university_id, db)
+        candidate_info: dict = diagnosis.pop("_candidate_info", {})
+        all_urls: list[str] = candidate_info.get("all_urls", [])
+        sample_dropped: list[str] = candidate_info.get("sample_dropped", [])
+        total_raw: int = candidate_info.get("total_raw", 0)
 
         risk_label = diagnosis.get("risk_label") or "low"
         safe_fix = diagnosis.get("safe_fix")
@@ -532,11 +581,40 @@ async def run_auto_repair_pipeline(
             safe_fix=safe_fix, fix_yaml_snippet=fix_yaml,
         )
 
-        # ── Step 4: Validate ─────────────────────────────────────────────────
+        # ── Step 4: Validate extraction quality ──────────────────────────────
         validation_result = await validate_proposed_fix(
             university_id, current_cfg, patched_cfg, db
         )
         confidence = validation_result.get("confidence", diagnosis.get("confidence", "medium"))
+
+        # ── Step 4a: URL-filter simulation (discovery-level) ─────────────────
+        # Tests the proposed allow/block patterns against the actual candidate URL
+        # pool from the last scrape job (staged + blocked sample).  Pure in-memory,
+        # no network requests.  Result is embedded in validation_result so the UI
+        # can show before/after URL counts and disable Apply Fix when no improvement.
+        if all_urls:
+            from app.services.repair_validator import validate_url_filter_change
+            try:
+                cur_disc = current_cfg.discovery
+                new_disc = patched_cfg.discovery
+                url_sim = validate_url_filter_change(
+                    candidate_urls=all_urls,
+                    current_allow=list(cur_disc.allow_url_patterns or []),
+                    current_block=list(cur_disc.block_url_patterns or []),
+                    proposed_allow=list(new_disc.allow_url_patterns or []),
+                    proposed_block=list(new_disc.block_url_patterns or []),
+                    total_raw=total_raw,
+                    sample_dropped_before=sample_dropped,
+                )
+                validation_result["url_simulation"] = url_sim
+                # If URL simulation shows stronger confidence than extraction, upgrade
+                if url_sim["improvement"] > 0:
+                    if url_sim["confidence"] == "high":
+                        confidence = "high"
+                    elif url_sim["confidence"] == "medium" and confidence == "low":
+                        confidence = "medium"
+            except Exception as _sim_exc:
+                log.warning("auto_repair: URL-filter simulation failed: %s", _sim_exc)
 
         # ── Step 5: Store ready suggestion ───────────────────────────────────
         await db.execute(text("""

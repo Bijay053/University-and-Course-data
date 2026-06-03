@@ -199,3 +199,84 @@ async def validate_proposed_fix(
         "method": "extraction",
         "skip_reason": None,
     }
+
+
+# ── URL-filter simulation ───────────────────────────────────────────────────────
+
+
+def validate_url_filter_change(
+    candidate_urls: list[str],
+    current_allow: list[str],
+    current_block: list[str],
+    proposed_allow: list[str],
+    proposed_block: list[str],
+    total_raw: int = 0,
+    sample_dropped_before: list[str] | None = None,
+) -> dict[str, Any]:
+    """Simulate the effect of changing allow/block URL patterns on a candidate URL pool.
+
+    Applies both the current and proposed filter patterns to the provided URLs and
+    returns before/after pass-through counts, along with sample rescued/dropped URLs.
+
+    This is a pure in-memory simulation — no network requests.
+
+    Confidence:
+      high   — improvement >= 5 URLs AND sample_size >= 10
+      medium — improvement >= 1 URL
+      low    — no improvement, or sample too small to be meaningful
+    """
+    import re
+
+    def _compile(pats: list[str]) -> list[re.Pattern]:
+        result = []
+        for p in pats:
+            try:
+                result.append(re.compile(p, re.IGNORECASE))
+            except re.error:
+                log.debug("validate_url_filter_change: invalid regex %r — skipping", p)
+        return result
+
+    def _passes(url: str, allow_pats: list, block_pats: list) -> bool:
+        if allow_pats and not any(p.search(url) for p in allow_pats):
+            return False
+        if block_pats and any(p.search(url) for p in block_pats):
+            return False
+        return True
+
+    cur_allow = _compile(current_allow)
+    cur_block = _compile(current_block)
+    new_allow = _compile(proposed_allow)
+    new_block = _compile(proposed_block)
+
+    # Deduplicate while preserving order
+    seen: set[str] = set()
+    urls = [u for u in candidate_urls if u and not (u in seen or seen.add(u))]  # type: ignore[func-returns-value]
+    sample_size = len(urls)
+
+    before_pass = [u for u in urls if _passes(u, cur_allow, cur_block)]
+    before_drop = [u for u in urls if not _passes(u, cur_allow, cur_block)]
+    after_pass  = [u for u in urls if _passes(u, new_allow, new_block)]
+
+    before_drop_set = set(before_drop)
+    rescued = [u for u in after_pass if u in before_drop_set]
+
+    improvement = len(after_pass) - len(before_pass)
+
+    if improvement >= 5 and sample_size >= 10:
+        confidence = "high"
+    elif improvement >= 1:
+        confidence = "medium"
+    else:
+        confidence = "low"
+
+    return {
+        "method":               "url_simulation",
+        "sample_size":          sample_size,
+        "total_raw":            total_raw or sample_size,
+        "before_pass":          len(before_pass),
+        "after_pass":           len(after_pass),
+        "improvement":          improvement,
+        "sample_dropped_before": (sample_dropped_before or before_drop)[:5],
+        "sample_rescued":       rescued[:5],
+        "confidence":           confidence,
+    }

@@ -608,6 +608,17 @@ interface AutoRepairSuggestion {
     confidence?: string;
     method?: string;
     skip_reason?: string | null;
+    url_simulation?: {
+      method:               "url_simulation";
+      sample_size:          number;
+      total_raw:            number;
+      before_pass:          number;
+      after_pass:           number;
+      improvement:          number;
+      sample_dropped_before: string[];
+      sample_rescued:       string[];
+      confidence:           "high" | "medium" | "low";
+    } | null;
   } | null;
   confidence:   "high" | "medium" | "low" | null;
   status:       "pending" | "ready" | "developer_required" | "applied" | "dismissed" | "failed";
@@ -4537,6 +4548,86 @@ export default function SettingsScraperConfigs() {
                         </div>
                       )}
 
+                      {/* URL-filter simulation panel */}
+                      {vr?.url_simulation && (() => {
+                        const us = vr.url_simulation!;
+                        const hasImprovement = us.improvement > 0;
+                        return (
+                          <div className={cn(
+                            "rounded border text-[11px] overflow-hidden",
+                            hasImprovement
+                              ? "border-blue-200 dark:border-blue-800"
+                              : "border-amber-200 dark:border-amber-800",
+                          )}>
+                            {/* Header */}
+                            <div className={cn(
+                              "px-2.5 py-1.5 font-semibold flex items-center gap-1.5",
+                              hasImprovement
+                                ? "bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200"
+                                : "bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200",
+                            )}>
+                              {hasImprovement ? "✓ Candidate URL Validated" : "⚠ No URL Improvement Detected"}
+                              <span className="ml-auto font-normal text-[10px] opacity-70">
+                                {us.sample_size} URL sample
+                              </span>
+                            </div>
+
+                            {/* Before / After counts */}
+                            <div className="grid grid-cols-3 border-t border-inherit">
+                              {(["Before", "After", "Change"] as const).map(h => (
+                                <div key={h} className="px-2.5 py-1 border-r last:border-r-0 border-inherit font-semibold text-center text-muted-foreground bg-muted/30">{h}</div>
+                              ))}
+                            </div>
+                            <div className="grid grid-cols-3 border-t border-inherit">
+                              <div className="px-2.5 py-1.5 border-r border-inherit text-center text-muted-foreground">
+                                {us.before_pass} pass
+                              </div>
+                              <div className={cn("px-2.5 py-1.5 border-r border-inherit text-center font-semibold",
+                                hasImprovement ? "text-blue-700 dark:text-blue-300" : "text-muted-foreground",
+                              )}>
+                                {us.after_pass} pass
+                              </div>
+                              <div className={cn("px-2.5 py-1.5 text-center font-bold",
+                                us.improvement > 0 ? "text-green-600 dark:text-green-400"
+                                : us.improvement < 0 ? "text-red-500 dark:text-red-400"
+                                : "text-muted-foreground",
+                              )}>
+                                {us.improvement > 0 ? "+" : ""}{us.improvement} URLs
+                              </div>
+                            </div>
+
+                            {/* Sample rescued URLs */}
+                            {hasImprovement && us.sample_rescued.length > 0 && (
+                              <div className="border-t border-inherit px-2.5 py-1.5 space-y-0.5">
+                                <div className="text-[10px] font-semibold text-blue-700 dark:text-blue-300 mb-1">Sample URLs now passing:</div>
+                                {us.sample_rescued.map((u, i) => (
+                                  <div key={i} className="text-[10px] text-muted-foreground font-mono break-all truncate" title={u}>• {u}</div>
+                                ))}
+                              </div>
+                            )}
+
+                            {/* Sample dropped URLs */}
+                            {us.sample_dropped_before.length > 0 && (
+                              <div className="border-t border-inherit px-2.5 py-1.5 space-y-0.5">
+                                <div className="text-[10px] font-semibold text-amber-700 dark:text-amber-300 mb-1">
+                                  {hasImprovement ? "Sample URLs still dropped by filter:" : "Sample URLs dropped by current filter:"}
+                                </div>
+                                {us.sample_dropped_before.map((u, i) => (
+                                  <div key={i} className="text-[10px] text-muted-foreground font-mono break-all truncate" title={u}>• {u}</div>
+                                ))}
+                              </div>
+                            )}
+
+                            {/* No-improvement warning */}
+                            {!hasImprovement && (
+                              <div className="border-t border-amber-200 dark:border-amber-800 px-2.5 py-1.5 text-[10px] text-amber-700 dark:text-amber-300">
+                                This YAML change does not improve URL pass-through. Apply Fix is disabled.
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
+
                       {/* Fix recommendation */}
                       {suggestion.fix_recommendation && (
                         <div className="text-xs text-slate-700 dark:text-slate-300 font-medium">
@@ -4586,35 +4677,55 @@ export default function SettingsScraperConfigs() {
                       )}
 
                       {/* Action buttons */}
-                      <div className="flex items-center gap-2 pt-0.5 flex-wrap">
-                        {(safeFix != null || suggestion.fix_yaml_snippet) && (
+                      {(() => {
+                        const us = vr?.url_simulation;
+                        // Disable Apply Fix when URL simulation ran and shows no improvement,
+                        // AND extraction metrics (if available) also show no improvement.
+                        const extractionImprovement = before && after
+                          ? (after.completeness - before.completeness)
+                          : null;
+                        const urlBlocked = us != null && us.improvement <= 0;
+                        const extractionBlocked = extractionImprovement != null && extractionImprovement <= 0;
+                        // Block if URL sim shows no improvement; allow through if extraction
+                        // shows improvement (extraction-only fixes like fee keywords).
+                        const applyBlocked = urlBlocked && (extractionImprovement == null || extractionBlocked);
+                        return (
+                        <div className="flex items-center gap-2 pt-0.5 flex-wrap">
+                          {(safeFix != null || suggestion.fix_yaml_snippet) && (
+                            <button
+                              onClick={() => !applyBlocked && setRepairConfirmSid(suggestion.id)}
+                              disabled={repairApplying[suggestion.id] || applyBlocked}
+                              title={applyBlocked ? "Disabled: URL simulation shows no improvement from this change" : undefined}
+                              className={cn(
+                                "flex items-center gap-1.5 text-[11px] font-medium px-3 py-1.5 rounded border transition-colors",
+                                applyBlocked
+                                  ? "bg-muted text-muted-foreground border-border cursor-not-allowed opacity-60"
+                                  : "bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-700 disabled:opacity-50",
+                              )}
+                            >
+                              {repairApplying[suggestion.id] ? (
+                                <><div className="h-3 w-3 rounded-full border-2 border-white border-t-transparent animate-spin" />Applying…</>
+                              ) : applyBlocked ? (
+                                <>⊘ Apply Fix (no improvement)</>
+                              ) : (
+                                <>✓ Preview &amp; Apply</>
+                              )}
+                            </button>
+                          )}
                           <button
-                            onClick={() => setRepairConfirmSid(suggestion.id)}
-                            disabled={repairApplying[suggestion.id]}
+                            onClick={() => setDebugTab("ai_analysis")}
                             className={cn(
-                              "flex items-center gap-1.5 text-[11px] font-medium px-3 py-1.5 rounded border transition-colors",
-                              "bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-700 disabled:opacity-50",
+                              "flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1.5 rounded border transition-colors",
+                              "border-violet-300 dark:border-violet-700 bg-violet-50 dark:bg-violet-950/30",
+                              "text-violet-700 dark:text-violet-300 hover:bg-violet-100 dark:hover:bg-violet-950/50",
                             )}
                           >
-                            {repairApplying[suggestion.id] ? (
-                              <><div className="h-3 w-3 rounded-full border-2 border-white border-t-transparent animate-spin" />Applying…</>
-                            ) : (
-                              <>✓ Preview &amp; Apply</>
-                            )}
+                            <Bot className="h-3 w-3" />
+                            Full AI Analysis
                           </button>
-                        )}
-                        <button
-                          onClick={() => setDebugTab("ai_analysis")}
-                          className={cn(
-                            "flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1.5 rounded border transition-colors",
-                            "border-violet-300 dark:border-violet-700 bg-violet-50 dark:bg-violet-950/30",
-                            "text-violet-700 dark:text-violet-300 hover:bg-violet-100 dark:hover:bg-violet-950/50",
-                          )}
-                        >
-                          <Bot className="h-3 w-3" />
-                          Full AI Analysis
-                        </button>
-                      </div>
+                        </div>
+                        );
+                      })()}
                     </div>
 
                     {/* ── Confirm Apply Modal ─────────────────────────────────── */}
