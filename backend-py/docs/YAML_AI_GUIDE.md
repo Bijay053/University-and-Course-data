@@ -54,16 +54,19 @@ Ask the user (or look up the university website yourself) and note the answers:
 | 3 | Is the course listing page rendered by JavaScript (React/Angular/Vue SPA), or is it plain HTML? | Determines discovery strategy |
 | 4 | Does browsing to a course-listing page with JavaScript disabled (or via `curl`) return course links? | Confirms static BFS will work |
 | 5 | Is the site protected by Cloudflare? (Look for "Checking your browser" or "Cloudflare" in the page source) | Sets `use_stealth_browser` |
-| 6 | What URL pattern do individual course pages follow? e.g. `/courses/bachelor-of-arts` | Sets `allow_url_patterns` / `must_contain` |
-| 7 | Does the university publish a single fee schedule page for international students? If yes, what is the URL? | Sets `fees.central_page` |
-| 8 | Does the university publish a fee schedule PDF? If yes, what is the URL? | Sets `fees.fees_pdf_url` |
-| 9 | Does the individual course page show an international fee, or does it only show a domestic fee? | Sets `prefer_international`, `reject_keywords` |
-| 10 | Does the university publish a central English requirements page? If yes, what is the URL? | Sets `english.central_page` |
-| 11 | Does the site require an `?international=true` (or similar) query parameter to show international fees / intakes? | Sets `url_rewrites` |
-| 12 | Does the H1 on each course page include the university name as a suffix (e.g. "Bachelor of Arts \| My University")? | Sets `course_name.strip_title_suffixes` |
-| 13 | Is there a JSON/REST API for the course catalogue? (Check DevTools → Network → XHR on the course search page) | Potentially sets `generic_search_api` block |
-| 14 | Approximately how many courses does the university offer internationally? | Validates `expected_min_courses` |
-| 15 | Does the university accept online-only enrolment for international students? (Distance education) | Sets `filters.online_only.enabled` |
+| 6 | What URL pattern do individual course pages follow? e.g. `/courses/bachelor-of-arts` | Sets `allow_url_patterns` / `course_detail_url_patterns` |
+| 7 | Where do the course listing/index pages live? Are they under paths like `/student-life/`, `/faculties/`, `/subject-areas/` (non-obvious paths)? | May need `allow_blocked_listing_patterns` |
+| 8 | Does the university publish a single fee schedule page for international students? If yes, what is the URL? | Sets `fees.central_page` |
+| 9 | Does the university publish a fee schedule PDF? If yes, what is the URL? | Sets `fees.fees_pdf_url` |
+| 10 | Does the course page show BOTH a domestic fee and an international fee (e.g. "UK fee: £9,250 / International fee: £15,000")? | Sets `reject_keywords` + `international_fee_keywords` |
+| 11 | Does the word "online" appear in navigation, footer, or utility copy (e.g. "apply online", "study online resources")? | May need `study_mode.online_only_requires_strong_evidence: true` |
+| 12 | Does the university publish a central English requirements page? If yes, what is the URL? | Sets `english.central_page` |
+| 13 | Does the site require an `?international=true` (or similar) query parameter to show international fees / intakes? | Sets `url_rewrites` |
+| 14 | Does the H1 on each course page include the university name as a suffix (e.g. "Bachelor of Arts \| My University")? | Sets `course_name.strip_title_suffixes` |
+| 15 | Is there a JSON/REST API for the course catalogue? (Check DevTools → Network → XHR on the course search page) | Potentially sets `generic_search_api` block |
+| 16 | Approximately how many courses does the university offer internationally? | Validates `expected_min_courses` |
+| 17 | Does the university accept online-only enrolment for international students? (Distance education) | Sets `filters.online_only.enabled` |
+| 18 | Does the university publish intake dates on its course pages? If not, what is the typical start month? | Sets `intake.use_default_when_missing` + `default_by_level` |
 
 ---
 
@@ -299,6 +302,17 @@ extraction:
       - "UK student"
       - "UK fee"
       - "Domestic"
+    international_fee_keywords:           # keep fee even when reject_keywords also fired
+      - "International"
+      - "International student"
+      - "International fee"
+      - "Overseas"
+
+  # UK sites often contain "online" in nav/footer utility copy.
+  # Suppress the bare \bonline\b fallback so campus courses aren't misclassified.
+  study_mode:
+    online_only_requires_strong_evidence: true
+    prefer_location_over_online_keyword: true
 
   english:
     trust_vision_ocr: false               # UK sites often have decorative IELTS images
@@ -308,6 +322,14 @@ extraction:
 
   intake:
     start_dates_only: true               # ignore application deadlines
+    use_default_when_missing: true       # many UK courses don't list intake on the page
+    default_source_note: "Typical UK September start"
+    default_by_level:
+      undergraduate:
+        - September
+      postgraduate:
+        - September
+        - January
 
   course_name:
     strip_title_suffixes:
@@ -316,7 +338,13 @@ extraction:
 
   filters:
     online_only:
-      enabled: false                     # UK universities often blend online + campus
+      enabled: true
+      keep_if_location_present: true     # don't reject blended courses with a campus
+
+  staging:
+    reject_if_missing:
+      - course_name
+    require_international_fee: false     # fees sometimes only on a central page
 ```
 
 ---
@@ -392,6 +420,99 @@ extraction:
     online_only:
       enabled: false     # default is true; turn off for distance-ed unis
 ```
+
+---
+
+### Pattern 10 — Listing pages under globally-blocked paths
+
+**Matches when:**
+- The university's real course-listing pages sit under paths that the global classifier
+  blocks as `campus_page` or `category_landing_page` (e.g. `/student-life/`,
+  `/faculties/`, `/schools/`, `/subject-areas/`)
+- Individual course pages are at a consistent URL like `/courses/ug-course-name`
+- Without this pattern: the scraper never crawls the listing pages → 0 courses discovered
+
+**Solution:** Use `allow_blocked_listing_patterns` to crawl those listing pages for links,
+plus `course_detail_url_patterns` as the final extraction gate so only genuine course
+URLs are extracted.
+
+```yaml
+# <University Full Name>
+# Hostname: www.uni.ac.uk
+# Discovery: listing pages under /student-life/ (globally blocked as campus_page)
+
+discovery:
+  always_sitemap_supplement: true
+  skip_browser_discovery: true
+  use_wayback: false
+
+  seed_urls:
+    - https://www.uni.ac.uk/courses/course-index-a-z/
+    - https://www.uni.ac.uk/student-life/undergraduate-study/     # blocked → override below
+    - https://www.uni.ac.uk/student-life/postgraduate-study/      # blocked → override below
+
+  # Override the global campus_page block for these listing-page paths.
+  # Crawled for links but NEVER added to the course-extraction candidate set.
+  # Emits: [DISCOVER] YAML listing override: /student-life/... treated as listing-only page
+  allow_blocked_listing_patterns:
+    - '/student-life/undergraduate-study'
+    - '/student-life/postgraduate-study'
+
+  # URLs matching these are also crawled but not extracted (pagination, indexes, etc.).
+  listing_only_patterns:
+    - '/courses/course-index-a-z'
+    - '/courses/interest-areas/'
+    - '\?'
+
+  # Final extraction gate: only URLs matching this pattern are actually extracted.
+  # Emits: [DISCOVER] YAML course detail filter: dropped listing URL <url>
+  course_detail_url_patterns:
+    - '^https://www\.uni\.ac\.uk/courses/(ug|pg|phd|pgce)-[a-z0-9-]+/?$'
+
+  # Keep BFS allow-list to just course-detail URLs (not the listing pages).
+  allow_url_patterns:
+    - '^https://www\.uni\.ac\.uk/courses/(ug|pg|phd|pgce)-[a-z0-9-]+/?$'
+
+  block_url_patterns:
+    - '/news/'
+    - '/events/'
+    - '/staff/'
+    - '/research/'
+    - '\.pdf$'
+
+extraction:
+  fees:
+    default_currency: GBP
+    prefer_international: true
+    reject_keywords:
+      - Home student
+      - UK student
+      - UK fee
+    international_fee_keywords:
+      - International
+      - International student
+      - International fee
+      - Overseas
+
+  study_mode:
+    online_only_requires_strong_evidence: true
+    prefer_location_over_online_keyword: true
+
+  intake:
+    start_dates_only: true
+    use_default_when_missing: true
+    default_source_note: "Default September intake"
+    default_by_level:
+      undergraduate:
+        - September
+      postgraduate:
+        - September
+```
+
+> **Key insight:** `allow_blocked_listing_patterns` separates *crawling* (following links for
+> discovery) from *extraction* (treating a URL as a course). `course_detail_url_patterns` then
+> enforces that only the intended course URL shape reaches the extractor — listing, index, and
+> search pages are silently dropped with a log line, not extracted as courses.
 
 ---
 
@@ -517,6 +638,100 @@ extraction:
       - "enrol at any time"
       - "research degree"
 ```
+
+---
+
+### Listing pages under globally-blocked paths
+
+When the university's course listing pages sit under paths like `/student-life/`,
+`/faculties/`, `/schools/`, `/subject-areas/` that the global classifier blocks:
+
+```yaml
+discovery:
+  # Tell the BFS to crawl these pages for course links but not extract them.
+  allow_blocked_listing_patterns:
+    - '/student-life/undergraduate-study'
+    - '/student-life/postgraduate-study'
+```
+
+Combine with `course_detail_url_patterns` to restrict what actually gets extracted:
+
+```yaml
+discovery:
+  allow_blocked_listing_patterns:
+    - '/student-life/undergraduate-study'
+    - '/student-life/postgraduate-study'
+  course_detail_url_patterns:
+    - '^https://www\.uni\.ac\.uk/courses/(ug|pg|phd)-[a-z0-9-]+/?$'
+```
+
+See Pattern 10 for the full template.
+
+---
+
+### Page shows both domestic and international fee — keep international
+
+When the course page shows `"UK fee: £9,250 / International fee: £15,000"` and
+`reject_keywords` would incorrectly drop the fee:
+
+```yaml
+extraction:
+  fees:
+    reject_keywords:
+      - "Home student"
+      - "UK student"
+      - "UK fee"
+      - "Domestic"
+    international_fee_keywords:           # international marker wins over reject_keyword
+      - "International"
+      - "International student"
+      - "International fee"
+      - "Overseas"
+```
+
+Log emitted: `[FEE_KEEP] kept international fee by YAML evidence`
+
+---
+
+### "apply online" / "study online" in nav marks campus courses as Online
+
+Symptom: many campus courses are staged with `study_mode="Online"` even though
+they are clearly on-campus. Root cause: the bare `\bonline\b` keyword fires on
+nav-bar copy like "apply online".
+
+```yaml
+extraction:
+  study_mode:
+    online_only_requires_strong_evidence: true   # suppress bare keyword fallback
+    prefer_location_over_online_keyword: true     # physical campus wins when present
+```
+
+Log emitted: `[STUDY_MODE] suppressed bare 'online' keyword result for <url>`
+
+---
+
+### Courses have no intake date on the page — fill with YAML default
+
+When courses consistently lack an intake date (common for UK universities), apply
+a YAML default per degree level instead of leaving `intake_months` blank:
+
+```yaml
+extraction:
+  intake:
+    use_default_when_missing: true
+    default_source_note: "Typical UK September start"
+    default_by_level:
+      undergraduate:
+        - September
+      postgraduate:
+        - September
+        - January
+      doctorate:
+        - September
+```
+
+The evidence row is marked `yaml_default_intake` with `confidence=0.4` so reviewers
+can distinguish YAML defaults from extracted values.
 
 ---
 
@@ -658,6 +873,9 @@ discovery:
   seed_urls:                 list of strings
   extra_course_urls:         list of strings
   allow_url_patterns:        list of regex strings
+  allow_blocked_listing_patterns: list of regex/substring strings  ← NEW (Pattern 10)
+  listing_only_patterns:     list of regex strings                 ← NEW (Pattern 10)
+  course_detail_url_patterns: list of regex strings                ← NEW (Pattern 10)
   block_url_patterns:        list of regex strings
   block_nav_patterns:        list of regex strings
   must_contain:              list of substrings
@@ -696,7 +914,14 @@ extraction:
     credit_points_per_unit:  int
     course_pdf_aliases:      dict {pdf_name: db_name}
     reject_keywords:         list of strings
+    international_fee_keywords: list of strings  ← NEW: intl marker wins over reject_keywords
     follow_links:            list of strings
+
+  study_mode:                                    ← NEW block
+    online_only_requires_strong_evidence: bool   (suppress bare \bonline\b fallback)
+    prefer_location_over_online_keyword:  bool   (physical campus wins over bare keyword)
+    strong_online_markers:                list of strings
+    ignore_online_keywords_in:            list of strings  (documentation only)
 
   english:
     central_page:            string (URL)
@@ -717,14 +942,22 @@ extraction:
     domestic_only:
       enabled:               bool
       text_must_appear_in:   string
+      require_international_evidence: bool    ← NEW
+      international_markers: list of strings  ← NEW
+      domestic_markers:      list of strings  ← NEW
     online_only:
       enabled:               bool
+      reject_if_mode_is_exactly: list of strings  ← NEW
+      keep_if_location_present:  bool             ← NEW (default true)
 
   intake:
     start_dates_only:        bool
     start_dates_window_chars: int
     rolling_enrollment_markers: list of strings
     rolling_enrollment_label: string
+    use_default_when_missing: bool              ← NEW
+    default_by_level:        dict {tier: [months]}  ← NEW
+    default_source_note:     string             ← NEW
 
   course_name:
     strip_title_suffixes:    list of strings

@@ -171,6 +171,31 @@ discovery:
   allow_url_patterns: []
   #   - /study/(?:undergraduate|postgraduate|research)/[a-z0-9-]+/?$
 
+  # Listing-page override: bypass the global is_blocked_page classifier for
+  # URLs matching these patterns. Matched URLs are crawled for course links but
+  # NOT added to the extraction candidate set. Use when the university's real
+  # listing pages sit under globally-blocked paths (e.g. /student-life/).
+  # Emits: [DISCOVER] YAML listing override: <path> treated as listing-only page
+  allow_blocked_listing_patterns: []
+  #   - '/student-life/undergraduate-study'
+  #   - '/student-life/postgraduate-study'
+  #   - '/faculties/arts/courses'
+
+  # Force-listing for non-blocked URLs: matched URLs are crawled for links but
+  # never added to the extraction candidate set (even if classifier says detail).
+  # Use for pagination, search-result, or category-index pages.
+  listing_only_patterns: []
+  #   - '/courses/course-index-a-z'
+  #   - '/courses/interest-areas/'
+  #   - '\?'           # any URL with a query string
+
+  # Post-discovery extraction gate: only candidate URLs matching at least one
+  # of these patterns are sent to the extractor. Lets the BFS crawl listing
+  # pages freely while restricting extraction to genuine course-detail URLs.
+  # Emits: [DISCOVER] YAML course detail filter: dropped listing URL <url>
+  course_detail_url_patterns: []
+  #   - '^https://www\.bathspa\.ac\.uk/courses/(ug|pg|ify|phd|edd|pgce)-[a-z0-9-]+/?$'
+
   # Regex blocklist: matching URLs are dropped before extraction.
   block_url_patterns: []
   #   - /study/getting-started/
@@ -336,6 +361,21 @@ extraction:
     #   - "HECS"
     #   - "HECS-HELP"
     #   - "Domestic students"
+    #   - "Home student"          # UK
+    #   - "UK student"            # UK
+
+    # Phrases that positively confirm the fee is international. When the evidence
+    # contains ANY of these, the fee is KEPT even when a reject_keyword also matched
+    # (international marker wins). Use for pages that list both domestic + international
+    # fees side-by-side (e.g. "UK fee: £9,250 / International fee: £15,000").
+    # Emits: [FEE_KEEP] kept international fee by YAML evidence
+    international_fee_keywords: []
+    #   - "International"
+    #   - "International student"
+    #   - "International fee"
+    #   - "Overseas"
+    #   - "Non UK"
+    #   - "EU and international"
 
     # When true, prefer the international fee over domestic even when domestic was
     # extracted first or has higher confidence. Pairs with reject_keywords.
@@ -461,6 +501,51 @@ extraction:
     #   - "enrolment shall be continuous"
     #   - "rolling intake"
 
+    # When True and intake_months is still empty after ALL extractors (including
+    # rolling_enrollment above), apply the default_by_level lookup for this course's
+    # degree level. The evidence row is marked yaml_default_intake (confidence 0.4)
+    # so reviewers know the intake was not extracted from the page.
+    use_default_when_missing: false
+    #   use_default_when_missing: true     # UK unis, courses with no published intake dates
+
+    # YAML default intake months per degree tier (undergraduate / postgraduate / doctorate).
+    # Applied when use_default_when_missing=True. Values: list of month name strings.
+    # default_by_level:
+    #   undergraduate:
+    #     - September
+    #   postgraduate:
+    #     - September
+    #     - January
+    #   doctorate:
+    #     - September
+
+    # Note written to the intake evidence row when a YAML default is applied.
+    # Shown in the admin review panel.
+    default_source_note: "YAML default intake"
+    #   default_source_note: "Bath Spa default intake (September)"
+
+
+  # ── Study mode ─────────────────────────────────────────────────────────────
+  # Controls online-mode detection. Enable online_only_requires_strong_evidence
+  # for universities whose pages contain "online" in nav, footer, or utility
+  # copy ("apply online", "UC Online") that should NOT classify campus courses.
+  study_mode:
+    # Suppress bare \bonline\b keyword fallback (confidence 0.5) — only
+    # authoritative labels and high-specificity phrases set Online.
+    online_only_requires_strong_evidence: false
+    #   online_only_requires_strong_evidence: true   # UK unis, Bath Spa
+
+    # When True and a course_location was found, suppress bare-keyword Online result.
+    prefer_location_over_online_keyword: false
+    #   prefer_location_over_online_keyword: true
+
+    # UI sections whose text contains "online" but shouldn't trigger Online mode.
+    # Informational only — suppression is controlled by the flags above.
+    ignore_online_keywords_in: []
+    #   - "navigation"
+    #   - "footer"
+    #   - "apply online"
+
 
   # ── Filters ────────────────────────────────────────────────────────────────
   filters:
@@ -469,11 +554,36 @@ extraction:
       # that list non-international courses without clearly marking them (e.g. ACAP).
       enabled: false
 
+      # When True, courses are rejected UNLESS international_markers found in page text.
+      require_international_evidence: false
+
+      # Phrases that confirm international eligibility (course kept even with domestic_markers).
+      international_markers: []
+      #   - "International students"
+      #   - "International fee"
+      #   - "overseas students"
+
+      # Phrases that identify the course as domestic-only (triggers rejection).
+      domestic_markers: []
+      #   - "UK students only"
+      #   - "Home students only"
+      #   - "Domestic only"
+
     online_only:
       # Drop courses with all-online delivery during staging. Default true mirrors
       # the historical hard-coded reject. Distance-education-heavy unis (e.g. CSU)
       # set this to false.
       enabled: true
+
+      # Only reject when study_mode exactly matches one of these values (case-
+      # insensitive). When empty, any Online classification triggers rejection.
+      reject_if_mode_is_exactly: []
+      #   - "Online"
+      #   - "Distance learning"
+
+      # When True (default), a course classified as Online is kept if a non-empty
+      # course_location is also present (physical campus confirmed).
+      keep_if_location_present: true
 
 
   # ── Text cleaning ──────────────────────────────────────────────────────────

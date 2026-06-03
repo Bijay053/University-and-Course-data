@@ -131,6 +131,55 @@ discovery:
   #   - "/courses/"
   #   - "/study/courses/"
 
+  # ── Listing-page override (blocked-path bypass) ───────────────────────────
+  # URLs matching any of these patterns bypass the global is_blocked_page
+  # classifier (campus_page, category_landing_page, etc.) AND are treated as
+  # discovery/listing pages: they are crawled for outbound course links but
+  # are NEVER added to the course-extraction candidate set.
+  #
+  # Use when the university's real listing pages sit under globally-blocked
+  # paths (e.g. /student-life/, /faculties/, /schools/, /subject-areas/).
+  #
+  # Bath Spa example:
+  #   /student-life/undergraduate-study/ and /student-life/postgraduate-study/
+  #   are blocked as campus_page but contain all course links.
+  #
+  # Emits: [DISCOVER] YAML listing override: <path> treated as listing-only page
+  allow_blocked_listing_patterns: []
+  #   - '/student-life/undergraduate-study'
+  #   - '/student-life/postgraduate-study'
+  #   - '/faculties/arts/courses'
+
+  # ── Listing-only patterns (force-listing without is_blocked_page bypass) ──
+  # URLs matching any of these patterns are crawled for links but NEVER added
+  # to the course-extraction candidate set, even if the classifier identifies
+  # them as detail pages. Use for pagination, search-result, or category-index
+  # URLs that contain course links but are not courses themselves.
+  # Complements allow_blocked_listing_patterns — only needed when the URL is
+  # not globally blocked by is_blocked_page.
+  listing_only_patterns: []
+  #   - '/courses/course-index-a-z'
+  #   - '/courses/interest-areas/'
+  #   - '\?'                          # any URL with a query string
+
+  # ── Post-discovery extraction gate ────────────────────────────────────────
+  # Regex whitelist applied AFTER all discovery tiers, as the final filter
+  # before extraction begins. When non-empty, only candidate URLs matching at
+  # least one pattern are sent to the extractor. Unlike allow_url_patterns
+  # (which restricts BFS crawling), this filter lets the BFS crawl listing
+  # and category pages freely while restricting extraction to URLs that look
+  # like genuine course-detail pages.
+  #
+  # Emits:
+  #   [DISCOVER] YAML course detail filter: kept <url>
+  #   [DISCOVER] YAML course detail filter: dropped listing URL <url>
+  #
+  # Bath Spa example:
+  #   course_detail_url_patterns:
+  #     - '^https://www\.bathspa\.ac\.uk/courses/(ug|pg|ify|phd|edd|pgce)-[a-z0-9-]+/?$'
+  course_detail_url_patterns: []
+  #   - '^https://www\.myuni\.ac\.uk/courses/(ug|pg|phd)-[a-z0-9-]+/?$'
+
   # ── URL block-list (blacklist) ────────────────────────────────────────────
   # URLs matching any of these patterns are dropped (regex, applied after allow).
   block_url_patterns: []
@@ -309,6 +358,22 @@ extraction:
     #   - "Commonwealth Supported"
     #   - "HECS-HELP"
     #   - "Domestic students"
+    #   - "Home student"        # UK pattern
+    #   - "UK student"          # UK pattern
+
+    # Phrases that positively confirm a fee evidence snippet is international.
+    # When non-empty: if the evidence contains ANY of these phrases, the fee is
+    # KEPT even when a reject_keyword is also matched (international wins).
+    # Use for pages that list both domestic and international fees:
+    #   e.g. "UK fee: £9,250 / International fee: £15,000"
+    # Emits: [FEE_KEEP] kept international fee by YAML evidence
+    international_fee_keywords: []
+    #   - "International"
+    #   - "International student"
+    #   - "International fee"
+    #   - "Overseas"
+    #   - "Non UK"
+    #   - "EU and international"
 
     # Anchor text links on the course page to follow when no fee is found inline.
     follow_links: []
@@ -384,6 +449,43 @@ extraction:
     #     toefl_overall: 86
     #     cambridge_overall: 176
 
+  # ── Study mode overrides ─────────────────────────────────────────────────
+  # Controls how the study-mode extractor handles the bare \bonline\b keyword.
+  # Enable for universities whose pages contain "online" in nav, footer, or
+  # utility copy that should NOT classify a campus course as Online.
+  study_mode:
+    # When True, the bare \bonline\b keyword fallback (confidence 0.5) is
+    # suppressed. Only authoritative labels (data-attribute, DOM label, or
+    # high-specificity phrases like "fully online", "100% online") set Online.
+    online_only_requires_strong_evidence: false
+    #   online_only_requires_strong_evidence: true   # Bath Spa, UK unis with "apply online" in nav
+
+    # When True and a course_location was found on the same page, a bare-
+    # keyword Online result (confidence 0.5) is suppressed — physical campus wins.
+    prefer_location_over_online_keyword: false
+    #   prefer_location_over_online_keyword: true    # use with online_only_requires_strong_evidence
+
+    # Phrases counted as "strong evidence" of online-only delivery.
+    # Default list covers the most common high-specificity patterns.
+    # Only used when online_only_requires_strong_evidence=true.
+    # strong_online_markers:
+    #   - "delivered fully online"
+    #   - "100% online"
+    #   - "online only"
+    #   - "distance learning"
+    #   - "study online"
+    #   - "fully online"
+    #   - "entirely online"
+    #   - "online delivery only"
+
+    # Documentation-only. Lists UI sections whose text contains "online" but
+    # should not trigger the Online classification (e.g. "apply online" buttons,
+    # nav menus). Actual suppression uses online_only_requires_strong_evidence.
+    ignore_online_keywords_in: []
+    #   - "navigation"
+    #   - "footer"
+    #   - "apply online"
+
   # ── Staging filters ───────────────────────────────────────────────────────
   filters:
     domestic_only:
@@ -393,11 +495,44 @@ extraction:
       # Optionally require this text in main_content for a course to be international-eligible:
       # text_must_appear_in: main_content
 
+      # When True, courses are rejected unless at least one phrase from
+      # international_markers appears in the scraped page text. Stronger
+      # than the default domestic-marker reject-on-match rule.
+      require_international_evidence: false
+      #   require_international_evidence: true
+
+      # Phrases that positively identify the course as open to international students.
+      # When present, the course is KEPT even if domestic_markers are also found.
+      international_markers: []
+      #   - "International students"
+      #   - "International fee"
+      #   - "international applicants"
+      #   - "overseas students"
+
+      # Phrases that identify the course as domestic-only. When found (and
+      # enabled=True), the course is rejected.
+      domestic_markers: []
+      #   - "UK students only"
+      #   - "Home students only"
+      #   - "Domestic only"
+
     online_only:
       # Drop courses with all-online delivery (visa rule). Default true.
       # Set false for distance-education universities (CSU) that legitimately
       # market online courses to international students.
       enabled: true
+
+      # When set and non-empty, only reject when study_mode exactly matches one
+      # of these values (case-insensitive). When empty, any Online classification
+      # triggers rejection (default behaviour).
+      reject_if_mode_is_exactly: []
+      #   - "Online"
+      #   - "Distance learning"
+
+      # When True (default), a course classified as Online is KEPT if a non-empty
+      # course_location is also present. Prevents over-rejection of blended courses
+      # whose study_mode extractor fired on nav/footer "online" text.
+      keep_if_location_present: true
 
   # ── Intake ────────────────────────────────────────────────────────────────
   intake:
@@ -416,6 +551,32 @@ extraction:
 
     # Label written to intake_months when rolling enrollment is detected.
     rolling_enrollment_label: "Rolling"
+
+    # When True and intake_months is still empty after ALL extractors (including
+    # rolling_enrollment above), apply the default_by_level lookup for this
+    # course's degree level. Fills the intake slot so the course is not flagged
+    # as missing_intake. The evidence row is marked as yaml_default_intake (0.4
+    # confidence) so reviewers can see the intake was not extracted from the page.
+    use_default_when_missing: false
+    #   use_default_when_missing: true   # UK unis, courses with no published intake dates
+
+    # YAML default intake months per degree tier, applied when
+    # use_default_when_missing=True. Keys: undergraduate / postgraduate / doctorate.
+    # Values: list of month name strings.
+    default_by_level: {}
+    #   default_by_level:
+    #     undergraduate:
+    #       - September
+    #     postgraduate:
+    #       - September
+    #       - January
+    #     doctorate:
+    #       - September
+
+    # Evidence note written into the intake evidence row when a YAML default is
+    # applied. Displayed in the admin review panel.
+    default_source_note: "YAML default intake"
+    #   default_source_note: "Bath Spa default intake (September)"
 
   # ── Course name cleaning ───────────────────────────────────────────────────
   course_name:
