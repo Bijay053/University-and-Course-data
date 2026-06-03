@@ -799,7 +799,13 @@ def probe_and_configure(  # noqa: ANN001
             if _platform_type:
                 try:
                     from app.services.scraper.pattern_store import lookup_patterns
-                    _learned_patterns = await lookup_patterns(_platform_type, db)
+                    # Use a savepoint so that if lookup_patterns fails (e.g. the
+                    # scraper_patterns table is missing on this environment) only
+                    # the nested sub-transaction is rolled back.  The outer
+                    # transaction — and the already-loaded `uni` object — remain
+                    # valid, and the UPDATE in Stage 4 succeeds normally.
+                    async with db.begin_nested():
+                        _learned_patterns = await lookup_patterns(_platform_type, db)
                     if _learned_patterns:
                         log.info(
                             "[PROBE] Phase 3: loaded %d learned patterns for platform=%r uni_id=%d",
@@ -807,14 +813,8 @@ def probe_and_configure(  # noqa: ANN001
                         )
                 except Exception as _pex:
                     log.debug("[PROBE] pattern lookup non-fatal: %s", _pex)
-                    # lookup_patterns runs a DB query via the same session.
-                    # If it raises (e.g. missing table), the transaction is
-                    # left in a failed state. Roll back so the UPDATE below
-                    # does not crash with InFailedSQLTransactionError.
-                    try:
-                        await db.rollback()
-                    except Exception:
-                        pass
+                    # Savepoint was automatically rolled back by the context
+                    # manager; outer transaction is still active.
 
             # ── Stage 3: Generate the config ───────────────────────────────────
             try:
