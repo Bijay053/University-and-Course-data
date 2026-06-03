@@ -517,6 +517,27 @@ interface ConfigEntry {
   university_name: string | null;
 }
 
+interface UniversityHealth {
+  university_id: number;
+  total_courses: number;
+  last_imported: number | null;
+  last_total_found: number | null;
+  last_job_at: string | null;
+  discovery_health: number;
+  extraction_health: number;
+  fee_coverage: number;
+  english_coverage: number;
+  intake_coverage: number;
+  overall_health: number;
+}
+
+function healthScoreMeta(score: number) {
+  if (score >= 85) return { label: "Healthy",      textCls: "text-green-700 dark:text-green-400",   bgCls: "bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800",   barCls: "bg-green-500"  };
+  if (score >= 70) return { label: "Watch",         textCls: "text-amber-700 dark:text-amber-400",   bgCls: "bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800",   barCls: "bg-amber-500"  };
+  if (score >= 50) return { label: "Needs Review",  textCls: "text-orange-700 dark:text-orange-400", bgCls: "bg-orange-50 dark:bg-orange-950/30 border-orange-200 dark:border-orange-800", barCls: "bg-orange-500" };
+  return              { label: "Critical",     textCls: "text-red-700 dark:text-red-400",     bgCls: "bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800",     barCls: "bg-red-500"    };
+}
+
 interface GenerateForm {
   university_name: string;
   website_url: string;
@@ -2494,6 +2515,7 @@ export default function SettingsScraperConfigs() {
   const { toast } = useToast();
   const [configs, setConfigs] = useState<ConfigEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [healthData, setHealthData] = useState<Record<string, UniversityHealth>>({});
   const [selected, setSelected] = useState<string | null>(null);
   const [editorYaml, setEditorYaml] = useState("");
   const [savedYaml, setSavedYaml] = useState("");
@@ -2580,7 +2602,16 @@ export default function SettingsScraperConfigs() {
       const res = await fetchWithAuth(`${BASE}/api/settings/scraper-configs`);
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
-      setConfigs(data.configs ?? []);
+      const cfgs: ConfigEntry[] = data.configs ?? [];
+      setConfigs(cfgs);
+      // Fire-and-forget health fetch for all linked universities
+      const ids = cfgs.map(c => c.university_id).filter((id): id is number => id != null);
+      if (ids.length > 0) {
+        fetchWithAuth(`${BASE}/api/settings/scraper-health?university_ids=${ids.join(",")}`)
+          .then(r => r.ok ? r.json() : null)
+          .then(d => { if (d?.health) setHealthData(d.health as Record<string, UniversityHealth>); })
+          .catch(() => { /* health is non-critical */ });
+      }
     } catch (err) {
       toast({ title: "Failed to load configs", description: (err as Error).message, variant: "destructive" });
     } finally {
@@ -3277,6 +3308,20 @@ export default function SettingsScraperConfigs() {
                           <JobStatusBadge state={job} compact />
                         </div>
                       )}
+                      {cfg.university_id != null && healthData[String(cfg.university_id)] && (() => {
+                        const h = healthData[String(cfg.university_id!)]!;
+                        const { barCls, textCls } = healthScoreMeta(h.overall_health);
+                        return (
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <div className="flex-1 h-1 rounded-full bg-muted overflow-hidden">
+                              <div className={cn("h-full rounded-full transition-all", barCls)} style={{ width: `${h.overall_health}%` }} />
+                            </div>
+                            <span className={cn("text-[10px] font-medium tabular-nums flex-shrink-0", textCls)}>
+                              {h.overall_health}/100
+                            </span>
+                          </div>
+                        );
+                      })()}
                     </button>
                     {/* Per-card trigger button */}
                     <button
@@ -3526,6 +3571,46 @@ export default function SettingsScraperConfigs() {
                   )}
                 </div>
               </div>
+
+              {/* ── Scrape Health Card ─────────────────────────────────────────── */}
+              {selectedConfig?.university_id != null && healthData[String(selectedConfig.university_id)] && (() => {
+                const h = healthData[String(selectedConfig.university_id!)]!;
+                const { label, textCls, bgCls } = healthScoreMeta(h.overall_health);
+                const metrics: [string, number, string][] = [
+                  ["Discovery",  h.discovery_health,  "Discovery health: how many courses were staged in the last scrape (20+ staged = 100%)"],
+                  ["Extraction", h.extraction_health,  "Extraction health: average completeness score across staged courses"],
+                  ["Fee",        h.fee_coverage,       "Fee coverage: % of courses with international fee filled"],
+                  ["English",    h.english_coverage,   "English coverage: % of courses with IELTS / PTE / TOEFL score"],
+                  ["Intake",     h.intake_coverage,    "Intake coverage: % of courses with intake months filled"],
+                ];
+                return (
+                  <div className={cn("px-4 py-2 border-b flex items-center gap-4", bgCls)}>
+                    <div className="flex-shrink-0 text-center min-w-[60px]">
+                      <div className={cn("text-[10px] uppercase tracking-wide font-semibold", textCls)}>{label}</div>
+                      <div className={cn("text-xl font-bold leading-tight tabular-nums", textCls)}>
+                        {h.overall_health}<span className="text-xs font-normal opacity-70">/100</span>
+                      </div>
+                      <div className="text-[9px] text-muted-foreground">{h.total_courses} courses</div>
+                    </div>
+                    <div className="flex-1 grid grid-cols-5 gap-x-4 gap-y-0">
+                      {metrics.map(([name, val, tip]) => {
+                        const { barCls: mb, textCls: mc } = healthScoreMeta(val);
+                        return (
+                          <div key={name} title={tip}>
+                            <div className="flex justify-between items-center mb-0.5">
+                              <span className="text-[10px] text-muted-foreground">{name}</span>
+                              <span className={cn("text-[10px] font-semibold tabular-nums", mc)}>{val}%</span>
+                            </div>
+                            <div className="h-1.5 rounded-full bg-background/60 border border-border/40 overflow-hidden">
+                              <div className={cn("h-full rounded-full transition-all duration-500", mb)} style={{ width: `${val}%` }} />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* AI Fix panel */}
               {aiFixOpen && (

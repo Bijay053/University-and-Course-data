@@ -493,6 +493,60 @@ async def list_scraper_configs(
     return JSONResponse(content={"configs": configs})
 
 
+# ── Scrape Health ──────────────────────────────────────────────────────────────
+
+@router.get("/scraper-health")
+async def get_scraper_health(
+    _user: Annotated[dict, Depends(require_permission("settings.view"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    university_ids: str = Query(..., description="Comma-separated university IDs"),
+) -> JSONResponse:
+    """Return v_university_health rows for the requested university IDs."""
+    ids: list[int] = [
+        int(i) for i in university_ids.split(",")
+        if i.strip().lstrip("-").isdigit() and int(i.strip()) > 0
+    ]
+    if not ids:
+        return JSONResponse(content={"health": {}})
+
+    res = await db.execute(
+        text("""
+            SELECT
+                university_id,
+                total_courses,
+                last_imported,
+                last_total_found,
+                last_job_at,
+                discovery_health,
+                extraction_health,
+                fee_coverage,
+                english_coverage,
+                intake_coverage,
+                overall_health
+            FROM v_university_health
+            WHERE university_id = ANY(:ids)
+        """),
+        {"ids": ids},
+    )
+    health: dict[str, dict] = {}
+    for row in res.mappings():
+        uid = str(row["university_id"])
+        health[uid] = {
+            "university_id": row["university_id"],
+            "total_courses":   row["total_courses"],
+            "last_imported":   row["last_imported"],
+            "last_total_found": row["last_total_found"],
+            "last_job_at":     row["last_job_at"].isoformat() if row["last_job_at"] else None,
+            "discovery_health":   row["discovery_health"],
+            "extraction_health":  row["extraction_health"],
+            "fee_coverage":       row["fee_coverage"],
+            "english_coverage":   row["english_coverage"],
+            "intake_coverage":    row["intake_coverage"],
+            "overall_health":     row["overall_health"],
+        }
+    return JSONResponse(content={"health": health})
+
+
 # ── Trigger scrape ────────────────────────────────────────────────────────────
 
 @router.post("/scraper-configs/{slug}/trigger")
