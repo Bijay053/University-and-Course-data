@@ -260,6 +260,7 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
   const pollFailRef = useRef(0);
   const logEndRef = useRef<HTMLDivElement>(null);
   const logContainerRef = useRef<HTMLDivElement>(null);
+  const doneLogRef = useRef<HTMLDivElement>(null);
   const submittingRef = useRef(false);
 
   // Restore any in-progress job after navigation
@@ -290,6 +291,14 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
       logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
     }
   }, [logs]);
+
+  // When transitioning to done, scroll the done-state log panel to the bottom
+  // so the user sees the most recent extraction lines, not the old discovery logs.
+  useEffect(() => {
+    if (phase === "done" && doneLogRef.current) {
+      doneLogRef.current.scrollTop = doneLogRef.current.scrollHeight;
+    }
+  }, [phase, logs]);
 
   const resetToIdle = useCallback(() => {
     if (pollRef.current) clearTimeout(pollRef.current);
@@ -1633,7 +1642,7 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
 
             {/* Full log (scrollable) */}
             <div className="relative">
-              <div className="max-h-[400px] overflow-y-auto bg-gray-950 rounded-lg p-2 font-mono text-[10px] leading-relaxed">
+              <div ref={doneLogRef} className="max-h-[600px] overflow-y-auto bg-gray-950 rounded-lg p-2 font-mono text-[10px] leading-relaxed">
                 {logs.map((l, i) => (
                   <div key={i} className={`${logColor(l.event, l.phase)} break-words`}>{l.message || l.event}</div>
                 ))}
