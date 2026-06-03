@@ -564,6 +564,32 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
     mode, snippet, confidence = classify_study_mode(html)
     if not mode:
         return []
+
+    # ── YAML study_mode controls ─────────────────────────────────────────────
+    # online_only_requires_strong_evidence: suppress bare \bonline\b fallback
+    # (confidence 0.5) so stray nav / footer / utility copy does not mark a
+    # campus course as Online.
+    # prefer_location_over_online_keyword: if a location was already found on
+    # the page, suppress the bare-keyword Online result at the extractor level.
+    if mode == "Online" and (confidence is None or confidence < 0.7):
+        try:
+            from app.services.scraper.config.context import (
+                get_uni_config as _get_sm_cfg,
+            )
+            _sm_uni = _get_sm_cfg()
+            if _sm_uni is not None:
+                _sm_opts = getattr(_sm_uni.extraction, "study_mode", None)
+                if _sm_opts is not None:
+                    if getattr(_sm_opts, "online_only_requires_strong_evidence", False):
+                        import logging as _sm_log
+                        _sm_log.getLogger(__name__).info(
+                            "[STUDY_MODE] suppressed bare 'online' keyword result for %s"
+                            " (online_only_requires_strong_evidence=True)", url
+                        )
+                        return []
+        except Exception:
+            pass
+
     return [
         ExtractionResult(
             field_key=field_key,

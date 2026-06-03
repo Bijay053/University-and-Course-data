@@ -2091,6 +2091,66 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     dropped_sample=_dropped_urls[:5],
                 )
 
+        # Phase A.5c — per-uni YAML course_detail_url_patterns final extraction gate.
+        # When non-empty, only candidate URLs matching at least one regex are kept
+        # for extraction.  Unlike allow_url_patterns (which restricts BFS crawling),
+        # this filter runs AFTER all discovery tiers and lets the BFS crawl listing /
+        # category pages freely while restricting extraction to URLs that look like
+        # genuine course-detail pages.  Logs each dropped/kept URL so operators can
+        # confirm the filter is working correctly.
+        _cdp_raw: list[str] = (
+            list(getattr(_uni_cfg.discovery, "course_detail_url_patterns", None) or [])
+            if _uni_cfg and _uni_cfg.discovery else []
+        )
+        if _cdp_raw and links:
+            _compiled_cdp: list[re.Pattern[str]] = []
+            for _cdp_str in _cdp_raw:
+                try:
+                    _compiled_cdp.append(re.compile(_cdp_str, re.IGNORECASE))
+                except re.error:
+                    log.warning(
+                        "discovery.course_detail_url_patterns: invalid regex skipped: %s",
+                        _cdp_str,
+                    )
+            if _compiled_cdp:
+                _pre_cdp = len(links)
+                _cdp_kept: list[dict] = []
+                _cdp_dropped: list[dict] = []
+                for _lk in links:
+                    _lk_url = _lk.get("url") or ""
+                    if any(_cp.search(_lk_url) for _cp in _compiled_cdp):
+                        log.debug(
+                            "[DISCOVER] YAML course detail filter: kept %s", _lk_url
+                        )
+                        _cdp_kept.append(_lk)
+                    else:
+                        log.info(
+                            "[DISCOVER] YAML course detail filter: dropped listing URL %s",
+                            _lk_url,
+                        )
+                        _cdp_dropped.append(_lk)
+                links = _cdp_kept
+                _cdp_n_dropped = _pre_cdp - len(links)
+                if _cdp_n_dropped:
+                    _cdp_drop_pct = (_cdp_n_dropped / _pre_cdp * 100) if _pre_cdp else 0
+                    log.info(
+                        "[EXTRACT] course_detail_url_patterns: kept %d / %d"
+                        " (dropped %d = %.0f%% non-detail URLs)",
+                        len(links), _pre_cdp, _cdp_n_dropped, _cdp_drop_pct,
+                    )
+                    await emit(
+                        "status",
+                        f"[EXTRACT] course_detail_url_patterns: kept {len(links)} / {_pre_cdp}"
+                        f" ({_cdp_drop_pct:.0f}% dropped as non-course-detail URLs). "
+                        f"Sample dropped: {', '.join(d.get('url','') for d in _cdp_dropped[:3]) or 'n/a'}",
+                        phase="extract",
+                        kind="extract_course_detail_filter",
+                        dropped=_cdp_n_dropped,
+                        kept=len(links),
+                        drop_pct=round(_cdp_drop_pct, 1),
+                        dropped_sample=[d.get("url", "") for d in _cdp_dropped[:5]],
+                    )
+
         # Phase A.5c — Recipe year filter + year-based URL deduplication ──────────
         # Reads course_year config from the recipe (stored in uni_scrape_config["recipe"]).
         # Three operations applied in order:

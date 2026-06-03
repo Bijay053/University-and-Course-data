@@ -832,6 +832,21 @@ async def discover_course_links(
             except re.error:
                 log.warning("[DISCOVER] invalid allow_url_patterns regex %r — skipped", _raw)
 
+    # Listing-override patterns: URLs matching these bypass is_blocked_page AND
+    # are treated as discovery/listing pages (crawled but NOT added to found).
+    # Combines allow_blocked_listing_patterns (blocked-path override) and
+    # listing_only_patterns (force-listing even for non-blocked URLs).
+    _yaml_listing_compiled: list[tuple[str, re.Pattern]] = []
+    if discovery_config is not None:
+        for _lp_field in ("allow_blocked_listing_patterns", "listing_only_patterns"):
+            for _raw in list(getattr(discovery_config, _lp_field, None) or []):
+                try:
+                    _yaml_listing_compiled.append((_raw, re.compile(_raw)))
+                except re.error:
+                    log.warning(
+                        "[DISCOVER] invalid %s regex %r — skipped", _lp_field, _raw
+                    )
+
     while queue and len(visited) < max_pages and len(found) < max_courses:
         url, depth = queue.pop(0)
         # Dedup on normalized URL so ?studentType=international and the bare
@@ -855,6 +870,34 @@ async def discover_course_links(
         # hostname, skip the global block check entirely.  This lets operators
         # fix unusual URL structures (e.g. Bath Spa's /student-life/…/course)
         # via YAML without a developer change to guards.py.
+        # Check listing-only override FIRST — these bypass is_blocked_page AND
+        # prevent the URL from being added to the course candidate set.
+        _yaml_listing_override = False
+        if _yaml_listing_compiled:
+            _url_parsed_l = urlparse(url)
+            if _url_parsed_l.netloc == _uni_netloc:
+                _url_path_q = _url_parsed_l.path + (
+                    "?" + _url_parsed_l.query if _url_parsed_l.query else ""
+                )
+                for _raw_pat_l, _compiled_pat_l in _yaml_listing_compiled:
+                    if _compiled_pat_l.search(_url_path_q) or _compiled_pat_l.search(url):
+                        _yaml_listing_override = True
+                        log.info(
+                            "[DISCOVER] YAML listing override: %s treated as listing-only page"
+                            " (pattern: %r) — crawling for links, NOT adding as course candidate",
+                            _url_parsed_l.path,
+                            _raw_pat_l,
+                        )
+                        if emit:
+                            await emit(
+                                "status",
+                                f"[DISCOVER] YAML listing override: {_url_parsed_l.path} treated"
+                                f" as listing-only page (pattern: {_raw_pat_l!r})",
+                                phase="discover",
+                                kind="yaml_listing_override",
+                            )
+                        break
+
         _yaml_allow_override = False
         if _yaml_allow_compiled:
             _url_parsed = urlparse(url)
@@ -876,7 +919,7 @@ async def discover_course_links(
                         )
                         break
 
-        if not _yaml_allow_override:
+        if not _yaml_allow_override and not _yaml_listing_override:
             try:
                 from app.services.scraper.guards import is_blocked_page
 
@@ -979,7 +1022,7 @@ async def discover_course_links(
         # The fix: trust the page-content classifier over the URL-shape
         # heuristic — if we fetched it and it looks like a course, it IS
         # a course candidate, regardless of its URL depth.
-        if ptype == "detail" and url not in found:
+        if ptype == "detail" and url not in found and not _yaml_listing_override:
             slug_name = url.rstrip("/").rsplit("/", 1)[-1].replace("-", " ").replace("_", " ").title()
             found[url] = slug_name
             log.info("[DISCOVER] added self as candidate %s", url)
@@ -1061,7 +1104,7 @@ async def discover_course_links(
         # We deliberately re-run `_looks_like_course` here too so that
         # course links the classifier missed (unusual link templates,
         # text outside the 5–180-char window) still get harvested.
-        if ptype != "detail" and len(found) < max_courses:
+        if (ptype != "detail" or _yaml_listing_override) and len(found) < max_courses:
             ext = _LinkExtractor()
             try:
                 ext.feed(html)

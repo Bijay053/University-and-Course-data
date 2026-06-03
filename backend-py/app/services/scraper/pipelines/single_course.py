@@ -3088,6 +3088,49 @@ async def extract_course(
                 (kw for kw in _fee_reject_kws if any(kw.lower() in s for s in _fee_ev_snips)),
                 None,
             )
+            # ── international_fee_keywords guard ─────────────────────────────
+            # If the evidence also contains an explicit international-student
+            # marker, the international marker wins and the fee is KEPT even
+            # when a reject_keyword was also matched.  Handles pages that
+            # publish both a domestic fee and an international fee on the same
+            # page (e.g. "UK fee: £9,250 / International fee: £15,000").
+            if _kw_hit:
+                try:
+                    _intl_fee_kws: list[str] = (
+                        _uc_fee_reject.extraction.fees.international_fee_keywords
+                        if _uc_fee_reject else []
+                    ) or []
+                except Exception:
+                    _intl_fee_kws = []
+                if _intl_fee_kws:
+                    _intl_kw_hit: str | None = next(
+                        (
+                            kw for kw in _intl_fee_kws
+                            if any(kw.lower() in s for s in _fee_ev_snips)
+                        ),
+                        None,
+                    )
+                    if _intl_kw_hit:
+                        log.info(
+                            "[FEE_KEEP] course=%r — international_fee=%r kept;"
+                            " international_marker %r overrides reject_keyword %r",
+                            payload.get("course_name") or url,
+                            payload["international_fee"],
+                            _intl_kw_hit,
+                            _kw_hit,
+                        )
+                        if emit:
+                            await emit(
+                                "status",
+                                f"[FEE_KEEP] {str(payload.get('course_name', url))[:40]}"
+                                f" — international fee kept (marker: {_intl_kw_hit!r}"
+                                f" overrides reject: {_kw_hit!r})",
+                                phase="extract",
+                                kind="fee_kept",
+                                url=url,
+                                keyword=_intl_kw_hit,
+                            )
+                        _kw_hit = None  # clear reject trigger
             if _kw_hit:
                 log.info(
                     "[FEE_REJECT] course=%r — international_fee=%r discarded; "
@@ -6117,6 +6160,69 @@ async def extract_course(
         ):
             payload["intake_months"] = [_rolling_label]
             _intake_months = payload["intake_months"]
+
+    # ── YAML default_by_level intake fallback ────────────────────────────────
+    # When intake_months is still empty after all extractors (including the
+    # rolling-enrollment fallback above), apply the YAML-configured default
+    # month(s) for the course's degree level.  The synthetic evidence row is
+    # marked with the configured default_source_note so reviewers can see the
+    # intake was not extracted from the course page.
+    if not _intake_months:
+        try:
+            _uc_intk = get_uni_config()
+            _intk_cfg = _uc_intk.extraction.intake if _uc_intk else None
+        except Exception:
+            _intk_cfg = None
+        if (
+            _intk_cfg is not None
+            and getattr(_intk_cfg, "use_default_when_missing", False)
+            and getattr(_intk_cfg, "default_by_level", None)
+        ):
+            _dl_map: dict = dict(_intk_cfg.default_by_level or {})
+            _course_dl = (payload.get("degree_level") or "").lower()
+            # Normalise degree_level to the three recognised tiers
+            _dl_tier = (
+                "undergraduate" if any(
+                    x in _course_dl for x in ("bachelor", "undergraduate", "diploma", "certificate")
+                )
+                else "postgraduate" if any(
+                    x in _course_dl for x in (
+                        "master", "postgraduate", "graduate certificate",
+                        "graduate diploma", "mba", "msc", "ma ",
+                    )
+                )
+                else "doctorate" if any(
+                    x in _course_dl for x in ("doctor", "phd", "doctorate", "edd")
+                )
+                else ""
+            )
+            _default_months: list[str] = (
+                list(_dl_map.get(_dl_tier) or [])
+                if _dl_tier else
+                list(_dl_map.get("undergraduate") or [])  # safe global fallback
+            )
+            if _default_months:
+                payload["intake_months"] = _default_months
+                _intake_months = _default_months
+                _src_note = getattr(_intk_cfg, "default_source_note", "YAML default intake")
+                evidence.append({
+                    "field_key": "intake_months",
+                    "value": _default_months,
+                    "confidence": 0.4,
+                    "method": "yaml_default_intake",
+                    "snippet": (
+                        f"{_src_note}: degree_level={_course_dl!r} → tier={_dl_tier!r} "
+                        f"→ months={_default_months}"
+                    ),
+                })
+                log.info(
+                    "[INTAKE_DEFAULT] %r — intake_months filled with YAML default %r"
+                    " (tier=%r, note=%r)",
+                    payload.get("course_name") or url,
+                    _default_months,
+                    _dl_tier,
+                    _src_note,
+                )
 
     if not _intake_months:
         # Only warn if page had explicit intake-related text (avoid false

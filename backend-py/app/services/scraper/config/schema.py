@@ -523,6 +523,48 @@ class DiscoveryConfig(BaseModel):
             "one pattern are kept.  Empty list = allow everything."
         ),
     )
+    allow_blocked_listing_patterns: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Substring or regex patterns that, when matched against a URL, override "
+            "the global ``is_blocked_page`` classifier and treat the URL as a "
+            "discovery/listing page: it is crawled for outbound course links but is "
+            "NOT added to the course candidate set for extraction. "
+            "Use when a university's real listing pages sit under globally-blocked "
+            "paths such as /student-life/, /faculties/, /schools/ or /subject-areas/ "
+            "that is_blocked_page classifies as campus_page or category_landing_page. "
+            "The override is host-scoped: only URLs on the same hostname as the "
+            "university's scrape_url are affected. "
+            "Emits: [DISCOVER] YAML listing override: bypassed <reason> for <path>"
+        ),
+    )
+    listing_only_patterns: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Regex patterns.  Any discovered URL matching one of these is crawled "
+            "for outbound links but never added to the course candidate set for "
+            "extraction — even if the page classifier identifies it as a detail page. "
+            "Use for pagination, search-result, and category-index URLs that contain "
+            "course links but are not courses themselves.  "
+            "Complements allow_blocked_listing_patterns (which is only needed when "
+            "the URL would also be blocked by is_blocked_page)."
+        ),
+    )
+    course_detail_url_patterns: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Regex whitelist applied AFTER discovery as the final extraction gate. "
+            "When non-empty, any candidate URL that does NOT match at least one "
+            "pattern is dropped before extraction begins.  "
+            "Unlike allow_url_patterns (which restricts BFS crawling), "
+            "course_detail_url_patterns lets the BFS crawl listing and category "
+            "pages freely while restricting extraction to URLs that match the "
+            "expected course-detail URL shape. "
+            "Emits: [DISCOVER] YAML course detail filter: dropped <url> / kept <url>. "
+            "Example (Bath Spa): ['^https://www\\.bathspa\\.ac\\.uk/courses/"
+            "(ug|pg|ify|phd|edd|pgce)-[a-z0-9-]+/?$']"
+        ),
+    )
     sitemap_url: Optional[str] = Field(
         default=None,
         description="Explicit sitemap URL.  Overrides the auto-detected sitemap.",
@@ -842,6 +884,22 @@ class FeesConfig(BaseModel):
             "Empty by default — opt-in per university."
         ),
     )
+    international_fee_keywords: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Phrases that positively confirm a fee evidence snippet is for "
+            "international students.  When non-empty: if the evidence snippet "
+            "contains at least one of these phrases, the fee is kept even when "
+            "a reject_keyword is also present (international marker wins). "
+            "This allows the pipeline to correctly handle pages that show both "
+            "domestic and international fees — e.g. 'UK fee: £9,250 / "
+            "International fee: £15,000' — by keeping the clearly-labelled "
+            "international figure.  "
+            "Typical values: ['International', 'Overseas', 'Non UK', "
+            "'EU and international'].  "
+            "Logged as: [FEE_KEEP] kept international fee by YAML evidence"
+        ),
+    )
     prefer_international: bool = Field(
         default=False,
         description=(
@@ -1113,6 +1171,33 @@ class DomesticOnlyFilter(BaseModel):
             "without marking them as such (e.g. ACAP)."
         ),
     )
+    require_international_evidence: bool = Field(
+        default=False,
+        description=(
+            "When True, a course is rejected unless at least one phrase from "
+            "international_markers is found in the scraped page text.  Stronger "
+            "than the default domestic-marker reject-on-match rule."
+        ),
+    )
+    international_markers: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Phrases that positively identify a course as open to international "
+            "students.  When found in the page, the course is kept even if "
+            "domestic_markers are also present.  "
+            "Typical values: ['International students', 'International fee', "
+            "'international applicants', 'overseas students']."
+        ),
+    )
+    domestic_markers: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Phrases that identify a course as domestic-only.  When found in "
+            "the page and enabled=True, the course is rejected. "
+            "Typical values: ['UK students', 'Home students', 'Domestic students', "
+            "'Commonwealth Supported', 'CSP', 'HECS', 'Student Finance England']."
+        ),
+    )
 
 
 class OnlineOnlyFilter(BaseModel):
@@ -1124,6 +1209,83 @@ class OnlineOnlyFilter(BaseModel):
             "in guards.should_stage_course.  Distance-education-heavy unis "
             "(e.g. CSU, OUA) opt out by setting this to false in their "
             "per-uni YAML."
+        ),
+    )
+    reject_if_mode_is_exactly: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Only reject when study_mode exactly matches one of these values "
+            "(case-insensitive).  When non-empty, overrides the default "
+            "behaviour of rejecting ANY Online classification.  "
+            "E.g. ['Online', 'Distance learning'] to reject fully-online but "
+            "keep Blended."
+        ),
+    )
+    keep_if_location_present: bool = Field(
+        default=True,
+        description=(
+            "When True, a course classified as Online is kept if a non-empty "
+            "course_location is also present (physical campus confirmed). "
+            "Default True prevents over-rejection of blended courses whose "
+            "study_mode extractor fired on nav/footer 'online' text."
+        ),
+    )
+
+
+class StudyModeConfig(BaseModel):
+    """YAML controls for study-mode extraction behaviour."""
+
+    online_only_requires_strong_evidence: bool = Field(
+        default=False,
+        description=(
+            "When True, the bare \\bonline\\b keyword fallback (confidence 0.5) "
+            "is suppressed.  Only authoritative structured labels (id-span, "
+            "data-attribute, DOM label) or high-specificity phrases like "
+            "'fully online', '100% online', 'distance learning' will set "
+            "study_mode='Online'.  Enable for universities whose pages contain "
+            "'online' in navigation, footer menus, or utility copy (e.g. "
+            "'apply online', 'UC Online', 'online reporting') that should NOT "
+            "mark a campus course as Online."
+        ),
+    )
+    prefer_location_over_online_keyword: bool = Field(
+        default=False,
+        description=(
+            "When True and a non-empty course_location was extracted on the "
+            "same course page, a study_mode='Online' result derived only from "
+            "the bare \\bonline\\b keyword fallback (confidence 0.5) is "
+            "suppressed in favour of 'On Campus'.  Has no effect on structured "
+            "labels or high-specificity patterns.  Use together with "
+            "online_only_requires_strong_evidence for maximum noise reduction."
+        ),
+    )
+    strong_online_markers: list[str] = Field(
+        default_factory=lambda: [
+            "delivered fully online",
+            "100% online",
+            "online only",
+            "distance learning",
+            "study online",
+            "fully online",
+            "entirely online",
+            "online delivery only",
+        ],
+        description=(
+            "Phrases that constitute 'strong evidence' of a fully online course. "
+            "Used when online_only_requires_strong_evidence=True to distinguish "
+            "genuinely online courses from pages that incidentally contain 'online'."
+        ),
+    )
+    ignore_online_keywords_in: list[str] = Field(
+        default_factory=list,
+        description=(
+            "UI section labels whose content should be excluded from online-mode "
+            "keyword scanning (e.g. 'navigation', 'footer', 'global menu', "
+            "'UC Online', 'online reporting').  Informational field — actual "
+            "noise-blocking is handled per-host via "
+            "_STUDY_MODE_RULE_SUPPRESSED_HOSTS in study_mode.py; this field "
+            "documents operator intent and will drive dynamic suppression in a "
+            "future extractor revision."
         ),
     )
 
@@ -1174,6 +1336,34 @@ class IntakeConfig(BaseModel):
             "Lower-cased substrings searched in the page body to "
             "trigger the rolling_enrollment_label fallback. Match is "
             "case-insensitive substring (no regex). Empty by default."
+        ),
+    )
+    use_default_when_missing: bool = Field(
+        default=False,
+        description=(
+            "When True and intake_months is still empty after all extractors "
+            "(including rolling_enrollment fallback), apply the default_by_level "
+            "lookup for the course's degree level.  The synthetic intake row is "
+            "marked with default_source_note so reviewers know it was not "
+            "extracted from the course page."
+        ),
+    )
+    default_by_level: dict[str, list[str]] = Field(
+        default_factory=dict,
+        description=(
+            "YAML-level default intake month(s) per degree tier, applied when "
+            "use_default_when_missing=True and the page has no extractable intake. "
+            "Keys are normalised degree tiers: 'undergraduate', 'postgraduate', "
+            "'doctorate'.  Values are month name lists. "
+            "Example: {undergraduate: [September], postgraduate: [September, January]}"
+        ),
+    )
+    default_source_note: str = Field(
+        default="YAML default intake",
+        description=(
+            "Evidence note written into the intake evidence row when a YAML "
+            "default is applied.  Shown in the admin review panel so operators "
+            "know the intake was not extracted from the course page."
         ),
     )
 
@@ -1404,6 +1594,7 @@ class ExtractionConfig(BaseModel):
     fees: FeesConfig = Field(default_factory=FeesConfig)
     english: EnglishConfig = Field(default_factory=EnglishConfig)
     intake: IntakeConfig = Field(default_factory=IntakeConfig)
+    study_mode: StudyModeConfig = Field(default_factory=StudyModeConfig)
     filters: FiltersConfig = Field(default_factory=FiltersConfig)
     text_cleaning: TextCleaningConfig = Field(default_factory=TextCleaningConfig)
     course_name: CourseNameConfig = Field(default_factory=CourseNameConfig)

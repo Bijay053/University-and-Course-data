@@ -1,7 +1,15 @@
 # Bath Spa University
 # Hostname: www.bathspa.ac.uk
 # Country: United Kingdom | Currency: GBP
-# Fix: crawl subject landing pages, but extract only real course detail pages.
+#
+# Discovery design:
+#   Real course discovery pages sit under /student-life/ (a globally-blocked
+#   campus_page path).  allow_blocked_listing_patterns overrides the global
+#   guard and crawls those pages for course links WITHOUT adding them to the
+#   candidate set for extraction.  course_detail_url_patterns then acts as
+#   the final extraction gate so only genuine /courses/(ug|pg|...)- URLs are
+#   extracted.  This separates "pages we need to crawl" from "pages we want
+#   to extract" — which allow_url_patterns conflates.
 
 discovery:
   auto_api_discovery: false
@@ -18,16 +26,39 @@ discovery:
   max_candidates: 1200
   expected_min_courses: 180
 
-  allow_url_patterns:
-    - '^https://www\.bathspa\.ac\.uk/courses/(ug|pg|ify|phd|edd)-[a-z0-9-]+/?$'
-    - '^https://www\.bathspa\.ac\.uk/student-life/undergraduate-study/'
-    - '^https://www\.bathspa\.ac\.uk/student-life/postgraduate-study/'
+  # Override the global campus_page block for these listing-page paths.
+  # They are crawled for outbound course links but NEVER added to the
+  # course-extraction candidate set.
+  allow_blocked_listing_patterns:
+    - '/student-life/undergraduate-study'
+    - '/student-life/postgraduate-study'
 
-  must_contain:
-    - '/courses/'
+  # URLs matching these patterns are crawled but not extracted, even if the
+  # page classifier calls them detail pages.
+  listing_only_patterns:
+    - '/courses/course-index-a-z'
+    - '/courses/interest-areas/'
+    - '/courses/types-of-courses/'
+    - '/courses/new-courses/'
+    - '/courses/short-courses/'
+    - '/courses/community-learning/'
+    - '/courses/course-documents/'
+    - '\?'
+
+  # Post-discovery extraction gate: only URLs matching this pattern are sent
+  # to the extractor.  Listing, search, and category pages are silently
+  # dropped.  Logged as:
+  #   [DISCOVER] YAML course detail filter: dropped listing URL ...
+  #   [DISCOVER] YAML course detail filter: kept ...
+  course_detail_url_patterns:
+    - '^https://www\.bathspa\.ac\.uk/courses/(ug|pg|ify|phd|edd|pgce)-[a-z0-9-]+/?$'
+
+  # Keep allow_url_patterns restricted to course-detail URLs only so that
+  # the orchestrator allow-filter doesn't widen the extraction set.
+  allow_url_patterns:
+    - '^https://www\.bathspa\.ac\.uk/courses/(ug|pg|ify|phd|edd|pgce)-[a-z0-9-]+/?$'
 
   block_url_patterns:
-    - '\?'
     - '^https://www\.bathspa\.ac\.uk/courses/?$'
     - '^https://www\.bathspa\.ac\.uk/courses/course-index-a-z/?$'
     - '/courses/types-of-courses/'
@@ -65,12 +96,36 @@ extraction:
     prefer_annual_over_total: true
     prefer_year_one_over_total: true
 
+    # Reject any fee whose evidence text contains one of these domestic markers.
     reject_keywords:
       - Home student
       - Home fee
       - UK student
       - UK fee
       - Domestic
+      - Student Finance England
+      - UK fees
+
+    # If the evidence also contains one of these phrases, the fee is KEPT even
+    # when a reject_keyword is present (international marker wins).
+    international_fee_keywords:
+      - International
+      - International student
+      - International fee
+      - Overseas student
+      - Overseas fee
+
+  # Suppress the bare \bonline\b keyword fallback (confidence 0.5) so that
+  # general site copy ("apply online", "study online resources") does not
+  # wrongly classify campus courses as Online.
+  study_mode:
+    online_only_requires_strong_evidence: true
+    prefer_location_over_online_keyword: true
+    ignore_online_keywords_in:
+      - navigation
+      - footer
+      - apply online
+      - online application
 
   english:
     trust_vision_ocr: false
@@ -78,12 +133,35 @@ extraction:
 
   intake:
     start_dates_only: true
+    # Apply YAML defaults when no intake date is found on the course page.
+    use_default_when_missing: true
+    default_source_note: Bath Spa default intake (September)
+    default_by_level:
+      undergraduate:
+        - September
+      postgraduate:
+        - September
 
   filters:
     domestic_only:
       enabled: false
+      # Future: set enabled: true + require_international_evidence: true
+      # when Bath Spa confirms all listed courses are internationally eligible.
+      international_markers:
+        - International students
+        - International fee
+        - international applicants
+        - overseas students
+      domestic_markers:
+        - UK students only
+        - Home students only
+        - Domestic only
     online_only:
-      enabled: false
+      enabled: true
+      keep_if_location_present: true
+      reject_if_mode_is_exactly:
+        - Online
+        - Distance learning
 
   course_name:
     strip_title_suffixes:
