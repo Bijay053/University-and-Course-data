@@ -6108,6 +6108,9 @@ async def auto_repair_candidates(
     )).scalars().all()
     historical_urls: list[str] = [u for u in url_rows if u]
 
+    # Extract dropped URL sample stored by the orchestrator filter pipeline
+    dropped_sample: list[str] = pipeline_stats.get("dropped_sample") or []
+
     # ── 4. Generate candidates ────────────────────────────────────────────────
     candidates = await generate_repair_candidates(
         uni_id=uni_id,
@@ -6121,6 +6124,7 @@ async def auto_repair_candidates(
         imported=imported,
         historical_urls=historical_urls,
         pipeline_stats=pipeline_stats,
+        dropped_sample=dropped_sample,
     )
 
     problem = "unknown"
@@ -6140,7 +6144,102 @@ async def auto_repair_candidates(
         "after_filter": after_filter,
         "imported": imported,
         "historical_url_count": len(historical_urls),
+        "dropped_sample": dropped_sample,
         "candidates": candidates,
+    }
+
+
+# ── Simulate fix — validate proposed patterns against dropped URL sample ──────
+
+class SimulateFixBody(BaseModel):
+    allow_url_patterns: list[str] = []
+    block_url_patterns: list[str] = []
+    dropped_urls: list[str] = []
+
+
+@router.post("/jobs/{job_id}/simulate-fix")
+async def simulate_fix(
+    job_id: str,
+    body: SimulateFixBody,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[dict, Depends(get_current_user)],
+) -> dict:
+    """Simulate proposed allow/block URL patterns against a list of dropped URLs.
+
+    Cheap CPU-only check — no HTTP calls. Returns before/after pass counts.
+
+    Body::
+
+        {
+          "allow_url_patterns": ["/courses/[^/]+/?$"],
+          "block_url_patterns": ["/apply", "/contact"],
+          "dropped_urls": ["https://uni.edu/courses/mba", ...]
+        }
+
+    Response::
+
+        {
+          "ok": true,
+          "before": 0,
+          "after": 8,
+          "total": 10,
+          "sample_rescued": ["https://uni.edu/courses/mba", ...]
+        }
+    """
+    import re as _re
+    from sqlalchemy import text as _text
+
+    # Verify job exists
+    exists = (await db.execute(
+        _text("SELECT 1 FROM scrape_runtime_jobs WHERE runtime_job_id = :jid"),
+        {"jid": job_id},
+    )).first()
+    if not exists:
+        raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
+
+    urls = body.dropped_urls or []
+    if not urls:
+        # Fall back to pipeline_stats dropped_sample stored in the job
+        row = (await db.execute(
+            _text("SELECT discovered_config FROM scrape_runtime_jobs WHERE runtime_job_id = :jid"),
+            {"jid": job_id},
+        )).first()
+        dc = (row[0] or {}) if row else {}
+        urls = dc.get("pipeline_stats", {}).get("dropped_sample") or []
+
+    if not urls:
+        return {"ok": True, "before": 0, "after": 0, "total": 0, "sample_rescued": []}
+
+    def _compile_pats(pats: list[str]) -> list:
+        result = []
+        for p in pats:
+            try:
+                result.append(_re.compile(p, _re.IGNORECASE))
+            except _re.error:
+                pass
+        return result
+
+    def _passes(url: str, allow_c, block_c) -> bool:
+        if allow_c and not any(p.search(url) for p in allow_c):
+            return False
+        if block_c and any(p.search(url) for p in block_c):
+            return False
+        return True
+
+    # "Before" = no filter (they were dropped, so 0 pass the current filter)
+    before = 0
+
+    new_allow = _compile_pats(body.allow_url_patterns)
+    new_block = _compile_pats(body.block_url_patterns)
+    passing = [u for u in urls if _passes(u, new_allow, new_block)]
+    after = len(passing)
+
+    return {
+        "ok": True,
+        "before": before,
+        "after": after,
+        "total": len(urls),
+        "sample_rescued": passing[:8],
     }
 
 

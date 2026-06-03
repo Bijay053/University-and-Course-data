@@ -254,6 +254,25 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
   const [urlTestError, setUrlTestError] = useState<string | null>(null);
   const [showUrlTestPanel, setShowUrlTestPanel] = useState(false);
 
+  // Smart YAML Fix repair candidates state
+  type RepairCandidateData = {
+    id: string;
+    label: string;
+    description: string;
+    proposed_yaml: string | null;
+    recipe_patch: Record<string, unknown>;
+    confidence: number;
+    expected_gain: number;
+    problem_addressed?: string;
+    simulation?: { before_count: number; after_count: number; method: string; note?: string };
+  };
+  const [repairCandidates, setRepairCandidates] = useState<RepairCandidateData[] | null>(null);
+  const [repairLoading, setRepairLoading] = useState(false);
+  const [validateResult, setValidateResult] = useState<{ before: number; after: number; total: number; sample_rescued?: string[] } | null>(null);
+  const [validateLoading, setValidateLoading] = useState(false);
+  const [applyingRepairFix, setApplyingRepairFix] = useState(false);
+  const [repairFixApplied, setRepairFixApplied] = useState(false);
+
   const pollRef = useRef<number | null>(null);
   const logIndexRef = useRef(0);
   const pollInFlightRef = useRef(false);
@@ -338,7 +357,69 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
     setUrlTestResults(null);
     setUrlTestError(null);
     setShowUrlTestPanel(false);
+    setRepairCandidates(null);
+    setRepairLoading(false);
+    setValidateResult(null);
+    setValidateLoading(false);
+    setApplyingRepairFix(false);
+    setRepairFixApplied(false);
   }, [slotKey, startTimeKey]);
+
+  // Auto-load repair candidates when done with a URL filter warning
+  useEffect(() => {
+    if (phase === "done" && urlFilterWarning && urlFilterWarning.kind !== "category_pages" && completedJobId && repairCandidates === null && !repairLoading) {
+      setRepairLoading(true);
+      fetch(`/api/scrape/jobs/${completedJobId}/auto-repair-candidates`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+      })
+        .then(r => r.ok ? r.json() : null)
+        .then(data => { if (data?.ok) setRepairCandidates(data.candidates || []); })
+        .catch(() => {})
+        .finally(() => setRepairLoading(false));
+    }
+  }, [phase, urlFilterWarning, completedJobId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleValidateRepairFix = useCallback(async (candidate: RepairCandidateData) => {
+    if (!completedJobId) return;
+    setValidateLoading(true);
+    try {
+      const patch = (candidate.recipe_patch as Record<string, Record<string, unknown>>)?.discovery || {};
+      const droppedUrls = urlFilterWarning?.droppedSample || [];
+      const res = await fetch(`/api/scrape/jobs/${completedJobId}/simulate-fix`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          allow_url_patterns: (patch.allow_url_patterns as string[]) || [],
+          block_url_patterns: (patch.block_url_patterns as string[]) || [],
+          dropped_urls: droppedUrls,
+        }),
+      });
+      const data = await res.json();
+      if (data.ok) setValidateResult({ before: data.before, after: data.after, total: data.total, sample_rescued: data.sample_rescued });
+    } catch { /* ignore */ } finally {
+      setValidateLoading(false);
+    }
+  }, [completedJobId, urlFilterWarning]);
+
+  const handleApplyRepairFix = useCallback(async (candidate: RepairCandidateData) => {
+    if (!completedJobId) return;
+    setApplyingRepairFix(true);
+    try {
+      const res = await fetch(`/api/scrape/jobs/${completedJobId}/apply-fix`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ config_patch: candidate.recipe_patch }),
+      });
+      const data = await res.json();
+      if (data.ok) setRepairFixApplied(true);
+    } catch { /* ignore */ } finally {
+      setApplyingRepairFix(false);
+    }
+  }, [completedJobId]);
 
   const handleCopyLogs = useCallback(() => {
     const text = logs.map(l => l.message || l.event).join("\n");
@@ -1083,6 +1164,81 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
                         Fix in Recipe Editor →
                       </a>
                     )}
+
+                    {/* ── Smart YAML Fix panel ── */}
+                    {repairLoading && (
+                      <div className="flex items-center gap-1.5 text-[10px] text-gray-500 pt-1">
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                        Analysing filter patterns…
+                      </div>
+                    )}
+                    {(() => {
+                      const smart = (repairCandidates || []).find(c => c.id === "smart_replace_patterns" && c.proposed_yaml);
+                      if (!smart) return null;
+                      return (
+                        <div className="space-y-2 pt-1.5 border-t border-amber-200 mt-1.5">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 bg-green-100 text-green-700 rounded-full border border-green-200 shrink-0">✓ Smart Fix Available</span>
+                            <span className="text-[10px] text-gray-600 leading-snug">{smart.description}</span>
+                          </div>
+                          {smart.problem_addressed && (
+                            <p className="text-[10px] text-amber-700 font-semibold">{smart.problem_addressed}</p>
+                          )}
+                          <div className="space-y-1">
+                            <p className="text-[9px] font-semibold text-gray-500 uppercase tracking-wide">Proposed YAML Fix</p>
+                            <pre className="text-[9px] font-mono bg-gray-900 text-green-300 rounded p-2 overflow-x-auto max-h-[160px] overflow-y-auto whitespace-pre leading-relaxed">{smart.proposed_yaml}</pre>
+                          </div>
+                          {!repairFixApplied ? (
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <button
+                                type="button"
+                                onClick={() => { setValidateResult(null); handleValidateRepairFix(smart); }}
+                                disabled={validateLoading}
+                                className="text-[10px] bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded flex items-center gap-1 disabled:opacity-50"
+                              >
+                                {validateLoading ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <Eye className="w-2.5 h-2.5" />}
+                                Validate Fix
+                              </button>
+                              {validateResult !== null && (
+                                <span className="text-[10px] font-semibold">
+                                  {validateResult.after > 0 && validateResult.before === 0 ? (
+                                    <span className="text-green-600">✓ Before: {validateResult.before}/{validateResult.total} pass → After: {validateResult.after}/{validateResult.total} pass</span>
+                                  ) : validateResult.after > validateResult.before ? (
+                                    <span className="text-green-600">↑ Before: {validateResult.before}/{validateResult.total} → After: {validateResult.after}/{validateResult.total}</span>
+                                  ) : (
+                                    <span className="text-amber-600">Before: {validateResult.before}/{validateResult.total} → After: {validateResult.after}/{validateResult.total} — check patterns</span>
+                                  )}
+                                </span>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => handleApplyRepairFix(smart)}
+                                disabled={applyingRepairFix || validateResult === null}
+                                title={validateResult === null ? "Validate first to confirm the fix works" : undefined}
+                                className="text-[10px] bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded flex items-center gap-1 disabled:opacity-50"
+                              >
+                                {applyingRepairFix ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <CheckCheck className="w-2.5 h-2.5" />}
+                                Apply Fix
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="text-[10px] text-green-700 font-semibold bg-green-50 border border-green-200 rounded px-2 py-1">
+                              ✓ Fix applied — re-run the scrape to see the improvement
+                            </div>
+                          )}
+                          {validateResult?.sample_rescued && validateResult.sample_rescued.length > 0 && (
+                            <div className="space-y-0.5">
+                              <p className="text-[9px] font-semibold text-green-700 uppercase tracking-wide">Rescued URLs (new pattern matches)</p>
+                              <div className="bg-green-50 border border-green-200 rounded p-1.5 space-y-0.5 max-h-[60px] overflow-y-auto">
+                                {validateResult.sample_rescued.map((u, i) => (
+                                  <div key={i} className="font-mono text-[9px] text-gray-600 truncate" title={u}>{u.replace(/^https?:\/\/[^/]+/, "")}</div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </>
                 )}
                 {/* URL filter test tool */}

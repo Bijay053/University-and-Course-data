@@ -20,6 +20,134 @@ from urllib.parse import urlparse
 
 log = logging.getLogger(__name__)
 
+
+# ─── URL pattern derivation helpers ──────────────────────────────────────────
+
+def _derive_allow_patterns_from_urls(urls: list[str]) -> list[str]:
+    """Derive allow_url_patterns from a list of sample dropped/course URLs.
+
+    Analyses path structure to find fixed vs variable segments, then builds a
+    regex that matches the variable last segment while fixing the common prefix.
+
+    Example
+    -------
+    ['https://uni.edu/study/undergrad/courses/python-101',
+     'https://uni.edu/study/postgrad/courses/data-science']
+    → ['/study/[^/]+/courses/[^/]+/?$']
+    """
+    if not urls:
+        return []
+    paths = [urlparse(u).path.rstrip("/") for u in urls if u]
+    parts_list = [p.lstrip("/").split("/") for p in paths if p]
+    if not parts_list:
+        return []
+
+    max_depth = max(len(p) for p in parts_list)
+    min_depth = min(len(p) for p in parts_list)
+
+    pattern_parts: list[str] = []
+    for i in range(max_depth):
+        values = {p[i] for p in parts_list if i < len(p)}
+        if len(values) == 1 and i < min_depth:
+            pattern_parts.append(re.escape(list(values)[0]))
+        else:
+            pattern_parts.append(r"[^/]+")
+
+    if not pattern_parts:
+        return []
+
+    return ["/" + "/".join(pattern_parts) + r"/?$"]
+
+
+def _derive_seed_urls(dropped_urls: list[str], fallback_url: str = "") -> list[str]:
+    """Extract distinct parent-directory seed URLs from dropped course URLs.
+
+    Takes the path up to the LAST variable segment (the course slug) and
+    returns unique directories with the scheme+host prepended.
+    """
+    if not dropped_urls:
+        return [fallback_url] if fallback_url else []
+
+    parts_list = []
+    host = ""
+    for u in dropped_urls:
+        parsed = urlparse(u)
+        if not host:
+            host = f"{parsed.scheme}://{parsed.netloc}"
+        segs = parsed.path.rstrip("/").lstrip("/").split("/")
+        parts_list.append(segs)
+
+    if not parts_list:
+        return [fallback_url] if fallback_url else []
+
+    # Find depth of last fixed segment (everything above the course slug)
+    max_depth = max(len(p) for p in parts_list)
+    min_depth = min(len(p) for p in parts_list)
+
+    # Walk from the end: the last segment is the course slug (always variable)
+    # Find the deepest segment that has variation — that's where seeds go
+    seed_depth = max(1, min_depth - 1)  # parent of last segment
+    for i in range(max_depth - 1, 0, -1):
+        values = {p[i] for p in parts_list if i < len(p)}
+        if len(values) > 1:
+            seed_depth = i  # variable segment — seed its parent
+            break
+
+    # Build unique seed paths at seed_depth
+    seen: set[str] = set()
+    seeds: list[str] = []
+    for parts in parts_list:
+        path = "/" + "/".join(parts[:seed_depth]) + "/"
+        full = host + path
+        if full not in seen:
+            seen.add(full)
+            seeds.append(full)
+    return seeds[:6] or ([fallback_url] if fallback_url else [])
+
+
+_STANDARD_BLOCK_PATTERNS = [
+    r"/apply",
+    r"/contact",
+    r"/news",
+    r"/events",
+    r"/blog",
+    r"/about",
+    r"/research",
+    r"/alumni",
+    r"/outreach",
+    r"/parents",
+    r"/jobs",
+    r"/careers",
+    r"/accommodation",
+    r"/life-on-campus",
+    r"/fees-and-funding$",
+    r"/international/living",
+]
+
+
+def _build_proposed_yaml(
+    seed_urls: list[str],
+    allow_pats: list[str],
+    block_pats: list[str],
+) -> str:
+    """Render a human-readable YAML snippet for the proposed config fix."""
+    lines = ["discovery:"]
+    if seed_urls:
+        lines.append("  seed_urls:")
+        for u in seed_urls:
+            lines.append(f"    - {u}")
+        lines.append("")
+    if allow_pats:
+        lines.append("  allow_url_patterns:")
+        for p in allow_pats:
+            lines.append(f"    - '{p}'")
+        lines.append("")
+    if block_pats:
+        lines.append("  block_url_patterns:")
+        for p in block_pats:
+            lines.append(f"    - '{p}'")
+    return "\n".join(lines)
+
 # ─── Data Model ───────────────────────────────────────────────────────────────
 
 @dataclass
@@ -50,6 +178,7 @@ class RepairCandidate:
     safety_gate_passed: bool = False
     expected_gain: int = 0     # after_count - before_count
     selection_reason: str = "" # human-readable explanation of why this fix was chosen / ranked here
+    proposed_yaml: str | None = None  # full YAML snippet for display in the UI
 
     def to_dict(self) -> dict:
         d = asdict(self)
@@ -75,6 +204,7 @@ class AutoRepairEngine:
         imported: int,
         historical_urls: list[str],
         pipeline_stats: dict,
+        dropped_sample: list[str] | None = None,
     ):
         self.uni_id = uni_id
         self.uni_name = uni_name
@@ -87,6 +217,7 @@ class AutoRepairEngine:
         self.imported = imported
         self.historical_urls = historical_urls
         self.pipeline_stats = pipeline_stats
+        self.dropped_sample: list[str] = dropped_sample or []
 
     # ── Problem classification ─────────────────────────────────────────────────
 
@@ -457,6 +588,80 @@ class AutoRepairEngine:
             ),
         ] + self._discovery_candidates(supplement=True)
 
+    # ── Smart YAML candidate (from dropped URL analysis) ───────────────────────
+
+    def _smart_replace_allow_patterns(self) -> list[RepairCandidate]:
+        """Derive replacement allow_url_patterns from the actual dropped URL sample.
+
+        This produces a POSITIVE fix — not just "clear the broken pattern" but
+        "here is a new pattern derived from the URLs the filter is dropping."
+        Only generated when we have at least 3 dropped-URL samples.
+        """
+        if len(self.dropped_sample) < 3:
+            return []
+
+        new_pats = _derive_allow_patterns_from_urls(self.dropped_sample)
+        if not new_pats:
+            return []
+
+        seed_urls = _derive_seed_urls(self.dropped_sample, self.scrape_url)
+
+        # Smart block patterns: use the standard set minus any that would
+        # accidentally block the paths we just allowed.
+        block_pats = [
+            b for b in _STANDARD_BLOCK_PATTERNS
+            if not any(re.search(b, p, re.IGNORECASE) for p in new_pats)
+        ]
+
+        # Simulate the new filter against historical URLs (or estimate from raw)
+        sim = self._simulate_filter(new_pats, [], [])
+
+        # For a brand-new uni with no historical URLs, at least we know the
+        # dropped_sample itself should now pass — use that as the before/after.
+        if not self.historical_urls:
+            compiled = [re.compile(p, re.IGNORECASE) for p in new_pats if p]
+            rescued = [u for u in self.dropped_sample if compiled and any(c.search(u) for c in compiled)]
+            sim = SimulationResult(
+                method="dropped_sample_filter",
+                before_count=0,
+                after_count=len(rescued),
+                drop_rate_before_pct=100,
+                drop_rate_after_pct=0 if rescued else 100,
+                historical_url_count=len(self.dropped_sample),
+                sample_urls_rescued=rescued[:5],
+                note=(
+                    f"Simulated against {len(self.dropped_sample)} dropped-URL sample(s). "
+                    f"{len(rescued)} would pass the new pattern."
+                ),
+            )
+
+        gate = sim.after_count > 0
+        proposed_yaml = _build_proposed_yaml(seed_urls, new_pats, block_pats)
+
+        return [RepairCandidate(
+            id="smart_replace_patterns",
+            rank=0,
+            label="Replace allow_url_patterns with patterns derived from dropped URLs",
+            description=(
+                f"Derived {len(new_pats)} pattern(s) from {len(self.dropped_sample)} "
+                f"dropped URL sample(s). Replaces the broken filter with one that "
+                f"matches actual course pages."
+            ),
+            category="url_filter",
+            problem_addressed=(
+                f"Current allow_url_patterns match 0 of {self.raw_discovered} discovered URLs"
+            ),
+            recipe_patch={"discovery": {
+                "allow_url_patterns": new_pats,
+                "block_url_patterns": block_pats,
+            }},
+            simulation=sim,
+            confidence=80 if len(self.dropped_sample) >= 6 else 60,
+            safety_gate_passed=gate,
+            expected_gain=max(0, sim.after_count - sim.before_count),
+            proposed_yaml=proposed_yaml,
+        )]
+
     # ── Main entry point ───────────────────────────────────────────────────────
 
     def generate_candidates(self) -> list[RepairCandidate]:
@@ -471,6 +676,10 @@ class AutoRepairEngine:
 
         if problem in ("url_filter_drop", "partial_filter"):
             candidates.extend(self._url_filter_candidates())
+            # Smart positive fix: derived from the actual dropped URL sample.
+            # Inserted before the generic "clear everything" candidates so it
+            # surfaces first if the pattern matches well.
+            candidates.extend(self._smart_replace_allow_patterns())
             # Also offer discovery fixes if raw_discovered is itself low
             if self.raw_discovered < 15:
                 candidates.extend(self._discovery_candidates(supplement=True))
@@ -540,6 +749,7 @@ async def generate_repair_candidates(
     imported: int,
     historical_urls: list[str],
     pipeline_stats: dict,
+    dropped_sample: list[str] | None = None,
 ) -> list[dict]:
     """Async entry point — returns ranked candidate dicts ready for JSON serialisation."""
     engine = AutoRepairEngine(
@@ -554,5 +764,6 @@ async def generate_repair_candidates(
         imported=imported,
         historical_urls=historical_urls,
         pipeline_stats=pipeline_stats,
+        dropped_sample=dropped_sample,
     )
     return [c.to_dict() for c in engine.generate_candidates()]

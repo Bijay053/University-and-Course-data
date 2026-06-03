@@ -1905,6 +1905,10 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 )
             links = kept
 
+        # Accumulate dropped URL samples across all filter passes so we can
+        # persist them in pipeline_stats for the repair-candidates endpoint.
+        _filter_dropped_sample: list[str] = []
+
         # Phase A.5b-pre — per-uni YAML block_url_patterns deny-list re-applied.
         # discovery.block_url_patterns is applied inside discover_course_links
         # (BFS phase) but NOT after the browser-discovery merge, so unwanted
@@ -1950,6 +1954,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                         _r = _bdd["rule"]
                         _block_pat_counts[_r] = _block_pat_counts.get(_r, 0) + 1
                     _block_dropped_sample = [_bdd["url"] for _bdd in _block_dropped_detail[:10]]
+                    _filter_dropped_sample = list(_block_dropped_sample)
                     log.info(
                         "[EXTRACT] block_url_patterns: dropped %d / %d blocked URLs (%d remain)",
                         _block_dropped_a5b, _pre_block_a5b, len(links),
@@ -2004,6 +2009,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     _dropped_sample_urls = [
                         _lk.get("url", "") for _lk in _dropped_links[:10] if _lk.get("url")
                     ]
+                    _filter_dropped_sample = list(_dropped_sample_urls)
                     _log_fn = log.warning if _drop_pct > 50 else log.info
                     _log_fn(
                         "[EXTRACT] allow_url_patterns: kept %d / %d (dropped %d = %.0f%% of discovered URLs)%s",
@@ -2283,6 +2289,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             "after_filter": len(links),
             "filter_drop_count": _raw - len(links),
             "filter_drop_pct": round((_raw - len(links)) / _raw * 100) if _raw else 0,
+            "dropped_sample": _filter_dropped_sample[:10],
         }
         job.discovered_config = _dc
         job.heartbeat_at = datetime.now(timezone.utc)
