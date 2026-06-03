@@ -1,0 +1,53 @@
+# Lincoln University (NZ) — slug "lincoln"
+# Hostname: www.lincoln.ac.nz
+#
+# DIAGNOSIS (2026-06-03):
+#   - www.lincoln.ac.nz returns HTTP 403 to plain-HTTP requests from cloud IPs.
+#   - /courses/ is a JavaScript course-search tool — contains NO static .htm links.
+#     The browser wanders to navigation pages (/study/...) instead.
+#   - Actual individual programme pages appear at:
+#       /study/study-programmes/programme-search/<slug>/
+#     e.g. /study/study-programmes/programme-search/doctor-of-philosophy-phd/
+#   - All per-course pages require browser rendering (Cloudflare blocks plain HTTP).
+#
+# CONFIG STRATEGY:
+#   - always_browser_discover: true — bypass 403 HTTP BFS
+#   - seed_urls: programme-search listing page (actual A-Z degree catalogue)
+#   - allow_url_patterns: individual programme pages only
+#   - block_url_patterns: suppress resources/schools/farming/nav noise
+#   - use_stealth_browser: true — per-course extraction via Playwright (Cloudflare)
+
+discovery:
+  always_browser_discover: true
+
+  seed_urls:
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/
+    - https://www.lincoln.ac.nz/study/study-programmes/undergraduate-study/
+    - https://www.lincoln.ac.nz/study/study-programmes/postgraduate-study/
+
+  allow_url_patterns:
+    - "lincoln\\.ac\\.nz/study/study-programmes/programme-search/[^/]+/?$"
+
+  block_url_patterns:
+    - "/resources-for-careers-advisors"
+    - "/farms-outreach"
+    - "/teaching-resources"
+    - "/future-students-and-schools"
+    - "/types-of-postgrad-study"
+    - "/make-postgraduate-study-work"
+    - "/on-farm-workshops"
+    - "/on-campus-workshops"
+    - "/apply"
+    - "/about"
+    - "/news"
+    - "/events"
+    - "/research"
+    - "/staff"
+    - "/contact"
+    - "programme-search/$"
+
+  use_stealth_browser: true
+
+extraction:
+  fees:
+    default_currency: "NZD"

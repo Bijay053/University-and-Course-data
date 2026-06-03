@@ -2620,8 +2620,13 @@ function DebuggerPanel({
                       const courseUrls = testDiscoveryResult.seed_results
                         .flatMap(sr => sr.classified_passing?.course ?? []);
                       const anyUrls = testDiscoveryResult.seed_results
-                        .flatMap(sr => sr.sample_passing ?? []);
-                      const urlsToTest = (courseUrls.length ? courseUrls : anyUrls).slice(0, 5);
+                        .flatMap(sr => [
+                          ...(sr.sample_passing ?? []),
+                          ...((sr as any).browser_test?.sample_passing ?? []),
+                        ]);
+                      const urlsToTest = (courseUrls.length ? courseUrls : anyUrls)
+                        .filter((u, i, a) => a.indexOf(u) === i)
+                        .slice(0, 5);
                       onRunFullValidation(urlsToTest);
                     }}
                   >

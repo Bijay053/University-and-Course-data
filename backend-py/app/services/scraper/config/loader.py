@@ -110,9 +110,34 @@ def _load_yaml_file(path: Path) -> dict[str, Any]:
 
 
 def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
-    """Recursively merge *override* into *base*.  Override wins on conflicts."""
+    """Recursively merge *override* into *base*.  Override wins on conflicts.
+
+    Special rule for list-type config fields (allow_url_patterns,
+    block_url_patterns, must_contain, seed_urls, …): an empty list ``[]``
+    in *override* is treated as "no opinion / not set" and does NOT clear a
+    non-empty list already present in *base*.  This prevents the admin UI
+    from accidentally wiping YAML-defined URL patterns when the operator
+    saves a form that happens to serialize an empty list for those fields.
+    A non-empty list in *override* always wins as usual.
+    """
+    _LIST_NO_CLEAR_KEYS: frozenset[str] = frozenset({
+        "allow_url_patterns", "block_url_patterns", "must_contain",
+        "seed_urls", "block_nav_patterns", "fallback_subdomains",
+    })
     result: dict[str, Any] = dict(base)
     for key, val in override.items():
+        if val is None:
+            # Explicit None in override → skip (treat as "unset")
+            continue
+        if (
+            key in _LIST_NO_CLEAR_KEYS
+            and isinstance(val, list)
+            and len(val) == 0
+            and isinstance(result.get(key), list)
+            and len(result[key]) > 0
+        ):
+            # Empty list override must not clear an existing non-empty list
+            continue
         if key in result and isinstance(result[key], dict) and isinstance(val, dict):
             result[key] = _deep_merge(result[key], val)
         else:

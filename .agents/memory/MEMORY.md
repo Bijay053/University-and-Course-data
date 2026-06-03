@@ -17,3 +17,5 @@
 - [Waikato fee table patterns](waikato-fee-patterns.md) — Pattern A/B for degree-header tables; major-list annotation stripper needed for token_sort_ratio to work.
 - [Canterbury UC staging bug & study_mode fix](canterbury-study-mode-bug.md) — admin_config (HIGHEST priority) silently overrode YAML online_only; nav "UC Online Staff" in non-<nav> div → add host to _STUDY_MODE_RULE_SUPPRESSED_HOSTS.
 - [Self-debugging UI debugger panel](debugger-panel-arch.md) — 5-tab panel in settings-scraper-configs.tsx; scraped_courses.scrape_job_id = runtime_job_id string; get_config_for_host() is keyword-only.
+- [admin_config empty list overrides YAML patterns](admin-config-empty-list-override.md) — empty [] in admin_config.discovery clears YAML allow/block; fixed in _deep_merge + DB cleanup pattern.
+- [_fv_classify listing hint endswith-only fix](fv-classify-endswith-fix.md) — listing hints must use endswith, not substring; /study mid-path misclassifies course pages as listing.

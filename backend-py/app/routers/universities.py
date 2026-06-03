@@ -1223,8 +1223,11 @@ async def post_test_discovery(
 
     def _classify_url_type(url: str) -> str:
         lurl = url.lower().split("?")[0].rstrip("/")
-        # Listing: broad course-index pages
-        if any(lurl.endswith(h.rstrip("/")) or h in lurl for h in _LISTING_HINTS_TD):
+        # Listing: broad course-index pages — only match when hint is the
+        # TERMINAL segment (endswith), not when it appears mid-path.
+        # Rationale: a URL like /study/programme-search/doctor-of-phd contains
+        # "/programmes" mid-path but is an individual course detail page.
+        if any(lurl.endswith(h.rstrip("/")) for h in _LISTING_HINTS_TD):
             return "listing"
         # Category: faculty/school/department hub pages
         if any(h in lurl for h in _CATEGORY_HINTS_TD):
@@ -1510,6 +1513,38 @@ async def post_test_discovery(
                                 warnings[_wi] = _real_diag
                                 break
 
+                        # Promote browser URLs to the top-level seed result so
+                        # Full Validation and other consumers can use them
+                        # without having to dig into browser_test sub-dict.
+                        _b_raw_types: dict[str, list[str]] = {
+                            "course": [], "listing": [], "category": [], "other": []
+                        }
+                        for _u3 in _b_all:
+                            _b_raw_types[_classify_url_type(_u3)].append(_u3)
+
+                        _sr["sample_passing"] = _b_pass[:6]
+                        _sr["sample_dropped"] = _b_drop[:6]
+                        _sr["raw_candidates"] = len(_b_all)
+                        _sr["raw_course_count"] = len(_b_raw_types["course"])
+                        _sr["raw_listing_count"] = len(_b_raw_types["listing"])
+                        _sr["raw_category_count"] = len(_b_raw_types["category"])
+                        _sr["raw_other_count"] = len(_b_raw_types["other"])
+                        _sr["after_filter"] = len(_b_pass)
+                        _sr["dropped"] = len(_b_drop)
+                        _sr["drop_rate_pct"] = round(_b_drop_r * 100)
+                        # Passing classified breakdown (for expand panel)
+                        _b_pass_types: dict[str, list[str]] = {
+                            "course": [], "listing": [], "category": [], "other": []
+                        }
+                        for _pu2 in _b_pass:
+                            _b_pass_types[_classify_url_type(_pu2)].append(_pu2)
+                        _sr["classified_passing"] = {
+                            k: v[:8] for k, v in _b_pass_types.items() if v
+                        }
+                        _sr["course_count"] = len(_b_pass_types["course"])
+                        _sr["listing_count"] = len(_b_pass_types["listing"])
+                        _sr["category_count"] = len(_b_pass_types["category"])
+
                 except Exception as _be:
                     _sr["browser_test"] = {"ok": False, "error": str(_be)[:120]}
 
@@ -1649,7 +1684,13 @@ async def post_full_validation(
             return False
         return True
 
-    _LISTING_P_FV = ("/courses", "/programmes", "/programs", "/find-a-course", "/study")
+    # Only treat URL as a listing page when the hint is the TERMINAL segment
+    # (the URL ends with it).  Mid-path occurrences like
+    # /study/study-programmes/programme-search/<course-slug> should NOT be
+    # classified as "listing" — they are individual course detail pages.
+    _LISTING_P_FV = ("/courses", "/programmes", "/programs", "/find-a-course", "/study",
+                     "/programme-search", "/course-search", "/study-programmes",
+                     "/undergraduate-study", "/postgraduate-study")
     _CATEGORY_P_FV = ("/faculty/", "/school/", "/department/", "/discipline/", "/area-of-study/")
 
     # Field extraction regexes — used to simulate what the extractor would find
@@ -1674,8 +1715,11 @@ async def post_full_validation(
     )
 
     def _fv_classify(url: str, has_degree_kw: bool) -> str:
-        lurl = url.lower().split("?")[0]
-        if any(lurl.rstrip("/").endswith(h.rstrip("/")) or h in lurl for h in _LISTING_P_FV):
+        lurl = url.lower().split("?")[0].rstrip("/")
+        # Only classify as listing when the hint is the TERMINAL path segment.
+        # Mid-path occurrences (e.g. /study/programme-search/<course-slug>)
+        # should NOT be classified as listing — they are course detail pages.
+        if any(lurl.endswith(h.rstrip("/")) for h in _LISTING_P_FV):
             return "listing"
         if any(h in lurl for h in _CATEGORY_P_FV):
             return "category"
