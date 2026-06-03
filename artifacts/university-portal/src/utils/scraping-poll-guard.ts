@@ -30,6 +30,11 @@ export interface ReviewPanelState {
   reviewJobId: string | null;
 }
 
+/**
+ * INVARIANT:
+ * The review table always belongs to the most recently user-selected scrape
+ * job, never the most recently completed scrape job.
+ */
 export function shouldLoadForBackgroundJob(
   jobId: string,
   panel: ReviewPanelState,
