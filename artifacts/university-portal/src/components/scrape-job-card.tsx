@@ -284,10 +284,28 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
     return () => clearInterval(id);
   }, [scraping]);
 
-  // Scroll logs to bottom — use direct container scrollTop to avoid
-  // scrollIntoView pulling the whole page up when the user is reading below.
+  // Track whether the user has scrolled up from the bottom of the live log.
+  // When true, new log lines do NOT force a scroll-to-bottom so the user can
+  // read earlier lines in peace. Auto-scroll resumes as soon as they scroll
+  // back to within 40 px of the bottom.
+  const userScrolledUpRef = useRef(false);
+
   useEffect(() => {
-    if (logContainerRef.current) {
+    const el = logContainerRef.current;
+    if (!el) return;
+    const handleScroll = () => {
+      const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+      userScrolledUpRef.current = !atBottom;
+    };
+    el.addEventListener("scroll", handleScroll, { passive: true });
+    return () => el.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  // Scroll logs to bottom — use direct container scrollTop to avoid
+  // scrollIntoView pulling the whole page up when the user is reading above.
+  // Skipped when the user has manually scrolled up to read earlier lines.
+  useEffect(() => {
+    if (logContainerRef.current && !userScrolledUpRef.current) {
       logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
     }
   }, [logs]);
