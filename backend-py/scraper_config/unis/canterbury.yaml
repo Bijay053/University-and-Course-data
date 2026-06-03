@@ -1,15 +1,8 @@
 # University of Canterbury
 # Hostname: www.canterbury.ac.nz
 # Country: New Zealand  |  Currency: NZD
-#
-# Discovery: Funnelback search API — two separate endpoints for UG and PG subjects.
-#   UG: f.Subject+Level|ucSubjectLevel=Undergraduate+subject  → 179 subjects
-#   PG: f.Subject+Level|ucSubjectLevel=Postgraduate+subject   →  78 subjects
-#   Combined: 257 subject pages, each describing a discipline's qualifications.
-#
-# The API returns /study/academic-study/subjects/<slug> URLs.
-# These subject pages are the canonical course-discovery pages on the UC site.
-# allow_url_patterns accepts /subjects/ so all 257 pass through without BFS fallback.
+# Discovery: Funnelback search API for UG and PG subject pages.
+# Fix: English scores use degree-level defaults so PG/doctorate do not receive UG scores.
 
 discovery:
   auto_api_discovery: false
@@ -17,9 +10,7 @@ discovery:
   generic_search_api:
     enabled: true
     method: GET
-    # Primary: Undergraduate subjects (179 results at num_ranks=300)
     url: "https://search.canterbury.ac.nz/s/search.json?s=%21PadreNull&MBL=300&num_ranks=300&profile=all-subjects-results-page&f.Subject+Level%7CucSubjectLevel=Undergraduate+subject&collection=uoc2%7Esp-aem-all-subjects&sort=title"
-    # Secondary: Postgraduate subjects (78 results at num_ranks=300)
     additional_urls:
       - "https://search.canterbury.ac.nz/s/search.json?s=%21PadreNull&MBL=300&num_ranks=300&profile=all-subjects-results-page&f.Subject+Level%7CucSubjectLevel=Postgraduate+subject&collection=uoc2%7Esp-aem-all-subjects&sort=title"
     root_path: "response.resultPacket.results"
@@ -32,7 +23,6 @@ discovery:
       - "name"
     normalize_relative_urls: true
     base_url: "https://www.canterbury.ac.nz"
-    # The API returns /subjects/ URLs — accept both subjects and qualifications
     allow_url_patterns:
       - "/study/academic-study/subjects/"
       - "/study/academic-study/qualifications/"
@@ -93,10 +83,6 @@ extraction:
     prefer_year_one_over_total: true
     prefer_international: true
     max_annual_fee: 90000
-    # UC uses a standardised per-point rate: all programmes at the same
-    # degree level pay the same fee.  A bucket (degree-level-only) match
-    # from the central fee page IS the correct fee, so allow it with a
-    # scrape warning rather than leaving the field blank.
     allow_bucket_match: true
 
     reject_keywords:
@@ -112,9 +98,19 @@ extraction:
     trust_vision_ocr: false
     trust_tier1_vision_ocr_english: false
 
-    default_ielts: 6.0
-    default_pte: 50
-    default_toefl: 80
+    degree_level_defaults:
+      undergraduate:
+        ielts: 6.0
+        pte: 50
+        toefl: 80
+      postgraduate:
+        ielts: 6.5
+        pte: 58
+        toefl: 90
+      doctorate:
+        ielts: 6.5
+        pte: 58
+        toefl: 90
 
   intake:
     start_dates_only: true
@@ -152,10 +148,6 @@ extraction:
       - Fees estimator
       - Student Services Levy
       - SSL
-      # "UC Online" is Canterbury's online learning brand — appears in the site
-      # navigation on every page. Without this block, the \bonline\b regex in
-      # the study_mode extractor fires on the nav text and falsely marks all
-      # bachelor programmes as mode='Online'.
       - UC Online
 
   course_name:

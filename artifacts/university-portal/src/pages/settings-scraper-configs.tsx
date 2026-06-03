@@ -707,6 +707,38 @@ interface DiagnosisResult {
   has_changes: boolean;
 }
 
+// ── AI Root Cause Analysis types ─────────────────────────────────────────────
+interface AiEvidenceItem {
+  type: "job_stat" | "rejection" | "config" | "alert" | "extraction" | "discovery";
+  label: string;
+  value: string;
+  source: string;
+}
+
+interface AiSafeFix {
+  action: "clear_admin_override" | "set_admin_override";
+  key: string;
+  value?: string | number | boolean | null;
+  description: string;
+}
+
+interface AiRootCauseResult {
+  issue_summary: string;
+  root_cause_category: "discovery" | "filtering" | "extraction" | "config_conflict" | "api" | "pdf" | "browser" | "staging_gate" | "healthy";
+  confidence: "high" | "medium" | "low";
+  evidence: AiEvidenceItem[];
+  fix_recommendation: string;
+  fix_yaml_snippet: string | null;
+  safe_fix: AiSafeFix | null;
+  risk_label: "low" | "medium" | "developer_required";
+  developer_required: boolean;
+  developer_note: string | null;
+  context_used: string[];
+  university_id: number;
+  university_name: string;
+  last_job_id: string | null;
+}
+
 const TERMINAL_STATUSES: JobStatus[] = ["done", "awaiting_approval", "failed", "cancelled"];
 
 function JobStatusBadge({ state, compact = false }: { state: TriggerState; compact?: boolean }) {
@@ -1570,8 +1602,8 @@ interface DebuggerPanelProps {
   rejectionLogLoading: boolean;
   rejectionFilter: string | null;
   setRejectionFilter: (v: string | null) => void;
-  debugTab: "config" | "overrides" | "rejections" | "extraction" | "discovery";
-  setDebugTab: (v: "config" | "overrides" | "rejections" | "extraction" | "discovery") => void;
+  debugTab: "config" | "overrides" | "rejections" | "extraction" | "discovery" | "ai_analysis";
+  setDebugTab: (v: "config" | "overrides" | "rejections" | "extraction" | "discovery" | "ai_analysis") => void;
   cfgExpandedSections: Record<string, boolean>;
   setCfgExpandedSections: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
   clearingOverrideKey: string | null;
@@ -1595,6 +1627,12 @@ interface DebuggerPanelProps {
   urlTestResult: UrlTestResult | null;
   urlTestLoading: boolean;
   onTestUrl: () => void;
+  // AI Root Cause Analysis
+  aiAnalysis: AiRootCauseResult | null;
+  aiAnalysisLoading: boolean;
+  aiAnalysisApplying: boolean;
+  onRunAiAnalysis: () => void;
+  onApplySafeFix: (fix: AiSafeFix) => void;
 }
 
 function DebuggerPanel({
@@ -1605,7 +1643,10 @@ function DebuggerPanel({
   scrapedCourses, scrapedCoursesLoading, extractionTrace, extractionTraceLoading,
   selectedCourseId, setSelectedCourseId, onLoadExtractionTrace,
   discoveryStats, discoveryStatsLoading, testUrl, setTestUrl, urlTestResult, urlTestLoading, onTestUrl,
+  aiAnalysis, aiAnalysisLoading, aiAnalysisApplying, onRunAiAnalysis, onApplySafeFix,
 }: DebuggerPanelProps) {
+  const [aiEvidenceExpanded, setAiEvidenceExpanded] = useState(false);
+
   if (!uniId) {
     return (
       <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm p-8 text-center">
@@ -1625,20 +1666,27 @@ function DebuggerPanel({
     ? (rejectionLog?.rejections ?? []).filter(r => r.reason === rejectionFilter)
     : (rejectionLog?.rejections ?? []);
 
-  const TAB_BUTTONS: { id: "config" | "overrides" | "rejections" | "extraction" | "discovery"; label: string; icon: React.ReactNode; badge?: number; badgeColor?: string }[] = [
-    { id: "config",     label: "Effective Config", icon: <Layers className="h-3.5 w-3.5" /> },
-    { id: "overrides",  label: "Admin Overrides",  icon: <ShieldAlert className="h-3.5 w-3.5" />,
+  const TAB_BUTTONS: { id: "config" | "overrides" | "rejections" | "extraction" | "discovery" | "ai_analysis"; label: string; icon: React.ReactNode; badge?: number; badgeColor?: string }[] = [
+    { id: "config",      label: "Effective Config", icon: <Layers className="h-3.5 w-3.5" /> },
+    { id: "overrides",   label: "Admin Overrides",  icon: <ShieldAlert className="h-3.5 w-3.5" />,
       badge: effectiveCfg?.admin_overrides_flat?.length,
       badgeColor: effectiveCfg?.has_admin_overrides ? "bg-orange-500" : undefined },
-    { id: "rejections", label: "Rejection Log",    icon: <Filter className="h-3.5 w-3.5" />,
+    { id: "rejections",  label: "Rejection Log",    icon: <Filter className="h-3.5 w-3.5" />,
       badge: rejectionLog?.total,
       badgeColor: (rejectionLog?.total ?? 0) > 0 ? "bg-red-500" : undefined },
-    { id: "extraction", label: "Extraction",       icon: <Code className="h-3.5 w-3.5" />,
+    { id: "extraction",  label: "Extraction",       icon: <Code className="h-3.5 w-3.5" />,
       badge: scrapedCourses?.courses?.length,
       badgeColor: (scrapedCourses?.courses?.length ?? 0) > 0 ? "bg-blue-500" : undefined },
-    { id: "discovery",  label: "Discovery",        icon: <Search className="h-3.5 w-3.5" />,
+    { id: "discovery",   label: "Discovery",        icon: <Search className="h-3.5 w-3.5" />,
       badge: discoveryStats ? (discoveryStats.summary.total_blocked_by_block_patterns + discoveryStats.summary.total_blocked_by_allow_patterns) : undefined,
       badgeColor: discoveryStats && (discoveryStats.summary.total_blocked_by_block_patterns + discoveryStats.summary.total_blocked_by_allow_patterns) > 0 ? "bg-amber-500" : undefined },
+    { id: "ai_analysis", label: "AI Analysis",      icon: <Bot className="h-3.5 w-3.5" />,
+      badge: aiAnalysis ? 1 : undefined,
+      badgeColor: aiAnalysis
+        ? (aiAnalysis.root_cause_category === "healthy" ? "bg-green-500"
+          : aiAnalysis.risk_label === "developer_required" ? "bg-red-500"
+          : "bg-violet-500")
+        : undefined },
   ];
 
   return (
@@ -2218,6 +2266,222 @@ function DebuggerPanel({
             )}
           </div>
         )}
+
+        {/* ── Tab: AI Root Cause Analysis ──────────────────────────────────── */}
+        {debugTab === "ai_analysis" && (
+          <div className="space-y-4">
+            {/* Run button */}
+            <div className="flex items-center gap-3">
+              <Button
+                size="sm"
+                className="h-8 text-xs px-4 bg-violet-600 hover:bg-violet-700 text-white"
+                onClick={onRunAiAnalysis}
+                disabled={aiAnalysisLoading}
+              >
+                {aiAnalysisLoading
+                  ? <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />Analysing…</>
+                  : <><Bot className="h-3.5 w-3.5 mr-1.5" />{aiAnalysis ? "Re-run Analysis" : "Run AI Analysis"}</>}
+              </Button>
+              {!aiAnalysis && !aiAnalysisLoading && (
+                <p className="text-xs text-muted-foreground">
+                  Reads all 7 data sources — config, overrides, rejection log, discovery, extraction, job stats, and YAML history — then identifies the root cause.
+                </p>
+              )}
+            </div>
+
+            {/* Loading skeleton */}
+            {aiAnalysisLoading && (
+              <div className="space-y-3 animate-pulse">
+                <div className="h-16 bg-muted rounded-md w-full" />
+                <div className="grid grid-cols-3 gap-2">
+                  {[1,2,3].map(i => <div key={i} className="h-8 bg-muted rounded" />)}
+                </div>
+                <div className="h-24 bg-muted rounded-md w-full" />
+                <div className="h-32 bg-muted rounded-md w-full" />
+              </div>
+            )}
+
+            {/* Result */}
+            {!aiAnalysisLoading && aiAnalysis && (() => {
+              const cat = aiAnalysis.root_cause_category;
+              const healthy = cat === "healthy";
+              const devRequired = aiAnalysis.developer_required;
+              const risk = aiAnalysis.risk_label;
+
+              const categoryColors: Record<string, string> = {
+                healthy:       "bg-green-100 text-green-800 dark:bg-green-950/40 dark:text-green-300 border-green-200 dark:border-green-800",
+                discovery:     "bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 border-amber-200 dark:border-amber-800",
+                filtering:     "bg-orange-100 text-orange-800 dark:bg-orange-950/40 dark:text-orange-300 border-orange-200 dark:border-orange-800",
+                extraction:    "bg-blue-100 text-blue-800 dark:bg-blue-950/40 dark:text-blue-300 border-blue-200 dark:border-blue-800",
+                config_conflict: "bg-red-100 text-red-800 dark:bg-red-950/40 dark:text-red-300 border-red-200 dark:border-red-800",
+                staging_gate:  "bg-purple-100 text-purple-800 dark:bg-purple-950/40 dark:text-purple-300 border-purple-200 dark:border-purple-800",
+                api:           "bg-sky-100 text-sky-800 dark:bg-sky-950/40 dark:text-sky-300 border-sky-200 dark:border-sky-800",
+                pdf:           "bg-teal-100 text-teal-800 dark:bg-teal-950/40 dark:text-teal-300 border-teal-200 dark:border-teal-800",
+                browser:       "bg-indigo-100 text-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800",
+              };
+              const riskColors: Record<string, string> = {
+                low:                "bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-300",
+                medium:             "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300",
+                developer_required: "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300",
+              };
+              const evidenceTypeIcon: Record<string, string> = {
+                job_stat:   "📊",
+                rejection:  "🚫",
+                config:     "⚙️",
+                alert:      "🔔",
+                extraction: "🔍",
+                discovery:  "🌐",
+              };
+
+              return (
+                <div className="space-y-3">
+                  {/* Issue summary banner */}
+                  <div className={cn(
+                    "border rounded-md p-4",
+                    healthy
+                      ? "bg-green-50 border-green-200 dark:bg-green-950/20 dark:border-green-800"
+                      : devRequired
+                        ? "bg-red-50 border-red-200 dark:bg-red-950/20 dark:border-red-800"
+                        : "bg-violet-50 border-violet-200 dark:bg-violet-950/20 dark:border-violet-800",
+                  )}>
+                    <div className="flex items-start gap-3">
+                      <span className="text-2xl flex-shrink-0 mt-0.5">
+                        {healthy ? "✅" : devRequired ? "🛑" : "⚠️"}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold leading-snug">{aiAnalysis.issue_summary}</p>
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          <span className={cn("inline-flex items-center rounded px-2 py-0.5 text-[11px] font-medium border", categoryColors[cat] ?? categoryColors.discovery)}>
+                            {cat.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())}
+                          </span>
+                          <span className={cn("inline-flex items-center rounded px-2 py-0.5 text-[11px] font-medium", riskColors[risk] ?? riskColors.medium)}>
+                            {risk === "developer_required" ? "🛑 Developer Required" : risk === "low" ? "✅ Low Risk" : "⚠️ Medium Risk"}
+                          </span>
+                          <span className="inline-flex items-center rounded px-2 py-0.5 text-[11px] font-medium bg-muted text-muted-foreground">
+                            {aiAnalysis.confidence === "high" ? "🔵" : aiAnalysis.confidence === "medium" ? "🟡" : "🔴"} {aiAnalysis.confidence} confidence
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Evidence */}
+                  <div className="border rounded-md overflow-hidden">
+                    <button
+                      className="w-full flex items-center justify-between px-3 py-2 bg-muted/20 hover:bg-muted/30 transition-colors"
+                      onClick={() => setAiEvidenceExpanded(v => !v)}
+                    >
+                      <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+                        <Info className="h-3.5 w-3.5" /> Evidence ({aiAnalysis.evidence.length} items)
+                      </span>
+                      {aiEvidenceExpanded ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronUp className="h-3.5 w-3.5 text-muted-foreground rotate-180" />}
+                    </button>
+                    {aiEvidenceExpanded && (
+                      <div className="divide-y">
+                        {aiAnalysis.evidence.map((ev, i) => (
+                          <div key={i} className="flex items-start gap-3 px-3 py-2 text-xs">
+                            <span className="flex-shrink-0 text-sm">{evidenceTypeIcon[ev.type] ?? "•"}</span>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-baseline gap-2">
+                                <span className="font-medium text-foreground">{ev.label}</span>
+                                <span className="text-[10px] text-muted-foreground">{ev.source}</span>
+                              </div>
+                              <code className="text-[11px] text-muted-foreground font-mono break-all">{ev.value}</code>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Fix recommendation */}
+                  <div className="border rounded-md overflow-hidden">
+                    <div className="px-3 py-1.5 border-b bg-muted/20 text-[11px] font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+                      <Wand2 className="h-3.5 w-3.5" /> Recommended Fix
+                    </div>
+                    <div className="p-3 space-y-3">
+                      <p className="text-xs leading-relaxed">{aiAnalysis.fix_recommendation}</p>
+
+                      {/* YAML snippet */}
+                      {aiAnalysis.fix_yaml_snippet && (
+                        <div>
+                          <p className="text-[11px] text-muted-foreground mb-1">Add to per-uni YAML config:</p>
+                          <pre className="text-[11px] font-mono bg-muted/30 rounded p-3 overflow-x-auto whitespace-pre-wrap leading-relaxed border">
+                            {aiAnalysis.fix_yaml_snippet}
+                          </pre>
+                        </div>
+                      )}
+
+                      {/* Developer note */}
+                      {devRequired && aiAnalysis.developer_note && (
+                        <div className="flex items-start gap-2 p-2.5 rounded-md bg-red-50 border border-red-200 dark:bg-red-950/20 dark:border-red-800 text-xs text-red-800 dark:text-red-300">
+                          <TriangleAlert className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                          <div>
+                            <p className="font-semibold mb-0.5">Developer Required</p>
+                            <p>{aiAnalysis.developer_note}</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* One-click safe fix */}
+                  {aiAnalysis.safe_fix && !devRequired && (
+                    <div className={cn(
+                      "border rounded-md p-4",
+                      risk === "low"
+                        ? "bg-green-50 border-green-200 dark:bg-green-950/20 dark:border-green-800"
+                        : "bg-amber-50 border-amber-200 dark:bg-amber-950/20 dark:border-amber-800",
+                    )}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-semibold mb-0.5 flex items-center gap-1.5">
+                            <CheckCircle2 className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
+                            One-Click Safe Fix
+                            <span className={cn("inline-flex items-center rounded px-1.5 py-0 text-[10px] font-medium ml-1", riskColors[risk] ?? riskColors.medium)}>
+                              {risk === "low" ? "Low risk" : "Medium risk"}
+                            </span>
+                          </p>
+                          <p className="text-xs text-muted-foreground">{aiAnalysis.safe_fix.description}</p>
+                          <p className="text-[11px] mt-1 font-mono text-muted-foreground">
+                            Action: <strong>{aiAnalysis.safe_fix.action}</strong>
+                            {" · "}Key: <code>{aiAnalysis.safe_fix.key}</code>
+                            {aiAnalysis.safe_fix.value != null && <> · Value: <code>{String(aiAnalysis.safe_fix.value)}</code></>}
+                          </p>
+                        </div>
+                        <Button
+                          size="sm"
+                          className={cn(
+                            "h-8 text-xs px-4 flex-shrink-0",
+                            risk === "low"
+                              ? "bg-green-600 hover:bg-green-700 text-white"
+                              : "bg-amber-600 hover:bg-amber-700 text-white",
+                          )}
+                          onClick={() => onApplySafeFix(aiAnalysis.safe_fix!)}
+                          disabled={aiAnalysisApplying}
+                        >
+                          {aiAnalysisApplying
+                            ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            : <><CheckCircle2 className="h-3.5 w-3.5 mr-1" />Apply Fix</>}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Data sources used */}
+                  <div className="text-[10px] text-muted-foreground flex flex-wrap gap-1.5 items-center pt-1">
+                    <span>Data sources:</span>
+                    {aiAnalysis.context_used.map(s => (
+                      <span key={s} className="inline-flex items-center rounded px-1.5 py-0 bg-muted text-[10px]">
+                        {s.replace(/_/g, " ")}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -2277,7 +2541,7 @@ export default function SettingsScraperConfigs() {
   const [aiFixPrev, setAiFixPrev] = useState<string | null>(null);
 
   // ── Debugger panel state ──────────────────────────────────────────────────
-  const [debugTab, setDebugTab] = useState<"config" | "overrides" | "rejections" | "extraction" | "discovery">("config");
+  const [debugTab, setDebugTab] = useState<"config" | "overrides" | "rejections" | "extraction" | "discovery" | "ai_analysis">("config");
   const [effectiveCfg, setEffectiveCfg] = useState<EffectiveConfigResult | null>(null);
   const [effectiveCfgLoading, setEffectiveCfgLoading] = useState(false);
   const [rejectionLog, setRejectionLog] = useState<RejectionLogResult | null>(null);
@@ -2298,6 +2562,10 @@ export default function SettingsScraperConfigs() {
   const [testUrl, setTestUrl] = useState("");
   const [urlTestResult, setUrlTestResult] = useState<UrlTestResult | null>(null);
   const [urlTestLoading, setUrlTestLoading] = useState(false);
+  // AI Root Cause Analysis
+  const [aiAnalysis, setAiAnalysis] = useState<AiRootCauseResult | null>(null);
+  const [aiAnalysisLoading, setAiAnalysisLoading] = useState(false);
+  const [aiAnalysisApplying, setAiAnalysisApplying] = useState(false);
 
   // ── AI Diagnose & Fix ─────────────────────────────────────────────────────
   const [diagnosing, setDiagnosing] = useState(false);
@@ -2488,6 +2756,64 @@ export default function SettingsScraperConfigs() {
       setUrlTestLoading(false);
     }
   }, [toast]);
+
+  const runAiRootCause = useCallback(async (uniId: number) => {
+    setAiAnalysisLoading(true);
+    setAiAnalysis(null);
+    try {
+      const res = await fetchWithAuth(`${BASE}/api/universities/${uniId}/ai-root-cause`, {
+        method: "POST",
+      });
+      if (!res.ok) throw new Error(await res.text());
+      setAiAnalysis(await res.json());
+    } catch (err) {
+      toast({ title: "AI analysis failed", description: (err as Error).message, variant: "destructive" });
+    } finally {
+      setAiAnalysisLoading(false);
+    }
+  }, [toast]);
+
+  const handleApplySafeFix = useCallback(async (uniId: number, fix: AiSafeFix) => {
+    setAiAnalysisApplying(true);
+    try {
+      if (fix.action === "clear_admin_override") {
+        const res = await fetchWithAuth(`${BASE}/api/universities/${uniId}/admin-config`, {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ keys: [fix.key] }),
+        });
+        if (!res.ok) throw new Error(await res.text());
+        toast({ title: "Fix applied", description: fix.description });
+        await fetchEffectiveConfig(uniId);
+        await runAiRootCause(uniId);
+      } else if (fix.action === "set_admin_override") {
+        // Build nested object from dot-notation key
+        const parts = fix.key.split(".");
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const nested: Record<string, any> = {};
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let cur: Record<string, any> = nested;
+        for (let i = 0; i < parts.length - 1; i++) {
+          cur[parts[i]] = {};
+          cur = cur[parts[i]];
+        }
+        cur[parts[parts.length - 1]] = fix.value;
+        const res = await fetchWithAuth(`${BASE}/api/universities/${uniId}/agent-config`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(nested),
+        });
+        if (!res.ok) throw new Error(await res.text());
+        toast({ title: "Fix applied", description: fix.description });
+        await fetchEffectiveConfig(uniId);
+        await runAiRootCause(uniId);
+      }
+    } catch (err) {
+      toast({ title: "Failed to apply fix", description: (err as Error).message, variant: "destructive" });
+    } finally {
+      setAiAnalysisApplying(false);
+    }
+  }, [toast, fetchEffectiveConfig, runAiRootCause]);
 
   const handleClearOverrideKey = useCallback(async (uniId: number, key: string) => {
     setClearingOverrideKey(key);
@@ -3486,6 +3812,15 @@ export default function SettingsScraperConfigs() {
                   urlTestLoading={urlTestLoading}
                   onTestUrl={() => {
                     if (selectedConfig?.university_id) void handleTestUrl(selectedConfig.university_id, testUrl);
+                  }}
+                  aiAnalysis={aiAnalysis}
+                  aiAnalysisLoading={aiAnalysisLoading}
+                  aiAnalysisApplying={aiAnalysisApplying}
+                  onRunAiAnalysis={() => {
+                    if (selectedConfig?.university_id) void runAiRootCause(selectedConfig.university_id);
+                  }}
+                  onApplySafeFix={(fix) => {
+                    if (selectedConfig?.university_id) void handleApplySafeFix(selectedConfig.university_id, fix);
                   }}
                 />
               ) : (

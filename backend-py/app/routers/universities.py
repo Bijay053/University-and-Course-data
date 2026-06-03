@@ -3223,6 +3223,363 @@ async def test_url_against_config(
     }
 
 
+@router.post("/universities/{uni_id}/ai-root-cause")
+async def ai_root_cause_analysis(
+    uni_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[dict, Depends(get_current_user)],
+) -> dict:
+    """
+    Gather all 7 debugger data sources for a university and run AI root-cause analysis.
+
+    Returns structured diagnosis: issue_summary, root_cause_category, confidence,
+    evidence[], fix_recommendation, fix_yaml_snippet, safe_fix, risk_label,
+    developer_required, developer_note.
+    """
+    import os as _os
+    from collections import Counter as _Counter
+
+    # ── 1. University + scrape_config ────────────────────────────────────────
+    uni: University | None = await db.get(University, uni_id)
+    if not uni:
+        raise HTTPException(status_code=404, detail="University not found")
+
+    sc_dict: dict = dict(uni.scrape_config or {})
+    admin_cfg: dict = sc_dict.get("admin_config") or {}
+    scrape_url: str = getattr(uni, "scrape_url", "") or ""
+
+    # ── 2. Last 2 scrape jobs ────────────────────────────────────────────────
+    jobs_res = await db.execute(
+        text("""
+            SELECT runtime_job_id, status, total_found, imported, errors, skipped,
+                   total_gemini_cost_usd, cost_ceiling_hit, error_message,
+                   EXTRACT(EPOCH FROM (completed_at - started_at))::int AS duration_s,
+                   created_at
+            FROM scrape_runtime_jobs
+            WHERE university_id = :uni_id
+            ORDER BY created_at DESC
+            LIMIT 2
+        """),
+        {"uni_id": uni_id},
+    )
+    jobs = [dict(r._mapping) for r in jobs_res]
+    last_job_id: str | None = jobs[0]["runtime_job_id"] if jobs else None
+
+    # ── 3. Scraped courses summary (last job) ────────────────────────────────
+    _job_filter = "AND scrape_job_id = :job_id" if last_job_id else ""
+    _job_params: dict = {"uni_id": uni_id}
+    if last_job_id:
+        _job_params["job_id"] = last_job_id
+
+    courses_res = await db.execute(
+        text(f"""
+            SELECT
+                COUNT(*) AS total,
+                COUNT(*) FILTER (WHERE status = 'pending')  AS pending,
+                COUNT(*) FILTER (WHERE status = 'approved') AS approved,
+                COUNT(*) FILTER (WHERE status = 'rejected') AS rejected,
+                COUNT(*) FILTER (WHERE auto_publish_status = 'review') AS in_review,
+                ROUND(AVG(completeness))   AS avg_completeness,
+                COUNT(*) FILTER (WHERE completeness < 70) AS low_completeness_count
+            FROM scraped_courses
+            WHERE university_id = :uni_id
+              {_job_filter}
+        """),
+        _job_params,
+    )
+    courses_summary = dict(courses_res.mappings().first() or {})
+
+    lc_res = await db.execute(
+        text(f"""
+            SELECT course_name, completeness, auto_publish_status, status,
+                   international_fee, ielts_overall, study_mode, academic_level
+            FROM scraped_courses
+            WHERE university_id = :uni_id
+              AND completeness < 70
+              {_job_filter}
+            ORDER BY completeness ASC NULLS FIRST
+            LIMIT 5
+        """),
+        _job_params,
+    )
+    low_completeness_samples = [dict(r._mapping) for r in lc_res]
+
+    # ── 4. Rejection / block log (last job) ──────────────────────────────────
+    rejection_rows: list[dict] = []
+    if last_job_id:
+        rej_res = await db.execute(
+            text("""
+                SELECT
+                    payload->>'kind'    AS kind,
+                    payload->>'url'     AS url,
+                    payload->>'reason'  AS reason,
+                    payload->>'pattern' AS pattern
+                FROM scrape_runtime_logs
+                WHERE runtime_job_id = :job_id
+                  AND payload->>'kind' IN (
+                      'block_url_filter','extract_block_url_filter',
+                      'extract_allow_url_filter','must_contain_filter',
+                      'extract_must_contain_filter','domestic_only_filter',
+                      'rejected_course'
+                  )
+                LIMIT 200
+            """),
+            {"job_id": last_job_id},
+        )
+        rejection_rows = [dict(r._mapping) for r in rej_res]
+
+    rejection_agg: dict[str, int] = _Counter(
+        f"{r.get('kind', '?')}:{r.get('reason') or r.get('pattern') or '?'}"
+        for r in rejection_rows
+    )
+    top_rejections = sorted(rejection_agg.items(), key=lambda x: -x[1])[:10]
+
+    # ── 5. Discovery event summary (last job) ────────────────────────────────
+    discovery_agg: dict[str, int] = {}
+    if last_job_id:
+        disc_res = await db.execute(
+            text("""
+                SELECT payload->>'kind' AS kind, COUNT(*) AS cnt
+                FROM scrape_runtime_logs
+                WHERE runtime_job_id = :job_id
+                  AND payload->>'kind' IN (
+                      'block_url_filter','extract_allow_url_filter',
+                      'must_contain_filter','page_classified'
+                  )
+                GROUP BY payload->>'kind'
+            """),
+            {"job_id": last_job_id},
+        )
+        discovery_agg = {r.kind: int(r.cnt) for r in disc_res}
+
+    # ── 6. Scrape run alerts (last job) ─────────────────────────────────────
+    alerts: list[dict] = []
+    if last_job_id:
+        alt_res = await db.execute(
+            text("""
+                SELECT rule_id, severity, message, acknowledged
+                FROM scrape_run_alerts
+                WHERE scrape_run_id = :job_id
+                ORDER BY CASE severity WHEN 'critical' THEN 0 WHEN 'warning' THEN 1 ELSE 2 END
+                LIMIT 10
+            """),
+            {"job_id": last_job_id},
+        )
+        alerts = [dict(r._mapping) for r in alt_res]
+
+    # ── 7. Config history (last 3 versions) ──────────────────────────────────
+    config_history: list[dict] = []
+    slug_for_hist: str | None = None
+    if scrape_url:
+        from urllib.parse import urlparse as _up_h
+        _host_h = (_up_h(scrape_url).hostname or "")
+        _bare_h = re.sub(r"^www\.", "", _host_h).split(".")[0]
+        if _bare_h:
+            slug_for_hist = _bare_h
+    if slug_for_hist:
+        hist_res = await db.execute(
+            text("""
+                SELECT id, slug, saved_at, saved_by,
+                       LEFT(yaml_content, 300) AS yaml_preview
+                FROM scraper_config_history
+                WHERE slug = :slug
+                ORDER BY saved_at DESC
+                LIMIT 3
+            """),
+            {"slug": slug_for_hist},
+        )
+        config_history = [dict(r._mapping) for r in hist_res]
+
+    # ── 8. Effective merged config (key fields) ──────────────────────────────
+    eff_cfg_summary: dict = {}
+    try:
+        from app.services.scraper.config.loader import get_config_for_host as _gcfh
+        from urllib.parse import urlparse as _up_e
+        _host_e = (_up_e(scrape_url).hostname or "") if scrape_url else ""
+        if _host_e:
+            _eff = _gcfh(
+                hostname=_host_e,
+                name=getattr(uni, "name", ""),
+                scrape_url=scrape_url,
+                university_id=uni_id,
+                db_scrape_config=sc_dict,
+            )
+            _disc = _eff.discovery
+            _extr = _eff.extraction
+            _dom = (
+                _extr.filters.domestic_only
+                if _extr and _extr.filters and _extr.filters.domestic_only
+                else None
+            )
+            eff_cfg_summary = {
+                "block_url_patterns":    list(_disc.block_url_patterns or []),
+                "allow_url_patterns":    list(_disc.allow_url_patterns or []),
+                "must_contain":          list(_disc.must_contain or []),
+                "domestic_only_enabled": getattr(_dom, "enabled", False),
+                "domestic_only_text":    getattr(_dom, "text_must_appear_in", None),
+                "bfs_page_budget":       getattr(_disc, "bfs_page_budget", None),
+                "seed_urls":             list((_disc.seed_urls or []))[:3],
+            }
+    except Exception as _e:
+        eff_cfg_summary = {"load_error": str(_e)}
+
+    # ── Build context document ───────────────────────────────────────────────
+    lines: list[str] = []
+
+    lines.append(f"=== UNIVERSITY ===\nName: {uni.name}\nScrape URL: {scrape_url}\nUni ID: {uni_id}")
+
+    if jobs:
+        j = jobs[0]
+        lines.append(
+            f"\n=== LAST SCRAPE JOB ===\n"
+            f"Status: {j.get('status','?')}  |  "
+            f"Found: {j.get('total_found',0)}  Imported: {j.get('imported',0)}  "
+            f"Errors: {j.get('errors',0)}  Skipped: {j.get('skipped',0)}\n"
+            f"Gemini cost: ${float(j.get('total_gemini_cost_usd') or 0):.4f}  "
+            f"Cost ceiling hit: {j.get('cost_ceiling_hit',False)}\n"
+            f"Duration: {j.get('duration_s','?')}s  |  "
+            f"Error message: {j.get('error_message') or 'None'}"
+        )
+    else:
+        lines.append("\n=== LAST SCRAPE JOB ===\nNo scrape jobs found for this university.")
+
+    cs = courses_summary
+    lines.append(
+        f"\n=== SCRAPED COURSES SUMMARY ===\n"
+        f"Total: {cs.get('total',0)}  Pending: {cs.get('pending',0)}  "
+        f"Approved: {cs.get('approved',0)}  Rejected: {cs.get('rejected',0)}  "
+        f"In review: {cs.get('in_review',0)}\n"
+        f"Avg completeness: {cs.get('avg_completeness',0)}%  "
+        f"Low (<70%): {cs.get('low_completeness_count',0)} courses"
+    )
+
+    if low_completeness_samples:
+        lines.append("\n=== LOW COMPLETENESS COURSES (sample) ===")
+        for s in low_completeness_samples:
+            lines.append(
+                f"  - {s.get('course_name','?')}  {s.get('completeness',0)}%  "
+                f"fee={s.get('international_fee')}  ielts={s.get('ielts_overall')}  "
+                f"mode={s.get('study_mode')}  level={s.get('academic_level')}"
+            )
+
+    if top_rejections:
+        lines.append("\n=== REJECTION/BLOCK LOG (aggregated, last job) ===")
+        for kind, count in top_rejections:
+            lines.append(f"  - {kind}: {count} times")
+
+    if discovery_agg:
+        lines.append("\n=== DISCOVERY EVENT COUNTS (last job) ===")
+        for k, v in discovery_agg.items():
+            lines.append(f"  - {k}: {v}")
+
+    if alerts:
+        lines.append("\n=== SCRAPE RUN ALERTS (last job) ===")
+        for a in alerts:
+            lines.append(
+                f"  - [{(a.get('severity') or '?').upper()}] "
+                f"{a.get('rule_id','?')}: {a.get('message','?')}  "
+                f"(acknowledged={a.get('acknowledged',False)})"
+            )
+
+    lines.append(f"\n=== EFFECTIVE MERGED CONFIG (key fields) ===\n{json.dumps(eff_cfg_summary, indent=2)}")
+
+    if admin_cfg:
+        lines.append(f"\n=== ADMIN OVERRIDES (admin_config) ===\n{json.dumps(admin_cfg, indent=2)}")
+    else:
+        lines.append("\n=== ADMIN OVERRIDES ===\nNone active.")
+
+    if config_history:
+        lines.append("\n=== RECENT CONFIG HISTORY (last 3 versions) ===")
+        for h in config_history:
+            lines.append(f"  Version {h['id']} saved {h['saved_at']} by {h.get('saved_by') or 'system'}:")
+            lines.append(f"  {h['yaml_preview']!r}")
+
+    context_doc = "\n".join(lines)
+
+    # ── Call Gemini ──────────────────────────────────────────────────────────
+    api_key = _os.environ.get("GEMINI_API_KEY", "")
+    if not api_key:
+        raise HTTPException(status_code=503, detail="GEMINI_API_KEY not configured")
+
+    try:
+        from google import genai as _gai
+        from google.genai import types as _gtypes
+        _gc = _gai.Client(api_key=api_key)
+    except Exception as _exc:
+        raise HTTPException(status_code=503, detail=f"Gemini client error: {_exc}") from _exc
+
+    prompt = f"""You are an expert university scraper diagnostic system. Analyse the real operational data below and identify the root cause of any issues.
+
+STRICT RULES:
+1. Base your analysis ONLY on the provided data — do not invent or guess.
+2. If the data shows healthy operation (good import counts, completeness ≥85%, no critical alerts), set root_cause_category to "healthy" and say so.
+3. Every evidence item MUST quote an exact value from the data context.
+4. safe_fix rules — only suggest ONE of these two actions, or null:
+   a. "clear_admin_override": an admin_config key is causing the problem → key = dot-notation path of that key
+   b. "set_admin_override": a small config change (in admin_config) can fix it without code changes → key = dot-notation path, value = the new value
+   Never suggest safe_fix for issues that require code changes.
+5. risk_label = "developer_required" when the fix needs: changing Python extractors/regex, adding a new provider, fixing a runtime exception, or changing discovery browser logic.
+6. fix_yaml_snippet: only include YAML that belongs in the per-uni YAML config file (discovery or extraction section). Keep it under 10 lines. null if not applicable.
+
+OPERATIONAL DATA:
+{context_doc}
+
+Return ONLY a valid JSON object — no markdown fences, no prose, just the object:
+{{
+  "issue_summary": "<1-2 sentence plain-English summary, or 'No significant issues detected'>",
+  "root_cause_category": "<discovery|filtering|extraction|config_conflict|api|pdf|browser|staging_gate|healthy>",
+  "confidence": "<high|medium|low>",
+  "evidence": [
+    {{"type": "<job_stat|rejection|config|alert|extraction|discovery>", "label": "<short label>", "value": "<exact value from data>", "source": "<e.g. last job stats, admin_config, scrape_run_alerts>"}}
+  ],
+  "fix_recommendation": "<plain-English recommended fix>",
+  "fix_yaml_snippet": null,
+  "safe_fix": null,
+  "risk_label": "<low|medium|developer_required>",
+  "developer_required": false,
+  "developer_note": null
+}}
+
+Include 3-8 evidence items. safe_fix and fix_yaml_snippet may be null. developer_note is required when developer_required is true."""
+
+    try:
+        _resp = await _gc.aio.models.generate_content(
+            model="gemini-2.5-flash-lite",
+            contents=prompt,
+            config=_gtypes.GenerateContentConfig(max_output_tokens=2048),
+        )
+        raw_text = (getattr(_resp, "text", "") or "").strip()
+    except Exception as _exc2:
+        raise HTTPException(status_code=502, detail=f"Gemini API error: {_exc2}") from _exc2
+
+    # Strip markdown fences if model added them
+    _clean = re.sub(r"^```(?:json)?\s*", "", raw_text, flags=re.MULTILINE).strip()
+    _clean = re.sub(r"\s*```$", "", _clean, flags=re.MULTILINE).strip()
+
+    try:
+        result: dict = json.loads(_clean)
+    except json.JSONDecodeError:
+        _m = re.search(r"\{.*\}", _clean, re.DOTALL)
+        if _m:
+            try:
+                result = json.loads(_m.group())
+            except Exception:
+                raise HTTPException(status_code=502, detail=f"Gemini returned unparseable JSON: {raw_text[:300]}")
+        else:
+            raise HTTPException(status_code=502, detail=f"Gemini returned non-JSON: {raw_text[:300]}")
+
+    result["university_id"]   = uni_id
+    result["university_name"] = uni.name
+    result["last_job_id"]     = last_job_id
+    result["context_used"]    = [
+        "university_info", "last_scrape_job", "scraped_courses_summary",
+        "rejection_log", "discovery_events", "scrape_run_alerts",
+        "effective_config", "admin_overrides",
+    ] + (["config_history"] if config_history else [])
+
+    return result
+
+
 def _to_camel_uni(u) -> dict:
     """Add camelCase aliases UI expects: scrapeUrl, feePageUrl, etc."""
     if hasattr(u, '__table__'):
