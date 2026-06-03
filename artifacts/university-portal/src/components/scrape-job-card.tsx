@@ -290,16 +290,6 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
   // back to within 40 px of the bottom.
   const userScrolledUpRef = useRef(false);
 
-  useEffect(() => {
-    const el = logContainerRef.current;
-    if (!el) return;
-    const handleScroll = () => {
-      const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
-      userScrolledUpRef.current = !atBottom;
-    };
-    el.addEventListener("scroll", handleScroll, { passive: true });
-    return () => el.removeEventListener("scroll", handleScroll);
-  }, []);
 
   // Scroll logs to bottom — use direct container scrollTop to avoid
   // scrollIntoView pulling the whole page up when the user is reading above.
@@ -978,7 +968,14 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
 
             {/* Compact log stream */}
             <div className="relative">
-              <div ref={logContainerRef} className="flex-1 min-h-[160px] max-h-[420px] overflow-y-auto bg-gray-950 rounded-lg p-2 font-mono text-[10px] leading-relaxed">
+              <div
+                ref={logContainerRef}
+                className="flex-1 min-h-[160px] max-h-[420px] overflow-y-auto bg-gray-950 rounded-lg p-2 font-mono text-[10px] leading-relaxed"
+                onScroll={(e) => {
+                  const el = e.currentTarget;
+                  userScrolledUpRef.current = el.scrollHeight - el.scrollTop - el.clientHeight > 40;
+                }}
+              >
                 {logs.length === 0 ? (
                   jobStatus === "queued" ? (
                     <div className="flex flex-col gap-1.5 pt-2">
