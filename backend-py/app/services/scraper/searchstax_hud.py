@@ -617,6 +617,180 @@ def _resolve_token(cfg: SearchStaxConfig) -> Optional[str]:
     return os.environ.get("SEARCHSTAX_TOKEN") or None
 
 
+_MONTH_NAMES = {
+    "january", "february", "march", "april", "may", "june",
+    "july", "august", "september", "october", "november", "december",
+}
+
+_LEVEL_MAP = {
+    "undergraduate": "Undergraduate",
+    "postgraduate": "Postgraduate",
+    "postgraduate taught": "Postgraduate",
+    "postgraduate research": "Postgraduate",
+    "doctorate": "Postgraduate",
+    "phd": "Postgraduate",
+}
+
+_MODE_MAP = {
+    "full time": "Full-time",
+    "full-time": "Full-time",
+    "part time": "Part-time",
+    "part-time": "Part-time",
+    "online": "Online",
+    "distance learning": "Online",
+    "blended": "Hybrid",
+    "hybrid": "Hybrid",
+}
+
+
+def _parse_intake_months_from_dates(dates_raw: str) -> str:
+    """Extract unique month names from strings like 'September 2026, March 2027'.
+
+    Returns comma-separated month names in order first seen, e.g. 'September, March'.
+    """
+    seen: list[str] = []
+    for token in re.split(r"[,;/\n]+", dates_raw):
+        word = token.strip().split()[0].lower() if token.strip() else ""
+        if word in _MONTH_NAMES:
+            month = word.capitalize()
+            if month not in seen:
+                seen.append(month)
+    return ", ".join(seen)
+
+
+def _normalize_study_mode(raw: str) -> str:
+    """Normalise a Solr study-mode string to canonical values."""
+    key = raw.strip().lower()
+    return _MODE_MAP.get(key, raw.strip())
+
+
+def _normalize_academic_level(raw: str) -> str:
+    """Normalise a Solr degree-level string to Undergraduate/Postgraduate."""
+    key = raw.strip().lower()
+    return _LEVEL_MAP.get(key, raw.strip())
+
+
+def _slug_to_name(url: str) -> str:
+    """Derive a human-readable fallback name from a course URL slug."""
+    # e.g. .../accounting-with-study-abroad-n410/ → "Accounting with Study Abroad N410"
+    slug = url.rstrip("/").rsplit("/", 1)[-1]
+    slug = re.sub(r"-([a-z]{1,4}\d+)$", r" \1", slug)  # detach code suffix
+    return slug.replace("-", " ").title()
+
+
+def _map_doc_field_map(doc: dict, cfg: SearchStaxConfig) -> Optional[dict]:
+    """Map a Solr doc → ``{name, url, searchstax_result}`` using cfg.field_map.
+
+    Used when ``cfg.field_map_as_payload`` is True: builds a fully-formed
+    staged-course payload from structured Solr fields without fetching the
+    individual course page.  Intended for universities (e.g. Durham) whose
+    Solr docs carry course metadata (name, level, duration, mode, intakes,
+    department) but do NOT have fees or IELTS — those are supplied later by
+    the ``degree_level_defaults`` fallback in the extraction pipeline.
+
+    Evidence rows use method ``searchstax:field_map`` with tier authority 1.5
+    (above HTML heuristics, below PDF/AI).
+    """
+    _fm = cfg.field_map or {}
+    _url_field   = _fm.get("url",          "url_t")
+    _name_field  = _fm.get("name",         "title_t")
+    _type_field  = _fm.get("degree_type",  "award_s")
+    _level_field = _fm.get("degree_level", "study_level_s")
+    _mode_field  = _fm.get("study_mode",   "mode_s")
+    _dur_field   = _fm.get("duration",     "duration_t")
+    _date_field  = _fm.get("intake_dates", "start_dates_s")
+    _cat_field   = _fm.get("category",     "subject_s")
+
+    url = _first_str(doc, _url_field, "id")
+    if not url:
+        return None
+
+    raw_title = _first_str(doc, _name_field)
+    award     = _first_str(doc, _type_field)
+
+    if raw_title:
+        if award and not raw_title.lower().startswith(award.lower()):
+            name = f"{award} {raw_title}"
+        else:
+            name = raw_title
+    elif award:
+        name = award
+    else:
+        name = _slug_to_name(url)
+
+    payload: dict[str, Any] = {"course_name": name}
+    evidence: list[dict] = []
+
+    def _ev(field: str, value: Any, method: str) -> None:
+        evidence.append({
+            "field_key": field,
+            "value": str(value),
+            "method": f"searchstax:{method}",
+            "source_url": url,
+            "entity_type": "course",
+            "authority": 1.5,
+            "confidence": 0.85,
+        })
+
+    _ev("course_name", name, "field_map")
+
+    if award:
+        payload["degree_level"] = award
+        _ev("degree_level", award, "field_map")
+
+    raw_level = _first_str(doc, _level_field)
+    if raw_level:
+        acad = _normalize_academic_level(raw_level)
+        payload["academic_level"] = acad
+        _ev("academic_level", acad, "field_map")
+
+    raw_mode_vals = doc.get(_mode_field, [])
+    if isinstance(raw_mode_vals, list):
+        raw_mode_vals = [v for v in raw_mode_vals if v]
+    elif raw_mode_vals:
+        raw_mode_vals = [raw_mode_vals]
+    if raw_mode_vals:
+        modes = ", ".join(_normalize_study_mode(str(m)) for m in raw_mode_vals)
+        payload["study_mode"] = modes
+        _ev("study_mode", modes, "field_map")
+
+    raw_dur = _first_str(doc, _dur_field)
+    if raw_dur:
+        payload["duration"] = raw_dur
+        _ev("duration", raw_dur, "field_map")
+
+    raw_dates_vals = doc.get(_date_field, [])
+    if isinstance(raw_dates_vals, list):
+        dates_blob = ", ".join(str(v) for v in raw_dates_vals if v)
+    else:
+        dates_blob = str(raw_dates_vals) if raw_dates_vals else ""
+    if dates_blob:
+        months = _parse_intake_months_from_dates(dates_blob)
+        if months:
+            payload["intake_months"] = months
+            _ev("intake_months", months, "field_map")
+
+    raw_cat = _first_str(doc, _cat_field)
+    if raw_cat:
+        payload["category"] = raw_cat
+        _ev("category", raw_cat, "field_map")
+
+    if cfg.location_override:
+        payload["course_location"] = cfg.location_override
+        _ev("course_location", cfg.location_override, "location_override")
+
+    return {
+        "name": name,
+        "url": url,
+        "searchstax_result": {
+            "name": name,
+            "url": url,
+            "payload": payload,
+            "evidence": evidence,
+        },
+    }
+
+
 async def _fetch_links_only(cfg: SearchStaxConfig, emit=None) -> list[dict]:
     """SearchStax discovery-only mode (``cfg.links_only = True``).
 
@@ -730,10 +904,16 @@ async def _fetch_links_only(cfg: SearchStaxConfig, emit=None) -> list[dict]:
                 title = _first_str(doc, _name_field)
                 award = _first_str(doc, _type_field)
                 # Build name: prepend award/degree-type when not already the prefix
-                if award and not title.lower().startswith(award.lower()):
-                    name = f"{award} {title}" if title else award
+                if title:
+                    if award and not title.lower().startswith(award.lower()):
+                        name = f"{award} {title}"
+                    else:
+                        name = title
+                elif award:
+                    name = award
                 else:
-                    name = title or url
+                    # Derive readable name from URL slug rather than using raw URL
+                    name = _slug_to_name(url)
                 link: dict = {"name": name, "url": url}
                 # Carry pre-fetched structured metadata on the link dict so
                 # the per-course extractor can use it as authoritative hints.
@@ -804,8 +984,13 @@ async def fetch_searchstax_links(cfg: SearchStaxConfig, emit=None) -> list[dict]
     if token:
         headers["Authorization"] = f"Token {token}"
 
-    # Choose mapper: HUD-specific (default) or generic
-    if cfg.use_generic_mapper:
+    # Choose mapper: field_map-driven generic (for universities like Durham
+    # whose Solr has structured metadata but no fees/IELTS content blob),
+    # HUD-specific (default), or generic_search_api.
+    if cfg.field_map_as_payload:
+        def _mapper(doc: dict) -> Optional[dict]:  # type: ignore[misc]
+            return _map_doc_field_map(doc, cfg)
+    elif cfg.use_generic_mapper:
         from app.services.scraper.generic_search_api import _map_searchstax_doc
         def _mapper(doc: dict) -> Optional[dict]:
             link = _map_searchstax_doc(doc)

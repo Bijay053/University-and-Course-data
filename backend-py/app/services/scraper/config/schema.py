@@ -181,6 +181,34 @@ class SearchStaxConfig(BaseModel):
             "  intake_dates: DegreeStartDate_ss, category: Department_ss}"
         ),
     )
+    field_map_as_payload: bool = Field(
+        default=False,
+        description=(
+            "When True (and links_only is False), use the field_map to build a "
+            "searchstax_result payload directly from Solr doc fields — no "
+            "per-course page fetch is needed.  Use for universities (e.g. Durham) "
+            "whose Solr docs contain structured metadata (name, level, duration, "
+            "mode, intakes, category) but NOT fees or IELTS. "
+            "Fees are then supplied by extraction.fees.degree_level_defaults. "
+            "field_map keys translated to payload: "
+            "  name         → course_name "
+            "  degree_type  → degree_level  (e.g. 'BA (Hons)', 'MSc') "
+            "  degree_level → academic_level (normalised to Undergraduate/Postgraduate) "
+            "  study_mode   → study_mode "
+            "  duration     → duration "
+            "  intake_dates → intake_months (month names extracted from 'Month YYYY') "
+            "  category     → category "
+            "location_override → course_location (when set)"
+        ),
+    )
+    location_override: Optional[str] = Field(
+        default=None,
+        description=(
+            "Hard-coded course_location value written into every staged course "
+            "when field_map_as_payload is True (e.g. 'Durham, UK'). "
+            "Ignored in links_only mode."
+        ),
+    )
 
 
 class ScrapyConfig(BaseModel):

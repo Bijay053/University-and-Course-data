@@ -1,17 +1,30 @@
 # Durham University (UK)
 # Hostname: www.durham.ac.uk
 #
-# Scraping method: SearchStax Solr API (discovery-only) + scrape.do for page fetch
+# Scraping method: SearchStax Solr API — full payload extraction from Solr docs
 # ---------------------------------------------------------------------------------
 # Durham's course listing is a JavaScript SPA that queries a SearchStax-hosted
 # Solr core client-side.  Standard BFS/sitemap discovery finds nothing useful
 # because the listing pages require JS execution.  The Solr core is queried
 # directly — this is the same endpoint the browser SPA uses.
 #
-# Individual course pages are protected by Cloudflare Turnstile — both plain
-# HTTP and headless-browser fetches are rejected immediately (0/256 staged).
-# scrape_do_fallback: true routes page fetches through scrape.do residential
-# proxy after browser exhaustion (~256 credits per scrape run).
+# Individual course pages are protected by Cloudflare Turnstile — all three
+# fetch tiers (HTTP, browser, scrape.do) are rejected.  Previously this meant
+# 0/256 staged.  Now we use field_map_as_payload=true: course metadata is
+# extracted directly from the Solr doc fields, with NO per-course page fetch.
+#
+# Fields available in Durham's Solr (verified 2026-06-04):
+#   Degreename_t           → course name
+#   Degreetype_ss          → degree abbreviation (BA (Hons), MSc, etc.)
+#   DegreeCourseLevel_ss   → Undergraduate / Postgraduate
+#   DegreeStudyOptions_ss  → Full Time / Part Time
+#   DegreeDuration_ss      → 3 years full-time / 1 year full-time
+#   DegreeStartDate_ss     → September 2026, January 2027, etc.
+#   Department_ss          → subject department / category
+#
+# NOT available in Solr (JS-rendered on page):
+#   international_fee      → supplied by degree_level_defaults (see extraction.fees)
+#   ielts_overall          → null (courses land in review queue for manual check)
 #
 # Solr endpoint (found via browser Network tab):
 #   https://searchcloud-1-eu-west-2.searchstax.com/29847/durhamuniv-1610/emselect
@@ -33,11 +46,15 @@ discovery:
     # Durham uses sectiontype_ss (multi-valued) not sectionType_s (single).
     filter_query: "sectiontype_ss:course"
 
-    # Discovery-only: Solr docs don't contain fees/IELTS — fetch live pages.
-    links_only: true
+    # Full payload extraction from Solr fields — no per-course page fetch.
+    # course pages are Cloudflare-blocked (all tiers: HTTP, browser, scrape.do).
+    links_only: false
+    field_map_as_payload: true
 
-    # Durham Solr uses PascalCase field names — map them to the standard keys
-    # so _fetch_links_only can find the URL, name, and metadata.
+    # Course location hardcoded since it is not in the Solr index.
+    location_override: "Durham, UK"
+
+    # Durham Solr uses PascalCase field names — maps logical keys to Solr fields.
     field_map:
       url:          courseUrl_t
       name:         Degreename_t
@@ -51,25 +68,6 @@ discovery:
     page_size: 100
     fee_year: 2026
     currency: GBP
-
-  allow_url_patterns:
-    - '/courses/[^/]+$'
-    - '/study/'
-
-  block_url_patterns:
-    - '/news'
-    - '/events'
-    - '/staff/'
-    - '/about'
-    - '/contact'
-    - '/linkassets/'
-
-  # Durham's course pages are protected by Cloudflare Turnstile — both plain
-  # HTTP and headless-browser fetches are rejected immediately (0/256 staged
-  # without this flag).  Enable scrape.do residential proxy as last resort
-  # after browser exhaustion (same mechanism as WLV/UTAS).
-  # Cost: 1 scrape.do credit per course page (~256 credits per scrape run).
-  scrape_do_fallback: true
 
 extraction:
   max_parallel_fetch: 8
