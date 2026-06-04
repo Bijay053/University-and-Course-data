@@ -141,7 +141,7 @@ async def _emit(db, runtime_job_id: str, sequence: int, event: str, message: str
 
 
 
-_MAX_COURSES_PER_JOB = 200
+_MAX_COURSES_PER_JOB = 500
 _MAX_PARALLEL_FETCH = 4
 # How long a pending/rejected scraped_courses row may sit before the next
 # scrape is allowed to wipe it. Anything older than this is considered
@@ -696,20 +696,14 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             # one pass and the full course catalogue is harvested.
             if _scrape_host in ("www.unisq.edu.au", "unisq.edu.au"):
                 max_pages = 60
-            # Federation: sitemap publishes ~223 /courses/ URLs and a handful
-            # of late-listed courses (e.g. dhw9-master-of-social-work-qualifying
-            # at position 216, dhy5-bachelor-of-psychological-science at 217)
-            # were silently dropped by the default 200-candidate cap. Raise the
-            # cap to 250 so the entire Federation catalogue reaches the
-            # extractor in one pass. Tests: discovery still respects max_pages
-            # and per-uni block_url_patterns continue to filter info pages.
+            # Federation: sitemap publishes ~223 /courses/ URLs (kept for
+            # historical reference; the 250 hardcode is now below the default
+            # 500 cap and is effectively a no-op, but left for documentation).
             if _scrape_host in ("www.federation.edu.au", "federation.edu.au"):
                 max_courses = 250
             # Per-uni YAML override (`discovery.max_candidates`) — used for
-            # sitemap-heavy catalogues whose allow_url_patterns-matching URL
-            # count exceeds the default 200 cap (e.g. CQU 199 HE courses
-            # minus 54 BFS = only 146 sitemap slots, dropping late-alphabet
-            # codes like cv82 master-of-engineering at index 168).
+            # large catalogues with year-variant URLs or many facet pages whose
+            # allow_url_patterns-matching URL count exceeds the default 500 cap.
             try:
                 _yaml_cap = getattr(_uni_cfg.discovery, "max_candidates", None)
                 if _yaml_cap and int(_yaml_cap) > max_courses:
