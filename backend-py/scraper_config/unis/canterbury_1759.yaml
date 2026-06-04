@@ -20,6 +20,24 @@ extraction:
   fees:
     default_currency: GBP
     prefer_international: true
+    # Canterbury CC is a React SPA — fee pages yield no static text.
+    # These defaults are used when per-course extraction fails to find a fee.
+    # Source: official CCCU website / Shiksha 2025/26 data.
+    degree_level_defaults:
+      undergraduate: 15500
+      postgraduate: 15500
+      doctorate: 15500
+
+  english:
+    # IELTS: 6.0 overall (UG); 6.5 overall (PG).
+    # Source: CCCU international admissions page 2025/26.
+    degree_level_defaults:
+      undergraduate:
+        ielts: 6.0
+      postgraduate:
+        ielts: 6.5
+      doctorate:
+        ielts: 6.5
 
   filters:
     domestic_only:

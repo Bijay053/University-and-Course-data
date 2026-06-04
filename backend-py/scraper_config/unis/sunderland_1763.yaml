@@ -26,9 +26,24 @@ extraction:
     # NOTE: https://www.sunderland.ac.uk/international/fees returns 404 (React SPA
     # routing — static HTML gives no fee data).  Remove central_page until a
     # scrapeable fee URL is found; use degree_level_defaults below instead.
+    # Source: University of Sunderland official fees page / CollegeDunia 2025/26.
+    # UG: £14,500, PGT: £16,500 (range £14,500–21,000; using floor as conservative default).
+    degree_level_defaults:
+      undergraduate: 14500
+      postgraduate: 16500
+      doctorate: 16500
 
   english:
     central_page: "https://www.sunderland.ac.uk/english-language-requirements"
+    # IELTS: 6.0 overall, min 5.5 each component (UG and PGT standard).
+    # Source: sunderland.ac.uk/study/international/entry-language-requirements 2025.
+    degree_level_defaults:
+      undergraduate:
+        ielts: 6.0
+      postgraduate:
+        ielts: 6.0
+      doctorate:
+        ielts: 6.0
 
   study_mode:
     # Sunderland pages contain "apply online" / "register online" nav copy that

@@ -5935,14 +5935,14 @@ async def extract_course(
             _fdl_raw = (payload.get("degree_level") or "").lower().strip()
             _fdl_tier: str | None = None
             if _fdl_raw:
-                import re as _re
+                import re as _re_local
                 if any(k in _fdl_raw for k in ("bachelor", "honours", "honor", "hons", "associate", "bsc", "ba ", "beng", "bbus", "bcom")):
                     _fdl_tier = "undergraduate"
-                elif any(k in _fdl_raw for k in ("master",)) or _re.search(r"\b(msc|ma|meng|mba|mres|mphil|llm|mpa|mfa|mmus|mus\.m)\b", _fdl_raw):
+                elif any(k in _fdl_raw for k in ("master",)) or _re_local.search(r"\b(msc|ma|meng|mba|mres|mphil|llm|mpa|mfa|mmus|mus\.m)\b", _fdl_raw):
                     _fdl_tier = "postgraduate"
-                elif any(k in _fdl_raw for k in ("doctor", "phd", "dphil")) or _re.search(r"\b(dba|edd|dsc|phd)\b", _fdl_raw):
+                elif any(k in _fdl_raw for k in ("doctor", "phd", "dphil")) or _re_local.search(r"\b(dba|edd|dsc|phd)\b", _fdl_raw):
                     _fdl_tier = "doctorate"
-                elif _fdl_raw.startswith("graduate") or "postgraduate" in _fdl_raw or _re.search(r"\bpg(dip|cert|diploma|certificate)\b", _fdl_raw):
+                elif _fdl_raw.startswith("graduate") or "postgraduate" in _fdl_raw or _re_local.search(r"\bpg(dip|cert|diploma|certificate)\b", _fdl_raw):
                     _fdl_tier = "postgraduate"
                 elif any(k in _fdl_raw for k in ("diploma", "certificate")):
                     _fdl_tier = "undergraduate"
