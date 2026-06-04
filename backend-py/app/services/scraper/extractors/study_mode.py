@@ -565,6 +565,7 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
     _suppress_rule = _host in _STUDY_MODE_RULE_SUPPRESSED_HOSTS
     if not _suppress_rule:
         try:
+            from app.services.scraper.config.context import get_uni_config as _get_sm_cfg
             _sm_uni = _get_sm_cfg()
             if _sm_uni is not None:
                 _sm_opts = getattr(_sm_uni.extraction, "study_mode", None)
