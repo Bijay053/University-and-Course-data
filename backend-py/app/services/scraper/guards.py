@@ -279,13 +279,23 @@ _DEGREE_QUALIFIER_RE = re.compile(
     r"med\b|"           # Master of Education
     r"mit\b|"           # Master of Info Tech
     r"msc\b|"           # Master of Science
+    r"msci\b|"          # Master of Science (integrated, UK)
     r"mcom\b|"          # Master of Commerce
     r"mres\b|"          # Master of Research
     r"mfin\b|"          # Master of Finance
+    r"meng\b|"          # Master of Engineering (integrated, UK)
+    r"mbiol\b|"         # Master of Biology (integrated, UK)
+    r"mchem\b|"         # Master of Chemistry (integrated, UK)
+    r"mphys\b|"         # Master of Physics (integrated, UK)
+    r"mmath\b|"         # Master of Mathematics (integrated, UK)
+    r"mds\b|"           # Master of Data Science
+    r"ma\b|"            # Master of Arts
     r"mba\s*\(|"        # MBA (Specialisation)
     r"phd\b|"           # Doctor of Philosophy (abbrev.)
     r"ph\.d\b|"
     r"dba\b|"           # Doctor of Business Admin
+    r"llb\b|"           # Bachelor of Laws (UK)
+    r"llm\b|"           # Master of Laws (UK)
     r"bba\b|"           # Bachelor of Business Admin
     r"bbs\b|"           # Bachelor of Business Science
     r"bcom\b|"          # Bachelor of Commerce
@@ -294,6 +304,9 @@ _DEGREE_QUALIFIER_RE = re.compile(
     r"bsw\b|"           # Bachelor of Social Work
     r"bsc\b|"           # Bachelor of Science
     r"beng\b|"          # Bachelor of Engineering
+    r"gdip\b|"          # Graduate Diploma (abbreviated, UK)
+    r"pdip\b|"          # Postgraduate Diploma (abbreviated, UK)
+    r"pcert\b|"         # Postgraduate/Professional Certificate (abbreviated, UK)
     r"ba\b(?:\s|$)"     # Bachelor of Arts (must be word-bounded)
     r")",
     re.IGNORECASE,

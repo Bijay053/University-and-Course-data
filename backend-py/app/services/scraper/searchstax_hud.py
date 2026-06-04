@@ -779,6 +779,43 @@ def _map_doc_field_map(doc: dict, cfg: SearchStaxConfig) -> Optional[dict]:
         payload["course_location"] = cfg.location_override
         _ev("course_location", cfg.location_override, "location_override")
 
+    # ── Fee degree_level_defaults fallback ──────────────────────────────────
+    # The searchstax_result short-circuit bypasses the extraction pipeline, so
+    # degree_level_defaults in extraction.fees never runs.  Apply it here
+    # using the UniConfig ContextVar (set by the orchestrator before the scrape)
+    # so Cloudflare-blocked universities can still get a default fee from the
+    # YAML rather than landing in _no_international_fee rejection.
+    # Also set has_central_fee_page=True so the no_international_fee gate is
+    # bypassed even when the fee lookup itself fails (force_central_fee_stage).
+    if payload.get("international_fee") in (None, "", 0):
+        try:
+            from app.services.scraper.config.context import get_uni_config
+            _uc = get_uni_config()
+            if _uc is not None:
+                _fee_cfg = getattr(getattr(_uc, "extraction", None), "fees", None)
+                _force = getattr(_fee_cfg, "force_central_fee_stage", False)
+                _dl_defaults: dict = getattr(_fee_cfg, "degree_level_defaults", {}) or {}
+                if _dl_defaults:
+                    _acad_lvl = str(payload.get("academic_level", "")).lower()
+                    if "undergraduate" in _acad_lvl:
+                        _fdl = _dl_defaults.get("undergraduate")
+                    elif any(k in _acad_lvl for k in ("postgraduate", "doctorate", "phd")):
+                        _fdl = _dl_defaults.get("postgraduate")
+                    else:
+                        _fdl = None
+                    if _fdl:
+                        payload["international_fee"] = float(_fdl)
+                        payload["has_central_fee_page"] = True
+                        _ev("international_fee", _fdl, "degree_level_default")
+                        log.debug(
+                            "[SEARCHSTAX field_map] fee default %s applied (%s) for %s",
+                            _fdl, _acad_lvl, url,
+                        )
+                if _force and not payload.get("has_central_fee_page"):
+                    payload["has_central_fee_page"] = True
+        except Exception as _fee_exc:  # noqa: BLE001
+            log.debug("[SEARCHSTAX field_map] fee defaults lookup failed: %s", _fee_exc)
+
     return {
         "name": name,
         "url": url,

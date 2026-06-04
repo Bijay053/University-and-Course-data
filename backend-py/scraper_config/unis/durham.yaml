@@ -32,6 +32,12 @@
 # Filter:    sectiontype_ss:course  → 312 courses (from 29,422 total docs)
 
 discovery:
+  # Override any allow_url_patterns / block_url_patterns stored in the DB
+  # from previous scrape configs — those were for BFS mode and are irrelevant
+  # now that Solr provides the full link list directly.  Empty lists clear them.
+  allow_url_patterns: []
+  block_url_patterns: []
+
   searchstax:
     endpoint: "https://searchcloud-1-eu-west-2.searchstax.com/29847/durhamuniv-1610/emselect"
 
