@@ -44,7 +44,7 @@ discovery:
     #   1. authorization_token literal below  (leave null to skip)
     #   2. env var named by token_env         ← preferred for production
     #   3. global SEARCHSTAX_TOKEN env var
-    authorization_token: null   # set to literal token if env var not yet configured
+    authorization_token: 75c41a510e054668f69fae93cf05b755ba027b7c   # set to literal token if env var not yet configured
     token_env: DURHAM_SEARCHSTAX_TOKEN
 
     # Solr filter: restrict to course documents only (312 from 29,422 total).
