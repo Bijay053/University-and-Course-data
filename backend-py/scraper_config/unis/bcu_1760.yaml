@@ -124,3 +124,17 @@ extraction:
     # When both a home fee and an international fee appear on the same page,
     # always prefer the international figure.
     prefer_international: true
+
+  staging:
+    # BCU's course page template (2026-27 and 2027-28) puts the degree badge
+    # ("BSc (Hons)", "BA (Hons)", etc.) in a separate <div class="badge">
+    # element, NOT in the H1.  The H1 contains only the subject name
+    # ("Accounting and Finance", "Acting", etc.).  This means the extracted
+    # payload["course_name"] carries no degree qualifier — and the staging
+    # guard's _name_has_degree_qualifier() check rejects it as a category
+    # landing page.  Bypassing the check is safe here because:
+    #   1. allow_url_patterns already enforces the canonical /courses/<slug>-YYYY-YY
+    #      shape, which uniquely identifies individual course-detail pages.
+    #   2. course_detail_url_patterns independently asserts these as course pages.
+    # Without this flag, 261/320 courses are rejected (82% rejection rate).
+    skip_degree_qualifier_check: true

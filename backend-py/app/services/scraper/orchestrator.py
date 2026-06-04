@@ -3155,6 +3155,11 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     "fee_calculation_mode",
                     "fee_prevent_full_course_rollup",
                     "max_annual_fee",
+                    # default_currency: YAML wins over AI-filled fee_currency.
+                    # Without this, the AI fallback sets fee_currency=AUD for
+                    # UK universities (e.g. BCU, WLV) and the YAML GBP config
+                    # has no effect on the final stored value.
+                    "default_currency",
                 )
                 from app.services.scraper.config.context import get_uni_config as _get_uc_fees
                 _yaml_uni_cfg = _get_uc_fees()
