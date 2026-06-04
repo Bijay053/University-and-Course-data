@@ -603,6 +603,7 @@ export default function Scraping() {
   const [lastScrapeInfo, setLastScrapeInfo] = useState<{ jobId: string; startedAt: string | null; completedAt: string | null; durationMs: number | null; totalFound: number; staged: number; skipped: number; errors: number } | null>(null);
   const [showReview, setShowReview] = useState(false);
   const [reviewJobId, setReviewJobId] = useState<string | null>(null);
+  const [latestAvailableJobId, setLatestAvailableJobId] = useState<string | null>(null);
   // Refs so callbacks can read current review state without stale closure issues
   const showReviewRef = useRef(false);
   const reviewJobIdRef = useRef<string | null>(null);
@@ -892,6 +893,7 @@ export default function Scraping() {
         setStagedCourses(pending);
         setReviewJobId(jobId);
         setShowReview(true);
+        setLatestAvailableJobId(null);
         setSelectedIds(new Set(pending.map((c: StagedCourse) => c.id)));
         // Fire quality fetch in background — uses universityId from first course
         const uniId = pending[0]?.universityId;
@@ -1109,6 +1111,7 @@ export default function Scraping() {
               loadStagedCourses(jobId);
             } else {
               console.debug("[SCRAPE_UI] ignored background staged-course load because review panel is open for another job", { backgroundJobId: jobId, openJobId: reviewJobIdRef.current });
+              setLatestAvailableJobId(jobId);
             }
           }
           // ETA tracking: clear start time when this URL finishes (next URL will reset it).
@@ -2036,6 +2039,21 @@ export default function Scraping() {
 
         return (
         <Card className="border-2 border-green-100">
+          {latestAvailableJobId && latestAvailableJobId !== reviewJobId && (
+            <div className="flex items-center justify-between gap-3 px-4 py-2 bg-blue-50 border-b border-blue-200 rounded-t-lg">
+              <span className="text-xs font-medium text-blue-800">
+                ✦ New scrape results available
+              </span>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-6 text-xs text-blue-700 border-blue-300 hover:bg-blue-100 px-2"
+                onClick={() => loadStagedCourses(latestAvailableJobId)}
+              >
+                Load latest results
+              </Button>
+            </div>
+          )}
           <CardHeader className="pb-3">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
@@ -2064,6 +2082,18 @@ export default function Scraping() {
                 )}
               </div>
               <div className="flex flex-wrap gap-2 shrink-0">
+                {reviewJobId && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-gray-600 border-gray-200 hover:bg-gray-50"
+                    onClick={() => loadStagedCourses(reviewJobId)}
+                    title="Reload staged courses and refresh quality scores"
+                  >
+                    <RefreshCw className="w-3 h-3 mr-1" />
+                    Refresh
+                  </Button>
+                )}
                 {selectedUni && selectedUni !== ALL && (
                   <Button
                     size="sm"
