@@ -1,114 +1,202 @@
-# Birmingham City University (BCU)
-# Hostname: www.bcu.ac.uk
-# Country: United Kingdom  |  Currency: GBP
-# Slug: bcu
+# Bath Spa University
+# Hostname: www.bathspa.ac.uk
+# Country: United Kingdom | Currency: GBP
 #
-# ── ARCHITECTURE (verified live) ──────────────────────────────────────────────
-# Server-rendered HTML CMS (.NET / Optimizely). Course links are in static HTML.
-# Catalogue: 386 courses behind a faceted server-paginated search at /courses/search.
-#   perpage capped at 20 server-side  → 20 result pages (?page=1..20).
-#   type = level (1 Foundation, 2 UG, 3 PG-Taught, 5 PG-Research, 8 Short/CPD, 9 Appr.)
-# Course detail URL (canonical): /courses/<slug>-YYYY-YY  e.g. /courses/computer-science-bsc-hons-2026-27
-#   Duplicate alternate paths also exist (/conservatoire/courses/..., /business-school/courses/...)
-#   that resolve to the SAME courses and produce garbled slug-titled duplicates.
-# NOTE: the ?International=true view is NOT seedable — the server rewrites it to
-#   ?International=true&JanStart=true&mode=1&intake=2025-26 (a January-only subset).
-#   So discovery uses the plain all-courses pages; international fees are resolved
-#   at extraction via fee keywords (below), not by changing the listing view.
-#
-# ── EVOLUTION OF THE FIX (run-by-run evidence) ────────────────────────────────
-# Run 1: BFS seeded at ?type=2 burned its budget on facet permutations → ~10 real
-#        courses found; broken filters then dropped everything → Staged 0.
-# Run 2 (this config's target): discovery+extraction WORK (136 fetched, fees/IELTS/
-#        duration mostly PASS 100/100) but staging rejected 119/127 as
-#        category_landing_page, leaving 8. Verified: the rejected pages (e.g.
-#        computer-science-bsc-hons-2026-27) are clean SINGLE-course pages, so the
-#        rejection is a false positive that tracks discovery SOURCE — only
-#        BFS-crawled detail pages survived; the 238 sitemap-supplemented candidates
-#        were the ones rejected.
-#
-# ── FIXES ─────────────────────────────────────────────────────────────────────
-#  (A) DISCOVERY — make every course a BFS-crawled detail page and remove the
-#      sitemap supplement that injected the mis-classified candidates:
-#        • seed all 20 pages of the unfiltered all-courses search
-#        • always_sitemap_supplement: false   (sitemap is news/about only; it was
-#          the source of the 119 category_landing_page staging rejections)
-#        • course_detail_url_patterns pins the canonical /courses/<slug>-YYYY-YY
-#          shape — excludes /conservatoire/courses/ & /business-school/courses/
-#          duplicates and asserts these URLs as genuine course-detail pages.
-#  (B) EXTRACTION — fix the now-observed fee defect: the regex was grabbing BCU's
-#      UK/home fee (~£9,790 / £10,050) instead of the international fee (~£17–19k),
-#      tripping 89 "annual_fee_too_low" + several "possible_domestic_fee" flags.
-#      Pattern-6 reject_keywords + international_fee_keywords steer to the intl fee.
-#  (C) Drop apprenticeship pages — by nature employer-funded & UK-only, they carry
-#      no international fee or IELTS (every apprenticeship in run 2 failed both).
+# Discovery design:
+#   Real course discovery pages sit under /student-life/ (a globally-blocked
+#   campus_page path).  allow_blocked_listing_patterns overrides the global
+#   guard and crawls those pages for course links WITHOUT adding them to the
+#   candidate set for extraction.  course_detail_url_patterns then acts as
+#   the final extraction gate so only genuine /courses/(ug|pg|...)- URLs are
+#   extracted.  This separates "pages we need to crawl" from "pages we want
+#   to extract" — which allow_url_patterns conflates.
 
 discovery:
+  auto_api_discovery: false
 
-  # All 386 courses, 20 per page (perpage is ignored by the server).
   seed_urls:
-    - https://www.bcu.ac.uk/courses/search?perpage=20&page=1
-    - https://www.bcu.ac.uk/courses/search?perpage=20&page=2
-    - https://www.bcu.ac.uk/courses/search?perpage=20&page=3
-    - https://www.bcu.ac.uk/courses/search?perpage=20&page=4
-    - https://www.bcu.ac.uk/courses/search?perpage=20&page=5
-    - https://www.bcu.ac.uk/courses/search?perpage=20&page=6
-    - https://www.bcu.ac.uk/courses/search?perpage=20&page=7
-    - https://www.bcu.ac.uk/courses/search?perpage=20&page=8
-    - https://www.bcu.ac.uk/courses/search?perpage=20&page=9
-    - https://www.bcu.ac.uk/courses/search?perpage=20&page=10
-    - https://www.bcu.ac.uk/courses/search?perpage=20&page=11
-    - https://www.bcu.ac.uk/courses/search?perpage=20&page=12
-    - https://www.bcu.ac.uk/courses/search?perpage=20&page=13
-    - https://www.bcu.ac.uk/courses/search?perpage=20&page=14
-    - https://www.bcu.ac.uk/courses/search?perpage=20&page=15
-    - https://www.bcu.ac.uk/courses/search?perpage=20&page=16
-    - https://www.bcu.ac.uk/courses/search?perpage=20&page=17
-    - https://www.bcu.ac.uk/courses/search?perpage=20&page=18
-    - https://www.bcu.ac.uk/courses/search?perpage=20&page=19
-    - https://www.bcu.ac.uk/courses/search?perpage=20&page=20
+    - https://www.bathspa.ac.uk/courses/course-index-a-z/
+    - https://www.bathspa.ac.uk/student-life/undergraduate-study/
+    - https://www.bathspa.ac.uk/student-life/postgraduate-study/
 
-  bfs_page_budget: 30        # 20 seed listing pages + headroom
-  max_candidates: 600        # > 386 course-detail links
+  always_sitemap_supplement: true
+  sitemap_url: https://www.bathspa.ac.uk/sitemap.xml
 
-  # ROOT CAUSE of the 119 category_landing_page staging rejections: the flat
-  # site-wide sitemap (news/about pages) was supplemented in and its candidates
-  # were staged as category_landing_page. The seeds above are authoritative.
-  always_sitemap_supplement: false
+  bfs_page_budget: 160
+  max_candidates: 1200
+  expected_min_courses: 180
 
-  # Canonical single-course shape only. Excludes /courses/search, /choices,
-  # /prospectus, /short-courses, nav/news, AND the faculty-prefixed duplicate
-  # paths (/conservatoire/courses/..., /business-school/courses/...).
-  allow_url_patterns:
-    - '^https://www\.bcu\.ac\.uk/courses/[a-z0-9-]+-20\d{2}-\d{2}$'
+  # Override the global campus_page block for these listing-page paths.
+  # They are crawled for outbound course links but NEVER added to the
+  # course-extraction candidate set.
+  allow_blocked_listing_patterns:
+    - '/student-life/undergraduate-study'
+    - '/student-life/postgraduate-study'
 
-  # Final extraction gate — asserts these URLs ARE course-detail pages.
+  # URLs matching these patterns are crawled but not extracted, even if the
+  # page classifier calls them detail pages.
+  listing_only_patterns:
+    - '/courses/course-index-a-z'
+    - '/courses/interest-areas/'
+    - '/courses/types-of-courses/'
+    - '/courses/new-courses/'
+    - '/courses/short-courses/'
+    - '/courses/community-learning/'
+    - '/courses/course-documents/'
+    - '\?'
+
+  # Post-discovery extraction gate: only URLs matching this pattern are sent
+  # to the extractor.  Listing, search, and category pages are silently
+  # dropped.  Logged as:
+  #   [DISCOVER] YAML course detail filter: dropped listing URL ...
+  #   [DISCOVER] YAML course detail filter: kept ...
   course_detail_url_patterns:
-    - '^https://www\.bcu\.ac\.uk/courses/[a-z0-9-]+-20\d{2}-\d{2}$'
+    - '^https://www\.bathspa\.ac\.uk/courses/(ug|pg|ify|phd|edd|pgce)-[a-z0-9-]+/?$'
 
-  # Apprenticeships are employer-funded / UK-only — no international fee or IELTS.
+  # Keep allow_url_patterns restricted to course-detail URLs only so that
+  # the orchestrator allow-filter doesn't widen the extraction set.
+  allow_url_patterns:
+    - '^https://www\.bathspa\.ac\.uk/courses/(ug|pg|ify|phd|edd|pgce)-[a-z0-9-]+/?$'
+
   block_url_patterns:
-    - 'apprenticeship'
+    - '^https://www\.bathspa\.ac\.uk/courses/?$'
+    - '^https://www\.bathspa\.ac\.uk/courses/course-index-a-z/?$'
+    - '/courses/types-of-courses/'
+    - '/courses/new-courses/'
+    - '/courses/interest-areas/'
+    - '/courses/course-documents/'
+    - '/courses/short-courses/'
+    - '/courses/community-learning/'
+    - '/schools/'
+    - '/news/'
+    - '/events/'
+    - '/open-days/'
+    - '/how-to-apply/'
+    - '/research/'
+    - '/staff/'
+    - '/contact/'
+    - '/accommodation/'
+    - '/fees-and-funding/'
+    - '/scholarships/'
+    - '\.pdf$'
 
-# ── EXTRACTION ────────────────────────────────────────────────────────────────
+  always_browser_discover: false
+  skip_browser_discovery: true
+  use_wayback: false
+
 extraction:
-  fees:
-    default_currency: GBP
-    # Correct central fee page (scraper auto-mis-detected the accommodation page).
-    central_page: "https://www.bcu.ac.uk/international/fees-costs-and-scholarships/international-fees"
+  max_parallel_fetch: 8
+  skip_browser_rescue: false
+  skip_per_course_browser: false
 
-    # BCU course pages list BOTH a UK/home fee (~£9,790/£10,050) and an
-    # international fee (~£17–19k). Run 2 captured the home figure on ~89 courses.
-    # Discard the home rows; keep the international one.
+  fees:
+    central_page: https://www.bathspa.ac.uk/students/student-finance/tuition-fees/international-fees/
+    default_currency: GBP
+    prefer_international: true
+    prefer_annual_over_total: true
+    prefer_year_one_over_total: true
+
+    # Reject any fee whose evidence text contains one of these domestic markers.
     reject_keywords:
-      - "Home student"
-      - "Home fee"
-      - "UK student"
-      - "UK fee"
-      - "Home/EU"
-      - "Domestic"
+      - Home student
+      - Home fee
+      - UK student
+      - UK fee
+      - Domestic
+      - Student Finance England
+      - UK fees
+
+    # If the evidence also contains one of these phrases, the fee is KEPT even
+    # when a reject_keyword is present (international marker wins).
     international_fee_keywords:
-      - "International student"
-      - "International fee"
-      - "International"
-      - "Overseas"
+      - International
+      - International student
+      - International fee
+      - Overseas student
+      - Overseas fee
+
+  # Suppress the bare \bonline\b keyword fallback (confidence 0.5) so that
+  # general site copy ("apply online", "study online resources") does not
+  # wrongly classify campus courses as Online.
+  study_mode:
+    online_only_requires_strong_evidence: true
+    prefer_location_over_online_keyword: true
+    ignore_online_keywords_in:
+      - navigation
+      - footer
+      - apply online
+      - online application
+
+  english:
+    trust_vision_ocr: false
+    trust_tier1_vision_ocr_english: false
+
+  intake:
+    start_dates_only: true
+    # Apply YAML defaults when no intake date is found on the course page.
+    use_default_when_missing: true
+    default_source_note: Bath Spa default intake (September)
+    default_by_level:
+      undergraduate:
+        - September
+      postgraduate:
+        - September
+
+  filters:
+    domestic_only:
+      enabled: false
+      # Future: set enabled: true + require_international_evidence: true
+      # when Bath Spa confirms all listed courses are internationally eligible.
+      international_markers:
+        - International students
+        - International fee
+        - international applicants
+        - overseas students
+      domestic_markers:
+        - UK students only
+        - Home students only
+        - Domestic only
+    online_only:
+      enabled: true
+      keep_if_location_present: true
+      reject_if_mode_is_exactly:
+        - Online
+        - Distance learning
+
+  course_name:
+    # Bath Spa CMS puts only the bare subject name in H1 ("Business and
+    # Management") while the full degree name ("Business and Management
+    # degree - BA (Hons)") is in the page <title>.  prefer_title_over_h1
+    # swaps the candidate order so we get the qualified name.
+    # strip_title_suffixes then removes " - Bath Spa University" from the title.
+    prefer_title_over_h1: true
+    strip_title_suffixes:
+      - " | Bath Spa University"
+      - " - Bath Spa University"
+
+  staging:
+    reject_if_missing:
+      - course_name
+    require_international_fee: false
+    # Bath Spa H1s are bare subject names ("Music", "Business and Management")
+    # without degree qualifiers — the qualifier appears only in the <title>.
+    # prefer_title_over_h1 above ensures the title is used for the name, but
+    # skip_degree_qualifier_check prevents the guard from firing on any course
+    # where the title-cleaned name still doesn't start with a qualifier word.
+    # The allow_url_patterns already gate the extraction set to genuine
+    # /courses/(ug|pg|ify|phd|edd|pgce)- URLs, making the URL-based guard
+    # sufficient to exclude non-course pages.
+    skip_degree_qualifier_check: true
+    # Some Bath Spa course URLs in the sitemap resolve to
+    # /site-map/course-not-found/ at fetch time (discontinued courses).
+    # Those pages yield no fee/mode/duration/degree and the name falls back
+    # to the URL slug ("Ug Computing", "Pg Performance Directing" etc.).
+    # This flag rejects any course whose name starts with a slug-level prefix
+    # AND has zero data — PGCE/PhD courses that did load correctly still have
+    # a fee and are kept.
+    reject_slug_name_with_no_data: true
+
+  default_course_location: Bath
+  prefer_blended_over_on_campus: true
+
+
