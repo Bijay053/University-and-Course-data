@@ -322,6 +322,7 @@ def _check_course(
     payload: Payload,
     url: str,
     campus_allowlist: list[str] | None = None,
+    default_currency: str = "AUD",
 ) -> list[QualityIssue]:
     """Return a list of quality issues for one staged course payload.
 
@@ -375,7 +376,7 @@ def _check_course(
     domestic_fee = payload.get("domestic_fee")
     has_central_fee = payload.get("has_central_fee_page")
     fee_term = (payload.get("fee_term") or "").strip()
-    fee_currency = (payload.get("fee_currency") or "AUD").strip().upper()
+    fee_currency = (payload.get("fee_currency") or default_currency or "AUD").strip().upper()
     duration_raw = payload.get("duration")
     duration_term_raw = (payload.get("duration_term") or "year").lower()
     degree_level_raw = (payload.get("degree_level") or "").lower()
@@ -861,11 +862,18 @@ async def run_quality_checks(
     all_issues: list[QualityIssue] = []
     payloads_with_urls: list[tuple[Payload, str]] = []
 
-    # Extract campus allowlist from uni_config if provided.
+    # Extract campus allowlist and default fee currency from uni_config if provided.
     campus_allowlist: list[str] = []
+    _default_currency: str = "AUD"
     if uni_config is not None:
         try:
             campus_allowlist = uni_config.extraction.campus_allowlist or []
+        except AttributeError:
+            pass
+        try:
+            _cfg_currency = uni_config.extraction.fees.default_currency
+            if _cfg_currency:
+                _default_currency = _cfg_currency.strip().upper()
         except AttributeError:
             pass
 
@@ -882,7 +890,11 @@ async def run_quality_checks(
             continue
         url = r.get("url") or r.get("source_url") or ""
         payloads_with_urls.append((payload, url))
-        course_issues = _check_course(payload, url, campus_allowlist=campus_allowlist or None)
+        course_issues = _check_course(
+            payload, url,
+            campus_allowlist=campus_allowlist or None,
+            default_currency=_default_currency,
+        )
         all_issues.extend(course_issues)
 
     # Duplicate checks are cross-course
