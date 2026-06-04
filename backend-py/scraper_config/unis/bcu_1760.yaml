@@ -162,6 +162,18 @@ extraction:
       - "View course fees"
       - "Course fees"
 
+  filters:
+    domestic_only:
+      # BCU publishes a JS-rendered fee section with a "UK Student /
+      # International Student" toggle.  Courses unavailable to international
+      # students show "Sorry, this course is not available to International
+      # students." in the hidden International tab — but that text IS present
+      # in the static HTML (not AJAX-loaded).  _DOMESTIC_ONLY_RE matches it
+      # and rejects the course (e.g. Professional Doctorate in Health Practice
+      # DHealth, Professional Doctorate in Education EdD — both domestic-only
+      # part-time courses with a ~£2,619/yr domestic fee, no IELTS).
+      enabled: true
+
   staging:
     # BCU's course page template (2026-27 and 2027-28) puts the degree badge
     # ("BSc (Hons)", "BA (Hons)", etc.) in a separate <div class="badge">

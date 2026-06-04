@@ -105,9 +105,12 @@ extraction:
   filters:
     domestic_only:
       # Drop courses detected as domestic-only during staging.
-      # Enable for universities that list non-international courses without
-      # clearly marking them (e.g. ACAP, some VET providers).
-      enabled: false
+      # DEFAULT: true (fail-open — _DOMESTIC_ONLY_RE ran for every university
+      # before the per-uni YAML gate was added; keeping it true preserves that
+      # behaviour).  Set enabled: false in a per-uni YAML ONLY when confirmed
+      # false positives have been found for that university (see: adelaide.yaml,
+      # anu.yaml, auckland.yaml).
+      enabled: true
 
     online_only:
       # Drop courses with all-online delivery during staging.

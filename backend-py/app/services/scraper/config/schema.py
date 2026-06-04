@@ -1201,11 +1201,14 @@ class EnglishConfig(BaseModel):
 
 class DomesticOnlyFilter(BaseModel):
     enabled: bool = Field(
-        default=False,
+        default=True,
         description=(
             "When true, courses detected as domestic-only are dropped during staging. "
-            "Enable for universities whose listing includes non-international courses "
-            "without marking them as such (e.g. ACAP)."
+            "Default: True (fail-open — the filter ran for every university before the "
+            "per-uni YAML gate was added; changing this default to False broke that "
+            "behaviour for any uni with a YAML config that does not explicitly opt in). "
+            "Set to false ONLY for universities where _DOMESTIC_ONLY_RE produces "
+            "confirmed false positives (see: adelaide.yaml, anu.yaml, auckland.yaml)."
         ),
     )
     require_international_evidence: bool = Field(
