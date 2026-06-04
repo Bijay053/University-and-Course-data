@@ -11,6 +11,10 @@
 discovery:
   allowed_extra_hostnames: []
   always_sitemap_supplement: true
+  # Course pages are a React SPA — static HTML gives text_len=0 and local
+  # Playwright also returns rendered=0B (Cloudflare challenge).  Route every
+  # course-page fetch through scrape.do (cloud JS renderer) instead.
+  scrape_do_fallback: true
 
 extraction:
   fees:
@@ -22,6 +26,16 @@ extraction:
       enabled: false
     online_only:
       enabled: false
+
+  study_mode:
+    # Canterbury CC is a physical campus university.  The bare \bonline\b
+    # rule-pass fires on "Apply online" / "Chat online" nav links and tags
+    # every course as Online.  Suppress it — Gemini reads the actual content.
+    suppress_nav_rule: true
+
+  # Local Playwright returns rendered=0B (Cloudflare Enterprise blocks it).
+  # Sparse-static rescue wastes 10-30 s per course with zero benefit.
+  skip_browser_rescue: true
 
   course_name:
     strip_title_suffixes:
