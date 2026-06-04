@@ -116,6 +116,13 @@ extraction:
   intake:
     start_dates_only: true
 
+  study_mode:
+    # Every Coventry/CU page contains "apply online" / "enrol online" nav text
+    # that fires the bare \bonline\b fallback → 'Online' at conf=0.50, even
+    # though all CU campus courses are On Campus / Full-time.  Suppress the weak
+    # fallback so Gemini's "On Campus" / "Full Time" reading wins.
+    online_only_requires_strong_evidence: true
+
   staging:
     reject_if_missing:
       - course_name

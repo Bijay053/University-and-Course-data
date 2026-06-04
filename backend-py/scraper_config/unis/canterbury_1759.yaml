@@ -33,9 +33,12 @@ extraction:
     # every course as Online.  Suppress it — Gemini reads the actual content.
     suppress_nav_rule: true
 
-  # Local Playwright returns rendered=0B (Cloudflare Enterprise blocks it).
-  # Sparse-static rescue wastes 10-30 s per course with zero benefit.
+  # Canterbury CC is Cloudflare Enterprise: static HTML = React SPA shell
+  # (text_len=0), scrape.do returns rendered=0B, local Playwright also
+  # returns rendered=0B.  Skip BOTH rescue paths — each wastes 30-90 s
+  # per course with zero yield (202 courses × 60 s = 3+ hours wasted).
   skip_browser_rescue: true
+  skip_per_course_browser: true
 
   course_name:
     strip_title_suffixes:

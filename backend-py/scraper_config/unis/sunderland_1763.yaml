@@ -23,9 +23,16 @@ discovery:
 extraction:
   fees:
     default_currency: GBP
-    central_page: "https://www.sunderland.ac.uk/international/fees"
+    # NOTE: https://www.sunderland.ac.uk/international/fees returns 404 (React SPA
+    # routing — static HTML gives no fee data).  Remove central_page until a
+    # scrapeable fee URL is found; use degree_level_defaults below instead.
 
   english:
     central_page: "https://www.sunderland.ac.uk/english-language-requirements"
 
-  suppress_nav_rule: true
+  study_mode:
+    # Sunderland pages contain "apply online" / "register online" nav copy that
+    # fires the bare \bonline\b fallback → 'Online' at conf=0.70 on every
+    # on-campus course.  Suppress the rule pass so Gemini reads the actual
+    # course content ("On campus", "Full-time") and classifies correctly.
+    suppress_nav_rule: true
