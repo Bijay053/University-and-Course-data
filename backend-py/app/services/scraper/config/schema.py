@@ -232,6 +232,16 @@ class SearchStaxConfig(BaseModel):
             "Full-time is staged."
         ),
     )
+    location_strip_prefixes: list[str] = Field(
+        default_factory=list,
+        description=(
+            "List of string prefixes to strip from each raw Solr location value "
+            "before joining into course_location. Useful when the Solr facet label "
+            "prepends a category name (e.g. 'University: City Campus' → 'City Campus'). "
+            "Stripping is case-sensitive and applied to every value in the "
+            "multi-valued location field."
+        ),
+    )
 
 
 class ScrapyConfig(BaseModel):

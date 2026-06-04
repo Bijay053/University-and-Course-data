@@ -56,6 +56,16 @@ discovery:
     # "https://www.wlv.ac.uk/courses/wr006j01umu" and the domain guard passes.
     url_base: "https://www.wlv.ac.uk/courses"
 
+    # WLV multi_location_ss values carry a "Category: Value" facet label prefix
+    # (e.g. "University: City Campus").  Strip the prefix so course_location
+    # stores only "City Campus", "Springfield Campus", etc.
+    location_strip_prefixes:
+      - "University: "
+
+    # International students only enrol full-time at WLV.  Drop Part-time from
+    # mixed-mode courses; skip courses that are exclusively Part-time.
+    exclude_part_time: true
+
     field_map:
       degree_level:  level_s
       study_mode:    multi_mode_ss
@@ -96,11 +106,17 @@ extraction:
       postgraduate: 17600
 
   english:
-    # WLV does not publish per-course IELTS scores.  Their international
-    # admissions page states IELTS 6.0 overall (no band below 5.5) as the
-    # general undergraduate entry requirement.  PG courses typically require 6.5.
-    # Use 6.0 as a conservative default; override per-course if a specific score
-    # is visible in the page HTML.
+    # WLV does not publish per-course IELTS scores.
+    # Source: https://www.wlv.ac.uk/international/english-language-requirements/
+    #   UG:  IELTS 6.0 overall, no band below 5.5
+    #   PG:  IELTS 6.5 overall, no band below 5.5
+    # Tier-based defaults applied by academic_level from Solr level_s field.
+    degree_level_defaults:
+      undergraduate:
+        ielts: 6.0
+      postgraduate:
+        ielts: 6.5
+    # Fallback for courses whose academic level cannot be determined.
     default_ielts: 6.0
 
   staging:

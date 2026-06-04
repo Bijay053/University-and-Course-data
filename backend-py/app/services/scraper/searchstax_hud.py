@@ -899,7 +899,16 @@ def _map_doc_field_map(
         elif raw_loc_vals:
             raw_loc_vals = [raw_loc_vals]
         if raw_loc_vals:
-            loc = ", ".join(str(v) for v in raw_loc_vals)
+            _strip_pfx = cfg.location_strip_prefixes or []
+            cleaned: list[str] = []
+            for _lv in raw_loc_vals:
+                _lv = str(_lv)
+                for _pfx in _strip_pfx:
+                    if _lv.startswith(_pfx):
+                        _lv = _lv[len(_pfx):]
+                        break
+                cleaned.append(_lv.strip())
+            loc = ", ".join(cleaned)
             payload["course_location"] = loc
             _ev("course_location", loc, "field_map")
 
