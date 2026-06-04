@@ -57,6 +57,9 @@ discovery:
     links_only: false
     field_map_as_payload: true
 
+    # Drop pure Part-time courses; strip Part-time from Full-time/Part-time combos.
+    exclude_part_time: true
+
     # Course location hardcoded since it is not in the Solr index.
     location_override: "Durham, UK"
 

@@ -837,7 +837,18 @@ def _map_doc_field_map(
     elif raw_mode_vals:
         raw_mode_vals = [raw_mode_vals]
     if raw_mode_vals:
-        modes = ", ".join(_normalize_study_mode(str(m)) for m in raw_mode_vals)
+        if cfg.exclude_part_time:
+            # Normalise first so we compare canonical strings.
+            norm_modes = [_normalize_study_mode(str(m)) for m in raw_mode_vals]
+            ft_modes = [m for m in norm_modes if "part" not in m.lower()]
+            if not ft_modes:
+                # Pure Part-time course — skip entirely.
+                return None
+            # Mixed: keep only Full-time modes.
+            raw_mode_vals = ft_modes
+            modes = ", ".join(ft_modes)
+        else:
+            modes = ", ".join(_normalize_study_mode(str(m)) for m in raw_mode_vals)
         payload["study_mode"] = modes
         _ev("study_mode", modes, "field_map")
 

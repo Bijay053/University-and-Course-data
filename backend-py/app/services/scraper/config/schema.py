@@ -209,6 +209,15 @@ class SearchStaxConfig(BaseModel):
             "Ignored in links_only mode."
         ),
     )
+    exclude_part_time: bool = Field(
+        default=False,
+        description=(
+            "When True (field_map_as_payload mode only): courses whose ONLY "
+            "study mode is Part-time are dropped entirely. Courses offered in "
+            "both Full-time and Part-time have Part-time stripped so only "
+            "Full-time is staged."
+        ),
+    )
 
 
 class ScrapyConfig(BaseModel):
