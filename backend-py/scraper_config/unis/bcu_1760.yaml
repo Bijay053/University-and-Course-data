@@ -1,15 +1,126 @@
-# Birmingham City University
+# Birmingham City University (BCU)
 # Hostname: www.bcu.ac.uk
 # Country: United Kingdom  |  Currency: GBP
+# University ID: 1760
 # Slug: bcu
-# Auto-generated: 2026-06-04
 #
-# This stub was created automatically on the first scrape of this university.
-# Review and expand it to improve discovery and extraction quality.
-# See scraper_config/defaults.yaml for all available options.
+# ── ARCHITECTURE (verified live) ──────────────────────────────────────────────
+# Server-rendered HTML CMS (.NET / Optimizely). Course links are in static HTML.
+# Catalogue: 386 courses behind a faceted server-paginated search at /courses/search.
+#   perpage capped at 20 server-side  → 20 result pages (?page=1..20).
+#   type = level (1 Foundation, 2 UG, 3 PG-Taught, 5 PG-Research, 8 Short/CPD, 9 Appr.)
+# Course detail URL (canonical): /courses/<slug>-YYYY-YY  e.g. /courses/computer-science-bsc-hons-2026-27
+#   Duplicate alternate paths also exist (/conservatoire/courses/..., /business-school/courses/...)
+#   that resolve to the SAME courses and produce garbled slug-titled duplicates.
+# NOTE: the ?International=true view is NOT seedable — the server rewrites it to
+#   ?International=true&JanStart=true&mode=1&intake=2025-26 (a January-only subset).
+#   So discovery uses the plain all-courses pages; international fees are resolved
+#   at extraction via fee keywords (below), not by changing the listing view.
+#
+# ── ISSUE HISTORY ─────────────────────────────────────────────────────────────
+# Run 1: BFS seeded at ?type=2 burned its budget on facet permutations → ~10 real
+#        courses found; broken filters then dropped everything → Staged 0.
+# Run 2: discovery+extraction WORK (136 fetched, fees/IELTS/duration mostly PASS
+#        100/100) but staging rejected 119/127 as category_landing_page, leaving 8.
+#        Root cause: sitemap supplement injected news/about pages that the
+#        staging gate (correctly) classified as category landing pages.
+# Run 3: auto-stub bcu_1760.yaml shadowed this config (old naming birminghamcitybcu.yaml
+#        was never found by the loader) → same 234/265 category_landing_page rejection.
+#        Fix: merged into id-specific filename so the loader resolves it correctly.
+#
+# ── FIXES APPLIED ─────────────────────────────────────────────────────────────
+#  (A) DISCOVERY — seed all 20 pages of the unfiltered all-courses search.
+#      always_sitemap_supplement: false  (sitemap is news/about only; it was the
+#      source of the category_landing_page mass-rejection in every run so far).
+#      course_detail_url_patterns pins the canonical /courses/<slug>-YYYY-YY
+#      shape — excludes /conservatoire/courses/ & /business-school/courses/
+#      duplicates AND asserts these URLs as genuine course-detail pages so the
+#      staging gate does not re-classify them.
+#  (B) EXTRACTION — BCU pages list BOTH a UK/home fee (~£9,790/£10,050) and an
+#      international fee (~£17–19k).  reject_keywords discards home rows;
+#      international_fee_keywords + prefer_international: true steer to the
+#      correct international figure.
+#  (C) Drop CPD and apprenticeship pages — employer-funded / UK-only; no
+#      international fee or IELTS.
 
-discovery: {}
+discovery:
 
+  # All 386 courses, 20 per page (perpage is ignored by the server).
+  seed_urls:
+    - https://www.bcu.ac.uk/courses/search?perpage=20&page=1
+    - https://www.bcu.ac.uk/courses/search?perpage=20&page=2
+    - https://www.bcu.ac.uk/courses/search?perpage=20&page=3
+    - https://www.bcu.ac.uk/courses/search?perpage=20&page=4
+    - https://www.bcu.ac.uk/courses/search?perpage=20&page=5
+    - https://www.bcu.ac.uk/courses/search?perpage=20&page=6
+    - https://www.bcu.ac.uk/courses/search?perpage=20&page=7
+    - https://www.bcu.ac.uk/courses/search?perpage=20&page=8
+    - https://www.bcu.ac.uk/courses/search?perpage=20&page=9
+    - https://www.bcu.ac.uk/courses/search?perpage=20&page=10
+    - https://www.bcu.ac.uk/courses/search?perpage=20&page=11
+    - https://www.bcu.ac.uk/courses/search?perpage=20&page=12
+    - https://www.bcu.ac.uk/courses/search?perpage=20&page=13
+    - https://www.bcu.ac.uk/courses/search?perpage=20&page=14
+    - https://www.bcu.ac.uk/courses/search?perpage=20&page=15
+    - https://www.bcu.ac.uk/courses/search?perpage=20&page=16
+    - https://www.bcu.ac.uk/courses/search?perpage=20&page=17
+    - https://www.bcu.ac.uk/courses/search?perpage=20&page=18
+    - https://www.bcu.ac.uk/courses/search?perpage=20&page=19
+    - https://www.bcu.ac.uk/courses/search?perpage=20&page=20
+
+  bfs_page_budget: 30        # 20 seed listing pages + headroom for child pages
+  max_candidates: 600        # > 386 course-detail links
+
+  # ROOT CAUSE of the category_landing_page mass-rejection: the flat site-wide
+  # sitemap (news/about pages) was supplemented in and those pages were classified
+  # as category_landing_page by the staging gate.  Seeds above are authoritative.
+  always_sitemap_supplement: false
+
+  # Canonical single-course URL shape only.
+  # Excludes /courses/search, /choices, /prospectus, /short-courses, nav/news,
+  # AND the faculty-prefixed duplicate paths (/conservatoire/courses/...,
+  # /business-school/courses/...) that produce garbled slug-titled duplicates.
+  allow_url_patterns:
+    - '^https://www\.bcu\.ac\.uk/courses/[a-z0-9-]+-20\d{2}-\d{2}$'
+
+  # Staging gate assertion: these URLs ARE course-detail pages.
+  # Without this, the staging gate's category_landing_page heuristic can
+  # re-classify sitemap-supplemented pages even after allow_url_patterns.
+  course_detail_url_patterns:
+    - '^https://www\.bcu\.ac\.uk/courses/[a-z0-9-]+-20\d{2}-\d{2}$'
+
+  # CPD and apprenticeship pages are employer-funded / UK-only.
+  # They carry no international fee or IELTS and pollute staging with
+  # data quality failures.
+  block_url_patterns:
+    - 'apprenticeship'
+    - '/cpd-'
+    - '-cpd-'
+
+# ── EXTRACTION ────────────────────────────────────────────────────────────────
 extraction:
   fees:
     default_currency: GBP
+
+    # Correct central fee page (scraper auto-mis-detected the accommodation page).
+    central_page: "https://www.bcu.ac.uk/international/fees-costs-and-scholarships/international-fees"
+
+    # BCU course pages list BOTH a UK/home fee (~£9,790/£10,050) and an
+    # international fee (~£17–19k).  Discard home rows; keep the international one.
+    reject_keywords:
+      - "Home student"
+      - "Home fee"
+      - "UK student"
+      - "UK fee"
+      - "Home/EU"
+      - "Domestic"
+
+    international_fee_keywords:
+      - "International student"
+      - "International fee"
+      - "International"
+      - "Overseas"
+
+    # When both a home fee and an international fee appear on the same page,
+    # always prefer the international figure.
+    prefer_international: true
