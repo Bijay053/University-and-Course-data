@@ -2019,6 +2019,21 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     links = _dom_ok_links
         # ── End Domain Safety Guard ───────────────────────────────────────────
 
+        # SearchStax short-circuit: when discovery.searchstax is active, the
+        # Solr query already filters to course docs (fq=sectiontype_ss:course),
+        # so every link IS a course.  allow/block_url_patterns are meant for
+        # BFS/sitemap discovery where arbitrary pages are crawled and must be
+        # filtered — applying them on top of Solr's own filter wrongly drops
+        # real courses (e.g. Durham /business/courses/ via a stale admin_config
+        # allow_url_patterns the YAML cannot override).  Skip both filters here.
+        _skip_url_filters_searchstax = _searchstax_cfg is not None
+        if _skip_url_filters_searchstax and links:
+            log.info(
+                "[EXTRACT] searchstax active — skipping allow/block_url_patterns "
+                "filters (Solr already filtered to course docs; %d links)",
+                len(links),
+            )
+
         # Phase A.5b-pre — per-uni YAML block_url_patterns deny-list re-applied.
         # discovery.block_url_patterns is applied inside discover_course_links
         # (BFS phase) but NOT after the browser-discovery merge, so unwanted
@@ -2030,7 +2045,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             list(getattr(_uni_cfg.discovery, "block_url_patterns", None) or [])
             if _uni_cfg and _uni_cfg.discovery else []
         )
-        if _block_pats_raw_a5b and links:
+        if _block_pats_raw_a5b and links and not _skip_url_filters_searchstax:
             _compiled_block_a5b: list[re.Pattern[str]] = []
             for _bp_str in _block_pats_raw_a5b:
                 try:
@@ -2093,7 +2108,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             list(getattr(_uni_cfg.discovery, "allow_url_patterns", None) or [])
             if _uni_cfg and _uni_cfg.discovery else []
         )
-        if _allow_pats_raw and links:
+        if _allow_pats_raw and links and not _skip_url_filters_searchstax:
             _compiled_allow: list[re.Pattern[str]] = []
             for _ap_str in _allow_pats_raw:
                 try:
