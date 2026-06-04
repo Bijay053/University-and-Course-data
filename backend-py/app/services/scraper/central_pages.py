@@ -61,7 +61,7 @@ CentralData = dict[str, Any]
 # ---------------------------------------------------------------------------
 
 _CURRENCY_RE = re.compile(
-    r"(?:A\$|AUD\s*|NZ\$|CA\$|US\$|\$)\s*([\d,]+(?:\.\d+)?)",
+    r"(?:A\$|AUD\s*|NZ\$|CA\$|US\$|GBP\s*|£|\$)\s*([\d,]+(?:\.\d+)?)",
     re.IGNORECASE,
 )
 
@@ -407,7 +407,7 @@ def _parse_fee_page_html(html: str, page_url: str) -> list[CentralFeeRecord]:
     #   (b) Same-line:  "Program Name — $fee" or "Program Name: $69,000"
     #       (e.g. AIT /apply page lists total-course fees in this format).
     _SAME_LINE_SPLIT_RE = re.compile(
-        r"^(.+?)\s*[-—–:]\s*(?=A?\$|USD\s|\bAUD\s)",
+        r"^(.+?)\s*[-—–:]\s*(?=A?\$|USD\s|\bAUD\s|£|GBP\s)",
         re.IGNORECASE,
     )
     text = html_to_text(html)

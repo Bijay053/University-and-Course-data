@@ -111,15 +111,16 @@ extraction:
         - ielts_speaking
 
   study_mode:
+    # Durham is a physical campus university. The bare \bonline\b rule-pass
+    # fires on nav text like "Apply online" and mis-tags every course as
+    # "Online". Suppress it so Gemini reads the actual course content.
+    suppress_nav_rule: true
     source_xpath: "//div[contains(@class, 'u-text-large u-font-bolder u-mb-2') and contains(text(), 'Location')]/following-sibling::p[1]"
     rules:
       - match_keywords:
           - "Blended"
         value: "Hybrid"
-      - match_keywords:
-          - "Online"
-        value: "Online"
-      - default: "On campus"
+      - default: "On Campus"
 
   selectors:
     course_name:
