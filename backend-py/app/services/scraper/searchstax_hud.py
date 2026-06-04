@@ -826,6 +826,11 @@ def _map_doc_field_map(
         elif force_fee_stage:
             payload["has_central_fee_page"] = True
 
+    # Always stamp currency + fee_term so the UI renders the correct symbol.
+    # cfg.currency defaults to "GBP"; override per-uni in YAML (discovery.searchstax.currency).
+    payload["currency"] = cfg.currency
+    payload["fee_term"] = "year"  # degree_level_defaults are always annual fees
+
     # ── IELTS degree_level_defaults fallback ─────────────────────────────────
     # ielts_defaults is a dict of tier → {"ielts": float, "pte": int, ...}
     # default_ielts is the flat fallback when no tier matches.
