@@ -73,6 +73,13 @@ discovery:
     fee_year: 2026
     currency: GBP
 
+  # Durham's course pages are protected by Cloudflare Turnstile — both plain
+  # HTTP and headless-browser fetches are rejected immediately (0/256 staged
+  # without this flag).  Enable scrape.do residential proxy as last resort
+  # after browser exhaustion (same mechanism as WLV/UTAS).
+  # Cost: 1 scrape.do credit per course page (~256 credits per scrape run).
+  scrape_do_fallback: true
+
 extraction:
   fees:
     default_currency: "GBP"
