@@ -604,6 +604,7 @@ export default function Scraping() {
   const [showReview, setShowReview] = useState(false);
   const [reviewJobId, setReviewJobId] = useState<string | null>(null);
   const [latestAvailableJobId, setLatestAvailableJobId] = useState<string | null>(null);
+  const latestAvailableJobIdRef = useRef<string | null>(null);
   // Refs so callbacks can read current review state without stale closure issues
   const showReviewRef = useRef(false);
   const reviewJobIdRef = useRef<string | null>(null);
@@ -890,10 +891,18 @@ export default function Scraping() {
           : ((payload as { lastScrape?: typeof lastScrapeInfo }).lastScrape ?? null);
         if (lastScrape) setLastScrapeInfo(lastScrape);
         const pending = data.filter((c: StagedCourse) => c.status === "pending");
+
+        // If this job has been cleared by a newer scrape, auto-load the latest instead.
+        const _latestJobId = latestAvailableJobIdRef.current;
+        if (pending.length === 0 && _latestJobId && _latestJobId !== jobId) {
+          loadStagedCourses(_latestJobId);
+          return;
+        }
+
         setStagedCourses(pending);
         setReviewJobId(jobId);
         setShowReview(true);
-        setLatestAvailableJobId(null);
+        if (pending.length > 0) setLatestAvailableJobId(null);
         setSelectedIds(new Set(pending.map((c: StagedCourse) => c.id)));
         // Fire quality fetch in background — uses universityId from first course
         const uniId = pending[0]?.universityId;
@@ -916,6 +925,7 @@ export default function Scraping() {
   // Keep refs in sync so auto-complete handler can read current review state.
   useEffect(() => { showReviewRef.current = showReview; }, [showReview]);
   useEffect(() => { reviewJobIdRef.current = reviewJobId; }, [reviewJobId]);
+  useEffect(() => { latestAvailableJobIdRef.current = latestAvailableJobId; }, [latestAvailableJobId]);
 
   const handleReviewReady = useCallback((jobId: string, _uniName?: string, force?: boolean) => {
     // BEHAVIOUR CONTRACT (see shouldLoadForBackgroundJob in scraping-poll-guard.ts):
