@@ -369,7 +369,7 @@ async def start_scrape(
     #
     #   queued — only block if the job is fresh (< 2 minutes old).  A queued
     #     job older than 2 minutes was almost certainly orphaned: either
-    #     .delay() failed silently (Redis hiccup) or all 4 Celery workers
+    #     .delay() failed silently (Redis hiccup) or all 8 Celery workers
     #     were briefly saturated and the lock expired before a slot freed up.
     #     Returning the stale job traps the operator in "Queued" forever;
     #     allowing a fresh dispatch lets the new task race the orphan —

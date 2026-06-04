@@ -577,15 +577,15 @@ export default function Scraping() {
     // We always show at least slot 0. Any higher-index slots that have a
     // saved jobId are also restored so running scrapes survive navigation.
     let highest = 0;
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < 8; i++) {
       if (sessionStorage.getItem(`scrape_slot_${i}_jobId`)) highest = i;
     }
     return Array.from({ length: highest + 1 }, (_, i) => i);
   });
-  const nextSlotId = useRef(4); // safe ceiling — slot IDs 0-3 are pre-allocated
+  const nextSlotId = useRef(8); // safe ceiling — slot IDs 0-7 are pre-allocated
 
   const addSlot = useCallback(() => {
-    if (slotIds.length >= 4) return;
+    if (slotIds.length >= 8) return;
     setSlotIds((prev) => [...prev, nextSlotId.current++]);
   }, [slotIds.length]);
 
@@ -1310,7 +1310,7 @@ export default function Scraping() {
     }
     // Reset all ScrapeJobCard slots — clear their sessionStorage keys first
     // so resetToIdle() inside each card sees no saved job on its next render.
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < 8; i++) {
       sessionStorage.removeItem(`scrape_slot_${i}_jobId`);
       sessionStorage.removeItem(`scrape_slot_${i}_startTime`);
     }
@@ -1936,12 +1936,12 @@ export default function Scraping() {
             </div>
             <div>
               <h2 className="text-base font-semibold text-gray-900">AI-Powered Web Scraper</h2>
-              <p className="text-xs text-muted-foreground">Run up to 4 simultaneous scrapes. Each slot is independent.</p>
+              <p className="text-xs text-muted-foreground">Run up to 8 simultaneous scrapes. Each slot is independent.</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <Can permission="scraping.run">
-              {slotIds.length < 4 && (
+              {slotIds.length < 8 && (
                 <Button
                   variant="outline"
                   size="sm"
