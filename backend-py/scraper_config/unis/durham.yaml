@@ -1,0 +1,85 @@
+# Durham University (UK)
+# Hostname: www.durham.ac.uk
+# University ID: look up on prod — "SELECT id FROM universities WHERE name ILIKE '%Durham%'"
+#
+# Scraping method: SearchStax Solr API (discovery-only)
+# -------------------------------------------------------
+# Durham's course listing is a JavaScript SPA that queries a SearchStax-hosted
+# Solr core client-side.  Standard BFS/sitemap discovery finds nothing useful
+# because the listing pages require JS execution.  The Solr core is queried
+# directly — this is the same endpoint the browser SPA uses.
+#
+# Solr endpoint (found via browser Network tab):
+#   https://searchcloud-1-eu-west-2.searchstax.com/29847/durhamuniv-1610/emselect
+# Auth:      Authorization: Token <DURHAM_SEARCHSTAX_TOKEN>
+# Filter:    sectiontype_ss:course  → 312 courses (from 29,422 total docs)
+#
+# The Solr docs do NOT contain fees or IELTS scores — those are on the
+# individual course pages.  links_only: true is used so the orchestrator
+# discovers URLs from Solr and then runs normal per-course HTTP/browser
+# extraction for fee, IELTS, and entry requirements.
+#
+# Token security
+# --------------
+# The SearchStax read token is shipped by Durham's own website to every
+# browser — it is a public read-only key, not a server secret.  However,
+# best practice is to store it in an environment variable so it can be
+# rotated without a code change.  Set the token in the environment:
+#
+#   On the production droplet:
+#     export DURHAM_SEARCHSTAX_TOKEN="<token from browser Network tab>"
+#
+#   For Replit dev:
+#     Add DURHAM_SEARCHSTAX_TOKEN to Replit Secrets.
+#
+# If you can't set an env var immediately, use authorization_token: "<literal>"
+# in this file as a temporary measure (acceptable because it is not a secret).
+
+discovery:
+  searchstax:
+    # The SearchStax Solr select endpoint for Durham's course index.
+    endpoint: "https://searchcloud-1-eu-west-2.searchstax.com/29847/durhamuniv-1610/emselect"
+
+    # Token resolution order (first non-empty wins):
+    #   1. authorization_token literal below  (leave null to skip)
+    #   2. env var named by token_env         ← preferred for production
+    #   3. global SEARCHSTAX_TOKEN env var
+    authorization_token: null   # set to literal token if env var not yet configured
+    token_env: DURHAM_SEARCHSTAX_TOKEN
+
+    # Solr filter: restrict to course documents only (312 from 29,422 total).
+    # Durham uses sectiontype_ss (multi-valued) not sectionType_s (single).
+    filter_query: "sectiontype_ss:course"
+
+    # Discovery-only: Solr docs don't contain fees/IELTS — fetch live pages.
+    links_only: true
+
+    # Durham Solr uses PascalCase field names — map them to the standard keys
+    # so _fetch_links_only can find the URL, name, and metadata.
+    field_map:
+      url:          courseUrl_t          # canonical course page URL
+      name:         Degreename_t         # e.g. "Philosophy, Politics and Economics"
+      degree_type:  Degreetype_ss        # e.g. "BA (Hons)", "MSc"
+      degree_level: DegreeCourseLevel_ss # "Undergraduate" / "Postgraduate"
+      study_mode:   DegreeStudyOptions_ss # "Full Time" / "Part Time"
+      duration:     DegreeDuration_ss    # e.g. "3 years full-time"
+      intake_dates: DegreeStartDate_ss   # e.g. ["September 2026", "September 2027"]
+      category:     Department_ss        # e.g. "Economics", "Law"
+
+    # Fetch 100 docs per paginated Solr request.
+    page_size: 100
+
+    # Academic fee year for staged fee rows (update each academic year cycle).
+    fee_year: 2026
+    currency: GBP
+
+extraction:
+  fees:
+    default_currency: "GBP"
+
+  filters:
+    domestic_only:
+      # Durham publishes courses for international students. Enable the
+      # domestic-only filter so any course page that explicitly states
+      # "not available to international students" is rejected at extraction.
+      enabled: true

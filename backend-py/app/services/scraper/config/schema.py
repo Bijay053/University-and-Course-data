@@ -158,6 +158,29 @@ class SearchStaxConfig(BaseModel):
             "on the course page)."
         ),
     )
+    field_map: dict[str, str] = Field(
+        default_factory=dict,
+        description=(
+            "Maps logical field names to the university-specific Solr field "
+            "names used by this SearchStax core.  Required when the Solr core "
+            "uses non-standard field names (e.g. Durham uses 'courseUrl_t' "
+            "instead of the WLV default 'url_t'). "
+            "Recognised logical keys and their built-in defaults: "
+            "  url          → 'url_t'           (canonical course page URL) "
+            "  name         → 'title_t'         (course display name) "
+            "  degree_type  → 'award_s'         (degree abbreviation, e.g. 'MSc') "
+            "  degree_level → 'study_level_s'   (Undergraduate / Postgraduate) "
+            "  study_mode   → 'mode_s'          (Full-time / Part-time) "
+            "  duration     → 'duration_t'      (e.g. '3 years full-time') "
+            "  intake_dates → 'start_dates_s'   (e.g. 'September 2026') "
+            "  category     → 'subject_s'       (department / subject area) "
+            "Example (Durham University): "
+            "  field_map: {url: courseUrl_t, name: Degreename_t, "
+            "  degree_type: Degreetype_ss, degree_level: DegreeCourseLevel_ss, "
+            "  study_mode: DegreeStudyOptions_ss, duration: DegreeDuration_ss, "
+            "  intake_dates: DegreeStartDate_ss, category: Department_ss}"
+        ),
+    )
 
 
 class ScrapyConfig(BaseModel):

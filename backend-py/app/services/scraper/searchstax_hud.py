@@ -579,6 +579,24 @@ def _map_doc(doc: dict, cfg: SearchStaxConfig) -> Optional[dict]:
     return {"name": name, "url": url, "searchstax_result": result}
 
 
+def _first_str(doc: dict, *field_names: str) -> str:
+    """Return the first non-empty string value found in ``doc`` for any of
+    the given field names.  Handles both scalar and list-valued Solr fields
+    (takes the first list element when the value is a list).
+    """
+    for field in field_names:
+        v = doc.get(field)
+        if v is None:
+            continue
+        if isinstance(v, list):
+            v = v[0] if v else None
+        if v is not None:
+            s = str(v).strip()
+            if s:
+                return s
+    return ""
+
+
 def _resolve_token(cfg: SearchStaxConfig) -> Optional[str]:
     """Resolve the auth token using a 4-level priority chain.
 
@@ -646,13 +664,30 @@ async def _fetch_links_only(cfg: SearchStaxConfig, emit=None) -> list[dict]:
         f"({'fq=' + _filter if _filter else 'unfiltered'}) ..."
     )
 
+    # Resolve field names from field_map (YAML-configurable) with defaults.
+    # Default keys match the original WLV field names for backward compatibility.
+    _fm = cfg.field_map or {}
+    _url_field    = _fm.get("url",          "url_t")
+    _name_field   = _fm.get("name",         "title_t")
+    _type_field   = _fm.get("degree_type",  "award_s")
+    _level_field  = _fm.get("degree_level", "study_level_s")
+    _mode_field   = _fm.get("study_mode",   "mode_s")
+    _dur_field    = _fm.get("duration",     "duration_t")
+    _date_field   = _fm.get("intake_dates", "start_dates_s")
+    _cat_field    = _fm.get("category",     "subject_s")
+    # Request only the fields we will actually use.
+    _fl_fields = ",".join({
+        _url_field, _name_field, _type_field, _level_field,
+        _mode_field, _dur_field, _date_field, _cat_field,
+    })
+
     async with httpx.AsyncClient(timeout=30.0) as client:
         while True:
             params: dict = {
                 "q": "*:*",
                 "rows": str(page_size),
                 "start": str(start),
-                "fl": "title_t,award_s,url_t,level_s",
+                "fl": _fl_fields,
                 "wt": "json",
             }
             if _filter:
@@ -687,18 +722,40 @@ async def _fetch_links_only(cfg: SearchStaxConfig, emit=None) -> list[dict]:
                 break
 
             for doc in docs:
-                url = (doc.get("url_t") or "").strip()
+                # URL: try mapped field first, then 'id' as universal fallback
+                url = _first_str(doc, _url_field, "id")
                 if not url:
                     skipped += 1
                     continue
-                title = (doc.get("title_t") or "").strip()
-                award = (doc.get("award_s") or "").strip()
-                # Build name: prepend award if title doesn't already start with it
+                title = _first_str(doc, _name_field)
+                award = _first_str(doc, _type_field)
+                # Build name: prepend award/degree-type when not already the prefix
                 if award and not title.lower().startswith(award.lower()):
                     name = f"{award} {title}" if title else award
                 else:
                     name = title or url
-                links.append({"name": name, "url": url})
+                link: dict = {"name": name, "url": url}
+                # Carry pre-fetched structured metadata on the link dict so
+                # the per-course extractor can use it as authoritative hints.
+                prefetch: dict = {}
+                lv = _first_str(doc, _level_field)
+                if lv:
+                    prefetch["degree_level_hint"] = lv
+                mo = _first_str(doc, _mode_field)
+                if mo:
+                    prefetch["study_mode_hint"] = mo
+                du = _first_str(doc, _dur_field)
+                if du:
+                    prefetch["duration_hint"] = du
+                da = _first_str(doc, _date_field)
+                if da:
+                    prefetch["intake_dates_hint"] = da
+                ca = _first_str(doc, _cat_field)
+                if ca:
+                    prefetch["category_hint"] = ca
+                if prefetch:
+                    link["_prefetch"] = prefetch
+                links.append(link)
 
             start += len(docs)
             if total is not None and start >= total:
@@ -710,11 +767,11 @@ async def _fetch_links_only(cfg: SearchStaxConfig, emit=None) -> list[dict]:
 
     await _emit(
         f"[SEARCHSTAX links_only] Discovered {len(links)} course URL(s) "
-        f"({skipped} skipped — no url_t field)."
+        f"({skipped} skipped — no URL field)."
     )
     log.info(
-        "[SEARCHSTAX links_only] total=%s links=%s skipped=%s token=%s",
-        total, len(links), skipped, "yes" if token else "NO",
+        "[SEARCHSTAX links_only] total=%s links=%s skipped=%s token=%s url_field=%s",
+        total, len(links), skipped, "yes" if token else "NO", _url_field,
     )
     return links
 
