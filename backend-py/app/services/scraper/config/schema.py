@@ -127,6 +127,21 @@ class SearchStaxConfig(BaseModel):
         default=None,
         description="Optional cap on the number of course docs staged (debug).",
     )
+    links_only: bool = Field(
+        default=False,
+        description=(
+            "When True the SearchStax provider is used for URL *discovery* only: "
+            "each Solr doc is mapped to a bare {name, url} link dict without "
+            "a 'searchstax_result' key.  The orchestrator then runs normal "
+            "per-course HTTP/browser extraction for each discovered URL "
+            "(fees, IELTS, etc. are fetched from the live page).  "
+            "Use this for universities like WLV whose Solr docs do NOT contain "
+            "fees or IELTS and whose live pages are fully reachable by the "
+            "browser pool.  Contrast with the default mode (links_only=False) "
+            "used by Huddersfield where Solr has the full page-text content "
+            "field and no per-course fetch is needed."
+        ),
+    )
     fee_year: int = Field(
         default=2025,
         description="Academic fee year written into every staged fee row.",

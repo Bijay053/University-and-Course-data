@@ -110,3 +110,4 @@ packages = ["libxcrypt", "postgresql", "rapidfuzz-cpp", "taskflow", "xcodebuild"
 
 [userenv.shared]
 GITHUB_PUSH_URL = "https://github.com/Studyinfocentre/University-and-course-managment.git"
+WLV_SEARCHSTAX_TOKEN = "d94d88f1dfd335e6bb4ef870b2c1ff29faf95bb6"

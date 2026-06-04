@@ -23,18 +23,32 @@
 #     English requirements page lists 6.0 overall as the general UG minimum.
 
 discovery:
-  # Seed both the UG and PG listing pages so the browser crawler finds both
-  # programme families within the time budget.
+  # ── SearchStax Solr provider (replaces browser BFS discovery) ─────────────
+  # WLV's search page (https://www.wlv.ac.uk/search/) is powered by a
+  # SearchStax-hosted Solr core that indexes all 433 courses.  The browser BFS
+  # crawler only discovers ~93/433 courses because Cloudflare blocks the
+  # listing pages and the sub-category nav trees exhaust the 180 s time budget.
+  #
+  # This block instructs the orchestrator to query Solr directly for ALL 433
+  # course URLs and hand them to the normal per-course browser+Gemini pipeline.
+  # "links_only: true" means we do NOT short-circuit extraction: each URL is
+  # still fetched individually for fees, IELTS, intakes, etc.
+  #
+  # Endpoint intercepted 2026-06-04 via Playwright network intercept.
+  # Token is the same read-only token the SPA ships to every browser user
+  # (not a server secret) — set via WLV_SEARCHSTAX_TOKEN env var so we avoid
+  # committing it to git.
+  searchstax:
+    endpoint: "https://searchcloud-1-eu-west-2.searchstax.com/29847/wolverhamptondevelopment-3254/emselect"
+    token_env: WLV_SEARCHSTAX_TOKEN
+    filter_query: "sectionType_s:courses"
+    links_only: true
+
+  # ── Retained as fallback only (not used when searchstax block is active) ──
   seed_urls:
     - https://www.wlv.ac.uk/courses/undergraduate/
     - https://www.wlv.ac.uk/courses/postgraduate/
-
-  # Default is 90s — enough for UG alone.  Double it so the crawler can also
-  # traverse PG subject-area category pages before stopping.
   browser_time_budget_s: 180
-
-  # Default early-stop is 100 courses.  WLV has ~130+ UG + 100+ PG; raise to
-  # 300 so the whole catalogue is captured in one run.
   browser_early_stop_courses: 300
 
 extraction:

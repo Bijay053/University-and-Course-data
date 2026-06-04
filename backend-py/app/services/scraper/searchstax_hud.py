@@ -599,11 +599,135 @@ def _resolve_token(cfg: SearchStaxConfig) -> Optional[str]:
     return os.environ.get("SEARCHSTAX_TOKEN") or None
 
 
+async def _fetch_links_only(cfg: SearchStaxConfig, emit=None) -> list[dict]:
+    """SearchStax discovery-only mode (``cfg.links_only = True``).
+
+    Queries the Solr core and returns plain ``{name, url}`` link dicts —
+    **without** a ``searchstax_result`` key.  The orchestrator's normal
+    per-course HTTP/browser extraction pipeline then fetches each URL to
+    extract fees, IELTS, and all other fields.
+
+    Use for universities (e.g. WLV) whose Solr docs do NOT contain fees or
+    IELTS scores but whose individual course pages are reachable by the
+    browser pool.  Solr is used purely as a complete URL catalogue (bypassing
+    the browser BFS crawler which misses Cloudflare-paginated listing pages).
+
+    WLV-specific field mapping:
+      ``title_t``  — course name (e.g. "MSc Engineering Management")
+      ``award_s``  — degree abbreviation (e.g. "MSc", "BA (Hons)")
+      ``url_t``    — canonical course URL
+
+    The name is reformatted as "{award_s} {title_t}" when award_s is not
+    already the first token of title_t (avoids "MSc MSc Engineering…").
+    """
+    token = _resolve_token(cfg)
+    headers: dict = {"Accept": "application/json"}
+    if token:
+        headers["Authorization"] = f"Token {token}"
+
+    _filter = cfg.filter_query or ""
+
+    async def _emit(msg: str) -> None:
+        if emit:
+            try:
+                await emit("status", msg, phase="discover")
+            except Exception:  # noqa: BLE001
+                pass
+
+    links: list[dict] = []
+    skipped = 0
+    start = 0
+    page_size = max(1, int(cfg.page_size or 100))
+    total: Optional[int] = None
+    _retried_unfiltered = False
+
+    await _emit(
+        f"[SEARCHSTAX links_only] Querying Solr "
+        f"({'fq=' + _filter if _filter else 'unfiltered'}) ..."
+    )
+
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        while True:
+            params: dict = {
+                "q": "*:*",
+                "rows": str(page_size),
+                "start": str(start),
+                "fl": "title_t,award_s,url_t,level_s",
+                "wt": "json",
+            }
+            if _filter:
+                params["fq"] = _filter
+            params.update(cfg.extra_params or {})
+
+            try:
+                resp = await client.get(cfg.endpoint, params=params, headers=headers)
+                resp.raise_for_status()
+                data = resp.json()
+            except Exception as exc:
+                log.error("[SEARCHSTAX links_only] fetch failed (start=%d): %s", start, exc)
+                break
+
+            response = data.get("response", {})
+            docs = response.get("docs", [])
+
+            # Auto-fallback: if the filter returned 0 on the first page, retry
+            # without it — some cores use different sectionType values.
+            if start == 0 and not docs and _filter and not _retried_unfiltered:
+                _retried_unfiltered = True
+                await _emit(f"[SEARCHSTAX links_only] {_filter!r} returned 0 — retrying unfiltered ...")
+                log.info("[SEARCHSTAX links_only] fq=%r returned 0 — retrying unfiltered", _filter)
+                _filter = ""
+                continue
+
+            if total is None:
+                total = int(response.get("numFound", 0))
+                await _emit(f"[SEARCHSTAX links_only] {total} course docs found.")
+
+            if not docs:
+                break
+
+            for doc in docs:
+                url = (doc.get("url_t") or "").strip()
+                if not url:
+                    skipped += 1
+                    continue
+                title = (doc.get("title_t") or "").strip()
+                award = (doc.get("award_s") or "").strip()
+                # Build name: prepend award if title doesn't already start with it
+                if award and not title.lower().startswith(award.lower()):
+                    name = f"{award} {title}" if title else award
+                else:
+                    name = title or url
+                links.append({"name": name, "url": url})
+
+            start += len(docs)
+            if total is not None and start >= total:
+                break
+            if cfg.max_courses and len(links) >= cfg.max_courses:
+                links = links[: cfg.max_courses]
+                break
+            await asyncio.sleep(0)
+
+    await _emit(
+        f"[SEARCHSTAX links_only] Discovered {len(links)} course URL(s) "
+        f"({skipped} skipped — no url_t field)."
+    )
+    log.info(
+        "[SEARCHSTAX links_only] total=%s links=%s skipped=%s token=%s",
+        total, len(links), skipped, "yes" if token else "NO",
+    )
+    return links
+
+
 async def fetch_searchstax_links(cfg: SearchStaxConfig, emit=None) -> list[dict]:
     """Query the SearchStax Solr core (paginated) → list of link dicts.
 
     Each returned dict carries a prebuilt ``searchstax_result`` payload that
     ``orchestrator._extract_only`` returns verbatim.
+
+    When ``cfg.links_only`` is True the provider operates in discovery-only
+    mode: it returns bare ``{name, url}`` dicts (no ``searchstax_result``) and
+    the orchestrator's normal per-course extraction runs for each URL.
 
     When ``cfg.use_generic_mapper`` is True the generic field mapper from
     ``generic_search_api`` is used instead of the Huddersfield-specific one
@@ -614,6 +738,10 @@ async def fetch_searchstax_links(cfg: SearchStaxConfig, emit=None) -> list[dict]
     university-specific flags (e.g. ``model=coursefinder-ug``) without code
     changes.
     """
+    # Discovery-only mode: return bare links without searchstax_result so
+    # normal per-course extraction runs (fees / IELTS fetched from live pages).
+    if cfg.links_only:
+        return await _fetch_links_only(cfg, emit=emit)
     token = _resolve_token(cfg)
     headers = {"Accept": "application/json"}
     if token:
