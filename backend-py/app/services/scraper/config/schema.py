@@ -212,6 +212,17 @@ class SearchStaxConfig(BaseModel):
             "Ignored in links_only mode."
         ),
     )
+    url_base: Optional[str] = Field(
+        default=None,
+        description=(
+            "Base URL used to construct a full course URL when the Solr url "
+            "field contains a bare course code rather than a real HTTP URL "
+            "(e.g. 'WR006J01UMU' → 'https://www.wlv.ac.uk/courses/wr006j01umu'). "
+            "When set and the resolved url value contains no '://', the provider "
+            "builds: url_base.rstrip('/') + '/' + code.lower(). "
+            "Ignored when the url field already contains a full URL."
+        ),
+    )
     exclude_part_time: bool = Field(
         default=False,
         description=(

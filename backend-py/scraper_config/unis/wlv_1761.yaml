@@ -51,6 +51,11 @@ discovery:
 
     # WLV Solr uses multi-valued "multi_*" fields for mode/duration/dates/location.
     # Only non-default fields need overriding — url_t, title_t, award_s match defaults.
+    # WLV's Solr url_t field contains bare SITS course codes (e.g. "WR006J01UMU"),
+    # not real HTTP URLs.  url_base is prepended so course_website ends up as
+    # "https://www.wlv.ac.uk/courses/wr006j01umu" and the domain guard passes.
+    url_base: "https://www.wlv.ac.uk/courses"
+
     field_map:
       degree_level:  level_s
       study_mode:    multi_mode_ss

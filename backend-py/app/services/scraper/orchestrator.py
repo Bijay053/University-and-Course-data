@@ -1942,6 +1942,17 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # than producing an empty (but misleading) staging result.
         _dom_guard_parsed = _urlparse_mp(scrape_url)
         _dom_scrape_host = (_dom_guard_parsed.netloc or "").lower().removeprefix("www.")
+        # SearchStax field_map_as_payload builds payloads entirely from Solr
+        # document fields — no pages are fetched.  The "URL" in each link dict
+        # may be a bare course code (e.g. "WR006J01UMU"), not a real HTTP URL,
+        # so the domain guard would fire on 100% of links and abort the scrape.
+        # Bypass the guard in this mode; data-contamination risk is zero because
+        # the orchestrator never issues HTTP requests against those identifiers.
+        if (
+            _searchstax_cfg is not None
+            and getattr(_searchstax_cfg, "field_map_as_payload", False)
+        ):
+            _dom_scrape_host = ""  # empty string disables the guard block below
         if _dom_scrape_host:
             _extra_hosts: list[str] = list(
                 getattr(getattr(_uni_cfg, "discovery", None), "allowed_extra_hostnames", None)

@@ -779,6 +779,13 @@ def _map_doc_field_map(
     if not url:
         return None
 
+    # If the Solr url field contains a bare course code (e.g. "WR006J01UMU")
+    # rather than a real HTTP URL, construct a full URL using url_base.
+    # This avoids the domain-guard blocking all links and gives course_website
+    # a browsable link.
+    if "://" not in url and cfg.url_base:
+        url = cfg.url_base.rstrip("/") + "/" + url.lower()
+
     raw_title = _first_str(doc, _name_field)
     award     = _first_str(doc, _type_field)
 
