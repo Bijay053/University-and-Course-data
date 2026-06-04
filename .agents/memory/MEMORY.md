@@ -22,3 +22,4 @@
 - [Lincoln fee matching + IELTS defaults](lincoln-fee-ielts-fixes.md) — s3b/s5/s6 scoring in _score(); degree_level_defaults YAML for IELTS when central page is Cloudflare-blocked. scrape_runtime_jobs PK = runtime_job_id.
 - [WLV SearchStax links_only provider](wlv-searchstax.md) — Wolverhampton Solr has 433 courses but NO fees/IELTS; links_only=true mode for discovery-only (per-course extraction still runs).
 - [95% YAML scraper control](yaml-scraper-control.md) — new unis need only YAML edits; 5 new fields replace 5 hardcoded host lists.
+- [scrape.do browser-fallback gap](scrape-do-browser-gap.md) — [BROWSER↑] path in single_course.py bypasses http_fetcher.py's scrape.do chain; must re-check _http_fetcher_mod._scrape_do_enabled after browser retries exhaust.

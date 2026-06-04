@@ -1425,6 +1425,40 @@ async def extract_course(
                         break
         except Exception as _exc:
             log.warning("browser fallback failed for %s: %s", url, _exc)
+
+    # ── scrape.do residential proxy (LAST RESORT) ─────────────────────────
+    # When both HTTP and browser are blocked (Cloudflare rate-limit after
+    # ~40 concurrent requests — seen on WLV, UTAS, Swinburne in prod) AND
+    # the university has scrape_do_fallback: true in its YAML, route the
+    # fetch through scrape.do's residential proxy pool.
+    # NOTE: this path is only reached when [BROWSER↑] retries also failed.
+    # The http_fetcher.py scrape.do check runs on the HTTP-only path, so
+    # courses that hit [BROWSER↑] and fail skip it without this guard.
+    if not html:
+        from app.services.scraper import http_fetcher as _http_fetcher_mod
+        from app.services.scraper.http_fetcher import fetch_html_scrape_do
+        # Import the MODULE (not the variable) so we read the live value that
+        # set_scrape_do_fallback() updated — `from module import bool_var`
+        # would freeze the value at import time and always read False.
+        if _http_fetcher_mod._scrape_do_enabled:
+            if emit:
+                await emit(
+                    "status",
+                    f"[SCRAPE.DO↑] browser blocked — trying scrape.do proxy for {url[:70]}",
+                    phase="extract",
+                    kind="scrape_do_browser_fallback",
+                    url=url,
+                )
+            log.info(
+                "[SCRAPE.DO↑] browser fallback exhausted for %s — trying scrape.do (1 credit)",
+                url,
+            )
+            try:
+                html = await fetch_html_scrape_do(url)
+            except Exception as _sdo_exc:
+                log.warning("[SCRAPE.DO↑] scrape.do failed for %s: %s", url, _sdo_exc)
+                html = None
+
     if not html:
         return {"url": url, "error": "fetch_failed", "payload": {}, "evidence": []}
 
