@@ -46,8 +46,15 @@ discovery:
   browser_time_budget_s: 300
 
   # Stop nav BFS once this many course links are collected.
-  # UEL catalogue is ~200 courses total (UG ~120 + PG ~80).
-  browser_early_stop_courses: 120
+  # Actual UEL catalogue: ~114 UG + ~159 PG = ~273 total (confirmed 2026-06-04).
+  # Previous value of 120 caused BFS to stop after seeds were done, but the
+  # 200-candidate pipeline cap silently dropped 73 postgraduate/master's courses.
+  browser_early_stop_courses: 300
+
+  # Raise the pipeline's 200-candidate hard cap to cover the full UEL catalogue.
+  # Without this, the orchestrator truncates browser-discovered links at 200,
+  # dropping ~73 postgraduate/master's courses after the 114 UG slots fill up.
+  max_candidates: 300
 
   # Warn if discovery returns fewer than this many courses.
   # Orchestrator emits: "Discovery incomplete: expected 100+, found X."
