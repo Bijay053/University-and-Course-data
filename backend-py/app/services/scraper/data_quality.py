@@ -376,7 +376,10 @@ def _check_course(
     domestic_fee = payload.get("domestic_fee")
     has_central_fee = payload.get("has_central_fee_page")
     fee_term = (payload.get("fee_term") or "").strip()
-    fee_currency = (payload.get("fee_currency") or default_currency or "AUD").strip().upper()
+    from app.services.scraper.currency_utils import default_currency as _dft_cur
+    fee_currency = (
+        payload.get("fee_currency") or default_currency or _dft_cur()
+    ).strip().upper()
     duration_raw = payload.get("duration")
     duration_term_raw = (payload.get("duration_term") or "year").lower()
     degree_level_raw = (payload.get("degree_level") or "").lower()

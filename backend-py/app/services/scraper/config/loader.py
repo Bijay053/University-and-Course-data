@@ -98,35 +98,70 @@ def _hostname_to_slug(hostname: str) -> str:
 
 
 def _infer_currency(hostname: str) -> str:
-    """Return the most likely fee currency for a university hostname."""
-    h = hostname.lower()
-    if h.endswith(".ac.uk") or h.endswith(".co.uk") or h.endswith(".uk"):
-        return "GBP"
-    if h.endswith(".ac.nz") or h.endswith(".co.nz") or h.endswith(".nz"):
-        return "NZD"
-    if h.endswith(".ca"):
-        return "CAD"
-    if h.endswith(".ie"):
-        return "EUR"
-    if h.endswith(".us") or h.endswith(".edu"):
-        return "USD"
-    return "AUD"  # .edu.au, .com.au, unknown → AUD default
+    """Return the most likely fee currency for a university hostname.
+
+    Reads the TLD→currency map from ``scraper_config/defaults.yaml``
+    (``currency_detection.tld_currency_map``) via ``currency_utils``.
+    Falls back to ``currency_detection.default_currency`` from the same file.
+    No hardcoded TLD list — extend the map in defaults.yaml to add new TLDs.
+    """
+    from app.services.scraper.currency_utils import infer_currency as _ic
+    return _ic(hostname)
+
+
+# ISO-4217 currency code → display country name used in auto-stub headers.
+# Keep in sync with tld_currency_map in defaults.yaml (informational only).
+_CURRENCY_COUNTRY: dict[str, str] = {
+    "GBP": "United Kingdom",
+    "NZD": "New Zealand",
+    "CAD": "Canada",
+    "EUR": "Europe",
+    "USD": "United States",
+    "SGD": "Singapore",
+    "HKD": "Hong Kong",
+    "MYR": "Malaysia",
+    "INR": "India",
+    "JPY": "Japan",
+    "KRW": "South Korea",
+    "CNY": "China",
+    "TWD": "Taiwan",
+    "THB": "Thailand",
+    "VND": "Vietnam",
+    "PHP": "Philippines",
+    "IDR": "Indonesia",
+    "ZAR": "South Africa",
+    "AED": "United Arab Emirates",
+    "QAR": "Qatar",
+    "SAR": "Saudi Arabia",
+    "OMR": "Oman",
+    "KWD": "Kuwait",
+    "BHD": "Bahrain",
+    "CHF": "Switzerland",
+    "SEK": "Sweden",
+    "NOK": "Norway",
+    "DKK": "Denmark",
+    "PLN": "Poland",
+    "CZK": "Czech Republic",
+    "HUF": "Hungary",
+    "RON": "Romania",
+    "TRY": "Turkey",
+    "BRL": "Brazil",
+    "MXN": "Mexico",
+    "CLP": "Chile",
+    "ARS": "Argentina",
+    "AUD": "Australia",
+}
 
 
 def _infer_country(hostname: str) -> str:
-    """Return a display country name from a university hostname."""
-    h = hostname.lower()
-    if h.endswith(".uk"):
-        return "United Kingdom"
-    if h.endswith(".nz"):
-        return "New Zealand"
-    if h.endswith(".ca"):
-        return "Canada"
-    if h.endswith(".ie"):
-        return "Ireland"
-    if h.endswith(".us") or h.endswith(".edu"):
-        return "United States"
-    return "Australia"
+    """Return a display country name inferred from *hostname*.
+
+    Derives the country by first inferring the currency (which reads the
+    configurable TLD map) then mapping currency → country display name.
+    Falls back to "Unknown" for currencies not in the local lookup table.
+    """
+    currency = _infer_currency(hostname)
+    return _CURRENCY_COUNTRY.get(currency, "Unknown")
 
 
 def _create_stub_yaml(

@@ -134,3 +134,142 @@ extraction:
     # A course missing any listed field is rejected at staging time.
     reject_if_missing:
       - course_name
+
+# ── Currency detection ───────────────────────────────────────────────────────
+# Controls how the scraper resolves fee currency when no explicit currency
+# marker is present in the extracted fee text.
+#
+# Precedence (highest → lowest):
+#   1. Currency explicitly extracted from fee text (£17,500 → GBP, NZ$29,000 → NZD)
+#   2. Currency returned by an API provider (SearchStax, custom JSON feed)
+#   3. Currency found in a PDF fee schedule
+#   4. Per-university YAML  extraction.fees.default_currency  override
+#   5. TLD-based inference via tld_currency_map below  ← this section
+#   6. default_currency below  (ultimate fallback)
+#
+# Tiers 1–4 are resolved upstream by the fee extractor and per-uni YAML.
+# This section governs tiers 5–6 only.
+#
+# Modifying tld_currency_map or default_currency takes effect on the next
+# Celery worker restart (the map is cached in memory for efficiency).
+
+currency_detection:
+  enabled: true
+
+  # Highest priority within this section: if the fee text itself contains an
+  # explicit currency marker, that always wins over TLD inference.
+  prefer_extracted_currency: true
+
+  # TLD → ISO 4217 currency code.  Matched longest-first so that
+  # ".edu.sg" (7 chars) is checked before ".sg" (3 chars).
+  tld_currency_map:
+    ".ac.uk":   "GBP"
+    ".co.uk":   "GBP"
+    ".uk":      "GBP"
+
+    ".ac.nz":   "NZD"
+    ".co.nz":   "NZD"
+    ".nz":      "NZD"
+
+    ".edu.au":  "AUD"
+    ".gov.au":  "AUD"
+    ".org.au":  "AUD"
+    ".com.au":  "AUD"
+    ".net.au":  "AUD"
+    ".au":      "AUD"
+
+    ".ca":      "CAD"
+
+    ".ie":      "EUR"
+
+    ".edu":     "USD"
+    ".us":      "USD"
+
+    ".edu.sg":  "SGD"
+    ".sg":      "SGD"
+
+    ".hk":      "HKD"
+
+    ".edu.my":  "MYR"
+    ".my":      "MYR"
+
+    ".edu.in":  "INR"
+    ".in":      "INR"
+
+    ".ac.jp":   "JPY"
+    ".jp":      "JPY"
+
+    ".ac.kr":   "KRW"
+    ".kr":      "KRW"
+
+    ".edu.cn":  "CNY"
+    ".cn":      "CNY"
+
+    ".edu.tw":  "TWD"
+    ".tw":      "TWD"
+
+    ".ac.th":   "THB"
+    ".th":      "THB"
+
+    ".edu.vn":  "VND"
+    ".vn":      "VND"
+
+    ".edu.ph":  "PHP"
+    ".ph":      "PHP"
+
+    ".ac.id":   "IDR"
+    ".id":      "IDR"
+
+    ".za":      "ZAR"
+
+    ".ac.ae":   "AED"
+    ".ae":      "AED"
+
+    ".qa":      "QAR"
+
+    ".sa":      "SAR"
+
+    ".om":      "OMR"
+
+    ".kw":      "KWD"
+
+    ".bh":      "BHD"
+
+    ".eu":      "EUR"
+    ".fr":      "EUR"
+    ".de":      "EUR"
+    ".es":      "EUR"
+    ".it":      "EUR"
+    ".nl":      "EUR"
+    ".be":      "EUR"
+    ".at":      "EUR"
+    ".fi":      "EUR"
+    ".pt":      "EUR"
+    ".gr":      "EUR"
+    ".lu":      "EUR"
+
+    ".ch":      "CHF"
+
+    ".se":      "SEK"
+    ".no":      "NOK"
+    ".dk":      "DKK"
+
+    ".pl":      "PLN"
+    ".cz":      "CZK"
+    ".hu":      "HUF"
+    ".ro":      "RON"
+
+    ".tr":      "TRY"
+
+    ".br":      "BRL"
+
+    ".mx":      "MXN"
+
+    ".cl":      "CLP"
+
+    ".ar":      "ARS"
+
+  # Ultimate fallback when TLD is unknown / ambiguous (e.g. bare .com).
+  # AUD is intentionally NOT the default here because an unknown .com domain
+  # is more likely to be a US or international institution than an Australian one.
+  default_currency: "USD"

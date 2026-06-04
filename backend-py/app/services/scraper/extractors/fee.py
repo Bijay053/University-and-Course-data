@@ -144,19 +144,12 @@ def _infer_currency_from_url(url: str) -> str | None:
 
     Only used as a last-resort override when ``_detect_currency`` would
     otherwise fall back to AUD (the code's global default).
-    """
-    from urllib.parse import urlparse as _up
 
-    host = (_up(url).hostname or "").lower()
-    if host.endswith(".nz"):
-        return "NZD"
-    if host.endswith(".ac.uk") or host.endswith(".co.uk") or host.endswith(".uk"):
-        return "GBP"
-    if host.endswith(".ca"):
-        return "CAD"
-    if host.endswith(".sg") or host.endswith(".edu.sg"):
-        return "SGD"
-    return None
+    Delegates to ``currency_utils.infer_currency_from_url`` which reads its
+    TLD→currency map from ``scraper_config/defaults.yaml`` — no hardcoded list.
+    """
+    from app.services.scraper.currency_utils import infer_currency_from_url as _icfu
+    return _icfu(url)
 
 
 def _detect_currency(ctx: str, country: str | None) -> str:
