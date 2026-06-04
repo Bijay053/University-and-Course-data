@@ -37,11 +37,6 @@ discovery:
   use_wayback: true
   use_stealth_browser: false
   always_sitemap_supplement: false
-  # scrape_do_fallback: true is NOT set — scrape.do returns 502 for Notre Dame
-  # (Cloudflare Enterprise also blocks residential-proxy datacenter exit nodes).
-  # The 60s timeout per attempt would make every page 60× slower with no benefit.
-  scrape_do_fallback: false
-
   # Restrict candidates to real course pages under /programs/.
   # Without this, BFS adds the homepage (/) and category pages like /study
   # and /study/our-programs/graduate-research as "course" candidates because

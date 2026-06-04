@@ -6,8 +6,6 @@
 discovery:
   sitemap_url: "https://www.sunderland.ac.uk/sitemap.xml"
   always_sitemap_supplement: true
-  scrape_do_fallback: true
-
   # Allow both sitemap-style slug URLs (/postgraduate/<slug>, /undergraduate/<slug>)
   # AND the numeric-ID format Wayback Machine returns (/course/\d+/<slug>).
   # REPLACES the DB auto_config allow_url_patterns which only had slug-style paths

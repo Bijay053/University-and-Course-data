@@ -15,11 +15,6 @@
 
 discovery:
   always_sitemap_supplement: true   # Supplement BFS with sitemap to catch SPA-only URLs
-  scrape_do_fallback: true          # Route CF-blocked pages through scrape.do residential proxy.
-                                    # study.csu.edu.au is behind Cloudflare Enterprise and blocks
-                                    # all datacenter IPs (httpx, curl_cffi, Playwright all get 403).
-                                    # scrape.do confirmed to bypass CF (tested 2026-05-30).
-
 extraction:
   filters:
     domestic_only:

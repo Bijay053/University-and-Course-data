@@ -8,8 +8,7 @@
 #   1. auto_api_discovery: true — Playwright browser intercepts Cardiff's internal
 #      XHR/Fetch calls (course data is JS-rendered via an internal search API).
 #      This is the primary discovery path.
-#   2. scrape.do must be enabled for this university once monthly quota resets.
-#      Cardiff is a residential-proxy-only site; no free tier works.
+#   2. Cardiff is a residential-proxy-only site; no free tier (httpx/curl_cffi/browser/Wayback) works.
 #
 # NOTE: discovery.parsers is NOT a valid schema key — it is silently ignored.
 # Per-listing-page XPath rules belong in extraction.selectors.course_list (see below).

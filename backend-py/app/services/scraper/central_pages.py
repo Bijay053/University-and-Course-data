@@ -892,36 +892,10 @@ async def _fetch_with_browser_fallback(url: str) -> str | None:
         if _html_has_fee_signal(html):
             log.info("central_pages: HTTP fetch has fee signals for %s (%d chars)", url, len(html or ""))
             return html
-        log.info("central_pages: HTTP fetch returned no fee signals for %s — trying scrape.do / browser", url)
+        log.info("central_pages: HTTP fetch returned no fee signals for %s — trying browser", url)
     except Exception as exc:
         log.warning("central_pages: HTTP fetch failed for %s: %s", url, exc)
         html = None
-
-    # ── 1b. scrape.do — cloud JS renderer bypass (Cloudflare-protected pages) ─
-    # Fires when the per-uni YAML has scrape_do_fallback: true AND plain HTTP
-    # returned no fee signals (e.g. Durham fee page returns Cloudflare 403).
-    # Tried BEFORE local Playwright because Playwright is also IP-blocked on
-    # those same sites (rendered=0B / 403 challenge page).
-    try:
-        from app.services.scraper import http_fetcher as _hf_mod
-        if getattr(_hf_mod, "_scrape_do_enabled", False):
-            from app.services.scraper.http_fetcher import fetch_html_scrape_do
-            _sdo_html = await fetch_html_scrape_do(url)
-            if _sdo_html and _html_has_fee_signal(_sdo_html):
-                log.info(
-                    "central_pages: scrape.do fetch has fee signals for %s (%d chars)",
-                    url, len(_sdo_html),
-                )
-                return _sdo_html
-            if _sdo_html:
-                log.info(
-                    "central_pages: scrape.do returned HTML but no fee signals for %s"
-                    " — falling through to Playwright",
-                    url,
-                )
-                html = _sdo_html  # use as browser fallback base
-    except Exception as _sdo_exc:
-        log.warning("central_pages: scrape.do fetch failed for %s: %s", url, _sdo_exc)
 
     # ── 2. Playwright fallback ───────────────────────────────────────────────
     # Hard 60-second wall-clock timeout on the entire browser block —

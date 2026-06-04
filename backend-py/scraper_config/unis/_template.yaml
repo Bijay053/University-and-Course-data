@@ -234,10 +234,6 @@ discovery:
   #                  that archive.org cannot index, e.g. JCU).
   # use_wayback: null
 
-  # Route blocked page fetches through scrape.do residential proxy. Enable when
-  # Cloudflare Enterprise blocks all cloud/datacenter IPs. Requires SCRAPE_DO_TOKEN.
-  scrape_do_fallback: false
-
   # Always merge sitemap results with BFS candidates even when BFS exceeded the
   # fallback threshold. Needed for JS-rendered SPAs (Torrens, CDU) and deep-faculty
   # sites where BFS burns its page budget on info/marketing pages (AUT, ACU).

@@ -227,11 +227,6 @@ discovery:
   browser_early_stop_courses: null
   #   browser_early_stop_courses: 300
 
-  # ── Scrape.do residential proxy fallback ─────────────────────────────────
-  # Route failed fetches through scrape.do when Cloudflare Enterprise blocks
-  # all cloud/datacenter IPs. Requires SCRAPE_DO_TOKEN env secret.
-  scrape_do_fallback: false
-
   # ── Wayback Machine fallback ──────────────────────────────────────────────
   # Fall back to Wayback Machine CDX API when all live-site discovery fails.
   use_wayback: false

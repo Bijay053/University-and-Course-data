@@ -292,7 +292,7 @@ class PlaywrightSpider(scrapy.Spider):
     (not full Cloudflare Enterprise Bot Management).
 
     For sites with Cloudflare Enterprise (blocks all DCs), this will also
-    fail — use the Wayback CDX + scrape.do path instead.
+    fail — use the Wayback CDX path or a SearchStax/API provider instead.
     """
 
     name = "template_playwright"

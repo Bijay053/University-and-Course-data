@@ -3,7 +3,7 @@
 Used by extractors when JS rendering isn't required (most fee/intake pages).
 Falls back to ``BrowserPool`` for SPAs.
 
-Cloudflare bypass — four-tier fallback (cheapest first):
+Cloudflare bypass — three-tier fallback (cheapest first):
 ---------------------------------------------------------
 1. ``httpx`` with browser UA/Accept headers.  Works for most sites.
 2. ``curl_cffi`` Chrome TLS impersonation.  Cloudflare blocks scrapers at
@@ -19,52 +19,21 @@ Cloudflare bypass — four-tier fallback (cheapest first):
    Wayback modifier.  The archived data may be weeks/months old, but for
    stable course-catalogue content this is usually acceptable.
    Cost: zero.  Overhead: two HTTP calls to archive.org (~1-3 s).
-4. ``fetch_html_scrape_do`` — scrape.do residential proxy (LAST RESORT, paid).
-   Only tried when httpx, curl_cffi, AND Wayback have all failed.  Routes the
-   request through a residential IP via Python ``requests`` (sync, run in a
-   thread executor).  Costs API credits (SCRAPE_DO_TOKEN required).  Enabled
-   ONLY for universities that set ``discovery.scrape_do_fallback: true`` in
-   their YAML.  Never called fleet-wide.  Overhead: ~1-3 s per page.
 """
 from __future__ import annotations
 
 import asyncio
 import logging
-import os
 import urllib.parse
 from contextlib import asynccontextmanager
 
 import httpx
-import requests as _requests
 
 from app.config import settings
 from app.services.scraper.extractors.curtin_session import cookies_for_url
 
 log = logging.getLogger(__name__)
 _sem = asyncio.Semaphore(settings.max_http_concurrency)
-
-# Per-job scrape.do opt-in flag.  Set to True by set_scrape_do_fallback()
-# when the current university has ``discovery.scrape_do_fallback: true`` in
-# its YAML.  Cleared after every scrape job by clear_scrape_do_fallback() so
-# it never bleeds into the next job on the same worker process.
-_scrape_do_enabled: bool = False
-
-
-def set_scrape_do_fallback(enabled: bool) -> None:
-    """Enable or disable the scrape.do fallback tier for the current job.
-
-    Call once after loading per-uni config.  Always pair with a corresponding
-    ``clear_scrape_do_fallback()`` call in the job's finally block.
-    """
-    global _scrape_do_enabled
-    _scrape_do_enabled = enabled
-
-
-def clear_scrape_do_fallback() -> None:
-    """Reset the scrape.do flag after a scrape job finishes."""
-    global _scrape_do_enabled
-    _scrape_do_enabled = False
-
 
 # Per-job Wayback timestamp cache: normalised-url → CDX timestamp string.
 # Populated by wayback_discover() during the discovery phase so that
@@ -110,67 +79,6 @@ def _is_cloudflare_block(resp: httpx.Response) -> bool:
     if resp.headers.get("cf-ray"):
         return True
     return False
-
-
-def _fetch_scrape_do_sync(url: str) -> str | None:
-    """Synchronous scrape.do fetch using Python ``requests`` library.
-
-    Runs in a thread executor so the async event loop is not blocked.
-    Uses Python's ``requests`` library (not httpx/curl_cffi) as requested —
-    a plain HTTPS GET through the scrape.do API endpoint.
-
-    Returns response text on HTTP 200, None on any failure.
-    """
-    token = os.environ.get("SCRAPE_DO_TOKEN", "")
-    if not token:
-        log.warning("scrape.do fallback requested but SCRAPE_DO_TOKEN is not set — skipping")
-        return None
-
-    params = {
-        "token": token,
-        "url": url,
-        "render": "false",
-    }
-    try:
-        r = _requests.get(
-            "https://api.scrape.do",
-            params=params,
-            timeout=30,
-            headers={"User-Agent": _BROWSER_UA},
-            allow_redirects=True,
-        )
-        if r.status_code == 200:
-            log.info(
-                "scrape.do fetch %s -> 200 (%d chars, 1 credit consumed)",
-                url, len(r.text),
-            )
-            return r.text
-        log.warning("scrape.do fetch %s -> %s", url, r.status_code)
-        return None
-    except Exception as exc:
-        log.warning("scrape.do fetch %s failed: %s", url, exc)
-        return None
-
-
-async def fetch_html_scrape_do(url: str) -> str | None:
-    """Fetch via scrape.do residential proxy (LAST RESORT, paid, opt-in per-uni).
-
-    Called ONLY when ALL of the following conditions are true:
-      1. The current university has ``discovery.scrape_do_fallback: true``.
-      2. httpx was blocked (Cloudflare WAF / IP block).
-      3. curl_cffi TLS impersonation also failed.
-      4. Wayback Machine returned nothing (no archived snapshot available).
-
-    This is the last-resort stage — scrape.do is tried only after every free
-    option has been exhausted.  It routes the request through a residential IP
-    via Python ``requests`` (run in a thread executor, non-blocking).
-
-    Cost accounting: every call consumes at least one scrape.do credit.
-    Operators can monitor spend in the scrape.do dashboard.
-
-    Returns the response text on HTTP 200, None on any failure.
-    """
-    return await asyncio.to_thread(_fetch_scrape_do_sync, url)
 
 
 async def fetch_html_cffi(url: str) -> str | None:
@@ -394,19 +302,7 @@ async def fetch_html(url: str, *, retries: int = 2) -> str | None:
         wayback_result = await fetch_html_wayback(url)
         if wayback_result is not None:
             return wayback_result
-        # Wayback also failed (no archived snapshot).  Last resort: scrape.do
-        # residential proxy (paid, opt-in per-uni).
-        if _scrape_do_enabled:
-            log.info(
-                "fetch %s: Wayback failed — trying scrape.do residential proxy "
-                "(last resort, 1 credit)",
-                url,
-            )
-            return await fetch_html_scrape_do(url)
-        log.info(
-            "fetch %s: all free tiers exhausted, scrape.do not enabled for this university",
-            url,
-        )
+        log.info("fetch %s: all free tiers exhausted (httpx, curl_cffi, Wayback)", url)
         return None
 
     if last_exc:

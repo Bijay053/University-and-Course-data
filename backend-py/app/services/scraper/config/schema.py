@@ -757,17 +757,6 @@ class DiscoveryConfig(BaseModel):
             "the path. Empty list (default) = no-op. Per-uni opt-in via YAML."
         ),
     )
-    scrape_do_fallback: bool = Field(
-        default=False,
-        description=(
-            "When True, route blocked page fetches through scrape.do after "
-            "curl_cffi fails but before Wayback Machine.  scrape.do proxies "
-            "the request through a residential IP so Cloudflare WAF + IP-level "
-            "blocks are bypassed.  Costs API credits, so enable ONLY for "
-            "universities where httpx + curl_cffi are both blocked.  Requires "
-            "the SCRAPE_DO_TOKEN env variable/secret.  Default: False."
-        ),
-    )
     browser_time_budget_s: int = Field(
         default=90,
         description=(

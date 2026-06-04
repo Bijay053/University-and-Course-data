@@ -50,14 +50,6 @@ discovery:
   # Leave unset here so the schema default (null = fallback-only) applies to every university.
   # use_wayback: null
 
-  # Route failed HTTP/browser fetches through scrape.do residential proxy.
-  # Enable when Cloudflare Enterprise Bot Management or similar WAF blocks all
-  # cloud/datacenter IPs.  Residential IPs used by scrape.do bypass IP-level
-  # blocks that defeat TLS impersonation and headed-browser fallbacks.
-  # Requires SCRAPE_DO_TOKEN env secret.  Uses API credits per page fetched.
-  # Known users: notredame.yaml (Cloudflare Enterprise, IP-level block).
-  scrape_do_fallback: false
-
   # Override the default BFS page budget (12 fast-mode / 25 full-mode).
   # Raise only for sites with an unusually large number of listing pages.
   bfs_page_budget: null

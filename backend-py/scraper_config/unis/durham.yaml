@@ -8,8 +8,8 @@
 # because the listing pages require JS execution.  The Solr core is queried
 # directly — this is the same endpoint the browser SPA uses.
 #
-# Individual course pages are protected by Cloudflare Turnstile — all three
-# fetch tiers (HTTP, browser, scrape.do) are rejected.  Previously this meant
+# Individual course pages are protected by Cloudflare Turnstile — all fetch
+# tiers (HTTP, browser, Wayback) are rejected.  Previously this meant
 # 0/256 staged.  Now we use field_map_as_payload=true: course metadata is
 # extracted directly from the Solr doc fields, with NO per-course page fetch.
 #
@@ -53,7 +53,7 @@ discovery:
     filter_query: "sectiontype_ss:course"
 
     # Full payload extraction from Solr fields — no per-course page fetch.
-    # course pages are Cloudflare-blocked (all tiers: HTTP, browser, scrape.do).
+    # course pages are Cloudflare-blocked (all tiers: HTTP, browser, Wayback).
     links_only: false
     field_map_as_payload: true
 
@@ -100,8 +100,7 @@ extraction:
 
     # Durham's course pages load the fee amount via JavaScript — the static
     # HTML has the "Tuition fees" heading but the £ value is injected by the
-    # browser SPA.  Without scrape.do quota (residential proxy that renders JS)
-    # the fee is never visible in the scraped HTML.
+    # browser SPA.  The fee amount is JS-injected and not visible in static HTML.
     #
     # These YAML defaults are applied as a last-resort fallback when
     # international_fee is still null after all extractors run.  Values are

@@ -11,11 +11,6 @@
 discovery:
   allowed_extra_hostnames: []
   always_sitemap_supplement: true
-  # Course pages are a React SPA — static HTML gives text_len=0 and local
-  # Playwright also returns rendered=0B (Cloudflare challenge).  Route every
-  # course-page fetch through scrape.do (cloud JS renderer) instead.
-  scrape_do_fallback: true
-
 extraction:
   fees:
     default_currency: GBP

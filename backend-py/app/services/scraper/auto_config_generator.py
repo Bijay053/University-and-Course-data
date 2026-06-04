@@ -131,13 +131,11 @@ def _base_config(profile: "SiteProfile") -> dict[str, Any]:  # type: ignore[name
     elif strategy == STRATEGY_WAYBACK:
         disc["use_wayback"] = True
         disc["use_stealth_browser"] = False
-        disc["scrape_do_fallback"] = False
         extr["skip_browser_rescue"] = True
         extr.setdefault("fees", {})["force_central_fee_stage"] = True
         log.info("[AUTO_CONFIG] Wayback strategy for %s", profile.url)
 
     elif strategy in (STRATEGY_PROXY,):
-        disc["scrape_do_fallback"] = True
         disc["use_stealth_browser"] = False
         extr["skip_browser_rescue"] = True
         log.info("[AUTO_CONFIG] Proxy strategy for %s", profile.url)
