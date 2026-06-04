@@ -59,6 +59,19 @@ extraction:
   # keeps the per-host request rate below CF's rate-limit threshold.
   max_parallel_fetch: 2
 
+  # WLV is Cloudflare-protected. The first browser request often fails (CF hasn't
+  # set cf_clearance yet); the second attempt passes. Previously hardcoded in
+  # _BROWSER_RETRY_HOSTS in per_course_browser.py.
+  retry_on_cloudflare: true
+
+  study_mode:
+    # WLV: site-wide nav contains "online" text (study-online / online-learning
+    # links) that the bare \bonline\b rule matches at conf=0.70, overriding the
+    # correct On Campus value for all on-campus courses. Gemini and
+    # location_derived correctly return 'On Campus'. Previously hardcoded in
+    # _STUDY_MODE_RULE_SUPPRESSED_HOSTS in study_mode.py.
+    suppress_nav_rule: true
+
   fees:
     # All WLV fees are denominated in GBP.  Setting this avoids false-positive
     # "annual_fee_too_low" and "possible_domestic_fee" DQ warnings that fire when

@@ -63,10 +63,24 @@ _INTERNATIONAL_TOGGLE_HOSTS = (
 
 
 def _needs_international_toggle(url: str) -> bool:
+    """Return True when the browser should click the International toggle.
+
+    Checks (in order):
+    1. Per-uni YAML ``extraction.needs_international_toggle: true``.
+    2. Hardcoded ``_INTERNATIONAL_TOGGLE_HOSTS`` fallback list.
+    """
     try:
         host = (urlparse(url).hostname or "").lower()
     except Exception:
         return False
+    # 1. YAML override
+    try:
+        _cfg = get_uni_config()
+        if _cfg is not None and _cfg.extraction.needs_international_toggle:
+            return True
+    except Exception:
+        pass
+    # 2. Hardcoded fallback list
     return any(host.endswith(h) for h in _INTERNATIONAL_TOGGLE_HOSTS)
 
 log = logging.getLogger(__name__)
@@ -245,27 +259,36 @@ _NETWORKIDLE_SETTLE_OVERRIDES: dict[str, int] = {
 # for that host on a hard outage.
 _BROWSER_RETRY_HOSTS: tuple[str, ...] = (
     "utas.edu.au",
-    # UEL: Cloudflare blocks HTTP for both UG and PG course pages; first browser
-    # attempt often fails (CF hasn't set cf_clearance yet), second attempt passes.
-    "uel.ac.uk",
-    # WLV: same Cloudflare pattern as UEL — HTTP blocked site-wide; second browser
-    # attempt passes once cf_clearance is set by the first failed request.
-    "wlv.ac.uk",
+    # Add new CF-protected hosts via YAML (extraction.retry_on_cloudflare: true)
+    # rather than extending this list.  UEL and WLV were migrated to YAML.
 )
 
 
 def should_retry_browser(url: str) -> bool:
-    """Return True for URLs whose host is in :data:`_BROWSER_RETRY_HOSTS`.
+    """Return True when the per-course browser fetch should be retried once.
+
+    Checks (in order):
+    1. Per-uni YAML ``extraction.retry_on_cloudflare: true`` — preferred for
+       new universities (no code change needed).
+    2. Hardcoded ``_BROWSER_RETRY_HOSTS`` fallback list for legacy entries.
 
     Used by the HTTP→browser fallback in single_course.py to decide whether
     to retry once after the first browser attempt returns None.  Cloudflare-
-    protected hosts (UTAS) often pass on the second attempt because the first
-    attempt's failed request still set cf_clearance.
+    protected hosts often pass on the second attempt because the first
+    attempt's failed request already set cf_clearance.
     """
     try:
         host = (urlparse(url).hostname or "").lower()
     except Exception:
         return False
+    # 1. YAML override — check first so new unis need no code change
+    try:
+        _cfg = get_uni_config()
+        if _cfg is not None and _cfg.extraction.retry_on_cloudflare:
+            return True
+    except Exception:
+        pass
+    # 2. Hardcoded fallback list
     return any(host == h or host.endswith("." + h) for h in _BROWSER_RETRY_HOSTS)
 
 # Hosts whose static HTML contains misleading site-wide IELTS/English
@@ -715,13 +738,25 @@ async def _extended_extract(
 
 
 def _force_browser_for_url(url: str) -> bool:
-    """Return True for hosts that always need a browser render, even when
-    english-test slots are already populated from static HTML (the static
-    value is a generic site-wide statement, not course-specific)."""
+    """Return True for hosts that always need a browser render.
+
+    Checks (in order):
+    1. Per-uni YAML ``extraction.force_browser: true`` — preferred for new
+       universities (no code change needed).
+    2. Hardcoded ``_FORCE_BROWSER_HOSTS`` fallback list for legacy entries.
+    """
     try:
         host = (urlparse(url).hostname or "").lower()
     except Exception:
         host = ""
+    # 1. YAML override
+    try:
+        _cfg = get_uni_config()
+        if _cfg is not None and _cfg.extraction.force_browser:
+            return True
+    except Exception:
+        pass
+    # 2. Hardcoded fallback list
     return any(host == h or host.endswith("." + h) for h in _FORCE_BROWSER_HOSTS)
 
 

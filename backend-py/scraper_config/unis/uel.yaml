@@ -120,6 +120,11 @@ extraction:
   # keeps the browser request rate well below the CF rate-limit threshold.
   max_parallel_fetch: 2
 
+  # UEL is Cloudflare-protected. The first browser request often fails (CF
+  # hasn't set cf_clearance yet); the second attempt passes once the cookie is
+  # established by the failed attempt. Previously hardcoded in _BROWSER_RETRY_HOSTS.
+  retry_on_cloudflare: true
+
   course_name:
     university_aliases:
       - "University of East London"
@@ -141,16 +146,18 @@ extraction:
     # instead; this check is redundant and causes false positives for UEL.
     skip_degree_qualifier_check: true
 
+  study_mode:
+    # UEL: every course page contains "apply online" / "online student services"
+    # text that triggers the bare \bonline\b rule at conf=0.70, overriding
+    # Gemini's correct 'On Campus' result. Suppressing the rule extractor
+    # entirely lets Gemini and location_derived classify study mode correctly.
+    # Previously hardcoded in _STUDY_MODE_RULE_SUPPRESSED_HOSTS in study_mode.py.
+    suppress_nav_rule: true
+
   filters:
     domestic_only:
       enabled: true
-    # UEL is an on-campus London university. The study_mode rule fires "Online"
-    # at 0.70 confidence on any \bonline\b match (e.g. "apply online", "online
-    # resources") present on every UEL course page. Gemini correctly returns
-    # "On Campus" but the rule wins in the merge due to authority ordering.
-    # Disabling online_only rejection here prevents false positives while still
-    # allowing the domestic_only and no_international_fee guards to protect data
-    # quality. Genuine UEL online-only courses (if any) would need a separate
-    # allow-list approach.
+    # online_only filter disabled: suppress_nav_rule above prevents false 'Online'
+    # detections at source. Gemini correctly returns 'On Campus' for UEL pages.
     online_only:
       enabled: false

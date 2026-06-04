@@ -543,8 +543,6 @@ def derive_mode_from_location(location_str: str | None) -> str | None:
 # student services" text that triggers the label pass → 'Online' at 0.70,
 # blocking Gemini's correct 'On Campus' extraction.
 _STUDY_MODE_RULE_SUPPRESSED_HOSTS: frozenset[str] = frozenset({
-    "www.uel.ac.uk",
-    "uel.ac.uk",
     # Canterbury (UC): "UC Online Staff" appears in the site-wide nav on
     # EVERY page inside a non-<nav> element, so _NOISE_BLOCK_RE cannot strip
     # it.  The bare \bonline\b fallback (confidence 0.5) fires on that nav
@@ -553,20 +551,28 @@ _STUDY_MODE_RULE_SUPPRESSED_HOSTS: frozenset[str] = frozenset({
     # actual course content and classifies correctly.
     "www.canterbury.ac.nz",
     "canterbury.ac.nz",
-    # WLV: site-wide nav contains "online" text (study-online / online-learning
-    # links) that the bare \bonline\b rule matches at conf=0.70, overriding the
-    # correct On Campus value for all on-campus courses.  Gemini and
-    # location_derived already return 'On Campus' correctly; suppressing the
-    # rule extractor eliminates the false FIELD SUMMARY noise.
-    "www.wlv.ac.uk",
-    "wlv.ac.uk",
+    # Add new hosts via YAML (extraction.study_mode.suppress_nav_rule: true)
+    # rather than extending this list.  UEL and WLV were migrated to YAML.
 })
 
 
 async def extract(html: str, url: str) -> list[ExtractionResult]:
     import urllib.parse as _up
     _host = _up.urlparse(url).netloc.lower()
-    if _host in _STUDY_MODE_RULE_SUPPRESSED_HOSTS:
+    # Suppress rule-based study-mode classification when:
+    # 1. Per-uni YAML extraction.study_mode.suppress_nav_rule: true (preferred)
+    # 2. Host is in the hardcoded _STUDY_MODE_RULE_SUPPRESSED_HOSTS list
+    _suppress_rule = _host in _STUDY_MODE_RULE_SUPPRESSED_HOSTS
+    if not _suppress_rule:
+        try:
+            _sm_uni = _get_sm_cfg()
+            if _sm_uni is not None:
+                _sm_opts = getattr(_sm_uni.extraction, "study_mode", None)
+                if _sm_opts is not None and getattr(_sm_opts, "suppress_nav_rule", False):
+                    _suppress_rule = True
+        except Exception:
+            pass
+    if _suppress_rule:
         return []
     mode, snippet, confidence = classify_study_mode(html)
     if not mode:

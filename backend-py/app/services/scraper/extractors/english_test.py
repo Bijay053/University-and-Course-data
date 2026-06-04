@@ -1108,9 +1108,23 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
     if not text:
         return []
     snippet = text[:500]
+    # Suppress PTE extraction when:
+    # 1. Per-uni YAML extraction.english.suppress_pte: true (preferred)
+    # 2. Host is in the hardcoded _NO_PTE_HOSTS list
+    _suppress_pte = _host in _NO_PTE_HOSTS
+    if not _suppress_pte:
+        try:
+            from app.services.scraper.config.context import get_uni_config as _get_et_cfg
+            _et_uni = _get_et_cfg()
+            if _et_uni is not None:
+                _et_en = getattr(_et_uni.extraction, "english", None)
+                if _et_en is not None and getattr(_et_en, "suppress_pte", False):
+                    _suppress_pte = True
+        except Exception:
+            pass
     results: list[ExtractionResult] = [
         *_emit("ielts", _ielts(text), snippet),
-        *(_emit("pte", _pte(text), snippet) if _host not in _NO_PTE_HOSTS else []),
+        *(_emit("pte", _pte(text), snippet) if not _suppress_pte else []),
         *_emit("toefl", _toefl(text), snippet),
         *_emit("cambridge", _cambridge(text), snippet),
         *_emit("duolingo", _duolingo(text), snippet),

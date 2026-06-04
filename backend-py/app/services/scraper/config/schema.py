@@ -1147,6 +1147,17 @@ class EnglishConfig(BaseModel):
             "the extracted English requirements). Empty by default."
         ),
     )
+    suppress_pte: bool = Field(
+        default=False,
+        description=(
+            "When True, skip PTE score extraction entirely for this university. "
+            "Use for universities whose pages mention 'PTE' incidentally "
+            "(e.g. 'Year 11 PTE' or competitor product references) causing "
+            "false-positive PTE scores to be staged. "
+            "YAML alternative to adding the hostname to _NO_PTE_HOSTS in "
+            "english_test.py — no code change needed."
+        ),
+    )
     follow_links: list[str] = Field(
         default_factory=list,
         description=(
@@ -1307,11 +1318,21 @@ class StudyModeConfig(BaseModel):
         description=(
             "UI section labels whose content should be excluded from online-mode "
             "keyword scanning (e.g. 'navigation', 'footer', 'global menu', "
-            "'UC Online', 'online reporting').  Informational field — actual "
-            "noise-blocking is handled per-host via "
-            "_STUDY_MODE_RULE_SUPPRESSED_HOSTS in study_mode.py; this field "
-            "documents operator intent and will drive dynamic suppression in a "
-            "future extractor revision."
+            "'UC Online', 'online reporting').  Informational only — use "
+            "suppress_nav_rule instead to actually suppress the rule extractor."
+        ),
+    )
+    suppress_nav_rule: bool = Field(
+        default=False,
+        description=(
+            "When True, skip the regex/rule-based study-mode classification "
+            "entirely for this university.  Use when site-wide navigation or "
+            "footer text contains the word 'online' that triggers false Online "
+            "detections (e.g. 'apply online', 'UC Online', 'study online' nav "
+            "links).  Gemini and location_derived still run and classify "
+            "study_mode correctly without the noisy rule result. "
+            "YAML alternative to adding the hostname to "
+            "_STUDY_MODE_RULE_SUPPRESSED_HOSTS in study_mode.py."
         ),
     )
 
@@ -1797,6 +1818,39 @@ class ExtractionConfig(BaseModel):
     #           text: "International Students"
     #
     # After clicking, the scraper waits for networkidle (up to 5s) + 1.2s settle.
+    retry_on_cloudflare: bool = Field(
+        default=False,
+        description=(
+            "When True, the per-course browser fetch is retried once when "
+            "the first attempt returns None (rendered=0B / Cloudflare block). "
+            "Use for CF-protected sites where the first browser request sets "
+            "cf_clearance and the second request passes through. "
+            "YAML alternative to adding the hostname to _BROWSER_RETRY_HOSTS "
+            "in per_course_browser.py — no code change needed."
+        ),
+    )
+    force_browser: bool = Field(
+        default=False,
+        description=(
+            "When True, always run the Playwright browser for every course page "
+            "even when static HTML appears to have populated fields like english "
+            "test scores.  Use for sites whose static HTML contains misleading "
+            "site-wide IELTS/English statements — the browser's course-specific "
+            "result overrides the generic static value. "
+            "YAML alternative to _FORCE_BROWSER_HOSTS in per_course_browser.py."
+        ),
+    )
+    needs_international_toggle: bool = Field(
+        default=False,
+        description=(
+            "When True, the browser clicks an 'International' student-type "
+            "toggle on each course page before scraping.  Use for universities "
+            "whose pages default to Domestic view (domestic fees, shorter "
+            "duration) and require a toggle click to reveal international fees, "
+            "IELTS requirements, and intakes. "
+            "YAML alternative to _INTERNATIONAL_TOGGLE_HOSTS in per_course_browser.py."
+        ),
+    )
     actions: list[dict] = Field(
         default_factory=list,
         description="Ordered list of browser interaction steps to execute after page load.",

@@ -21,3 +21,4 @@
 - [_fv_classify listing hint endswith-only fix](fv-classify-endswith-fix.md) — listing hints must use endswith, not substring; /study mid-path misclassifies course pages as listing.
 - [Lincoln fee matching + IELTS defaults](lincoln-fee-ielts-fixes.md) — s3b/s5/s6 scoring in _score(); degree_level_defaults YAML for IELTS when central page is Cloudflare-blocked. scrape_runtime_jobs PK = runtime_job_id.
 - [WLV SearchStax links_only provider](wlv-searchstax.md) — Wolverhampton Solr has 433 courses but NO fees/IELTS; links_only=true mode for discovery-only (per-course extraction still runs).
+- [95% YAML scraper control](yaml-scraper-control.md) — new unis need only YAML edits; 5 new fields replace 5 hardcoded host lists.
