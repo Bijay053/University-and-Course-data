@@ -113,12 +113,24 @@ discovery:
     - "/study-online"
 
 extraction:
+  # UEL is a Cloudflare-protected site: HTTP is blocked for ALL course pages
+  # (both UG and PG), so every page needs a browser escalation.  With the
+  # default concurrency (4) UEL rate-limits the browser pool after ~28 pages,
+  # leaving all PG courses as fetch_failed.  Reducing to 2 concurrent fetches
+  # keeps the browser request rate well below the CF rate-limit threshold.
+  max_parallel_fetch: 2
+
   course_name:
     university_aliases:
       - "University of East London"
       - "UEL"
 
   staging:
+    # UEL is a flat-fee university: every undergraduate international course
+    # costs £16,020/year.  The duplicate_fee_detected DQ check fires at ≥75%
+    # and would flag this as a CRITICAL selector-scope bug — suppress it.
+    skip_duplicate_fee_check: true
+
     # UEL course pages surface the course name from JSON metadata (SPA-style
     # rendering) WITHOUT a leading degree qualifier. Examples:
     #   "Accounting and Finance"           (BSc implied by URL /undergraduate/...)

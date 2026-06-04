@@ -779,13 +779,25 @@ def _check_duplicates(payloads_with_urls: list[tuple[Payload, str]]) -> list[Qua
     return issues
 
 
-def _check_duplicate_fees(payloads_with_urls: list[tuple[Payload, str]]) -> list[QualityIssue]:
+def _check_duplicate_fees(
+    payloads_with_urls: list[tuple[Payload, str]],
+    *,
+    uni_config: Any | None = None,
+) -> list[QualityIssue]:
     """Detect repeated fee values across courses — a strong indicator of a
     selector-scope reuse bug (the same DOM element being scraped for every
     course page). Fires when:
       • At least 5 courses have a fee, AND
       • ≥ 75% of fee-bearing courses share the same single fee value.
     """
+    # Per-uni override: suppress for universities with a genuine flat-rate fee
+    # (e.g. UEL charges £16,020 for every undergraduate course — not a bug).
+    if uni_config is not None:
+        try:
+            if getattr(uni_config.extraction.staging, "skip_duplicate_fee_check", False):
+                return []
+        except AttributeError:
+            pass
     issues: list[QualityIssue] = []
     fee_to_courses: dict[float, list[str]] = defaultdict(list)
     for payload, _url in payloads_with_urls:
@@ -902,7 +914,7 @@ async def run_quality_checks(
 
     # Duplicate checks are cross-course
     all_issues.extend(_check_duplicates(payloads_with_urls))
-    all_issues.extend(_check_duplicate_fees(payloads_with_urls))
+    all_issues.extend(_check_duplicate_fees(payloads_with_urls, uni_config=uni_config))
 
     # Sort by severity then code then url for deterministic output.
     all_issues.sort(

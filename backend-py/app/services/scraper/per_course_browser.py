@@ -245,6 +245,9 @@ _NETWORKIDLE_SETTLE_OVERRIDES: dict[str, int] = {
 # for that host on a hard outage.
 _BROWSER_RETRY_HOSTS: tuple[str, ...] = (
     "utas.edu.au",
+    # UEL: Cloudflare blocks HTTP for both UG and PG course pages; first browser
+    # attempt often fails (CF hasn't set cf_clearance yet), second attempt passes.
+    "uel.ac.uk",
 )
 
 

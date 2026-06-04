@@ -151,7 +151,15 @@ _DURATION_ANTI_CONTEXT = re.compile(
     r"year\s+12\b|"
     r"\d+\s+years?\s+of\s+(?:schooling|secondary|high\s?school|education)|"
     r"equivalent\s+to\s+year\s+\d+|"
-    r"completed?\s+year\s+\d+)\b",
+    r"completed?\s+year\s+\d+|"
+    # UK university course-module year-selector tabs (e.g. UEL, Coventry) render
+    # as "Select year Year 1 Year 2 Year 3" in plain text after html_to_text.
+    # Pattern-3 then matches "1 Year" (from "Year [1 Year] 2") and wins the
+    # weight tournament with duration=1, beating the real 3-year Gemini value.
+    # Two consecutive "Year N" occurrences is a reliable tab-selector signal;
+    # "select year" as a phrase is a direct match of the tab heading.
+    r"select\s+year\b|"
+    r"year\s+\d+\s+year\s+\d+)\b",
     re.I,
 )
 

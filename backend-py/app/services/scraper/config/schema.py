@@ -1596,6 +1596,16 @@ class StagingConfig(BaseModel):
             "non-course pages so the name check is redundant."
         ),
     )
+    skip_duplicate_fee_check: bool = Field(
+        default=False,
+        description=(
+            "When True, the cross-course duplicate_fee_detected data-quality check "
+            "is suppressed.  Use when the university publishes a genuine flat-rate "
+            "international fee (same amount for all or most courses) that would "
+            "otherwise trigger a false-positive CRITICAL selector-scope warning "
+            "(e.g. UEL charges £16,020 for every undergraduate course)."
+        ),
+    )
     require_international_fee: bool = Field(
         default=True,
         description=(
