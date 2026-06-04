@@ -3161,7 +3161,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 _trace_fields = {
                     k: payload.get(k)
                     for k in (
-                        "annual_tuition_fee", "ielts_overall",
+                        "international_fee", "ielts_overall",
                         "duration", "duration_term",
                         "intake_months", "location",
                         "study_mode", "english_test_name",
@@ -3171,7 +3171,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     "[FIELD TRACE] %s → fee=%s ielts=%s dur=%s%s intake=%s "
                     "loc=%s mode=%s",
                     r.get("name", "?"),
-                    _trace_fields["annual_tuition_fee"],
+                    _trace_fields["international_fee"],
                     _trace_fields["ielts_overall"],
                     _trace_fields["duration"],
                     _trace_fields["duration_term"] or "",
