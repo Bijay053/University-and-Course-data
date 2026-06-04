@@ -33,6 +33,27 @@ Replicating those Solr calls returns ~790 course docs with all needed fields.
 - Rate limit (HTTP 429) hits if Solr is called more than once in quick succession
   in dev; the Celery scrape itself is fine (single sequential pass).
 
+## field_map_as_payload type-coercion (Durham, 2026-06-04)
+When `cfg.field_map_as_payload` is True, `_map_doc_field_map` copies raw Solr
+strings directly into the staged payload — but the payload feeds an INSERT whose
+columns are strongly typed. `scraped_courses.duration` is `NUMERIC(6,2)`, so
+writing the raw `duration_t` string (e.g. `"3 years full-time"`) caused 299/312
+flush failures (`asyncpg DataError: invalid input … decimal ConversionSyntax`).
+**Rule:** any numeric-typed column must be parsed before going into the payload
+in field_map mode — duration goes through `_parse_duration()` → (value, term, mode),
+not the raw string.
+**Why:** field_map mode bypasses the normal HTML-extraction path that already
+parses these fields, so the coercion must be done inside `_map_doc_field_map`.
+
+## SearchStax + URL filters (Durham, 2026-06-04)
+In SearchStax mode the Solr query already filters to course docs
+(`fq=sectiontype_ss:course`), so the orchestrator's Phase A.5b
+allow/block_url_patterns chokepoint must be skipped (`_skip_url_filters_searchstax`).
+**Why:** a stale `admin_config.discovery.allow_url_patterns` in the DB (merged
+LAST, and protected by `_LIST_NO_CLEAR_KEYS` so an empty YAML list can't clear it)
+silently dropped 53 `/business/courses/` URLs every run. Per-uni YAML cannot
+override a DB admin_config list — skip the filter entirely for Solr-sourced links.
+
 ## Token
 Set `HUD_SEARCHSTAX_TOKEN` in the environment. The YAML has a hardcoded fallback
 for dev convenience — never commit a literal token to the YAML in production.

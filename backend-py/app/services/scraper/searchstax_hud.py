@@ -756,8 +756,19 @@ def _map_doc_field_map(doc: dict, cfg: SearchStaxConfig) -> Optional[dict]:
 
     raw_dur = _first_str(doc, _dur_field)
     if raw_dur:
-        payload["duration"] = raw_dur
-        _ev("duration", raw_dur, "field_map")
+        # scraped_courses.duration is NUMERIC(6,2) — never write the raw text
+        # (e.g. "3 years full-time") here or the INSERT flush fails with a
+        # decimal ConversionSyntax error. Parse into (value, term, mode).
+        _dur_val, _dur_term, _dur_mode = _parse_duration(raw_dur)
+        if _dur_val is not None:
+            payload["duration"] = _dur_val
+            _ev("duration", _dur_val, "field_map")
+            if _dur_term:
+                payload["duration_term"] = _dur_term
+                _ev("duration_term", _dur_term, "field_map")
+        if _dur_mode and not payload.get("study_mode"):
+            payload["study_mode"] = _dur_mode
+            _ev("study_mode", _dur_mode, "field_map")
 
     raw_dates_vals = doc.get(_date_field, [])
     if isinstance(raw_dates_vals, list):
