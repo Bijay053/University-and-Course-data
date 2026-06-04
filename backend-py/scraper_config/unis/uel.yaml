@@ -113,22 +113,37 @@ discovery:
     - "/study-online"
 
 extraction:
-  # UEL is a Cloudflare-protected site: HTTP is blocked for ALL course pages
-  # (both UG and PG), so every page needs a browser escalation.  With the
-  # default concurrency (4) UEL rate-limits the browser pool after ~28 pages,
-  # leaving all PG courses as fetch_failed.  Reducing to 2 concurrent fetches
-  # keeps the browser request rate well below the CF rate-limit threshold.
-  max_parallel_fetch: 2
+  # UEL is Cloudflare-protected — every course page needs a real browser.
+  # Without scrape.do, 4 parallel browser tabs is the practical ceiling before
+  # CF starts rate-limiting; retry_on_cloudflare: true handles the occasional
+  # challenge that fires after the burst, so net throughput is still ~2× faster
+  # than max_parallel_fetch: 2 (was ~72 min → now ~36-40 min for 270 courses).
+  max_parallel_fetch: 4
 
-  # UEL is Cloudflare-protected. The first browser request often fails (CF
-  # hasn't set cf_clearance yet); the second attempt passes once the cookie is
-  # established by the failed attempt. Previously hardcoded in _BROWSER_RETRY_HOSTS.
+  # First request per new browser context often fails CF challenge; second
+  # attempt passes once cf_clearance cookie is established.
   retry_on_cloudflare: true
 
   course_name:
     university_aliases:
       - "University of East London"
       - "UEL"
+
+  fees:
+    default_currency: GBP
+    force_central_fee_stage: true
+    # UEL publishes flat international fees (2025/26):
+    #   UG: £16,020/year  PG: £16,680/year
+    # Source: https://www.uel.ac.uk/study/undergraduate/fees-and-funding
+    # Applied as fallback when page extraction yields no fee.
+    degree_level_defaults:
+      undergraduate: 16020
+      postgraduate: 16680
+
+  english:
+    # UEL general entry: IELTS 6.0 overall, no band below 5.5 (UG/PG standard).
+    # Source: https://www.uel.ac.uk/international/english-language-requirements
+    default_ielts: 6.0
 
   staging:
     # UEL is a flat-fee university: every undergraduate international course
