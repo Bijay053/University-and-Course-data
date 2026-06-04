@@ -288,13 +288,50 @@ def load_uni_config(
     uni_yaml_path: Path = _id_yaml if _id_yaml is not None else _UNIS_DIR / f"{slug}.yaml"
     per_uni = _load_yaml_file(uni_yaml_path)
     if per_uni:
-        if _id_yaml is not None:
-            log.debug(
-                "Per-uni YAML loaded for slug=%r uni_id=%r (id-specific file)",
-                slug,
-                university_id,
+        # Hostname guard — prevents a shared-slug YAML from being applied to the
+        # wrong university.  If the YAML declares ``hostname_guard: "www.foo.ac.nz"``
+        # and the current scrape URL's hostname differs, the YAML is silently skipped
+        # and the university falls back to defaults + DB config.
+        #
+        # This guards against slug collisions such as:
+        #   www.canterbury.ac.uk  →  slug "canterbury"
+        #   www.canterbury.ac.nz  →  slug "canterbury"
+        # where both resolve to the same YAML file.  The id-specific filename
+        # (e.g. canterbury_1750.yaml) is the PRIMARY disambiguation mechanism;
+        # hostname_guard is a defence-in-depth safety net for shared slug files.
+        _guard_host = per_uni.pop("hostname_guard", None)
+        if _guard_host is not None:
+            _scrape_host = urlparse(scrape_url).hostname or ""
+            _guard_clean = _guard_host.lstrip("*.").lower()
+            _scrape_clean = _scrape_host.lower()
+            # Allow exact match OR subdomain-of-guard (e.g. guard="canterbury.ac.nz"
+            # accepts "www.canterbury.ac.nz").
+            _host_ok = (
+                _scrape_clean == _guard_clean
+                or _scrape_clean.endswith("." + _guard_clean)
             )
-        merged = _deep_merge(merged, per_uni)
+            if not _host_ok:
+                log.warning(
+                    "YAML hostname_guard mismatch for slug=%r: guard=%r scrape_host=%r "
+                    "— skipping YAML (university will use defaults + DB config). "
+                    "If this YAML should apply, update hostname_guard or create an "
+                    "id-specific file (%s_%s.yaml).",
+                    slug,
+                    _guard_host,
+                    _scrape_host,
+                    slug,
+                    university_id,
+                )
+                per_uni = {}
+
+        if per_uni:
+            if _id_yaml is not None:
+                log.debug(
+                    "Per-uni YAML loaded for slug=%r uni_id=%r (id-specific file)",
+                    slug,
+                    university_id,
+                )
+            merged = _deep_merge(merged, per_uni)
     else:
         log.debug("No per-uni YAML for slug=%r (will use defaults + DB config)", slug)
 

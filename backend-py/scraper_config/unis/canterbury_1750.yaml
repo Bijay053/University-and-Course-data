@@ -1,6 +1,13 @@
 # University of Canterbury
 # Hostname: www.canterbury.ac.nz
 # Country: New Zealand  |  Currency: NZD
+#
+# hostname_guard prevents this YAML from being applied to Canterbury Christ
+# Church University (www.canterbury.ac.uk), which shares the same slug
+# "canterbury".  The id-specific filename (canterbury_1750.yaml) is the
+# primary disambiguation; hostname_guard is a defence-in-depth safety net.
+hostname_guard: "canterbury.ac.nz"
+
 # Discovery: Funnelback search API for UG and PG subject pages.
 # Fix: English scores use degree-level defaults so PG/doctorate do not receive UG scores.
 

@@ -1919,6 +1919,112 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # persist them in pipeline_stats for the repair-candidates endpoint.
         _filter_dropped_sample: list[str] = []
 
+        # ── Domain Safety Guard ───────────────────────────────────────────────
+        # Reject any discovered link whose apex domain differs from the scrape
+        # URL's apex domain.  This prevents a slug-collision YAML (e.g. two
+        # universities both named "Canterbury" mapping to slug "canterbury") from
+        # injecting seed_urls / sitemap / central-pages from the wrong domain and
+        # silently staging courses that belong to a different university.
+        #
+        # Apex domain: strip leading "www." from the hostname.
+        # allowed_extra_hostnames (from YAML discovery section) opts specific
+        # partner / CDN / handbook hostnames into the allowed set.
+        #
+        # If ALL links are from the wrong domain the scrape is aborted rather
+        # than producing an empty (but misleading) staging result.
+        _dom_guard_parsed = _urlparse_mp(scrape_url)
+        _dom_scrape_host = (_dom_guard_parsed.netloc or "").lower().removeprefix("www.")
+        if _dom_scrape_host:
+            _extra_hosts: list[str] = list(
+                getattr(getattr(_uni_cfg, "discovery", None), "allowed_extra_hostnames", None)
+                or []
+            )
+            _dom_ok_links: list[dict] = []
+            _dom_bad_links: list[dict] = []
+            for _lnk in links:
+                _lnk_url = _lnk if isinstance(_lnk, str) else _lnk.get("url", "")
+                _lnk_host = (_urlparse_mp(_lnk_url).netloc or "").lower().removeprefix("www.")
+                _host_ok = (
+                    _lnk_host == _dom_scrape_host
+                    or _lnk_host.endswith("." + _dom_scrape_host)
+                    or any(
+                        _lnk_host == _xh.lower().removeprefix("www.")
+                        or _lnk_host.endswith("." + _xh.lower().removeprefix("www."))
+                        for _xh in _extra_hosts
+                    )
+                )
+                if _host_ok:
+                    _dom_ok_links.append(_lnk)
+                else:
+                    _dom_bad_links.append(_lnk)
+
+            if _dom_bad_links:
+                _bad_sample = [
+                    (_b if isinstance(_b, str) else _b.get("url", ""))
+                    for _b in _dom_bad_links[:5]
+                ]
+                _bad_pct = int(100 * len(_dom_bad_links) / max(len(links), 1))
+                _dom_msg = (
+                    f"[DOMAIN GUARD] {len(_dom_bad_links)}/{len(links)} links ({_bad_pct}%) "
+                    f"are from a foreign domain and have been BLOCKED. "
+                    f"Expected apex domain: {_dom_scrape_host!r}. "
+                    f"Sample foreign URLs: {_bad_sample}. "
+                    f"This usually means a per-uni YAML has seed_urls / sitemap from the wrong "
+                    f"domain (slug collision). Check scraper_config/unis/{_uni_cfg.slug}*.yaml."
+                )
+                if not _dom_ok_links:
+                    log.critical(
+                        "DOMAIN GUARD: ALL %d discovered links are from foreign domains — "
+                        "aborting scrape to prevent data contamination. "
+                        "scrape_url=%r expected_apex=%r sample_foreign=%s",
+                        len(_dom_bad_links),
+                        scrape_url,
+                        _dom_scrape_host,
+                        _bad_sample,
+                    )
+                    await emit(
+                        "error",
+                        _dom_msg,
+                        phase="discover",
+                        kind="domain_guard_abort",
+                        scrape_url=scrape_url,
+                        expected_apex=_dom_scrape_host,
+                        foreign_count=len(_dom_bad_links),
+                        sample_foreign=_bad_sample,
+                    )
+                    summary["stage"] = "domain_guard_abort"
+                    summary["domain_guard_foreign_count"] = len(_dom_bad_links)
+                    summary["domain_guard_expected_apex"] = _dom_scrape_host
+                    return {
+                        "status": "error",
+                        "error": _dom_msg,
+                        "summary": summary,
+                        "errors": errors,
+                        "staged": staged,
+                    }
+                else:
+                    log.warning(
+                        "DOMAIN GUARD: dropped %d foreign-domain link(s) (%d%%) "
+                        "from discovered set. scrape_url=%r expected_apex=%r sample=%s",
+                        len(_dom_bad_links),
+                        _bad_pct,
+                        scrape_url,
+                        _dom_scrape_host,
+                        _bad_sample,
+                    )
+                    await emit(
+                        "warning",
+                        _dom_msg,
+                        phase="discover",
+                        kind="domain_guard_partial",
+                        expected_apex=_dom_scrape_host,
+                        foreign_count=len(_dom_bad_links),
+                        ok_count=len(_dom_ok_links),
+                        sample_foreign=_bad_sample,
+                    )
+                    links = _dom_ok_links
+        # ── End Domain Safety Guard ───────────────────────────────────────────
+
         # Phase A.5b-pre — per-uni YAML block_url_patterns deny-list re-applied.
         # discovery.block_url_patterns is applied inside discover_course_links
         # (BFS phase) but NOT after the browser-discovery merge, so unwanted

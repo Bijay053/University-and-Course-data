@@ -1,0 +1,31 @@
+# Canterbury Christ Church University
+# Hostname: www.canterbury.ac.uk
+# Country: United Kingdom  |  Currency: GBP
+# Slug "canterbury" is shared with University of Canterbury NZ (uni_id=1750).
+# This file (canterbury_1759.yaml) shadows the shared slug file and is loaded
+# ONLY for uni_id=1759 so the two universities never mix configuration.
+#
+# NOTE: Do NOT add seed_urls, sitemap_url, or central_page URLs from
+# www.canterbury.ac.nz here.  That domain belongs to a different university.
+
+discovery:
+  allowed_extra_hostnames: []
+  always_sitemap_supplement: true
+
+extraction:
+  fees:
+    default_currency: GBP
+    prefer_international: true
+
+  filters:
+    domestic_only:
+      enabled: false
+    online_only:
+      enabled: false
+
+  course_name:
+    strip_title_suffixes:
+      - " | Canterbury Christ Church University"
+      - " - Canterbury Christ Church University"
+      - " | CCCU"
+      - " - CCCU"

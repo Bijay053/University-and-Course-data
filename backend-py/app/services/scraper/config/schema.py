@@ -501,6 +501,17 @@ class DiscoveryConfig(BaseModel):
             "E.g. ['handbook.{domain}', 'courses.{domain}', 'international.{domain}']."
         ),
     )
+    allowed_extra_hostnames: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Hostnames (in addition to the scrape URL's own apex domain) whose links "
+            "are permitted to pass the domain safety guard.  Use for universities that "
+            "legitimately host course pages on a second domain, e.g. a subdomain CDN or "
+            "a partner site.  Entries are matched as suffix (apex-domain level), so "
+            "'portal.myuni.edu.au' matches any *.portal.myuni.edu.au link. "
+            "Do NOT add a foreign university's domain here — that is a misconfiguration."
+        ),
+    )
     always_sitemap_supplement: bool = Field(
         default=False,
         description=(
