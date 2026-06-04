@@ -218,10 +218,25 @@ class AutoRepairEngine:
         self.historical_urls = historical_urls
         self.pipeline_stats = pipeline_stats
         self.dropped_sample: list[str] = dropped_sample or []
+        # Block-filter stats captured from inside discover_course_links.
+        # pre_block_discovered = raw count BEFORE block_url_patterns ran.
+        # block_dropped_count   = how many URLs were removed by block patterns.
+        self.pre_block_discovered: int = pipeline_stats.get("pre_block_discovered", raw_discovered)
+        self.block_dropped_count: int = pipeline_stats.get("block_dropped_count", 0)
 
     # ── Problem classification ─────────────────────────────────────────────────
 
     def _classify_problem(self) -> str:
+        # Block patterns are the primary culprit when they drop >80% of all
+        # URLs discovered before the block filter ran.  This is a separate
+        # case from "url_filter_drop" because the raw count visible to the
+        # allow/must filters is already tiny — the real problem is upstream.
+        if (
+            self.pre_block_discovered > 5
+            and self.block_dropped_count > 0
+            and self.block_dropped_count > self.pre_block_discovered * 0.80
+        ):
+            return "block_catastrophic"
         if self.raw_discovered > 5 and self.after_filter == 0:
             return "url_filter_drop"
         if self.raw_discovered > 5 and self.after_filter < self.raw_discovered * 0.5:
@@ -231,6 +246,20 @@ class AutoRepairEngine:
         if self.imported > 0 and self.imported < 30:
             return "low_count"
         return "unknown"
+
+    def _filter_funnel_str(self) -> str:
+        """Human-readable filter funnel: 128 raw → block dropped 124 → 4 → allow dropped 4 → 0."""
+        if self.block_dropped_count <= 0:
+            return ""
+        pct = self.pipeline_stats.get("block_dropped_pct", 0)
+        allow_mc_dropped = self.raw_discovered - self.after_filter
+        return (
+            f"{self.pre_block_discovered} discovered → "
+            f"block dropped {self.block_dropped_count} ({pct}%) → "
+            f"{self.raw_discovered} remain → "
+            f"allow/must dropped {allow_mc_dropped} → "
+            f"{self.after_filter} extractable"
+        )
 
     # ── Core filter simulator ──────────────────────────────────────────────────
 
@@ -423,20 +452,48 @@ class AutoRepairEngine:
             label_bp = ", ".join(f'"{p}"' for p in self.block_pats[:2])
             if len(self.block_pats) > 2:
                 label_bp += f" +{len(self.block_pats) - 2} more"
+            _block_catast = (
+                self.block_dropped_count > 0
+                and self.pre_block_discovered > 5
+                and self.block_dropped_count > self.pre_block_discovered * 0.80
+            )
+            _block_pct = self.pipeline_stats.get("block_dropped_pct", 0)
+            _funnel = self._filter_funnel_str()
             candidates.append(RepairCandidate(
                 id="clear_block_patterns",
                 rank=0,
-                label="Remove block_url_patterns",
+                label=(
+                    "Remove block_url_patterns — primary fix (over-blocking course URLs)"
+                    if _block_catast
+                    else "Remove block_url_patterns"
+                ),
                 description=(
-                    f"Clears block pattern(s): {label_bp}. "
-                    "These patterns were blocking URLs that happened to match. "
-                    "allow_url_patterns and must_contain are kept."
+                    (
+                        f"⚠ block_url_patterns dropped {self.block_dropped_count} / "
+                        f"{self.pre_block_discovered} discovered URLs ({_block_pct}%) — "
+                        f"this is the primary problem. "
+                        if _block_catast else ""
+                    )
+                    + f"Clears block pattern(s): {label_bp}. "
+                    + (
+                        "allow_url_patterns and must_contain are kept."
+                        + (f" Filter funnel: {_funnel}." if _funnel else "")
+                    )
                 ),
                 category="url_filter",
-                problem_addressed="block_url_patterns accidentally matching course URLs",
+                problem_addressed=(
+                    f"block_url_patterns dropped {self.block_dropped_count}/{self.pre_block_discovered} "
+                    f"discovered URLs ({_block_pct}%) — catastrophic over-blocking"
+                    if _block_catast
+                    else "block_url_patterns accidentally matching course URLs"
+                ),
                 recipe_patch={"discovery": {"block_url_patterns": []}},
                 simulation=sim,
-                confidence=_conf_base(78) if total_raw > 0 else 35,
+                confidence=(
+                    _conf_base(93) if _block_catast
+                    else _conf_base(78) if total_raw > 0
+                    else 35
+                ),
                 safety_gate_passed=gate,
                 expected_gain=max(0, sim.after_count - sim.before_count),
             ))
@@ -649,7 +706,9 @@ class AutoRepairEngine:
             ),
             category="url_filter",
             problem_addressed=(
-                f"Current allow_url_patterns match 0 of {self.raw_discovered} discovered URLs"
+                f"Filter funnel: {self._filter_funnel_str()}"
+                if self._filter_funnel_str()
+                else f"Current allow_url_patterns match 0 of {self.raw_discovered} discovered URLs"
             ),
             recipe_patch={"discovery": {
                 "allow_url_patterns": new_pats,
@@ -674,7 +733,15 @@ class AutoRepairEngine:
 
         candidates: list[RepairCandidate] = []
 
-        if problem in ("url_filter_drop", "partial_filter"):
+        if problem == "block_catastrophic":
+            # block_url_patterns dropped >80% of all discovered URLs.
+            # Generate all filter candidates — Fix D (clear_block_patterns)
+            # will rank #1 due to elevated confidence (93%) and after_count.
+            candidates.extend(self._url_filter_candidates())
+            candidates.extend(self._smart_replace_allow_patterns())
+            if self.raw_discovered < 15:
+                candidates.extend(self._discovery_candidates(supplement=True))
+        elif problem in ("url_filter_drop", "partial_filter"):
             candidates.extend(self._url_filter_candidates())
             # Smart positive fix: derived from the actual dropped URL sample.
             # Inserted before the generic "clear everything" candidates so it

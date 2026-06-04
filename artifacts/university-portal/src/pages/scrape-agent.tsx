@@ -731,7 +731,6 @@ export default function ScrapeAgentPage() {
       await res.json();
       setRepairCandidates(null);
       setPostRepairCandidate(candidate);
-      toast({ title: "Fix applied", description: "Running fast Test Discovery to validate…" });
 
       // Step 2: Auto-run fast Test Discovery to validate the fix immediately
       setRunningPostRepair(true);
@@ -743,6 +742,21 @@ export default function ScrapeAgentPage() {
         const discData: DiscoveryTest = await discRes.json();
         setPostRepairDiscovery(discData);
         setDiscoveryTest(discData);
+        const found = discData.total_found ?? 0;
+        if (found > 0) {
+          toast({
+            title: `Fix validated ✓ — ${found} URL${found === 1 ? "" : "s"} found`,
+            description: "The config change is working. Run a full scrape when ready.",
+          });
+        } else {
+          toast({
+            title: "Fix saved — not yet validated",
+            description: "Test discovery still returned 0 URLs. Try a different fix or review the block/allow patterns.",
+            variant: "destructive",
+          });
+        }
+      } else {
+        toast({ title: "Fix saved", description: "Config applied — validation discovery failed. Re-run scrape to confirm." });
       }
     } catch (err) {
       toast({ title: "Apply failed", description: String(err), variant: "destructive" });

@@ -6127,8 +6127,13 @@ async def auto_repair_candidates(
         dropped_sample=dropped_sample,
     )
 
+    _block_dropped = pipeline_stats.get("block_dropped_count", 0)
+    _pre_block = pipeline_stats.get("pre_block_discovered", raw_discovered)
+
     problem = "unknown"
-    if raw_discovered > 5 and after_filter == 0:
+    if _pre_block > 5 and _block_dropped > 0 and _block_dropped > _pre_block * 0.80:
+        problem = "block_catastrophic"
+    elif raw_discovered > 5 and after_filter == 0:
         problem = "url_filter_drop"
     elif raw_discovered > 5 and after_filter < raw_discovered * 0.5:
         problem = "partial_filter"
@@ -6141,6 +6146,9 @@ async def auto_repair_candidates(
         "ok": True,
         "problem": problem,
         "raw_discovered": raw_discovered,
+        "pre_block_discovered": _pre_block,
+        "block_dropped_count": _block_dropped,
+        "block_dropped_pct": pipeline_stats.get("block_dropped_pct", 0),
         "after_filter": after_filter,
         "imported": imported,
         "historical_url_count": len(historical_urls),

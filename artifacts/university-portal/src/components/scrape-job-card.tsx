@@ -502,8 +502,8 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
       }
       setFixApplied(true);
       toast({
-        title: "Fix applied!",
-        description: "Config saved — re-run the scrape to see results.",
+        title: "Config saved",
+        description: "Fix applied — validate with Test Discovery or re-run the scrape to confirm improvement.",
       });
     } catch (e) {
       toast({
@@ -1223,7 +1223,7 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
                             </div>
                           ) : (
                             <div className="text-[10px] text-green-700 font-semibold bg-green-50 border border-green-200 rounded px-2 py-1">
-                              ✓ Fix applied — re-run the scrape to see the improvement
+                              ✓ Config saved — validate with Test Discovery to confirm
                             </div>
                           )}
                           {validateResult?.sample_rescued && validateResult.sample_rescued.length > 0 && (
@@ -1772,7 +1772,7 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
                                 <div className="flex items-center gap-1.5">
                                   {fixApplied ? (
                                     <span className="text-[10px] text-green-700 flex items-center gap-1">
-                                      <CheckCheck className="w-3 h-3" /> Fix applied — re-run scrape to see results
+                                      <CheckCheck className="w-3 h-3" /> Config saved — validate with Test Discovery to confirm
                                     </span>
                                   ) : (
                                     <button

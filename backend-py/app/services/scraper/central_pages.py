@@ -1793,7 +1793,22 @@ def _extract_fee_link_candidates(html: str, base_domain: str) -> list[str]:
         anchor_text = a.get_text(" ", strip=True).lower()
 
         # Path-based signal.
-        path_match = any(path.endswith(fragment) or fragment in path for fragment in _FEE_URL_PATHS)
+        # NOTE: endswith() is safe for all fragments; "in path" matches as a
+        # substring which is intentional for most tokens (e.g. "/fees" matches
+        # "/admissions/fees/international") but we must guard short tokens like
+        # "/apply" so they don't match "/international/applying-for-accommodation".
+        # Require path-segment boundary by checking that the fragment is followed
+        # by "/" or end-of-string when matching by substring.
+        def _path_fragment_matches(fragment: str, p: str) -> bool:
+            if p.endswith(fragment):
+                return True
+            idx = p.find(fragment)
+            if idx == -1:
+                return False
+            after = p[idx + len(fragment):]
+            return not after or after[0] == "/"
+
+        path_match = any(_path_fragment_matches(f, path) for f in _FEE_URL_PATHS)
         # Anchor-text signal.
         text_match = any(token in anchor_text for token in _FEE_ANCHOR_TEXT)
 
@@ -1915,6 +1930,16 @@ def _fee_url_specificity(url: str) -> int:
     # contains both "fee" (from "fees-and-scholarships") and is longer.
     if "scholarship" in path:
         score -= 50
+    # Penalise accommodation / housing / living-costs pages — these contain
+    # "apply" or "international" in their path but are never the fee schedule.
+    # e.g. /international/preparing-for-the-uk/applying-for-accommodation
+    _NON_FEE_SEGMENTS = (
+        "accommodation", "housing", "living-cost", "living-costs",
+        "preparing-for", "preparing-to", "arrival", "on-campus-living",
+        "student-life", "apply-now",
+    )
+    if any(seg in path for seg in _NON_FEE_SEGMENTS):
+        score -= 40
     return score
 
 

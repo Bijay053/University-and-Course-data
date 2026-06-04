@@ -1148,13 +1148,23 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             )
         else:
             _bfs_start_url = scrape_url
+        # Capture block_url_patterns drop counts emitted inside discover_course_links
+        # so they can be stored in pipeline_stats for the diagnosis endpoint.
+        _filter_funnel_stats: dict = {}
+        _emit_for_discover = emit
+        async def _tracking_emit(type_: str, message: str, **kwargs: object) -> None:
+            if kwargs.get("kind") == "block_url_filter":
+                _filter_funnel_stats["block_dropped"] = int(kwargs.get("dropped", 0))
+                _filter_funnel_stats["after_block"] = int(kwargs.get("kept", 0))
+            await _emit_for_discover(type_, message, **kwargs)
+
         if (not links or _yaml_api_partial) and not _always_browser:
             _pre_bfs_links = list(links)
             links = await discover_course_links(
                 _bfs_start_url,
                 max_pages=max_pages,
                 max_courses=max_courses,
-                emit=emit,
+                emit=_tracking_emit,
                 _blocked_fee_urls_sink=_discover_blocked_fee_urls,
                 discovery_config=_uni_cfg.discovery,
             )
@@ -2352,8 +2362,15 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # Store raw vs post-filter counts in discovered_config so the diagnostic
         # endpoint can distinguish "0 links found" from "links found but filtered out".
         _dc = dict(job.discovered_config or {})
+        _block_dropped_n = _filter_funnel_stats.get("block_dropped", 0)
+        _after_block_n = _filter_funnel_stats.get("after_block", _raw)
+        _pre_block_n = _raw + _block_dropped_n  # true raw before any URL filtering
         _dc["pipeline_stats"] = {
             "raw_discovered": _raw,
+            "pre_block_discovered": _pre_block_n,
+            "block_dropped_count": _block_dropped_n,
+            "block_dropped_pct": round(_block_dropped_n / _pre_block_n * 100) if _pre_block_n else 0,
+            "after_block": _after_block_n,
             "after_filter": len(links),
             "filter_drop_count": _raw - len(links),
             "filter_drop_pct": round((_raw - len(links)) / _raw * 100) if _raw else 0,
