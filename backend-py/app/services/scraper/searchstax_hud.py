@@ -682,6 +682,55 @@ _INTEGRATED_MASTERS_RE = re.compile(
 )
 
 
+# ── Degree-level normalisation for field_map_as_payload universities ─────────
+# Solr docs carry the specific award abbreviation (e.g. "BA (Hons)", "MSc").
+# The system's `degree_level` field on scraped_courses / courses uses broad
+# canonical categories.  Map every known abbreviation to the canonical value.
+_FIELD_MAP_DEGREE_LEVEL: dict[str, str] = {
+    # Undergraduate Bachelor's
+    "ba": "Bachelor", "ba (hons)": "Bachelor",
+    "bsc": "Bachelor", "bsc (hons)": "Bachelor",
+    "beng": "Bachelor", "beng (hons)": "Bachelor",
+    "llb": "Bachelor", "llb (hons)": "Bachelor",
+    "bmus": "Bachelor", "bmus (hons)": "Bachelor",
+    "bfa": "Bachelor", "bfa (hons)": "Bachelor",
+    "bed": "Bachelor", "bed (hons)": "Bachelor",
+    "bsw": "Bachelor", "bsw (hons)": "Bachelor",
+    # Integrated masters (M-prefix with (Hons)) — system treats as Master
+    "mchem (hons)": "Master", "meng (hons)": "Master",
+    "mmath (hons)": "Master", "mphys (hons)": "Master",
+    "mbiol (hons)": "Master", "msci (hons)": "Master",
+    "march (hons)": "Master", "mvet sci (hons)": "Master",
+    # Taught postgraduate masters
+    "msc": "Master", "ma": "Master", "mba": "Master",
+    "llm": "Master", "mres": "Master", "mphil": "Master",
+    "mph": "Master", "mds": "Master", "med": "Master",
+    "mpa": "Master", "mfa": "Master", "msw": "Master",
+    "mmus": "Master",
+    # Postgraduate certificates / diplomas
+    "pgce": "Graduate Certificate & Diploma",
+    "pcert": "Graduate Certificate & Diploma",
+    "pdip": "Graduate Certificate & Diploma",
+    "gdip": "Graduate Certificate & Diploma",
+    "pgdip": "Graduate Certificate & Diploma",
+    "pgcert": "Graduate Certificate & Diploma",
+    "postgraduate certificate": "Graduate Certificate & Diploma",
+    "postgraduate diploma": "Graduate Certificate & Diploma",
+    # Doctorates
+    "phd": "Doctor/Doctorate", "dphil": "Doctor/Doctorate",
+    "edd": "Doctor/Doctorate", "dba": "Doctor/Doctorate",
+    "md": "Doctor/Doctorate", "dsc": "Doctor/Doctorate",
+}
+
+
+def _normalise_field_map_degree_level(award: str) -> str:
+    """Map a Solr degree abbreviation to the system's canonical degree_level.
+
+    Falls back to the raw award string if not in the table so no data is lost.
+    """
+    return _FIELD_MAP_DEGREE_LEVEL.get(award.strip().lower(), award.strip())
+
+
 def _slug_to_name(url: str) -> str:
     """Derive a human-readable fallback name from a course URL slug."""
     # e.g. .../accounting-with-study-abroad-n410/ → "Accounting with Study Abroad N410"
@@ -762,8 +811,12 @@ def _map_doc_field_map(
     _ev("course_name", name, "field_map")
 
     if award:
-        payload["degree_level"] = award
-        _ev("degree_level", award, "field_map")
+        # Normalise to system canonical values (Bachelor / Master /
+        # Graduate Certificate & Diploma / Doctor/Doctorate) rather than
+        # storing the raw Solr abbreviation (BA (Hons), MSc, etc.).
+        normalised_degree_level = _normalise_field_map_degree_level(award)
+        payload["degree_level"] = normalised_degree_level
+        _ev("degree_level", normalised_degree_level, "field_map")
 
     raw_level = _first_str(doc, _level_field)
     if raw_level:
