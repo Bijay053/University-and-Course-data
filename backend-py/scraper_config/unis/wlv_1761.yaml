@@ -10,6 +10,12 @@
 #  2. 17 fetch_failed at the end of the run — Cloudflare rate-limits the browser
 #     pool after ~46 concurrent requests.  Fix: max_parallel_fetch=2 + wlv.ac.uk
 #     added to _BROWSER_RETRY_HOSTS in per_course_browser.py.
+#  7. 375/433 fetch_failed (prod run 2026-06-04) — Cloudflare blocks curl_cffi
+#     AND browser for the majority of courses (only first ~40 succeed before
+#     rate-limit kicks in).  max_parallel_fetch=2 is insufficient.  Fix:
+#     scrape_do_fallback: true routes blocked fetches through scrape.do
+#     residential proxy (bypasses Cloudflare).  Costs ~375 scrape.do credits
+#     per full run; SCRAPE_DO_TOKEN must be set on the Celery worker.
 #  3. duplicate_fee_detected CRITICAL — WLV charges a near-flat £17,600 for most
 #     UG courses (legitimate flat rate, not a selector bug).  Suppressed.
 #  4. annual_fee_too_low / possible_domestic_fee — first-run DQ used AUD defaults
@@ -43,6 +49,13 @@ discovery:
     token_env: WLV_SEARCHSTAX_TOKEN
     filter_query: "sectionType_s:courses"
     links_only: true
+
+  # ── scrape.do residential proxy fallback ─────────────────────────────────
+  # WLV's Cloudflare blocks both curl_cffi and browser after ~40 concurrent
+  # requests (375/433 fetch_failed observed in prod).  Enabling scrape.do
+  # routes blocked per-course fetches through a residential proxy, bypassing
+  # Cloudflare entirely.  Requires SCRAPE_DO_TOKEN env var (already set).
+  scrape_do_fallback: true
 
   # ── Retained as fallback only (not used when searchstax block is active) ──
   seed_urls:
