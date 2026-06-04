@@ -1,15 +1,31 @@
 # University of Sunderland
 # Hostname: www.sunderland.ac.uk
 # Country: United Kingdom  |  Currency: GBP
-# Slug: sunderland
-# Auto-generated: 2026-06-04
-#
-# This stub was created automatically on the first scrape of this university.
-# Review and expand it to improve discovery and extraction quality.
-# See scraper_config/defaults.yaml for all available options.
+# uni_id: 1763
 
-discovery: {}
+discovery:
+  sitemap_url: "https://www.sunderland.ac.uk/sitemap.xml"
+  always_sitemap_supplement: true
+  scrape_do_fallback: true
+
+  # Allow both sitemap-style slug URLs (/postgraduate/<slug>, /undergraduate/<slug>)
+  # AND the numeric-ID format Wayback Machine returns (/course/\d+/<slug>).
+  # REPLACES the DB auto_config allow_url_patterns which only had slug-style paths
+  # and was dropping 100% of the 47 Wayback-sourced /course/ URLs.
+  allow_url_patterns:
+    - "sunderland\\.ac\\.uk/(postgraduate|undergraduate)/(?!(conversion-courses|difference-between-ma-msc-degree|llm-criminal-law-procedure))"
+    - "sunderland\\.ac\\.uk/course/\\d+"
+
+  seed_urls:
+    - "https://www.sunderland.ac.uk/postgraduate"
+    - "https://www.sunderland.ac.uk/undergraduate"
 
 extraction:
   fees:
     default_currency: GBP
+    central_page: "https://www.sunderland.ac.uk/international/fees"
+
+  english:
+    central_page: "https://www.sunderland.ac.uk/english-language-requirements"
+
+  suppress_nav_rule: true
