@@ -89,13 +89,33 @@ discovery:
   course_detail_url_patterns:
     - '^https://www\.bcu\.ac\.uk/courses/[a-z0-9-]+-20\d{2}-\d{2}$'
 
-  # CPD and apprenticeship pages are employer-funded / UK-only.
-  # They carry no international fee or IELTS and pollute staging with
-  # data quality failures.
+  # CPD, apprenticeship, and UK-only employer/NHS-funded pages.
+  # These carry no international fee or IELTS and pollute staging.
+  #
+  # Patterns added after Run 4 log analysis:
+  #  - nursing-*-bsc-hons / nursing-associate-fdsc: NHS pre-registration
+  #    nursing programmes are UK-only bursary places (Home students only).
+  #    The pre-registration MSc variants ARE open to international students
+  #    and must NOT be blocked (no 'bsc' suffix in those URLs).
+  #  - nursing-associate: Nursing Associate FdSc is NHS-funded UK-only.
+  #  - education-leadership-in-learning: Teach First MA — requires active
+  #    UK school employment; definitively not open to international students.
+  #  - applied-cancer-practice: NHS CPD module, no international fee.
+  #  - clinical-hypnosis: CPD short course (no international IELTS/fee).
+  #  - conductive-education: UK-specific specialist teacher programme.
   block_url_patterns:
     - 'apprenticeship'
     - '/cpd-'
     - '-cpd-'
+    - 'nursing-adult-bsc-hons'
+    - 'nursing-child-bsc-hons'
+    - 'nursing-mental-health-bsc-hons'
+    - 'nursing-learning-disability-bsc-hons'
+    - 'nursing-associate-fdsc'
+    - 'education-leadership-in-learning'
+    - 'applied-cancer-practice'
+    - 'clinical-hypnosis'
+    - 'conductive-education'
 
 # ── EXTRACTION ────────────────────────────────────────────────────────────────
 extraction:
@@ -124,6 +144,23 @@ extraction:
     # When both a home fee and an international fee appear on the same page,
     # always prefer the international figure.
     prefer_international: true
+
+    # Fallback for courses where per-programme name matching against the
+    # central fee page fails (e.g. Criminology MA, Fine Art MA, Forensic
+    # Psychology MSc).  Those pages publish per-module NHS/CPD rates
+    # (£1,040–£1,632) which are far below the true international annual fee.
+    # allow_bucket_match lets the central page degree-level rate (e.g.
+    # "Postgraduate Taught: £15,990") override the per-module value when
+    # no programme-specific match is found.  Confidence=0.30 so reviewers
+    # still see these as estimates rather than confirmed fees.
+    allow_bucket_match: true
+
+    # Some BCU course pages publish fees via a "View course fees" text link.
+    # Following it reaches the per-programme fee breakdown on the BCU
+    # international fees page when the inline fee table is absent.
+    follow_links:
+      - "View course fees"
+      - "Course fees"
 
   staging:
     # BCU's course page template (2026-27 and 2027-28) puts the degree badge
