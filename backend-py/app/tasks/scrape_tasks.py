@@ -799,13 +799,15 @@ def probe_and_configure(  # noqa: ANN001
             if _platform_type:
                 try:
                     from app.services.scraper.pattern_store import lookup_patterns
-                    # Use a savepoint so that if lookup_patterns fails (e.g. the
-                    # scraper_patterns table is missing on this environment) only
-                    # the nested sub-transaction is rolled back.  The outer
-                    # transaction — and the already-loaded `uni` object — remain
-                    # valid, and the UPDATE in Stage 4 succeeds normally.
-                    async with db.begin_nested():
-                        _learned_patterns = await lookup_patterns(_platform_type, db)
+                    # Use a SEPARATE session so any DB error in lookup_patterns
+                    # (e.g. scraper_patterns table missing, constraint violation)
+                    # cannot poison the outer session's transaction.
+                    # The savepoint / begin_nested() approach was unreliable:
+                    # asyncpg leaves the outer connection in InFailedSQLTransaction
+                    # state when the savepoint teardown itself raises, causing the
+                    # Stage 4 UPDATE to fail even though the intent was to isolate.
+                    async with AsyncSessionLocal() as _db2:
+                        _learned_patterns = await lookup_patterns(_platform_type, _db2)
                     if _learned_patterns:
                         log.info(
                             "[PROBE] Phase 3: loaded %d learned patterns for platform=%r uni_id=%d",
@@ -813,8 +815,7 @@ def probe_and_configure(  # noqa: ANN001
                         )
                 except Exception as _pex:
                     log.debug("[PROBE] pattern lookup non-fatal: %s", _pex)
-                    # Savepoint was automatically rolled back by the context
-                    # manager; outer transaction is still active.
+                    # Separate session closed cleanly; outer transaction unaffected.
 
             # ── Stage 3: Generate the config ───────────────────────────────────
             try:
