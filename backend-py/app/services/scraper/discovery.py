@@ -25,6 +25,7 @@ log = logging.getLogger(__name__)
 _COURSE_URL_HINTS = (
     "/course/",
     "/courses/",
+    "/course-structure/",
     "/international/courses/",
     "/program/",
     "/programs/",

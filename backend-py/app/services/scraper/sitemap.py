@@ -50,6 +50,13 @@ _NOISE_PARAMS: Final = ("students", "audience", "mode", "view", "tab", "ref")
 # no degree qualifier word but are clearly valid course identifiers.
 _COURSE_CODE_RE = re.compile(r"^[A-Z]{2,8}\d{3,4}$")
 
+# Degree abbreviation slugs: MBA, LLM, LLB, MSc, MRes, MBBS, etc.
+# These are genuine course URL terminal segments but only 2-4 alpha chars —
+# the normal len(name)<4 guard would block them.  Keep the pattern tight
+# (all-alpha, 2-5 chars) so it never matches generic index words like
+# "all", "new", "top" (already 3 chars but not degree abbrs).
+_DEGREE_ABBR_RE = re.compile(r"^[A-Za-z]{2,5}$")
+
 
 def _is_nested_loc(loc: str) -> bool:
     """A `<loc>` that points at another sitemap rather than a real page."""
@@ -131,8 +138,15 @@ def _is_course_loc(loc: str, *, base_host: str = "") -> bool:
     if not _looks_like_course_url(loc):
         return False
     name = _slug_to_name(loc)
-    if not name or len(name) < 4:
+    if not name:
         return False
+    if len(name) < 4:
+        # Allow short all-alpha slugs that look like degree abbreviations
+        # (MBA, LLM, LLB, MSc, MRes, MBBS …) before blocking short names.
+        # Without this, /course-structure/pg/fbl/mba/ is silently dropped.
+        last_seg = urlparse(loc).path.rstrip("/").rsplit("/", 1)[-1]
+        if not _DEGREE_ABBR_RE.match(last_seg):
+            return False
     if _JUNK_TEXT.match(name):
         return False
     # An honest course slug almost always contains a degree/level word OR
