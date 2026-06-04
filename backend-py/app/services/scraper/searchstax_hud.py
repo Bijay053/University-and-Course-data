@@ -744,6 +744,8 @@ def _map_doc_field_map(
             "entity_type": "course",
             "authority": 1.5,
             "confidence": 0.85,
+            "decision_status": "selected",
+            "selected": True,
         })
 
     _ev("course_name", name, "field_map")
