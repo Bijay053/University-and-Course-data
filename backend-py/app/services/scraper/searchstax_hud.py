@@ -1226,11 +1226,19 @@ async def fetch_searchstax_links(
         f"({'fq=' + _filter if _filter else 'unfiltered'}) ..."
     )
 
-    # When using field_map_as_payload, request only the mapped Solr field names
+    # When using field_map_as_payload, request the mapped Solr field names
     # (e.g. Durham's PascalCase fields like Degreename_t, Degreetype_ss, ...).
+    # Also always include the three "identity" fields used by _map_doc_field_map
+    # for course name, degree type, and URL — even if they aren't in field_map.
+    # Without this, docs come back missing title_t / award_s / url_t and every
+    # course gets a slug-derived name like "Sr037M01Uwu" instead of its real title.
     # For HUD/generic modes, fall back to the standard _FIELDS string.
     if cfg.field_map_as_payload and cfg.field_map:
-        _fl = ",".join({"id", *cfg.field_map.values()})
+        _fm_vals = cfg.field_map or {}
+        _url_fl  = _fm_vals.get("url",         "url_t")
+        _name_fl = _fm_vals.get("name",        "title_t")
+        _type_fl = _fm_vals.get("degree_type", "award_s")
+        _fl = ",".join({"id", _url_fl, _name_fl, _type_fl, *_fm_vals.values()})
     else:
         _fl = _FIELDS
 
