@@ -1027,6 +1027,14 @@ async def fetch_searchstax_links(cfg: SearchStaxConfig, emit=None) -> list[dict]
         f"({'fq=' + _filter if _filter else 'unfiltered'}) ..."
     )
 
+    # When using field_map_as_payload, request only the mapped Solr field names
+    # (e.g. Durham's PascalCase fields like Degreename_t, Degreetype_ss, ...).
+    # For HUD/generic modes, fall back to the standard _FIELDS string.
+    if cfg.field_map_as_payload and cfg.field_map:
+        _fl = ",".join({"id", *cfg.field_map.values()})
+    else:
+        _fl = _FIELDS
+
     async with httpx.AsyncClient(timeout=30.0) as client:
         _retried_unfiltered = False
         while True:
@@ -1034,7 +1042,7 @@ async def fetch_searchstax_links(cfg: SearchStaxConfig, emit=None) -> list[dict]
                 "q": "*:*",
                 "rows": str(page_size),
                 "start": str(start),
-                "fl": _FIELDS,
+                "fl": _fl,
                 "wt": "json",
             }
             if _filter:
