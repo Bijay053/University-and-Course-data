@@ -123,15 +123,15 @@ async def fetch_repair_samples(
     """Fetch HTML for up to *n* course URLs from the run.
 
     Returns a list of ``(url, html)`` tuples (empty on failure).
-    URLs are picked from ``scraped_courses.source_url`` for the run.
+    URLs are picked from ``scraped_courses.course_website`` for the run.
     """
     from sqlalchemy import text as _t
     try:
         rows = await db.execute(_t("""
-            SELECT DISTINCT source_url
+            SELECT DISTINCT course_website
             FROM scraped_courses
             WHERE scrape_job_id = :run_id
-              AND source_url IS NOT NULL
+              AND course_website IS NOT NULL
             ORDER BY id
             LIMIT :n
         """), {"run_id": scrape_run_id, "n": n})

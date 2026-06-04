@@ -213,8 +213,8 @@ async def update_country_stats(
                 success_count=CountryPattern.success_count + 1,
                 avg_completeness=new_completeness,
                 avg_confidence=new_confidence,
-                last_scrape_at=datetime.now(timezone.utc),
-                updated_at=datetime.now(timezone.utc),
+                last_scrape_at=datetime.now(timezone.utc).replace(tzinfo=None),
+                updated_at=datetime.now(timezone.utc).replace(tzinfo=None),
             )
         )
         await db.commit()
