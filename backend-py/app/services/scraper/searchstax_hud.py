@@ -643,10 +643,11 @@ _MODE_MAP = {
 }
 
 
-def _parse_intake_months_from_dates(dates_raw: str) -> str:
+def _parse_intake_months_from_dates(dates_raw: str) -> list[str]:
     """Extract unique month names from strings like 'September 2026, March 2027'.
 
-    Returns comma-separated month names in order first seen, e.g. 'September, March'.
+    Returns a list of month names in order first seen, e.g. ['September', 'March'].
+    intake_months is stored as JSONB (array); callers must NOT join to a string.
     """
     seen: list[str] = []
     for token in re.split(r"[,;/\n]+", dates_raw):
@@ -655,7 +656,7 @@ def _parse_intake_months_from_dates(dates_raw: str) -> str:
             month = word.capitalize()
             if month not in seen:
                 seen.append(month)
-    return ", ".join(seen)
+    return seen
 
 
 def _normalize_study_mode(raw: str) -> str:

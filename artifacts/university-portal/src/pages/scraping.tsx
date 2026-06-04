@@ -2424,13 +2424,20 @@ export default function Scraping() {
                           ) : <span className="text-gray-300 text-xs">-</span>}
                         </td>
                         <td className="p-2 text-xs text-gray-600">
-                          {course.intakeMonths?.length ? (
-                            course.intakeMonths.map(m => m.slice(0, 3)).join(", ")
-                          ) : (
-                            <span className="inline-flex items-center gap-0.5 text-amber-600 text-xs font-medium" title="Missing intake months">
-                              <AlertTriangle className="w-3 h-3" />
-                            </span>
-                          )}
+                          {(() => {
+                            const months = Array.isArray(course.intakeMonths)
+                              ? course.intakeMonths
+                              : typeof course.intakeMonths === "string" && course.intakeMonths
+                                ? [course.intakeMonths]
+                                : null;
+                            return months?.length ? (
+                              months.map(m => m.slice(0, 3)).join(", ")
+                            ) : (
+                              <span className="inline-flex items-center gap-0.5 text-amber-600 text-xs font-medium" title="Missing intake months">
+                                <AlertTriangle className="w-3 h-3" />
+                              </span>
+                            );
+                          })()}
                         </td>
                         <td className="p-2 text-xs text-gray-600">
                           {course.courseLocation || <span className="text-gray-300">-</span>}
