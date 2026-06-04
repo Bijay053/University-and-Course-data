@@ -773,6 +773,7 @@ def _map_doc_field_map(
     _dur_field   = _fm.get("duration",     "duration_t")
     _date_field  = _fm.get("intake_dates", "start_dates_s")
     _cat_field   = _fm.get("category",     "subject_s")
+    _loc_field   = _fm.get("location",     None)
 
     url = _first_str(doc, _url_field, "id")
     if not url:
@@ -883,6 +884,17 @@ def _map_doc_field_map(
     if raw_cat:
         payload["category"] = raw_cat
         _ev("category", raw_cat, "field_map")
+
+    if _loc_field:
+        raw_loc_vals = doc.get(_loc_field, [])
+        if isinstance(raw_loc_vals, list):
+            raw_loc_vals = [v for v in raw_loc_vals if v]
+        elif raw_loc_vals:
+            raw_loc_vals = [raw_loc_vals]
+        if raw_loc_vals:
+            loc = ", ".join(str(v) for v in raw_loc_vals)
+            payload["course_location"] = loc
+            _ev("course_location", loc, "field_map")
 
     if cfg.location_override:
         payload["course_location"] = cfg.location_override

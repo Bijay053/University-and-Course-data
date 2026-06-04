@@ -46,7 +46,18 @@ discovery:
     endpoint: "https://searchcloud-1-eu-west-2.searchstax.com/29847/wolverhamptondevelopment-3254/emselect"
     token_env: WLV_SEARCHSTAX_TOKEN
     filter_query: "sectionType_s:courses"
-    links_only: true
+    links_only: false
+    field_map_as_payload: true
+
+    # WLV Solr uses multi-valued "multi_*" fields for mode/duration/dates/location.
+    # Only non-default fields need overriding — url_t, title_t, award_s match defaults.
+    field_map:
+      degree_level:  level_s
+      study_mode:    multi_mode_ss
+      duration:      multi_duration_ss
+      intake_dates:  multi_course_start_date_ss
+      category:      subject_area_ss
+      location:      multi_location_ss
 
   # ── Retained as fallback only (not used when searchstax block is active) ──
   seed_urls:
@@ -56,17 +67,9 @@ discovery:
   browser_early_stop_courses: 300
 
 extraction:
-  # WLV is fully Cloudflare-protected: HTTP is blocked for all course pages and
-  # every fetch needs browser escalation.  With default concurrency=4, WLV's CF
-  # starts rate-limiting the browser pool after ~46 requests, causing the last
-  # batch of courses to hit fetch_failed.  Reducing to 2 concurrent sessions
-  # keeps the per-host request rate below CF's rate-limit threshold.
-  max_parallel_fetch: 2
-
-  # WLV is Cloudflare-protected. The first browser request often fails (CF hasn't
-  # set cf_clearance yet); the second attempt passes. Previously hardcoded in
-  # _BROWSER_RETRY_HOSTS in per_course_browser.py.
-  retry_on_cloudflare: true
+  # field_map_as_payload mode: no per-course page fetches at all.
+  # Raise concurrency to default — it's irrelevant since nothing is fetched.
+  max_parallel_fetch: 8
 
   study_mode:
     # WLV: site-wide nav contains "online" text (study-online / online-learning
@@ -77,10 +80,15 @@ extraction:
     suppress_nav_rule: true
 
   fees:
-    # All WLV fees are denominated in GBP.  Setting this avoids false-positive
-    # "annual_fee_too_low" and "possible_domestic_fee" DQ warnings that fire when
-    # the system defaults to AUD and interprets £17,600 as $17,600 AUD.
     default_currency: GBP
+    prefer_international: true
+    force_central_fee_stage: true
+    # WLV publishes a near-flat £17,600/year for the majority of courses.
+    # Solr docs do not contain fee amounts — these defaults are the fallback.
+    # Source: https://www.wlv.ac.uk/apply/fees-and-finance/international-students/
+    degree_level_defaults:
+      undergraduate: 17600
+      postgraduate: 17600
 
   english:
     # WLV does not publish per-course IELTS scores.  Their international
