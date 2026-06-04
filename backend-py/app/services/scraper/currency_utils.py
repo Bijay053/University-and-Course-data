@@ -79,7 +79,16 @@ def infer_currency_from_hostname(hostname: str) -> str | None:
 
 def infer_currency_from_url(url: str) -> str | None:
     """Convenience wrapper: extract hostname from *url* then call
-    :func:`infer_currency_from_hostname`.  Returns ``None`` on no match.
+    :func:`infer_currency_from_hostname`.
+
+    **Returns ``None`` for unknown TLDs** such as ``.com``, ``.org``, ``.net``.
+    Callers (fee extractor, browser extractor) MUST treat ``None`` as
+    "no opinion" — they must NOT fall back to ``default_currency()`` here.
+    ``None`` leaves the door open for text-extracted currency, API/PDF
+    currency, or per-uni YAML ``default_currency`` to win upstream.
+
+    Only :func:`default_currency` (called from ``data_quality.py``) should
+    apply the global last-resort fallback.
     """
     host = (urlparse(url).hostname or "").lower()
     return infer_currency_from_hostname(host)
@@ -90,6 +99,12 @@ def default_currency() -> str:
 
     Reads ``currency_detection.default_currency``; falls back to ``"AUD"``
     only if the config key is missing (so the file can't silently break prod).
+
+    **Call site rule**: this function must only be called from
+    ``data_quality.py`` as the final tier-5 fallback.  Fee extractors must
+    call :func:`infer_currency_from_url` (which returns ``None`` for unknown
+    TLDs) so that extracted text currency and per-uni YAML currency can still
+    win.
     """
     return _load_currency_detection().get("default_currency") or "AUD"
 
@@ -98,6 +113,10 @@ def infer_currency(hostname: str) -> str:
     """Return a currency code for *hostname*, guaranteed non-None.
 
     Tries TLD inference first; falls back to :func:`default_currency`.
-    Suitable for stub-YAML generation where a definitive answer is needed.
+
+    **Only use this in ``loader.py``** for stub-YAML creation, where a
+    definitive answer (even a fallback) is required.  For fee extraction,
+    use :func:`infer_currency_from_url` which returns ``None`` for unknown
+    TLDs and preserves the upstream precedence chain.
     """
     return infer_currency_from_hostname(hostname) or default_currency()

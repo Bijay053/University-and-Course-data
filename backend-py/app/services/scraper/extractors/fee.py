@@ -139,14 +139,16 @@ _COUNTRY_CURRENCY = {
 
 
 def _infer_currency_from_url(url: str) -> str | None:
-    """Infer default currency from URL TLD when context text carries no explicit
-    currency marker (e.g. AUT uses bare '$' with no 'NZ$' prefix).
+    """Infer fee currency from URL TLD when page text carries no explicit marker.
 
-    Only used as a last-resort override when ``_detect_currency`` would
-    otherwise fall back to AUD (the code's global default).
+    **Returns ``None`` for unknown TLDs** (``.com``, ``.org``, ``.net``, etc.).
+    Callers must use the ``if _url_cur:`` guard (already in place) so that
+    ``None`` does not override a currency already detected from fee text.
+    This preserves the precedence chain:
+      text-extracted → API/PDF → per-uni YAML → TLD map → (data_quality only) default
 
-    Delegates to ``currency_utils.infer_currency_from_url`` which reads its
-    TLD→currency map from ``scraper_config/defaults.yaml`` — no hardcoded list.
+    The TLD→currency map is read from ``scraper_config/defaults.yaml``
+    (``currency_detection.tld_currency_map``); no hardcoded list here.
     """
     from app.services.scraper.currency_utils import infer_currency_from_url as _icfu
     return _icfu(url)
