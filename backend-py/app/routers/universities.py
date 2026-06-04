@@ -630,6 +630,7 @@ async def add_university_by_url(
     # Small hostname → city lookup for universities whose homepages use
     # a marketing phrase as the page title rather than their real name.
     _HOSTNAME_CITY: dict[str, str] = {
+        # ── New Zealand ───────────────────────────────────────────────────────
         "waikato.ac.nz":     "Hamilton",
         "auckland.ac.nz":    "Auckland",
         "aut.ac.nz":         "Auckland",
@@ -639,6 +640,7 @@ async def add_university_by_url(
         "lincoln.ac.nz":     "Christchurch",
         "canterbury.ac.nz":  "Christchurch",
         "otago.ac.nz":       "Dunedin",
+        # ── Australia ────────────────────────────────────────────────────────
         "anu.edu.au":        "Canberra",
         "unimelb.edu.au":    "Melbourne",
         "sydney.edu.au":     "Sydney",
@@ -669,13 +671,100 @@ async def add_university_by_url(
         "une.edu.au":        "Armidale",
         "uow.edu.au":        "Wollongong",
         "canberra.edu.au":   "Canberra",
-        "uts.edu.au":        "Sydney",
         "jcu.edu.au":        "Townsville",
         "cdu.edu.au":        "Darwin",
         "federation.edu.au": "Ballarat",
         "usq.edu.au":        "Toowoomba",
         "unisq.edu.au":      "Toowoomba",
         "scu.edu.au":        "Lismore",
+        # ── United Kingdom ────────────────────────────────────────────────────
+        "ox.ac.uk":          "Oxford",
+        "cam.ac.uk":         "Cambridge",
+        "ucl.ac.uk":         "London",
+        "kcl.ac.uk":         "London",
+        "lse.ac.uk":         "London",
+        "imperial.ac.uk":    "London",
+        "city.ac.uk":        "London",
+        "gold.ac.uk":        "London",
+        "rhul.ac.uk":        "Egham",
+        "brunel.ac.uk":      "Uxbridge",
+        "birmingham.ac.uk":  "Birmingham",
+        "bcu.ac.uk":         "Birmingham",
+        "aston.ac.uk":       "Birmingham",
+        "manchester.ac.uk":  "Manchester",
+        "mmu.ac.uk":         "Manchester",
+        "salford.ac.uk":     "Salford",
+        "liverpool.ac.uk":   "Liverpool",
+        "ljmu.ac.uk":        "Liverpool",
+        "leeds.ac.uk":       "Leeds",
+        "leedsbeckett.ac.uk":"Leeds",
+        "sheffield.ac.uk":   "Sheffield",
+        "shu.ac.uk":         "Sheffield",
+        "nottingham.ac.uk":  "Nottingham",
+        "ntu.ac.uk":         "Nottingham",
+        "bristol.ac.uk":     "Bristol",
+        "uwe.ac.uk":         "Bristol",
+        "bath.ac.uk":        "Bath",
+        "exeter.ac.uk":      "Exeter",
+        "soton.ac.uk":       "Southampton",
+        "surrey.ac.uk":      "Guildford",
+        "sussex.ac.uk":      "Brighton",
+        "brighton.ac.uk":    "Brighton",
+        "reading.ac.uk":     "Reading",
+        "kent.ac.uk":        "Canterbury",
+        "york.ac.uk":        "York",
+        "durham.ac.uk":      "Durham",
+        "ncl.ac.uk":         "Newcastle",
+        "northumbria.ac.uk": "Newcastle",
+        "newcastle.ac.uk":   "Newcastle",
+        "warwick.ac.uk":     "Coventry",
+        "coventry.ac.uk":    "Coventry",
+        "leicester.ac.uk":   "Leicester",
+        "dmu.ac.uk":         "Leicester",
+        "lboro.ac.uk":       "Loughborough",
+        "ed.ac.uk":          "Edinburgh",
+        "hw.ac.uk":          "Edinburgh",
+        "napier.ac.uk":      "Edinburgh",
+        "glasgow.ac.uk":     "Glasgow",
+        "gla.ac.uk":         "Glasgow",
+        "strath.ac.uk":      "Glasgow",
+        "gcal.ac.uk":        "Glasgow",
+        "gcu.ac.uk":         "Glasgow",
+        "cardiff.ac.uk":     "Cardiff",
+        "cardiffmet.ac.uk":  "Cardiff",
+        "qub.ac.uk":         "Belfast",
+        "ulster.ac.uk":      "Coleraine",
+        "hud.ac.uk":         "Huddersfield",
+        "bradford.ac.uk":    "Bradford",
+        "hull.ac.uk":        "Hull",
+        "lincoln.ac.uk":     "Lincoln",
+        "derby.ac.uk":       "Derby",
+        "chester.ac.uk":     "Chester",
+        "keele.ac.uk":       "Keele",
+        "lancaster.ac.uk":   "Lancaster",
+        "plymouth.ac.uk":    "Plymouth",
+        "port.ac.uk":        "Portsmouth",
+        "winchester.ac.uk":  "Winchester",
+        "bournemouth.ac.uk": "Bournemouth",
+        "arts.ac.uk":        "London",
+        "soas.ac.uk":        "London",
+        "mdx.ac.uk":         "London",
+        "kingston.ac.uk":    "Kingston upon Thames",
+        "roehampton.ac.uk":  "London",
+        "greenwich.ac.uk":   "London",
+        "westminster.ac.uk": "London",
+        "uel.ac.uk":         "London",
+        "londonmet.ac.uk":   "London",
+        "uwl.ac.uk":         "London",
+        "bathspa.ac.uk":     "Bath",
+        "falmouth.ac.uk":    "Falmouth",
+        "herts.ac.uk":       "Hatfield",
+        "beds.ac.uk":        "Luton",
+        "anglia.ac.uk":      "Cambridge",
+        "uea.ac.uk":         "Norwich",
+        "essex.ac.uk":       "Colchester",
+        "cranfield.ac.uk":   "Cranfield",
+        "open.ac.uk":        "Milton Keynes",
     }
 
     # Generic page-title values that are not institution names and must be
@@ -795,6 +884,46 @@ async def add_university_by_url(
                 city = _HOSTNAME_CITY[_candidate]
                 break
 
+    # ── City fallback: derive from university name ─────────────────────────
+    # Covers universities whose hostname is an acronym (bcu, kcl, lse …)
+    # but whose scraped name contains the city explicitly.
+    # e.g. "Birmingham City University" → Birmingham
+    #      "University of Sheffield"    → Sheffield
+    #      "Sheffield Hallam University"→ Sheffield
+    if city == "Unknown" and name:
+        _NAME_STOP = {
+            "the", "city", "royal", "imperial", "open", "national",
+            "central", "eastern", "western", "northern", "southern",
+            "arts", "technology", "science", "health", "liberal",
+            "international", "new", "great", "institute", "college",
+        }
+        # Pattern A: "[City] City University"  →  first word before "City University"
+        _cm = _re.search(r'\b([A-Z][a-z]+)\s+City\s+University\b', name)
+        if _cm and _cm.group(1).lower() not in _NAME_STOP:
+            city = _cm.group(1)
+        # Pattern B: "University of [City]"  →  word(s) after "of"
+        if city == "Unknown":
+            _cm = _re.search(
+                r'\bUniversity\s+of\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\b', name,
+            )
+            if _cm and _cm.group(1).lower().split()[0] not in _NAME_STOP:
+                city = _cm.group(1)
+        # Pattern C: known compound suffixes  e.g. "Sheffield Hallam", "Nottingham Trent"
+        if city == "Unknown":
+            _cm = _re.search(
+                r'\b([A-Z][a-z]+)\s+'
+                r'(?:Hallam|Trent|Metropolitan|Napier|Caledonian|Brookes|'
+                r'Beckett|Moores|Solent|Staffordshire|Huddersfield)\s+University\b',
+                name,
+            )
+            if _cm and _cm.group(1).lower() not in _NAME_STOP:
+                city = _cm.group(1)
+        # Pattern D: generic "[City] University" (single word city before University)
+        if city == "Unknown":
+            _cm = _re.search(r'\b([A-Z][a-z]+)\s+University\b', name)
+            if _cm and _cm.group(1).lower() not in _NAME_STOP:
+                city = _cm.group(1)
+
     if not name:
         # Fallback: derive a readable name from the hostname.
         # Strip generic prefixes (www, courses, study) and known TLD suffixes
@@ -819,13 +948,28 @@ async def add_university_by_url(
     )).scalar_one_or_none()
 
     if existing:
-        # Return existing — don't duplicate
+        # Patch city / country in-place if the stored value is still "Unknown"
+        # (happens when the university was added before city extraction worked).
+        _needs_update = False
+        _eff_city    = existing.city
+        _eff_country = existing.country
+        if (not existing.city or existing.city == "Unknown") and city != "Unknown":
+            existing.city = city
+            _eff_city = city
+            _needs_update = True
+        if (not existing.country or existing.country == "Unknown") and country != "Unknown":
+            existing.country = country
+            _eff_country = country
+            _needs_update = True
+        if _needs_update:
+            existing.updated_at = datetime.now(timezone.utc)
+            await db.commit()
         return {
             "university_id": existing.id,
             "task_id": None,
             "name": existing.name,
-            "country": existing.country or country,
-            "city": existing.city or city,
+            "country": _eff_country,
+            "city": _eff_city,
             "already_exists": True,
             "message": (
                 f"University '{existing.name}' already exists "
