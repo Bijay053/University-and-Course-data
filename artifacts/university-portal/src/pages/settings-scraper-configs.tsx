@@ -250,14 +250,51 @@ discovery:
   #   - https://www.example.ac.nz/study/qualifications/
   # # When API returns 0 links, BFS starts from seed_urls[0] instead of homepage.
 
-  # Option C — SearchStax Solr provider (Huddersfield-style, full provider).
-  # Use when the site is a JS SPA that queries Solr client-side.
+  # Option C — SearchStax Solr provider (Huddersfield / WLV style, full provider).
+  # Use when the site is a React SPA that queries a Solr/SearchStax core client-side.
+  # HOW TO IDENTIFY: DevTools → Network → filter XHR → find a call to
+  #   searchcloud-*.searchstax.com/.../emselect  → copy the endpoint URL.
   # searchstax:
   #   enabled: true
   #   endpoint: "https://searchcloud-1-eu-west-2.searchstax.com/29847/<core-id>/emselect"
-  #   token_env: "HUD_SEARCHSTAX_TOKEN"    # env var name — never commit literal tokens
-  #   filter_query: "sectionType_s:course"
-  #   currency: "GBP"
+  #   token_env: "MY_UNI_SEARCHSTAX_TOKEN"  # env var name — never commit literal tokens
+  #   filter_query: "sectionType_s:course"   # Solr fq filter — copy from DevTools request
+  #   currency: "GBP"                        # NZD | AUD | USD | GBP | EUR
+  #
+  #   # When the Solr url_t field contains bare course codes rather than full URLs
+  #   # (e.g. WLV SITS codes like "WR006J01UMU"), prepend url_base to build real links:
+  #   # url_base: "https://www.example.ac.uk/courses"
+  #
+  #   # Strip category-label prefixes from the Solr location field values before storing.
+  #   # Example: "University: City Campus" → "City Campus"
+  #   # location_strip_prefixes:
+  #   #   - "University: "
+  #   #   - "Campus: "
+  #
+  #   # Drop "Part-time" from mixed-mode courses; skip exclusively Part-time courses.
+  #   # Use for international-student portals where only Full-time enrolment is offered:
+  #   # exclude_part_time: true
+  #
+  #   # When Solr documents already contain full course data (duration, mode, intakes,
+  #   # fees, IELTS) there is no need to fetch each course HTML page separately.
+  #   # Set both flags below so the orchestrator uses the Solr payload directly:
+  #   # links_only: false          # false = run per-course extraction pass
+  #   # field_map_as_payload: true # true  = use Solr doc fields as the payload (no HTTP)
+  #
+  #   # Map semantic field names to the actual Solr field names for this university.
+  #   # Only override fields whose Solr name differs from the HUD defaults.
+  #   # Defaults: name→title_t, url→url_t, award→award_s
+  #   # field_map:
+  #   #   degree_level:  level_s
+  #   #   study_mode:    multi_mode_ss
+  #   #   duration:      multi_duration_ss
+  #   #   intake_dates:  multi_course_start_date_ss
+  #   #   category:      subject_area_ss
+  #   #   location:      multi_location_ss
+  #
+  #   # Pagination (defaults usually fine — only change if Solr returns < all courses):
+  #   # page_size: 200
+  #   # max_pages: 20
 
   # ── BFS / Sitemap / Browser ────────────────────────────────────────────────
 
@@ -468,6 +505,11 @@ extraction:
 # BFS finds 0–9 courses (JS SPA, hidden API)     auto_api_discovery: true
 # You already know the API endpoint URL           generic_search_api (Option B above)
 # Site uses SearchStax Solr directly             searchstax (Option C above)
+# SearchStax url_t holds SITS codes, not URLs    searchstax.url_base
+# Location shows "Category: Value" prefix        searchstax.location_strip_prefixes
+# Mode shows Part-time for intl-only courses     searchstax.exclude_part_time: true
+# Solr doc has all fields (no HTML fetch needed) searchstax.field_map_as_payload: true + links_only: false
+# Solr field names differ from HUD defaults      searchstax.field_map (6 overrideable fields)
 # Discovery finds nav/news pages, not courses    must_contain / block_url_patterns
 # Sitemap not auto-discovered                    sitemap_url
 # BFS finds < 5 courses (different subdomain)    fallback_subdomains

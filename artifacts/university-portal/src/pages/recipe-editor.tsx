@@ -33,6 +33,31 @@ interface FieldSelector {
   attribute?: string;
 }
 
+interface SearchStaxFieldMap {
+  degree_level?: string;
+  study_mode?: string;
+  duration?: string;
+  intake_dates?: string;
+  category?: string;
+  location?: string;
+}
+
+interface SearchStaxConfig {
+  enabled: boolean;
+  endpoint: string;
+  token_env: string;
+  filter_query: string;
+  currency: string;
+  url_base?: string;
+  location_strip_prefixes: string[];
+  exclude_part_time: boolean;
+  links_only: boolean;
+  field_map_as_payload: boolean;
+  field_map: SearchStaxFieldMap;
+  page_size?: number;
+  max_pages?: number;
+}
+
 interface ApiConfig {
   endpoint: string;
   method: string;
@@ -172,6 +197,7 @@ interface Recipe {
   fee_reject_years: number[];
   url_rewrites: { host: string; path_contains?: string; append_query: string }[];
   degree_level_defaults: Record<string, DegreeEnglishTier>;
+  searchstax?: SearchStaxConfig;
 }
 
 const EMPTY_RECIPE: Recipe = {
@@ -224,6 +250,7 @@ const EMPTY_RECIPE: Recipe = {
   fee_reject_years: [],
   url_rewrites: [],
   degree_level_defaults: {},
+  searchstax: undefined,
 };
 
 const STANDARD_FIELDS = [
@@ -992,6 +1019,16 @@ export default function RecipeEditorPage() {
     setRecipe(r => ({ ...r, campus: { default_city: "", valid_campuses: [], online_only_reject: false, ...(r.campus || {}), ...patch } }));
   const patchSelector = (field: string, patch: Partial<FieldSelector>) =>
     setRecipe(r => ({ ...r, selectors: { ...r.selectors, [field]: { ...(r.selectors[field] || {}), ...patch } } }));
+  const EMPTY_SEARCHSTAX: SearchStaxConfig = {
+    enabled: true, endpoint: "", token_env: "", filter_query: "sectionType_s:course",
+    currency: "GBP", url_base: "", location_strip_prefixes: [],
+    exclude_part_time: false, links_only: false, field_map_as_payload: false,
+    field_map: {}, page_size: undefined, max_pages: undefined,
+  };
+  const patchSearchStax = (patch: Partial<SearchStaxConfig>) =>
+    setRecipe(r => ({ ...r, searchstax: { ...EMPTY_SEARCHSTAX, ...(r.searchstax || {}), ...patch } }));
+  const patchSearchStaxFieldMap = (patch: Partial<SearchStaxFieldMap>) =>
+    setRecipe(r => ({ ...r, searchstax: { ...EMPTY_SEARCHSTAX, ...(r.searchstax || {}), field_map: { ...(r.searchstax?.field_map || {}), ...patch } } }));
 
   if (loading) {
     return (
@@ -1843,6 +1880,7 @@ export default function RecipeEditorPage() {
       <Tabs defaultValue="discovery" className="space-y-4">
         <TabsList className="flex flex-wrap h-auto gap-1">
           <TabsTrigger value="discovery" className="flex items-center gap-1"><Globe className="h-3 w-3" /> Discovery</TabsTrigger>
+          <TabsTrigger value="searchstax" className="flex items-center gap-1"><Zap className="h-3 w-3" /> SearchStax</TabsTrigger>
           <TabsTrigger value="api" className="flex items-center gap-1"><Database className="h-3 w-3" /> JSON API</TabsTrigger>
           <TabsTrigger value="filters" className="flex items-center gap-1"><Filter className="h-3 w-3" /> URL Filters</TabsTrigger>
           <TabsTrigger value="selectors" className="flex items-center gap-1"><Code2 className="h-3 w-3" /> Field Selectors</TabsTrigger>
@@ -2005,6 +2043,210 @@ export default function RecipeEditorPage() {
                 helpText="Individual course pages injected directly after discovery — bypasses all crawling. Use for courses that no crawler can find."
               />
             </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ── 1b. SearchStax Solr Provider ────────────────────────────────── */}
+        <TabsContent value="searchstax">
+          <Card>
+            <CardHeader>
+              <div className="flex items-start justify-between">
+                <div>
+                  <CardTitle className="text-base flex items-center gap-2"><Zap className="h-4 w-4" /> SearchStax Solr Provider</CardTitle>
+                  <CardDescription className="mt-1">
+                    Use when the university site is a React SPA that queries a Solr/SearchStax core client-side
+                    (e.g. Huddersfield, Wolverhampton). Find the endpoint in DevTools → Network → filter XHR → look
+                    for <code className="text-xs">searchcloud-*.searchstax.com/.../emselect</code>.
+                  </CardDescription>
+                </div>
+                <div className="flex items-center gap-2 shrink-0 ml-4">
+                  <span className="text-xs text-muted-foreground">{recipe.searchstax ? "Configured" : "Not configured"}</span>
+                  <Switch
+                    checked={!!recipe.searchstax}
+                    onCheckedChange={v => v
+                      ? patchSearchStax({})
+                      : setRecipe(r => ({ ...r, searchstax: undefined }))
+                    }
+                  />
+                </div>
+              </div>
+            </CardHeader>
+            {recipe.searchstax && (
+              <CardContent className="space-y-6">
+                {/* Core connection fields */}
+                <div className="grid grid-cols-1 gap-4">
+                  <div>
+                    <Label>Solr Endpoint URL</Label>
+                    <Input
+                      value={recipe.searchstax.endpoint}
+                      onChange={e => patchSearchStax({ endpoint: e.target.value })}
+                      placeholder="https://searchcloud-1-eu-west-2.searchstax.com/29847/<core-id>/emselect"
+                      className="mt-1 text-sm font-mono"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">Copy from DevTools request URL. Never commit tokens here.</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Token Env Var Name</Label>
+                    <Input
+                      value={recipe.searchstax.token_env}
+                      onChange={e => patchSearchStax({ token_env: e.target.value })}
+                      placeholder="MY_UNI_SEARCHSTAX_TOKEN"
+                      className="mt-1 text-sm font-mono"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">Name of the Replit secret that holds the bearer token.</p>
+                  </div>
+                  <div>
+                    <Label>Filter Query (fq)</Label>
+                    <Input
+                      value={recipe.searchstax.filter_query}
+                      onChange={e => patchSearchStax({ filter_query: e.target.value })}
+                      placeholder="sectionType_s:course"
+                      className="mt-1 text-sm font-mono"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">Solr <code>fq</code> parameter — copy from DevTools request.</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Currency</Label>
+                    <Select value={recipe.searchstax.currency} onValueChange={v => patchSearchStax({ currency: v })}>
+                      <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="GBP">GBP — British Pounds</SelectItem>
+                        <SelectItem value="AUD">AUD — Australian Dollars</SelectItem>
+                        <SelectItem value="NZD">NZD — New Zealand Dollars</SelectItem>
+                        <SelectItem value="USD">USD — US Dollars</SelectItem>
+                        <SelectItem value="EUR">EUR — Euros</SelectItem>
+                        <SelectItem value="CAD">CAD — Canadian Dollars</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>URL Base</Label>
+                    <Input
+                      value={recipe.searchstax.url_base || ""}
+                      onChange={e => patchSearchStax({ url_base: e.target.value || undefined })}
+                      placeholder="https://www.example.ac.uk/courses"
+                      className="mt-1 text-sm font-mono"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Prepend to bare course codes in <code>url_t</code> (e.g. WLV SITS codes like "WR006J01UMU").
+                      Leave blank when Solr returns full URLs.
+                    </p>
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* Toggles */}
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="flex items-center justify-between rounded-lg border p-3">
+                    <div>
+                      <p className="text-sm font-medium">Exclude Part-time</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">Drop Part-time from mixed-mode courses; skip Part-time-only courses.</p>
+                    </div>
+                    <Switch
+                      checked={recipe.searchstax.exclude_part_time}
+                      onCheckedChange={v => patchSearchStax({ exclude_part_time: v })}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between rounded-lg border p-3">
+                    <div>
+                      <p className="text-sm font-medium">Field Map as Payload</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">Use Solr doc fields as course data directly (no HTML fetch per course).</p>
+                    </div>
+                    <Switch
+                      checked={recipe.searchstax.field_map_as_payload}
+                      onCheckedChange={v => patchSearchStax({ field_map_as_payload: v })}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between rounded-lg border p-3">
+                    <div>
+                      <p className="text-sm font-medium">Links Only</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">Only use Solr for discovery; still fetch each course HTML page.</p>
+                    </div>
+                    <Switch
+                      checked={recipe.searchstax.links_only}
+                      onCheckedChange={v => patchSearchStax({ links_only: v })}
+                    />
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* Location strip prefixes */}
+                <StringListEditor
+                  label="Location Strip Prefixes"
+                  values={recipe.searchstax.location_strip_prefixes}
+                  onChange={v => patchSearchStax({ location_strip_prefixes: v })}
+                  placeholder='University: '
+                  helpText='Strip these prefixes from raw Solr location values. Example: "University: City Campus" → "City Campus". Add a trailing space if the prefix includes one.'
+                />
+
+                <Separator />
+
+                {/* Field map */}
+                <div>
+                  <Label className="text-sm font-semibold">Solr Field Name Mapping</Label>
+                  <p className="text-xs text-muted-foreground mt-1 mb-3">
+                    Override only the Solr field names that differ from the HUD defaults.
+                    Leave blank to use defaults (<code>title_t</code>, <code>url_t</code>, <code>award_s</code>).
+                  </p>
+                  <div className="grid grid-cols-2 gap-3">
+                    {([ 
+                      { key: "degree_level", label: "Degree Level", placeholder: "level_s" },
+                      { key: "study_mode",   label: "Study Mode",   placeholder: "multi_mode_ss" },
+                      { key: "duration",     label: "Duration",     placeholder: "multi_duration_ss" },
+                      { key: "intake_dates", label: "Intake Dates", placeholder: "multi_course_start_date_ss" },
+                      { key: "category",     label: "Category",     placeholder: "subject_area_ss" },
+                      { key: "location",     label: "Location",     placeholder: "multi_location_ss" },
+                    ] as const).map(({ key, label, placeholder }) => (
+                      <div key={key}>
+                        <Label className="text-xs">{label}</Label>
+                        <Input
+                          value={(recipe.searchstax!.field_map as any)[key] || ""}
+                          onChange={e => patchSearchStaxFieldMap({ [key]: e.target.value || undefined })}
+                          placeholder={placeholder}
+                          className="mt-1 text-sm font-mono"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* Pagination */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Page Size</Label>
+                    <Input
+                      type="number"
+                      value={recipe.searchstax.page_size ?? ""}
+                      onChange={e => patchSearchStax({ page_size: e.target.value ? parseInt(e.target.value) : undefined })}
+                      placeholder="default: 200"
+                      className="mt-1 text-sm"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">Solr rows per page. Only change if the default misses courses.</p>
+                  </div>
+                  <div>
+                    <Label>Max Pages</Label>
+                    <Input
+                      type="number"
+                      value={recipe.searchstax.max_pages ?? ""}
+                      onChange={e => patchSearchStax({ max_pages: e.target.value ? parseInt(e.target.value) : undefined })}
+                      placeholder="default: 20"
+                      className="mt-1 text-sm"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">Safety cap on Solr pagination. Raise for universities with &gt;4000 courses.</p>
+                  </div>
+                </div>
+              </CardContent>
+            )}
           </Card>
         </TabsContent>
 
@@ -3729,6 +3971,34 @@ function buildYamlPreview(recipe: Recipe): string {
 
   // ── Discovery ─────────────────────────────────────────────────────────────
   const discLines: string[] = [];
+
+  // SearchStax Solr provider
+  if (recipe.searchstax) {
+    const ss = recipe.searchstax;
+    discLines.push("  searchstax:");
+    if (ss.endpoint) discLines.push(`    endpoint: ${_yq(ss.endpoint)}`);
+    if (ss.token_env) discLines.push(`    token_env: ${_yq(ss.token_env)}`);
+    if (ss.filter_query) discLines.push(`    filter_query: ${_yq(ss.filter_query)}`);
+    if (ss.currency && ss.currency !== "GBP") discLines.push(`    currency: ${_yq(ss.currency)}`);
+    else if (ss.currency === "GBP") discLines.push(`    currency: "GBP"`);
+    if (ss.url_base) discLines.push(`    url_base: ${_yq(ss.url_base)}`);
+    if (ss.location_strip_prefixes.length > 0) {
+      discLines.push("    location_strip_prefixes:");
+      ss.location_strip_prefixes.forEach(p => discLines.push(`      - ${_yq(p)}`));
+    }
+    if (ss.exclude_part_time) discLines.push("    exclude_part_time: true");
+    if (!ss.links_only) discLines.push("    links_only: false");
+    if (ss.field_map_as_payload) discLines.push("    field_map_as_payload: true");
+    const fm = ss.field_map;
+    const fmEntries = Object.entries(fm).filter(([, v]) => v);
+    if (fmEntries.length > 0) {
+      discLines.push("    field_map:");
+      fmEntries.forEach(([k, v]) => discLines.push(`      ${k}: ${_yq(v as string)}`));
+    }
+    if (ss.page_size != null) discLines.push(`    page_size: ${ss.page_size}`);
+    if (ss.max_pages != null) discLines.push(`    max_pages: ${ss.max_pages}`);
+  }
+
   if (recipe.seed_urls.length > 0) {
     discLines.push("  seed_urls:");
     recipe.seed_urls.forEach(u => discLines.push(`    - ${_yq(u)}`));
