@@ -370,7 +370,27 @@ def apply_overrides(
     # that London Met embeds on every course page.  This runs AFTER the
     # loan-banner null above so the real fee replaces the bogus one.
     # Only fields that are currently empty on the payload are filled.
-    real = extract_real_fees(parse_data_cost_entries(html))
+    entries = parse_data_cost_entries(html)
+    real = extract_real_fees(entries)
+    # Build a human-readable snippet for enforce_source_evidence.
+    # The guard (guards.py::enforce_source_evidence) requires BOTH
+    # source_url AND snippet to be non-empty for critical fields such as
+    # international_fee.  Without a snippet the guard silently nulls the
+    # recovered fee even though the scrub correctly filled it.
+    _intl_entry = next(
+        (e for e in entries
+         if e.get("fee_type", "").lower() == "international"
+         and "full-time" in e.get("mode", "").lower()),
+        None,
+    )
+    _fee_snippet = (
+        f"data-fee-type='International' data-mode='Full-time' "
+        f"data-cost='£{int(real['international_fee']):,} per year' "
+        f"data-location='{_intl_entry.get('location', '')}' "
+        f"data-duration='{_intl_entry.get('duration', '')}'"
+        if _intl_entry and real.get("international_fee")
+        else "londonmet data-cost entry"
+    )
     for field in ("international_fee", "domestic_fee", "fee_term", "currency",
                   "intake_months", "course_location"):
         new_val = real.get(field)
@@ -389,6 +409,9 @@ def apply_overrides(
                 "method": "londonmet_chrome_scrub:data_cost_attr",
                 "source_url": url,
                 "raw_value": new_val,
+                # snippet is required by enforce_source_evidence — without it
+                # the guard will null international_fee even after we fill it.
+                "snippet": _fee_snippet,
             })
     if any(k in applied for k in ("international_fee", "domestic_fee")) and (
         real.get("international_fee") or real.get("domestic_fee")

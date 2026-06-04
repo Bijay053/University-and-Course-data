@@ -75,6 +75,23 @@ extraction:
   # after the loan-banner scrub), wasting ~70 s/course for zero gain.
   skip_browser_rescue: true
 
+  english:
+    # London Met does NOT publish per-course IELTS/PTE/TOEFL scores.
+    # Every course page says "this course requires you to meet our standard
+    # requirements" and links to a shared entry-requirements page:
+    #   UG: /international/applying/english-language-requirements/undergraduate/
+    #   PG: /international/applying/english-language-requirements/postgraduate/
+    # Both pages state the SAME standard minimums (verified 2026-06-04):
+    #   IELTS 6.0 overall with 5.5 in each component
+    #   PTE Academic 59 in each component
+    #   TOEFL iBT 72 overall
+    # These defaults fill ielts_overall / pte_overall / toefl_overall when
+    # all earlier extraction paths (regex, Gemini, browser OCR, central page)
+    # come up empty — which is every London Met course.
+    default_ielts: 6.0
+    default_pte: 59
+    default_toefl: 72
+
   filters:
     domestic_only:
       # London Met publishes both UK and International entry-point options
