@@ -27,8 +27,11 @@ Call log accumulator (Component 4):
 """
 from __future__ import annotations
 
+import asyncio
 import contextvars
 import logging
+import random
+import re
 from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
@@ -41,6 +44,28 @@ log = logging.getLogger(__name__)
 
 _INPUT_USD_PER_M = 0.075
 _OUTPUT_USD_PER_M = 0.30
+
+# ---------------------------------------------------------------------------
+# 429 retry-with-backoff
+# ---------------------------------------------------------------------------
+# When 8 concurrent workers hit Gemini simultaneously the free-tier RPM is
+# exhausted and every call gets 429 RESOURCE_EXHAUSTED.  Rather than
+# propagating the error immediately (wasting all the page-fetching work
+# already done), we retry up to _MAX_RETRIES times, respecting the API's
+# own `retryDelay` hint.  The circuit breaker is only recorded after all
+# retries are exhausted so transient bursts don't trip it prematurely.
+_MAX_RETRIES = 3
+_MAX_RETRY_WAIT_S = 60.0
+_JITTER_FACTOR = 0.25          # ±25 % of the suggested delay
+
+# Parse  'retryDelay': '20s'  from the 429 error body.
+_RETRY_DELAY_RE = re.compile(r"retryDelay['\"]?:\s*['\"]?(\d+)s?['\"]?", re.IGNORECASE)
+
+
+def _parse_retry_delay(err_str: str, default: float = 20.0) -> float:
+    """Return retry delay seconds suggested by the API, or *default*."""
+    m = _RETRY_DELAY_RE.search(err_str)
+    return float(m.group(1)) if m else default
 
 
 # ---------------------------------------------------------------------------
@@ -285,32 +310,47 @@ async def generate(
         _append_call_log(call_type, model_name, in_tok, 0, 0.0, 0, False, "no_api_key", course_url)
         return resp
 
-    try:
-        from google.genai import types as _gtypes
-        resp = await c.aio.models.generate_content(
-            model=model_name,
-            contents=prompt,
-            config=_gtypes.GenerateContentConfig(max_output_tokens=max_output_tokens),
-        )
-        text = (getattr(resp, "text", "") or "").strip()
-        out_tok = _estimate_tokens(text)
-        cost = (in_tok * _INPUT_USD_PER_M + out_tok * _OUTPUT_USD_PER_M) / 1_000_000
-        budget.add_spend(cost)
-        duration_ms = int((datetime.now(timezone.utc) - started).total_seconds() * 1000)
-        _append_call_log(call_type, model_name, in_tok, out_tok, cost, duration_ms, True, None, course_url)
-        return GeminiResponse(text, in_tok, out_tok, cost, call_type=call_type, model=model_name)
-    except Exception as exc:
-        err_str = str(exc)
-        err_code = getattr(exc, "code", None) or getattr(exc, "status_code", None)
-        _quota_tracker.record_failure(err_code, err_str)
-        log.warning("Gemini generate failed [%s]: %s", call_type, exc)
-        duration_ms = int((datetime.now(timezone.utc) - started).total_seconds() * 1000)
-        _append_call_log(call_type, model_name, in_tok, 0, 0.0, duration_ms, False, err_str[:500], course_url)
-        return GeminiResponse(
-            "", in_tok, 0, 0.0,
-            skipped=True, skip_reason=err_str,
-            call_type=call_type, model=model_name,
-        )
+    from google.genai import types as _gtypes
+
+    for attempt in range(_MAX_RETRIES + 1):
+        try:
+            resp = await c.aio.models.generate_content(
+                model=model_name,
+                contents=prompt,
+                config=_gtypes.GenerateContentConfig(max_output_tokens=max_output_tokens),
+            )
+            text = (getattr(resp, "text", "") or "").strip()
+            out_tok = _estimate_tokens(text)
+            cost = (in_tok * _INPUT_USD_PER_M + out_tok * _OUTPUT_USD_PER_M) / 1_000_000
+            budget.add_spend(cost)
+            duration_ms = int((datetime.now(timezone.utc) - started).total_seconds() * 1000)
+            _append_call_log(call_type, model_name, in_tok, out_tok, cost, duration_ms, True, None, course_url)
+            return GeminiResponse(text, in_tok, out_tok, cost, call_type=call_type, model=model_name)
+        except Exception as exc:
+            err_str = str(exc)
+            err_code = getattr(exc, "code", None) or getattr(exc, "status_code", None)
+            is_quota = GeminiQuotaTracker._looks_like_quota(err_code, err_str)
+            if is_quota and attempt < _MAX_RETRIES:
+                delay_s = min(_parse_retry_delay(err_str), _MAX_RETRY_WAIT_S)
+                jitter = delay_s * _JITTER_FACTOR * (random.random() * 2 - 1)
+                wait = max(1.0, delay_s + jitter)
+                log.warning(
+                    "[GEMINI 429] attempt %d/%d — waiting %.1fs before retry [%s]",
+                    attempt + 1, _MAX_RETRIES, wait, call_type,
+                )
+                await asyncio.sleep(wait)
+                continue
+            _quota_tracker.record_failure(err_code, err_str)
+            log.warning("Gemini generate failed [%s]: %s", call_type, exc)
+            duration_ms = int((datetime.now(timezone.utc) - started).total_seconds() * 1000)
+            _append_call_log(call_type, model_name, in_tok, 0, 0.0, duration_ms, False, err_str[:500], course_url)
+            return GeminiResponse(
+                "", in_tok, 0, 0.0,
+                skipped=True, skip_reason=err_str,
+                call_type=call_type, model=model_name,
+            )
+    # unreachable — loop always returns or continues
+    return GeminiResponse("", in_tok, 0, 0.0, skipped=True, skip_reason="max_retries", call_type=call_type, model=model_name)
 
 
 async def generate_with_images(
@@ -354,31 +394,44 @@ async def generate_with_images(
         _append_call_log(call_type, model_name, in_tok, 0, 0.0, 0, False, "no_api_key", course_url)
         return GeminiResponse("", in_tok, 0, 0.0, skipped=True, skip_reason="GEMINI_API_KEY not set", call_type=call_type, model=model_name)
 
-    try:
-        from google.genai import types as _gtypes
-        parts: list[_gtypes.Part] = []
-        for img in images:
-            detected = _detect_mime_type(img)
-            parts.append(_gtypes.Part.from_bytes(data=img, mime_type=detected))
-        parts.append(_gtypes.Part.from_text(text=prompt))
+    from google.genai import types as _gtypes
+    parts: list[_gtypes.Part] = []
+    for img in images:
+        detected = _detect_mime_type(img)
+        parts.append(_gtypes.Part.from_bytes(data=img, mime_type=detected))
+    parts.append(_gtypes.Part.from_text(text=prompt))
 
-        resp = await c.aio.models.generate_content(
-            model=model_name,
-            contents=parts,
-            config=_gtypes.GenerateContentConfig(max_output_tokens=max_output_tokens),
-        )
-        text = (getattr(resp, "text", "") or "").strip()
-        out_tok = _estimate_tokens(text)
-        cost = (in_tok * _INPUT_USD_PER_M + out_tok * _OUTPUT_USD_PER_M) / 1_000_000
-        budget.add_spend(cost)
-        duration_ms = int((datetime.now(timezone.utc) - started).total_seconds() * 1000)
-        _append_call_log(call_type, model_name, in_tok, out_tok, cost, duration_ms, True, None, course_url)
-        return GeminiResponse(text, in_tok, out_tok, cost, call_type=call_type, model=model_name)
-    except Exception as exc:
-        err_str = str(exc)
-        err_code = getattr(exc, "code", None) or getattr(exc, "status_code", None)
-        _quota_tracker.record_failure(err_code, err_str)
-        log.warning("Gemini vision generate failed: %s", exc)
-        duration_ms = int((datetime.now(timezone.utc) - started).total_seconds() * 1000)
-        _append_call_log(call_type, model_name, in_tok, 0, 0.0, duration_ms, False, err_str[:500], course_url)
-        return GeminiResponse("", in_tok, 0, 0.0, skipped=True, skip_reason=err_str, call_type=call_type, model=model_name)
+    for attempt in range(_MAX_RETRIES + 1):
+        try:
+            resp = await c.aio.models.generate_content(
+                model=model_name,
+                contents=parts,
+                config=_gtypes.GenerateContentConfig(max_output_tokens=max_output_tokens),
+            )
+            text = (getattr(resp, "text", "") or "").strip()
+            out_tok = _estimate_tokens(text)
+            cost = (in_tok * _INPUT_USD_PER_M + out_tok * _OUTPUT_USD_PER_M) / 1_000_000
+            budget.add_spend(cost)
+            duration_ms = int((datetime.now(timezone.utc) - started).total_seconds() * 1000)
+            _append_call_log(call_type, model_name, in_tok, out_tok, cost, duration_ms, True, None, course_url)
+            return GeminiResponse(text, in_tok, out_tok, cost, call_type=call_type, model=model_name)
+        except Exception as exc:
+            err_str = str(exc)
+            err_code = getattr(exc, "code", None) or getattr(exc, "status_code", None)
+            is_quota = GeminiQuotaTracker._looks_like_quota(err_code, err_str)
+            if is_quota and attempt < _MAX_RETRIES:
+                delay_s = min(_parse_retry_delay(err_str), _MAX_RETRY_WAIT_S)
+                jitter = delay_s * _JITTER_FACTOR * (random.random() * 2 - 1)
+                wait = max(1.0, delay_s + jitter)
+                log.warning(
+                    "[GEMINI 429] vision attempt %d/%d — waiting %.1fs before retry",
+                    attempt + 1, _MAX_RETRIES, wait,
+                )
+                await asyncio.sleep(wait)
+                continue
+            _quota_tracker.record_failure(err_code, err_str)
+            log.warning("Gemini vision generate failed: %s", exc)
+            duration_ms = int((datetime.now(timezone.utc) - started).total_seconds() * 1000)
+            _append_call_log(call_type, model_name, in_tok, 0, 0.0, duration_ms, False, err_str[:500], course_url)
+            return GeminiResponse("", in_tok, 0, 0.0, skipped=True, skip_reason=err_str, call_type=call_type, model=model_name)
+    return GeminiResponse("", in_tok, 0, 0.0, skipped=True, skip_reason="max_retries", call_type=call_type, model=model_name)
