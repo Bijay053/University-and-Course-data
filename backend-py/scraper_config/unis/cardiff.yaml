@@ -1,0 +1,157 @@
+# Cardiff University
+# Hostname: www.cardiff.ac.uk
+#
+# CLOUDFLARE IP-BLOCK: All datacenter IPs return 403 — listing pages, course pages,
+# sitemap, robots.txt — everything. cffi (TLS impersonation) does NOT bypass it.
+#
+# Strategy:
+#   1. auto_api_discovery: true — Playwright browser intercepts Cardiff's internal
+#      XHR/Fetch calls (course data is JS-rendered via an internal search API).
+#      This is the primary discovery path.
+#   2. scrape.do must be enabled for this university once monthly quota resets.
+#      Cardiff is a residential-proxy-only site; no free tier works.
+#
+# NOTE: discovery.parsers is NOT a valid schema key — it is silently ignored.
+# Per-listing-page XPath rules belong in extraction.selectors.course_list (see below).
+
+discovery:
+  seed_urls:
+    - https://www.cardiff.ac.uk/study/undergraduate/courses/a-to-z
+    - https://www.cardiff.ac.uk/study/postgraduate/research/programmes/a-to-z
+    - https://www.cardiff.ac.uk/study/postgraduate/taught/courses
+
+  auto_api_discovery: true
+
+  allow_url_patterns:
+    - '/study/undergraduate/courses/'
+    - '/study/postgraduate/research/programmes/'
+    - '/study/postgraduate/taught/courses/'
+    - '/courses/.+'
+
+  block_url_patterns:
+    - '/news'
+    - '/events'
+    - '/staff/'
+    - '/about'
+    - '/contact'
+    - '/linkassets/'
+
+  use_wayback: false
+
+extraction:
+  max_parallel_fetch: 3
+
+  filters:
+    domestic_only:
+      enabled: false
+
+    online_only:
+      enabled: false
+
+  fees:
+    default_currency: "GBP"
+    prefer_international: true
+    prefer_annual_over_total: true
+    fee_year: "2025"
+    fee_term: "year"
+
+    reject_keywords:
+      - "Domestic"
+      - "Home student"
+      - "UK student"
+
+  english:
+    source: course_page
+    source_xpath: "//div[contains(@class, 'row') and contains(.//h2/@id, 'requirements')]/*[not(self::div[contains(@id, 'outside-uk-requirements')])] | //div[contains(@class, 'row') and contains(.//h2/@id, 'admission')] | //div[contains(@id, 'entry-requirement')]"
+
+    ielts:
+      raw_xpath: ".//p[contains(., 'IELTS')] | .//li[contains(., 'IELTS')] | .//h3[contains(., 'IELTS')]/following-sibling::p"
+      patterns:
+        overall:
+          - 'score\sof\s.?(\d\.?\d)'
+          - 'of\s*(\d\.?\d*)'
+        each:
+          - 'no\selement\sbelow\s*(\d\.?\d*)'
+          - '(\d\.?\d*)\sin\seach'
+          - '(\d\.?\d*)\sin\sall'
+      apply_each_to:
+        - ielts_reading
+        - ielts_writing
+        - ielts_listening
+        - ielts_speaking
+
+    toefl_ibt:
+      raw_xpath: ".//p[contains(., 'TOEFL')] | .//li[contains(., 'TOEFL')] | .//h3[contains(., 'TOEFL')]/following-sibling::p"
+      patterns:
+        overall:
+          - '(\d\.?\d*)\s*overall'
+          - 'of\s*(\d\.?\d*)'
+        each:
+          - 'no\selement\sbelow\s*(\d\.?\d*)'
+          - '(\d\.?\d*)\sin\sall'
+        individual:
+          writing: '(\d\.?\d*)\sfor\swriting'
+          reading: '(\d\.?\d*)\sfor\sreading'
+          listening: '(\d\.?\d*)\sfor\slistening'
+          speaking: '(\d\.?\d*)\sfor\sspeaking'
+      apply_each_to:
+        - toefl_ibt_reading
+        - toefl_ibt_writing
+        - toefl_ibt_listening
+        - toefl_ibt_speaking
+
+    pte:
+      raw_xpath: ".//p[contains(., 'PTE')] | .//li[contains(., 'PTE')] | .//h3[contains(., 'PTE')]/following-sibling::p"
+      patterns:
+        overall:
+          - '(\d\.?\d*)\s*overall'
+          - 'of\s*(\d\.?\d*)'
+        each:
+          - 'no\selement\sbelow\s*(\d\.?\d*)'
+          - '(\d\.?\d*)\sin\seach'
+          - '(\d\.?\d*)\sin\sall'
+      apply_each_to:
+        - pte_reading
+        - pte_writing
+        - pte_listening
+        - pte_speaking
+
+  selectors:
+    # Combined XPath for both listing page types:
+    #   - UG / Research: table rows  → //table//tbody/tr//a/@href
+    #   - PG Taught: card/teaser divs → //div[contains(@class,'teaser')]//a/@href
+    course_list:
+      xpath: "//table//tbody/tr//a/@href | //div[contains(@class, 'teaser')]//a/@href"
+
+    course_name:
+      xpath: "//h1/text()"
+
+    city:
+      value: "Cardiff"
+
+    course_description:
+      xpath: "//div[contains(@class, 'row') and contains(.//h2/@id, 'overview')] | //div[contains(@id, 'overview')]"
+
+    other_requirements:
+      xpath: "//div[contains(@class, 'row') and contains(.//h2/@id, 'requirements')]/*[not(self::div[contains(@id, 'outside-uk-requirements')])] | //div[contains(@class, 'row') and contains(.//h2/@id, 'admission')] | //div[contains(@id, 'entry-requirement')]"
+
+    career:
+      xpath: "//div[contains(@id, 'employability')] | //div[contains(@class, 'row') and contains(.//h2/@id, 'career')]"
+
+    course_structure:
+      xpath: "//div[contains(@class, 'row') and contains(.//h2/@id, 'structure')] | //div[contains(@id, 'details')]"
+
+    intake_month:
+      xpath: "//li[strong[contains(., 'intake')]]/text() | //legend[contains(., 'Start')]/following-sibling::div//label/text()"
+
+    duration:
+      xpath: "//li[strong[contains(., 'Duration')]]"
+      remove_tags: true
+      strip: true
+
+    fee_international:
+      xpath: "//div[contains(@class, 'row') and contains(.//h2/@id, 'fee')]//h3[contains(., 'overseas')]/following-sibling::div[contains(@class, 'table')]//table//tbody//tr[1]/td[2]"
+
+  staging:
+    reject_if_missing:
+      - course_name
