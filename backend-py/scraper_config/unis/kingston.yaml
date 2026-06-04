@@ -1,0 +1,131 @@
+# Kingston University London
+# Hostname: www.kingston.ac.uk
+#
+# Cloudflare WAF site — cffi (TLS impersonation) bypasses it successfully.
+# Do NOT pre-seed paginated listing pages; BFS discovers them naturally.
+# Parallelism MUST stay low (≤2) — page 11+ triggers 429 at higher concurrency.
+# Wayback disabled: archive.org has no useful snapshots and adds latency for nothing.
+
+discovery:
+  seed_urls:
+    - https://www.kingston.ac.uk/study/undergraduate/courses
+    - https://www.kingston.ac.uk/study/postgraduate/courses
+    - https://www.kingston.ac.uk/study/foundation/courses
+
+  allow_url_patterns:
+    - '/undergraduate/'
+    - '/postgraduate/'
+    - '/foundation/'
+
+  block_url_patterns:
+    - '/news'
+    - '/events'
+    - '/staff/'
+    - '/about'
+    - '/contact'
+    - '/linkassets/'
+
+  use_wayback: false
+
+extraction:
+  max_parallel_fetch: 2
+
+  filters:
+    domestic_only:
+      enabled: false
+
+    online_only:
+      enabled: false
+
+  fees:
+    default_currency: "GBP"
+    prefer_international: true
+    prefer_annual_over_total: true
+    fee_year: "2025"
+    fee_term: "year"
+
+    reject_keywords:
+      - "Domestic"
+      - "Home student"
+      - "UK student"
+
+  english:
+    source: course_page
+    source_xpath: "//div[contains(@class, 'contentblock') and contains(.//h2, 'Entry requirements')]"
+
+    ielts:
+      raw_xpath: ".//p[contains(., 'IELTS')]"
+      remove_tags: true
+      patterns:
+        overall:
+          - 'score\sof\s.?(\d\.?\d)'
+          - 'of\s*(\d\.?\d*)'
+        each:
+          - 'no\selement\sbelow\s*(\d\.?\d*)'
+          - '(\d\.?\d*)\sin\sall'
+      apply_each_to:
+        - ielts_reading
+        - ielts_writing
+        - ielts_listening
+        - ielts_speaking
+
+  degree_from_url:
+    rules:
+      - match_keyword: "undergraduate"
+        value: "undergraduate"
+      - match_keyword: "postgraduate"
+        value: "postgraduate"
+
+  selectors:
+    course_list:
+      xpath: "//div[contains(@class, 'course-text-box')]//a/@href"
+
+    course_name:
+      xpath: "//h1/text()"
+
+    city:
+      value: "London"
+
+    study_load:
+      xpath: "//div[contains(@class, 'big-data-table')]//table[contains(@class, 'pretty') and contains(.//tr/th, 'Mode')]//tr//td[count(//th[contains(., 'Mode')]/preceding-sibling::*)+1]/text()"
+      multi: true
+      join: ", "
+
+    duration:
+      primary:
+        xpath: "//div[contains(@class, 'big-data-table')]//table[contains(@class, 'pretty') and contains(.//tr, 'Duration')]//tr[2]//td[count(//th[contains(., 'Duration') or contains(., 'Attendance')]/preceding-sibling::*)+1]/text()"
+        duration_raw_xpath: "//div[contains(@class, 'big-data-table')]//table[contains(@class, 'pretty') and contains(.//tr, 'Duration')]//tr//td[count(//th[contains(., 'Duration')]/preceding-sibling::*)+1]/text()"
+      fallback:
+        xpath: "//div[contains(@class, 'big-data-table')]//table[contains(@class, 'pretty') and contains(.//tr, 'Attendance')]//tr[2]//td[count(//th[contains(., 'Attendance')]/preceding-sibling::*)+1]/text()"
+        duration_raw_xpath: "//div[contains(@class, 'big-data-table')]//table[contains(@class, 'pretty') and contains(.//tr, 'Attendance')]//tr[2]//td[count(//th[contains(., 'Attendance')]/preceding-sibling::*)+1]/text()"
+
+    intake_month:
+      xpath: "//div[contains(@class, 'big-data-table')]//table[contains(@class, 'pretty') and contains(//tr, 'Start date')]//tr[2]//td[count(//th[contains(., 'Start date')]/preceding-sibling::*)+1]"
+
+    course_description:
+      xpath: "//div[contains(@class, 'site-course-overview-left-inner')]"
+
+    other_requirements:
+      xpath: "//div[contains(@class, 'contentblock') and contains(.//h2, 'Entry requirements')]"
+
+    career:
+      xpath: "//div[contains(@class, 'contentblock') and contains(.//h2, 'After you graduate')]"
+
+    fee_international:
+      xpath: "//div[contains(@class, 'contentblock') and contains(.//h2, 'fees')]//div[contains(@class, 'site-expand-box-heading') and contains(.//h3, '2025/26')]/following-sibling::div[1]//td[contains(., 'nternational')]/following-sibling::td/text() | //div[contains(@class, 'contentblock') and contains(.//h2, 'ees')]//div[contains(@class, 'site-expand-box-heading') and contains(.//h3, '2025/26')]/following-sibling::div[1]//h3[contains(., 'nternational')]//following-sibling::ul//li/text()"
+      multi: true
+      first_as_fee_int: true
+
+    course_structure:
+      primary:
+        xpath: "//div[contains(@class, 'site-modules-block-tab') and contains(@data-tab, 'list')]"
+        tab_navigation:
+          tab_label_xpath: ".//h3/text()"
+          tab_target_attr: "data-tab"
+          tab_content_xpath: "//div[contains(@id, '{tab_id}')]"
+      fallback:
+        xpath: "//div[contains(@class, 'contentblock') and contains(.//h2, 'What you will')]"
+
+  staging:
+    reject_if_missing:
+      - course_name
