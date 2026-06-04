@@ -4648,9 +4648,22 @@ async def extract_course(
         from app.services.scraper.extractors import londonmet_chrome_scrub as _lm_scrub
         if _lm_scrub.is_londonmet_host(url):
             try:
-                _lm_scrub.apply_overrides(
+                _lm_applied = _lm_scrub.apply_overrides(
                     payload, html, url=url, evidence=evidence
                 )
+                if _lm_applied.get("is_domestic_only"):
+                    # The page has the entry-point selector but no
+                    # data-fee-type="International" option — this course is
+                    # UK-only.  Reject it the same way as _DOMESTIC_ONLY_RE.
+                    payload["domestic_only"] = True
+                    await emit(
+                        "status",
+                        f"[LM DOMESTIC ONLY] {url} — no International entry-point option; skipping",
+                        phase="extract",
+                        kind="domestic_only_skip",
+                        url=url,
+                    )
+                    return {"url": url, "payload": payload, "evidence": evidence}
             except Exception as _lm_exc:  # noqa: BLE001 — never break a scrape
                 log.warning("londonmet_chrome_scrub failed on %s: %s", url, _lm_exc)
         # Build a lookup of which fields already have evidence from a

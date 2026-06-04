@@ -78,19 +78,35 @@ _BRAND_NAME_RE = re.compile(
 )
 
 # London Met embeds real per-mode tuition fees in HTML data-* attributes
-# on each course page, e.g.:
-#   <... data-cost="£11,000 per year" data-mode="Full-time"
-#        data-m="September" data-y="2026" data-location="Holloway" ...>
-# Every page has 6 entries (3 domestic, 3 international) — domestic is the
-# LOWEST "Full-time per year" amount and international is the HIGHEST.
-# Part-time-per-module entries are ignored (different fee unit).
+# on each course page inside a <select id="course-entry-point-selector">:
+#
+#   <option data-fee-type="International" data-mode="Full-time"
+#           data-cost="£17,500 for year 1, £10,000 for year 2, £5,000 for year 3"
+#           data-m="September" data-y="2026" data-location="Holloway"
+#           data-duration="3 years" ...>
+#
+# data-fee-type is "UK" or "International" — the explicit label we use to
+# separate domestic from international entries.  Courses with NO
+# data-fee-type="International" option at all are UK-only (domestic-only)
+# and must be rejected by the pipeline.
+#
+# Fee format: either "£N per year" (simple) or tiered "£N for year 1,
+# £M for year 2, ..." — in both cases the first £ amount is the correct
+# Year 1 / annual fee to store (do NOT require "per year" in the string).
 _DATA_COST_TAG_RE = re.compile(
     r'<[a-z]+\b[^>]*\bdata-cost="[^"]+"[^>]*>',
     re.IGNORECASE,
 )
-_DATA_ATTR_RE = re.compile(r'data-([a-z]+)="([^"]*)"', re.IGNORECASE)
-_PER_YEAR_RE = re.compile(r'(?:per\s+year|/\s*yr|annual)', re.IGNORECASE)
+# data-([a-z-]+) — note the hyphen so data-fee-type is captured as key "fee-type".
+_DATA_ATTR_RE = re.compile(r'data-([a-z][a-z-]*)="([^"]*)"', re.IGNORECASE)
 _AMOUNT_RE = re.compile(r'(?:£|&pound;|&#163;)\s?([\d,]{2,12})')
+# Kept for the legacy MIN/MAX fallback path (pages without data-fee-type labels).
+_PER_YEAR_RE = re.compile(r'(?:per\s+year|/\s*yr|annual)', re.IGNORECASE)
+# Detect the entry-point selector — its presence means the page IS a real
+# course page with a fee table; its absence means no fee data at all.
+_SELECTOR_RE = re.compile(r'id=["\']course-entry-point-selector["\']', re.IGNORECASE)
+# Detect at least one International option in that selector.
+_INTL_OPTION_RE = re.compile(r'data-fee-type=["\']International["\']', re.IGNORECASE)
 
 _MONTH_TO_NUM = {
     "january": 1, "february": 2, "march": 3, "april": 4, "may": 5, "june": 6,
@@ -101,14 +117,21 @@ _MONTH_TO_NUM = {
 def parse_data_cost_entries(html: str) -> list[dict[str, Any]]:
     """Parse every ``<elem ... data-cost="..." data-mode="..." ...>`` tag.
 
-    Returns a list of dicts with keys ``cost`` (float £), ``mode``,
-    ``month`` (lowercase), ``year`` (int), ``location``, and ``per_year``
-    (bool — True iff the cost string contains "per year").
+    Returns a list of dicts with keys:
+      ``cost``      — first £ amount from data-cost (float)
+      ``fee_type``  — "UK" | "International" | "" (from data-fee-type)
+      ``mode``      — "Full-time" | "Part-time" | ""
+      ``month``     — lowercase month name from data-m
+      ``year``      — int from data-y, or None
+      ``location``  — campus string from data-location, or None
+      ``duration``  — duration string from data-duration, or None
+      ``per_year``  — True iff cost string contains "per year" / "annual"
     """
     entries: list[dict[str, Any]] = []
     if not html:
         return entries
     for tag_match in _DATA_COST_TAG_RE.finditer(html):
+        # data-fee-type uses a hyphen — _DATA_ATTR_RE now captures [a-z-]+ keys.
         attrs = {k.lower(): v for k, v in _DATA_ATTR_RE.findall(tag_match.group(0))}
         cost_str = attrs.get("cost", "")
         if not cost_str:
@@ -126,45 +149,81 @@ def parse_data_cost_entries(html: str) -> list[dict[str, Any]]:
             year = None
         entries.append({
             "cost": amount,
+            "fee_type": (attrs.get("fee-type") or "").strip(),
             "mode": (attrs.get("mode") or "").strip(),
             "month": (attrs.get("m") or "").strip().lower(),
             "year": year,
             "location": (attrs.get("location") or "").strip() or None,
+            "duration": (attrs.get("duration") or "").strip() or None,
             "per_year": bool(_PER_YEAR_RE.search(cost_str)),
         })
     return entries
 
 
 def extract_real_fees(entries: list[dict[str, Any]]) -> dict[str, Any]:
-    """From parsed data-cost entries, derive the real domestic + international
-    annual fees, the canonical intake months, and the campus location.
+    """Derive the international annual fee, intake months, location, and
+    duration from parsed data-cost entries.
 
-    Strategy: filter to ``Full-time``/``per year`` entries, then take the
-    MIN cost as the domestic fee and the MAX as the international fee
-    (London Met always lists both side-by-side in this format).
-    Intake months are collected from any per-year entry.
+    Strategy (preferred path):
+      Filter to entries with ``fee_type == "International"`` and
+      ``mode == "Full-time"``.  Take the first £ amount as the annual
+      international fee — this handles both simple "£N per year" and tiered
+      "£N for year 1, £M for year 2, ..." formats correctly (Year 1 fee is
+      the right value to display).
+
+    Legacy fallback (pages without data-fee-type labels):
+      If no explicitly-labelled International entries exist, fall back to the
+      original MIN/MAX heuristic on Full-time per-year entries.
     """
     out: dict[str, Any] = {}
+
+    # --- Preferred path: explicit data-fee-type="International" entries ---
+    intl_ft = [
+        e for e in entries
+        if e.get("fee_type", "").lower() == "international"
+        and "full-time" in e.get("mode", "").lower()
+    ]
+    if intl_ft:
+        # Cohort isolation: use the earliest academic year to avoid mixing
+        # a 2026 and a 2027 entry.
+        years_present = {e["year"] for e in intl_ft if e["year"] is not None}
+        if years_present:
+            target_year = min(years_present)
+            intl_ft = [e for e in intl_ft if e["year"] == target_year]
+        # First entry is authoritative (same fee repeated per intake month).
+        target = intl_ft[0]
+        out["international_fee"] = target["cost"]
+        out["fee_term"] = "Annual"
+        out["currency"] = "GBP"
+        if target["location"]:
+            out["course_location"] = target["location"]
+        if target["duration"]:
+            out["duration"] = target["duration"]
+        # Intake months from ALL International entries (full + part-time).
+        all_intl = [e for e in entries if e.get("fee_type", "").lower() == "international"]
+        months = sorted({
+            _MONTH_TO_NUM[e["month"]] for e in all_intl if e["month"] in _MONTH_TO_NUM
+        })
+        if months:
+            out["intake_months"] = months
+        return out
+
+    # --- Legacy fallback: no data-fee-type labels → use MIN/MAX heuristic ---
     full_year = [
         e for e in entries
         if e["per_year"] and "full-time" in e["mode"].lower()
     ]
     if not full_year:
         return out
-    # Cohort isolation: if multiple academic years are present (e.g. 2026
-    # alongside 2027), confine the MIN/MAX comparison to the EARLIEST year
-    # so we never pair a 2026 domestic fee with a 2027 international fee.
     years_present = {e["year"] for e in full_year if e["year"] is not None}
     if years_present:
         target_year = min(years_present)
         full_year = [e for e in full_year if e["year"] == target_year]
     costs = sorted({e["cost"] for e in full_year})
     if len(costs) >= 2:
-        # Distinct domestic + international values present.
         out["domestic_fee"] = costs[0]
         out["international_fee"] = costs[-1]
     else:
-        # Only one value — assume international (safer for our gate).
         out["international_fee"] = costs[0]
     out["fee_term"] = "Annual"
     out["currency"] = "GBP"
@@ -175,9 +234,27 @@ def extract_real_fees(entries: list[dict[str, Any]]) -> dict[str, Any]:
         out["intake_months"] = months
     locations = [e["location"] for e in full_year if e["location"]]
     if locations:
-        # Most common location wins.
         out["course_location"] = max(set(locations), key=locations.count)
     return out
+
+
+def has_international_options(html: str) -> bool:
+    """True iff the page has at least one ``data-fee-type="International"``
+    option in the entry-point selector.
+
+    When the selector is present but has NO International option the course
+    is UK-only — international students cannot enrol.  The caller should
+    treat this as a domestic-only rejection.
+
+    Returns True (pass-through) when the selector is absent entirely, because
+    the page may be a non-standard course format where we cannot determine
+    eligibility from the selector alone — _DOMESTIC_ONLY_RE will handle it.
+    """
+    if not html:
+        return True  # can't determine → don't block
+    if not _SELECTOR_RE.search(html):
+        return True  # no selector on this page → pass through
+    return bool(_INTL_OPTION_RE.search(html))
 
 
 def is_londonmet_host(url: str | None) -> bool:
@@ -215,25 +292,39 @@ def apply_overrides(
     url: str = "",
     evidence: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    """Strip brand-chrome contamination from ``payload``.
+    """Strip brand-chrome contamination from ``payload`` and detect
+    domestic-only courses.
 
-    Two independent operations:
+    Operations (in order):
+
+    0. Domestic-only detection — if the page has the entry-point selector
+       but zero ``data-fee-type="International"`` options, the course is
+       UK-only.  ``applied["is_domestic_only"] = True`` is set so the
+       caller can reject the course without staging it.
 
     1. If the page contains the ``Postgraduate Loan of over £10,000``
        advert AND ``payload["international_fee"]`` is exactly 10000,
-       null out the fee triple (fee, fee_term, currency).  We do
-       NOT touch other fees — only the bogus loan-advert match.
+       null out the fee triple (fee, fee_term, currency).
 
-    2. If ``payload["course_location"]`` equals the literal
-       institution name (any casing, e.g. ``"London Metropolitan
-       University"``), null it out.  Brand-chrome leak from
-       header/footer/OG-meta.
+    2. If ``payload["course_location"]`` equals the literal institution
+       name, null it out (brand-chrome leak).
 
-    Returns a dict describing which overrides fired.
+    3. Real-fee recovery from ``data-cost`` attributes — fills
+       ``international_fee``, ``intake_months``, ``course_location``,
+       and ``duration`` when those fields are still empty after steps 1-2.
+
+    Returns a dict describing which overrides fired.  Callers MUST check
+    ``applied.get("is_domestic_only")`` and reject the course if True.
     """
     applied: dict[str, Any] = {}
     if not html:
         return applied
+
+    # Operation 0 — domestic-only detection.
+    if not has_international_options(html):
+        applied["is_domestic_only"] = True
+        log.info("[LM CHROME SCRUB] %s — no International options → domestic-only", url or "(no url)")
+        return applied  # nothing else to do; caller will reject the course
 
     # Bug 1 — kill the loan-banner false-positive fee.
     fee = payload.get("international_fee")

@@ -68,33 +68,35 @@ discovery:
 
 extraction:
   # Skip the sparse-static rescue browser refetch.
-  # London Met's chrome scrub (londonmet_chrome_scrub.py) nullifies the
-  # £10,000 UK government postgraduate loan advert that regex mistakenly
-  # extracts as a tuition fee, leaving fee=None after every static+Gemini
-  # pass.  With fee=None the sparse-static rescue fires on every single
-  # course, forcing a browser refetch that returns rendered=0B (London Met
-  # does not block IPs, but the browser pool simply can't recover fees that
-  # don't exist on per-course pages).  Result: ~70 s wasted per course,
-  # 322 courses → 373 minute job with zero extra data recovered.
-  # London Met fees live on a shared tuition-fees page, not per-course pages;
-  # force_central_fee_stage (below) is the correct long-term path.
+  # The chrome scrub (londonmet_chrome_scrub.py) now recovers fees directly
+  # from the data-* attributes embedded in each course page's
+  # <select id="course-entry-point-selector"> — no browser render needed.
+  # Previously the browser refetch was triggered on every course (fee=None
+  # after the loan-banner scrub), wasting ~70 s/course for zero gain.
   skip_browser_rescue: true
 
+  filters:
+    domestic_only:
+      # London Met publishes both UK and International entry-point options
+      # in a <select> dropdown on every course page that accepts international
+      # students.  Courses with NO data-fee-type="International" option are
+      # UK-only (e.g. PGCE routes-into-teaching, some foundation years).
+      # The londonmet_chrome_scrub.apply_overrides() function detects this
+      # via has_international_options() and returns is_domestic_only=True;
+      # the call site in single_course.py rejects the course immediately.
+      # This flag also ensures _DOMESTIC_ONLY_RE runs for courses whose
+      # page text explicitly states international ineligibility.
+      enabled: true
+
   fees:
-    # London Met is a UK university — quoted fees are in GBP (£).  In
-    # practice currency is already inferred correctly from the literal £
-    # token in the page text and from the .ac.uk TLD, so this knob is a
-    # belt-and-braces default rather than the active enforcement
-    # mechanism.  Kept for clarity of intent.
+    # London Met is a UK university — quoted fees are in GBP (£).
     default_currency: "GBP"
-    # Mark every staged course as having a central fee page so it bypasses
-    # the no_international_fee gate and lands in the review queue instead
-    # of being dropped.  London Met does NOT publish per-course fees on the
-    # individual course page; tuition fees are listed on a shared page at
-    # https://www.londonmet.ac.uk/international/costs-and-fees/.
-    # Until a fees sub-page fetcher is built, courses need to reach review
-    # so they can be manually enriched or approved with a known fee.
-    force_central_fee_stage: true
+    # DO NOT set force_central_fee_stage here.  As of 2026-06, fees are
+    # published per-course in data-* attributes on each course page and
+    # londonmet_chrome_scrub.py reads them directly.  force_central_fee_stage
+    # was a workaround when fees appeared only on the shared tuition-fees page
+    # (https://www.londonmet.ac.uk/international/costs-and-fees/); that
+    # workaround is no longer needed and would mask extraction failures.
     central_page: "https://www.londonmet.ac.uk/international/costs-and-fees/"
 
 # Bug history / 2026-05-14 brand-chrome scrub:
