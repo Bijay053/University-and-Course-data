@@ -3,49 +3,49 @@
 # Country: United Kingdom  |  Currency: GBP
 # Slug: bcu
 #
-# ── ARCHITECTURE (verified on the live site) ──────────────────────────────────
-# Server-rendered HTML CMS (.NET / Optimizely). NOT a JS SPA for discovery —
-# every course link is present in the static HTML of the search results page.
-# No JSON/Algolia/SearchStax/GraphQL course API is exposed; the search is a
-# plain server-rendered, query-string-paginated page.
+# ── ARCHITECTURE (verified live) ──────────────────────────────────────────────
+# Server-rendered HTML CMS (.NET / Optimizely). Course links are in static HTML.
+# Catalogue: 386 courses behind a faceted server-paginated search at /courses/search.
+#   perpage capped at 20 server-side  → 20 result pages (?page=1..20).
+#   type = level (1 Foundation, 2 UG, 3 PG-Taught, 5 PG-Research, 8 Short/CPD, 9 Appr.)
+# Course detail URL (canonical): /courses/<slug>-YYYY-YY  e.g. /courses/computer-science-bsc-hons-2026-27
+#   Duplicate alternate paths also exist (/conservatoire/courses/..., /business-school/courses/...)
+#   that resolve to the SAME courses and produce garbled slug-titled duplicates.
+# NOTE: the ?International=true view is NOT seedable — the server rewrites it to
+#   ?International=true&JanStart=true&mode=1&intake=2025-26 (a January-only subset).
+#   So discovery uses the plain all-courses pages; international fees are resolved
+#   at extraction via fee keywords (below), not by changing the listing view.
 #
-# Course catalogue  : 386 courses (all levels, 2025/26 + 2026/27 entry)
-# Listing endpoint  : /courses/search   (facets: type=level, mode=attendance)
-#                       type=1 Foundation | 2 UG | 3 PG-Taught | 5 PG-Research
-#                       8 Short/CPD       | 9 Apprenticeships
-# Pagination        : ?page=N  — perpage is CAPPED server-side at 20
-#                       (tested perpage=500 → still 20/page, "Page 1 of 20")
-#                       386 / 20  ⇒  20 result pages
-# Course detail URL : /courses/<slug>-YYYY-YY
-#                       e.g. /courses/acting-ba-hons-2026-27
-#                            /courses/accounting-and-finance-msc-2026-27
+# ── EVOLUTION OF THE FIX (run-by-run evidence) ────────────────────────────────
+# Run 1: BFS seeded at ?type=2 burned its budget on facet permutations → ~10 real
+#        courses found; broken filters then dropped everything → Staged 0.
+# Run 2 (this config's target): discovery+extraction WORK (136 fetched, fees/IELTS/
+#        duration mostly PASS 100/100) but staging rejected 119/127 as
+#        category_landing_page, leaving 8. Verified: the rejected pages (e.g.
+#        computer-science-bsc-hons-2026-27) are clean SINGLE-course pages, so the
+#        rejection is a false positive that tracks discovery SOURCE — only
+#        BFS-crawled detail pages survived; the 238 sitemap-supplemented candidates
+#        were the ones rejected.
 #
-# ── ROOT CAUSE of the previous 0-staged run ───────────────────────────────────
-# Two independent faults, both fatal:
-#
-#  (1) DISCOVERY starvation. BFS was seeded from the home-page probe at
-#      /courses/search?type=2 and spent its entire 25-page budget crawling
-#      FACET permutations from the nav (?type=1/3/5/9, ?mode=1/3/5, ?jan=1,
-#      ?int=1). Each facet only renders page 1 (20 items) and BFS never
-#      paginated (?page=2..20), so only ~10 unique course-detail pages were
-#      ever collected out of 386.
-#
-#  (2) BROKEN URL FILTERS in the old per-uni YAML.
-#        "block_url_patterns: dropped 124 URL(s)"  → over-broad, ate real courses
-#        "URL filter dropped 3/3 URLs (100%)"      → allow_url_patterns did not
-#        match the real course shape, dropping even /business-school/courses/...
-#      Net: Discovered 4 → Found 0 → Staged 0.
-#
-# ── FIX ───────────────────────────────────────────────────────────────────────
-# Seed every page of the UNFILTERED all-courses search so all 386 courses appear
-# as static links in one deterministic crawl, and replace the URL filter with a
-# single inclusion pattern that matches the real year-suffixed detail URL.
-# No block_url_patterns needed — the allow pattern alone removes search/nav/news.
+# ── FIXES ─────────────────────────────────────────────────────────────────────
+#  (A) DISCOVERY — make every course a BFS-crawled detail page and remove the
+#      sitemap supplement that injected the mis-classified candidates:
+#        • seed all 20 pages of the unfiltered all-courses search
+#        • always_sitemap_supplement: false   (sitemap is news/about only; it was
+#          the source of the 119 category_landing_page staging rejections)
+#        • course_detail_url_patterns pins the canonical /courses/<slug>-YYYY-YY
+#          shape — excludes /conservatoire/courses/ & /business-school/courses/
+#          duplicates and asserts these URLs as genuine course-detail pages.
+#  (B) EXTRACTION — fix the now-observed fee defect: the regex was grabbing BCU's
+#      UK/home fee (~£9,790 / £10,050) instead of the international fee (~£17–19k),
+#      tripping 89 "annual_fee_too_low" + several "possible_domestic_fee" flags.
+#      Pattern-6 reject_keywords + international_fee_keywords steer to the intl fee.
+#  (C) Drop apprenticeship pages — by nature employer-funded & UK-only, they carry
+#      no international fee or IELTS (every apprenticeship in run 2 failed both).
 
 discovery:
 
-  # Deterministically crawl all 20 result pages of the full catalogue.
-  # perpage is ignored by the server, so each page must be requested explicitly.
+  # All 386 courses, 20 per page (perpage is ignored by the server).
   seed_urls:
     - https://www.bcu.ac.uk/courses/search?perpage=20&page=1
     - https://www.bcu.ac.uk/courses/search?perpage=20&page=2
@@ -69,29 +69,46 @@ discovery:
     - https://www.bcu.ac.uk/courses/search?perpage=20&page=20
 
   bfs_page_budget: 30        # 20 seed listing pages + headroom
-  max_candidates: 600        # comfortably above the 386 course-detail links
+  max_candidates: 600        # > 386 course-detail links
 
-  # The site's flat sitemap.xml is alphabetical site-wide content (news, about-us,
-  # corporate pages) and carries no usable course index — it previously injected
-  # 22 stray candidates that had to be blocked. The seeds above are authoritative.
+  # ROOT CAUSE of the 119 category_landing_page staging rejections: the flat
+  # site-wide sitemap (news/about pages) was supplemented in and its candidates
+  # were staged as category_landing_page. The seeds above are authoritative.
   always_sitemap_supplement: false
 
-  # Keep ONLY real course-detail pages. The year-of-entry suffix (-YYYY-YY) is the
-  # reliable marker for a genuine course page and cleanly excludes the search,
-  # /courses/choices, /courses/prospectus, /courses/short-courses and nav pages.
-  # Substring match also catches school-prefixed URLs (e.g. /business-school/courses/...).
+  # Canonical single-course shape only. Excludes /courses/search, /choices,
+  # /prospectus, /short-courses, nav/news, AND the faculty-prefixed duplicate
+  # paths (/conservatoire/courses/..., /business-school/courses/...).
   allow_url_patterns:
-    - '/courses/[a-z0-9-]+-20\d{2}-\d{2}/?$'
+    - '^https://www\.bcu\.ac\.uk/courses/[a-z0-9-]+-20\d{2}-\d{2}$'
+
+  # Final extraction gate — asserts these URLs ARE course-detail pages.
+  course_detail_url_patterns:
+    - '^https://www\.bcu\.ac\.uk/courses/[a-z0-9-]+-20\d{2}-\d{2}$'
+
+  # Apprenticeships are employer-funded / UK-only — no international fee or IELTS.
+  block_url_patterns:
+    - 'apprenticeship'
 
 # ── EXTRACTION ────────────────────────────────────────────────────────────────
-# Extraction never ran in the previous job (0 courses reached it), so NO
-# extraction overrides are added speculatively. Only the two structurally-certain
-# facts for a UK university are set: currency, and the correct central fee page
-# (the scraper had auto-mis-detected the accommodation page and parsed 0 records).
-# Re-run, inspect staged rows, then add fee/English/study_mode overrides only if
-# a real symptom appears.
-
 extraction:
   fees:
     default_currency: GBP
+    # Correct central fee page (scraper auto-mis-detected the accommodation page).
     central_page: "https://www.bcu.ac.uk/international/fees-costs-and-scholarships/international-fees"
+
+    # BCU course pages list BOTH a UK/home fee (~£9,790/£10,050) and an
+    # international fee (~£17–19k). Run 2 captured the home figure on ~89 courses.
+    # Discard the home rows; keep the international one.
+    reject_keywords:
+      - "Home student"
+      - "Home fee"
+      - "UK student"
+      - "UK fee"
+      - "Home/EU"
+      - "Domestic"
+    international_fee_keywords:
+      - "International student"
+      - "International fee"
+      - "International"
+      - "Overseas"
