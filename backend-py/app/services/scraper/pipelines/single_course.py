@@ -5918,6 +5918,70 @@ async def extract_course(
     except Exception as exc:  # noqa: BLE001 — never abort extraction
         log.warning("english institutional-defaults fallback errored on %s: %s", url, exc)
 
+    # ── Fee degree_level_defaults fallback ──────────────────────────────────
+    # When international_fee is still null after all extractors, check whether
+    # the per-uni YAML defines a degree_level_defaults fee for this tier.
+    # Mirrors the pattern used above for English requirements.
+    try:
+        _fee_dl_cfg = None
+        try:
+            _fee_uc = get_uni_config()
+            if _fee_uc is not None:
+                _fee_dl_cfg = _fee_uc.extraction.fees
+        except Exception:
+            pass
+        _fee_defaults_map: dict = getattr(_fee_dl_cfg, "degree_level_defaults", {}) or {}
+        if _fee_defaults_map and payload.get("international_fee") in (None, "", 0):
+            _fdl_raw = (payload.get("degree_level") or "").lower().strip()
+            _fdl_tier: str | None = None
+            if _fdl_raw:
+                import re as _re
+                if any(k in _fdl_raw for k in ("bachelor", "honours", "honor", "hons", "associate", "bsc", "ba ", "beng", "bbus", "bcom")):
+                    _fdl_tier = "undergraduate"
+                elif any(k in _fdl_raw for k in ("master",)) or _re.search(r"\b(msc|ma|meng|mba|mres|mphil|llm|mpa|mfa|mmus|mus\.m)\b", _fdl_raw):
+                    _fdl_tier = "postgraduate"
+                elif any(k in _fdl_raw for k in ("doctor", "phd", "dphil")) or _re.search(r"\b(dba|edd|dsc|phd)\b", _fdl_raw):
+                    _fdl_tier = "doctorate"
+                elif _fdl_raw.startswith("graduate") or "postgraduate" in _fdl_raw or _re.search(r"\bpg(dip|cert|diploma|certificate)\b", _fdl_raw):
+                    _fdl_tier = "postgraduate"
+                elif any(k in _fdl_raw for k in ("diploma", "certificate")):
+                    _fdl_tier = "undergraduate"
+            _fdl_default: int | None = None
+            if _fdl_tier:
+                _fdl_default = _fee_defaults_map.get(_fdl_tier)
+                if _fdl_default is None and _fdl_tier == "doctorate":
+                    _fdl_default = _fee_defaults_map.get("postgraduate")
+            if _fdl_default and isinstance(_fdl_default, int):
+                _fee_currency = getattr(_fee_dl_cfg, "default_currency", "AUD") or "AUD"
+                _fee_term = getattr(_fee_dl_cfg, "fee_term", "Annual") or "Annual"
+                payload["international_fee"] = _fdl_default
+                payload.setdefault("currency", _fee_currency)
+                payload.setdefault("fee_term", _fee_term)
+                evidence.append({
+                    "field_key": "international_fee",
+                    "value": _fdl_default,
+                    "confidence": 0.35,
+                    "method": "uni_config:fee_default",
+                    "source_url": url,
+                    "snippet": (
+                        f"institutional fee default from per-uni YAML: "
+                        f"{_fdl_tier}={_fdl_default} {_fee_currency}"
+                    ),
+                })
+                if emit:
+                    await emit(
+                        "status",
+                        f"[FEE-DEFAULT] {payload.get('course_name', url)[:40]} — "
+                        f"YAML default applied: {_fee_currency} {_fdl_default:,} "
+                        f"({_fdl_tier})",
+                        phase="fallback",
+                        kind="fee_default_applied",
+                        url=url,
+                        filled=["international_fee"],
+                    )
+    except Exception as exc:  # noqa: BLE001
+        log.warning("fee degree_level_defaults fallback errored on %s: %s", url, exc)
+
     # Rule-based category classifier — runs after every other slot is
     # populated so we can use the (possibly AI-filled) course_name. The
     # Review table's Category column reads scraped_courses.category; without

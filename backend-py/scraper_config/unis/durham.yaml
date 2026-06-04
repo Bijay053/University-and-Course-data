@@ -91,6 +91,26 @@ extraction:
       - "Home student"
       - "UK student"
 
+    # Durham's course pages load the fee amount via JavaScript — the static
+    # HTML has the "Tuition fees" heading but the £ value is injected by the
+    # browser SPA.  Without scrape.do quota (residential proxy that renders JS)
+    # the fee is never visible in the scraped HTML.
+    #
+    # These YAML defaults are applied as a last-resort fallback when
+    # international_fee is still null after all extractors run.  Values are
+    # Durham's published 2025/26 international fees.  Update annually.
+    #
+    # Sources:
+    #   UG:  https://www.durham.ac.uk/study/undergraduate/fees-and-funding/
+    #   PG:  https://www.durham.ac.uk/study/postgraduate/fees/
+    degree_level_defaults:
+      undergraduate: 26400
+      postgraduate: 24000
+
+    # Allow courses to stage even when international_fee is null (they will
+    # land in the review queue rather than being silently dropped).
+    force_central_fee_stage: true
+
   english:
     source: course_page
     source_xpath: "//div[contains(./h2/@id, 'entry-requirements')]"

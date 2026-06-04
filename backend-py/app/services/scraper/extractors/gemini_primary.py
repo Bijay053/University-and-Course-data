@@ -568,7 +568,20 @@ def _trim_text(html: str, *, max_chars: int = 50_000, url: str = "") -> str:
         return text
     # For very long pages: prefer the first 40 K (intro + fees section) and
     # last 10 K (admission requirements often sit at the bottom of the page).
-    return f"{text[:40_000]}\n...\n{text[-10_000:]}"
+    # Additionally, search the middle (chars 40k–last-10k) for the first fee
+    # amount (£/$ followed by digits) and inject a 2 000-char spotlight so
+    # Gemini can still read fees that are buried deep in long pages.
+    _middle_start = 40_000
+    _middle_end = max(len(text) - 10_000, _middle_start)
+    _fee_snippet = ""
+    if _middle_end > _middle_start:
+        _middle = text[_middle_start:_middle_end]
+        _fm = re.search(r"[£$€]\s*\d[\d,\s]*\d", _middle)
+        if _fm:
+            _s = max(0, _fm.start() - 300)
+            _e = min(len(_middle), _fm.start() + 1_700)
+            _fee_snippet = f"\n[FEE SECTION]\n{_middle[_s:_e]}\n[/FEE SECTION]"
+    return f"{text[:40_000]}{_fee_snippet}\n...\n{text[-10_000:]}"
 
 
 def _parse_json(raw: str) -> dict[str, Any]:

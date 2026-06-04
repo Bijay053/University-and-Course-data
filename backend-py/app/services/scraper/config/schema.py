@@ -1023,6 +1023,19 @@ class FeesConfig(BaseModel):
             "Typical safe cap for Australian universities: 80000."
         ),
     )
+    degree_level_defaults: dict[str, int] = Field(
+        default_factory=dict,
+        description=(
+            "Fallback international fee (in ``default_currency``) applied per "
+            "degree level when no course-specific fee is found after all "
+            "extractors run.  Keys are normalised tier names: ``undergraduate``, "
+            "``postgraduate``, ``doctorate``.  Values are annual fee amounts as "
+            "integers (e.g. ``26400`` for £26,400).  Only fills "
+            "``international_fee`` when the slot is still null; a value from any "
+            "extractor always wins.  Recorded in evidence with method "
+            "``uni_config:fee_default`` and confidence 0.35."
+        ),
+    )
 
 
 class BandSpec(BaseModel):
