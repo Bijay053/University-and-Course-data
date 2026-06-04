@@ -28,6 +28,7 @@ defaults only (plus the DB scrape_config backwards-compat translation).
 from __future__ import annotations
 
 import logging
+from datetime import date
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -94,6 +95,103 @@ def _hostname_to_slug(hostname: str) -> str:
         if part not in _TLD_TOKENS:
             return part
     return parts[0]
+
+
+def _infer_currency(hostname: str) -> str:
+    """Return the most likely fee currency for a university hostname."""
+    h = hostname.lower()
+    if h.endswith(".ac.uk") or h.endswith(".co.uk") or h.endswith(".uk"):
+        return "GBP"
+    if h.endswith(".ac.nz") or h.endswith(".co.nz") or h.endswith(".nz"):
+        return "NZD"
+    if h.endswith(".ca"):
+        return "CAD"
+    if h.endswith(".ie"):
+        return "EUR"
+    if h.endswith(".us") or h.endswith(".edu"):
+        return "USD"
+    return "AUD"  # .edu.au, .com.au, unknown → AUD default
+
+
+def _infer_country(hostname: str) -> str:
+    """Return a display country name from a university hostname."""
+    h = hostname.lower()
+    if h.endswith(".uk"):
+        return "United Kingdom"
+    if h.endswith(".nz"):
+        return "New Zealand"
+    if h.endswith(".ca"):
+        return "Canada"
+    if h.endswith(".ie"):
+        return "Ireland"
+    if h.endswith(".us") or h.endswith(".edu"):
+        return "United States"
+    return "Australia"
+
+
+def _create_stub_yaml(
+    *,
+    slug: str,
+    name: str,
+    scrape_url: str,
+    hostname: str,
+    university_id: int | None,
+) -> Path:
+    """Write a minimal stub YAML for a university with no existing config file.
+
+    Uses an id-specific filename (``{slug}_{university_id}.yaml``) when
+    ``university_id`` is known so that future slug collisions are avoided
+    automatically.  Falls back to ``{slug}.yaml`` when id is unavailable.
+
+    The stub is intentionally minimal — it sets only ``default_currency``
+    (inferred from the hostname TLD) so the scraper doesn't misclassify
+    GBP/NZD fees as AUD.  Operators can expand it after the first run.
+    """
+    if path := (_UNIS_DIR / f"{slug}_{university_id}.yaml") if university_id else None:
+        target = path
+    else:
+        target = _UNIS_DIR / f"{slug}.yaml"
+
+    if target.exists():
+        return target
+
+    currency = _infer_currency(hostname)
+    country = _infer_country(hostname)
+    today = date.today().isoformat()
+
+    content = (
+        f"# {name}\n"
+        f"# Hostname: {hostname}\n"
+        f"# Country: {country}  |  Currency: {currency}\n"
+        f"# Slug: {slug}\n"
+        f"# Auto-generated: {today}\n"
+        "#\n"
+        "# This stub was created automatically on the first scrape of this university.\n"
+        "# Review and expand it to improve discovery and extraction quality.\n"
+        "# See scraper_config/defaults.yaml for all available options.\n"
+        "\n"
+        "discovery: {}\n"
+        "\n"
+        "extraction:\n"
+        "  fees:\n"
+        f"    default_currency: {currency}\n"
+    )
+
+    try:
+        _UNIS_DIR.mkdir(parents=True, exist_ok=True)
+        target.write_text(content, encoding="utf-8")
+        log.info(
+            "Auto-created stub YAML for slug=%r uni_id=%r → %s (currency=%s country=%s)",
+            slug,
+            university_id,
+            target.name,
+            currency,
+            country,
+        )
+    except OSError as exc:
+        log.warning("Could not write stub YAML for slug=%r: %s", slug, exc)
+
+    return target
 
 
 def _load_yaml_file(path: Path) -> dict[str, Any]:
@@ -333,7 +431,21 @@ def load_uni_config(
                 )
             merged = _deep_merge(merged, per_uni)
     else:
-        log.debug("No per-uni YAML for slug=%r (will use defaults + DB config)", slug)
+        # No hand-authored YAML exists yet — auto-create a minimal stub so:
+        #   1. The correct fee currency (GBP/NZD/CAD/AUD) is set immediately,
+        #      preventing false "possible_domestic_fee" data-quality flags.
+        #   2. Operators have a starting file to expand after the first scrape.
+        _parsed_host = urlparse(scrape_url).hostname or ""
+        _stub_path = _create_stub_yaml(
+            slug=slug,
+            name=name,
+            scrape_url=scrape_url,
+            hostname=_parsed_host,
+            university_id=university_id,
+        )
+        _stub_data = _load_yaml_file(_stub_path)
+        if _stub_data:
+            merged = _deep_merge(merged, _stub_data)
 
     if db_scrape_config:
         # 4.5. Merge admin UI config LAST so operator UI changes always win.
