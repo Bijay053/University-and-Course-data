@@ -116,6 +116,21 @@ extraction:
     force_central_fee_stage: true
 
   english:
+    # Course pages are Cloudflare-blocked so per-course extraction never runs.
+    # degree_level_defaults supply IELTS/PTE/TOEFL for every staged course.
+    # Source: https://www.durham.ac.uk/study/international/applying/english-language-requirements/
+    # Most UG and PG programmes: IELTS 6.5 overall, 6.0 in each component.
+    default_ielts: 6.5
+    degree_level_defaults:
+      undergraduate:
+        ielts: 6.5
+        pte: 61
+        toefl: 92
+      postgraduate:
+        ielts: 6.5
+        pte: 61
+        toefl: 92
+
     source: course_page
     source_xpath: "//div[contains(./h2/@id, 'entry-requirements')]"
     ielts:

@@ -821,9 +821,32 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         _searchstax_cfg = getattr(_uni_cfg.discovery, "searchstax", None)
         if _searchstax_cfg is not None:
             from app.services.scraper.searchstax_hud import fetch_searchstax_links
+            # Extract fee/IELTS defaults from UniConfig and pass directly so
+            # fetch_searchstax_links never needs to touch the ContextVar.
+            _ss_fees_cfg = getattr(getattr(_uni_cfg, "extraction", None), "fees", None)
+            _ss_fee_defs = dict(getattr(_ss_fees_cfg, "degree_level_defaults", {}) or {})
+            _ss_force_fee = bool(getattr(_ss_fees_cfg, "force_central_fee_stage", False))
+            _ss_eng_cfg = getattr(getattr(_uni_cfg, "extraction", None), "english", None)
+            _ss_default_ielts = getattr(_ss_eng_cfg, "default_ielts", None)
+            _ss_ielts_raw = dict(getattr(_ss_eng_cfg, "degree_level_defaults", {}) or {})
+            _ss_ielts_defs = {
+                k: (v.model_dump() if hasattr(v, "model_dump") else dict(v))
+                for k, v in _ss_ielts_raw.items()
+            }
+            log.info(
+                "[SEARCHSTAX] fee_defaults=%s force_fee=%s ielts_defs=%s default_ielts=%s",
+                _ss_fee_defs, _ss_force_fee, list(_ss_ielts_defs.keys()), _ss_default_ielts,
+            )
             _ss_error: str | None = None
             try:
-                links = await fetch_searchstax_links(_searchstax_cfg, emit=emit)
+                links = await fetch_searchstax_links(
+                    _searchstax_cfg,
+                    emit=emit,
+                    fee_defaults=_ss_fee_defs,
+                    force_fee_stage=_ss_force_fee,
+                    ielts_defaults=_ss_ielts_defs,
+                    default_ielts=_ss_default_ielts,
+                )
             except Exception as _ss_exc:  # noqa: BLE001
                 log.error("SearchStax provider failed: %s", _ss_exc, exc_info=True)
                 links = []

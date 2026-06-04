@@ -679,15 +679,27 @@ def _slug_to_name(url: str) -> str:
     return slug.replace("-", " ").title()
 
 
-def _map_doc_field_map(doc: dict, cfg: SearchStaxConfig) -> Optional[dict]:
+def _map_doc_field_map(
+    doc: dict,
+    cfg: SearchStaxConfig,
+    *,
+    fee_defaults: dict | None = None,
+    force_fee_stage: bool = False,
+    ielts_defaults: dict | None = None,
+    default_ielts: float | None = None,
+) -> Optional[dict]:
     """Map a Solr doc → ``{name, url, searchstax_result}`` using cfg.field_map.
 
     Used when ``cfg.field_map_as_payload`` is True: builds a fully-formed
     staged-course payload from structured Solr fields without fetching the
     individual course page.  Intended for universities (e.g. Durham) whose
     Solr docs carry course metadata (name, level, duration, mode, intakes,
-    department) but do NOT have fees or IELTS — those are supplied later by
-    the ``degree_level_defaults`` fallback in the extraction pipeline.
+    department) but do NOT have fees or IELTS in the Solr index.
+
+    ``fee_defaults``  — dict mapping tier → int fee (e.g. {"undergraduate": 26400})
+    ``force_fee_stage`` — set has_central_fee_page=True even when no fee default matches
+    ``ielts_defaults`` — dict mapping tier → {"ielts": 6.5, "pte": 59, ...}
+    ``default_ielts``  — flat IELTS fallback when no tier matches
 
     Evidence rows use method ``searchstax:field_map`` with tier authority 1.5
     (above HTML heuristics, below PDF/AI).
@@ -719,13 +731,14 @@ def _map_doc_field_map(doc: dict, cfg: SearchStaxConfig) -> Optional[dict]:
     else:
         name = _slug_to_name(url)
 
-    payload: dict[str, Any] = {"course_name": name}
+    payload: dict[str, Any] = {"course_name": name, "course_website": url}
     evidence: list[dict] = []
 
     def _ev(field: str, value: Any, method: str) -> None:
         evidence.append({
             "field_key": field,
             "value": str(value),
+            "snippet": f"[SearchStax:{method}] {field}={value}",
             "method": f"searchstax:{method}",
             "source_url": url,
             "entity_type": "course",
@@ -792,41 +805,51 @@ def _map_doc_field_map(doc: dict, cfg: SearchStaxConfig) -> Optional[dict]:
         _ev("course_location", cfg.location_override, "location_override")
 
     # ── Fee degree_level_defaults fallback ──────────────────────────────────
-    # The searchstax_result short-circuit bypasses the extraction pipeline, so
-    # degree_level_defaults in extraction.fees never runs.  Apply it here
-    # using the UniConfig ContextVar (set by the orchestrator before the scrape)
-    # so Cloudflare-blocked universities can still get a default fee from the
-    # YAML rather than landing in _no_international_fee rejection.
-    # Also set has_central_fee_page=True so the no_international_fee gate is
-    # bypassed even when the fee lookup itself fails (force_central_fee_stage).
+    # fee_defaults and force_fee_stage are resolved by fetch_searchstax_links
+    # before the doc loop (avoiding ContextVar timing issues) and passed in
+    # as plain dicts so this sync function needs no async/ContextVar access.
     if payload.get("international_fee") in (None, "", 0):
-        try:
-            from app.services.scraper.config.context import get_uni_config
-            _uc = get_uni_config()
-            if _uc is not None:
-                _fee_cfg = getattr(getattr(_uc, "extraction", None), "fees", None)
-                _force = getattr(_fee_cfg, "force_central_fee_stage", False)
-                _dl_defaults: dict = getattr(_fee_cfg, "degree_level_defaults", {}) or {}
-                if _dl_defaults:
-                    _acad_lvl = str(payload.get("academic_level", "")).lower()
-                    if "undergraduate" in _acad_lvl:
-                        _fdl = _dl_defaults.get("undergraduate")
-                    elif any(k in _acad_lvl for k in ("postgraduate", "doctorate", "phd")):
-                        _fdl = _dl_defaults.get("postgraduate")
-                    else:
-                        _fdl = None
-                    if _fdl:
-                        payload["international_fee"] = float(_fdl)
-                        payload["has_central_fee_page"] = True
-                        _ev("international_fee", _fdl, "degree_level_default")
-                        log.debug(
-                            "[SEARCHSTAX field_map] fee default %s applied (%s) for %s",
-                            _fdl, _acad_lvl, url,
-                        )
-                if _force and not payload.get("has_central_fee_page"):
-                    payload["has_central_fee_page"] = True
-        except Exception as _fee_exc:  # noqa: BLE001
-            log.debug("[SEARCHSTAX field_map] fee defaults lookup failed: %s", _fee_exc)
+        _acad_lvl = str(payload.get("academic_level", "")).lower()
+        if "undergraduate" in _acad_lvl:
+            _tier_key = "undergraduate"
+        elif any(k in _acad_lvl for k in ("postgraduate", "doctorate", "phd")):
+            _tier_key = "postgraduate"
+        else:
+            _tier_key = None
+        _fdl = (fee_defaults or {}).get(_tier_key) if _tier_key else None
+        if not _fdl:
+            _fdl = (fee_defaults or {}).get("postgraduate") or (fee_defaults or {}).get("undergraduate")
+        if _fdl:
+            payload["international_fee"] = float(_fdl)
+            payload["has_central_fee_page"] = True
+            _ev("international_fee", _fdl, "degree_level_default")
+        elif force_fee_stage:
+            payload["has_central_fee_page"] = True
+
+    # ── IELTS degree_level_defaults fallback ─────────────────────────────────
+    # ielts_defaults is a dict of tier → {"ielts": float, "pte": int, ...}
+    # default_ielts is the flat fallback when no tier matches.
+    if payload.get("ielts_overall") is None and (ielts_defaults or default_ielts is not None):
+        _acad_lvl2 = str(payload.get("academic_level", "")).lower()
+        if "undergraduate" in _acad_lvl2:
+            _ielts_tier = "undergraduate"
+        elif any(k in _acad_lvl2 for k in ("postgraduate", "doctorate", "phd")):
+            _ielts_tier = "postgraduate"
+        else:
+            _ielts_tier = None
+        _eng_band = (ielts_defaults or {}).get(_ielts_tier) if _ielts_tier else None
+        _ielts_val = float(_eng_band["ielts"]) if (_eng_band and _eng_band.get("ielts")) else (
+            float(default_ielts) if default_ielts is not None else None
+        )
+        if _ielts_val is not None:
+            payload["ielts_overall"] = _ielts_val
+            _ev("ielts_overall", _ielts_val, "degree_level_default")
+        if _eng_band:
+            for _test, _fld in (("pte", "pte_overall"), ("toefl", "toefl_overall"), ("duolingo", "duolingo_overall")):
+                _tval = _eng_band.get(_test)
+                if _tval is not None and payload.get(_fld) is None:
+                    payload[_fld] = int(_tval)
+                    _ev(_fld, _tval, "degree_level_default")
 
     return {
         "name": name,
@@ -1005,7 +1028,15 @@ async def _fetch_links_only(cfg: SearchStaxConfig, emit=None) -> list[dict]:
     return links
 
 
-async def fetch_searchstax_links(cfg: SearchStaxConfig, emit=None) -> list[dict]:
+async def fetch_searchstax_links(
+    cfg: SearchStaxConfig,
+    emit=None,
+    *,
+    fee_defaults: dict | None = None,
+    force_fee_stage: bool = False,
+    ielts_defaults: dict | None = None,
+    default_ielts: float | None = None,
+) -> list[dict]:
     """Query the SearchStax Solr core (paginated) → list of link dicts.
 
     Each returned dict carries a prebuilt ``searchstax_result`` payload that
@@ -1023,6 +1054,11 @@ async def fetch_searchstax_links(cfg: SearchStaxConfig, emit=None) -> list[dict]
     ``cfg.extra_params`` is merged into every Solr request, allowing
     university-specific flags (e.g. ``model=coursefinder-ug``) without code
     changes.
+
+    ``fee_defaults`` / ``force_fee_stage`` / ``ielts_defaults`` / ``default_ielts``
+    are extracted by the orchestrator from the UniConfig and passed directly
+    so that ``_map_doc_field_map`` (a sync function) never needs to touch
+    the ContextVar.
     """
     # Discovery-only mode: return bare links without searchstax_result so
     # normal per-course extraction runs (fees / IELTS fetched from live pages).
@@ -1038,7 +1074,13 @@ async def fetch_searchstax_links(cfg: SearchStaxConfig, emit=None) -> list[dict]
     # HUD-specific (default), or generic_search_api.
     if cfg.field_map_as_payload:
         def _mapper(doc: dict) -> Optional[dict]:  # type: ignore[misc]
-            return _map_doc_field_map(doc, cfg)
+            return _map_doc_field_map(
+                doc, cfg,
+                fee_defaults=fee_defaults,
+                force_fee_stage=force_fee_stage,
+                ielts_defaults=ielts_defaults,
+                default_ielts=default_ielts,
+            )
     elif cfg.use_generic_mapper:
         from app.services.scraper.generic_search_api import _map_searchstax_doc
         def _mapper(doc: dict) -> Optional[dict]:
