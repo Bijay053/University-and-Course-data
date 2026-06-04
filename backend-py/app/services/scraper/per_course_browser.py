@@ -248,6 +248,9 @@ _BROWSER_RETRY_HOSTS: tuple[str, ...] = (
     # UEL: Cloudflare blocks HTTP for both UG and PG course pages; first browser
     # attempt often fails (CF hasn't set cf_clearance yet), second attempt passes.
     "uel.ac.uk",
+    # WLV: same Cloudflare pattern as UEL — HTTP blocked site-wide; second browser
+    # attempt passes once cf_clearance is set by the first failed request.
+    "wlv.ac.uk",
 )
 
 

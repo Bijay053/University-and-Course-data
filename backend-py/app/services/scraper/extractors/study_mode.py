@@ -553,6 +553,13 @@ _STUDY_MODE_RULE_SUPPRESSED_HOSTS: frozenset[str] = frozenset({
     # actual course content and classifies correctly.
     "www.canterbury.ac.nz",
     "canterbury.ac.nz",
+    # WLV: site-wide nav contains "online" text (study-online / online-learning
+    # links) that the bare \bonline\b rule matches at conf=0.70, overriding the
+    # correct On Campus value for all on-campus courses.  Gemini and
+    # location_derived already return 'On Campus' correctly; suppressing the
+    # rule extractor eliminates the false FIELD SUMMARY noise.
+    "www.wlv.ac.uk",
+    "wlv.ac.uk",
 })
 
 

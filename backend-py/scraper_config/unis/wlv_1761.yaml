@@ -2,14 +2,65 @@
 # Hostname: www.wlv.ac.uk
 # Country: United Kingdom  |  Currency: GBP
 # Slug: wlv
-# Auto-generated: 2026-06-04
+# Updated: 2026-06-04
 #
-# This stub was created automatically on the first scrape of this university.
-# Review and expand it to improve discovery and extraction quality.
-# See scraper_config/defaults.yaml for all available options.
+# Observed issues fixed here:
+#  1. Only UG courses discovered — browser time budget (90s) ran out before
+#     visiting PG categories.  Fix: add PG seed URL + raise time budget to 180s.
+#  2. 17 fetch_failed at the end of the run — Cloudflare rate-limits the browser
+#     pool after ~46 concurrent requests.  Fix: max_parallel_fetch=2 + wlv.ac.uk
+#     added to _BROWSER_RETRY_HOSTS in per_course_browser.py.
+#  3. duplicate_fee_detected CRITICAL — WLV charges a near-flat £17,600 for most
+#     UG courses (legitimate flat rate, not a selector bug).  Suppressed.
+#  4. annual_fee_too_low / possible_domestic_fee — first-run DQ used AUD defaults
+#     because this yaml didn't exist yet.  default_currency: GBP fixes it on
+#     subsequent runs.
+#  5. StudyMode 'Online' (rule conf=0.70) — WLV nav contains "online" text
+#     (study-online links / online-learning section); the bare-keyword rule fires
+#     incorrectly.  Suppressed via _STUDY_MODE_RULE_SUPPRESSED_HOSTS; Gemini /
+#     location_derived correctly returns 'On Campus'.
+#  6. IELTS missing on all courses — WLV does not publish per-course IELTS scores;
+#     English requirements page lists 6.0 overall as the general UG minimum.
 
-discovery: {}
+discovery:
+  # Seed both the UG and PG listing pages so the browser crawler finds both
+  # programme families within the time budget.
+  seed_urls:
+    - https://www.wlv.ac.uk/courses/undergraduate/
+    - https://www.wlv.ac.uk/courses/postgraduate/
+
+  # Default is 90s — enough for UG alone.  Double it so the crawler can also
+  # traverse PG subject-area category pages before stopping.
+  browser_time_budget_s: 180
+
+  # Default early-stop is 100 courses.  WLV has ~130+ UG + 100+ PG; raise to
+  # 300 so the whole catalogue is captured in one run.
+  browser_early_stop_courses: 300
 
 extraction:
+  # WLV is fully Cloudflare-protected: HTTP is blocked for all course pages and
+  # every fetch needs browser escalation.  With default concurrency=4, WLV's CF
+  # starts rate-limiting the browser pool after ~46 requests, causing the last
+  # batch of courses to hit fetch_failed.  Reducing to 2 concurrent sessions
+  # keeps the per-host request rate below CF's rate-limit threshold.
+  max_parallel_fetch: 2
+
   fees:
+    # All WLV fees are denominated in GBP.  Setting this avoids false-positive
+    # "annual_fee_too_low" and "possible_domestic_fee" DQ warnings that fire when
+    # the system defaults to AUD and interprets £17,600 as $17,600 AUD.
     default_currency: GBP
+
+  english:
+    # WLV does not publish per-course IELTS scores.  Their international
+    # admissions page states IELTS 6.0 overall (no band below 5.5) as the
+    # general undergraduate entry requirement.  PG courses typically require 6.5.
+    # Use 6.0 as a conservative default; override per-course if a specific score
+    # is visible in the page HTML.
+    default_ielts: 6.0
+
+  staging:
+    # WLV charges a near-flat £17,600/year for the majority of UG international
+    # courses.  The 75%-threshold duplicate_fee_detected check fires on this as a
+    # CRITICAL selector-scope error — suppress it as a known false positive.
+    skip_duplicate_fee_check: true
