@@ -678,6 +678,14 @@ async def add_university_by_url(
         "scu.edu.au":        "Lismore",
     }
 
+    # Generic page-title values that are not institution names and must be
+    # skipped so we fall through to a better source (og:site_name or hostname).
+    _GENERIC_TITLES = {
+        "home", "welcome", "index", "index page", "default", "untitled",
+        "homepage", "home page", "main", "start", "portal", "site home",
+        "university home", "college home",
+    }
+
     try:
         async with _httpx.AsyncClient(
             follow_redirects=True, timeout=10.0, verify=False,
@@ -687,21 +695,48 @@ async def add_university_by_url(
             if resp.status_code < 400:
                 html = resp.text
 
-                # ── Name from <title> ────────────────────────────────────────
-                title_m = _re.search(r"<title[^>]*>([^<]+)</title>", html, _re.I)
-                if title_m:
-                    raw_title = title_m.group(1).strip()
-                    segments = [s.strip() for s in _re.split(r"\s*[|–—:]\s*", raw_title) if s.strip()]
-                    if segments:
-                        # Prefer the segment that looks like an institution name
-                        preferred = next(
-                            (s for s in segments if _UNI_KEYWORDS.search(s)),
-                            None,
-                        )
-                        if preferred is None:
-                            # Fall back to the longest segment
-                            preferred = max(segments, key=len)
-                        name = preferred[:200]
+                # ── Name from og:site_name (most reliable branded name) ──────
+                # Many universities set this to their official full name even
+                # when the homepage <title> is just "Home" or a marketing phrase.
+                for _og_pat in (
+                    r'<meta[^>]+property=["\']og:site_name["\'][^>]+content=["\']([^"\']{3,})["\']',
+                    r'<meta[^>]+content=["\']([^"\']{3,})["\'][^>]+property=["\']og:site_name["\']',
+                    r'<meta[^>]+name=["\']application-name["\'][^>]+content=["\']([^"\']{3,})["\']',
+                    r'<meta[^>]+content=["\']([^"\']{3,})["\'][^>]+name=["\']application-name["\']',
+                ):
+                    _og_m = _re.search(_og_pat, html, _re.I)
+                    if _og_m:
+                        _candidate = _og_m.group(1).strip()
+                        # Only accept if it looks like an institution name or is
+                        # at least reasonably long (avoids grabbing short codes).
+                        if (
+                            _UNI_KEYWORDS.search(_candidate)
+                            or len(_candidate) > 8
+                        ) and _candidate.lower() not in _GENERIC_TITLES:
+                            name = _candidate[:200]
+                            break
+
+                # ── Name from <title> (fallback when og:site_name absent) ────
+                if not name:
+                    title_m = _re.search(r"<title[^>]*>([^<]+)</title>", html, _re.I)
+                    if title_m:
+                        raw_title = title_m.group(1).strip()
+                        segments = [s.strip() for s in _re.split(r"\s*[|–—:]\s*", raw_title) if s.strip()]
+                        if segments:
+                            # Prefer the segment that looks like an institution name
+                            preferred = next(
+                                (s for s in segments if _UNI_KEYWORDS.search(s)),
+                                None,
+                            )
+                            if preferred is None:
+                                # Fall back to the longest non-generic segment
+                                non_generic = [
+                                    s for s in segments
+                                    if s.lower() not in _GENERIC_TITLES
+                                ]
+                                preferred = max(non_generic, key=len) if non_generic else None
+                            if preferred and preferred.lower() not in _GENERIC_TITLES:
+                                name = preferred[:200]
 
                 # ── City from JSON-LD structured data ────────────────────────
                 for ld_block in _re.finditer(
@@ -761,9 +796,22 @@ async def add_university_by_url(
                 break
 
     if not name:
-        # Fallback: capitalise hostname parts
-        parts = hostname.removeprefix("www.").split(".")
-        name = " ".join(p.capitalize() for p in parts[:2])
+        # Fallback: derive a readable name from the hostname.
+        # Strip generic prefixes (www, courses, study) and known TLD suffixes
+        # so that "www.canterbury.ac.uk" → "Canterbury" not "Canterbury Ac".
+        _generic_subdomains = {"www", "courses", "study", "www2", "www3"}
+        _tld_suffixes = {"ac", "edu", "co", "com", "org", "net", "gov"}
+        _stripped_host = hostname.lower()
+        _host_parts = _stripped_host.split(".")
+        # Drop leading generic subdomains (www, courses, etc.)
+        while _host_parts and _host_parts[0] in _generic_subdomains:
+            _host_parts = _host_parts[1:]
+        # The meaningful label is the first remaining part before any TLD noise.
+        # e.g. ["canterbury", "ac", "uk"] → "canterbury"
+        #      ["coventry", "ac", "uk"]   → "coventry"
+        #      ["monash", "edu"]          → "monash"
+        _label = _host_parts[0] if _host_parts else "University"
+        name = _label.capitalize()
 
     # ── Step 2: Check for existing university with same website ───────────
     existing = (await db.execute(
