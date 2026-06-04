@@ -711,16 +711,33 @@ async def repair_conflicts_for_job(
             job_summary.fields_unresolved += course_result.fields_unresolved
         except Exception as _exc:  # noqa: BLE001
             log.warning("[REPAIR] course sc=%s failed: %s", sc_id, _exc)
+            # Roll back the poisoned transaction so subsequent courses and
+            # the post-loop queries can still run.  Same pattern as
+            # bulk_approve.py — without this, one bad row poisons the
+            # entire session (InFailedSQLTransactionError on every
+            # subsequent statement).
+            try:
+                await db.rollback()
+            except Exception:  # noqa: BLE001
+                pass
 
     # Compute after-confidence across same courses
-    q2 = await db.execute(
-        select(ScrapedCourse.avg_verification_confidence)
-        .where(
-            ScrapedCourse.scrape_job_id == job_id,
-            ScrapedCourse.avg_verification_confidence.is_not(None),
+    try:
+        q2 = await db.execute(
+            select(ScrapedCourse.avg_verification_confidence)
+            .where(
+                ScrapedCourse.scrape_job_id == job_id,
+                ScrapedCourse.avg_verification_confidence.is_not(None),
+            )
         )
-    )
-    confs_after = [float(r[0]) for r in q2.fetchall()]
+        confs_after = [float(r[0]) for r in q2.fetchall()]
+    except Exception as _q2_exc:  # noqa: BLE001
+        log.warning("[REPAIR] job=%s after-confidence query failed: %s", job_id, _q2_exc)
+        try:
+            await db.rollback()
+        except Exception:  # noqa: BLE001
+            pass
+        confs_after = []
     job_summary.avg_confidence_after = (
         round(sum(confs_after) / len(confs_after), 1)
         if confs_after else 0.0
