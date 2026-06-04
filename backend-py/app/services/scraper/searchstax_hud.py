@@ -671,6 +671,17 @@ def _normalize_academic_level(raw: str) -> str:
     return _LEVEL_MAP.get(key, raw.strip())
 
 
+# Integrated masters awards — degree type starts with M + subject abbrev and
+# confers a master's qualification even though entry is at undergraduate level.
+# Universities (e.g. Durham) tag these as "Undergraduate" in their Solr index
+# because students enrol via UCAS, but our academic_level field should reflect
+# the award level (Postgraduate) for correct classification and fee tier.
+_INTEGRATED_MASTERS_RE = re.compile(
+    r"\bM(?:Chem|Eng|Math|Phys|Biol|Sci|Dent|Nurs|Arch|Vet|Opt|Earth)\b",
+    re.I,
+)
+
+
 def _slug_to_name(url: str) -> str:
     """Derive a human-readable fallback name from a course URL slug."""
     # e.g. .../accounting-with-study-abroad-n410/ → "Accounting with Study Abroad N410"
@@ -757,6 +768,13 @@ def _map_doc_field_map(
     raw_level = _first_str(doc, _level_field)
     if raw_level:
         acad = _normalize_academic_level(raw_level)
+        # Integrated masters (MChem, MEng, MMath, MPhys, MBiol, MSci …) are
+        # enrolled at undergraduate entry via UCAS — Durham's Solr tags them
+        # "Undergraduate".  But they confer a master's award so academic_level
+        # should be "Postgraduate" for correct classification AND fee tier
+        # (PG fee default applies instead of UG fee default).
+        if acad == "Undergraduate" and award and _INTEGRATED_MASTERS_RE.search(award):
+            acad = "Postgraduate"
         payload["academic_level"] = acad
         _ev("academic_level", acad, "field_map")
 
