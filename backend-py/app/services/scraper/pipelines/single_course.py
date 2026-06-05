@@ -1405,7 +1405,14 @@ async def extract_course(
             _uc_http is not None
             and getattr(_uc_http.extraction, "skip_initial_http_fetch", False)
         )
-        if not _skip_http:
+        if _skip_http:
+            if emit:
+                await emit(
+                    "status",
+                    f"[BROWSER-FIRST] skip_initial_http_fetch=true — skipping HTTP, going straight to browser for {url[:70]}",
+                    phase="extract", kind="skip_initial_http", url=url,
+                )
+        else:
             if _use_scrape_do_render:
                 with scrape_do_render_scope():
                     html = await fetch_html(url)
