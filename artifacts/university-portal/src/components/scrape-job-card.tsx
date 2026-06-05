@@ -29,6 +29,7 @@ type ScrapeLog = {
   performance_savings?: {
     http_fetches_skipped: number;
     vision_ocr_skipped: number;
+    empty_text_ai_skipped: number;
     estimated_seconds_saved: number;
     estimated_ai_calls_saved: number;
     estimated_cost_saved_usd: number;
@@ -244,6 +245,7 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
   const [performanceSavings, setPerformanceSavings] = useState<{
     http_fetches_skipped: number;
     vision_ocr_skipped: number;
+    empty_text_ai_skipped: number;
     estimated_seconds_saved: number;
     estimated_ai_calls_saved: number;
     estimated_cost_saved_usd: number;
@@ -1381,6 +1383,12 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
                     <div className="flex justify-between">
                       <span>HTTP fetches skipped</span>
                       <span className="font-medium">{performanceSavings.http_fetches_skipped}</span>
+                    </div>
+                  )}
+                  {performanceSavings.empty_text_ai_skipped > 0 && (
+                    <div className="flex justify-between">
+                      <span>Empty-text AI skipped</span>
+                      <span className="font-medium">{performanceSavings.empty_text_ai_skipped}</span>
                     </div>
                   )}
                   {performanceSavings.vision_ocr_skipped > 0 && (

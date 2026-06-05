@@ -33,6 +33,9 @@ extraction:
         ielts: 6.5
       doctorate:
         ielts: 6.5
+    # With degree-level IELTS defaults + fee defaults both pre-filled, there
+    # is nothing useful for vision OCR to find — skip the image scan entirely.
+    skip_vision_when_core_found: true
 
   filters:
     domestic_only:
@@ -48,14 +51,25 @@ extraction:
 
   # Canterbury CC is Cloudflare Enterprise — httpx receives a 200 SPA shell
   # with near-zero visible text (React / Contensis CMS, JS-rendered).
-  # With the Scrape.do token now available, we use scrape_do_render: true
-  # to detect the empty shell and retry via Scrape.do's headless Chrome,
-  # which returns the fully-rendered HTML including the per-course fee table
-  # (e.g. "UK £9,790 | Overseas £17,000").  Local Playwright is still
-  # skipped (skip_per_course_browser: true) because it is also IP-blocked.
+  # scrape_do_render: true lets Scrape.do's headless Chrome return the
+  # fully-rendered HTML for pages where it works.
+  #
+  # skip_ai_when_text_empty: true — when a page still returns text_len=0
+  # after the scrape.do fetch (JS hydration failed or rate-limited), we skip
+  # Gemini + AI fallback entirely.  This avoids sending empty prompts and
+  # wasting API tokens/credits.  The per-course browser (skip_per_course_browser
+  # now false) can still attempt a Playwright render as a fallback.
+  #
+  # skip_per_course_browser was previously true (local Playwright is also
+  # IP-blocked by Cloudflare).  Reverting to false so that on pages where
+  # scrape.do returns 0-text the browser path can be tried before giving up.
+  # Playwright will still fail on CF-Enterprise pages — the cost is just
+  # a Playwright timeout (~15 s) rather than a silent zero-result.
   scrape_do_render: true
-  skip_browser_rescue: true
-  skip_per_course_browser: true
+  skip_ai_when_text_empty: true
+  skip_per_course_browser: false
+  # skip_browser_rescue removed (false by default) — allow sparse-static
+  # rescue to fire when fee + duration are both blank after the initial fetch.
 
   course_name:
     strip_title_suffixes:

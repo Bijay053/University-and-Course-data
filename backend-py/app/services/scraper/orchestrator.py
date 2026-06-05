@@ -2835,17 +2835,29 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             1 for _r in results
             if isinstance(_r, dict) and (_r.get("_perf") or {}).get("vision_skipped")
         )
+        _empty_text_count = sum(
+            1 for _r in results
+            if isinstance(_r, dict) and (_r.get("_perf") or {}).get("empty_text_static")
+        )
         # 3 s per avoided HTTP attempt + 4 s per avoided vision OCR pass (empirical)
-        _est_seconds_saved = _http_skipped_count * 3 + _vision_skipped_count * 4
-        # $0.00015 per Gemini vision call (gemini-2.5-flash-lite, ~500 input tokens)
-        _est_cost_saved_usd = round(_vision_skipped_count * 0.00015, 5)
+        # 2 s per avoided Gemini call on empty text (prompt build + API round-trip)
+        _est_seconds_saved = (
+            _http_skipped_count * 3
+            + _vision_skipped_count * 4
+            + _empty_text_count * 2
+        )
+        # $0.00015 per Gemini vision call; $0.00020 per avoided primary Gemini call
+        _est_cost_saved_usd = round(
+            _vision_skipped_count * 0.00015 + _empty_text_count * 0.00020, 5
+        )
         _perf_savings = {
             "http_fetches_skipped": _http_skipped_count,
             "vision_ocr_skipped": _vision_skipped_count,
+            "empty_text_ai_skipped": _empty_text_count,
             "estimated_seconds_saved": _est_seconds_saved,
-            "estimated_ai_calls_saved": _vision_skipped_count,
+            "estimated_ai_calls_saved": _vision_skipped_count + _empty_text_count,
             "estimated_cost_saved_usd": _est_cost_saved_usd,
-        } if (_http_skipped_count or _vision_skipped_count) else None
+        } if (_http_skipped_count or _vision_skipped_count or _empty_text_count) else None
 
         if _all_gemini_calls:
             try:

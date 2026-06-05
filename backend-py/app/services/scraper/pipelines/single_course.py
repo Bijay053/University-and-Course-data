@@ -1397,7 +1397,11 @@ async def extract_course(
     # ── per-call performance flags ────────────────────────────────────────────
     # Mutable dict accumulated as the call progresses; included in the returned
     # result dict so the orchestrator can aggregate savings across the run.
-    _perf_flags: dict = {"http_skipped": False, "vision_skipped": False}
+    _perf_flags: dict = {
+        "http_skipped": False,
+        "vision_skipped": False,
+        "empty_text_static": False,
+    }
 
     if html is None:
         # ── skip_initial_http_fetch gate ──────────────────────────────────────
@@ -2692,7 +2696,41 @@ async def extract_course(
             from app.services.ai import gemini_client as _gc
             import json as _gp_json
 
-            _gate_skip, _gate_reason = _gate_check(payload, evidence)
+            # ── Empty-text guard ─────────────────────────────────────────────────
+            # If the fetched HTML (static or scrape.do render) yields zero visible
+            # text, calling Gemini/AI wastes tokens and returns nothing useful.
+            # skip_ai_when_text_empty=true in YAML enables this guard so the pipeline
+            # falls through to the browser refetch instead (if not also skipped).
+            _uc_eat = get_uni_config()
+            _skip_ai_on_empty = (
+                _uc_eat is not None
+                and getattr(_uc_eat.extraction, "skip_ai_when_text_empty", False)
+            )
+            if _skip_ai_on_empty:
+                _eat_text = (_h2t_gate(html or "") or "").strip()
+                if not _eat_text:
+                    _perf_flags["empty_text_static"] = True
+                    use_ai_fallback = False
+                    _gemini_primary_cost = 0.0
+                    log.info(
+                        "[AI-SKIP] text_len=0 after fetch — skipping Gemini+AI "
+                        "(skip_ai_when_text_empty=true) on %s",
+                        url,
+                    )
+                    if emit:
+                        await emit(
+                            "status",
+                            f"[AI-SKIP] text_len=0 — skipping Gemini+AI fallback "
+                            f"(skip_ai_when_text_empty=true) for {url[:60]}",
+                            phase="extract",
+                            kind="ai_skip_empty_text",
+                            url=url,
+                        )
+                    _gate_skip, _gate_reason = True, "empty_text"
+                else:
+                    _gate_skip, _gate_reason = _gate_check(payload, evidence)
+            else:
+                _gate_skip, _gate_reason = _gate_check(payload, evidence)
 
             _gp_filled: dict[str, Any] = {}
             _gp_dbg: dict[str, Any] = {}

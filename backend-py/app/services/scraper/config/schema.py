@@ -2000,6 +2000,22 @@ class ExtractionConfig(BaseModel):
             "responses are empty SPA shells (Canterbury, Sunderland, etc.)."
         ),
     )
+    skip_ai_when_text_empty: bool = Field(
+        default=False,
+        description=(
+            "When True, skip ALL AI calls (Gemini primary + AI fallback) for a "
+            "course page whose extracted visible text_len is zero after the "
+            "initial static/scrape.do fetch.  An empty-text page means the SPA "
+            "shell was fetched but JS hydration did not produce visible content — "
+            "sending it to Gemini wastes tokens and returns nothing useful. "
+            "With this flag set, the pipeline skips Gemini/AI and allows the "
+            "per-course browser (Playwright) to attempt a render instead "
+            "(if skip_per_course_browser is false). "
+            "Enable for React-SPA sites that already use scrape_do_render: true "
+            "but still receive 0-text shells for some pages (e.g. Canterbury CC). "
+            "Example: extraction.skip_ai_when_text_empty: true"
+        ),
+    )
     retry_on_cloudflare: bool = Field(
         default=False,
         description=(
