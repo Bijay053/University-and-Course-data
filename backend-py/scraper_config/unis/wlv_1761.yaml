@@ -46,18 +46,28 @@ discovery:
     endpoint: "https://searchcloud-1-eu-west-2.searchstax.com/29847/wolverhamptondevelopment-3254/emselect"
     token_env: WLV_SEARCHSTAX_TOKEN
     filter_query: "sectionType_s:courses"
-    # links_only: true — Solr provides all 433 course URLs; the normal per-course
-    # browser + Gemini pipeline then fetches each page for fees, IELTS, duration,
-    # location, intakes etc.  Replaces the old field_map_as_payload approach which
-    # built payloads entirely from Solr fields (skipping page fetches) — that left
-    # ~10 courses with no duration/mode/location/intake because WLV Solr had those
-    # fields empty for those specific records.
-    links_only: true
+    # field_map_as_payload: true — builds payloads directly from Solr fields
+    # without fetching any individual course pages.  ~432 courses complete in
+    # <5 minutes vs ~271 minutes with per-page browser extraction at concurrency 2.
+    # Fees and IELTS come from degree_level_defaults in the extraction section
+    # below (WLV Solr does not carry fee/IELTS data in the index).
+    field_map_as_payload: true
+    exclude_part_time: true
 
     # WLV Solr url_t field contains bare SITS course codes (e.g. "WR006J01UMU"),
     # not real HTTP URLs.  url_base is prepended so the link URL becomes
-    # "https://www.wlv.ac.uk/courses/wr006j01umu" and the domain guard passes.
+    # "https://www.wlv.ac.uk/courses/wr006j01umu".
     url_base: "https://www.wlv.ac.uk/courses"
+
+    # Solr field name → system field mapping for _build_field_map_payload.
+    field_map:
+      url: url_t
+      name: title_t
+      degree_type: award_s
+      degree_level: study_level_s
+      duration: multi_duration_ss
+      intake_dates: multi_course_start_date_ss
+      category: subject_s
 
   # ── Retained as fallback only (not used when searchstax block is active) ──
   seed_urls:
@@ -67,12 +77,8 @@ discovery:
   browser_early_stop_courses: 300
 
 extraction:
-  # WLV is Cloudflare-protected.  Cap concurrency at 2 to avoid rate-limiting
-  # (previous browser-only runs hit 375/433 fetch_failed at higher concurrency).
-  # Browser fallback fires automatically when HTTP returns 403/challenge.
-  max_parallel_fetch: 2
-  retry_on_cloudflare: true
-  force_browser: true
+  # No per-page fetching needed: field_map_as_payload uses Solr data directly.
+  # Cloudflare-bypass settings (force_browser, retry_on_cloudflare) are removed.
 
   filters:
     # WLV pages that list only "Part-time (N years)" with no Full-time option

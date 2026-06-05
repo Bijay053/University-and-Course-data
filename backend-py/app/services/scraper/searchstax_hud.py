@@ -885,11 +885,14 @@ def _map_doc_field_map(
     raw_dur: str = ""
     if _all_durs:
         if cfg.exclude_part_time:
-            # Prefer full-time entries; fall back to first value only when the
-            # list is exclusively part-time (that course would have already been
-            # skipped via the mode filter above, so this is a safety net).
             _ft_durs = [d for d in _all_durs if "part" not in d.lower()]
-            raw_dur = _ft_durs[0] if _ft_durs else _all_durs[0]
+            if not _ft_durs:
+                # All durations are part-time only — reject the course.
+                # This is the safety net for universities (e.g. WLV) that
+                # have duration data in multi_duration_ss but no separate
+                # mode_s field, so the study-mode filter above never fired.
+                return None
+            raw_dur = _ft_durs[0]
         else:
             raw_dur = _all_durs[0]
 
