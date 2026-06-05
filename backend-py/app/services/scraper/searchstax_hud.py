@@ -860,7 +860,30 @@ def _map_doc_field_map(
         payload["study_mode"] = modes
         _ev("study_mode", modes, "field_map")
 
-    raw_dur = _first_str(doc, _dur_field)
+    # Collect ALL values from the (potentially multi-valued) duration field.
+    # Multi-valued Solr fields like multi_duration_ss may carry both modes:
+    #   ["Part-time (8 years)", "Full-time (4 years)"]
+    # _first_str only returns index[0], so when exclude_part_time is set we
+    # would pick the Part-time duration and show 8 years instead of 4 years.
+    # Fix: read every entry and prefer Full-time when exclude_part_time: true.
+    _all_durs: list[str] = []
+    _raw_dur_vals = doc.get(_dur_field)
+    if isinstance(_raw_dur_vals, list):
+        _all_durs = [str(v).strip() for v in _raw_dur_vals if v]
+    elif _raw_dur_vals:
+        _all_durs = [str(_raw_dur_vals).strip()]
+
+    raw_dur: str = ""
+    if _all_durs:
+        if cfg.exclude_part_time:
+            # Prefer full-time entries; fall back to first value only when the
+            # list is exclusively part-time (that course would have already been
+            # skipped via the mode filter above, so this is a safety net).
+            _ft_durs = [d for d in _all_durs if "part" not in d.lower()]
+            raw_dur = _ft_durs[0] if _ft_durs else _all_durs[0]
+        else:
+            raw_dur = _all_durs[0]
+
     if raw_dur:
         # scraped_courses.duration is NUMERIC(6,2) — never write the raw text
         # (e.g. "3 years full-time") here or the INSERT flush fails with a
