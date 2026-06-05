@@ -448,6 +448,10 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
     summary = {"discovered": 0, "staged": 0, "skipped": 0, "errors": 0, "fetch_failed": 0}
     # Track why courses were skipped: {guard_name: count}
     skip_reasons: dict[str, int] = {}
+    # Sample URLs+names per skip reason (capped at 10 per reason) for diagnostics.
+    # Populated only for category_landing_page_* sub-reasons so operators can
+    # see exactly which pages were rejected and why without reading raw logs.
+    skip_reason_samples: dict[str, list[dict]] = {}
 
     # Stop signalling: shared list-of-bool (mutable across closures) plus a
     # background poller that watches scrape_runtime_jobs.stop_requested. The
@@ -3276,6 +3280,15 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     summary["skipped"] += 1
                     _skip_key = (res.reason or "unknown").replace(" ", "_").lower()[:40]
                     skip_reasons[_skip_key] = skip_reasons.get(_skip_key, 0) + 1
+                    # Collect sample URLs for category_landing_page_* sub-reasons
+                    # so operators can diagnose root causes without reading raw logs.
+                    if res.reason and res.reason.startswith("category_landing_page_"):
+                        _samples = skip_reason_samples.setdefault(res.reason, [])
+                        if len(_samples) < 10:
+                            _samples.append({
+                                "url": r.get("url") or "",
+                                "name": r.get("name") or "",
+                            })
                     await emit(
                         "status",
                         f"[STAGE] skipped {r['name']}: {res.reason}",
@@ -3535,6 +3548,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             skipped=summary.get("skipped", 0),
             errors=summary.get("errors", 0),
             skip_reasons=skip_reasons,
+            skip_reason_samples=skip_reason_samples,
             level="success",
         )
         # PR-1.5: post-run sanity check on the imported counter.

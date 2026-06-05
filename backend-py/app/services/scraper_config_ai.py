@@ -562,3 +562,178 @@ def _post_process(text: str) -> str:
     if not body.endswith("\n"):
         body += "\n"
     return body
+
+
+# ---------------------------------------------------------------------------
+# Category-landing-page rejection analyser
+# ---------------------------------------------------------------------------
+
+def analyze_category_landing_rejections(
+    skip_reasons: dict[str, int],
+    skip_reason_samples: dict[str, list[dict]],
+) -> list[dict[str, Any]]:
+    """Analyse ``category_landing_page_*`` skip-reason counts and return a list
+    of actionable YAML fix recommendations for the operator.
+
+    Each item in the returned list is a dict with keys:
+      ``sub_reason``  — the granular reason key (e.g. ``category_landing_page_missing_degree_qualifier``)
+      ``count``       — number of pages rejected for this reason
+      ``samples``     — list of {url, name} dicts (up to 10)
+      ``severity``    — ``"high"`` (≥10) / ``"medium"`` (3-9) / ``"low"`` (<3)
+      ``recommendation`` — human-readable YAML fix suggestion
+
+    Only sub-reasons with count > 0 are included.  Sub-reasons with no YAML
+    fix (``url_block``, ``title_block``) receive an ``"informational"``
+    recommendation explaining that the guard is correct.
+    """
+    results: list[dict[str, Any]] = []
+
+    _CATEGORY_SUB_REASONS = (
+        "category_landing_page_missing_degree_qualifier",
+        "category_landing_page_url_block",
+        "category_landing_page_title_block",
+        "category_landing_page_url_suffix",
+    )
+
+    for sub_reason in _CATEGORY_SUB_REASONS:
+        count = skip_reasons.get(sub_reason, 0)
+        if count == 0:
+            continue
+        samples = skip_reason_samples.get(sub_reason, [])
+        severity = "high" if count >= 10 else ("medium" if count >= 3 else "low")
+
+        if sub_reason == "category_landing_page_missing_degree_qualifier":
+            # Sample names help the operator decide whether to relax the gate.
+            sample_names = [s.get("name", "") for s in samples if s.get("name")]
+            name_preview = ", ".join(f'"{n}"' for n in sample_names[:3])
+            recommendation = (
+                f"{count} course(s) were rejected because the extracted H1/title "
+                "lacks a recognised degree-level qualifier (Bachelor, Master, Diploma, etc.).\n"
+                "Sample names: " + (name_preview or "(none captured)") + "\n\n"
+                "Fix options:\n"
+                "  A) If this university uses non-standard degree names (e.g. short "
+                "     professional awards), add to extraction.staging:\n"
+                "       skip_degree_qualifier_check: true\n"
+                "     This suppresses the guard for this university only.\n"
+                "  B) If the names look like generic nav-text (e.g. 'Study online', "
+                "     'Postgraduate study') the guard is working correctly — "
+                "     tighten allow_url_patterns or add block_url_patterns instead.\n"
+                "  C) If names look like real awards but the qualifier is missing "
+                "     (e.g. titles scraped from a listing card with no H1), check "
+                "     extraction.html.h1_selectors to ensure the correct heading is "
+                "     targeted."
+            )
+
+        elif sub_reason == "category_landing_page_url_block":
+            sample_urls = [s.get("url", "") for s in samples if s.get("url")]
+            url_preview = "\n    ".join(sample_urls[:5])
+            # Find common path prefix across samples to suggest a tighter pattern.
+            _common_prefix = _common_url_path_prefix(sample_urls)
+            prefix_hint = (
+                f"\n  Common path prefix: {_common_prefix!r}" if _common_prefix else ""
+            )
+            recommendation = (
+                f"{count} URL(s) matched a globally-blocked path pattern "
+                "(category/listing hub, not a course detail).\n"
+                "Sample URLs:\n"
+                f"    {url_preview}\n"
+                f"{prefix_hint}\n\n"
+                "Fix options:\n"
+                "  A) Informational — these rejections are expected; the global URL "
+                "     block list is catching navigation/category hubs correctly.\n"
+                "  B) If legitimate course URLs share the blocked path segment, add a "
+                "     host exception in guards._BLOCK_URL_SUBSTRINGS_HOST_EXCEPTIONS "
+                "     or tighten discovery.allow_url_patterns to only emit real "
+                "     course-detail paths so those pages are never enqueued.\n"
+                "  C) Add discovery.block_url_patterns entries to exclude the specific "
+                f"     hub prefix ({_common_prefix!r}) at discovery time rather than "
+                "     at staging, reducing wasted extraction work."
+            )
+
+        elif sub_reason == "category_landing_page_title_block":
+            sample_names = [s.get("name", "") for s in samples if s.get("name")]
+            name_preview = ", ".join(f'"{n}"' for n in sample_names[:5])
+            recommendation = (
+                f"{count} page(s) were rejected because the page title matched a "
+                "known category-listing prefix (e.g. 'Undergraduate study', "
+                "'Browse courses', 'Study online').\n"
+                "Sample titles: " + (name_preview or "(none captured)") + "\n\n"
+                "Fix options:\n"
+                "  A) Informational — the title-block guard is working correctly; "
+                "     these are listing/hub pages, not course details.\n"
+                "  B) If real course titles are being caught, check "
+                "     extraction.html.h1_selectors — the scraper may be picking up "
+                "     the page <title> or a nav heading instead of the course H1. "
+                "     Add a more specific h1_selectors CSS path."
+            )
+
+        elif sub_reason == "category_landing_page_url_suffix":
+            sample_urls = [s.get("url", "") for s in samples if s.get("url")]
+            url_preview = "\n    ".join(sample_urls[:3])
+            recommendation = (
+                f"{count} URL(s) ended with a known shared-specialisation suffix "
+                "(/two-specialisations, /two-specializations).\n"
+                "Sample URLs:\n"
+                f"    {url_preview}\n\n"
+                "Fix options:\n"
+                "  A) Informational — these are specialisation-picker hub pages; "
+                "     the guard is correct.\n"
+                "  B) If this university embeds real per-specialisation fee/IELTS "
+                "     data on these pages and you want them staged, add the suffix "
+                "     to discovery.allow_url_patterns with a specific regex that "
+                "     anchors on the course slug before the suffix, then remove the "
+                "     suffix from guards._CATEGORY_URL_SUFFIXES for this host via "
+                "     a YAML extraction.staging override (not yet supported — "
+                "     raise a backend ticket)."
+            )
+
+        else:
+            recommendation = (
+                f"{count} page(s) were rejected for reason {sub_reason!r}. "
+                "No automated fix rule available."
+            )
+
+        results.append({
+            "sub_reason": sub_reason,
+            "count": count,
+            "samples": samples,
+            "severity": severity,
+            "recommendation": recommendation,
+        })
+
+    # Sort highest count first.
+    results.sort(key=lambda x: -x["count"])
+    return results
+
+
+def _common_url_path_prefix(urls: list[str]) -> str:
+    """Return the longest common path prefix shared by all non-empty URLs.
+
+    Only considers the path component (ignoring scheme/host).  Returns ``""``
+    when there is no meaningful common prefix (fewer than 2 URLs or the shared
+    prefix is just ``"/"``).
+    """
+    if len(urls) < 2:
+        return ""
+    paths: list[str] = []
+    for u in urls:
+        try:
+            from urllib.parse import urlparse as _up
+            p = _up(u).path.lower()
+        except Exception:
+            p = ""
+        if p:
+            paths.append(p)
+    if not paths:
+        return ""
+    # Split into segments and find common prefix.
+    split = [p.split("/") for p in paths]
+    common: list[str] = []
+    for segs in zip(*split):
+        if len(set(segs)) == 1:
+            common.append(segs[0])
+        else:
+            break
+    prefix = "/".join(common)
+    # Only return if it's more than just the root slash.
+    return prefix if len(prefix) > 1 else ""

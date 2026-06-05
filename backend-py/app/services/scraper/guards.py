@@ -406,8 +406,14 @@ def should_stage_course(
     ``(False, reject_reason)`` on the first failing check.  Reject reasons
     are designed to be grep-able in production logs:
 
-    * ``"category_landing_page"`` — H1/course-name lacks a degree qualifier
-                                     OR URL matches a known category-page suffix
+    * ``"category_landing_page_url_suffix"`` — URL ends with a known category suffix
+                                              (e.g. ``/two-specialisations``)
+    * ``"category_landing_page_missing_degree_qualifier"`` — H1/course-name extracted
+                                              from the page lacks a degree-level word.
+                                              Suppress per-uni via
+                                              ``extraction.staging.skip_degree_qualifier_check: true``.
+    All ``category_landing_page_*`` reasons are bucketed as ``"category_landing_page"``
+    in run-summary stats and the public UI.
     * ``"no_international_fee"`` — international_fee is None after full extraction
     * ``"online_only"``           — study_mode is exactly "Online" (case-insensitive).
                                      Only on-campus or blended courses are ingested.
@@ -456,7 +462,7 @@ def should_stage_course(
     if source_url:
         _url_path = source_url.lower().split("?")[0]  # strip query string
         if any(_url_path.endswith(sfx) for sfx in _CATEGORY_URL_SUFFIXES):
-            return (False, "category_landing_page")
+            return (False, "category_landing_page_url_suffix")
 
         # URL-slug online detection: if the last path segment ends with
         # "-online" the university explicitly published this as an online-only
@@ -502,7 +508,7 @@ def should_stage_course(
     except Exception:  # noqa: BLE001
         pass
     if not _skip_dq and effective_name and not _name_has_degree_qualifier(effective_name):
-        return (False, "category_landing_page")
+        return (False, "category_landing_page_missing_degree_qualifier")
 
     # Explicit domestic-only flag: set by extractors when the page text
     # states "this course is not available to international students" etc.
@@ -783,7 +789,7 @@ _BLOCK_URL_SUBSTRINGS: tuple[tuple[str, str], ...] = (
     # marketing prefixes used to brand whole sub-sites that show every
     # programme but are themselves not a single course.
     ("/study-at-",              "marketing_page"),  # /study-at-uow, /study-at-une-online
-    ("/study-online/",          "category_landing_page"),
+    ("/study-online/",          "category_landing_page_url_block"),
     # NOTE: bare "/study-with-us" is INTENTIONALLY narrowed.  MIT
     # (Melbourne Institute of Technology) — and any future university
     # that uses Drupal-style brand-subsite URL hierarchy — publishes
@@ -827,11 +833,11 @@ _BLOCK_URL_SUBSTRINGS: tuple[tuple[str, str], ...] = (
     # UOW, or Flinders.  All have leading slashes so they cannot match
     # inside a real course slug.
     ("/career-finder",          "info_page"),       # UniSQ "career-finder/accountant"
-    ("/online-study",           "category_landing_page"),
+    ("/online-study",           "category_landing_page_url_block"),
     ("/pathway-programs",       "pathway_page"),
     ("/pathway-program/",       "pathway_page"),
-    ("/short-courses",          "category_landing_page"),
-    ("/short-course/",          "category_landing_page"),
+    ("/short-courses",          "category_landing_page_url_block"),
+    ("/short-course/",          "category_landing_page_url_block"),
     ("/english-language-programs", "pathway_page"),
     ("/english-language-program",  "pathway_page"),
     ("/events-key-dates",       "events_page"),
@@ -844,14 +850,14 @@ _BLOCK_URL_SUBSTRINGS: tuple[tuple[str, str], ...] = (
     # courses under a subject heading but carry no fee, IELTS, or degree-level
     # data for any individual course.  The "/linkassets/" token is unique to
     # JCU's URL scheme; it will never appear inside a real degree-course slug.
-    ("/linkassets/",            "category_landing_page"),
+    ("/linkassets/",            "category_landing_page_url_block"),
     # Specific Flinders nav paths.  IMPORTANT: each entry uses a path
     # boundary so it cannot accidentally match a real degree slug.
     # `/study/postgrad/` matches Flinders' postgrad landing page and
     # any nested category pages, but NEVER matches
     # `/study/postgraduate-diploma-of-counselling` (that would have
     # been the bug had we used bare `/study/postgrad`).
-    ("/study/postgrad/",        "category_landing_page"),
+    ("/study/postgrad/",        "category_landing_page_url_block"),
     ("/study/pathways/",        "pathway_page"),
     ("/study/pathways-to-",     "pathway_page"),
     ("/study/events-key-dates", "events_page"),
@@ -883,7 +889,7 @@ _BLOCK_URL_SUBSTRINGS: tuple[tuple[str, str], ...] = (
     # detail routes elsewhere in their site (e.g. WordPress-routed
     # /courses/index.php?id=NNN style URLs that we have NOT confirmed
     # as leaks).
-    ("/study/index.php",        "category_landing_page"),
+    ("/study/index.php",        "category_landing_page_url_block"),
     # AEM (Adobe Experience Manager) digital asset library — marketing
     # brochures, PDF schedules, and image assets published at
     # /content/dam/...  These URLs are discovered via sitemap on AEM-hosted
@@ -911,27 +917,27 @@ _BLOCK_URL_SUBSTRINGS: tuple[tuple[str, str], ...] = (
     # category listings, not individual CRICOS course detail pages.
     # Match with AND without trailing slash to catch both /study/undergraduate
     # and /study/undergraduate/ as seen in different browser nav exports.
-    ("/study/undergraduate",    "category_landing_page"),
+    ("/study/undergraduate",    "category_landing_page_url_block"),
     # UTAS /study/certificates — the certificate study-type category hub.
     # Not a CRICOS course page; real certificate courses appear under
     # /courses/<faculty>/courses/<slug>.  The trailing slash anchors
     # to the hub URL (/study/certificates and /study/certificates/).
-    ("/study/certificates",     "category_landing_page"),
+    ("/study/certificates",     "category_landing_page_url_block"),
     # UTAS study-info pages that are NOT course detail pages.  These pages
     # appear in BFS because /courses links to them in the site navigation.
     # All real UTAS CRICOS courses live under /courses/<faculty>/courses/<slug>.
-    ("/study/learning-abroad",  "category_landing_page"),
-    ("/study/interstate",       "category_landing_page"),
-    ("/study/areas/",           "category_landing_page"),
-    ("/study/international",    "category_landing_page"),
-    ("/study/online",           "category_landing_page"),
-    ("/study/sustainability",   "category_landing_page"),
-    ("/study/parents-and-carers", "category_landing_page"),
-    ("/study/starting-at-the-university", "category_landing_page"),
+    ("/study/learning-abroad",  "category_landing_page_url_block"),
+    ("/study/interstate",       "category_landing_page_url_block"),
+    ("/study/areas/",           "category_landing_page_url_block"),
+    ("/study/international",    "category_landing_page_url_block"),
+    ("/study/online",           "category_landing_page_url_block"),
+    ("/study/sustainability",   "category_landing_page_url_block"),
+    ("/study/parents-and-carers", "category_landing_page_url_block"),
+    ("/study/starting-at-the-university", "category_landing_page_url_block"),
     # Trailing slash enforces path-boundary semantics: this blocks
     # /study/postgraduate/ (Flinders category hub) and any sub-pages but
     # NEVER matches /study/postgraduate-diploma-of-counselling (a real degree).
-    ("/study/postgraduate/",    "category_landing_page"),
+    ("/study/postgraduate/",    "category_landing_page_url_block"),
 )
 
 # URL query-string substring matches.  Real course-detail pages do not
@@ -955,8 +961,8 @@ _BLOCK_URL_QUERY_SUBSTRINGS: tuple[tuple[str, str], ...] = (
 # category page and a hypothetical "/courses/undergraduate-study-tips").
 # Compared against the path's last segment with trailing slash stripped.
 _BLOCK_URL_LAST_SEGMENTS: dict[str, str] = {
-    "undergraduate-study":      "category_landing_page",
-    "postgraduate-study":       "category_landing_page",
+    "undergraduate-study":      "category_landing_page_url_block",
+    "postgraduate-study":       "category_landing_page_url_block",
     # Bare nav-root last-segments — when /…/undergraduate (or /…/postgraduate)
     # ends the URL with NO course slug after it, the page is the listing
     # root, not a course.  Real course URLs always have the degree-name
@@ -966,23 +972,23 @@ _BLOCK_URL_LAST_SEGMENTS: dict[str, str] = {
     # course slug, never the bare word "undergraduate").  Safe globally:
     # no university publishes a real course detail page at a URL whose
     # last segment is literally "undergraduate" or "postgraduate".
-    "undergraduate":            "category_landing_page",
-    "postgraduate":             "category_landing_page",
+    "undergraduate":            "category_landing_page_url_block",
+    "postgraduate":             "category_landing_page_url_block",
     # Macquarie nav-driven landing pages discovered via browser BFS when
     # the catalogue seeds short-circuit on Cloudflare (2026-05-18 leak).
-    "combined-bachelor-master-degrees": "category_landing_page",
-    "double-degree-builder":    "category_landing_page",
-    "browse-all-degrees":       "category_landing_page",
-    "view-degrees":             "category_landing_page",
-    "view-all-degrees":         "category_landing_page",
-    "all-degrees":              "category_landing_page",
-    "all-courses":              "category_landing_page",
-    "find-a-course":            "category_landing_page",
-    "study-online":             "category_landing_page",
-    "online-study":             "category_landing_page",
-    "online-courses":           "category_landing_page",
-    "double-degrees":           "category_landing_page",
-    "new-degrees":              "category_landing_page",
+    "combined-bachelor-master-degrees": "category_landing_page_url_block",
+    "double-degree-builder":    "category_landing_page_url_block",
+    "browse-all-degrees":       "category_landing_page_url_block",
+    "view-degrees":             "category_landing_page_url_block",
+    "view-all-degrees":         "category_landing_page_url_block",
+    "all-degrees":              "category_landing_page_url_block",
+    "all-courses":              "category_landing_page_url_block",
+    "find-a-course":            "category_landing_page_url_block",
+    "study-online":             "category_landing_page_url_block",
+    "online-study":             "category_landing_page_url_block",
+    "online-courses":           "category_landing_page_url_block",
+    "double-degrees":           "category_landing_page_url_block",
+    "new-degrees":              "category_landing_page_url_block",
     "english-language-programs": "pathway_page",
     "english-language":         "pathway_page",
     "saved-courses":            "ui_page",
@@ -1016,7 +1022,7 @@ _BLOCK_TITLE_PREFIXES: tuple[tuple[str, str], ...] = (
     # Real degree titles always start with a degree qualifier (Bachelor,
     # Master, MBA, Diploma, Certificate, ...).  None of the patterns
     # below can accidentally match a real course title.
-    ("study online",                    "category_landing_page"),
+    ("study online",                    "category_landing_page_title_block"),
     ("study at ",                       "marketing_page"),  # "Study at UOW", "Study at UNE"
     # NOTE: do NOT add bare "undergraduate" / "postgraduate" prefixes —
     # those would wrongly block real award titles like "Undergraduate
@@ -1024,20 +1030,20 @@ _BLOCK_TITLE_PREFIXES: tuple[tuple[str, str], ...] = (
     # of Counselling".  We instead match the specific category-landing
     # phrasings and rely on _BLOCK_TITLE_EXACT for the bare nav items
     # ("Undergraduate" / "Postgraduate" alone, with no following word).
-    ("undergraduate study",             "category_landing_page"),  # "Undergraduate study"
-    ("undergraduate degrees",           "category_landing_page"),
-    ("undergraduate courses",           "category_landing_page"),
-    ("undergraduate programs",          "category_landing_page"),
-    ("undergraduate programmes",        "category_landing_page"),
-    ("postgraduate study",              "category_landing_page"),  # "Postgraduate study"
-    ("postgraduate degrees",            "category_landing_page"),
-    ("postgraduate courses",            "category_landing_page"),
-    ("postgraduate programs",           "category_landing_page"),
-    ("postgraduate programmes",         "category_landing_page"),
-    ("graduate study",                  "category_landing_page"),
-    ("research study",                  "category_landing_page"),
-    ("higher degree by research",       "category_landing_page"),
-    ("higher degrees by research",      "category_landing_page"),
+    ("undergraduate study",             "category_landing_page_title_block"),  # "Undergraduate study"
+    ("undergraduate degrees",           "category_landing_page_title_block"),
+    ("undergraduate courses",           "category_landing_page_title_block"),
+    ("undergraduate programs",          "category_landing_page_title_block"),
+    ("undergraduate programmes",        "category_landing_page_title_block"),
+    ("postgraduate study",              "category_landing_page_title_block"),  # "Postgraduate study"
+    ("postgraduate degrees",            "category_landing_page_title_block"),
+    ("postgraduate courses",            "category_landing_page_title_block"),
+    ("postgraduate programs",           "category_landing_page_title_block"),
+    ("postgraduate programmes",         "category_landing_page_title_block"),
+    ("graduate study",                  "category_landing_page_title_block"),
+    ("research study",                  "category_landing_page_title_block"),
+    ("higher degree by research",       "category_landing_page_title_block"),
+    ("higher degrees by research",      "category_landing_page_title_block"),
     ("pathways to ",                    "pathway_page"),       # "Pathways to uni"
     ("pathway to ",                     "pathway_page"),
     ("pathway program",                 "pathway_page"),
@@ -1052,11 +1058,11 @@ _BLOCK_TITLE_PREFIXES: tuple[tuple[str, str], ...] = (
     ("year 12",                         "info_page"),          # "Year 12 entry"
     ("year 11",                         "info_page"),
     ("why ",                            "marketing_page"),     # "Why study", "Why choose UNE"
-    ("explore courses",                 "category_landing_page"),
-    ("browse courses",                  "category_landing_page"),
-    ("our courses",                     "category_landing_page"),
-    ("study area",                      "category_landing_page"),  # "Study area" / "Study areas"
-    ("subject area",                    "category_landing_page"),
+    ("explore courses",                 "category_landing_page_title_block"),
+    ("browse courses",                  "category_landing_page_title_block"),
+    ("our courses",                     "category_landing_page_title_block"),
+    ("study area",                      "category_landing_page_title_block"),  # "Study area" / "Study areas"
+    ("subject area",                    "category_landing_page_title_block"),
     ("information for",                 "info_page"),          # "Information for international students"
     ("how it works",                    "info_page"),
     ("open day",                        "marketing_page"),
