@@ -830,6 +830,12 @@ async def maybe_browser_refetch(
             url=url,
         )
     wait_until, settle_ms, outer_sec, goto_ms = _browser_config_for(url)
+    _uc_for_actions = get_uni_config()
+    _browser_actions = (
+        _uc_for_actions.extraction.actions or None
+        if _uc_for_actions is not None
+        else None
+    )
     try:
         rendered = await asyncio.wait_for(
             browser_pool.fetch_html(
@@ -838,7 +844,7 @@ async def maybe_browser_refetch(
                 settle_ms=settle_ms,
                 timeout=goto_ms,
                 click_international=_needs_international_toggle(url),
-                actions=get_uni_config().extraction.actions or None,
+                actions=_browser_actions,
             ),
             timeout=outer_sec,
         )

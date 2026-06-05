@@ -501,6 +501,67 @@ def _is_domestic_only_page(html: str) -> bool:
     return False
 
 
+_DURATION_LABEL_PAT_RE = _re.compile(
+    r"\b(?:course\s*(?:duration|length)|duration|programme?\s*(?:duration|length)"
+    r"|study\s*duration)\b",
+    _re.IGNORECASE,
+)
+_PARTTIME_ONLY_PT_RE = _re.compile(r"\bpart[- ]?time\b", _re.IGNORECASE)
+_PARTTIME_ONLY_FT_RE = _re.compile(r"\bfull[- ]?time\b", _re.IGNORECASE)
+
+
+def _is_parttime_only_page(html: str) -> bool:
+    """Return True when the course-length cell contains Part-time but not Full-time.
+
+    Detects WLV-style pages where the duration label/value pair reads
+    "Course length: Part-time (1 year)" with no Full-time option listed.
+    Such courses are not suitable for international students (visa rules
+    typically require full-time enrolment).
+
+    Uses BeautifulSoup to inspect the DOM cell directly so incidental
+    occurrences of "part-time" in page prose (e.g. a footer note) don't
+    produce false positives.
+    """
+    if not html:
+        return False
+    try:
+        from bs4 import BeautifulSoup as _BS4_pt
+
+        soup = _BS4_pt(html, "html.parser")
+        for label_tag in soup.find_all(("dt", "th", "strong", "b")):
+            label_text = label_tag.get_text(" ", strip=True).rstrip(":").strip()
+            if not _DURATION_LABEL_PAT_RE.search(label_text):
+                continue
+            # Retrieve the associated value cell
+            if label_tag.name == "dt":
+                sibling = label_tag.find_next_sibling("dd")
+                value_text = sibling.get_text(" ", strip=True) if sibling else ""
+            elif label_tag.name == "th":
+                sibling = label_tag.find_next_sibling("td")
+                value_text = sibling.get_text(" ", strip=True) if sibling else ""
+            else:
+                nxt = label_tag.next_sibling
+                value_text = str(nxt).strip() if nxt else ""
+            if not value_text:
+                continue
+            # Part-time present AND Full-time absent → reject
+            if _PARTTIME_ONLY_PT_RE.search(value_text) and not _PARTTIME_ONLY_FT_RE.search(value_text):
+                return True
+    except Exception:
+        pass
+    return False
+
+
+def _parttime_only_filter_enabled() -> bool:
+    """Return True when extraction.filters.reject_parttime_only is set in uni config.
+
+    Fail-closed: returns False when the contextvar is unset (no per-uni context),
+    so the filter never fires for universities that haven't explicitly opted in.
+    """
+    uc = get_uni_config()
+    return uc is not None and uc.extraction.filters.reject_parttime_only
+
+
 _FEDERATION_HOSTS: frozenset[str] = frozenset(
     {"www.federation.edu.au", "federation.edu.au"}
 )
@@ -1543,6 +1604,27 @@ async def extract_course(
             f"[DOMESTIC ONLY] {url} — course page states domestic-students-only; skipping",
             phase="extract",
             kind="domestic_only_skip",
+            url=url,
+        )
+        return {"url": url, "payload": payload, "evidence": evidence}
+
+    # ── Part-time-only early exit ─────────────────────────────────────────────
+    # Some universities (e.g. WLV) offer certain courses as Part-time only with
+    # no Full-time option.  International students on a student visa must
+    # typically enrol full-time, so these courses are not applicable and should
+    # be rejected at the extraction stage rather than staged for review.
+    # Gated on extraction.filters.reject_parttime_only: true in per-uni YAML;
+    # fail-closed (never fires for universities that haven't opted in).
+    # Reuses the existing domestic_only payload key so guards.py rejects with
+    # reason "domestic_only"; parttime_only=True is set for metrics/logging.
+    if _parttime_only_filter_enabled() and _is_parttime_only_page(html):
+        payload["domestic_only"] = True
+        payload["parttime_only"] = True
+        await emit(
+            "status",
+            f"[PART-TIME ONLY] {url} — no full-time option found in course-length cell; skipping",
+            phase="extract",
+            kind="parttime_only_skip",
             url=url,
         )
         return {"url": url, "payload": payload, "evidence": evidence}

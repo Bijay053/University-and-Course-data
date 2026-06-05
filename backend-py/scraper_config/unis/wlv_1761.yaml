@@ -74,6 +74,12 @@ extraction:
   retry_on_cloudflare: true
   force_browser: true
 
+  filters:
+    # WLV pages that list only "Part-time (N years)" with no Full-time option
+    # are courses that international students cannot take on a student visa.
+    # Reject them during extraction rather than staging them for manual review.
+    reject_parttime_only: true
+
   text_cleaning:
     duration:
       # WLV course-length cells list Part-time before Full-time:

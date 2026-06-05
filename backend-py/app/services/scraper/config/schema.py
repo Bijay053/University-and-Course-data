@@ -1511,6 +1511,20 @@ class FiltersConfig(BaseModel):
     online_only: OnlineOnlyFilter = Field(
         default_factory=OnlineOnlyFilter,
     )
+    reject_parttime_only: bool = Field(
+        default=False,
+        description=(
+            "When True, courses where the course-length cell shows Part-time only "
+            "(no Full-time option) are rejected during staging.  International "
+            "students on a student visa must typically enrol full-time, so part-time-"
+            "only courses are not applicable to them.\n\n"
+            "Enable only for universities that clearly label both Part-time and "
+            "Full-time per course — e.g. WLV, where 'Course length: Part-time "
+            "(1 year)' vs 'Part-time (8 years), Full-time (4 years)' are "
+            "unambiguously distinguishable.  Off by default so no existing "
+            "university is affected."
+        ),
+    )
     broken_cms_retry_strip_query: bool = Field(
         default=False,
         description=(
