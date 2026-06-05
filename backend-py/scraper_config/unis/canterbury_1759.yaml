@@ -84,6 +84,13 @@ extraction:
   # static rescue can still run if browser gives partial content.
   skip_ai_when_text_empty: true
   skip_per_course_browser: false
+  # skip_browser_rescue: true — the sparse-static rescue triggers when
+  # international_fee + duration are both blank after Gemini-primary.  On
+  # Canterbury CC pages the per-course browser returns filled=[] (Cloudflare
+  # also blocks Playwright), so each rescue wastes one Scrape.do JS-render
+  # credit (~10 s) for zero benefit.  Fees and IELTS are already covered by
+  # degree_level_defaults above, so skipping the rescue loses nothing.
+  skip_browser_rescue: true
 
   course_name:
     strip_title_suffixes:

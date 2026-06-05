@@ -40,9 +40,14 @@ _JUNK = re.compile(
 )
 _TRAILING_KEYS = re.compile(
     r"\b(?:delivery\s*mode|delivery\s*method|study\s*mode|course\s*structure|intakes?|course\s*length|duration|cricos\s*code|fees?"
-    r"|view\s+dates|start\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec))\b",
+    r"|view\s+dates|start\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)"
+    r"|scroll\s+to\s+top)\b",
     re.I,
 )
+# Strip leading section markers injected by some CMSes into page text.
+# Canterbury's Contensis CMS emits "(s)" before section headings which
+# bleeds into Gemini's location_text extraction: "(s)Canterbury Scroll to top".
+_LEADING_SECTION_MARKER_RE = re.compile(r"^\([a-z]\)\s*", re.I)
 _REMOVE_VIRTUAL = re.compile(
     r"\b(?:online|virtual|remote|distance(?:\s*learning)?|off[-\s]?campus|external)\b",
     re.I,
@@ -437,6 +442,10 @@ def _is_only_delivery_method(text: str) -> bool:
 def _normalise(raw: str | None) -> str | None:
     if not raw:
         return None
+    # Strip leading CMS section markers like "(s)" that Contensis / similar
+    # CMSes inject into page headings.  These bleed into Gemini's location_text
+    # as "(s)Canterbury Scroll to top" — strip before any other cleaning.
+    raw = _LEADING_SECTION_MARKER_RE.sub("", raw)
     cleaned = re.sub(r"\s+", " ", raw).replace(" , ", ", ").strip()
     # Normalise slash-separated city lists to comma-separated.
     # KBS (and some others) publish location as "Adelaide / Brisbane / Melbourne /".
@@ -501,6 +510,14 @@ _CAMPUS_AVAILABILITY_SUFFIX_RE = re.compile(
 
 
 def _sanitise_for_display(raw: str | None) -> str | None:
+    if not raw:
+        return None
+    # Strip CMS section markers (e.g. "(s)") and trailing page-chrome
+    # suffixes (e.g. "Scroll to top") before any other processing so that
+    # Gemini-sourced location_text values like "(s)Canterbury Scroll to top"
+    # are cleaned even when _normalise() was not called first.
+    raw = _LEADING_SECTION_MARKER_RE.sub("", raw).strip()
+    raw = _TRAILING_KEYS.split(raw, maxsplit=1)[0].strip() or raw
     if not raw:
         return None
     # Strip trailing availability qualifiers from each campus part before
