@@ -2740,7 +2740,10 @@ async def extract_course(
             _gp_full_ran: bool = False
 
             if _gate_skip:
-                # All high-value fields already covered at high confidence — skip.
+                # All high-value fields already covered — skip Gemini primary.
+                # Also skip AI fallback: if regex/defaults already have the
+                # core money fields, the AI fallback can't improve on them.
+                use_ai_fallback = False
                 _gemini_primary_cost = 0.0
                 if emit:
                     await emit(

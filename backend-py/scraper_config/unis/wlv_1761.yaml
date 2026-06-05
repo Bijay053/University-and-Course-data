@@ -155,8 +155,11 @@ discovery:
   browser_early_stop_courses: 300
 
 extraction:
-  # No per-page fetching needed: field_map_as_payload uses Solr data directly.
-  # Cloudflare-bypass settings (force_browser, retry_on_cloudflare) are removed.
+  # WLV serves fees + durations in static HTML via Scrape.do — no JS rendering
+  # required.  Per-course browser adds only Cloudflare timeouts (~15 s each)
+  # with no benefit.  Sparse-static rescue also disabled for the same reason.
+  skip_per_course_browser: true
+  skip_browser_rescue: true
 
   filters:
     # WLV pages that list only "Part-time (N years)" with no Full-time option
@@ -211,6 +214,11 @@ extraction:
         ielts: 7.0
     # Fallback for courses whose academic level cannot be determined.
     default_ielts: 6.0
+    # IELTS is always filled by degree_level_defaults above; fee is always
+    # filled by degree_level_defaults or static-HTML regex.  Both core fields
+    # are present before the vision step so OCR on course-page images adds
+    # nothing — skip the 6-image scan entirely.
+    skip_vision_when_core_found: true
 
   staging:
     # WLV charges a near-flat £17,600/year for the majority of UG international

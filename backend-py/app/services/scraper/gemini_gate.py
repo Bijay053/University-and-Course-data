@@ -34,6 +34,20 @@ GEMINI_HIGH_VALUE_FIELDS: frozenset[str] = frozenset({
     "category",
 })
 
+# The four money/admission fields Gemini is most useful for.
+# If ALL of these are already non-null in payload (from regex, defaults, or
+# Solr/SearchStax data), Gemini primary text extraction adds nothing —
+# we can skip straight to classification-only (or full skip if category too).
+# This fast path fires on a payload-value check (not confidence) so that
+# degree_level_defaults and YAML-configured values trigger it even when the
+# evidence confidence is below CONFIDENCE_THRESHOLD.
+CORE_MONEY_FIELDS: frozenset[str] = frozenset({
+    "international_fee",
+    "ielts_overall",
+    "duration",
+    "intake_months",
+})
+
 # Even when most high-value fields are populated, run Gemini if these are
 # missing — it is uniquely good at taxonomy classification.
 GEMINI_UNIQUE_FIELDS: frozenset[str] = frozenset({
@@ -78,6 +92,41 @@ def should_skip_gemini_primary(
       ``"classification_only"``             — run, cheap prompt only
       ``"full_extraction_needed"``          — run, full prompt
     """
+    # Fast path: all 4 core money/admission fields already have a value in
+    # payload (from regex, degree_level_defaults, or SearchStax Solr data).
+    # Gemini primary extraction cannot improve on these — skip straight to
+    # classification-only (or full skip if category is also present).
+    # This check is intentionally payload-value-only (no confidence gate) so
+    # that YAML-configured defaults trigger it even when the evidence entry
+    # has confidence below CONFIDENCE_THRESHOLD.
+    core_all_present = all(
+        payload.get(f) not in (None, "", 0, []) for f in CORE_MONEY_FIELDS
+    )
+    if core_all_present:
+        needs_classification = (
+            not payload.get("category") or not payload.get("sub_category")
+        )
+        if needs_classification:
+            log.debug(
+                "[GEMINI GATE] classification_only (core fields present) — "
+                "fee=%r ielts=%r duration=%r intake=%r category=%r",
+                payload.get("international_fee"),
+                payload.get("ielts_overall"),
+                payload.get("duration"),
+                payload.get("intake_months"),
+                payload.get("category"),
+            )
+            return False, "classification_only"
+        log.debug(
+            "[GEMINI GATE] skip (all core fields present + category set) — "
+            "fee=%r ielts=%r duration=%r intake=%r",
+            payload.get("international_fee"),
+            payload.get("ielts_overall"),
+            payload.get("duration"),
+            payload.get("intake_months"),
+        )
+        return True, "all_high_value_fields_populated"
+
     # Build fast lookup: field_key → max confidence seen in evidence list.
     best_conf: dict[str, float] = {}
     for ev in evidence:
