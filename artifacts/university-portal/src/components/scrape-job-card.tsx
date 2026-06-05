@@ -319,6 +319,20 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
   const [apiDiscCopied, setApiDiscCopied] = useState<number | null>(null);
   const apiDiscPollRef = useRef<number | null>(null);
 
+  type ApplyState = {
+    status: "idle" | "smoke-running" | "smoke-done" | "smoke-error" | "applying" | "applied" | "error";
+    error?: string;
+    slug?: string;
+    smokeResult?: {
+      ok: boolean;
+      courses_found: number;
+      sample_titles: string[];
+      fields_detected: string[];
+      error?: string | null;
+    };
+  };
+  const [applyStates, setApplyStates] = useState<Record<number, ApplyState>>({});
+
   // Smart YAML Fix repair candidates state
   type RepairCandidateData = {
     id: string;
@@ -435,6 +449,7 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
     setApiDiscResult(null);
     setApiDiscError(null);
     setApiDiscCopied(null);
+    setApplyStates({});
     if (apiDiscPollRef.current) { clearTimeout(apiDiscPollRef.current); apiDiscPollRef.current = null; }
   }, [slotKey, startTimeKey]);
 
@@ -494,6 +509,56 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
       if (apiDiscPollRef.current) { clearTimeout(apiDiscPollRef.current); apiDiscPollRef.current = null; }
     };
   }, [apiDiscStatus, apiDiscJobId]);
+
+  // ── Apply API config ──────────────────────────────────────────────────────
+  const handleApplyApiConfig = useCallback(async (idx: number) => {
+    if (!apiDiscJobId) return;
+    setApplyStates(prev => ({ ...prev, [idx]: { status: "applying" } }));
+    try {
+      const res = await fetch(`/api/scrape/discover-api/${apiDiscJobId}/apply`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ candidate_index: idx }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setApplyStates(prev => ({ ...prev, [idx]: { status: "applied", slug: data.slug } }));
+      } else {
+        setApplyStates(prev => ({ ...prev, [idx]: { status: "error", error: data.error || "Apply failed" } }));
+      }
+    } catch (e) {
+      setApplyStates(prev => ({ ...prev, [idx]: { status: "error", error: String(e) } }));
+    }
+  }, [apiDiscJobId]);
+
+  const handleSmokeTest = useCallback(async (idx: number) => {
+    if (!apiDiscJobId) return;
+    setApplyStates(prev => ({ ...prev, [idx]: { ...(prev[idx] ?? { status: "idle" }), status: "smoke-running" } }));
+    try {
+      const res = await fetch(`/api/scrape/discover-api/${apiDiscJobId}/smoke-test`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ candidate_index: idx }),
+      });
+      const data = await res.json();
+      setApplyStates(prev => ({
+        ...prev,
+        [idx]: {
+          ...(prev[idx] ?? { status: "idle" }),
+          status: data.ok ? "smoke-done" : "smoke-error",
+          smokeResult: data,
+          error: !data.ok ? (data.error ?? "Smoke test failed") : undefined,
+        },
+      }));
+    } catch (e) {
+      setApplyStates(prev => ({
+        ...prev,
+        [idx]: { ...(prev[idx] ?? { status: "idle" }), status: "smoke-error", error: String(e) },
+      }));
+    }
+  }, [apiDiscJobId]);
 
   // Auto-load repair candidates when done with a URL filter warning
   useEffect(() => {
@@ -1674,37 +1739,112 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
                       )}
                     </div>
 
-                    {/* YAML snippet */}
-                    <div className="mt-2">
-                      <div className="text-[10px] text-purple-500 mb-1">Suggested YAML config:</div>
-                      <pre className="text-[10px] font-mono bg-purple-950 text-purple-100 rounded p-2 overflow-x-auto leading-relaxed whitespace-pre">
-                        {c.suggested_yaml}
-                      </pre>
-                      <div className="mt-1.5 flex items-center gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-5 text-[10px] px-2 border-purple-200 text-purple-600 hover:bg-purple-50"
-                          onClick={() => {
-                            navigator.clipboard.writeText(c.suggested_yaml);
-                            setApiDiscCopied(i);
-                            setTimeout(() => setApiDiscCopied(null), 2000);
-                          }}
-                        >
-                          {apiDiscCopied === i ? (
-                            <><Check className="w-2.5 h-2.5 mr-1 text-green-600" /> Copied</>
-                          ) : (
-                            <><Copy className="w-2.5 h-2.5 mr-1" /> Copy YAML</>
+                    {/* ── Apply API Config ── */}
+                    {(() => {
+                      const as = applyStates[i] ?? { status: "idle" };
+                      return (
+                        <div className="mt-3 space-y-2">
+                          {/* Primary action row */}
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {as.status === "applied" ? (
+                              <div className="flex items-center gap-1 text-[10px] text-green-700 font-medium bg-green-50 border border-green-200 rounded px-2 py-1">
+                                <Check className="w-3 h-3" />
+                                Saved to <span className="font-mono">{as.slug}.yaml</span>
+                              </div>
+                            ) : (
+                              <Button
+                                size="sm"
+                                disabled={as.status === "applying"}
+                                className="h-6 text-[10px] px-2.5 bg-purple-700 hover:bg-purple-800 text-white"
+                                onClick={() => handleApplyApiConfig(i)}
+                              >
+                                {as.status === "applying" ? (
+                                  <><span className="animate-spin mr-1">⟳</span> Saving…</>
+                                ) : (
+                                  "Use this API →"
+                                )}
+                              </Button>
+                            )}
+
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={as.status === "smoke-running"}
+                              className="h-6 text-[10px] px-2 border-purple-200 text-purple-700 hover:bg-purple-50"
+                              onClick={() => handleSmokeTest(i)}
+                            >
+                              {as.status === "smoke-running" ? (
+                                <><span className="animate-spin mr-1">⟳</span> Testing…</>
+                              ) : (
+                                "Run smoke test"
+                              )}
+                            </Button>
+
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-6 text-[10px] px-2 border-purple-100 text-purple-500 hover:bg-purple-50"
+                              onClick={() => {
+                                navigator.clipboard.writeText(c.suggested_yaml);
+                                setApiDiscCopied(i);
+                                setTimeout(() => setApiDiscCopied(null), 2000);
+                              }}
+                            >
+                              {apiDiscCopied === i ? (
+                                <><Check className="w-2.5 h-2.5 mr-1 text-green-600" />Copied</>
+                              ) : (
+                                <><Copy className="w-2.5 h-2.5 mr-1" />Copy YAML</>
+                              )}
+                            </Button>
+                          </div>
+
+                          {/* Apply error */}
+                          {as.status === "error" && as.error && (
+                            <div className="text-[10px] text-red-600 bg-red-50 border border-red-200 rounded px-2 py-1">
+                              ✗ {as.error}
+                            </div>
                           )}
-                        </Button>
-                        <a
-                          href={`/settings`}
-                          className="text-[10px] text-purple-500 underline hover:text-purple-800"
-                        >
-                          Open config editor →
-                        </a>
-                      </div>
-                    </div>
+
+                          {/* Smoke test results */}
+                          {(as.status === "smoke-done" || as.status === "smoke-error") && as.smokeResult && (
+                            <div className={`rounded p-2 text-[10px] border ${as.smokeResult.ok ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"}`}>
+                              <div className={`font-semibold mb-1 ${as.smokeResult.ok ? "text-green-700" : "text-red-700"}`}>
+                                {as.smokeResult.ok
+                                  ? `✓ API working — ${as.smokeResult.courses_found} course${as.smokeResult.courses_found !== 1 ? "s" : ""} found`
+                                  : `✗ API failed — ${as.smokeResult.error}`}
+                              </div>
+                              {as.smokeResult.ok && as.smokeResult.sample_titles.length > 0 && (
+                                <div className="mb-1">
+                                  <span className="text-green-600 font-medium">Sample titles:</span>{" "}
+                                  {as.smokeResult.sample_titles.map((t, ti) => (
+                                    <span key={ti} className="text-green-800">
+                                      {ti > 0 && <span className="text-green-400 mx-1">·</span>}
+                                      {t}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                              {as.smokeResult.ok && as.smokeResult.fields_detected.length > 0 && (
+                                <div>
+                                  <span className="text-green-600 font-medium">Fields:</span>{" "}
+                                  <span className="text-green-800">{as.smokeResult.fields_detected.join(", ")}</span>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Collapsible YAML */}
+                          <details className="group">
+                            <summary className="text-[10px] text-purple-400 cursor-pointer hover:text-purple-700 list-none flex items-center gap-1">
+                              <span className="group-open:rotate-90 inline-block transition-transform">▶</span> View suggested YAML
+                            </summary>
+                            <pre className="mt-1 text-[10px] font-mono bg-purple-950 text-purple-100 rounded p-2 overflow-x-auto leading-relaxed whitespace-pre">
+                              {c.suggested_yaml}
+                            </pre>
+                          </details>
+                        </div>
+                      );
+                    })()}
                   </div>
                 ))}
 

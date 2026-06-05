@@ -411,3 +411,279 @@ async def discover_api_endpoints(
         "sample_urls": urls_to_probe,
         "uni_hostname": uni_hostname,
     }
+
+
+# ── Safety check ──────────────────────────────────────────────────────────────
+
+# Paths that indicate the endpoint is NOT a public course-data API
+_SAFETY_BLOCKLIST_PATHS = (
+    "/auth", "/login", "/sso", "/oauth", "/token", "/session",
+    "/student-portal", "/myaccount", "/my.", "/logout",
+    "/forgot", "/reset", "/register", "/signup",
+    "/cookie", "/privacy", "/terms", "/404", "/error",
+    "student.", "my.", "portal.",
+)
+
+
+def safety_check(candidate: dict) -> tuple[bool, str]:
+    """
+    Returns ``(is_safe, reason_if_not_safe)``.
+
+    Blocks:
+    - Analytics/tracking domains (already filtered at capture, re-checked here)
+    - Auth / student-portal paths
+    - Appeared on fewer than 2 sample pages (too unreliable)
+    - Score < 45 (low confidence)
+    - No course-like fields detected
+    """
+    url = candidate.get("url", "").lower()
+    score = candidate.get("score", 0)
+    page_count = candidate.get("page_count", 0)
+    fields = candidate.get("fields_found", [])
+
+    if any(dom in url for dom in _ANALYTICS_DOMAINS):
+        return False, "analytics or tracking endpoint"
+
+    for path in _SAFETY_BLOCKLIST_PATHS:
+        if path in url:
+            return False, f"auth/portal endpoint (contains '{path}')"
+
+    if page_count < 2:
+        return False, (
+            f"only appeared on {page_count} sample page — "
+            "need ≥2 for safety (endpoint must be consistent across course pages)"
+        )
+
+    if score < 45:
+        return False, f"confidence score too low ({score} — need ≥45)"
+
+    if not fields:
+        return False, "no course-like fields detected in the response"
+
+    return True, ""
+
+
+# ── Smoke-test helpers ────────────────────────────────────────────────────────
+
+_TITLE_KEYS = (
+    "courseName", "courseTitle", "title", "name", "programmeTitle",
+    "awardTitle", "label", "shortTitle", "course_name", "programme_title",
+)
+_FEE_KEYS   = ("fees", "internationalFee", "tuitionFee", "fee", "tuition", "cost")
+_DUR_KEYS   = ("duration", "studyDuration", "courseLength", "length", "years", "months")
+_INTK_KEYS  = ("intakeMonths", "startDates", "intakes", "commencementDates", "start")
+_IELTS_KEYS = ("ielts", "englishRequirements", "entryRequirements", "englishEntry")
+_LEVEL_KEYS = ("degreeLevel", "awardLevel", "qualificationLevel", "academicLevel", "level", "qualification")
+
+
+def _get_field(item: dict, keys: tuple[str, ...]) -> Any:
+    for k in keys:
+        v = item.get(k)
+        if v not in (None, "", [], {}):
+            return v
+    lower = {k.lower(): v for k, v in item.items()}
+    for k in keys:
+        v = lower.get(k.lower())
+        if v not in (None, "", [], {}):
+            return v
+    return None
+
+
+def _extract_course_items(data: Any) -> list[dict]:
+    """Extract a list of course-like dicts from various response shapes."""
+    if isinstance(data, list):
+        return [x for x in data if isinstance(x, dict)]
+    if isinstance(data, dict):
+        for key in (
+            "results", "items", "courses", "data", "records",
+            "programmes", "content", "hits", "docs", "entries",
+            "response", "collection", "list",
+        ):
+            v = data.get(key)
+            if isinstance(v, list) and v and isinstance(v[0], dict):
+                return v
+        # Fallback: any list-of-dicts value
+        for v in data.values():
+            if isinstance(v, list) and len(v) > 0 and isinstance(v[0], dict):
+                return v
+    return []
+
+
+def _extract_titles(items: list[dict]) -> list[str]:
+    out = []
+    for item in items:
+        v = _get_field(item, _TITLE_KEYS)
+        if v and isinstance(v, str) and 3 < len(v) < 200:
+            out.append(v.strip())
+    return out
+
+
+def _detect_fields_in_items(items: list[dict]) -> list[str]:
+    checks = [
+        ("fee",      _FEE_KEYS),
+        ("duration", _DUR_KEYS),
+        ("intake",   _INTK_KEYS),
+        ("english/ielts", _IELTS_KEYS),
+        ("level",    _LEVEL_KEYS),
+    ]
+    return [
+        fname
+        for fname, keys in checks
+        if any(_get_field(item, keys) is not None for item in items)
+    ]
+
+
+async def smoke_test_endpoint(endpoint_url: str, max_items: int = 5) -> dict:
+    """
+    Directly GET the endpoint and report what course data is present.
+
+    Returns::
+
+        {
+            ok: bool,
+            courses_found: int,
+            sample_titles: list[str],
+            fields_detected: list[str],
+            error: str | None,
+        }
+    """
+    import httpx  # available in requirements
+    try:
+        async with httpx.AsyncClient(
+            timeout=15,
+            follow_redirects=True,
+            verify=False,
+        ) as client:
+            resp = await client.get(
+                endpoint_url,
+                headers={
+                    "User-Agent": (
+                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                        "AppleWebKit/537.36 (KHTML, like Gecko) "
+                        "Chrome/120.0.0.0 Safari/537.36"
+                    ),
+                    "Accept": "application/json, */*",
+                },
+            )
+        if resp.status_code not in range(200, 300):
+            return {
+                "ok": False, "courses_found": 0,
+                "sample_titles": [], "fields_detected": [],
+                "error": f"HTTP {resp.status_code} from endpoint",
+            }
+        try:
+            data = resp.json()
+        except Exception:
+            return {
+                "ok": False, "courses_found": 0,
+                "sample_titles": [], "fields_detected": [],
+                "error": "Response is not valid JSON",
+            }
+    except Exception as exc:
+        return {
+            "ok": False, "courses_found": 0,
+            "sample_titles": [], "fields_detected": [],
+            "error": str(exc)[:200],
+        }
+
+    items = _extract_course_items(data)
+
+    if not items:
+        # Maybe a single course object rather than a list
+        if isinstance(data, dict) and _get_field(data, _TITLE_KEYS):
+            return {
+                "ok": True, "courses_found": 1,
+                "sample_titles": [str(_get_field(data, _TITLE_KEYS))[:120]],
+                "fields_detected": _detect_fields_in_items([data]),
+                "error": None,
+            }
+        return {
+            "ok": False, "courses_found": 0,
+            "sample_titles": [], "fields_detected": [],
+            "error": "Response contains no recognisable course items (check items_key in YAML)",
+        }
+
+    return {
+        "ok": True,
+        "courses_found": len(items),
+        "sample_titles": _extract_titles(items[:max_items]),
+        "fields_detected": _detect_fields_in_items(items[:10]),
+        "error": None,
+    }
+
+
+# ── YAML injection ────────────────────────────────────────────────────────────
+
+def _deep_merge(base: dict, patch: dict) -> dict:
+    result = dict(base)
+    for k, v in patch.items():
+        if k in result and isinstance(result[k], dict) and isinstance(v, dict):
+            result[k] = _deep_merge(result[k], v)
+        else:
+            result[k] = v
+    return result
+
+
+def inject_api_config(
+    current_yaml: str,
+    candidate: dict,
+    uni_hostname: str,
+    apply_date: str,
+) -> str:
+    """
+    Merge the discovered API config into the existing YAML for this university.
+
+    Strategy: parse → deep-merge → dump with an explanatory header comment.
+    The previous file content is preserved in scraper_config_history via the
+    caller; operators can roll back using the config editor history panel.
+    """
+    import yaml as _yaml
+
+    try:
+        existing: dict = _yaml.safe_load(current_yaml) or {} if current_yaml.strip() else {}
+        if not isinstance(existing, dict):
+            existing = {}
+    except Exception:
+        existing = {}
+
+    if candidate.get("is_paginated"):
+        patch: dict = {
+            "discovery": {
+                "api": {
+                    "endpoint": candidate["url"],
+                    "method": candidate.get("method", "GET"),
+                    "pagination_param": candidate.get("pagination_param") or "page",
+                    "page_size": 20,
+                    # Operator must verify this key matches the actual response shape
+                    "items_key": "results",
+                }
+            }
+        }
+    else:
+        patch = {
+            "extraction": {
+                "api": {
+                    "url_template": candidate["url"],
+                    "method": candidate.get("method", "GET"),
+                }
+            }
+        }
+
+    merged = _deep_merge(existing, patch)
+
+    header = (
+        f"# Auto-discovered API config — applied {apply_date} via portal\n"
+        f"# Hostname: {uni_hostname}\n"
+        f"# Score: {candidate.get('score', 0)}  Confidence: {candidate.get('confidence', '?')}\n"
+        f"# Fields detected: {', '.join(candidate.get('fields_found', []) or [])}\n"
+        f"# NOTE: review items_key / pagination_param before triggering a full scrape.\n"
+        f"\n"
+    )
+    body = _yaml.dump(
+        merged,
+        default_flow_style=False,
+        sort_keys=False,
+        allow_unicode=True,
+        width=120,
+    )
+    return header + body

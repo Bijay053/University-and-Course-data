@@ -225,3 +225,147 @@ async def poll_discovery(
     if data is None:
         raise HTTPException(status_code=404, detail="Discovery job not found or expired.")
     return data
+
+
+# ── Shared request body ───────────────────────────────────────────────────────
+
+class CandidateRequest(BaseModel):
+    candidate_index: int = 0
+
+
+# ── Slug resolution ───────────────────────────────────────────────────────────
+
+async def _find_or_create_slug(uni_id: int | None, uni_hostname: str, db: AsyncSession) -> str:
+    """
+    Return the YAML slug for this university:
+    1. Scan existing YAML files for a matching hostname comment.
+    2. Fall back to apex-domain + uni_id derived slug.
+    """
+    import re
+    from pathlib import Path
+
+    _UNIS_DIR = Path(__file__).parent.parent.parent / "scraper_config" / "unis"
+
+    # Clean hostname → apex label (e.g. "www.canterbury.ac.nz" → "canterbury")
+    clean = re.sub(r"^(www|study|courses|handbook|programmes)\.", "", uni_hostname.lower())
+    apex = clean.split(".")[0] if clean else "university"
+
+    if _UNIS_DIR.exists():
+        # Prefer exact apex prefix match (e.g. "canterbury_1759.yaml")
+        matches = list(_UNIS_DIR.glob(f"{apex}*.yaml"))
+        if matches:
+            return matches[0].stem  # e.g. "canterbury_1759"
+
+    # Derive a fresh slug: apex + uni_id
+    suffix = f"_{uni_id}" if uni_id else ""
+    raw = f"{apex}{suffix}"
+    slug = re.sub(r"[^a-z0-9_-]", "_", raw)[:64]
+    return slug
+
+
+# ── Smoke test ────────────────────────────────────────────────────────────────
+
+@router.post("/discover-api/{job_id}/smoke-test")
+async def run_smoke_test(
+    job_id: str,
+    body: CandidateRequest,
+    _user: Annotated[dict, Depends(require_permission("settings.view"))],
+) -> dict[str, Any]:
+    """
+    Directly fetch the discovered API endpoint and report what course data is returned.
+    Runs a safety check before fetching — blocks analytics/auth endpoints.
+    """
+    data = await _redis_get(_redis_key(job_id))
+    if not data:
+        raise HTTPException(status_code=404, detail="Discovery job not found or expired.")
+
+    candidates = data.get("candidates", [])
+    if body.candidate_index >= len(candidates):
+        raise HTTPException(status_code=400, detail="Candidate index out of range.")
+
+    candidate = candidates[body.candidate_index]
+
+    from app.services.scraper.api_discovery import safety_check, smoke_test_endpoint
+    safe, reason = safety_check(candidate)
+    if not safe:
+        return {"ok": False, "courses_found": 0, "sample_titles": [],
+                "fields_detected": [], "error": f"Safety check failed: {reason}"}
+
+    result = await smoke_test_endpoint(candidate["url"])
+    return result
+
+
+# ── Apply config ──────────────────────────────────────────────────────────────
+
+@router.post("/discover-api/{job_id}/apply")
+async def apply_api_config(
+    job_id: str,
+    body: CandidateRequest,
+    _user: Annotated[dict, Depends(require_permission("settings.edit"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> dict[str, Any]:
+    """
+    Safety-check, merge, and save the discovered API config into the
+    university's YAML scraper config file, then push to GitHub.
+    """
+    data = await _redis_get(_redis_key(job_id))
+    if not data:
+        raise HTTPException(status_code=404, detail="Discovery job not found or expired.")
+
+    candidates = data.get("candidates", [])
+    if body.candidate_index >= len(candidates):
+        raise HTTPException(status_code=400, detail="Candidate index out of range.")
+
+    candidate = candidates[body.candidate_index]
+    uni_id: int | None = data.get("uni_id")
+    uni_hostname: str = data.get("uni_hostname", "")
+
+    # ── Safety gate ───────────────────────────────────────────────────────────
+    from app.services.scraper.api_discovery import safety_check, inject_api_config
+    safe, reason = safety_check(candidate)
+    if not safe:
+        return {"ok": False, "error": f"Safety check blocked save: {reason}"}
+
+    # ── Resolve slug + paths ──────────────────────────────────────────────────
+    from pathlib import Path
+    slug = await _find_or_create_slug(uni_id, uni_hostname, db)
+    _UNIS_DIR = Path(__file__).parent.parent.parent / "scraper_config" / "unis"
+    slug_path = _UNIS_DIR / f"{slug}.yaml"
+
+    current_yaml = slug_path.read_text(encoding="utf-8") if slug_path.exists() else ""
+
+    # ── Inject API config ─────────────────────────────────────────────────────
+    from datetime import datetime
+    new_yaml = inject_api_config(
+        current_yaml, candidate, uni_hostname,
+        apply_date=datetime.utcnow().strftime("%Y-%m-%d"),
+    )
+
+    # ── Write YAML file ───────────────────────────────────────────────────────
+    _UNIS_DIR.mkdir(parents=True, exist_ok=True)
+    slug_path.write_text(new_yaml, encoding="utf-8")
+    log.info("api_discovery apply: wrote %s", slug_path)
+
+    # ── History ───────────────────────────────────────────────────────────────
+    try:
+        from app.routers.scraper_configs import _append_history
+        await _append_history(db, slug, new_yaml, "api_discovery_portal")
+        await db.commit()
+    except Exception:
+        log.exception("Failed to record apply history for slug=%r", slug)
+
+    # ── Git sync (non-fatal) ──────────────────────────────────────────────────
+    git_result: dict = {}
+    try:
+        from app.routers.scraper_configs import _git_sync_config
+        git_result = await _git_sync_config(slug)
+    except Exception:
+        log.exception("git sync failed after apply for slug=%r", slug)
+
+    return {
+        "ok": True,
+        "slug": slug,
+        "message": f"Saved API config to {slug}.yaml",
+        "git_pushed": git_result.get("ok", False),
+        "git_message": git_result.get("message") or git_result.get("error", ""),
+    }
