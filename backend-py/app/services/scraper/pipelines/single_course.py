@@ -1394,6 +1394,11 @@ async def extract_course(
         if (_parsed_url.fragment or "").lower() in ("tabdomestic", "tab-domestic"):
             url = urlunparse(_parsed_url._replace(fragment=""))
 
+    # ── per-call performance flags ────────────────────────────────────────────
+    # Mutable dict accumulated as the call progresses; included in the returned
+    # result dict so the orchestrator can aggregate savings across the run.
+    _perf_flags: dict = {"http_skipped": False, "vision_skipped": False}
+
     if html is None:
         # ── skip_initial_http_fetch gate ──────────────────────────────────────
         # For 100%-Cloudflare-protected universities (e.g. UEL), every plain
@@ -1406,6 +1411,7 @@ async def extract_course(
             and getattr(_uc_http.extraction, "skip_initial_http_fetch", False)
         )
         if _skip_http:
+            _perf_flags["http_skipped"] = True
             if emit:
                 await emit(
                     "status",
@@ -3824,6 +3830,7 @@ async def extract_course(
             # Avoids scanning 6 candidate images + Gemini API call per course.
             _ielts_v = payload.get("ielts_overall")
             _fee_v = payload.get("international_fee")
+            _perf_flags["vision_skipped"] = True
             log.info(
                 "[VISION SKIP] skip_vision_when_core_found — ielts=%s fee=%s already set on %s",
                 _ielts_v, _fee_v, url,
@@ -6703,4 +6710,5 @@ async def extract_course(
         "provenance_footer": footer,
         "gemini_primary_cost_usd": _gemini_primary_cost,
         "gemini_calls": _gcl_get(),
+        "_perf": _perf_flags,
     }

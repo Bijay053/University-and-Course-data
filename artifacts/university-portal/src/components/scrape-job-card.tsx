@@ -25,6 +25,14 @@ type ScrapeLog = {
   skip_reasons?: Record<string, number>;
   /** Per-sub-reason sample URLs+names (up to 10 each) — present only on the "done" event. */
   skip_reason_samples?: Record<string, Array<{ url: string; name: string }>>;
+  /** Run-level pipeline optimisation savings — present only when ≥1 skip fired. */
+  performance_savings?: {
+    http_fetches_skipped: number;
+    vision_ocr_skipped: number;
+    estimated_seconds_saved: number;
+    estimated_ai_calls_saved: number;
+    estimated_cost_saved_usd: number;
+  } | null;
 };
 
 type QualityAction = {
@@ -232,6 +240,15 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
   const qualityPollRef = useRef<number | null>(null);
   const qualityTriggerTimeRef = useRef<number>(0);
 
+  // Pipeline optimisation savings from the done event
+  const [performanceSavings, setPerformanceSavings] = useState<{
+    http_fetches_skipped: number;
+    vision_ocr_skipped: number;
+    estimated_seconds_saved: number;
+    estimated_ai_calls_saved: number;
+    estimated_cost_saved_usd: number;
+  } | null>(null);
+
   // Category landing page rejection breakdown from the done event
   const [categoryDiagnostics, setCategoryDiagnostics] = useState<{
     skipReasons: Record<string, number>;
@@ -356,6 +373,7 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
     setJobStatus(null);
     setLogs([]);
     setResultSummary(null);
+    setPerformanceSavings(null);
     setCompletedJobId(null);
     setQualityData(null);
     setQualityError(null);
@@ -682,6 +700,10 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
                 });
               }
             }
+            // Capture pipeline optimisation savings if any skips fired
+            if (doneLog.performance_savings) {
+              setPerformanceSavings(doneLog.performance_savings);
+            }
           }
 
           // Detect URL filter warnings in live log stream
@@ -797,6 +819,7 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
     setLogs([]);
     setProgress(null);
     setResultSummary(null);
+    setPerformanceSavings(null);
     extractionStartRef.current = null;
     const t0 = Date.now();
     setStartTime(t0);
@@ -1345,6 +1368,49 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
                 <div className="bg-red-50 rounded-lg p-2">
                   <div className="text-lg font-bold text-red-700">{resultSummary.errors}</div>
                   <div className="text-xs text-red-600">Errors</div>
+                </div>
+              </div>
+            )}
+
+            {/* ── Pipeline Performance Savings ─────────────────────── */}
+            {performanceSavings && (
+              <div className="rounded-lg border border-blue-100 bg-blue-50 p-3">
+                <div className="text-xs font-semibold text-blue-800 mb-2">⚡ Performance Optimisations</div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-blue-700">
+                  {performanceSavings.http_fetches_skipped > 0 && (
+                    <div className="flex justify-between">
+                      <span>HTTP fetches skipped</span>
+                      <span className="font-medium">{performanceSavings.http_fetches_skipped}</span>
+                    </div>
+                  )}
+                  {performanceSavings.vision_ocr_skipped > 0 && (
+                    <div className="flex justify-between">
+                      <span>Vision OCR skipped</span>
+                      <span className="font-medium">{performanceSavings.vision_ocr_skipped}</span>
+                    </div>
+                  )}
+                  {performanceSavings.estimated_seconds_saved > 0 && (
+                    <div className="flex justify-between">
+                      <span>Est. runtime saved</span>
+                      <span className="font-medium">
+                        {performanceSavings.estimated_seconds_saved >= 60
+                          ? `${Math.round(performanceSavings.estimated_seconds_saved / 60)} min`
+                          : `${performanceSavings.estimated_seconds_saved} s`}
+                      </span>
+                    </div>
+                  )}
+                  {performanceSavings.estimated_ai_calls_saved > 0 && (
+                    <div className="flex justify-between">
+                      <span>Est. AI calls saved</span>
+                      <span className="font-medium">{performanceSavings.estimated_ai_calls_saved}</span>
+                    </div>
+                  )}
+                  {performanceSavings.estimated_cost_saved_usd > 0 && (
+                    <div className="flex justify-between col-span-2 border-t border-blue-200 pt-1 mt-0.5">
+                      <span>Est. AI cost saved</span>
+                      <span className="font-medium text-blue-900">${performanceSavings.estimated_cost_saved_usd.toFixed(4)}</span>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

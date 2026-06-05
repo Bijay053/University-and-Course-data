@@ -2826,6 +2826,27 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 for _call in _calls:
                     _all_gemini_calls.append({**_call, "course_url": _r.get("url")})
 
+        # ── per-run performance savings ────────────────────────────────────────
+        _http_skipped_count = sum(
+            1 for _r in results
+            if isinstance(_r, dict) and (_r.get("_perf") or {}).get("http_skipped")
+        )
+        _vision_skipped_count = sum(
+            1 for _r in results
+            if isinstance(_r, dict) and (_r.get("_perf") or {}).get("vision_skipped")
+        )
+        # 3 s per avoided HTTP attempt + 4 s per avoided vision OCR pass (empirical)
+        _est_seconds_saved = _http_skipped_count * 3 + _vision_skipped_count * 4
+        # $0.00015 per Gemini vision call (gemini-2.5-flash-lite, ~500 input tokens)
+        _est_cost_saved_usd = round(_vision_skipped_count * 0.00015, 5)
+        _perf_savings = {
+            "http_fetches_skipped": _http_skipped_count,
+            "vision_ocr_skipped": _vision_skipped_count,
+            "estimated_seconds_saved": _est_seconds_saved,
+            "estimated_ai_calls_saved": _vision_skipped_count,
+            "estimated_cost_saved_usd": _est_cost_saved_usd,
+        } if (_http_skipped_count or _vision_skipped_count) else None
+
         if _all_gemini_calls:
             try:
                 from sqlalchemy import text as _gcl_text
@@ -3564,6 +3585,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             skip_reasons=skip_reasons,
             skip_reason_samples=skip_reason_samples,
             searchstax_filter=_ss_filter_stats or None,
+            performance_savings=_perf_savings,
             level="success",
         )
         # PR-1.5: post-run sanity check on the imported counter.
