@@ -61,6 +61,33 @@ discovery:
     # "unclassifiable".  _fetch_links_only already reads title_t/url_t/award_s
     # from cfg.field_map, so no other change is needed.
     links_only: true
+
+    # ── CPD / professional module pre-filter ──────────────────────────────────
+    # WLV Solr indexes ~432 courses but many are domestic-only NHS workforce
+    # development modules, CPD credits, and practitioner courses that:
+    #   • show international_fee=null (no international pricing published)
+    #   • show domestic_fee only (e.g. £1,050 / £3,150)
+    #   • require NMC/HCPC registration or employer sponsorship
+    # These waste Gemini budget and inflate the staged count with
+    # courses that will never be approved for international students.
+    # Reject them immediately from the Solr link list before any HTTP call.
+    exclude_title_prefixes:
+      - "Postgraduate Credit"
+      - "Undergraduate Credit"
+      - "Professional Credit"
+      - "CPD "
+      - "Continuing Professional Development"
+      - "Short Course"
+      - "Workshop"
+      - "Training Course"
+      - "UGSKECREDIT"
+      - "PGSKECREDIT"
+    exclude_title_substrings:
+      - "(v300)"
+      - "non-medical prescribing"
+      - "approved mental health professional"
+      - "subject knowledge enhancement"
+
     exclude_part_time: true
     # Reject courses whose parsed duration exceeds 4 years when exclude_part_time
     # is set.  WLV PhD/MPhil research programs are part-time-only (6–8 years)

@@ -1222,6 +1222,11 @@ async def _fetch_links_only(cfg: SearchStaxConfig, emit=None) -> list[dict]:
             if not docs:
                 break
 
+            # Build exclude_title_prefixes and exclude_title_substrings lookups
+            # once per page (lowercased for O(1) startswith checks).
+            _excl_prefixes = [p.lower() for p in (cfg.exclude_title_prefixes or [])]
+            _excl_subs     = [s.lower() for s in (cfg.exclude_title_substrings or [])]
+
             for doc in docs:
                 # URL: try mapped field first, then 'id' as universal fallback
                 url = _first_str(doc, _url_field, "id")
@@ -1241,6 +1246,30 @@ async def _fetch_links_only(cfg: SearchStaxConfig, emit=None) -> list[dict]:
                 else:
                     # Derive readable name from URL slug rather than using raw URL
                     name = _slug_to_name(url)
+
+                # ── Title-based CPD/professional module pre-filter ────────────
+                # Reject before any HTTP/Gemini/browser call so we never waste
+                # AI budget on domestic-only practitioner courses.
+                if _excl_prefixes or _excl_subs:
+                    _name_lc = name.lower()
+                    _rejected = False
+                    for _pfx in _excl_prefixes:
+                        if _name_lc.startswith(_pfx):
+                            _rejected = True
+                            break
+                    if not _rejected:
+                        for _sub in _excl_subs:
+                            if _sub in _name_lc:
+                                _rejected = True
+                                break
+                    if _rejected:
+                        skipped += 1
+                        log.debug(
+                            "[SEARCHSTAX links_only] title-filter skip: %r (url=%s)",
+                            name, url,
+                        )
+                        continue
+
                 link: dict = {"name": name, "url": url}
                 # Carry pre-fetched structured metadata on the link dict so
                 # the per-course extractor can use it as authoritative hints.

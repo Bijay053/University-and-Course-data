@@ -258,6 +258,31 @@ class SearchStaxConfig(BaseModel):
             "multi-valued location field."
         ),
     )
+    exclude_title_prefixes: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Case-insensitive title prefixes that identify professional/CPD modules "
+            "that should be rejected immediately — before any HTTP fetch, Gemini call, "
+            "or browser pass.  A course is skipped when its Solr title (or the "
+            "constructed '<award> <title>' name) starts with any listed prefix. "
+            "Intended for links_only mode where Solr surfaces CPD/practitioner "
+            "courses alongside degree programmes, e.g. 'Postgraduate Credit', "
+            "'Undergraduate Credit', 'CPD', 'Workshop'.\n"
+            "Example (WLV):\n"
+            "  exclude_title_prefixes:\n"
+            "    - 'Postgraduate Credit'\n"
+            "    - 'Undergraduate Credit'\n"
+            "    - 'CPD'\n"
+        ),
+    )
+    exclude_title_substrings: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Like exclude_title_prefixes but matches anywhere in the title "
+            "(case-insensitive substring check).  Use for keywords that appear "
+            "mid-title, e.g. '(V300)' or 'Non-Medical Prescribing'."
+        ),
+    )
 
 
 class ScrapyConfig(BaseModel):
