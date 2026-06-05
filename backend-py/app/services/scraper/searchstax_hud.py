@@ -892,14 +892,32 @@ def _map_doc_field_map(
     raw_dur: str = ""
     if _all_durs:
         if cfg.exclude_part_time:
-            _ft_durs = [d for d in _all_durs if "part" not in d.lower()]
-            if not _ft_durs:
-                # All durations are part-time only — reject the course.
-                # This is the safety net for universities (e.g. WLV) that
-                # have duration data in multi_duration_ss but no separate
-                # mode_s field, so the study-mode filter above never fired.
-                return None
-            raw_dur = _ft_durs[0]
+            # Positional mode-duration alignment (WLV pattern):
+            #   multi_mode_ss     = ["Part-time", "Full-time"]
+            #   multi_duration_ss = ["2 years",   "1 year"   ]
+            # The two arrays are index-aligned, so we find the "Full-time" index
+            # in the mode list and use it to select the correct duration — rather
+            # than trying to find "part-time" text inside the bare duration strings
+            # (which don't carry the qualifier when the Solr schema separates mode
+            # and duration into distinct multi-valued fields).
+            _raw_mode_list = doc.get(_mode_field, [])
+            if isinstance(_raw_mode_list, list) and len(_raw_mode_list) > 1 and len(_all_durs) > 1:
+                ft_indices = [
+                    i for i, m in enumerate(_raw_mode_list)
+                    if "full" in str(m).lower()
+                ]
+                if ft_indices:
+                    idx = ft_indices[0]
+                    raw_dur = _all_durs[idx] if idx < len(_all_durs) else _all_durs[-1]
+                else:
+                    # All modes part-time (mode filter should have caught this above)
+                    return None
+            else:
+                # Single-valued or no positional alignment — fall back to string filter.
+                _ft_durs = [d for d in _all_durs if "part" not in d.lower()]
+                if not _ft_durs:
+                    return None
+                raw_dur = _ft_durs[0]
         else:
             raw_dur = _all_durs[0]
 
@@ -1033,6 +1051,17 @@ def _map_doc_field_map(
                 if _tval is not None and payload.get(_fld) is None:
                     payload[_fld] = int(_tval)
                     _ev(_fld, _tval, "degree_level_default")
+
+    # ── Description from Solr field (e.g. description_t) ─────────────────────
+    # Mapped via field_map["description"]. Collapse whitespace and cap at 3000
+    # chars to stay within the DB column limit.
+    _desc_solr_field = _fm.get("description")
+    if _desc_solr_field and not payload.get("description"):
+        _raw_desc = _first_str(doc, _desc_solr_field)
+        if _raw_desc:
+            _clean_desc = " ".join(_raw_desc.split())[:3000]
+            payload["description"] = _clean_desc
+            _ev("description", _clean_desc[:80] + ("..." if len(_clean_desc) > 80 else ""), "field_map")
 
     return {
         "name": name,
