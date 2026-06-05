@@ -318,6 +318,15 @@ _DEGREE_QUALIFIER_RE = re.compile(
     r"pcert\b|"         # Postgraduate/Professional Certificate (abbreviated, UK)
     r"iqts\b|"          # International Qualified Teacher Status (UK)
     r"qts\b|"           # Qualified Teacher Status (UK)
+    r"bnurs\b|"         # Bachelor of Nursing (UK)
+    r"bmid\b|"          # Bachelor of Midwifery (UK)
+    r"mphil\b|"         # Master of Philosophy (distinct from mph = Public Health)
+    r"mpharm\b|"        # Master of Pharmacy (UK; also in trailing list)
+    r"prof\s+gradcert\b|"          # Professional Graduate Certificate
+    r"professional\s+doctorate|"   # Professional Doctorate
+    r"advanced\s+university\s+diploma|"   # Advanced University Diploma
+    r"university\s+statement\s+of\s+credit|"  # University Statement of Credit
+    r"international\s+mba\b|"      # International MBA (subject-first form)
     r"ba\b(?:\s|$)"     # Bachelor of Arts (must be word-bounded)
     r")",
     re.IGNORECASE,
@@ -332,6 +341,41 @@ _DEGREE_QUALIFIER_RE = re.compile(
 # BSB40120, CHC33015). Case-insensitive so mixed-case entries like
 # "Ict50220" also match.
 _QUAL_CODE_PREFIX_RE = re.compile(r"^[A-Za-z]{2,6}\d{4,6}\s+", re.I)
+
+# ---------------------------------------------------------------------------
+# Punctuation / spacing normalisers applied before qualifier matching so that
+# universities that write the same award in different ways all resolve to the
+# canonical abbreviation recognised by the regexes above.
+#
+# Canonical forms targeted:
+#   LL.B. → LLB     M.Phil → MPhil     Ph.D → PhD   (inter-letter dots)
+#   PG Cert → PGCert    PG Dip → PGDip              (space after "PG")
+# ---------------------------------------------------------------------------
+# Strip a dot that sits *between* two letters (abbreviation dots).
+# Anchored with lookbehind/lookahead so only inter-letter dots are removed;
+# sentence-ending dots are left alone.
+_QUAL_STRIP_DOTS_RE = re.compile(r"(?<=[A-Za-z])\.(?=[A-Za-z])", re.I)
+
+# Collapse the space between "PG" and the next token when that token looks
+# like a qualification keyword (Cert, Dip, Cert(s) etc.).  Case-insensitive.
+# Lookahead keeps the following word intact: "PG Cert" → "PGCert".
+_QUAL_PG_SPACE_RE = re.compile(r"\bPG\s+(?=(?:cert|dip)\w*\b)", re.I)
+
+
+def _normalise_for_qualifier_match(text: str) -> str:
+    """Return *text* with punctuation/spacing collapsed to canonical form.
+
+    Applied before the degree-qualifier regex so that all typography
+    variants of the same award are recognised:
+      - ``LL.B.``  → ``LLB``
+      - ``M.Phil`` → ``MPhil``
+      - ``Ph.D``   → ``PhD``
+      - ``PG Cert`` / ``Pg Cert`` → ``PGCert``
+      - ``PG Dip``  / ``Pg Dip``  → ``PGDip``
+    """
+    t = _QUAL_STRIP_DOTS_RE.sub("", text)
+    t = _QUAL_PG_SPACE_RE.sub("PG", t)
+    return t
 
 
 # Some universities name courses with the degree abbreviation at the END
@@ -351,8 +395,10 @@ _QUAL_CODE_PREFIX_RE = re.compile(r"^[A-Za-z]{2,6}\d{4,6}\s+", re.I)
 # "Learn about MBA programmes" doesn't match — it has words after.
 _TRAILING_QUALIFIER_RE = re.compile(
     r"(?:"
-    # "Foundation Degree" as a full trailing phrase (no abbreviation form).
+    # Full trailing phrases (no abbreviation form).
     r"\bfoundation\s+degree"
+    r"|\bprof\s+gradcert\b"              # Professional Graduate Certificate
+    r"|\bprofessional\s+doctorate\b"     # Professional Doctorate (full phrase trailing)
     r"|"
     # Abbreviations that may be followed by optional "(Hons)" and/or "Top-up".
     # Examples (all real Coventry / UK course names):
@@ -366,11 +412,13 @@ _TRAILING_QUALIFIER_RE = re.compile(
     r"\b(?:"
     r"pgce|pgcert|pgdip|"
     r"mba|mbs|mpa|mph|med|mit|msc|msci|meng|mcom|mres|mfin|"
+    r"mphil|mpharm|"                     # MPhil / MPharm (trailing forms)
     r"phd|ph\.d|dba|dclinpsychol|edd|"
     r"bba|bbs|bcom|bbus|bit|bsw|bsc|beng|"
-    r"ba|llb|ll\.b|llm|mbbs|bds|mpharm|"
-    r"fda|fdsc|fd|certhe|diphe|"  # UK Foundation Degree / CertHE / DipHE
-    r"iqts|qts"                   # Qualified Teacher Status variants
+    r"bnurs|bmid|"                        # BNurs / BMid (trailing forms)
+    r"ba|llb|ll\.b|llm|mbbs|bds|"
+    r"fda|fdsc|fd|certhe|diphe|"          # UK Foundation Degree / CertHE / DipHE
+    r"iqts|qts"                           # Qualified Teacher Status variants
     r")\s*(?:\(\s*hons\.?\s*\))?\s*(?:top[\s\-]up)?"
     r")\s*[\)\]]*\s*$",
     re.IGNORECASE,
@@ -384,18 +432,26 @@ def _name_has_degree_qualifier(name: str) -> bool:
 
     Handles entries like "ICT50220 Diploma of Information Technology" where
     an Australian/UK national qualification code precedes the degree title.
+
+    Normalises punctuation/spacing before matching so that all typography
+    variants of the same award are detected:
+      ``LL.B.`` == ``LLB``,  ``M.Phil`` == ``MPhil``,
+      ``PG Cert`` == ``Pg Cert`` == ``PGCert``,
+      ``PG Dip``  == ``Pg Dip``  == ``PGDip``.
     """
     raw = (name or "").strip()
-    if _DEGREE_QUALIFIER_RE.match(raw):
+    normed = _normalise_for_qualifier_match(raw)
+
+    if _DEGREE_QUALIFIER_RE.match(normed):
         return True
     # Try stripping a leading qualification code and re-matching.
-    stripped = _QUAL_CODE_PREFIX_RE.sub("", raw)
-    if stripped != raw and _DEGREE_QUALIFIER_RE.match(stripped):
+    stripped = _QUAL_CODE_PREFIX_RE.sub("", normed)
+    if stripped != normed and _DEGREE_QUALIFIER_RE.match(stripped):
         return True
     # Check for trailing degree abbreviations (e.g. "Business Management MBA",
     # "Primary with Early Years (3-7) Pgce"). Only recognised abbreviations
     # match; plain English words like "online" or "courses" do not.
-    if _TRAILING_QUALIFIER_RE.search(raw):
+    if _TRAILING_QUALIFIER_RE.search(normed):
         return True
     return False
 
