@@ -16,7 +16,7 @@ export default defineConfig(async ({ mode }) => {
   }
 
   const basePath = env.BASE_PATH ?? "/";
-  const apiPort = env.API_PORT ?? "8000";
+  const apiPort = env.API_PORT ?? "8080";
   const apiProxyTarget = env.API_PROXY_TARGET ?? `http://127.0.0.1:${apiPort}`;
 
   return {
@@ -54,17 +54,14 @@ export default defineConfig(async ({ mode }) => {
       port,
       host: "0.0.0.0",
       allowedHosts: true,
-      // Local dev: browser calls /api on the Vite origin; forward to the Express app.
-      ...(env.REPL_ID === undefined
-        ? {
-            proxy: {
-              "/api": {
-                target: apiProxyTarget,
-                changeOrigin: true,
-              },
-            },
-          }
-        : {}),
+      // Always proxy /api to the FastAPI backend — covers both direct-port
+      // access (replit.dev:3000) and the shared proxy path (port 80).
+      proxy: {
+        "/api": {
+          target: apiProxyTarget,
+          changeOrigin: true,
+        },
+      },
       fs: {
         strict: true,
         deny: ["**/.*"],
