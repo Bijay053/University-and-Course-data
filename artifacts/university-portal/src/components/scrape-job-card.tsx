@@ -21,6 +21,10 @@ type ScrapeLog = {
   dropped?: number; kept?: number;
   category_count?: number; total_kept?: number; category_pct?: number;
   pattern_breakdown?: Record<string, number>;
+  /** Granular per-guard skip counts — present only on the "done" event. */
+  skip_reasons?: Record<string, number>;
+  /** Per-sub-reason sample URLs+names (up to 10 each) — present only on the "done" event. */
+  skip_reason_samples?: Record<string, Array<{ url: string; name: string }>>;
 };
 
 type QualityAction = {
@@ -228,6 +232,12 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
   const qualityPollRef = useRef<number | null>(null);
   const qualityTriggerTimeRef = useRef<number>(0);
 
+  // Category landing page rejection breakdown from the done event
+  const [categoryDiagnostics, setCategoryDiagnostics] = useState<{
+    skipReasons: Record<string, number>;
+    skipReasonSamples: Record<string, Array<{ url: string; name: string }>>;
+  } | null>(null);
+
   // AI Diagnostic state
   const [diagnoseResult, setDiagnoseResult] = useState<DiagnoseResult | null>(null);
   const [diagnoseLoading, setDiagnoseLoading] = useState(false);
@@ -363,6 +373,7 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
     setValidateLoading(false);
     setApplyingRepairFix(false);
     setRepairFixApplied(false);
+    setCategoryDiagnostics(null);
   }, [slotKey, startTimeKey]);
 
   // Auto-load repair candidates when done with a URL filter warning
@@ -661,6 +672,16 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
               skipped: doneLog.skipped ?? 0,
               errors: doneLog.errors ?? 0,
             });
+            // Capture granular category-landing rejection breakdown if present
+            if (doneLog.skip_reasons) {
+              const catKeys = Object.keys(doneLog.skip_reasons).filter(k => k.startsWith("category_landing_page_"));
+              if (catKeys.length > 0) {
+                setCategoryDiagnostics({
+                  skipReasons: doneLog.skip_reasons,
+                  skipReasonSamples: doneLog.skip_reason_samples ?? {},
+                });
+              }
+            }
           }
 
           // Detect URL filter warnings in live log stream
@@ -1327,6 +1348,130 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
                 </div>
               </div>
             )}
+
+            {/* ── Category Landing Rejection Diagnostics ──────────── */}
+            {categoryDiagnostics && (() => {
+              const { skipReasons, skipReasonSamples } = categoryDiagnostics;
+              const CATEGORY_TOTAL =
+                (skipReasons["category_landing_page_missing_degree_qualifier"] ?? 0) +
+                (skipReasons["category_landing_page_url_block"] ?? 0) +
+                (skipReasons["category_landing_page_title_block"] ?? 0) +
+                (skipReasons["category_landing_page_url_suffix"] ?? 0);
+              if (CATEGORY_TOTAL === 0) return null;
+
+              const SUB_REASONS: Array<{
+                key: string;
+                title: string;
+                explanation: string;
+                yamlFix?: string;
+                infoOnly?: boolean;
+              }> = [
+                {
+                  key: "category_landing_page_missing_degree_qualifier",
+                  title: "Missing Degree Qualifier",
+                  explanation:
+                    "These may be real course pages where the H1 does not start with Bachelor, Master, MSc, MBA, PhD, Diploma, etc. " +
+                    "If the URLs are already tightly limited to course pages, add skip_degree_qualifier_check: true in YAML.",
+                  yamlFix: "extraction:\n  staging:\n    skip_degree_qualifier_check: true",
+                },
+                {
+                  key: "category_landing_page_url_block",
+                  title: "URL Blocklist Matched",
+                  explanation:
+                    "The global URL blocklist rejected these pages. If these are real course URLs for this university, " +
+                    "narrow the block rule or add a host/YAML override.",
+                },
+                {
+                  key: "category_landing_page_title_block",
+                  title: "Title Blocklist Matched",
+                  explanation:
+                    "The page title matched a generic title block (e.g. 'Courses', 'Browse programmes'). " +
+                    "If these are real course pages, check h1_selectors or course_name extraction.",
+                },
+                {
+                  key: "category_landing_page_url_suffix",
+                  title: "Category URL Suffix",
+                  explanation:
+                    "These URLs end with a suffix pattern that indicates a subject/specialisation picker page (e.g. /courses, /programmes). " +
+                    "They are usually correct to reject — individual course URLs should be deeper in the path.",
+                  infoOnly: true,
+                },
+              ];
+
+              const activeReasons = SUB_REASONS.filter(r => (skipReasons[r.key] ?? 0) > 0);
+              if (activeReasons.length === 0) return null;
+
+              return (
+                <div className="border border-orange-200 rounded-lg overflow-hidden">
+                  <div className="px-3 py-2 bg-orange-50 border-b border-orange-200 flex items-center gap-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5 text-orange-600 shrink-0" />
+                    <span className="text-xs font-semibold text-orange-800">Category Rejection Diagnostics</span>
+                    <span className="ml-auto text-[10px] font-bold text-orange-700 bg-orange-100 border border-orange-200 px-1.5 py-0.5 rounded-full">
+                      {CATEGORY_TOTAL} pages
+                    </span>
+                  </div>
+                  <div className="p-3 space-y-3">
+                    {CATEGORY_TOTAL >= 10 && (
+                      <div className="text-[11px] bg-orange-50 border border-orange-200 rounded px-2.5 py-1.5 text-orange-800 leading-relaxed">
+                        ⚠ Many pages rejected as category landing pages. Exact reason breakdown below.
+                      </div>
+                    )}
+                    {activeReasons.map(({ key, title, explanation, yamlFix, infoOnly }) => {
+                      const count = skipReasons[key] ?? 0;
+                      const samples = skipReasonSamples[key] ?? [];
+                      const severity = count >= 10 ? "high" : count >= 3 ? "medium" : "low";
+                      return (
+                        <div key={key} className={`rounded border-l-2 pl-2.5 pr-2 py-2 space-y-1.5 ${
+                          severity === "high"   ? "border-red-400 bg-red-50" :
+                          severity === "medium" ? "border-amber-400 bg-amber-50" :
+                                                  "border-gray-300 bg-gray-50"
+                        }`}>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className={`text-[11px] font-semibold ${
+                              severity === "high" ? "text-red-800" : severity === "medium" ? "text-amber-800" : "text-gray-700"
+                            }`}>{title}</span>
+                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
+                              severity === "high"   ? "bg-red-200 text-red-700" :
+                              severity === "medium" ? "bg-amber-200 text-amber-700" :
+                                                      "bg-gray-200 text-gray-600"
+                            }`}>{count} pages · {severity}</span>
+                            {infoOnly && (
+                              <span className="text-[9px] bg-blue-100 text-blue-600 px-1 py-0.5 rounded">informational</span>
+                            )}
+                          </div>
+                          <p className="text-[10px] leading-relaxed text-gray-700">{explanation}</p>
+                          {yamlFix && (
+                            <div>
+                              <p className="text-[9px] font-semibold text-gray-500 uppercase tracking-wide mb-0.5">YAML Fix</p>
+                              <pre className="text-[9px] font-mono bg-gray-900 text-green-300 rounded p-1.5 overflow-x-auto whitespace-pre leading-relaxed">{yamlFix}</pre>
+                            </div>
+                          )}
+                          {samples.length > 0 && (
+                            <div>
+                              <p className="text-[9px] font-semibold text-gray-500 uppercase tracking-wide mb-0.5">
+                                Sample rejected pages ({samples.length})
+                              </p>
+                              <div className="space-y-1 max-h-[130px] overflow-y-auto bg-white border border-gray-200 rounded p-1.5">
+                                {samples.map((s, i) => (
+                                  <div key={i} className="text-[9px]">
+                                    {s.name && (
+                                      <div className="font-medium text-gray-700 truncate" title={s.name}>{s.name}</div>
+                                    )}
+                                    <div className="font-mono text-gray-500 truncate" title={s.url}>
+                                      {s.url.replace(/^https?:\/\/[^/]+/, "") || s.url}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* ── Quality Optimizer panel ─────────────────────────── */}
             {completedJobId && (
