@@ -262,7 +262,13 @@ _DEGREE_QUALIFIER_RE = re.compile(
     r"pgce\b|"                                    # Postgraduate Certificate of Education (UK)
     r"pgcert\b|"                                  # PgCert (abbreviated)
     r"pgdip\b|"                                   # PgDip (abbreviated)
-    r"foundation\s+degree|"                      # UK FdSc / FdA
+    r"foundation\s+degree|"                      # UK Foundation Degree (full phrase)
+    r"fda\b|"                                     # Foundation Degree Arts (UK)
+    r"fdsc\b|"                                    # Foundation Degree Science (UK)
+    r"fd\b|"                                      # Foundation Degree (bare abbrev, UK)
+    r"certhe\b|"                                  # Certificate of Higher Education (UK)
+    r"diphe\b|"                                   # Diploma of Higher Education (UK)
+    r"university\s+certificate|"                  # University Certificate in ...
     r"advanced\s+diploma|"
     r"associate\s+degree|"
     r"diploma(?:\s+of|\s+in)?(?!\s+of\s+(?:ceremonies|honor))|"
@@ -294,7 +300,10 @@ _DEGREE_QUALIFIER_RE = re.compile(
     r"phd\b|"           # Doctor of Philosophy (abbrev.)
     r"ph\.d\b|"
     r"dba\b|"           # Doctor of Business Admin
+    r"dclinpsychol\b|"  # Doctor of Clinical Psychology (UK)
+    r"edd\b|"           # Doctor of Education (UK)
     r"llb\b|"           # Bachelor of Laws (UK)
+    r"ll\.b\b|"         # LLB with dots (LL.B.)
     r"llm\b|"           # Master of Laws (UK)
     r"bba\b|"           # Bachelor of Business Admin
     r"bbs\b|"           # Bachelor of Business Science
@@ -307,6 +316,8 @@ _DEGREE_QUALIFIER_RE = re.compile(
     r"gdip\b|"          # Graduate Diploma (abbreviated, UK)
     r"pdip\b|"          # Postgraduate Diploma (abbreviated, UK)
     r"pcert\b|"         # Postgraduate/Professional Certificate (abbreviated, UK)
+    r"iqts\b|"          # International Qualified Teacher Status (UK)
+    r"qts\b|"           # Qualified Teacher Status (UK)
     r"ba\b(?:\s|$)"     # Bachelor of Arts (must be word-bounded)
     r")",
     re.IGNORECASE,
@@ -344,17 +355,22 @@ _TRAILING_QUALIFIER_RE = re.compile(
     r"\bfoundation\s+degree"
     r"|"
     # Abbreviations that may be followed by optional "(Hons)" and/or "Top-up".
-    # Examples (all real Coventry course names):
+    # Examples (all real Coventry / UK course names):
     #   "Acting for Stage and Screen BA (Hons)"
     #   "Aerospace Engineering MEng/BEng (Hons)"
     #   "International Business BA (Hons) Top-up"
     #   "Applied Mechanical Engineering BEng (Hons) Top-up"
+    #   "Computing QTS" / "Primary Education iQTS"
+    #   "Early Childhood Studies FdA"
+    #   "Education Studies CertHE"
     r"\b(?:"
     r"pgce|pgcert|pgdip|"
     r"mba|mbs|mpa|mph|med|mit|msc|msci|meng|mcom|mres|mfin|"
-    r"phd|ph\.d|dba|"
+    r"phd|ph\.d|dba|dclinpsychol|edd|"
     r"bba|bbs|bcom|bbus|bit|bsw|bsc|beng|"
-    r"ba|llb|llm|mbbs|bds|mpharm"
+    r"ba|llb|ll\.b|llm|mbbs|bds|mpharm|"
+    r"fda|fdsc|fd|certhe|diphe|"  # UK Foundation Degree / CertHE / DipHE
+    r"iqts|qts"                   # Qualified Teacher Status variants
     r")\s*(?:\(\s*hons\.?\s*\))?\s*(?:top[\s\-]up)?"
     r")\s*[\)\]]*\s*$",
     re.IGNORECASE,
@@ -681,18 +697,23 @@ def should_stage_course(
     # be listed for this specific course yet — stage for human review instead
     # of auto-rejecting.  International fees on a separate page are legitimate.
     if payload.get("international_fee") is None:
+        # Escape hatch 1: university has a central fee page — the per-course
+        # fee may legitimately not appear on the individual page.
         if payload.get("has_central_fee_page"):
             return (True, "accepted")
-        # Per-uni YAML opt-out: require_international_fee=false lets courses
-        # without a fee through for human review (e.g. ARU where fees are on
-        # JS tabs that the extractor cannot always render).
+        # Escape hatches 2–4 all require reading the per-uni YAML config.
         _req_fee = True
+        _has_fee_defaults = False
+        _browser_skipped = False
         try:
             from app.services.scraper.config.context import (  # noqa: PLC0415
                 get_uni_config as _get_uni_config_fee,
             )
             _fee_cfg = _get_uni_config_fee()
             if _fee_cfg is not None and _fee_cfg.extraction is not None:
+                # Escape hatch 2: explicit opt-out (require_international_fee=false).
+                # Use case: ARU / sites where fees are on JS tabs the extractor
+                # cannot always render — stage for human review rather than reject.
                 _req_fee = bool(
                     getattr(
                         _fee_cfg.extraction.staging,
@@ -700,16 +721,52 @@ def should_stage_course(
                         True,
                     )
                 )
+                # Escape hatch 3: YAML has degree_level_defaults fees configured.
+                # When defaults exist but the course's degree_level couldn't be
+                # determined, the default was never applied and the fee is None —
+                # but the fee IS known in principle.  Stage for review; a human
+                # can confirm the correct tier rather than the course being silently
+                # dropped.  This also covers courses with non-standard qualifiers
+                # (FdA, QTS, CertHE, etc.) that may be matched to the wrong tier.
+                _fee_defaults: dict = (
+                    getattr(_fee_cfg.extraction.fees, "degree_level_defaults", None)
+                    or {}
+                )
+                _has_fee_defaults = bool(_fee_defaults)
+                # Escape hatch 4: per-course browser was explicitly skipped
+                # (skip_per_course_browser=true).  The fee may be behind a JS tab
+                # that was never rendered — stage for review rather than auto-reject.
+                _browser_skipped = bool(
+                    getattr(
+                        _fee_cfg.extraction,
+                        "skip_per_course_browser",
+                        False,
+                    )
+                )
         except Exception:  # noqa: BLE001
             pass
-        if _req_fee:
-            return (False, "no_international_fee")
-        log.info(
-            "[STAGE-OK] course=%r — staged without fee "
-            "(require_international_fee=false in YAML)",
-            effective_name,
-        )
-        return (True, "accepted")
+        if not _req_fee:
+            log.info(
+                "[STAGE-OK] course=%r — staged without fee "
+                "(require_international_fee=false in YAML)",
+                effective_name,
+            )
+            return (True, "accepted")
+        if _has_fee_defaults:
+            log.info(
+                "[STAGE-OK] course=%r — staged without fee "
+                "(degree_level_defaults configured; tier may not have matched)",
+                effective_name,
+            )
+            return (True, "accepted")
+        if _browser_skipped:
+            log.info(
+                "[STAGE-OK] course=%r — staged without fee "
+                "(skip_per_course_browser=true; fee may be behind JS tab)",
+                effective_name,
+            )
+            return (True, "accepted")
+        return (False, "no_international_fee")
 
     return (True, "accepted")
 
