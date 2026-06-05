@@ -765,6 +765,25 @@ async def extract_primary(
 
     fields_block = "\n".join(f"- {k}: {hint}" for k, hint in _HARD_FIELDS.items())
     text = _trim_text(html, url=url)
+
+    # Fast-exit: if the page has no visible text content, calling the API
+    # will produce nothing useful but still burns the full 30 s timeout.
+    # Return immediately so the pipeline can move on (browser-retry or
+    # fetch_failed_empty_text handling picks it up upstream).
+    _MIN_TEXT_LEN = 100
+    if len(text) < _MIN_TEXT_LEN:
+        log.info(
+            "gemini_primary: text_len=%d < %d — skipping API call for %s",
+            len(text), _MIN_TEXT_LEN, url,
+        )
+        return {}, 0.0, 0, 0, {
+            "skipped": True,
+            "skip_reason": "empty_page",
+            "text_len": len(text),
+            "text_snippet": text[:500],
+            "raw_response": "",
+        }
+
     prompt = _PROMPT_TEMPLATE.format(fields_block=fields_block, url=url, text=text)
 
     try:

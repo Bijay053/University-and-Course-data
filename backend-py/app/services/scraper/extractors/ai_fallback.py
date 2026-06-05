@@ -296,9 +296,16 @@ async def fill_missing(
     if not missing:
         return {}
 
+    text = _trim_text(html)
+    # Fast-exit: empty pages cannot yield useful AI extractions.
+    # Skip the API call to avoid burning the fallback timeout on a blank prompt.
+    if len(text) < 100:
+        log.info("AI fallback: text_len=%d < 100 — skipping for %s", len(text), url)
+        return {}
+
     fields_block = "\n".join(f"- {f}: {_FIELD_HINTS[f]}" for f in missing)
     prompt = _PROMPT_TEMPLATE.format(
-        fields_block=fields_block, url=url, text=_trim_text(html)
+        fields_block=fields_block, url=url, text=text
     )
     resp = await gemini_client.generate(prompt, max_output_tokens=2048)
     if resp.skipped:
