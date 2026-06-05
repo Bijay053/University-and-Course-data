@@ -644,18 +644,27 @@ _MODE_MAP = {
 
 
 def _parse_intake_months_from_dates(dates_raw: str) -> list[str]:
-    """Extract unique month names from strings like 'September 2026, March 2027'.
+    """Extract unique month names from date strings in any word order.
+
+    Handles both 'September 2026' (month-first) and '14 September 2026'
+    (day-first, e.g. WLV Solr multi_course_start_date_ss format).
+    Scans for a month name anywhere within each comma/semicolon-separated
+    token rather than assuming the month is the first word.
 
     Returns a list of month names in order first seen, e.g. ['September', 'March'].
     intake_months is stored as JSONB (array); callers must NOT join to a string.
     """
     seen: list[str] = []
     for token in re.split(r"[,;/\n]+", dates_raw):
-        word = token.strip().split()[0].lower() if token.strip() else ""
-        if word in _MONTH_NAMES:
-            month = word.capitalize()
-            if month not in seen:
-                seen.append(month)
+        token = token.strip()
+        if not token:
+            continue
+        for word in token.split():
+            if word.lower() in _MONTH_NAMES:
+                month = word.capitalize()
+                if month not in seen:
+                    seen.append(month)
+                break  # one month per date token
     return seen
 
 
