@@ -59,14 +59,25 @@ discovery:
     # "https://www.wlv.ac.uk/courses/wr006j01umu".
     url_base: "https://www.wlv.ac.uk/courses"
 
+    # WLV campus — used as course_location for all courses since Solr does
+    # not carry a location field.
+    location_override: "Wolverhampton"
+
     # Solr field name → system field mapping for _build_field_map_payload.
+    # WLV Solr has two duration fields:
+    #   multi_duration_ss — multi-valued ("Part-time (8 years)", "Full-time (4 years)")
+    #   duration_t        — single-valued ("3 years full-time") for most courses
+    # duration_fallback is tried when multi_duration_ss is absent from the doc.
+    # Same pattern for intake dates.
     field_map:
       url: url_t
       name: title_t
       degree_type: award_s
       degree_level: study_level_s
       duration: multi_duration_ss
+      duration_fallback: duration_t
       intake_dates: multi_course_start_date_ss
+      intake_fallback: start_dates_s
       category: subject_s
 
   # ── Retained as fallback only (not used when searchstax block is active) ──

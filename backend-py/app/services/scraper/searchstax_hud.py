@@ -875,8 +875,15 @@ def _map_doc_field_map(
     # _first_str only returns index[0], so when exclude_part_time is set we
     # would pick the Part-time duration and show 8 years instead of 4 years.
     # Fix: read every entry and prefer Full-time when exclude_part_time: true.
+    #
+    # WLV dual-field pattern: multi_duration_ss (multi-valued, FT+PT courses)
+    # and duration_t (single-valued, most other courses) coexist in the same
+    # Solr core.  When the configured field is empty fall back to duration_t.
+    _dur_fallback = _fm.get("duration_fallback", "duration_t" if _dur_field != "duration_t" else None)
     _all_durs: list[str] = []
     _raw_dur_vals = doc.get(_dur_field)
+    if not _raw_dur_vals and _dur_fallback:
+        _raw_dur_vals = doc.get(_dur_fallback)
     if isinstance(_raw_dur_vals, list):
         _all_durs = [str(v).strip() for v in _raw_dur_vals if v]
     elif _raw_dur_vals:
@@ -911,7 +918,12 @@ def _map_doc_field_map(
             payload["study_mode"] = _dur_mode
             _ev("study_mode", _dur_mode, "field_map")
 
+    # Intake dates: same dual-field pattern as duration.
+    # multi_course_start_date_ss (WLV multi-valued) → fall back to start_dates_s.
+    _date_fallback = _fm.get("intake_fallback", "start_dates_s" if _date_field != "start_dates_s" else None)
     raw_dates_vals = doc.get(_date_field, [])
+    if not raw_dates_vals and _date_fallback:
+        raw_dates_vals = doc.get(_date_fallback, [])
     if isinstance(raw_dates_vals, list):
         dates_blob = ", ".join(str(v) for v in raw_dates_vals if v)
     else:
