@@ -6,7 +6,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import {
   Play, StopCircle, Loader2, Globe, CheckCircle2, AlertCircle,
   ChevronsUpDown, Search, Eye, RefreshCw, ChevronDown, X, Zap, TrendingUp,
-  Bot, AlertTriangle, CheckCheck, Copy, Check,
+  Bot, AlertTriangle, CheckCheck, Copy, Check, Radar,
 } from "lucide-react";
 import { getFetchErrorMessage, readResponseJson } from "@/lib/readResponseJson";
 import { CountrySelect } from "@/components/country-select";
@@ -289,6 +289,36 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
   const [urlTestError, setUrlTestError] = useState<string | null>(null);
   const [showUrlTestPanel, setShowUrlTestPanel] = useState(false);
 
+  // Auto API Discovery state
+  type ApiDiscCandidate = {
+    url: string;
+    method: string;
+    score: number;
+    confidence: "high" | "medium" | "low";
+    content_type: string;
+    size_bytes: number;
+    fields_found: string[];
+    page_count: number;
+    sample_keys: string[];
+    suggested_yaml: string;
+    is_paginated: boolean;
+    pagination_param: string;
+  };
+  type ApiDiscResult = {
+    status: "running" | "done" | "error";
+    candidates: ApiDiscCandidate[];
+    sample_urls: string[];
+    uni_hostname: string;
+    uni_id: number;
+    error?: string;
+  };
+  const [apiDiscJobId, setApiDiscJobId] = useState<string | null>(null);
+  const [apiDiscStatus, setApiDiscStatus] = useState<"idle" | "running" | "done" | "error">("idle");
+  const [apiDiscResult, setApiDiscResult] = useState<ApiDiscResult | null>(null);
+  const [apiDiscError, setApiDiscError] = useState<string | null>(null);
+  const [apiDiscCopied, setApiDiscCopied] = useState<number | null>(null);
+  const apiDiscPollRef = useRef<number | null>(null);
+
   // Smart YAML Fix repair candidates state
   type RepairCandidateData = {
     id: string;
@@ -400,7 +430,70 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
     setApplyingRepairFix(false);
     setRepairFixApplied(false);
     setCategoryDiagnostics(null);
+    setApiDiscJobId(null);
+    setApiDiscStatus("idle");
+    setApiDiscResult(null);
+    setApiDiscError(null);
+    setApiDiscCopied(null);
+    if (apiDiscPollRef.current) { clearTimeout(apiDiscPollRef.current); apiDiscPollRef.current = null; }
   }, [slotKey, startTimeKey]);
+
+  // ── Auto API Discovery ────────────────────────────────────────────────────
+  const handleDiscoverApi = useCallback(async () => {
+    const uniId = parseInt(selectedUni);
+    if (!selectedUni || selectedUni === ALL || isNaN(uniId) || apiDiscStatus === "running") return;
+    setApiDiscStatus("running");
+    setApiDiscError(null);
+    setApiDiscResult(null);
+    setApiDiscJobId(null);
+    try {
+      const res = await fetch("/api/scrape/discover-api", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ uni_id: uniId }),
+      });
+      if (!res.ok) {
+        const msg = await getFetchErrorMessage(res);
+        setApiDiscError(msg || `Error ${res.status}`);
+        setApiDiscStatus("error");
+        return;
+      }
+      const data = await res.json();
+      setApiDiscJobId(data.job_id);
+    } catch (e) {
+      setApiDiscError(String(e));
+      setApiDiscStatus("error");
+    }
+  }, [selectedUni, apiDiscStatus]);
+
+  // Poll API discovery job until done/error
+  useEffect(() => {
+    if (apiDiscStatus !== "running" || !apiDiscJobId) return;
+    let cancelled = false;
+    const poll = async () => {
+      if (cancelled) return;
+      try {
+        const res = await fetch(`/api/scrape/discover-api/${apiDiscJobId}`, { cache: "no-store" });
+        if (!res.ok) { setApiDiscStatus("error"); setApiDiscError(`Poll error ${res.status}`); return; }
+        const data = await res.json() as ApiDiscResult;
+        if (data.status === "done" || data.status === "error") {
+          setApiDiscResult(data);
+          setApiDiscStatus(data.status);
+          if (data.status === "error") setApiDiscError(data.error || "Discovery failed");
+        } else {
+          if (!cancelled) apiDiscPollRef.current = window.setTimeout(poll, 3000);
+        }
+      } catch (e) {
+        if (!cancelled) { setApiDiscStatus("error"); setApiDiscError(String(e)); }
+      }
+    };
+    apiDiscPollRef.current = window.setTimeout(poll, 3000);
+    return () => {
+      cancelled = true;
+      if (apiDiscPollRef.current) { clearTimeout(apiDiscPollRef.current); apiDiscPollRef.current = null; }
+    };
+  }, [apiDiscStatus, apiDiscJobId]);
 
   // Auto-load repair candidates when done with a URL filter warning
   useEffect(() => {
@@ -1446,6 +1539,188 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
                 </div>
               </div>
             )}
+
+            {/* ── Auto API Discovery ───────────────────────────────── */}
+            {selectedUni && selectedUni !== ALL && !isNaN(parseInt(selectedUni)) && (
+              (((performanceSavings?.skipped_empty_text ?? 0) > 30) || apiDiscStatus !== "idle") && (
+              <div className="rounded-lg border border-purple-100 bg-purple-50 p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-xs font-semibold text-purple-800 flex items-center gap-1.5">
+                    <Radar className="w-3.5 h-3.5" />
+                    Auto API Discovery
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    {apiDiscStatus === "idle" && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-6 text-xs border-purple-300 text-purple-700 hover:bg-purple-100 px-2"
+                        onClick={handleDiscoverApi}
+                      >
+                        Find API automatically
+                      </Button>
+                    )}
+                    {apiDiscStatus !== "idle" && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-5 text-[10px] text-purple-400 hover:text-purple-600 px-1"
+                        onClick={() => {
+                          setApiDiscStatus("idle");
+                          setApiDiscResult(null);
+                          setApiDiscError(null);
+                          setApiDiscJobId(null);
+                          setApiDiscCopied(null);
+                        }}
+                      >
+                        Reset
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Context hint when idle */}
+                {apiDiscStatus === "idle" && (performanceSavings?.skipped_empty_text ?? 0) > 30 && (
+                  <p className="text-xs text-purple-600 mb-2">
+                    <span className="font-medium text-orange-600">{performanceSavings?.skipped_empty_text}</span> course pages
+                    returned no text — the site likely serves data via a hidden JSON API.
+                    Click <span className="font-medium">Find API automatically</span> to open sample pages
+                    in Playwright, intercept network requests, and identify the endpoint.
+                  </p>
+                )}
+
+                {/* Loading state */}
+                {apiDiscStatus === "running" && (
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-2 text-xs text-purple-600">
+                      <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+                      <span>Opening sample pages in Playwright and recording network traffic…</span>
+                    </div>
+                    <div className="text-[10px] text-purple-400 pl-5">
+                      Step 1: Capture XHR/fetch JSON responses on 3 course URLs
+                      <br />Step 2: Score candidates (content type · course fields · repeating endpoints)
+                      <br />Step 3: Rank and generate YAML config snippets
+                    </div>
+                  </div>
+                )}
+
+                {/* Error */}
+                {apiDiscError && (
+                  <p className="text-xs text-red-600 mt-1">{apiDiscError}</p>
+                )}
+
+                {/* No candidates found */}
+                {apiDiscResult?.status === "done" && apiDiscResult.candidates.length === 0 && (
+                  <p className="text-xs text-purple-500 mt-1">
+                    No JSON API endpoints detected on {apiDiscResult.sample_urls.length} sample page(s).
+                    The site may use server-side rendering, Cloudflare-blocked responses, or a non-standard
+                    data format. Try checking DevTools Network tab on a real course page for XHR calls.
+                  </p>
+                )}
+
+                {/* Candidate cards */}
+                {apiDiscResult?.candidates.map((c, i) => (
+                  <div
+                    key={i}
+                    className={`mt-2 rounded border p-2.5 text-xs ${
+                      i === 0
+                        ? "border-purple-300 bg-white shadow-sm"
+                        : "border-purple-100 bg-white/60"
+                    }`}
+                  >
+                    {/* Header row */}
+                    <div className="flex items-start gap-2 justify-between">
+                      <span className="font-mono text-[10px] text-purple-900 break-all leading-tight">
+                        {c.url}
+                      </span>
+                      <Badge
+                        className={`shrink-0 text-[10px] px-1.5 py-0 ${
+                          c.confidence === "high"
+                            ? "bg-green-100 text-green-700 border-green-200"
+                            : c.confidence === "medium"
+                            ? "bg-yellow-100 text-yellow-700 border-yellow-200"
+                            : "bg-gray-100 text-gray-500 border-gray-200"
+                        }`}
+                      >
+                        {c.confidence} · {c.score}pts
+                      </Badge>
+                    </div>
+
+                    {/* Stats */}
+                    <div className="mt-1.5 text-purple-600 space-y-0.5">
+                      <div>
+                        <span className="font-medium">{c.method}</span>
+                        {" · "}
+                        {(c.size_bytes / 1024).toFixed(1)} KB
+                        {" · "}
+                        Found on{" "}
+                        <span className="font-medium">{c.page_count}</span>/{apiDiscResult.sample_urls.length} sample pages
+                        {c.is_paginated && (
+                          <span className="ml-1 text-green-600 font-medium">· paginated</span>
+                        )}
+                      </div>
+                      {c.fields_found.length > 0 && (
+                        <div>
+                          Fields detected:{" "}
+                          <span className="font-medium text-purple-800">
+                            {c.fields_found.join(", ")}
+                          </span>
+                        </div>
+                      )}
+                      {c.sample_keys.length > 0 && (
+                        <div className="font-mono text-[10px] text-purple-400 leading-relaxed">
+                          JSON keys: {c.sample_keys.slice(0, 10).join(", ")}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* YAML snippet */}
+                    <div className="mt-2">
+                      <div className="text-[10px] text-purple-500 mb-1">Suggested YAML config:</div>
+                      <pre className="text-[10px] font-mono bg-purple-950 text-purple-100 rounded p-2 overflow-x-auto leading-relaxed whitespace-pre">
+                        {c.suggested_yaml}
+                      </pre>
+                      <div className="mt-1.5 flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-5 text-[10px] px-2 border-purple-200 text-purple-600 hover:bg-purple-50"
+                          onClick={() => {
+                            navigator.clipboard.writeText(c.suggested_yaml);
+                            setApiDiscCopied(i);
+                            setTimeout(() => setApiDiscCopied(null), 2000);
+                          }}
+                        >
+                          {apiDiscCopied === i ? (
+                            <><Check className="w-2.5 h-2.5 mr-1 text-green-600" /> Copied</>
+                          ) : (
+                            <><Copy className="w-2.5 h-2.5 mr-1" /> Copy YAML</>
+                          )}
+                        </Button>
+                        <a
+                          href={`/settings`}
+                          className="text-[10px] text-purple-500 underline hover:text-purple-800"
+                        >
+                          Open config editor →
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                {/* Sample URLs used */}
+                {apiDiscResult && apiDiscResult.sample_urls.length > 0 && (
+                  <div className="mt-2 text-[10px] text-purple-400">
+                    Probed: {apiDiscResult.sample_urls.map((u, i) => (
+                      <a key={i} href={u} target="_blank" rel="noopener noreferrer"
+                        className="underline hover:text-purple-600 mr-2">
+                        page {i + 1}
+                      </a>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
 
             {/* ── Category Landing Rejection Diagnostics ──────────── */}
             {categoryDiagnostics && (() => {
