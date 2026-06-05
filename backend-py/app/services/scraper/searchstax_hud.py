@@ -1377,7 +1377,16 @@ async def fetch_searchstax_links(
         _url_fl  = _fm_vals.get("url",         "url_t")
         _name_fl = _fm_vals.get("name",        "title_t")
         _type_fl = _fm_vals.get("degree_type", "award_s")
-        _fl = ",".join({"id", _url_fl, _name_fl, _type_fl, *_fm_vals.values()})
+        # Flatten field_map values — fallback keys may be lists of field names
+        # (e.g. duration_fallback: [duration_s, duration_t]).  Each field name
+        # must be a separate string in the Solr fl= parameter.
+        _fm_fields: set[str] = set()
+        for _v in _fm_vals.values():
+            if isinstance(_v, list):
+                _fm_fields.update(str(f) for f in _v if f)
+            elif _v:
+                _fm_fields.add(str(_v))
+        _fl = ",".join({"id", _url_fl, _name_fl, _type_fl, *_fm_fields})
     else:
         _fl = _FIELDS
 
