@@ -46,33 +46,18 @@ discovery:
     endpoint: "https://searchcloud-1-eu-west-2.searchstax.com/29847/wolverhamptondevelopment-3254/emselect"
     token_env: WLV_SEARCHSTAX_TOKEN
     filter_query: "sectionType_s:courses"
-    links_only: false
-    field_map_as_payload: true
+    # links_only: true — Solr provides all 433 course URLs; the normal per-course
+    # browser + Gemini pipeline then fetches each page for fees, IELTS, duration,
+    # location, intakes etc.  Replaces the old field_map_as_payload approach which
+    # built payloads entirely from Solr fields (skipping page fetches) — that left
+    # ~10 courses with no duration/mode/location/intake because WLV Solr had those
+    # fields empty for those specific records.
+    links_only: true
 
-    # WLV Solr uses multi-valued "multi_*" fields for mode/duration/dates/location.
-    # Only non-default fields need overriding — url_t, title_t, award_s match defaults.
-    # WLV's Solr url_t field contains bare SITS course codes (e.g. "WR006J01UMU"),
-    # not real HTTP URLs.  url_base is prepended so course_website ends up as
+    # WLV Solr url_t field contains bare SITS course codes (e.g. "WR006J01UMU"),
+    # not real HTTP URLs.  url_base is prepended so the link URL becomes
     # "https://www.wlv.ac.uk/courses/wr006j01umu" and the domain guard passes.
     url_base: "https://www.wlv.ac.uk/courses"
-
-    # WLV multi_location_ss values carry a "Category: Value" facet label prefix
-    # (e.g. "University: City Campus").  Strip the prefix so course_location
-    # stores only "City Campus", "Springfield Campus", etc.
-    location_strip_prefixes:
-      - "University: "
-
-    # International students only enrol full-time at WLV.  Drop Part-time from
-    # mixed-mode courses; skip courses that are exclusively Part-time.
-    exclude_part_time: true
-
-    field_map:
-      degree_level:  level_s
-      study_mode:    multi_mode_ss
-      duration:      multi_duration_ss
-      intake_dates:  multi_course_start_date_ss
-      category:      subject_area_ss
-      location:      multi_location_ss
 
   # ── Retained as fallback only (not used when searchstax block is active) ──
   seed_urls:
@@ -82,9 +67,12 @@ discovery:
   browser_early_stop_courses: 300
 
 extraction:
-  # field_map_as_payload mode: no per-course page fetches at all.
-  # Raise concurrency to default — it's irrelevant since nothing is fetched.
-  max_parallel_fetch: 8
+  # WLV is Cloudflare-protected.  Cap concurrency at 2 to avoid rate-limiting
+  # (previous browser-only runs hit 375/433 fetch_failed at higher concurrency).
+  # Browser fallback fires automatically when HTTP returns 403/challenge.
+  max_parallel_fetch: 2
+  retry_on_cloudflare: true
+  force_browser: true
 
   study_mode:
     # WLV: site-wide nav contains "online" text (study-online / online-learning
