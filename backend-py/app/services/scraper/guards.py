@@ -1013,7 +1013,20 @@ _BLOCK_TITLE_PREFIXES: tuple[tuple[str, str], ...] = (
     ("important dates",                 "key_dates_page"),
     ("news",                            "news_page"),
     ("blog",                            "blog_page"),
-    ("events",                          "events_page"),
+    # "events" bare prefix intentionally NOT here — it would block legitimate
+    # academic courses such as "Events Management BA" and "International Events
+    # Management MSc".  Instead we match specific event-listing phrasings:
+    ("upcoming events",                 "events_page"),
+    ("events calendar",                 "events_page"),
+    ("events and conferences",          "events_page"),
+    ("open day events",                 "events_page"),
+    ("university events",               "events_page"),
+    ("student events",                  "events_page"),
+    ("news and events",                 "events_page"),
+    ("events at ",                      "events_page"),
+    ("events for ",                     "events_page"),
+    # A page titled exactly "Events" (no qualifier) is an event listing;
+    # that case is handled by _BLOCK_TITLE_EXACT below.
     ("contact us",                      "contact_page"),
     ("contact",                         "contact_page"),
     ("about us",                        "about_page"),
@@ -1119,6 +1132,9 @@ _BLOCK_TITLE_EXACT: frozenset[str] = frozenset({
     # Bare nav labels — full-string equals only so award titles like
     # "Undergraduate Certificate of Psychology Fundamentals" or
     # "Postgraduate Diploma of Counselling" are NEVER blocked.
+    # "events" is safe as an exact match (nav link titled just "Events") but
+    # must NOT be a prefix — "Events Management BA" is a real course.
+    "events",
     "undergraduate",
     "postgraduate",
     "graduate",

@@ -61,6 +61,46 @@ def test_blocks_news_and_blog():
         assert r == expect
 
 
+def test_events_title_precision():
+    """'Events Management BA' must NOT be blocked — only bare nav/listing titles."""
+    from app.services.scraper.guards import is_blocked_page
+
+    # These are real academic course titles — must pass through
+    not_blocked = [
+        (None, "Events Management, BA"),
+        (None, "Events Management with Foundation Year, BA"),
+        (None, "International Events Management MSc"),
+        (None, "Event Production BA"),
+        (None, "Events Marketing MSc"),
+        (None, "Sport and Events Management BSc"),
+        # Course URL containing "events-management" in path must NOT be blocked
+        ("https://www.uni.edu.au/courses/events-management-ba", None),
+        ("https://www.uni.edu.au/subjects/events-management",   None),
+    ]
+    for url, title in not_blocked:
+        b, r = is_blocked_page(url, title=title)
+        assert b is False, (
+            f"False positive: url={url!r} title={title!r} was blocked as {r!r} "
+            "— 'Events Management' is a legitimate academic course"
+        )
+
+    # These ARE real event listing pages and must still be blocked
+    blocked = [
+        (None,                                                 "Events",              "info_page"),
+        (None,                                                 "Events Calendar",     "events_page"),
+        (None,                                                 "Upcoming Events",     "events_page"),
+        (None,                                                 "Events and Conferences", "events_page"),
+        (None,                                                 "University Events",   "events_page"),
+        (None,                                                 "News and Events",     "news_page"),   # "news" prefix fires first — still correctly blocked
+        ("https://www.uni.edu.au/events/open-day-2026",        None,                 "events_page"),
+        ("https://www.uni.edu.au/events/",                     None,                 "events_page"),
+    ]
+    for url, title, expect in blocked:
+        b, r = is_blocked_page(url, title=title)
+        assert b is True,  f"Should be blocked: url={url!r} title={title!r}"
+        assert r == expect, f"Expected {expect!r}, got {r!r}: url={url!r} title={title!r}"
+
+
 def test_blocks_faculty_and_school_pages():
     for url in (
         "https://www.uni.edu.au/schools/business",
