@@ -46,10 +46,14 @@ extraction:
     # every course as Online.  Suppress it — Gemini reads the actual content.
     suppress_nav_rule: true
 
-  # Canterbury CC is Cloudflare Enterprise: static HTML = React SPA shell
-  # (text_len=0), scrape.do returns rendered=0B, local Playwright also
-  # returns rendered=0B.  Skip BOTH rescue paths — each wastes 30-90 s
-  # per course with zero yield (202 courses × 60 s = 3+ hours wasted).
+  # Canterbury CC is Cloudflare Enterprise — httpx receives a 200 SPA shell
+  # with near-zero visible text (React / Contensis CMS, JS-rendered).
+  # With the Scrape.do token now available, we use scrape_do_render: true
+  # to detect the empty shell and retry via Scrape.do's headless Chrome,
+  # which returns the fully-rendered HTML including the per-course fee table
+  # (e.g. "UK £9,790 | Overseas £17,000").  Local Playwright is still
+  # skipped (skip_per_course_browser: true) because it is also IP-blocked.
+  scrape_do_render: true
   skip_browser_rescue: true
   skip_per_course_browser: true
 

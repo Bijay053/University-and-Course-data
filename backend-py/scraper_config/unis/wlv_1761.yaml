@@ -46,12 +46,14 @@ discovery:
     endpoint: "https://searchcloud-1-eu-west-2.searchstax.com/29847/wolverhamptondevelopment-3254/emselect"
     token_env: WLV_SEARCHSTAX_TOKEN
     filter_query: "sectionType_s:courses"
-    # field_map_as_payload: true — builds payloads directly from Solr fields
-    # without fetching any individual course pages.  ~432 courses complete in
-    # <5 minutes vs ~271 minutes with per-page browser extraction at concurrency 2.
-    # Fees and IELTS come from degree_level_defaults in the extraction section
-    # below (WLV Solr does not carry fee/IELTS data in the index).
-    field_map_as_payload: true
+    # field_map_as_payload: false — Solr provides course URLs; each page is
+    # then fetched for per-course data extraction.  Cloudflare blocks plain
+    # httpx/curl_cffi after ~40 requests, but Scrape.do static (no JS render
+    # needed — WLV serves fees in static HTML) bypasses this cleanly.
+    # Test confirmed: wlv.ac.uk/courses/<slug> returns Home £3,029 /
+    # International £5,650–£6,215 per year in static HTML via Scrape.do.
+    # Previously true (payload-only) because SCRAPERAPI_KEY was missing.
+    field_map_as_payload: false
     exclude_part_time: true
     # Reject courses whose parsed duration exceeds 4 years when exclude_part_time
     # is set.  WLV PhD/MPhil research programs are part-time-only (6–8 years)

@@ -43,6 +43,11 @@ extraction:
       doctorate:
         ielts: 6.0
 
+  # Sunderland is a React SPA — httpx gets 200 SPA shell with no visible
+  # content.  scrape_do_render: true triggers Scrape.do headless Chrome
+  # rendering to get real page content for field extraction.
+  scrape_do_render: true
+
   study_mode:
     # Sunderland pages contain "apply online" / "register online" nav copy that
     # fires the bare \bonline\b fallback → 'Online' at conf=0.70 on every

@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import urllib.parse
 from contextlib import asynccontextmanager
 
@@ -65,6 +66,123 @@ _BROWSER_UA = (
     "AppleWebKit/537.36 (KHTML, like Gecko) "
     "Chrome/124.0.0.0 Safari/537.36"
 )
+
+
+def _unescape_json_html(html: str) -> str:
+    """Un-escape JSON Unicode sequences (\\uXXXX → char) embedded in HTML.
+
+    Contensis CMS (Canterbury CC) and other Next.js / React-hydration sites
+    embed the server-rendered content as a JSON string inside a <script> tag
+    (e.g. ``__NEXT_DATA__`` or ``window.__data``).  The JSON encoder escapes
+    ``<`` → ``\\u003C``, ``/`` → ``\\u002F``, ``"`` → ``\\"``, etc., making
+    the fee table body invisible to simple ``£`` / ``&pound;`` regex extractors.
+
+    Decoding the ``\\uXXXX`` sequences converts them back to their Unicode
+    characters so downstream extractors can parse the HTML normally.
+
+    Safe to apply globally: ASCII ``\\uXXXX`` sequences (\\u0020–\\u007E) map
+    back to themselves; the only risk is sequences in JavaScript string
+    literals that are *not* HTML content, but BeautifulSoup handles those
+    gracefully because it never executes JS.
+
+    Applied only when at least one ``\\u`` sequence is present to avoid any
+    overhead on plain static HTML pages.
+    """
+    import re as _re
+    if "\\u" not in html:
+        return html
+    try:
+        return _re.sub(
+            r"\\u([0-9a-fA-F]{4})",
+            lambda m: chr(int(m.group(1), 16)),
+            html,
+        )
+    except Exception:
+        return html
+
+
+def _is_spa_shell(html: str) -> bool:
+    """Return True when HTML looks like an unrendered React/SPA shell.
+
+    A SPA shell is a 200 response that contains only JavaScript bundles
+    and CSS — no visible text content.  Universities like Canterbury CC
+    return this when Cloudflare lets the request through but the page
+    data is injected by JS at runtime.
+
+    Heuristic: strip tags, collapse whitespace, check visible text length.
+    If the ratio of visible text to total HTML size is < 3 % AND the
+    total visible text is less than 800 characters the page has no useful
+    extractable content.
+    """
+    import re as _re
+    text = _re.sub(r"<[^>]+>", "", html)
+    text = _re.sub(r"\s+", " ", text).strip()
+    if len(text) >= 800:
+        return False
+    if len(html) > 5_000 and len(text) / len(html) < 0.03:
+        return True
+    return len(text) < 200
+
+
+async def fetch_html_scrape_do(
+    url: str,
+    *,
+    render: bool = False,
+    wait_for_ms: int = 3000,
+) -> str | None:
+    """Fetch via Scrape.do residential proxy — paid tier-4/5 Cloudflare bypass.
+
+    Scrape.do routes requests through a pool of residential IPs and can
+    optionally execute the page in a headless Chrome instance (render=True).
+    Use for sites where Cloudflare Enterprise blocks all datacenter IPs
+    (httpx, curl_cffi, Wayback Machine CDN all return CF challenges) OR
+    where fee / course data is injected by JavaScript at runtime.
+
+    When render=True, ``waitFor=wait_for_ms`` is sent so Scrape.do waits for
+    JavaScript hydration to complete before returning the HTML.  Canterbury's
+    Contensis CMS injects the fee table via React hydration; the default 3 s
+    wait is sufficient.
+
+    The returned HTML is post-processed by ``_unescape_json_html`` to decode
+    ``\\uXXXX`` sequences that Next.js / Contensis embed as JSON-encoded HTML
+    inside their hydration payloads (e.g. ``\\u003Ctd\\u003E&pound;9,790``
+    → ``<td>&pound;9,790``).  Without this step, fee/IELTS regexes see no
+    ``£`` or ``&pound;`` patterns in the text.
+
+    Requires SCRAPE_DO_TOKEN environment variable (set as a Replit secret).
+    Returns None if the token is absent, the request fails, or the
+    response is suspiciously short (likely an error page from scrape.do).
+    """
+    token = os.environ.get("SCRAPE_DO_TOKEN")
+    if not token:
+        log.debug("fetch_html_scrape_do: SCRAPE_DO_TOKEN not set — skipping")
+        return None
+    try:
+        params: dict[str, str] = {"token": token, "url": url}
+        if render:
+            params["render"] = "true"
+            params["waitFor"] = str(wait_for_ms)
+        async with httpx.AsyncClient(timeout=90, follow_redirects=True) as c:
+            r = await c.get("https://api.scrape.do", params=params)
+            if r.status_code == 200 and len(r.text) > 500:
+                log.info(
+                    "scrape.do fetch %s render=%s -> 200 (%d chars)",
+                    url,
+                    render,
+                    len(r.text),
+                )
+                return _unescape_json_html(r.text)
+            log.warning(
+                "scrape.do fetch %s render=%s -> %s (%d chars)",
+                url,
+                render,
+                r.status_code,
+                len(r.text),
+            )
+            return None
+    except Exception as exc:
+        log.warning("scrape.do fetch %s render=%s failed: %s", url, render, exc)
+        return None
 
 
 def _is_cloudflare_block(resp: httpx.Response) -> bool:
@@ -247,9 +365,25 @@ async def _client():
 
 
 async def fetch_html(url: str, *, retries: int = 2) -> str | None:
+    # Check if the current uni config requests Scrape.do render for SPA shells.
+    # Soft-fail: if no context var is set (PDF fetches, central pages, etc.)
+    # the flag stays False and behaviour is unchanged from the baseline.
+    _scrape_do_render = False
+    _has_scrape_do = bool(os.environ.get("SCRAPE_DO_TOKEN"))
+    if _has_scrape_do:
+        try:
+            from app.services.scraper.config.context import get_uni_config  # noqa: PLC0415
+            _scrape_do_render = bool(
+                getattr(get_uni_config().extraction, "scrape_do_render", False)
+            )
+        except Exception:
+            pass
+
     last_exc: Exception | None = None
     got_cloudflare_block = False
     got_hard_403 = False
+    html_200: str | None = None  # track 200 result so we can check for SPA shell
+
     for attempt in range(retries + 1):
         async with _sem:
             try:
@@ -260,7 +394,8 @@ async def fetch_html(url: str, *, retries: int = 2) -> str | None:
                     # no-op for ~100 universities in the fleet.
                     r = await c.get(url, cookies=cookies_for_url(url))
                     if r.status_code == 200:
-                        return r.text
+                        html_200 = r.text
+                        break  # exit loop; post-loop logic decides what to return
                     if _is_cloudflare_block(r):
                         got_cloudflare_block = True
                         log.info(
@@ -289,12 +424,38 @@ async def fetch_html(url: str, *, retries: int = 2) -> str | None:
         # Wayback Machine. Return None so the pipeline records a fetch_failed.
         return None
 
+    # ── Got HTTP 200 ──────────────────────────────────────────────────────────
+    if html_200 is not None:
+        # When scrape_do_render is explicitly set for this university, ALWAYS
+        # upgrade to Scrape.do headless Chrome rendering even when httpx returned
+        # a 200 with substantial content.  Canterbury CC is the canonical case:
+        # httpx gets a 200 with 2.6MB of pre-rendered Contensis HTML, but the
+        # fee tables are injected at runtime by JavaScript (not in the static
+        # HTML).  Scrape.do render=True executes JS and returns the full page
+        # including per-course fee rows (UK £9,790 / Overseas £17,000).
+        # We always render — no SPA-shell heuristic needed — because the flag
+        # is explicitly configured per-university in the YAML.
+        if _scrape_do_render:
+            log.info(
+                "fetch %s -> 200 (scrape_do_render=True) — upgrading to Scrape.do headless render",
+                url,
+            )
+            rendered = await fetch_html_scrape_do(url, render=True)
+            if rendered is not None:
+                return rendered
+            log.info(
+                "fetch %s: Scrape.do render failed — falling back to plain httpx 200 response",
+                url,
+            )
+        return html_200
+
+    # ── Cloudflare WAF block — tiered fallback ────────────────────────────────
     if got_cloudflare_block:
+        # Tier 2: curl_cffi Chrome TLS impersonation
         cffi_result = await fetch_html_cffi(url)
         if cffi_result is not None:
             return cffi_result
-        # curl_cffi also blocked (IP/ASN-level block — TLS fingerprint alone
-        # is not the issue).  Try Wayback Machine next (free).
+        # Tier 3: Wayback Machine archived HTML (free, zero API cost)
         log.info(
             "fetch %s: curl_cffi blocked — trying Wayback Machine archived HTML",
             url,
@@ -302,7 +463,28 @@ async def fetch_html(url: str, *, retries: int = 2) -> str | None:
         wayback_result = await fetch_html_wayback(url)
         if wayback_result is not None:
             return wayback_result
-        log.info("fetch %s: all free tiers exhausted (httpx, curl_cffi, Wayback)", url)
+        # Tier 4: Scrape.do static (residential proxy, no JS rendering)
+        if _has_scrape_do:
+            log.info(
+                "fetch %s: Wayback Machine empty — trying Scrape.do static",
+                url,
+            )
+            scrape_do_static = await fetch_html_scrape_do(url, render=False)
+            if scrape_do_static is not None and not _is_spa_shell(scrape_do_static):
+                return scrape_do_static
+            # Tier 5: Scrape.do render (paid headless Chrome — most expensive)
+            if _scrape_do_render:
+                log.info(
+                    "fetch %s: Scrape.do static empty/SPA — trying Scrape.do render",
+                    url,
+                )
+                scrape_do_rendered = await fetch_html_scrape_do(url, render=True)
+                if scrape_do_rendered is not None:
+                    return scrape_do_rendered
+        log.info(
+            "fetch %s: all tiers exhausted (httpx, curl_cffi, Wayback, Scrape.do)",
+            url,
+        )
         return None
 
     if last_exc:

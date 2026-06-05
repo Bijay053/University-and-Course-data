@@ -1948,6 +1948,18 @@ class ExtractionConfig(BaseModel):
     #           text: "International Students"
     #
     # After clicking, the scraper waits for networkidle (up to 5s) + 1.2s settle.
+    scrape_do_render: bool = Field(
+        default=False,
+        description=(
+            "When True, fetch_html() detects React/SPA shells (200 response "
+            "but near-zero visible text) and retries via the Scrape.do paid "
+            "proxy with render=true (headless Chrome rendering).  Also enables "
+            "Scrape.do render as tier-5 after the free tier-4 static fetch "
+            "when Cloudflare blocks all free options.  Requires SCRAPE_DO_TOKEN "
+            "env var.  Use for Cloudflare-Enterprise sites whose httpx/cffi "
+            "responses are empty SPA shells (Canterbury, Sunderland, etc.)."
+        ),
+    )
     retry_on_cloudflare: bool = Field(
         default=False,
         description=(
