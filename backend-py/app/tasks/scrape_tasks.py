@@ -116,6 +116,31 @@ def set_initial_dispatch_lock(job_id: str) -> None:
 
 async def _async_scrape(runtime_job_id: str) -> None:
     from app.services.scraper.browser_pool import pool as _browser_pool
+
+    # Suppress "RuntimeError: Event loop is closed" noise emitted by the
+    # google-genai SDK's GeminiApiClient.aclose() cleanup task.  The SDK
+    # schedules transport cleanup via asyncio.ensure_future(); if any of
+    # those futures are still pending when asyncio.run() tears down the loop
+    # they raise this error as an "unretrieved exception" warning.  Our
+    # _close_client() call in gemini_client.py handles it proactively, but
+    # this handler is a belt-and-suspenders guard for any residual cases.
+    _loop = asyncio.get_running_loop()
+    _orig_exc_handler = _loop.get_exception_handler()
+
+    def _gemini_cleanup_handler(loop: asyncio.AbstractEventLoop, context: dict) -> None:
+        exc = context.get("exception")
+        msg = context.get("message", "")
+        if isinstance(exc, RuntimeError) and "Event loop is closed" in str(exc):
+            return  # Suppress — GeminiApiClient httpx transport cleanup noise
+        if "Event loop is closed" in msg:
+            return
+        if _orig_exc_handler is not None:
+            _orig_exc_handler(loop, context)
+        else:
+            loop.default_exception_handler(context)
+
+    _loop.set_exception_handler(_gemini_cleanup_handler)
+
     try:
         async with AsyncSessionLocal() as db:
             await run_scrape(db, runtime_job_id)
@@ -129,6 +154,18 @@ async def _async_scrape(runtime_job_id: str) -> None:
         try:
             await _browser_pool.close()
         except Exception:  # noqa: BLE001 — best-effort cleanup
+            pass
+        # Cancel and drain any remaining asyncio tasks (e.g. stray Gemini
+        # httpx cleanup futures) before asyncio.run() closes the loop.
+        # Without this, Python logs "Task exception was never retrieved" for
+        # each pending GeminiApiClient.aclose() coroutine.
+        try:
+            _pending = {t for t in asyncio.all_tasks() if t is not asyncio.current_task()}
+            if _pending:
+                for _t in _pending:
+                    _t.cancel()
+                await asyncio.gather(*_pending, return_exceptions=True)
+        except Exception:  # noqa: BLE001
             pass
 
 
