@@ -353,6 +353,7 @@ export default function UniversityDetail() {
   const [editUniName, setEditUniName] = useState("");
   const [editUniCity, setEditUniCity] = useState("");
   const [editUniCountry, setEditUniCountry] = useState("");
+  const [editUniWebsite, setEditUniWebsite] = useState("");
   const [editUniSaving, setEditUniSaving] = useState(false);
 
   // ── Repair scrape state ─────────────────────────────────────────────────
@@ -1823,6 +1824,7 @@ export default function UniversityDetail() {
     setEditUniName(uni?.name ?? "");
     setEditUniCity(uni?.city ?? "");
     setEditUniCountry(uni?.country ?? "");
+    setEditUniWebsite((uni as { website?: string | null })?.website ?? "");
     setEditUniOpen(true);
   };
   const [featuredSaving, setFeaturedSaving] = useState(false);
@@ -1853,7 +1855,7 @@ export default function UniversityDetail() {
       const res = await fetch(`${BASE}/api/universities/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: editUniName, city: editUniCity, country: editUniCountry }),
+        body: JSON.stringify({ name: editUniName, city: editUniCity, country: editUniCountry, ...(editUniWebsite ? { website: editUniWebsite } : {}) }),
       });
       if (!res.ok) throw new Error(await res.text());
       toast({ title: "University updated" });
@@ -5799,6 +5801,10 @@ export default function UniversityDetail() {
             <div className="space-y-1">
               <Label>Country</Label>
               <Input value={editUniCountry} onChange={e => setEditUniCountry(e.target.value)} placeholder="Country" />
+            </div>
+            <div className="space-y-1">
+              <Label>University URL</Label>
+              <Input value={editUniWebsite} onChange={e => setEditUniWebsite(e.target.value)} placeholder="https://www.university.edu" type="url" />
             </div>
           </div>
           <DialogFooter>

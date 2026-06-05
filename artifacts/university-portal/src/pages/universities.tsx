@@ -69,6 +69,7 @@ export default function Universities() {
   const [editName, setEditName] = useState("");
   const [editCity, setEditCity] = useState("");
   const [editCountry, setEditCountry] = useState("");
+  const [editWebsite, setEditWebsite] = useState("");
   const [editSaving, setEditSaving] = useState(false);
   const [featuredSavingId, setFeaturedSavingId] = useState<number | null>(null);
   const [featuredConfirm, setFeaturedConfirm] = useState<{ id: number; name: string; current: boolean } | null>(null);
@@ -162,11 +163,12 @@ export default function Universities() {
     }
   };
 
-  const openEdit = (uni: { id: number; name: string; city: string; country: string }) => {
+  const openEdit = (uni: { id: number; name: string; city: string; country: string; website?: string | null }) => {
     setEditId(uni.id);
     setEditName(uni.name);
     setEditCity(uni.city === "Unknown" ? "" : uni.city);
     setEditCountry(uni.country === "Unknown" ? "" : uni.country);
+    setEditWebsite(uni.website ?? "");
   };
 
   const saveEdit = async () => {
@@ -176,7 +178,7 @@ export default function Universities() {
       const res = await fetch(`${BASE}/api/universities/${editId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: editName, city: editCity || "Unknown", country: editCountry || "Unknown" }),
+        body: JSON.stringify({ name: editName, city: editCity || "Unknown", country: editCountry || "Unknown", ...(editWebsite ? { website: editWebsite } : {}) }),
       });
       if (!res.ok) throw new Error(await res.text());
       toast({ title: "University updated" });
@@ -708,6 +710,10 @@ export default function Universities() {
                 <Label>Country</Label>
                 <Input value={editCountry} onChange={e => setEditCountry(e.target.value)} placeholder="Country" />
               </div>
+            </div>
+            <div className="space-y-1">
+              <Label>University URL</Label>
+              <Input value={editWebsite} onChange={e => setEditWebsite(e.target.value)} placeholder="https://www.university.edu" type="url" />
             </div>
           </div>
           <DialogFooter>
