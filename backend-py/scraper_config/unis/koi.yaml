@@ -56,6 +56,12 @@ extraction:
     requirements_pdf_url: "https://koi.edu.au/international-applicants-entry-requirement/"
   fees:
     fees_pdf_url: "https://koi.edu.au/wp-content/uploads/2025/11/KOI_TUITION_FEES_2026-V_07_NOV_2025.pdf"
+    # KOI's fee PDF uses a character-spaced encoding (each glyph is a separate
+    # token in pypdf output) AND a columnar layout (one field per line per course).
+    # The "spaced_columnar" parser normalises the spacing and then walks the
+    # vertical sequence: CourseName → CRICOS → Duration → PerTrimester → Total.
+    pdf_parser: "spaced_columnar"
+    default_currency: AUD
   # The university has intake dates that might be relevant for the extraction process.
   # This field can be used to inject the URL to the intake dates page if it's not automatically discovered.
   # We are not adding an explicit URL here as it might be discovered, but it's a potential override.

@@ -142,6 +142,47 @@ _AMOUNT_RE = re.compile(r"\$\s*([\d,]+(?:\.\d+)?)")
 _FEE_YEAR_RE = re.compile(r"\b(20\d{2})\b")
 
 
+def _normalize_spaced_pdf_text(text: str) -> str:
+    """Collapse PDFs where each glyph is space-separated (e.g. KOI fee schedule).
+
+    pypdf extracts KOI's fee PDF with every character space-separated::
+
+        'D i p l o m a  o f  A c c o u n t i n g'  (double spaces between words)
+        '0 7 0 3 6 8 K'                              (single spaces between digits)
+        '$ 7 , 2 5 0'                                (single spaces everywhere)
+
+    Strategy: heuristically detect a spaced-character PDF (>60 % of tokens are
+    single characters), then for each line replace runs of 2+ spaces with a
+    placeholder word-boundary, strip remaining single spaces (intra-character
+    gaps), and restore the placeholder as a regular space.
+
+    Leaves normal PDFs unchanged (fast-path: returns *text* as-is when the
+    single-character fraction is below the detection threshold).
+    """
+    tokens = text.split()
+    if not tokens:
+        return text
+    single_frac = sum(1 for t in tokens if len(t) == 1) / len(tokens)
+    if single_frac < 0.60:
+        return text  # Normal PDF — skip normalization
+
+    lines = text.split("\n")
+    result: list[str] = []
+    for line in lines:
+        if not line.strip():
+            result.append("")
+            continue
+        # 1. Mark word boundaries (2+ consecutive spaces) with a placeholder.
+        normalized = re.sub(r"  +", "\x00", line)
+        # 2. Remove remaining intra-character single spaces.
+        normalized = normalized.replace(" ", "")
+        # 3. Restore word boundaries as single spaces.
+        normalized = normalized.replace("\x00", " ").strip()
+        result.append(normalized)
+
+    return "\n".join(result)
+
+
 def _pick_amounts_from_pdf_text(text: str) -> dict[str, Any]:
     """Port of Node's ``pickAmounts`` heuristic for fee PDFs.
 
@@ -717,6 +758,135 @@ def _pick_per_course_amounts(text: str) -> dict[str, dict[str, Any]]:
     return out
 
 
+# ---------------------------------------------------------------------------
+# Spaced-columnar PDF parser — KOI-style PDFs
+# ---------------------------------------------------------------------------
+# KOI publishes a fee schedule where pypdf yields each character as a separate
+# token (space-separated) AND the table is laid out vertically (one field per
+# line).  After _normalize_spaced_pdf_text() collapses the character spacing
+# the page looks like:
+#
+#   Diploma of Accounting
+#   070368K
+#   52
+#   $7,250
+#   $14,500
+#   Bachelor of Business (Accounting)
+#   ...
+#
+# The standard _PDF_DATA_ROW_RE (horizontal row matcher) never fires on this
+# layout; the uni-wide fallback then picks up a random large number as the
+# fee and stamps it on every course.  This vertical parser fixes that.
+
+_SPACED_COL_CRICOS_RE = re.compile(r"^\d{6}[A-Z]$|^\d{7,8}$")
+_SPACED_COL_FEE_RE = re.compile(r"^\$([\d,]+(?:\.\d{1,2})?)$")
+_SPACED_COL_DURATION_RE = re.compile(r"^\d{1,4}$")
+
+
+def _pick_per_course_amounts_spaced_columnar(text: str) -> dict[str, dict[str, Any]]:
+    """Parse KOI-style columnar fee PDFs after spaced-character normalization.
+
+    After :func:`_normalize_spaced_pdf_text` each course block looks like::
+
+        Diploma of Accounting   ← degree-lead line (possibly multi-line)
+        070368K                 ← CRICOS code
+        52                      ← duration in weeks
+        $7,250                  ← per-trimester fee  (skipped)
+        $14,500                 ← total course fee → international_fee
+
+    Returns a CRICOS-keyed dict with the same shape as
+    :func:`_pick_per_course_amounts` so downstream callers need no changes.
+    Returns ``{}`` when fewer than 2 data rows are detected.
+    """
+    lines = [ln.strip() for ln in text.split("\n")]
+    year_default: int | None = None
+    yr = _FEE_YEAR_RE.search(text)
+    if yr:
+        year_default = int(yr.group(1))
+
+    out: dict[str, dict[str, Any]] = {}
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        if not line or not _PDF_DEGREE_LEAD_RE.match(line):
+            i += 1
+            continue
+
+        # Accumulate multi-line course name until CRICOS or next degree-lead
+        primary_parts: list[str] = [line]
+        j = i + 1
+        while j < len(lines):
+            nxt = lines[j]
+            if not nxt:
+                j += 1
+                continue
+            if _SPACED_COL_CRICOS_RE.match(nxt):
+                break
+            if _PDF_DEGREE_LEAD_RE.match(nxt):
+                break
+            # Accept short parenthetical / continuation text
+            if nxt.startswith("(") or (
+                len(nxt) < 80
+                and not _SPACED_COL_FEE_RE.match(nxt)
+                and not _SPACED_COL_DURATION_RE.match(nxt)
+            ):
+                primary_parts.append(nxt)
+            j += 1
+
+        raw_primary = " ".join(primary_parts).strip()
+        primary, _extras = _extract_primary_name(raw_primary)
+        if not primary:
+            i += 1
+            continue
+
+        # CRICOS must be the very next non-empty line after the name block
+        if j >= len(lines) or not _SPACED_COL_CRICOS_RE.match(lines[j]):
+            i = j
+            continue
+        cricos = lines[j]
+        j += 1
+
+        # Optional duration (pure integer, e.g. "52" weeks)
+        if j < len(lines) and _SPACED_COL_DURATION_RE.match(lines[j]):
+            j += 1
+
+        # Per-trimester fee (first $ amount after CRICOS / duration)
+        if j >= len(lines) or not _SPACED_COL_FEE_RE.match(lines[j]):
+            i = j
+            continue
+        j += 1  # skip per-trimester, we want the total
+
+        # Total course fee (second $ amount)
+        if j >= len(lines) or not _SPACED_COL_FEE_RE.match(lines[j]):
+            i = j
+            continue
+
+        fee_m = _SPACED_COL_FEE_RE.match(lines[j])
+        try:
+            total = int(fee_m.group(1).replace(",", ""))  # type: ignore[union-attr]
+        except (ValueError, AttributeError):
+            i = j + 1
+            continue
+
+        if 1000 < total < 500_000:
+            out[cricos] = {
+                "international_fee": total,
+                "currency": "AUD",
+                "fee_term": "Full Course",
+                "fee_year": year_default,
+                "duration_pdf": None,
+                "duration_term_pdf": None,
+                "_pdf_match_text": primary,
+                "_pdf_primary_name": primary,
+                "_cricos": cricos,
+            }
+        i = j + 1
+
+    if len(out) < 2:
+        return {}
+    return out
+
+
 # Columnar PDF parser regexes — used by ``_pick_per_course_amounts_columnar``
 # only, kept module-private so they don't leak into the legacy parser's
 # behaviour. See _pick_per_course_amounts_columnar() for the full design.
@@ -1155,6 +1325,29 @@ async def _parse_fee_pdf(url: str, country: str | None, emit=None) -> dict[str, 
                 url,
                 len(by_course),
             )
+    elif pdf_parser_strategy == "spaced_columnar" and text:
+        # KOI-style PDFs: every character is space-separated AND the table
+        # is laid out vertically (one field per line). Normalize the spacing
+        # first, then run the dedicated vertical parser.
+        normalized_text = _normalize_spaced_pdf_text(text)
+        by_course = _pick_per_course_amounts_spaced_columnar(normalized_text)
+        log.info(
+            "fee PDF %s: spaced_columnar parser produced %d rows",
+            url,
+            len(by_course),
+        )
+        if not by_course:
+            # Safety net: fall back to legacy parser on the normalized text
+            by_course = _pick_per_course_amounts(normalized_text)
+            log.info(
+                "fee PDF %s: spaced_columnar empty, legacy fallback on normalized text produced %d rows",
+                url,
+                len(by_course),
+            )
+        # Also run the uni-wide picker on the normalized text so the fallback
+        # value is correct (rather than the AI-hallucinated 83500).
+        if normalized_text:
+            out = _pick_amounts_from_pdf_text(normalized_text)
     elif text:
         # NEW: per-course table parser runs first. When the PDF is a
         # multi-row schedule (ASA, Torrens, …), this returns one row
