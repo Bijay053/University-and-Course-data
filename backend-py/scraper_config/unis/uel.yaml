@@ -124,6 +124,16 @@ extraction:
   # attempt passes once cf_clearance cookie is established.
   retry_on_cloudflare: true
 
+  # UEL's Cloudflare blocks plain HTTP → fetch_html returns None → browser
+  # fallback fires for the initial HTML fetch.  However, if that first browser
+  # pass returns a partial challenge page, Gemini fills ielts_overall with the
+  # flat default_ielts (6.0), which BLOCKS the normal maybe_browser_refetch
+  # gate (gate skips when any English slot is already populated).  This leaves
+  # duration, intake, and mode blank on ~30% of courses.
+  # force_browser: true overrides the gate so the full browser re-extraction
+  # pass always runs, regardless of whether Gemini already filled a slot.
+  force_browser: true
+
   course_name:
     university_aliases:
       - "University of East London"
