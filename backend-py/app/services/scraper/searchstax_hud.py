@@ -629,6 +629,9 @@ _LEVEL_MAP = {
     "postgraduate research": "Postgraduate",
     "doctorate": "Postgraduate",
     "phd": "Postgraduate",
+    # WLV Solr uses "Research" for PhD/MPhil/MRes research programmes
+    # (level_s: "Research").  These are postgraduate in academic level.
+    "research": "Postgraduate",
 }
 
 _MODE_MAP = {
@@ -1067,9 +1070,14 @@ def _map_doc_field_map(
     # default_ielts is the flat fallback when no tier matches.
     if payload.get("ielts_overall") is None and (ielts_defaults or default_ielts is not None):
         _acad_lvl2 = str(payload.get("academic_level", "")).lower()
+        _deg_lvl2  = str(payload.get("degree_level",  "")).lower()
         if "undergraduate" in _acad_lvl2:
             _ielts_tier = "undergraduate"
-        elif any(k in _acad_lvl2 for k in ("postgraduate", "doctorate", "phd")):
+        elif any(k in _deg_lvl2 for k in ("doctor", "doctorate", "phd")):
+            # PhD / Doctorate has its own IELTS tier (typically higher than taught PG).
+            # Use "doctorate" tier if configured; fall back to "postgraduate" if not.
+            _ielts_tier = "doctorate" if "doctorate" in (ielts_defaults or {}) else "postgraduate"
+        elif any(k in _acad_lvl2 for k in ("postgraduate", "doctorate", "phd", "research")):
             _ielts_tier = "postgraduate"
         else:
             _ielts_tier = None

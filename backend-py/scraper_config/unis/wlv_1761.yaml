@@ -162,12 +162,17 @@ extraction:
     # Source: https://www.wlv.ac.uk/international/english-language-requirements/
     #   UG:  IELTS 6.0 overall, no band below 5.5
     #   PG:  IELTS 6.5 overall, no band below 5.5
-    # Tier-based defaults applied by academic_level from Solr level_s field.
+    #   PhD/Research: IELTS 7.0 overall, no element below 6.0
+    #     (confirmed on course page: "at least to the level of an IELTS score of 7.0")
+    # Tier-based defaults applied by degree_level (doctorate) / academic_level.
+    # Solr level_s: "Research" → academic_level: "Postgraduate", degree_level: "Doctor/Doctorate"
     degree_level_defaults:
       undergraduate:
         ielts: 6.0
       postgraduate:
         ielts: 6.5
+      doctorate:
+        ielts: 7.0
     # Fallback for courses whose academic level cannot be determined.
     default_ielts: 6.0
 
