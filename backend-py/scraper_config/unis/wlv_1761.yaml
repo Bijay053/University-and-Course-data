@@ -54,6 +54,13 @@ discovery:
     # International £5,650–£6,215 per year in static HTML via Scrape.do.
     # Previously true (payload-only) because SCRAPERAPI_KEY was missing.
     field_map_as_payload: false
+    # links_only: true — Solr provides URLs; per-course browser+Gemini pipeline
+    # fetches each page for fees/IELTS/intakes.  Without this flag the code falls
+    # through to the HUD-specific _map_doc which looks for HUD fields (h1,
+    # searchTitle, study_level_s) absent from WLV docs → all 432 skipped as
+    # "unclassifiable".  _fetch_links_only already reads title_t/url_t/award_s
+    # from cfg.field_map, so no other change is needed.
+    links_only: true
     exclude_part_time: true
     # Reject courses whose parsed duration exceeds 4 years when exclude_part_time
     # is set.  WLV PhD/MPhil research programs are part-time-only (6–8 years)
