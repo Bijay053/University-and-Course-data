@@ -1395,11 +1395,22 @@ async def extract_course(
             url = urlunparse(_parsed_url._replace(fragment=""))
 
     if html is None:
-        if _use_scrape_do_render:
-            with scrape_do_render_scope():
+        # ── skip_initial_http_fetch gate ──────────────────────────────────────
+        # For 100%-Cloudflare-protected universities (e.g. UEL), every plain
+        # HTTP attempt returns a 403/challenge before the browser fallback fires.
+        # Setting skip_initial_http_fetch=true in the YAML bypasses the wasted
+        # round-trip and jumps straight to the browser path below.
+        _uc_http = get_uni_config()
+        _skip_http = (
+            _uc_http is not None
+            and getattr(_uc_http.extraction, "skip_initial_http_fetch", False)
+        )
+        if not _skip_http:
+            if _use_scrape_do_render:
+                with scrape_do_render_scope():
+                    html = await fetch_html(url)
+            else:
                 html = await fetch_html(url)
-        else:
-            html = await fetch_html(url)
     if not html:
         # HTTP fetch failed (Cloudflare, bot-protection, JS-gate, etc.).
         # Try a real Playwright browser before giving up — this handles any
@@ -2392,7 +2403,7 @@ async def extract_course(
             _summary_name = (payload.get("course_name") or url.split("/")[-1] or url)[:50]
             await emit(
                 "status",
-                f"[FIELD SUMMARY] {_summary_name}\n" + "\n".join(_summary_lines),
+                f"[FIELD SUMMARY — pre-Gemini/vision baseline] {_summary_name}\n" + "\n".join(_summary_lines),
                 phase="extract",
                 kind="field_extraction_summary",
                 url=url,
@@ -3794,6 +3805,28 @@ async def extract_course(
                 "skipping vision OCR pass on %s",
                 url,
             )
+            vision_filled, vision_evidence = {}, []
+        elif (
+            getattr(get_uni_config(), "extraction", None) is not None
+            and getattr(get_uni_config().extraction.english, "skip_vision_when_core_found", False)
+            and payload.get("ielts_overall")
+            and payload.get("international_fee")
+        ):
+            # skip_vision_when_core_found=true + both core fields populated:
+            # vision OCR cannot improve on pre-filled IELTS default + fee default.
+            # Avoids scanning 6 candidate images + Gemini API call per course.
+            _ielts_v = payload.get("ielts_overall")
+            _fee_v = payload.get("international_fee")
+            log.info(
+                "[VISION SKIP] skip_vision_when_core_found — ielts=%s fee=%s already set on %s",
+                _ielts_v, _fee_v, url,
+            )
+            if emit:
+                await emit(
+                    "status",
+                    f"[VISION SKIP] Core fields already set (IELTS={_ielts_v} fee={_fee_v}) — skipping vision OCR",
+                    phase="extract", kind="vision_skip_core_found", url=url,
+                )
             vision_filled, vision_evidence = {}, []
         else:
             from app.services.scraper.per_course_vision import maybe_vision_refetch

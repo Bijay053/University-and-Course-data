@@ -420,7 +420,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         if "level" not in kw:
             kw["level"] = infer_log_level(message)
         await _emit(db, runtime_job_id, seq, event, message, kw or None)
-    await emit("status", "Worker claimed queued scrape job", phase="queue")
+    await emit("status", f"Worker claimed queued scrape job (job_id={runtime_job_id})", phase="queue")
 
     # Wipe stale pending/rejected scraped_courses rows for this university so
     # a previous failed run cannot block dedup on this attempt. Done before

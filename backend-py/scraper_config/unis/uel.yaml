@@ -134,6 +134,12 @@ extraction:
   # pass always runs, regardless of whether Gemini already filled a slot.
   force_browser: true
 
+  # UEL is 100% Cloudflare-protected: every plain HTTP attempt returns a 403
+  # or bot-challenge page before the browser fallback fires.  Skipping the
+  # initial HTTP try eliminates the wasted round-trip for every course page
+  # (saves ~2–5 s × 273 courses = ~10–23 min per run).
+  skip_initial_http_fetch: true
+
   course_name:
     university_aliases:
       - "University of East London"
@@ -154,6 +160,13 @@ extraction:
     # UEL general entry: IELTS 6.0 overall, no band below 5.5 (UG/PG standard).
     # Source: https://www.uel.ac.uk/international/english-language-requirements
     default_ielts: 6.0
+
+    # When both ielts_overall (from default_ielts above) and international_fee
+    # (from degree_level_defaults above) are already set before the vision pass,
+    # skip the full Gemini image scan (6 candidate images per course).
+    # For UEL these two fields always come from YAML defaults — vision OCR adds
+    # nothing but cost.  Saves ~273 × Gemini-image-scan overhead per run.
+    skip_vision_when_core_found: true
 
   staging:
     # UEL is a flat-fee university: every undergraduate international course

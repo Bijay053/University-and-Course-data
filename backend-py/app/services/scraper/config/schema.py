@@ -1217,6 +1217,21 @@ class EnglishConfig(BaseModel):
             "Disabling falls back to HTML extraction only."
         ),
     )
+    skip_vision_when_core_found: bool = Field(
+        default=False,
+        description=(
+            "When True, skip vision OCR entirely for a course page when both "
+            "ielts_overall and international_fee are already populated in the "
+            "payload before the vision pass runs.  Avoids the Gemini image-scan "
+            "overhead (6 candidate images, tier1_skipped checks, API call) on "
+            "courses where the two most expensive fields are already known.\n"
+            "Safe to enable when IELTS comes from a reliable pre-filled source "
+            "(default_ielts, central page, regex) AND fees from degree_level_defaults "
+            "or a fee-listing page — vision cannot improve on those sources.\n"
+            "Example: UEL — IELTS=6.0 (default_ielts) + fee from degree_level_defaults "
+            "are both set before vision; the full image scan adds nothing."
+        ),
+    )
     trust_tier1_vision_ocr_english: bool = Field(
         default=False,
         description=(
@@ -2005,6 +2020,18 @@ class ExtractionConfig(BaseModel):
             "site-wide IELTS/English statements — the browser's course-specific "
             "result overrides the generic static value. "
             "YAML alternative to _FORCE_BROWSER_HOSTS in per_course_browser.py."
+        ),
+    )
+    skip_initial_http_fetch: bool = Field(
+        default=False,
+        description=(
+            "When True, skip the initial httpx HTTP fetch entirely and go straight "
+            "to the Playwright browser for every course page.  Use for universities "
+            "whose pages are ALWAYS Cloudflare/bot-protected — every HTTP attempt "
+            "returns a 403/challenge that wastes a round-trip before the browser "
+            "fallback fires.  Pair with force_browser=true and max_parallel_fetch "
+            "to eliminate the wasted HTTP overhead and cut per-course latency.\n"
+            "Example: UEL — 100% Cloudflare-protected, HTTP always blocked."
         ),
     )
     needs_international_toggle: bool = Field(
