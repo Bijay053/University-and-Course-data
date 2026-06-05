@@ -26,7 +26,8 @@ import asyncio
 import logging
 import os
 import urllib.parse
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, contextmanager
+from contextvars import ContextVar
 
 import httpx
 
@@ -35,6 +36,50 @@ from app.services.scraper.extractors.curtin_session import cookies_for_url
 
 log = logging.getLogger(__name__)
 _sem = asyncio.Semaphore(settings.max_http_concurrency)
+
+# ---------------------------------------------------------------------------
+# Scrape.do render gate — extraction-only ContextVar
+# ---------------------------------------------------------------------------
+# `_scrape_do_render_active` is False by default so that discovery, sitemap,
+# central-page, and PDF-link fetches NEVER trigger Scrape.do render (which
+# costs ~$0.006/call).  It is set True only inside `scrape_do_render_scope()`,
+# which `single_course.extract_course()` enters for each per-course HTTP
+# fetch when the university's YAML has `extraction.scrape_do_render: true`.
+#
+# Scrape.do *static* (CF-blocked tier 4) is NOT gated here — it still fires
+# for any CF-blocked fetch so that CF-protected discovery pages can be reached.
+# Only the httpx-200 → render upgrade and the CF tier-5 render fallback are
+# gated behind this var.
+_scrape_do_render_active: ContextVar[bool] = ContextVar(
+    "scrape_do_render_active", default=False
+)
+
+# Per-process running counter — logged at INFO level on each scrape job so
+# operators can see how many paid render calls were consumed.
+_scrape_do_render_call_count: int = 0
+
+
+@contextmanager
+def scrape_do_render_scope():
+    """Context manager: activate Scrape.do render for the enclosed fetch.
+
+    Usage (single_course.py)::
+
+        from app.services.scraper.http_fetcher import scrape_do_render_scope
+
+        with scrape_do_render_scope():
+            html = await fetch_html(url)
+
+    Outside this scope every ``fetch_html()`` call behaves as if
+    ``scrape_do_render`` were False — no paid render calls are made during
+    discovery, sitemap crawling, central-page fetching, or any other phase
+    that does not need JS-rendered fee data.
+    """
+    token = _scrape_do_render_active.set(True)
+    try:
+        yield
+    finally:
+        _scrape_do_render_active.reset(token)
 
 # Per-job Wayback timestamp cache: normalised-url → CDX timestamp string.
 # Populated by wayback_discover() during the discovery phase so that
@@ -365,19 +410,11 @@ async def _client():
 
 
 async def fetch_html(url: str, *, retries: int = 2) -> str | None:
-    # Check if the current uni config requests Scrape.do render for SPA shells.
-    # Soft-fail: if no context var is set (PDF fetches, central pages, etc.)
-    # the flag stays False and behaviour is unchanged from the baseline.
-    _scrape_do_render = False
+    # Scrape.do render is only active inside scrape_do_render_scope() —
+    # i.e. during per-course extraction in single_course.extract_course().
+    # It is NEVER True during discovery / sitemap / central-page phases.
+    _scrape_do_render = _scrape_do_render_active.get()
     _has_scrape_do = bool(os.environ.get("SCRAPE_DO_TOKEN"))
-    if _has_scrape_do:
-        try:
-            from app.services.scraper.config.context import get_uni_config  # noqa: PLC0415
-            _scrape_do_render = bool(
-                getattr(get_uni_config().extraction, "scrape_do_render", False)
-            )
-        except Exception:
-            pass
 
     last_exc: Exception | None = None
     got_cloudflare_block = False

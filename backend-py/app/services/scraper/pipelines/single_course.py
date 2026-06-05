@@ -35,7 +35,7 @@ from app.services.scraper.extractors import (
     study_mode,
 )
 from app.services.scraper.extractors.base import ExtractionResult
-from app.services.scraper.http_fetcher import fetch_html
+from app.services.scraper.http_fetcher import fetch_html, scrape_do_render_scope
 from app.services.scraper.provenance import build_course_page_provenance_footer
 
 log = logging.getLogger(__name__)
@@ -1238,6 +1238,12 @@ async def extract_course(
     # _uc is unused in Week 1; Week-2+ extractors will read config from it.
     from app.services.scraper.config.context import require_uni_config as _ruc
     _uc = _ruc()
+    # Scrape.do render is expensive (~$0.006/call).  Only activate it for
+    # per-course extraction fetches when the YAML explicitly opts in.
+    # Discovery / sitemap / central-page fetches never enter this scope.
+    _use_scrape_do_render: bool = bool(
+        getattr(getattr(_uc, "extraction", None), "scrape_do_render", False)
+    )
 
     # ── YAML-driven per-host URL rewrites ──────────────────────────────────
     # Generic version of the hardcoded UNE/UOW/ACU/UniSQ blocks below. Reads
@@ -1389,7 +1395,11 @@ async def extract_course(
             url = urlunparse(_parsed_url._replace(fragment=""))
 
     if html is None:
-        html = await fetch_html(url)
+        if _use_scrape_do_render:
+            with scrape_do_render_scope():
+                html = await fetch_html(url)
+        else:
+            html = await fetch_html(url)
     if not html:
         # HTTP fetch failed (Cloudflare, bot-protection, JS-gate, etc.).
         # Try a real Playwright browser before giving up — this handles any
@@ -1816,7 +1826,11 @@ async def extract_course(
                     _retry_attempted = True
                     _bare_url = urlunparse(_pu._replace(query=""))
                     try:
-                        _retry_html = await fetch_html(_bare_url)
+                        if _use_scrape_do_render:
+                            with scrape_do_render_scope():
+                                _retry_html = await fetch_html(_bare_url)
+                        else:
+                            _retry_html = await fetch_html(_bare_url)
                     except Exception as _exc:  # noqa: BLE001
                         log.warning(
                             "broken-cms retry-without-query failed for %s: %s",
@@ -1896,7 +1910,11 @@ async def extract_course(
                     _bare_path = _vu_path[: -len("/international")]
                     _bare_url = urlunparse(_vu_pu._replace(path=_bare_path))
                     try:
-                        _retry_html = await fetch_html(_bare_url)
+                        if _use_scrape_do_render:
+                            with scrape_do_render_scope():
+                                _retry_html = await fetch_html(_bare_url)
+                        else:
+                            _retry_html = await fetch_html(_bare_url)
                     except Exception as _exc:  # noqa: BLE001
                         log.warning(
                             "VU /international strip retry failed for %s: %s",
