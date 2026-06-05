@@ -322,8 +322,13 @@ _DEGREE_QUALIFIER_RE = re.compile(
     r"bmid\b|"          # Bachelor of Midwifery (UK)
     r"mphil\b|"         # Master of Philosophy (distinct from mph = Public Health)
     r"mpharm\b|"        # Master of Pharmacy (UK; also in trailing list)
+    r"march\b|"         # Master of Architecture (UK, e.g. "MArch / march")
+    r"gdl\b|"           # Graduate Diploma in Law (UK conversion course)
+    r"hnc\b|"           # Higher National Certificate (UK vocational)
+    r"hnd\b|"           # Higher National Diploma (UK vocational)
+    r"prof\s+doc\b|"               # Professional Doctorate (abbreviated, UK)
     r"prof\s+gradcert\b|"          # Professional Graduate Certificate
-    r"professional\s+doctorate|"   # Professional Doctorate
+    r"professional\s+doctorate|"   # Professional Doctorate (full phrase)
     r"advanced\s+university\s+diploma|"   # Advanced University Diploma
     r"university\s+statement\s+of\s+credit|"  # University Statement of Credit
     r"international\s+mba\b|"      # International MBA (subject-first form)
@@ -378,6 +383,49 @@ def _normalise_for_qualifier_match(text: str) -> str:
     return t
 
 
+# ---------------------------------------------------------------------------
+# Anywhere-in-title qualifier check
+# ---------------------------------------------------------------------------
+# The leading ``_DEGREE_QUALIFIER_RE`` (anchored to ``^``) and trailing
+# ``_TRAILING_QUALIFIER_RE`` (anchored to ``$``) already cover most forms.
+# This regex catches qualifiers that appear in the *middle* of a title, e.g.:
+#   "Full-time MBA Programme"          → MBA (middle)
+#   "QTS Primary Education pathway"    → QTS (middle)
+#   "Translation (MA) - Full time"     → MA  (bracketed, mid-title)
+#   "Architecture RIBA 2 March"        → MArch via march token (mid/end)
+#   "Crime, Policy and Security Prof Doc" → Prof Doc (end with words before)
+#
+# Uses \b word boundaries throughout so "Drama" never matches "MA",
+# "management" never matches "MA", etc.
+#
+# NOTE: ``\bmarch\b`` will match the month name "March" with IGNORECASE.
+# This is an accepted trade-off: in practice, course H1 titles from
+# university pages do not contain the month name as a standalone word, and
+# the common false-positive form ("courses starting in March") is blocked
+# upstream by ``is_blocked_page`` before ``_name_has_degree_qualifier`` runs.
+_ANYWHERE_QUALIFIER_RE = re.compile(
+    r"\b(?:"
+    # ── Masters ────────────────────────────────────────────────────────────
+    r"ma|msc|msci|mba|march|meng|mphil|mpharm|mres|mfin|mds|"
+    r"mbs|mpa|mph|med|mit|mcom|mbiol|mchem|mphys|mmath|llm|"
+    # ── Doctorates ─────────────────────────────────────────────────────────
+    r"phd|dba|dclinpsychol|edd|"
+    r"prof\s+doc|"        # Professional Doctorate (abbreviated)
+    # ── Bachelors ──────────────────────────────────────────────────────────
+    r"ba|bsc|beng|llb|bnurs|bmid|bba|bbs|bcom|bbus|bit|bsw|mbbs|bds|"
+    # ── PG awards ──────────────────────────────────────────────────────────
+    r"pgce|pgcert|pgdip|gdl|"
+    # ── Foundation / vocational ────────────────────────────────────────────
+    r"fda|fdsc|fd|certhe|diphe|hnc|hnd|"
+    # ── Teacher status ─────────────────────────────────────────────────────
+    r"qts|iqts"
+    r")"
+    r"(?:\s*\(\s*hons\.?\s*\))?"    # optional (Hons) immediately after
+    r"(?!\w)",                       # must NOT be followed by a word char
+    re.IGNORECASE,
+)
+
+
 # Some universities name courses with the degree abbreviation at the END
 # rather than the start, e.g. UEL's "Primary with Early Years (3-7) Pgce"
 # or "Business Management MBA". These are genuine degree pages whose H1
@@ -412,11 +460,12 @@ _TRAILING_QUALIFIER_RE = re.compile(
     r"\b(?:"
     r"pgce|pgcert|pgdip|"
     r"mba|mbs|mpa|mph|med|mit|msc|msci|meng|mcom|mres|mfin|"
-    r"mphil|mpharm|"                     # MPhil / MPharm (trailing forms)
+    r"mphil|mpharm|march|"               # MPhil / MPharm / MArch (trailing forms)
     r"phd|ph\.d|dba|dclinpsychol|edd|"
     r"bba|bbs|bcom|bbus|bit|bsw|bsc|beng|"
     r"bnurs|bmid|"                        # BNurs / BMid (trailing forms)
     r"ba|llb|ll\.b|llm|mbbs|bds|"
+    r"gdl|hnc|hnd|"                       # GDL / HNC / HND (trailing forms)
     r"fda|fdsc|fd|certhe|diphe|"          # UK Foundation Degree / CertHE / DipHE
     r"iqts|qts"                           # Qualified Teacher Status variants
     r")\s*(?:\(\s*hons\.?\s*\))?\s*(?:top[\s\-]up)?"
@@ -442,16 +491,27 @@ def _name_has_degree_qualifier(name: str) -> bool:
     raw = (name or "").strip()
     normed = _normalise_for_qualifier_match(raw)
 
+    # 1. Leading check — qualifier at the START of the title (fastest path,
+    #    catches the majority of courses, e.g. "MSc Computer Science").
     if _DEGREE_QUALIFIER_RE.match(normed):
         return True
-    # Try stripping a leading qualification code and re-matching.
+    # 2. Leading check after stripping a national qualification code prefix
+    #    (e.g. "ICT50220 Diploma of Information Technology").
     stripped = _QUAL_CODE_PREFIX_RE.sub("", normed)
     if stripped != normed and _DEGREE_QUALIFIER_RE.match(stripped):
         return True
-    # Check for trailing degree abbreviations (e.g. "Business Management MBA",
-    # "Primary with Early Years (3-7) Pgce"). Only recognised abbreviations
-    # match; plain English words like "online" or "courses" do not.
+    # 3. Trailing check — qualifier at the END of the title, with optional
+    #    "(Hons)" / "Top-up" suffix (e.g. "Business Management MBA (Hons)").
     if _TRAILING_QUALIFIER_RE.search(normed):
+        return True
+    # 4. Anywhere check — qualifier appears in the MIDDLE of the title using
+    #    word-boundary matching.  Catches:
+    #      "Full-time MBA programme"
+    #      "QTS Primary Education pathway"
+    #      "Translation (MA) - Full time"
+    #      "Architecture RIBA 2 March"
+    #      "Crime, Policy and Security Prof Doc"
+    if _ANYWHERE_QUALIFIER_RE.search(normed):
         return True
     return False
 
