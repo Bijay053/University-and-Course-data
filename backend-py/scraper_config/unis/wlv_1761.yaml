@@ -53,6 +53,12 @@ discovery:
     # below (WLV Solr does not carry fee/IELTS data in the index).
     field_map_as_payload: true
     exclude_part_time: true
+    # Reject courses whose parsed duration exceeds 4 years when exclude_part_time
+    # is set.  WLV PhD/MPhil research programs are part-time-only (6–8 years)
+    # but their Solr duration_t field contains bare "8 years" with no "part-time"
+    # qualifier, so the text filter cannot detect them.  UG max is 4 yrs (with
+    # sandwich), PG max is 2 yrs — threshold 4 safely covers both.
+    max_fulltime_duration_years: 4
 
     # WLV Solr url_t field contains bare SITS course codes (e.g. "WR006J01UMU"),
     # not real HTTP URLs.  url_base is prepended so the link URL becomes

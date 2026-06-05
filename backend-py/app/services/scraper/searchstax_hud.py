@@ -909,6 +909,15 @@ def _map_doc_field_map(
         # decimal ConversionSyntax error. Parse into (value, term, mode).
         _dur_val, _dur_term, _dur_mode = _parse_duration(raw_dur)
         if _dur_val is not None:
+            # max_fulltime_duration_years: reject courses whose duration exceeds
+            # the threshold when exclude_part_time is set.  Catches part-time-only
+            # PhD/MPhil programs whose Solr duration_t = "8 years" has no
+            # "part-time" qualifier so the text filter above cannot detect them.
+            _max_ft = cfg.max_fulltime_duration_years
+            if (cfg.exclude_part_time and _max_ft is not None
+                    and str(_dur_term or "").lower() in ("year", "years", "")
+                    and _dur_val > _max_ft):
+                return None
             payload["duration"] = _dur_val
             _ev("duration", _dur_val, "field_map")
             if _dur_term:
@@ -962,6 +971,16 @@ def _map_doc_field_map(
     if cfg.location_override:
         payload["course_location"] = cfg.location_override
         _ev("course_location", cfg.location_override, "location_override")
+
+    # ── Study mode default when exclude_part_time is active ──────────────────
+    # When exclude_part_time is True every course that reaches this point has
+    # either passed the "no part-time modes" filter or had its full-time
+    # duration confirmed.  If the Solr doc carries no mode field AND the
+    # duration string didn't contain a mode qualifier (e.g. bare "2 years"),
+    # default to "Full-time" so the mode column is populated.
+    if cfg.exclude_part_time and not payload.get("study_mode"):
+        payload["study_mode"] = "Full-time"
+        _ev("study_mode", "Full-time", "exclude_part_time_default")
 
     # ── Fee degree_level_defaults fallback ──────────────────────────────────
     # fee_defaults and force_fee_stage are resolved by fetch_searchstax_links

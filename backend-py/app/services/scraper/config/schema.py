@@ -232,6 +232,16 @@ class SearchStaxConfig(BaseModel):
             "Full-time is staged."
         ),
     )
+    max_fulltime_duration_years: Optional[int] = Field(
+        default=None,
+        description=(
+            "When set with exclude_part_time, rejects any course whose parsed "
+            "duration (in years) exceeds this threshold. Used to filter out "
+            "part-time-only programs (e.g. PhD research = 6/8 years) whose "
+            "Solr duration_t field lacks a 'part-time' qualifier so the text "
+            "filter cannot detect them. Typical value: 4 (WLV)."
+        ),
+    )
     location_strip_prefixes: list[str] = Field(
         default_factory=list,
         description=(
