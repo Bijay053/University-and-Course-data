@@ -814,6 +814,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # browser rendering, AND per-course extraction (the prebuilt result is
         # returned verbatim by _extract_only). See searchstax_hud.py.
         _searchstax_cfg = getattr(_uni_cfg.discovery, "searchstax", None)
+        _ss_filter_stats: dict = {}  # populated only when links_only SearchStax runs
         if _searchstax_cfg is not None:
             from app.services.scraper.searchstax_hud import fetch_searchstax_links
             # Extract fee/IELTS defaults from UniConfig and pass directly so
@@ -834,7 +835,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             )
             _ss_error: str | None = None
             try:
-                links = await fetch_searchstax_links(
+                _ss_result = await fetch_searchstax_links(
                     _searchstax_cfg,
                     emit=emit,
                     fee_defaults=_ss_fee_defs,
@@ -842,6 +843,11 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     ielts_defaults=_ss_ielts_defs,
                     default_ielts=_ss_default_ielts,
                 )
+                # links_only mode returns (links, filter_stats); full mode returns list
+                if isinstance(_ss_result, tuple):
+                    links, _ss_filter_stats = _ss_result
+                else:
+                    links = _ss_result
             except Exception as _ss_exc:  # noqa: BLE001
                 log.error("SearchStax provider failed: %s", _ss_exc, exc_info=True)
                 links = []
@@ -3536,12 +3542,20 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # Build human-readable skip breakdown for the log line.
         _skip_parts = [f"{k}={v}" for k, v in sorted(skip_reasons.items(), key=lambda x: -x[1])]
         _skip_detail = f" ({', '.join(_skip_parts)})" if _skip_parts else ""
-        await emit(
-            "done",
+        _done_msg = (
             f"══ DONE ══ Found:{summary.get('discovered', 0)} | "
             f"Staged:{summary.get('staged', 0)} | "
             f"Skipped:{summary.get('skipped', 0)}{_skip_detail} | "
-            f"Errors:{summary.get('errors', 0)}",
+            f"Errors:{summary.get('errors', 0)}"
+        )
+        if _ss_filter_stats.get("searchstax_title_excluded", 0):
+            _done_msg += (
+                f" | SearchStax title-filter excluded:{_ss_filter_stats['searchstax_title_excluded']}"
+                f" queued:{_ss_filter_stats.get('searchstax_queued', '?')}"
+            )
+        await emit(
+            "done",
+            _done_msg,
             phase="complete",
             totalFound=summary.get("discovered", 0),
             imported=summary.get("staged", 0),
@@ -3549,6 +3563,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             errors=summary.get("errors", 0),
             skip_reasons=skip_reasons,
             skip_reason_samples=skip_reason_samples,
+            searchstax_filter=_ss_filter_stats or None,
             level="success",
         )
         # PR-1.5: post-run sanity check on the imported counter.

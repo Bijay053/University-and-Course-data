@@ -1118,7 +1118,7 @@ def _map_doc_field_map(
     }
 
 
-async def _fetch_links_only(cfg: SearchStaxConfig, emit=None) -> list[dict]:
+async def _fetch_links_only(cfg: SearchStaxConfig, emit=None) -> tuple[list[dict], dict]:
     """SearchStax discovery-only mode (``cfg.links_only = True``).
 
     Queries the Solr core and returns plain ``{name, url}`` link dicts —
@@ -1155,10 +1155,16 @@ async def _fetch_links_only(cfg: SearchStaxConfig, emit=None) -> list[dict]:
 
     links: list[dict] = []
     skipped = 0
+    title_excl_prefix = 0  # rejected by exclude_title_prefixes
+    title_excl_sub = 0     # rejected by exclude_title_substrings
     start = 0
     page_size = max(1, int(cfg.page_size or 100))
     total: Optional[int] = None
     _retried_unfiltered = False
+
+    # Pre-compute lowercased filter lists once (avoid rebuilding every doc).
+    _excl_prefixes = [p.lower() for p in (cfg.exclude_title_prefixes or [])]
+    _excl_subs     = [s.lower() for s in (cfg.exclude_title_substrings or [])]
 
     await _emit(
         f"[SEARCHSTAX links_only] Querying Solr "
@@ -1222,11 +1228,6 @@ async def _fetch_links_only(cfg: SearchStaxConfig, emit=None) -> list[dict]:
             if not docs:
                 break
 
-            # Build exclude_title_prefixes and exclude_title_substrings lookups
-            # once per page (lowercased for O(1) startswith checks).
-            _excl_prefixes = [p.lower() for p in (cfg.exclude_title_prefixes or [])]
-            _excl_subs     = [s.lower() for s in (cfg.exclude_title_substrings or [])]
-
             for doc in docs:
                 # URL: try mapped field first, then 'id' as universal fallback
                 url = _first_str(doc, _url_field, "id")
@@ -1252,21 +1253,27 @@ async def _fetch_links_only(cfg: SearchStaxConfig, emit=None) -> list[dict]:
                 # AI budget on domestic-only practitioner courses.
                 if _excl_prefixes or _excl_subs:
                     _name_lc = name.lower()
-                    _rejected = False
+                    _matched_reason: str | None = None
+                    _matched_pattern: str | None = None
                     for _pfx in _excl_prefixes:
                         if _name_lc.startswith(_pfx):
-                            _rejected = True
+                            _matched_reason = "exclude_title_prefixes"
+                            _matched_pattern = _pfx
                             break
-                    if not _rejected:
+                    if _matched_reason is None:
                         for _sub in _excl_subs:
                             if _sub in _name_lc:
-                                _rejected = True
+                                _matched_reason = "exclude_title_substrings"
+                                _matched_pattern = _sub
                                 break
-                    if _rejected:
-                        skipped += 1
-                        log.debug(
-                            "[SEARCHSTAX links_only] title-filter skip: %r (url=%s)",
-                            name, url,
+                    if _matched_reason is not None:
+                        if _matched_reason == "exclude_title_prefixes":
+                            title_excl_prefix += 1
+                        else:
+                            title_excl_sub += 1
+                        log.info(
+                            '[SEARCHSTAX FILTER] excluded title=%r reason=%s pattern=%r url=%s',
+                            name, _matched_reason, _matched_pattern, url,
                         )
                         continue
 
@@ -1301,15 +1308,29 @@ async def _fetch_links_only(cfg: SearchStaxConfig, emit=None) -> list[dict]:
                 break
             await asyncio.sleep(0)
 
+    _title_excluded = title_excl_prefix + title_excl_sub
     await _emit(
-        f"[SEARCHSTAX links_only] Discovered {len(links)} course URL(s) "
-        f"({skipped} skipped — no URL field)."
+        f"[SEARCHSTAX links_only] "
+        f"SearchStax URLs found: {total or 0} | "
+        f"Excluded by title prefix: {title_excl_prefix} | "
+        f"Excluded by title substring: {title_excl_sub} | "
+        f"Queued for extraction: {len(links)}"
+        + (f" | Skipped (no URL): {skipped}" if skipped else "")
     )
     log.info(
-        "[SEARCHSTAX links_only] total=%s links=%s skipped=%s token=%s url_field=%s",
-        total, len(links), skipped, "yes" if token else "NO", _url_field,
+        "[SEARCHSTAX links_only] total=%s queued=%s title_excl=%s (prefix=%s sub=%s) "
+        "skipped_no_url=%s token=%s url_field=%s",
+        total, len(links), _title_excluded, title_excl_prefix, title_excl_sub,
+        skipped, "yes" if token else "NO", _url_field,
     )
-    return links
+    _filter_stats: dict = {
+        "searchstax_total": total or 0,
+        "searchstax_title_excluded": _title_excluded,
+        "searchstax_title_excl_prefix": title_excl_prefix,
+        "searchstax_title_excl_sub": title_excl_sub,
+        "searchstax_queued": len(links),
+    }
+    return links, _filter_stats
 
 
 async def fetch_searchstax_links(
@@ -1347,7 +1368,7 @@ async def fetch_searchstax_links(
     # Discovery-only mode: return bare links without searchstax_result so
     # normal per-course extraction runs (fees / IELTS fetched from live pages).
     if cfg.links_only:
-        return await _fetch_links_only(cfg, emit=emit)
+        return await _fetch_links_only(cfg, emit=emit)  # returns (links, filter_stats)
     token = _resolve_token(cfg)
     headers = {"Accept": "application/json"}
     if token:
