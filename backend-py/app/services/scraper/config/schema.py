@@ -21,7 +21,7 @@ hallucinations from polluting a brand-new university's scrape).
 """
 from __future__ import annotations
 
-from typing import Optional
+from typing import Optional, Union
 
 from pydantic import BaseModel, Field
 
@@ -158,13 +158,19 @@ class SearchStaxConfig(BaseModel):
             "on the course page)."
         ),
     )
-    field_map: dict[str, str] = Field(
+    field_map: dict[str, Union[str, list[str]]] = Field(
         default_factory=dict,
         description=(
             "Maps logical field names to the university-specific Solr field "
             "names used by this SearchStax core.  Required when the Solr core "
             "uses non-standard field names (e.g. Durham uses 'courseUrl_t' "
             "instead of the WLV default 'url_t'). "
+            "Fallback keys (duration_fallback, intake_fallback, mode_fallback, "
+            "location_fallback) accept a string OR a list of strings tried in "
+            "order — the first non-empty Solr field wins.  This lets a single "
+            "YAML config handle universities whose Solr index uses different "
+            "field schemas for different course sub-types (e.g. WLV clearing vs "
+            "non-clearing courses). "
             "Recognised logical keys and their built-in defaults: "
             "  url          → 'url_t'           (canonical course page URL) "
             "  name         → 'title_t'         (course display name) "

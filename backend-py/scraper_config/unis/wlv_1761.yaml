@@ -82,19 +82,32 @@ discovery:
       degree_type: award_s
       # WLV Solr uses level_s for UG/PG (NOT study_level_s which is absent).
       degree_level: level_s
-      # multi_mode_ss = ["Part-time", "Full-time"] — positionally aligned with
-      # multi_duration_ss so the FT duration is picked by mode index below.
+      # WLV Solr has TWO schemas coexisting in the same index:
+      #  • non-clearing courses → multi_mode_ss / multi_duration_ss / multi_location_ss / multi_course_start_date_ss
+      #  • clearing courses     → mode_s       / duration_s         / location_s         / course_start_date_s
+      # Primary fields target the non-clearing (richer) schema.
+      # Fallback fields (string or list, tried in order) catch the clearing schema.
       study_mode: multi_mode_ss
+      mode_fallback: mode_s          # clearing fallback: "Full-time" / "Part-time"
       duration: multi_duration_ss
-      duration_fallback: duration_t
+      # duration_fallback tries duration_s first (clearing, e.g. "3 years"),
+      # then duration_t (older single-valued non-clearing fallback).
+      duration_fallback:
+        - duration_s
+        - duration_t
       intake_dates: multi_course_start_date_ss
-      intake_fallback: start_dates_s
+      # intake_fallback tries course_start_date_s first (clearing, e.g. "September 2026"),
+      # then start_dates_s (legacy single-valued field used by HUD etc.).
+      intake_fallback:
+        - course_start_date_s
+        - start_dates_s
       # subject_area_ss is more descriptive than subject_s (e.g. "Engineering
       # and technology" vs bare keyword).
       category: subject_area_ss
       # multi_location_ss = ["University: Springfield Campus"] — "University: "
       # prefix is stripped by location_strip_prefixes above.
       location: multi_location_ss
+      location_fallback: location_s  # clearing fallback: "University: City Campus"
       # description_t contains the full course overview text from the Solr index.
       description: description_t
 

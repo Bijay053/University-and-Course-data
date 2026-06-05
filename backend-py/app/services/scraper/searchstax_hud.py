@@ -853,6 +853,15 @@ def _map_doc_field_map(
         raw_mode_vals = [v for v in raw_mode_vals if v]
     elif raw_mode_vals:
         raw_mode_vals = [raw_mode_vals]
+    # mode_fallback: try a single-valued field (e.g. mode_s) when the primary
+    # multi-valued field (multi_mode_ss) is absent.  Critical for part-time
+    # detection on WLV "clearing" courses which use a different Solr schema.
+    if not raw_mode_vals:
+        _mode_fallback_field = _fm.get("mode_fallback")
+        if _mode_fallback_field:
+            _fb_mode = doc.get(_mode_fallback_field)
+            if _fb_mode:
+                raw_mode_vals = [str(_fb_mode)] if isinstance(_fb_mode, str) else [str(v) for v in _fb_mode if v]
     if raw_mode_vals:
         if cfg.exclude_part_time:
             # Normalise first so we compare canonical strings.
@@ -879,11 +888,21 @@ def _map_doc_field_map(
     # WLV dual-field pattern: multi_duration_ss (multi-valued, FT+PT courses)
     # and duration_t (single-valued, most other courses) coexist in the same
     # Solr core.  When the configured field is empty fall back to duration_t.
-    _dur_fallback = _fm.get("duration_fallback", "duration_t" if _dur_field != "duration_t" else None)
+    # duration_fallback accepts a string OR a list of strings tried in order.
+    # WLV uses two distinct Solr schemas:
+    #   non-clearing → multi_duration_ss (primary)
+    #   clearing     → duration_s (first fallback, single-valued, e.g. "3 years")
+    # duration_t is kept as a secondary fallback for other universities.
+    _dur_fallbacks_raw = _fm.get("duration_fallback", "duration_t" if _dur_field != "duration_t" else None)
+    _dur_fallbacks: list[str] = (
+        [_dur_fallbacks_raw] if isinstance(_dur_fallbacks_raw, str)
+        else list(_dur_fallbacks_raw or [])
+    )
     _all_durs: list[str] = []
     _raw_dur_vals = doc.get(_dur_field)
-    if not _raw_dur_vals and _dur_fallback:
-        _raw_dur_vals = doc.get(_dur_fallback)
+    for _fb in _dur_fallbacks:
+        if not _raw_dur_vals:
+            _raw_dur_vals = doc.get(_fb)
     if isinstance(_raw_dur_vals, list):
         _all_durs = [str(v).strip() for v in _raw_dur_vals if v]
     elif _raw_dur_vals:
@@ -947,10 +966,17 @@ def _map_doc_field_map(
 
     # Intake dates: same dual-field pattern as duration.
     # multi_course_start_date_ss (WLV multi-valued) → fall back to start_dates_s.
-    _date_fallback = _fm.get("intake_fallback", "start_dates_s" if _date_field != "start_dates_s" else None)
+    # intake_fallback accepts a string OR a list tried in order (same pattern
+    # as duration_fallback).  WLV clearing courses use course_start_date_s.
+    _date_fallbacks_raw = _fm.get("intake_fallback", "start_dates_s" if _date_field != "start_dates_s" else None)
+    _date_fallbacks: list[str] = (
+        [_date_fallbacks_raw] if isinstance(_date_fallbacks_raw, str)
+        else list(_date_fallbacks_raw or [])
+    )
     raw_dates_vals = doc.get(_date_field, [])
-    if not raw_dates_vals and _date_fallback:
-        raw_dates_vals = doc.get(_date_fallback, [])
+    for _fb in _date_fallbacks:
+        if not raw_dates_vals:
+            raw_dates_vals = doc.get(_fb, [])
     if isinstance(raw_dates_vals, list):
         dates_blob = ", ".join(str(v) for v in raw_dates_vals if v)
     else:
@@ -972,6 +998,15 @@ def _map_doc_field_map(
             raw_loc_vals = [v for v in raw_loc_vals if v]
         elif raw_loc_vals:
             raw_loc_vals = [raw_loc_vals]
+        # location_fallback: try single-valued field (e.g. location_s) when the
+        # primary multi-valued field (multi_location_ss) is absent — same
+        # multi-fallback pattern used for duration and intake dates.
+        if not raw_loc_vals:
+            _loc_fallback_field = _fm.get("location_fallback")
+            if _loc_fallback_field:
+                _fb_loc = doc.get(_loc_fallback_field)
+                if _fb_loc:
+                    raw_loc_vals = [str(_fb_loc)]
         if raw_loc_vals:
             _strip_pfx = cfg.location_strip_prefixes or []
             cleaned: list[str] = []
