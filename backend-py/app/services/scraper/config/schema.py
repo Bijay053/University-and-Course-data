@@ -1547,6 +1547,17 @@ class DurationCleaningConfig(BaseModel):
             "compound patterns like 'X years / Y subjects / Z trimesters'."
         ),
     )
+    prefer_fulltime: bool = Field(
+        default=False,
+        description=(
+            "When True, demote any label-matched (Pattern-0) duration sentence where "
+            "'part-time' appears BEFORE the matched number so that the Pattern-1 "
+            "('full-time N units') match wins instead.  Use for universities whose "
+            "course-length cell lists Part-time first, then Full-time — e.g. "
+            "'Part-time (8 years), Full-time (4 years)' — so the per-page extractor "
+            "picks the correct full-time value instead of the first (part-time) number."
+        ),
+    )
     reject_sentence_patterns: list[str] = Field(
         default_factory=list,
         description=(

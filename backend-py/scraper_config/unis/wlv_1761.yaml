@@ -74,6 +74,16 @@ extraction:
   retry_on_cloudflare: true
   force_browser: true
 
+  text_cleaning:
+    duration:
+      # WLV course-length cells list Part-time before Full-time:
+      #   "Course length: Part-time (8 years), Full-time (4 years)"
+      # The label-matched Pattern-0 picks "8 years" (first number) at ×100
+      # priority, beating Pattern-1's "4 years" at ×10.
+      # prefer_fulltime: true demotes Pattern-0 when "part-time" precedes
+      # the matched number so Pattern-1 (full-time anchor) wins instead.
+      prefer_fulltime: true
+
   study_mode:
     # WLV: site-wide nav contains "online" text (study-online / online-learning
     # links) that the bare \bonline\b rule matches at conf=0.70, overriding the

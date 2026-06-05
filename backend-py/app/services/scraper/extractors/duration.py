@@ -363,7 +363,16 @@ def _convert_weeks(amount: float, unit: str) -> tuple[float, str]:
     return amount, unit
 
 
-def _classify_duration_value(value: str) -> tuple[float, str] | None:
+_PART_THEN_FULL_RE = re.compile(
+    r"part[- ]?time\b.+\bfull[- ]?time\b", re.IGNORECASE | re.DOTALL
+)
+_FULLTIME_SPLIT_RE = re.compile(r"\bfull[- ]?time\b", re.IGNORECASE)
+
+
+def _classify_duration_value(
+    value: str,
+    prefer_fulltime: bool = False,
+) -> tuple[float, str] | None:
     """Parse a duration expression from a label-value cell. Returns
     ``(amount, canonical_unit)`` or ``None`` when no plausible
     duration is recoverable. Applies the same per-unit caps as the
@@ -377,7 +386,20 @@ def _classify_duration_value(value: str) -> tuple[float, str] | None:
       3. Digit scan — skips matches inside extension clauses
          ("possibility of a 12 month extension") so the nominal
          duration is not displaced by the extension qualifier.
+
+    When ``prefer_fulltime=True`` and the value lists Part-time before
+    Full-time (e.g. "Part-time (8 years), Full-time (4 years)"), only
+    the Full-time portion is parsed.  Needed for WLV-style cells where
+    the DOM value contains both modes in a single string.
     """
+    if prefer_fulltime and _PART_THEN_FULL_RE.search(value):
+        # Keep only the text starting from "Full-time" so the digit scan
+        # sees "Full-time (4 years)" instead of "Part-time (8 years),
+        # Full-time (4 years)" and returns the correct 4-year value.
+        m_ft = _FULLTIME_SPLIT_RE.search(value)
+        if m_ft:
+            value = value[m_ft.start():]
+
     if _ACCELERATED.search(value):
         return None
 
@@ -440,6 +462,7 @@ def _classify_duration_value(value: str) -> tuple[float, str] | None:
 
 def _extract_strong_label_value(
     html: str,
+    prefer_fulltime: bool = False,
 ) -> tuple[tuple[float, str] | None, str | None]:
     """Structural pre-pass for label/value duration idioms in the DOM.
     See :func:`study_mode._extract_strong_label_value` for the full
@@ -507,7 +530,7 @@ def _extract_strong_label_value(
         value_text = value_text.lstrip(":-– ").strip()
         if not value_text:
             continue
-        parsed = _classify_duration_value(value_text)
+        parsed = _classify_duration_value(value_text, prefer_fulltime=prefer_fulltime)
         if parsed is not None:
             snippet = (
                 f"<{label_tag.name}>{label_raw}</{label_tag.name}> -> "
@@ -593,6 +616,7 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
     #   2. Sentence tournament — any sentence matching a pattern is skipped
     #      entirely (same effect as the global _ACCELERATED filter).
     _uni_reject_pats: list[re.Pattern[str]] = []
+    _prefer_fulltime: bool = False
     try:
         from app.services.scraper.config.context import get_uni_config
         _dcfg = get_uni_config().extraction.text_cleaning.duration
@@ -601,6 +625,7 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
                 _uni_reject_pats.append(re.compile(_p, re.IGNORECASE))
             except re.error:
                 pass  # invalid pattern in YAML — skip silently
+        _prefer_fulltime = _dcfg.prefer_fulltime
     except Exception:
         pass  # contextvar not set or config missing — treat as empty list
 
@@ -631,7 +656,7 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
     # read the value cell out of the DOM directly so a flattened-text
     # boundary collision with the previous field's value can't bleed
     # an unrelated `<num> <unit>` token run into the duration capture.
-    structural, snippet = _extract_strong_label_value(html)
+    structural, snippet = _extract_strong_label_value(html, prefer_fulltime=_prefer_fulltime)
     # Per-uni: if the structural DOM-cell text matches a configured reject
     # pattern (e.g. "up to 10 years" = max-completion-time, not standard
     # duration), discard the structural result and fall through to the
@@ -928,6 +953,21 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
             # (not a combined-degree sentence) will win by ×1000.
             if is_combined_degree_sentence:
                 weight_mod *= 0.001
+            # prefer_fulltime (YAML flag): demote Pattern-0/3 label matches
+            # where "part-time" appears BEFORE the matched number in the same
+            # sentence.  Needed for universities (e.g. WLV) whose course-length
+            # cell lists Part-time first:
+            #   "Course length: Part-time (8 years), Full-time (4 years)"
+            # Pattern-0 fires on "8 years" (first number) at ×100 priority.
+            # Pattern-1 fires on "4 years" (after "full-time") at ×10.
+            # Without this demote, Pattern-0 always wins → 8 years staged.
+            # Demoting ×0.001 drops the Part-time Pattern-0 score below
+            # the Pattern-1 full-time score, so "4 years" wins correctly.
+            if _prefer_fulltime and pat_idx in (0, 3) and not is_combined_degree_sentence:
+                _m_start = m.start()
+                _pre_match = s[:_m_start]
+                if re.search(r"\bpart[- ]?time\b", _pre_match, re.IGNORECASE):
+                    weight_mod *= 0.001
             # Demote part-time-only loose-fallback matches (Pattern-2, ×0.1).
             # When a course page lists two separate lines:
             #   "3 years full-time"  and  "6 years part-time"
