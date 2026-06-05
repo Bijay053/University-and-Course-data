@@ -1401,7 +1401,14 @@ async def extract_course(
         "http_skipped": False,
         "vision_skipped": False,
         "empty_text_static": False,
+        "ai_skipped_empty_text": False,      # Gemini+AI skipped: static text was 0
+        "browser_retry_empty_text": False,   # browser retried but ALSO returned 0 text
+        "skipped_empty_text": False,         # course bailed: no text from any source
+        "fallback_skipped_empty_text": False, # fee/IELTS defaults suppressed (no text)
     }
+    # Set to True when text_len=0 after both static and browser attempts, causing
+    # the course to be skipped without applying fee/IELTS defaults.
+    _bail_empty_text: bool = False
 
     if html is None:
         # ── skip_initial_http_fetch gate ──────────────────────────────────────
@@ -2696,11 +2703,19 @@ async def extract_course(
             from app.services.ai import gemini_client as _gc
             import json as _gp_json
 
-            # ── Empty-text guard ─────────────────────────────────────────────────
+            # ── Empty-text guard with browser retry ──────────────────────────────
             # If the fetched HTML (static or scrape.do render) yields zero visible
-            # text, calling Gemini/AI wastes tokens and returns nothing useful.
-            # skip_ai_when_text_empty=true in YAML enables this guard so the pipeline
-            # falls through to the browser refetch instead (if not also skipped).
+            # text, calling Gemini/AI is wasteful and produces nothing useful.
+            # skip_ai_when_text_empty=true in YAML enables this guard.
+            #
+            # New behaviour (2026-06-05):
+            #   1. text_len=0 after static fetch → skip AI, log, attempt browser retry
+            #      (if skip_per_course_browser is not set in YAML).
+            #   2. Browser recovers text → clear flags, proceed normally.
+            #   3. Browser also empty (or not allowed) → _bail_empty_text=True.
+            #      The bail flag propagates to the fee/IELTS defaults blocks (which
+            #      are skipped) and triggers an early return with
+            #      error="fetch_failed_empty_text" before the final staging step.
             _uc_eat = get_uni_config()
             _skip_ai_on_empty = (
                 _uc_eat is not None
@@ -2710,23 +2725,106 @@ async def extract_course(
                 _eat_text = (_h2t_gate(html or "") or "").strip()
                 if not _eat_text:
                     _perf_flags["empty_text_static"] = True
+                    _perf_flags["ai_skipped_empty_text"] = True
                     use_ai_fallback = False
                     _gemini_primary_cost = 0.0
                     log.info(
-                        "[AI-SKIP] text_len=0 after fetch — skipping Gemini+AI "
-                        "(skip_ai_when_text_empty=true) on %s",
+                        "[AI-SKIP] text_len=0 static — skip_ai_when_text_empty=true "
+                        "on %s — attempting browser retry",
                         url,
                     )
                     if emit:
                         await emit(
                             "status",
-                            f"[AI-SKIP] text_len=0 — skipping Gemini+AI fallback "
-                            f"(skip_ai_when_text_empty=true) for {url[:60]}",
+                            f"[AI-SKIP] text_len=0 static — skipping Gemini+AI, "
+                            f"retrying with browser for {url[:60]}",
                             phase="extract",
                             kind="ai_skip_empty_text",
                             url=url,
                         )
-                    _gate_skip, _gate_reason = True, "empty_text"
+                    # ── One browser retry ─────────────────────────────────────
+                    _allow_empty_browser = not getattr(
+                        getattr(_uc_eat, "extraction", None),
+                        "skip_per_course_browser",
+                        False,
+                    )
+                    if _allow_empty_browser:
+                        try:
+                            from app.services.scraper.browser_pool import (
+                                pool as _bpet,
+                            )
+                            from app.services.scraper.per_course_browser import (
+                                _browser_config_for as _bcfg_et,
+                            )
+                            _wait_et, _settle_et, _, _goto_et = _bcfg_et(url)
+                            if emit:
+                                await emit(
+                                    "status",
+                                    f"[BROWSER-RETRY] text_len=0 — fetching via browser for {url[:60]}",
+                                    phase="extract",
+                                    kind="browser_retry_empty_text",
+                                    url=url,
+                                )
+                            _br_html = await _bpet.fetch_html(
+                                url,
+                                wait_until=_wait_et,
+                                timeout=_goto_et,
+                                settle_ms=_settle_et,
+                            )
+                            _br_text = (
+                                (_h2t_gate(_br_html or "") or "").strip()
+                                if _br_html else ""
+                            )
+                            if _br_text:
+                                # Browser got visible text — use it and proceed.
+                                html = _br_html
+                                _perf_flags["empty_text_static"] = False
+                                _perf_flags["ai_skipped_empty_text"] = False
+                                use_ai_fallback = True
+                                log.info(
+                                    "[BROWSER-RETRY ✓] recovered %d chars from browser for %s",
+                                    len(_br_text), url,
+                                )
+                                if emit:
+                                    await emit(
+                                        "status",
+                                        f"[BROWSER-RETRY ✓] recovered {len(_br_text)} chars — "
+                                        f"proceeding for {url[:60]}",
+                                        phase="extract",
+                                        kind="browser_retry_text_recovered",
+                                        url=url,
+                                    )
+                                _gate_skip, _gate_reason = _gate_check(payload, evidence)
+                            else:
+                                # Browser also empty — bail.
+                                _perf_flags["browser_retry_empty_text"] = True
+                                _perf_flags["skipped_empty_text"] = True
+                                _bail_empty_text = True
+                                log.info(
+                                    "[BROWSER-RETRY ✗] browser also empty — bailing for %s", url,
+                                )
+                                if emit:
+                                    await emit(
+                                        "status",
+                                        f"[BROWSER-RETRY ✗] browser also empty — "
+                                        f"skipping {url[:60]} (fetch_failed_empty_text)",
+                                        phase="extract",
+                                        kind="browser_retry_still_empty",
+                                        url=url,
+                                    )
+                                _gate_skip, _gate_reason = True, "empty_text"
+                        except Exception as _exc_et:
+                            log.warning(
+                                "browser retry on empty text raised for %s: %s", url, _exc_et,
+                            )
+                            _bail_empty_text = True
+                            _perf_flags["skipped_empty_text"] = True
+                            _gate_skip, _gate_reason = True, "empty_text"
+                    else:
+                        # Browser disabled for this uni — bail immediately.
+                        _bail_empty_text = True
+                        _perf_flags["skipped_empty_text"] = True
+                        _gate_skip, _gate_reason = True, "empty_text"
                 else:
                     _gate_skip, _gate_reason = _gate_check(payload, evidence)
             else:
@@ -5958,7 +6056,7 @@ async def extract_course(
     # state a lower requirement that would be wrongly overridden.
     try:
         _eng_cfg = getattr(getattr(get_uni_config(), "extraction", None), "english", None)
-        if _eng_cfg is not None and not bool(payload.get("is_pathway")):
+        if not _bail_empty_text and _eng_cfg is not None and not bool(payload.get("is_pathway")):
             # Resolve degree-level tier for per-level defaults (e.g. UG 6.0 / PG 6.5).
             _dl_raw = (payload.get("degree_level") or "").lower().strip()
             _dl_tier: str | None = None
@@ -6086,7 +6184,7 @@ async def extract_course(
         except Exception:
             pass
         _fee_defaults_map: dict = getattr(_fee_dl_cfg, "degree_level_defaults", {}) or {}
-        if _fee_defaults_map and payload.get("international_fee") in (None, "", 0):
+        if not _bail_empty_text and _fee_defaults_map and payload.get("international_fee") in (None, "", 0):
             _fdl_raw = (payload.get("degree_level") or "").lower().strip()
             _fdl_tier: str | None = None
             if _fdl_raw:
@@ -6743,6 +6841,21 @@ async def extract_course(
         _finalize_evidence_selection(payload, evidence)
     except Exception as _ev_exc:  # never break the pipeline
         log.warning("_finalize_evidence_selection failed on %s: %s", url, _ev_exc)
+
+    # ── Empty-text early exit ──────────────────────────────────────────────────
+    # If text_len=0 from both static fetch AND browser retry, we never had
+    # enough content to extract meaningful data.  Fee/IELTS defaults were
+    # already suppressed above.  Return a skip sentinel so the orchestrator
+    # counts this as fetch_failed_empty_text rather than staging a hollow record.
+    if _bail_empty_text:
+        _perf_flags["fallback_skipped_empty_text"] = True
+        return {
+            "url": url,
+            "error": "fetch_failed_empty_text",
+            "payload": {},
+            "evidence": [],
+            "_perf": _perf_flags,
+        }
 
     return {
         "url": url,

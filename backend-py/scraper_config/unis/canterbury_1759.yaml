@@ -66,10 +66,24 @@ extraction:
   # Playwright will still fail on CF-Enterprise pages — the cost is just
   # a Playwright timeout (~15 s) rather than a silent zero-result.
   scrape_do_render: true
+
+  # ── Empty-text guard (skip_ai_when_text_empty) ──────────────────────────────
+  # Canterbury CC is Cloudflare Enterprise + Contensis React SPA.  The
+  # scrape.do static fetch returns a large HTML shell (2–3 MB) but
+  # html_to_text() = "" (zero visible text) on many course pages.
+  #
+  # With skip_ai_when_text_empty: true the pipeline:
+  #   1. Detects text_len=0 → skips Gemini+AI fallback immediately.
+  #   2. Retries with a real Playwright browser (one attempt).
+  #   3a. Browser recovered text → proceeds with browser HTML normally.
+  #   3b. Browser also empty → returns fetch_failed_empty_text; the course
+  #       is counted as an error, NOT staged with hollow default data.
+  #
+  # skip_per_course_browser must be false (browser allowed) so step 2 fires.
+  # skip_browser_rescue intentionally absent (false default) — the sparse-
+  # static rescue can still run if browser gives partial content.
   skip_ai_when_text_empty: true
   skip_per_course_browser: false
-  # skip_browser_rescue removed (false by default) — allow sparse-static
-  # rescue to fire when fee + duration are both blank after the initial fetch.
 
   course_name:
     strip_title_suffixes:

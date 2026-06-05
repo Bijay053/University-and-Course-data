@@ -28,6 +28,9 @@ type ScrapeLog = {
   /** Run-level pipeline optimisation savings — present only when ≥1 skip fired. */
   performance_savings?: {
     http_fetches_skipped: number;
+    browser_retry_empty_text: number;
+    skipped_empty_text: number;
+    fallback_skipped_empty_text: number;
     vision_ocr_skipped: number;
     empty_text_ai_skipped: number;
     estimated_seconds_saved: number;
@@ -246,6 +249,9 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
     http_fetches_skipped: number;
     vision_ocr_skipped: number;
     empty_text_ai_skipped: number;
+    browser_retry_empty_text: number;
+    skipped_empty_text: number;
+    fallback_skipped_empty_text: number;
     estimated_seconds_saved: number;
     estimated_ai_calls_saved: number;
     estimated_cost_saved_usd: number;
@@ -1389,6 +1395,24 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
                     <div className="flex justify-between">
                       <span>Empty-text AI skipped</span>
                       <span className="font-medium">{performanceSavings.empty_text_ai_skipped}</span>
+                    </div>
+                  )}
+                  {(performanceSavings.browser_retry_empty_text ?? 0) > 0 && (
+                    <div className="flex justify-between">
+                      <span>Browser retry (still empty)</span>
+                      <span className="font-medium">{performanceSavings.browser_retry_empty_text}</span>
+                    </div>
+                  )}
+                  {(performanceSavings.skipped_empty_text ?? 0) > 0 && (
+                    <div className="flex justify-between">
+                      <span>Courses skipped (no text)</span>
+                      <span className="font-medium text-orange-600">{performanceSavings.skipped_empty_text}</span>
+                    </div>
+                  )}
+                  {(performanceSavings.fallback_skipped_empty_text ?? 0) > 0 && (
+                    <div className="flex justify-between">
+                      <span>Defaults suppressed (no text)</span>
+                      <span className="font-medium">{performanceSavings.fallback_skipped_empty_text}</span>
                     </div>
                   )}
                   {performanceSavings.vision_ocr_skipped > 0 && (
