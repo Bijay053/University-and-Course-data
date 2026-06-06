@@ -2,12 +2,16 @@
 """Repair already-staged scraped_courses rows:
 
 1. degree_level    — re-derive from course_name for every row where it is NULL
+                     OR where the stored value is not in the canonical set
+                     (e.g. full course name stored by mistake: "Music Business
+                     - BA (Hons)" → re-inferred as "Bachelor's")
 2. course_location — strip "University: Campus" label prefixes and reject
                      bare delivery-mode values ("Mode", "Delivery method", …)
 3. domestic fees   — clear GBP < £10,000 and AUD < A$5,000 (home/module rates)
-4. wrong-currency  — clear AUD fees stored for UK universities (scrape_url
-                     contains .ac.uk / .co.uk / .uk) — old code lacked the
-                     TLD→GBP inference; these are not real AUD fees
+4. wrong-currency  — clear non-GBP fees stored for UK universities (.ac.uk /
+                     .co.uk / .uk) — CAD/AUD are misdetections of £ amounts
+5. garbage location — clear testimonial / person-name / date / boilerplate text
+                     that was extracted as location (BCU/ARU pattern)
 
 Run on dev (Replit):
   cd /home/runner/workspace
@@ -33,11 +37,62 @@ _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
-from app.services.scraper.extractors.degree_level import classify_degree_level
+from app.services.scraper.extractors.degree_level import (
+    CANONICAL_DEGREE_LEVELS,
+    classify_degree_level,
+)
 from app.services.scraper.extractors.location import (
     _INST_LABEL_PREFIX_RE,
     _is_only_delivery_method,
 )
+
+# ── Garbage location patterns (mirrors stage_course.py guard) ────────────
+_LOC_GARBAGE_PERSON_JOB = re.compile(
+    r"\b(?:student|graduate|producer|presenter|speaker|professor|"
+    r"doctor|director|lecturer|coordinator|researcher|alumni|"
+    r"phd\s+student|course\s+leader|bbc|radio\s+\d|programme\s+lead"
+    r"|course\s+director)\b",
+    re.IGNORECASE,
+)
+# Separate honorific check — \b at end of alternation fails between [A-Z]
+# and the next word character, so this must be its own anchored pattern.
+_LOC_GARBAGE_HONORIFIC = re.compile(
+    r"^(?:dr|mr|ms|mrs|prof)\.?\s+[A-Za-z]",
+    re.IGNORECASE,
+)
+_LOC_GARBAGE_DATE = re.compile(
+    r"\b(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b"
+    r"|\b(?:january|february|march|april|may|june|july|august|"
+    r"september|october|november|december)\s+\d",
+    re.IGNORECASE,
+)
+_LOC_GARBAGE_PHRASES = re.compile(
+    r"(?:please\s+note|worried\s+about|course\s+structure|"
+    r"eu\s*/\s*international|\bcredits?\s+of\s+"
+    r"|\bdissertation\b|one\s+of\s+(?:our|the)|personal\s+statement"
+    r"|sound,|1xtra|radio\s+1)",
+    re.IGNORECASE,
+)
+
+
+def _is_garbage_location_part(p: str) -> bool:
+    """Return True if this location token looks like garbage (non-campus text)."""
+    p = p.strip()
+    if not p:
+        return True
+    if len(p) > 80:
+        return True
+    if _LOC_GARBAGE_DATE.search(p):
+        return True
+    if _LOC_GARBAGE_PERSON_JOB.search(p):
+        return True
+    if _LOC_GARBAGE_HONORIFIC.match(p):
+        return True
+    if _LOC_GARBAGE_PHRASES.search(p):
+        return True
+    if re.match(r"^(?:one|some|many|all)\s+of\s*$", p, re.IGNORECASE):
+        return True
+    return False
 
 
 def _clean_location(raw: str) -> str | None:
@@ -84,16 +139,29 @@ async def _run(dry_run: bool, university_id: int | None) -> None:
     uni_filter = "AND university_id = $2" if university_id else ""
 
     # ── 1. degree_level repair ────────────────────────────────────────────────
+    # Fetch rows where degree_level is either:
+    #   • NULL / empty                 → was never extracted
+    #   • A non-canonical value        → full course name saved by mistake
+    #     e.g. "Music Business - BA (Hons)" instead of "Bachelor's"
+    # Both cases are re-inferred from course_name using the classifier.
+    # asyncpg requires a typed parameter — pass canonical values as text[].
+    canonical_list = list(CANONICAL_DEGREE_LEVELS)
+
     if university_id:
         rows = await conn.fetch(
-            f"""
+            """
             SELECT id, course_name, degree_level
             FROM scraped_courses
-            WHERE (degree_level IS NULL OR degree_level = '')
+            WHERE (
+                degree_level IS NULL
+                OR degree_level = ''
+                OR degree_level != ALL($1::text[])
+            )
               AND status NOT IN ('rejected', 'approved')
-              {uni_filter}
+              AND university_id = $2
             ORDER BY university_id, id
             """,
+            canonical_list,
             university_id,
         )
     else:
@@ -101,24 +169,32 @@ async def _run(dry_run: bool, university_id: int | None) -> None:
             """
             SELECT id, course_name, degree_level
             FROM scraped_courses
-            WHERE (degree_level IS NULL OR degree_level = '')
+            WHERE (
+                degree_level IS NULL
+                OR degree_level = ''
+                OR degree_level != ALL($1::text[])
+            )
               AND status NOT IN ('rejected', 'approved')
             ORDER BY university_id, id
-            """
+            """,
+            canonical_list,
         )
 
-    print(f"Found {len(rows)} rows with missing degree_level")
+    print(f"Found {len(rows)} rows with missing/non-canonical degree_level")
 
     dl_updates: list[tuple[str, int]] = []
     for row in rows:
         course_name = (row["course_name"] or "").strip()
+        old_dl = row["degree_level"] or ""
         if not course_name:
             continue
         inferred, method, _ = classify_degree_level(course_name)
         if inferred:
             dl_updates.append((inferred, row["id"]))
+            label = "[DL NC]" if old_dl else "[DL NULL]"
             print(
-                f"  [DL] id={row['id']:6d} {course_name!r:60s} → {inferred!r} ({method})"
+                f"  {label} id={row['id']:6d} {course_name!r:55s} "
+                f"old={old_dl!r:20s} → {inferred!r} ({method})"
             )
 
     if not dry_run and dl_updates:
@@ -297,6 +373,68 @@ async def _run(dry_run: bool, university_id: int | None) -> None:
     elif dry_run:
         print(f"→ (dry-run) would clear wrong-currency fee on {len(wrong_cur_ids)} rows")
 
+    # ── 5. Garbage location clearing ─────────────────────────────────────────
+    # BCU / ARU and other universities with embedded testimonial / event
+    # blocks on their course pages produce garbage course_location values:
+    #   "Worried about Personal Statements?"   → boilerplate
+    #   "Friday 4 December"                    → date
+    #   "Ben Stones, Producer, Station Sound, BBC Radio 1, …"  → person name
+    #   "Please note"                          → boilerplate
+    #   "Speaker 1"                            → role label
+    #   "Clare Maiden - student"               → person name + role
+    # Fetch all non-null location rows and apply the same garbage filter that
+    # was added to stage_course.py so future scrapes are also protected.
+    if university_id:
+        garbage_loc_rows = await conn.fetch(
+            f"""
+            SELECT id, course_name, course_location
+            FROM scraped_courses
+            WHERE course_location IS NOT NULL
+              AND course_location != ''
+              AND status NOT IN ('rejected', 'approved')
+              {uni_filter}
+            ORDER BY university_id, id
+            """,
+            university_id,
+        )
+    else:
+        garbage_loc_rows = await conn.fetch(
+            """
+            SELECT id, course_name, course_location
+            FROM scraped_courses
+            WHERE course_location IS NOT NULL
+              AND course_location != ''
+              AND status NOT IN ('rejected', 'approved')
+            ORDER BY university_id, id
+            """
+        )
+
+    print(f"\nChecking {len(garbage_loc_rows)} non-null location rows for garbage text")
+    garbage_loc_updates: list[tuple[str | None, int]] = []
+    for row in garbage_loc_rows:
+        raw = (row["course_location"] or "").strip()
+        if not raw:
+            continue
+        parts = [p.strip() for p in raw.split(",") if p.strip()]
+        clean_parts = [p for p in parts if not _is_garbage_location_part(p)]
+        if len(clean_parts) != len(parts):
+            cleaned = ", ".join(clean_parts) if clean_parts else None
+            garbage_loc_updates.append((cleaned, row["id"]))
+            cname = (row["course_name"] or "")[:40]
+            print(
+                f"  [GLOC] id={row['id']:6d} {cname!r:42s} "
+                f"{raw!r:55s} → {cleaned!r}"
+            )
+
+    if not dry_run and garbage_loc_updates:
+        await conn.executemany(
+            "UPDATE scraped_courses SET course_location = $1 WHERE id = $2",
+            garbage_loc_updates,
+        )
+        print(f"→ garbage location cleared on {len(garbage_loc_updates)} rows")
+    elif dry_run:
+        print(f"→ (dry-run) would clear garbage location on {len(garbage_loc_updates)} rows")
+
     await conn.close()
 
     if not dry_run:
@@ -304,7 +442,8 @@ async def _run(dry_run: bool, university_id: int | None) -> None:
             f"\n✔ Done: {len(dl_updates)} degree_level fixes, "
             f"{len(loc_updates)} location fixes, "
             f"{len(fee_clear_ids)} domestic fee clears, "
-            f"{len(wrong_cur_ids)} wrong-currency clears"
+            f"{len(wrong_cur_ids)} wrong-currency clears, "
+            f"{len(garbage_loc_updates)} garbage location clears"
         )
     else:
         print(f"\n(dry-run complete — no changes written)")

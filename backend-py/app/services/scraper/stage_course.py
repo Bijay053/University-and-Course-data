@@ -489,6 +489,39 @@ async def stage_course(
         payload = dict(payload)
         payload["degree_level"] = _canon
 
+    # Non-canonical degree_level guard.
+    #
+    # Some upstream extractors (Gemini AI, page_lead scan) return the full
+    # course title as the degree_level instead of a canonical label.
+    # Examples observed in the wild:
+    #   "Music Business - BA (Hons)"            (should be "Bachelor's")
+    #   "Medical Imaging Technology - MSc"      (should be "Master's")
+    #   "Media and Cultural Studies - PhD"      (should be "Doctorate")
+    #   "Jewellery and Silversmithing - Higher National Diploma"
+    #
+    # These pass the blank-check guard below because the field IS non-empty,
+    # yet they are not valid canonical values.  The fix: after the
+    # apostrophe-normalization above, if the value is still outside the known
+    # canonical set, clear it and let the re-inference block below re-derive
+    # the correct label from the course name.
+    #
+    # The classifier already handles suffix-format names
+    # ("Course Name - BA (Hons)" → "Bachelor's") so clearing is all we need.
+    try:
+        from app.services.scraper.extractors.degree_level import (
+            CANONICAL_DEGREE_LEVELS as _CANON_DL_SET,
+        )
+        _dl_now = (payload.get("degree_level") or "").strip()
+        if _dl_now and _dl_now not in _CANON_DL_SET:
+            payload = dict(payload)
+            payload["degree_level"] = None
+            log.warning(
+                "[DL NONCANON] %s: non-canonical degree_level %r cleared for re-inference",
+                name, _dl_now[:80],
+            )
+    except Exception:  # noqa: BLE001
+        pass  # never block staging on guard failure
+
     # Fallback degree_level inference from course_name.
     #
     # The degree_level extractor in single_course.py uses payload.setdefault()
@@ -610,6 +643,83 @@ async def stage_course(
                 )
         except Exception:  # noqa: BLE001
             pass  # never block staging on clean failure
+
+    # Garbage location guard.
+    #
+    # Some university pages (BCU, ARU, and others with embedded testimonial /
+    # event blocks) return random page content as the course_location:
+    #   "Worried about Personal Statements?"
+    #   "Friday 4 December"
+    #   "Ben Stones, Producer, Station Sound, BBC Radio 1, 1Xtra, …"
+    #   "Please note"
+    #   "Speaker 1"
+    #   "Clare Maiden - student"
+    #   "one of"
+    # None of these are real campus names.  This guard runs after all other
+    # location scrubs and clears any value that matches the garbage patterns.
+    # Legitimate campus names (City Centre, City South, Margaret Street,
+    # Birmingham, Online, Distance Learning) do NOT match any of these.
+    _raw_loc4 = (payload.get("course_location") or "").strip()
+    if _raw_loc4:
+        try:
+            # Each part in a comma-separated list is checked independently.
+            # A part is dropped if it looks like garbage; the remaining
+            # parts are re-joined.
+            _LOC_GARBAGE_PERSON_JOB = re.compile(
+                r"\b(?:student|graduate|producer|presenter|speaker|professor|"
+                r"doctor|director|lecturer|coordinator|researcher|alumni|"
+                r"phd\s+student|course\s+leader|bbc|radio\s+\d|programme\s+lead"
+                r"|course\s+director)\b",
+                re.IGNORECASE,
+            )
+            # Separate honorific check — cannot use \b at end of alternation
+            # because \b fails between [A-Z] and the next word character.
+            _LOC_GARBAGE_HONORIFIC = re.compile(
+                r"^(?:dr|mr|ms|mrs|prof)\.?\s+[A-Za-z]",
+                re.IGNORECASE,
+            )
+            _LOC_GARBAGE_DATE = re.compile(
+                r"\b(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b"
+                r"|\b(?:january|february|march|april|may|june|july|august|"
+                r"september|october|november|december)\s+\d",
+                re.IGNORECASE,
+            )
+            _LOC_GARBAGE_PHRASES = re.compile(
+                r"(?:please\s+note|worried\s+about|course\s+structure|"
+                r"eu\s*/\s*international|^\d+\s+credits?\b|\bcredits?\s+of\s+"
+                r"|\bdissertation\b|one\s+of\s+(?:our|the)|personal\s+statement"
+                r"|sound,|1xtra|radio\s+1)",
+                re.IGNORECASE,
+            )
+
+            def _is_garbage_loc_part(p: str) -> bool:
+                if len(p) > 80:
+                    return True
+                if _LOC_GARBAGE_DATE.search(p):
+                    return True
+                if _LOC_GARBAGE_PERSON_JOB.search(p):
+                    return True
+                if _LOC_GARBAGE_HONORIFIC.match(p):
+                    return True
+                if _LOC_GARBAGE_PHRASES.search(p):
+                    return True
+                # "one of" / "some of" bare phrases with no location word
+                if re.match(r"^(?:one|some|many|all)\s+of\s*$", p, re.IGNORECASE):
+                    return True
+                return False
+
+            _loc4_parts = [p.strip() for p in _raw_loc4.split(",") if p.strip()]
+            _loc4_clean_parts = [p for p in _loc4_parts if not _is_garbage_loc_part(p)]
+            if len(_loc4_clean_parts) != len(_loc4_parts):
+                _loc4_result = ", ".join(_loc4_clean_parts) if _loc4_clean_parts else None
+                payload = dict(payload)
+                payload["course_location"] = _loc4_result
+                log.warning(
+                    "[LOC GARBAGE] %s: %r → %r",
+                    name, _raw_loc4[:100], _loc4_result,
+                )
+        except Exception:  # noqa: BLE001
+            pass  # never block staging on guard failure
 
     # ── Per-uni global_substring_blocklist + field_overrides (opt-in) ────────
     # Two YAML knobs applied here so they affect EVERY string field on the

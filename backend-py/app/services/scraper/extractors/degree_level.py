@@ -25,6 +25,23 @@ from app.services.scraper.extractors.base import ExtractionResult
 
 field_key = "degree_level"
 
+# Canonical degree level values accepted by the system.
+# Any value NOT in this set is rejected at the staging chokepoint and
+# re-inferred from the course name.  Keeping this in one place avoids the
+# guard and the classifier drifting out of sync.
+CANONICAL_DEGREE_LEVELS: frozenset[str] = frozenset({
+    "Bachelor's",
+    "Master's",
+    "Doctorate",
+    "Graduate Certificate",
+    "Graduate Diploma",
+    "Associate Degree",
+    "Advanced Diploma",
+    "Diploma",
+    "Certificate",
+    "Foundation",
+})
+
 # Order matters: more specific patterns must come first so e.g. "Graduate
 # Certificate" is not matched by the looser "certificate" rule.
 # Graduate Diploma and Graduate Certificate are DIFFERENT qualifications:
@@ -84,7 +101,9 @@ _NAME_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"\bhn[cd]\b", re.IGNORECASE), "Bachelor's"),   # HNC, HND
     # Existing broad bachelor patterns — BSc (Hons) style covered by b\.?sc;
     # BHons added explicitly for courses whose title leads with the honours tag.
-    (re.compile(r"\b(bachelor('?s)?|b\.?sc|b\.?eng|b\.?ed|b\.?a|b\.?bus)\b", re.IGNORECASE), "Bachelor's"),
+    # BBA (Bachelor of Business Administration) and BSW (Bachelor of Social Work)
+    # and BSN (Bachelor of Science in Nursing) added for US/UK university patterns.
+    (re.compile(r"\b(bachelor('?s)?|b\.?sc|b\.?eng|b\.?ed|b\.?a|b\.?bus|bba|bsw|bsn)\b", re.IGNORECASE), "Bachelor's"),
     (re.compile(r"\bb\.?hons?\b", re.IGNORECASE), "Bachelor's"),
     # ── Sub-degree ───────────────────────────────────────────────────────────
     (re.compile(r"\bassociate\s+degree\b", re.IGNORECASE), "Associate Degree"),
