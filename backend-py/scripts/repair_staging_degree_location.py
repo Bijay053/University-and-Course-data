@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
 """Repair already-staged scraped_courses rows:
 
-1. degree_level  — re-derive from course_name for every row where it is NULL
+1. degree_level    — re-derive from course_name for every row where it is NULL
 2. course_location — strip "University: Campus" label prefixes and reject
                      bare delivery-mode values ("Mode", "Delivery method", …)
+3. domestic fees   — clear GBP < £10,000 and AUD < A$5,000 (home/module rates)
+4. wrong-currency  — clear AUD fees stored for UK universities (scrape_url
+                     contains .ac.uk / .co.uk / .uk) — old code lacked the
+                     TLD→GBP inference; these are not real AUD fees
 
 Run on dev (Replit):
   cd /home/runner/workspace
@@ -232,13 +236,75 @@ async def _run(dry_run: bool, university_id: int | None) -> None:
     elif dry_run:
         print(f"→ (dry-run) would clear international_fee on {len(fee_clear_ids)} rows")
 
+    # ── 4. Wrong-currency fee repair ─────────────────────────────────────────
+    # Old code (pre-TLD-inference) stored AUD amounts for UK universities whose
+    # scrape_url ends with .ac.uk / .co.uk / .uk.  These are NOT real AUD fees;
+    # the currency detector defaulted to AUD when no explicit symbol was found.
+    # Clear them so the re-scrape picks up the correct GBP amount.
+    _uk_tld_pattern = r"\.(ac|co)\.uk(/|$)|\bwww\.[^/]+\.uk/"
+    if university_id:
+        wrong_cur_rows = await conn.fetch(
+            f"""
+            SELECT sc.id, sc.course_name, sc.international_fee, sc.currency,
+                   u.scrape_url
+            FROM scraped_courses sc
+            JOIN universities u ON u.id = sc.university_id
+            WHERE sc.international_fee IS NOT NULL
+              AND sc.currency = 'AUD'
+              AND sc.status NOT IN ('rejected', 'approved')
+              AND (
+                    u.scrape_url ILIKE '%.ac.uk%'
+                 OR u.scrape_url ILIKE '%.co.uk%'
+                 OR u.scrape_url ILIKE '%://%.uk/%'
+              )
+              {uni_filter}
+            ORDER BY sc.university_id, sc.id
+            """,
+            university_id,
+        )
+    else:
+        wrong_cur_rows = await conn.fetch(
+            """
+            SELECT sc.id, sc.course_name, sc.international_fee, sc.currency,
+                   u.scrape_url
+            FROM scraped_courses sc
+            JOIN universities u ON u.id = sc.university_id
+            WHERE sc.international_fee IS NOT NULL
+              AND sc.currency = 'AUD'
+              AND sc.status NOT IN ('rejected', 'approved')
+              AND (
+                    u.scrape_url ILIKE '%.ac.uk%'
+                 OR u.scrape_url ILIKE '%.co.uk%'
+                 OR u.scrape_url ILIKE '%://%.uk/%'
+              )
+            ORDER BY sc.university_id, sc.id
+            """
+        )
+
+    print(f"\nFound {len(wrong_cur_rows)} AUD-on-UK-university rows to clear")
+    wrong_cur_ids: list[int] = []
+    for row in wrong_cur_rows:
+        cname = (row["course_name"] or "")[:45]
+        print(f"  [WCUR] id={row['id']:6d} {cname!r:47s} A${row['international_fee']:,.0f} → clear")
+        wrong_cur_ids.append(row["id"])
+
+    if not dry_run and wrong_cur_ids:
+        await conn.executemany(
+            "UPDATE scraped_courses SET international_fee = NULL, fee_term = NULL, currency = NULL WHERE id = $1",
+            [(i,) for i in wrong_cur_ids],
+        )
+        print(f"→ wrong-currency fee cleared on {len(wrong_cur_ids)} rows")
+    elif dry_run:
+        print(f"→ (dry-run) would clear wrong-currency fee on {len(wrong_cur_ids)} rows")
+
     await conn.close()
 
     if not dry_run:
         print(
             f"\n✔ Done: {len(dl_updates)} degree_level fixes, "
             f"{len(loc_updates)} location fixes, "
-            f"{len(fee_clear_ids)} domestic fee clears"
+            f"{len(fee_clear_ids)} domestic fee clears, "
+            f"{len(wrong_cur_ids)} wrong-currency clears"
         )
     else:
         print(f"\n(dry-run complete — no changes written)")
