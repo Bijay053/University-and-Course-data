@@ -186,13 +186,13 @@ async def _run(dry_run: bool, university_id: int | None) -> None:
     if university_id:
         fee_rows = await conn.fetch(
             f"""
-            SELECT id, course_name, international_fee, fee_currency
+            SELECT id, course_name, international_fee, currency
             FROM scraped_courses
             WHERE international_fee IS NOT NULL
               AND status NOT IN ('rejected', 'approved')
               AND (
-                  (fee_currency = 'GBP' AND international_fee < 10000)
-                  OR (fee_currency = 'AUD' AND international_fee < 5000)
+                  (currency = 'GBP' AND international_fee < 10000)
+                  OR (currency = 'AUD' AND international_fee < 5000)
               )
               {uni_filter}
             ORDER BY university_id, id
@@ -202,13 +202,13 @@ async def _run(dry_run: bool, university_id: int | None) -> None:
     else:
         fee_rows = await conn.fetch(
             """
-            SELECT id, course_name, international_fee, fee_currency
+            SELECT id, course_name, international_fee, currency
             FROM scraped_courses
             WHERE international_fee IS NOT NULL
               AND status NOT IN ('rejected', 'approved')
               AND (
-                  (fee_currency = 'GBP' AND international_fee < 10000)
-                  OR (fee_currency = 'AUD' AND international_fee < 5000)
+                  (currency = 'GBP' AND international_fee < 10000)
+                  OR (currency = 'AUD' AND international_fee < 5000)
               )
             ORDER BY university_id, id
             """
@@ -219,13 +219,13 @@ async def _run(dry_run: bool, university_id: int | None) -> None:
     for row in fee_rows:
         cname = (row["course_name"] or "")[:45]
         fee = row["international_fee"]
-        cur = row["fee_currency"]
+        cur = row["currency"]
         fee_clear_ids.append(row["id"])
         print(f"  [FEE] id={row['id']:6d} {cname!r:47s} {cur} {fee:,.0f} → clear")
 
     if not dry_run and fee_clear_ids:
         await conn.executemany(
-            "UPDATE scraped_courses SET international_fee = NULL, fee_term = NULL, fee_currency = NULL WHERE id = $1",
+            "UPDATE scraped_courses SET international_fee = NULL, fee_term = NULL, currency = NULL WHERE id = $1",
             [(i,) for i in fee_clear_ids],
         )
         print(f"→ international_fee cleared on {len(fee_clear_ids)} rows")
