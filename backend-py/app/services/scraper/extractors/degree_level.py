@@ -33,12 +33,13 @@ field_key = "degree_level"
 # Both are AQF/NZQF level 8 so we cannot distinguish from a numeric level
 # alone — rely on the name pattern instead.
 _NAME_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
-    (re.compile(r"\b(doctor(ate)?|ph\.?d|d\.?phil)\b", re.IGNORECASE), "Doctorate"),
+    # ── Doctorate ────────────────────────────────────────────────────────────
+    # EdD (Doctor of Education), DBA (Doctor of Business Administration) added.
+    (re.compile(r"\b(doctor(ate)?|ph\.?d|d\.?phil|ed\.?d|dba)\b", re.IGNORECASE), "Doctorate"),
+    # ── Graduate Diploma / Certificate ───────────────────────────────────────
     (re.compile(r"\bgraduate\s+diploma\b", re.IGNORECASE), "Graduate Diploma"),
     (re.compile(r"\bgraduate\s+certificate\b", re.IGNORECASE), "Graduate Certificate"),
-    # BUG FIX: "Postgraduate Diploma" is NOT a "Graduate Certificate".
-    # A Postgraduate Diploma (AQF 8, 1 year) ≠ Graduate Certificate (AQF 8, 6 months).
-    # The two are distinct qualifications — the diploma is the longer award.
+    # A Postgraduate Diploma (AQF 8, 1 year) ≠ Graduate Certificate (6 months).
     (re.compile(r"\bpostgraduate\s+diploma\b", re.IGNORECASE), "Graduate Diploma"),
     (re.compile(r"\bpostgraduate\s+certificate\b", re.IGNORECASE), "Graduate Certificate"),
     # UK-specific abbreviations — must precede the bare "\bdiploma\b" and
@@ -50,17 +51,34 @@ _NAME_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"\bPGCE\b", re.IGNORECASE), "Graduate Certificate"),
     (re.compile(r"\bPG\s*Dip\b|\bPGDip\b", re.IGNORECASE), "Graduate Diploma"),
     (re.compile(r"\bPG\s*Cert\b|\bPGCert\b", re.IGNORECASE), "Graduate Certificate"),
-    # Master-level patterns — m\.?res (MRes) and m\.?arch (MArch) added; integrated
-    # masters (e.g. "Integrated Master of Engineering") mapped here too.
+    # ── Master's ─────────────────────────────────────────────────────────────
+    # MA (Master of Arts), MPH (Master of Public Health), LLM (Master of Laws)
+    # added. MPharm MUST come before MPH/MA to avoid partial match on "MPh".
+    # Integrated masters (e.g. "Integrated Master of Engineering") also mapped.
     (re.compile(
-        r"\b(master('?s)?|mba|m\.?sc|m\.?eng|m\.?ed|m\.?phil|m\.?res|m\.?arch)\b",
+        r"\b(master('?s)?|mba|m\.?sc|m\.?eng|m\.?ed|m\.?phil|m\.?res|m\.?arch"
+        r"|m\.?ph|ll\.?m|m\.?a)\b",
         re.IGNORECASE,
     ), "Master's"),
     (re.compile(r"\bintegrated\s+masters?\b", re.IGNORECASE), "Master's"),
-    # Bachelor patterns — BSc (Hons) style UK names covered by existing b\.?sc rule;
+    # ── Bachelor's ───────────────────────────────────────────────────────────
+    # UK nursing/midwifery/law/pharmacy abbreviations added:
+    #   BNurs = Bachelor of Nursing
+    #   BMid  = Bachelor of Midwifery
+    #   LLB   = Bachelor of Laws
+    #   MPharm = Master of Pharmacy (UK 4-year integrated undergraduate degree)
+    # Foundation Degrees (FdA / FdSc) and Higher Nationals (HNC / HND) also
+    # mapped to Bachelor's level per institution convention.
+    (re.compile(r"\b(b\.?nurs|b\.?mid)\b", re.IGNORECASE), "Bachelor's"),
+    (re.compile(r"\bll\.?b\b", re.IGNORECASE), "Bachelor's"),
+    (re.compile(r"\bm\.?pharm\b", re.IGNORECASE), "Bachelor's"),
+    (re.compile(r"\bfd(?:a|sc)\b", re.IGNORECASE), "Bachelor's"),  # FdA, FdSc
+    (re.compile(r"\bhn[cd]\b", re.IGNORECASE), "Bachelor's"),   # HNC, HND
+    # Existing broad bachelor patterns — BSc (Hons) style covered by b\.?sc;
     # BHons added explicitly for courses whose title leads with the honours tag.
     (re.compile(r"\b(bachelor('?s)?|b\.?sc|b\.?eng|b\.?ed|b\.?a|b\.?bus)\b", re.IGNORECASE), "Bachelor's"),
     (re.compile(r"\bb\.?hons?\b", re.IGNORECASE), "Bachelor's"),
+    # ── Sub-degree ───────────────────────────────────────────────────────────
     (re.compile(r"\bassociate\s+degree\b", re.IGNORECASE), "Associate Degree"),
     (re.compile(r"\badvanced\s+diploma\b", re.IGNORECASE), "Advanced Diploma"),
     (re.compile(r"\bdiploma\b", re.IGNORECASE), "Diploma"),

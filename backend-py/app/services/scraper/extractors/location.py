@@ -48,6 +48,16 @@ _TRAILING_KEYS = re.compile(
 # Canterbury's Contensis CMS emits "(s)" before section headings which
 # bleeds into Gemini's location_text extraction: "(s)Canterbury Scroll to top".
 _LEADING_SECTION_MARKER_RE = re.compile(r"^\([a-z]\)\s*", re.I)
+
+# Strip institutional label prefixes that some CMSes (e.g. Wolverhampton)
+# prepend to campus names.  Gemini faithfully copies these from the page,
+# producing values like "University: City Campus" or "University:".
+# Applied per comma-separated part so "University: City Campus,
+# University: Springfield Campus" → "City Campus, Springfield Campus".
+_INST_LABEL_PREFIX_RE = re.compile(
+    r"^\s*(?:university|college|institution|campus)\s*:\s*",
+    re.IGNORECASE,
+)
 _REMOVE_VIRTUAL = re.compile(
     r"\b(?:online|virtual|remote|distance(?:\s*learning)?|off[-\s]?campus|external)\b",
     re.I,
@@ -373,6 +383,9 @@ _NON_LOCATION_PHRASES: frozenset[str] = frozenset({
     "attendance pattern",
     "mode of study",
     "mode of delivery",
+    # Bare "Mode" label (Wolverhampton CMS emits this as a standalone value
+    # adjacent to the delivery-method section — not a campus name).
+    "mode",
     # Action verbs / button labels picked up by sloppy DOM walks.
     "view dates",
     "view date",
@@ -464,6 +477,21 @@ def _normalise(raw: str | None) -> str | None:
     # Expand campus short-codes (e.g. "SYD | MEL | BNE" → "Sydney, Melbourne, Brisbane")
     # before any marketing / junk checks so the expanded text can be validated normally.
     cleaned = _expand_campus_codes(cleaned)
+    # Strip institutional label prefixes (e.g. "University: City Campus" → "City Campus").
+    # Some CMSes (Wolverhampton) prefix every campus name with "University:".
+    # Gemini faithfully copies the label, producing values like:
+    #   "University: City Campus, University: Springfield Campus"
+    # Apply per comma-separated part and drop any parts that become empty
+    # (e.g. bare "University:" with no campus name following it).
+    if _INST_LABEL_PREFIX_RE.search(cleaned):
+        stripped_parts = [
+            _INST_LABEL_PREFIX_RE.sub("", p).strip()
+            for p in cleaned.split(",")
+        ]
+        stripped_parts = [p for p in stripped_parts if p]
+        cleaned = ", ".join(stripped_parts)
+        if not cleaned:
+            return None
     # JCU "COURSE AVAILABLE AT NOTES JCU Townsville JCU Cairns" → "Townsville, Cairns"
     if _COURSE_AVAIL_NOTES_RE.match(cleaned):
         cities = _JCU_CAMPUS_TOKEN_RE.findall(cleaned)
