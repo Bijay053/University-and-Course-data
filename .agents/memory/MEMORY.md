@@ -23,3 +23,4 @@
 - [WLV SearchStax links_only provider](wlv-searchstax.md) — Wolverhampton Solr has 433 courses but NO fees/IELTS; links_only=true mode for discovery-only (per-course extraction still runs).
 - [95% YAML scraper control](yaml-scraper-control.md) — new unis need only YAML edits; 5 new fields replace 5 hardcoded host lists.
 - [scrape.do browser-fallback gap](scrape-do-browser-gap.md) — [BROWSER↑] path in single_course.py bypasses http_fetcher.py's scrape.do chain; must re-check _http_fetcher_mod._scrape_do_enabled after browser retries exhaust.
+- [UK structured fee table extractor](uk-fee-table-extractor.md) — Pre-pass 0 in fee.extract(); _FEE_TABLE_FOUND_NO_INTL sentinel → return []; picks Intl+FT latest-year row; part-time-only courses get no fee.

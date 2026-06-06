@@ -490,6 +490,141 @@ def _extract_strong_label_value(
     return None, None
 
 
+# ── Structured fee table extractor ───────────────────────────────────────────
+# UK universities (Wolverhampton, Coventry, etc.) publish fee tables with rows
+# shaped like:
+#
+#   Home          | Full time  | £9,535 per year  | 2025 to 26
+#   Home          | Full time  | £9,790 per year  | 2026 to 27
+#   Home          | Part time  | £4,768 per year  | 2025 to 26
+#   Home          | Part time  | £4,895 per year  | 2026 to 27
+#   International | Full time  | £17,000 per year | 2025 to 26
+#   International | Full time  | £18,700 per year | 2026 to 27
+#
+# The flat-text scanner has no concept of row boundaries so it picks amounts
+# indiscriminately (often the first Home row value).  This pre-pass reads the
+# <table> DOM directly and returns the International + Full-time row for the
+# latest available year.
+#
+# Return values (used by extract() for branching):
+#   (amount, ctx_str)          — valid International + Full-time row found
+#   _FEE_TABLE_FOUND_NO_INTL  — fee table detected but no Intl+FT row exists
+#                                (caller must return [] to prevent fallback
+#                                picking up a Home / part-time amount)
+#   None                       — no structured fee table found; fall through
+
+_FEE_TABLE_FOUND_NO_INTL = object()  # sentinel — must compare with `is`
+
+# Row-level student-type and study-mode matchers (applied to joined cell text).
+_ROW_INTL_RE    = re.compile(r"\bInternational\b|\bOverseas\b",  re.IGNORECASE)
+_ROW_HOME_RE    = re.compile(r"\bHome\b|\bDomestic\b",           re.IGNORECASE)
+_ROW_FULLTIME_RE = re.compile(r"Full[\s\-]?time",                re.IGNORECASE)
+_ROW_PARTTIME_RE = re.compile(r"Part[\s\-]?time",                re.IGNORECASE)
+# Takes the first "20XX" in a year-range cell: "2026 to 27", "2026/27", "2026"
+_ROW_YEAR_RE    = re.compile(r"20(\d{2})")
+
+
+def _extract_fee_table_row(
+    html: str,
+) -> "tuple[int, str] | object | None":
+    """Parse a structured multi-row fee table and return the International +
+    Full-time row for the latest available year.
+
+    **Return-value contract** (callers must use ``is`` for the sentinel)::
+
+        (amount, ctx_str)        — valid Intl + Full-time row found
+        _FEE_TABLE_FOUND_NO_INTL — fee table detected, but no Intl+FT row
+        None                     — no structured fee table in this page
+    """
+    if not html:
+        return None
+    try:
+        from bs4 import BeautifulSoup
+    except ImportError:  # pragma: no cover — bs4 is a hard dep
+        return None
+
+    try:
+        soup = BeautifulSoup(html, "html.parser")
+    except Exception:  # pragma: no cover — defensive
+        return None
+
+    best_year: int = -1
+    best_amount: int | None = None
+    best_ctx: str | None = None
+    found_fee_table = False
+
+    for table in soup.find_all("table"):
+        # Flatten each <tr> into a list of stripped cell-text values.
+        rows: list[list[str]] = []
+        for tr in table.find_all("tr"):
+            cells = [
+                td.get_text(" ", strip=True)
+                for td in tr.find_all(["td", "th"])
+            ]
+            if cells:
+                rows.append(cells)
+
+        if len(rows) < 2:
+            continue
+
+        # A table qualifies as a structured fee table when ≥1 data row
+        # contains (Home OR International) AND (Full/Part time) AND an amount.
+        is_fee_table = False
+        for cells in rows:
+            row_text = " | ".join(cells)
+            if (
+                (_ROW_INTL_RE.search(row_text) or _ROW_HOME_RE.search(row_text))
+                and (_ROW_FULLTIME_RE.search(row_text) or _ROW_PARTTIME_RE.search(row_text))
+                and _AMOUNT_RE.search(row_text)
+            ):
+                is_fee_table = True
+                break
+
+        if not is_fee_table:
+            continue
+
+        found_fee_table = True
+
+        # Scan rows for International + Full-time entries.
+        for cells in rows:
+            row_text = " | ".join(cells)
+            if not _ROW_INTL_RE.search(row_text):
+                continue
+            if not _ROW_FULLTIME_RE.search(row_text):
+                continue
+            # Guard: skip rows that contain BOTH Full-time and Part-time tokens
+            # (typically a combined header cell — not a data row).
+            if _ROW_PARTTIME_RE.search(row_text):
+                continue
+            # Extract the fee amount from this row.
+            am = _AMOUNT_RE.search(row_text)
+            if not am:
+                continue
+            raw = am.group(2) or am.group(3) or ""
+            amount = _parse_amount(raw)
+            if amount is None or amount < 5_000:
+                continue
+            # Extract year (start year of range), e.g. "2026 to 27" → 2026.
+            yr = -1
+            ym = _ROW_YEAR_RE.search(row_text)
+            if ym:
+                yr = int("20" + ym.group(1))
+            # Keep highest-year row; break ties with larger amount.
+            if yr > best_year or (yr == best_year and amount > (best_amount or 0)):
+                best_year = yr
+                best_amount = amount
+                best_ctx = row_text
+
+    if not found_fee_table:
+        return None
+    if best_amount is None:
+        # Fee table detected but zero International + Full-time rows exist.
+        # Signal caller to return [] and suppress the text-scan fallback so a
+        # Home or part-time figure is never mistakenly stored.
+        return _FEE_TABLE_FOUND_NO_INTL
+    return best_amount, best_ctx
+
+
 def _candidates(text: str) -> Iterable[tuple[int, str, str]]:
     """Yield (amount, currency_token_in_match, surrounding_context)."""
     for m in _AMOUNT_RE.finditer(text):
@@ -639,6 +774,44 @@ async def extract(
     except Exception:  # noqa: BLE001 — defensive; keep extractor working
         prefer_yr1 = False
 
+    # ── Pre-pass 0: structured fee table (highest priority) ─────────────────
+    # UK universities publish multi-row tables with Home / International ×
+    # Full-time / Part-time rows.  The flat-text scanner has no row-boundary
+    # awareness and picks the first plausible amount (often the Home row).
+    # This pre-pass reads the <table> DOM directly and returns the
+    # International + Full-time row for the latest year — or blocks the
+    # fallback entirely when no such row exists.
+    _table_result = _extract_fee_table_row(html)
+    if _table_result is _FEE_TABLE_FOUND_NO_INTL:
+        # Structured fee table exists but has NO International + Full-time row
+        # (e.g. a part-time-only course like HNC Building Studies).
+        # Return empty so the text-scan fallback never picks up a Home fee.
+        return []
+    if _table_result is not None:
+        _tbl_amount, _tbl_ctx = _table_result  # type: ignore[misc]
+        _tbl_currency = _detect_currency(_tbl_ctx, country)
+        if _tbl_currency == "AUD":
+            _url_cur = _infer_currency_from_url(url)
+            if _url_cur:
+                _tbl_currency = _url_cur
+        _tbl_fee_term = _normalize_fee_term(_tbl_ctx, prefer_year_one=prefer_yr1)
+        return [
+            ExtractionResult(
+                field_key="international_fee",
+                value=_tbl_amount,
+                normalized={
+                    "international_fee": _tbl_amount,
+                    "currency": _tbl_currency,
+                    "fee_term": _tbl_fee_term,
+                    "fee_year": _extract_year(_tbl_ctx),
+                },
+                confidence=0.92,
+                snippet=f"fee-table row: {_tbl_ctx[:120]}",
+                method="fee.table_row",
+            )
+        ]
+
+    # ── Pre-pass 1: strong label / dt-dd / th-td structural extractor ────────
     structural, snippet = _extract_strong_label_value(html)
     if structural is not None:
         amount, value_ctx = structural

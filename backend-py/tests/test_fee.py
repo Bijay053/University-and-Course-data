@@ -155,3 +155,98 @@ def test_first_year_fee_only_still_extracted():
     assert out, "fee extractor must return a result when only first-year fee is present"
     n = out[0].normalized
     assert n["international_fee"] == 38_000
+
+
+# ── Structured fee table tests ─────────────────────────────────────────────
+# These test the new _extract_fee_table_row pre-pass (Pre-pass 0) which must
+# run before the label/keyword extractors so that UK Home / Part-time rows
+# are never stored as the international annual fee.
+
+def _uk_fee_table_html(rows: list[tuple[str, str, str, str]]) -> str:
+    """Build a minimal HTML page containing a fee table matching the WLV
+    pattern: Student type | Study mode | Fee | Year."""
+    trs = "\n".join(
+        f"<tr><td>{r[0]}</td><td>{r[1]}</td><td>{r[2]}</td><td>{r[3]}</td></tr>"
+        for r in rows
+    )
+    return f"<html><body><table>{trs}</table></body></html>"
+
+
+_WLV_FULL_TABLE = _uk_fee_table_html([
+    ("Home",          "Full time",  "£9,535 per year",  "2025 to 26"),
+    ("Home",          "Full time",  "£9,790 per year",  "2026 to 27"),
+    ("Home",          "Part time",  "£4,768 per year",  "2025 to 26"),
+    ("Home",          "Part time",  "£4,895 per year",  "2026 to 27"),
+    ("International", "Full time",  "£17,000 per year", "2025 to 26"),
+    ("International", "Full time",  "£18,700 per year", "2026 to 27"),
+])
+
+
+def test_fee_table_picks_international_fulltime_latest_year():
+    """The standard WLV six-row fee table must yield £18,700 (International,
+    Full time, 2026 to 27) and reject all four Home rows."""
+    out = _run(fee.extract(_WLV_FULL_TABLE, "https://www.wlv.ac.uk/course/x"))
+    assert out, "fee table extractor must fire on a structured Home/International table"
+    n = out[0].normalized
+    assert n["international_fee"] == 18_700, (
+        f"Expected £18,700 (Intl Full-time 2026/27), got {n['international_fee']}. "
+        "Rejected values: 9535, 9790, 4768, 4895 (Home rows), 17000 (older year)."
+    )
+    assert n["currency"] == "GBP", f"Expected GBP, got {n['currency']}"
+    assert n["fee_term"] == "Annual"
+    assert out[0].method == "fee.table_row"
+
+
+def test_fee_table_rejects_home_only_no_international_rows():
+    """When the fee table has ONLY Home rows (e.g. HNC Building Studies,
+    part-time only), the extractor must return an empty list so no fee is
+    stored and the course is left with a missing-fee flag for operator review."""
+    html = _uk_fee_table_html([
+        ("Home", "Full time",  "£9,790 per year", "2026 to 27"),
+        ("Home", "Part time",  "£4,895 per year", "2026 to 27"),
+    ])
+    out = _run(fee.extract(html, "https://www.wlv.ac.uk/course/hnc-building"))
+    assert out == [], (
+        "A Home-only fee table must produce no result — not store the Home fee "
+        f"as the international tuition. Got: {out!r}"
+    )
+
+
+def test_fee_table_parttime_international_only_returns_empty():
+    """If International rows exist but ONLY for Part time (no Full-time
+    International row), the extractor must return [] rather than store a
+    part-time rate as the annual international fee."""
+    html = _uk_fee_table_html([
+        ("Home",          "Full time",  "£9,790 per year", "2026 to 27"),
+        ("International", "Part time",  "£9,000 per year", "2026 to 27"),
+    ])
+    out = _run(fee.extract(html, "https://www.wlv.ac.uk/course/pt-only"))
+    assert out == [], (
+        "International Part-time-only table must produce no result. "
+        f"Got: {out!r}"
+    )
+
+
+def test_fee_table_prefers_latest_year():
+    """When two International + Full-time rows exist for different years,
+    the extractor must return the higher-year (more recent) value."""
+    html = _uk_fee_table_html([
+        ("International", "Full time", "£17,000 per year", "2025 to 26"),
+        ("International", "Full time", "£18,700 per year", "2026 to 27"),
+    ])
+    out = _run(fee.extract(html, "https://www.wlv.ac.uk/course/x"))
+    assert out
+    assert out[0].normalized["international_fee"] == 18_700
+
+
+def test_fee_table_not_triggered_for_non_fee_tables():
+    """An HTML page with a plain table (no Home/International rows) must
+    NOT trigger the fee-table pre-pass — falls through to keyword extractor."""
+    html = (
+        "<table><tr><td>Module</td><td>Credits</td></tr>"
+        "<tr><td>Core studies</td><td>30</td></tr></table>"
+        "<p>International tuition fee: A$32,000 per year</p>"
+    )
+    out = _run(fee.extract(html, "https://uni.edu.au/course/x"))
+    assert out, "keyword extractor must fire when fee table pre-pass does not match"
+    assert out[0].normalized["international_fee"] == 32_000
