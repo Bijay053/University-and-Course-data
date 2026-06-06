@@ -406,7 +406,114 @@ discovery:
 
 ---
 
-### Pattern 9 — Distance-education / online-only university
+### Pattern 9 — UK university with CMS testimonial / staff text in location field
+
+**Matches when:**
+- `course_location` is filled with person names ("Dr Foroogh Hajiseyedjavadi"),
+  CMS boilerplate ("Worried about Personal Statements?", "Please note"),
+  date strings ("Friday 17 July"), or credit descriptions ("60 credits of modules")
+- The university's CMS renders testimonial and staff-profile sections immediately
+  adjacent to the campus/location section; the extractor captures both
+- Examples: BCU (Birmingham City University), ARU (Anglia Ruskin University)
+
+**Important:** This is **auto-handled** since 2026-06-06. The staging pipeline
+rejects garbage location parts at every scrape — no YAML is needed for new
+scrapes. The YAML below is only needed if the auto-guard incorrectly removes a
+legitimate campus name that shares a blocked keyword.
+
+```yaml
+# <University Full Name>
+# Hostname: www.uni.ac.uk
+# CMS: [e.g. Contensis / custom CMS]
+# Country: United Kingdom  |  Currency: GBP
+# Note: CMS renders testimonials adjacent to location; auto-guard cleans garbage.
+
+discovery:
+  always_sitemap_supplement: true
+  allow_url_patterns:
+    - '/courses/'
+  block_url_patterns:
+    - '/news/'
+    - '/events/'
+    - '/staff/'
+    - '/research/'
+
+extraction:
+  fees:
+    default_currency: "GBP"
+    prefer_international: true
+    reject_keywords:
+      - "Home student"
+      - "UK student"
+      - "UK fee"
+    international_fee_keywords:
+      - "International"
+      - "International fee"
+      - "Overseas"
+
+  study_mode:
+    online_only_requires_strong_evidence: true   # "apply online" in nav
+    prefer_location_over_online_keyword: true
+
+  english:
+    trust_vision_ocr: false
+    default_ielts: 6.0
+
+  intake:
+    start_dates_only: true
+    use_default_when_missing: true
+    default_source_note: "Typical UK September start"
+    default_by_level:
+      undergraduate:
+        - September
+      postgraduate:
+        - September
+        - January
+
+  course_name:
+    strip_title_suffixes:
+      - " | My University"
+      - " - My University"
+
+  # Only needed if the auto location guard removes a legitimate campus name.
+  # Example: "Media Production Centre" → blocked because "Production" matches.
+  # text_cleaning:
+  #   field_overrides:
+  #     - url_regex: '/courses/media-production'
+  #       field: course_location
+  #       value: "Media Production Centre"
+
+  filters:
+    online_only:
+      enabled: true
+      keep_if_location_present: true
+
+  staging:
+    reject_if_missing:
+      - course_name
+    require_international_fee: false
+```
+
+> **Auto-guard detail:** The staging pipeline rejects these location parts
+> automatically (comma-split, each part checked independently):
+> - Strings > 80 characters
+> - Date strings — "Friday 17 July", "March 2025"
+> - Honorific person names — "Dr Smith", "Prof. Rice" (Dr/Mr/Ms/Mrs/Prof prefix)
+> - Person job-title words — professor, lecturer, course leader, BBC producer
+> - CMS boilerplate — "Please note", "Worried about Personal Statements?",
+>   "Course Structure", "EU/international students"
+> - Credit descriptions — "60 credits of modules", "Dissertation - 40 credits"
+>
+> Run the repair script on existing staged rows after a new scrape if old
+> garbage rows were promoted before this guard existed:
+> ```bash
+> PYTHONPATH=backend-py python3 backend-py/scripts/repair_staging_degree_location.py \
+>   --university-id <N>
+> ```
+
+---
+
+### Pattern 10 — Distance-education / online-only university
 
 **Matches when:**
 - The university explicitly markets courses to international students as online/distance
@@ -423,7 +530,7 @@ extraction:
 
 ---
 
-### Pattern 10 — Listing pages under globally-blocked paths
+### Pattern 11 — Listing pages under globally-blocked paths
 
 **Matches when:**
 - The university's real course-listing pages sit under paths that the global classifier
@@ -519,6 +626,62 @@ extraction:
 ## Step 3 — Fill in common fields
 
 After picking a pattern, add the following fields **only if they apply**:
+
+### Degree level shows as full course name or non-canonical value (auto-handled)
+
+> **No YAML action needed in most cases.** The staging pipeline enforces
+> exactly 10 canonical `degree_level` values at every scrape run. Any value
+> outside this set is automatically cleared and re-inferred from the course
+> name.
+
+**Canonical values (the only valid options):**
+
+| Value | Auto-corrected from |
+|---|---|
+| `"Bachelor's"` | BA, BSc, BEng, BBA, BSW, BSN, HNC, HND, Foundation Degree, FdA/FdSc, "Bachelor of …" |
+| `"Master's"` | MA, MSc, MEng, MBA, MRes, "Master of …" |
+| `"Doctorate"` | PhD, DBA, DEng, EdD, "Doctor of …" |
+| `"Graduate Certificate"` | PgCert, **Postgraduate Certificate** |
+| `"Graduate Diploma"` | PgDip, **Postgraduate Diploma** |
+| `"Associate Degree"` | Associate Degree |
+| `"Advanced Diploma"` | Advanced Diploma |
+| `"Diploma"` | Diploma |
+| `"Certificate"` | Certificate |
+| `"Foundation"` | Foundation, Foundation Year, Foundation Certificate |
+
+**Suffix-format course names** (e.g. `"Music Business - BA (Hons)"`) are also
+detected and re-inferred — no YAML needed. If `degree_level` is still wrong
+after a fresh scrape, the course name does not contain a recognisable
+qualification abbreviation; escalate to engineering to add the abbreviation to
+`extractors/degree_level.py`.
+
+To repair existing staged rows from before this guard was added:
+```bash
+PYTHONPATH=backend-py python3 backend-py/scripts/repair_staging_degree_location.py \
+  --university-id <N>
+```
+
+---
+
+### Location contains garbage text (person names, dates, boilerplate) — auto-handled
+
+> **No YAML action needed in most cases.** Since 2026-06-06 the staging
+> pipeline auto-strips garbage `course_location` parts on every scrape.
+
+Automatically rejected (comma-split, each part checked independently):
+- Parts > 80 characters
+- Date strings — "Friday 17 July", "March 2025"
+- Honorific person names — "Dr Smith", "Prof. Rice" (Dr/Mr/Ms/Mrs/Prof prefix)
+- Person job-title words — professor, lecturer, course leader, BBC producer
+- CMS boilerplate — "Please note", "Worried about Personal Statements?", "Course Structure"
+- Credit descriptions — "60 credits of modules", "Dissertation - 40 credits"
+
+**If the guard incorrectly removes a real campus name**, pre-clean with
+`text_cleaning.location.strip_patterns` (removes the offending substring before
+the guard fires) or hard-set specific URLs with `text_cleaning.field_overrides`.
+See YAML_OPERATIONS_GUIDE.md SECTION E — Recipe E3 for the exact YAML.
+
+---
 
 ### Course name has university suffix
 

@@ -671,6 +671,46 @@ extraction:
     reject_if_missing:
       - course_name
 
+  # ── Degree-level canonical values (code-enforced, not YAML-configurable) ──
+  # The staging pipeline accepts exactly these 10 values for degree_level.
+  # Any other value (including "Postgraduate Certificate", "Postgraduate
+  # Diploma", or a full course name stored by mistake such as
+  # "Accounting and Finance - BSc (Hons)") is automatically cleared and
+  # re-inferred from the course name using the degree_level classifier.
+  #
+  # Valid values:
+  #   "Bachelor's"          "Master's"            "Doctorate"
+  #   "Graduate Certificate"                       "Graduate Diploma"
+  #   "Associate Degree"    "Advanced Diploma"     "Diploma"
+  #   "Certificate"         "Foundation"
+  #
+  # Auto-corrections applied silently at staging time:
+  #   "Postgraduate Certificate"        → "Graduate Certificate"
+  #   "Postgraduate Diploma"            → "Graduate Diploma"
+  #   "Music Business - BA (Hons)"      → "Bachelor's"  (suffix-format name)
+  #   "BBA", "BSW", "BSN"               → "Bachelor's"  (degree abbreviations)
+  #   "Foundation Degree"               → "Bachelor's"  (UK sub-degree)
+  #   "Master of Business Administration" → "Master's"  (full title stored)
+
+  # ── Location garbage auto-cleaning (code-enforced, not YAML-configurable) ─
+  # The staging pipeline rejects garbage text from course_location automatically.
+  # These comma-split parts are stripped without any YAML configuration:
+  #   • Parts longer than 80 characters
+  #   • Date strings          — "Friday 17 July", "March 2025", "4 December"
+  #   • Person names          — "Dr Foroogh Hajiseyedjavadi", "Prof. Rice"
+  #                              (honorific prefix Dr/Mr/Ms/Mrs/Prof detected)
+  #   • Person job titles     — "Professor Iain Rice", "Course Leader Smith",
+  #                              "Lecturer", "Researcher", "BBC Producer"
+  #   • CMS boilerplate       — "Please note", "Worried about Personal
+  #                              Statements?", "Course Structure",
+  #                              "EU/international students"
+  #   • Credit descriptions   — "60 credits of modules", "Dissertation - 40 credits"
+  #   • Media credits         — "Lauren Redfern, Presenter, BBC Radio 1 Anthems"
+  #
+  # If auto-cleaning removes a legitimate campus value, use
+  # text_cleaning.location.strip_patterns to pre-clean the raw string BEFORE
+  # the guard fires, or text_cleaning.field_overrides to hard-set the value.
+
 
   # ── Per-course extraction options ──────────────────────────────────────────
 

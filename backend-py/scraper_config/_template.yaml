@@ -632,6 +632,47 @@ extraction:
     reject_if_missing:
       - course_name
 
+  # ── Degree-level canonical values (code-enforced, not YAML-configurable) ──
+  # The staging pipeline accepts exactly these 10 values for degree_level.
+  # Any other value is automatically cleared and re-inferred from the course
+  # name using the degree_level classifier (degree_level.py).
+  #
+  # Valid values:
+  #   "Bachelor's"          "Master's"            "Doctorate"
+  #   "Graduate Certificate"                       "Graduate Diploma"
+  #   "Associate Degree"    "Advanced Diploma"     "Diploma"
+  #   "Certificate"         "Foundation"
+  #
+  # Auto-corrections applied silently at staging time:
+  #   "Postgraduate Certificate"        → "Graduate Certificate"
+  #   "Postgraduate Diploma"            → "Graduate Diploma"
+  #   "Music Business - BA (Hons)"      → "Bachelor's"  (suffix-format name)
+  #   "BBA", "BSW", "BSN"               → "Bachelor's"  (degree abbreviations)
+  #   "Foundation Degree"               → "Bachelor's"  (UK sub-degree)
+  #   "Master of Business Administration" → "Master's"  (full title stored)
+  #
+  # There is no YAML key to change or extend this list — it is enforced in
+  # app/services/scraper/stage_course.py and degree_level.py.
+
+  # ── Location garbage auto-cleaning (code-enforced, not YAML-configurable) ─
+  # The staging pipeline automatically strips non-campus text from
+  # course_location before writing to the DB. No YAML key is needed.
+  #
+  # Comma-split parts rejected automatically:
+  #   • Parts > 80 characters
+  #   • Date strings          — "Friday 17 July", "March 2025"
+  #   • Honorific person names — "Dr Foroogh Hajiseyedjavadi", "Prof. Rice"
+  #   • Person job titles     — "Professor Iain Rice", "Course Leader Smith",
+  #                              "Lecturer", "Researcher", "BBC Producer"
+  #   • CMS boilerplate       — "Please note", "Worried about Personal
+  #                              Statements?", "Course Structure",
+  #                              "EU/international students"
+  #   • Credit descriptions   — "60 credits of modules", "Dissertation - 40 credits"
+  #
+  # If the guard incorrectly removes a legitimate campus name, use
+  # text_cleaning.location.strip_patterns to pre-clean BEFORE the guard fires,
+  # or text_cleaning.field_overrides to hard-set the value for specific URLs.
+
 
 # ── NOTES ─────────────────────────────────────────────────────────────────────
 # Document the WHY of every override so the next maintainer (or Gemini AI)

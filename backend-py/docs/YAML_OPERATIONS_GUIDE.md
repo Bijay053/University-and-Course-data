@@ -40,6 +40,8 @@ Scrape result has a problem
          │
          ├─ Location is blank or wrong? ──────────────────► SECTION E (Location)
          │
+         ├─ degree_level shows as full course name / wrong? ► SECTION E2 (Degree level)
+         │
          ├─ Course name has junk suffix? ─────────────────► SECTION F (Course name)
          │
          ├─ Domestic-only courses are being staged? ──────► filters.domestic_only
@@ -228,6 +230,16 @@ extraction:
 | `text_cleaning.location.strip_patterns` | `[]` | Strip CMS noise from raw location strings before parsing |
 | `default_course_location` | `null` | Fallback when all extractors return blank; prevents online-only staging gate from rejecting on-campus courses whose location HTML was missing |
 
+> **Auto-cleaning guard (no YAML needed):** The staging pipeline automatically
+> rejects obvious garbage from `course_location` at every scrape — no YAML key
+> required. Rejected patterns include: strings > 80 chars, date strings
+> ("Friday 17 July"), honorific person names ("Dr Smith", "Prof. Rice"),
+> person job-title words (professor / lecturer / course leader / BBC producer),
+> CMS boilerplate ("Please note", "Worried about Personal Statements?",
+> "Course Structure", "EU/international students"), and credit descriptions
+> ("60 credits of modules"). If the guard incorrectly removes a legitimate
+> campus name, pre-clean with `strip_patterns` or hard-set via `field_overrides`.
+
 ### Recipe E1 — "Location includes a trailing label like 'Delivery method'"
 
 Use YAML single-quoted strings for all regex patterns — backslashes need no extra escaping:
@@ -248,6 +260,88 @@ extraction:
   default_course_location: "Hobart"   # primary campus city
   max_parallel_fetch: 2               # reduce concurrency to avoid 429s
 ```
+
+### Recipe E3 — "Location auto-clean removed a legitimate campus name"
+
+Symptom: a campus name like "Media Production Centre" is cleared because it
+triggers a blocked phrase (e.g. "Production").  
+Fix: pre-clean the field before the guard fires, or hard-override the URL:
+
+```yaml
+extraction:
+  text_cleaning:
+    location:
+      strip_patterns:
+        - '\bProduction Centre\b'     # strip the ambiguous part first; guard sees remainder
+  # OR hard-set specific URLs:
+  text_cleaning:
+    field_overrides:
+      - url_regex: '/courses/media-production'
+        field: course_location
+        value: "Media Production Centre"
+```
+
+---
+
+## SECTION E2 — Degree level
+
+The scraper enforces **exactly 10 canonical** `degree_level` values.  Any
+other value is automatically cleared and re-inferred from the course name.
+
+| Canonical value | Common raw inputs auto-corrected to it |
+|---|---|
+| `"Bachelor's"` | BA, BSc, BEng, BBA, BSW, BSN, BHons, HNC, HND, Foundation Degree, FdA, FdSc, any "Bachelor of …" title |
+| `"Master's"` | MA, MSc, MEng, MBA, MRes, any "Master of …" title |
+| `"Doctorate"` | PhD, DBA, DEng, EdD, any "Doctor of …" title |
+| `"Graduate Certificate"` | PgCert, Postgraduate Certificate |
+| `"Graduate Diploma"` | PgDip, Postgraduate Diploma |
+| `"Associate Degree"` | Associate Degree |
+| `"Advanced Diploma"` | Advanced Diploma |
+| `"Diploma"` | Diploma |
+| `"Certificate"` | Certificate |
+| `"Foundation"` | Foundation, Foundation Year, Foundation Certificate |
+
+> **This is code-enforced — there is no YAML key to change the allowed set.**
+> The guard runs in `stage_course.py` on every staged course. Non-canonical
+> values (including full course names like "Accounting and Finance - BSc (Hons)"
+> stored by Gemini) are silently cleared and re-inferred.
+
+### Recipe E2-A — "degree_level shows as 'Postgraduate Certificate' instead of 'Graduate Certificate'"
+
+**No YAML action needed.** The staging guard automatically maps:
+- `"Postgraduate Certificate"` → `"Graduate Certificate"`
+- `"Postgraduate Diploma"` → `"Graduate Diploma"`
+
+If many courses still show the wrong value in the UI *before* the next scrape,
+run the repair script to fix existing staged rows:
+
+```bash
+# Dev
+PYTHONPATH=backend-py python3 backend-py/scripts/repair_staging_degree_location.py
+
+# Prod (per university)
+PYTHONPATH=backend-py python3 backend-py/scripts/repair_staging_degree_location.py --university-id <N>
+```
+
+### Recipe E2-B — "degree_level shows as the full course name (e.g. 'Music Business - BA (Hons)')"
+
+Symptom: Gemini or the page-lead extractor stored the full course title in the
+`degree_level` column instead of a canonical value.
+
+**No YAML action needed.** The non-canonical guard catches this and re-infers
+from the course name. For existing rows, run the repair script above.
+
+### Recipe E2-C — "degree_level is blank for many courses"
+
+The classifier couldn't infer a value from the course name. Check:
+
+1. Does the course name include a recognisable qualification abbreviation?
+   (BA, BSc, MA, PhD, etc.) — if not, Gemini is the only source.
+2. Is Gemini returning the correct value? Check the evidence panel in the
+   admin review screen.
+3. If the university uses an unusual abbreviation not in the classifier
+   (e.g. a custom program code), escalate to engineering to add it to
+   `_NAME_PATTERNS` in `extractors/degree_level.py`.
 
 ---
 
