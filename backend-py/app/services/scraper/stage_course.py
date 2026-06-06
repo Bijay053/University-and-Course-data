@@ -489,6 +489,34 @@ async def stage_course(
         payload = dict(payload)
         payload["degree_level"] = _canon
 
+    # Fallback degree_level inference from course_name.
+    #
+    # The degree_level extractor in single_course.py uses payload.setdefault()
+    # so it can be silently blocked when something upstream set degree_level=None
+    # explicitly (e.g. a sibling-cache hit that returned None, or a pre-seed).
+    # This staging chokepoint runs AFTER all extractors and acts as a guaranteed
+    # last-resort: if degree_level is still blank, re-derive it from course_name
+    # using the same classifier.  This catches qualifications like MA, MPH, LLM,
+    # LLB, BNurs, BMid, MPharm, HNC, HND, FdA/FdSc that the extractor resolved
+    # but whose result was blocked by a prior None assignment.
+    if not (payload.get("degree_level") or "").strip():
+        _cname_for_dl = (payload.get("course_name") or "").strip()
+        if _cname_for_dl:
+            try:
+                from app.services.scraper.extractors.degree_level import (
+                    classify_degree_level as _classify_dl,
+                )
+                _inferred_dl, _dl_method, _ = _classify_dl(_cname_for_dl)
+                if _inferred_dl:
+                    payload = dict(payload)
+                    payload["degree_level"] = _inferred_dl
+                    log.info(
+                        "[DL FALLBACK] %s: %r → %r (method=%s)",
+                        name, _cname_for_dl[:60], _inferred_dl, _dl_method,
+                    )
+            except Exception:  # noqa: BLE001
+                pass  # never block staging on inference failure
+
     # Universal "Online" / virtual-mode scrub for course_location.
     #
     # Rationale: the location extractor cascade calls _sanitise_for_display
@@ -545,6 +573,43 @@ async def stage_course(
                 "[LOC COUNTRY STRIP] %s: %r → %r",
                 name, _raw_loc2, payload["course_location"],
             )
+
+    # Strip institutional label prefixes and reject bare delivery-mode labels.
+    #
+    # Some CMSes (Wolverhampton, etc.) prefix every campus with "University:"
+    # and Gemini faithfully copies it into location_text.  The fix in
+    # _sanitise_for_display covers new scrapes via the Gemini path, but this
+    # staging chokepoint handles ALL paths (structural extractor, AI fallback,
+    # uni-specific pre-seeds) and also cleans already-staged rows on re-scrape.
+    #
+    # Examples cleaned here:
+    #   "University: City Campus"  → "City Campus"
+    #   "University: City Campus, University: Springfield Campus"
+    #                              → "City Campus, Springfield Campus"
+    #   "University:"              → None  (bare label → drop)
+    #   "Mode"                     → None  (delivery-mode label → drop)
+    _raw_loc3 = (payload.get("course_location") or "").strip()
+    if _raw_loc3:
+        try:
+            from app.services.scraper.extractors.location import (
+                _INST_LABEL_PREFIX_RE as _ilpre,
+                _is_only_delivery_method as _iodm,
+            )
+            _loc3_parts = [
+                _ilpre.sub("", p).strip()
+                for p in _raw_loc3.split(",")
+            ]
+            _loc3_parts = [p for p in _loc3_parts if p and not _iodm(p)]
+            _loc3 = ", ".join(_loc3_parts) if _loc3_parts else None
+            if _loc3 != _raw_loc3:
+                payload = dict(payload)
+                payload["course_location"] = _loc3
+                log.info(
+                    "[LOC PREFIX STRIP] %s: %r → %r",
+                    name, _raw_loc3, _loc3,
+                )
+        except Exception:  # noqa: BLE001
+            pass  # never block staging on clean failure
 
     # ── Per-uni global_substring_blocklist + field_overrides (opt-in) ────────
     # Two YAML knobs applied here so they affect EVERY string field on the

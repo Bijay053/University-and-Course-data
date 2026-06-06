@@ -548,6 +548,23 @@ def _sanitise_for_display(raw: str | None) -> str | None:
     raw = _TRAILING_KEYS.split(raw, maxsplit=1)[0].strip() or raw
     if not raw:
         return None
+    # Reject bare delivery-method / non-location labels (e.g. "Mode") before
+    # any further processing so they never reach the staging queue regardless
+    # of which extraction path produced them (structural, Gemini, AI fallback).
+    if _is_only_delivery_method(raw):
+        return None
+    # Strip institutional label prefixes that some CMSes prepend to campus
+    # names.  Gemini faithfully copies these, producing values like
+    # "University: City Campus" or "University: City, University: Walsall".
+    # Apply per comma-separated part BEFORE the split loop so that multi-
+    # campus strings are cleaned as a unit.  Empty parts (bare "University:")
+    # are dropped.
+    if _INST_LABEL_PREFIX_RE.search(raw):
+        _pre_parts = [_INST_LABEL_PREFIX_RE.sub("", p).strip() for p in raw.split(",")]
+        _pre_parts = [p for p in _pre_parts if p]
+        raw = ", ".join(_pre_parts)
+        if not raw:
+            return None
     # Strip trailing availability qualifiers from each campus part before
     # any other processing.  JCU course pages render availability as a table
     # whose cells end up as "Townsville Not offered", "Cairns Not", etc. after
