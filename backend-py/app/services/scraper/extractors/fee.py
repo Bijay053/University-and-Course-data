@@ -103,16 +103,37 @@ _FIRST_YEAR_FEE_CTX = re.compile(
 )
 _YEAR_RE = re.compile(r"\b(20\d{2})\b")
 
-# Commonwealth Supported Place / HECS / student contribution labels signal
-# a domestic government-subsidised fee.  These amounts must never be stored
-# as the international tuition fee (e.g. UTAS CSP ~$9,000–$16,000/yr).
+# Domestic / non-international fee context labels.  Any amount whose
+# surrounding window contains one of these phrases is NOT a valid
+# international tuition fee and must be skipped.
+#
+# Covers:
+#  AU/NZ: Commonwealth Supported Place, HECS-HELP, student contribution
+#  UK:    Home fee, Home student fee, UK fee, UK student fee
+#  Any:   per-module / per-credit / CPD / professional development fees
+#         (these are module-unit prices, never annual international tuition)
 _CSP_DOMESTIC_CTX = re.compile(
     r"\b(?:commonwealth\s+supported(?:\s+place)?|"
     r"HECS(?:-HELP)?|"
     r"student\s+contribution(?:\s+amount)?|"
-    r"domestic\s+(?:student\s+)?(?:tuition\s+)?fee)\b",
+    r"domestic\s+(?:student\s+)?(?:tuition\s+)?fee|"
+    # UK home-student labels
+    r"home\s+(?:student\s+)?(?:tuition\s+)?fee|"
+    r"uk\s+(?:student\s+)?(?:tuition\s+)?fee|"
+    r"(?:for\s+)?(?:uk|home)\s+students?|"
+    # Per-module / per-credit / CPD prices (never annual international tuition)
+    r"per\s+(?:module|credit|unit\s+of\s+credit)|"
+    r"module\s+fee|credit\s+fee|"
+    r"(?:continuing\s+professional\s+development|cpd)\s+(?:fee|rate|price)|"
+    r"part[\s\-]time\s+(?:fee|rate|tuition))\b",
     re.IGNORECASE,
 )
+
+# Minimum plausible international annual fee in GBP for a UK university.
+# Genuine international UG/PG fees at UK universities are ≥ £10,000/yr.
+# Amounts below this threshold without an explicit "international" label in
+# the surrounding context are almost certainly domestic/home/module fees.
+_GBP_INTL_MIN = 10_000
 
 _COUNTRY_CURRENCY = {
     "australia": "AUD",
@@ -520,11 +541,19 @@ def _candidates(text: str) -> Iterable[tuple[int, str, str]]:
             continue
         # CSP / domestic fee guard: reject amounts whose immediate context
         # mentions "Commonwealth Supported Place", "HECS", "student
-        # contribution", or "domestic fee".  These are government-subsidised
-        # domestic fees and must never be stored as the international tuition
-        # (e.g. UTAS CSP ~$9,000–$16,000/yr appearing alongside the real
-        # international fee of ~$35,000+/yr).
+        # contribution", "domestic fee", "home student fee", "UK student fee",
+        # "per module", "per credit", "CPD fee", or "part-time fee".
+        # These are domestic/module prices and must never be stored as the
+        # international annual tuition fee.
         if _CSP_DOMESTIC_CTX.search(ctx):
+            continue
+        # GBP floor guard for UK universities.
+        # Genuine international annual fees at UK universities are ≥ £10,000.
+        # Any GBP amount below this threshold is almost certainly a domestic
+        # (home-student) fee, a per-module price, a CPD rate, or a part-time
+        # module charge — unless the immediate context contains an explicit
+        # "international" cue that confirms this is the international fee.
+        if cur == "GBP" and amount < _GBP_INTL_MIN and not _INTL_CTX.search(ctx):
             continue
         yield amount, cur, ctx
 

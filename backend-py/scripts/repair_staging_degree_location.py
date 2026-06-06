@@ -175,10 +175,71 @@ async def _run(dry_run: bool, university_id: int | None) -> None:
     elif dry_run:
         print(f"→ (dry-run) would update course_location on {len(loc_updates)} rows")
 
+    # ── 3. Domestic / sub-floor fee clearing ─────────────────────────────────
+    # Clear international_fee on rows where the stored value is almost
+    # certainly a domestic fee:
+    #   GBP < £10,000  — home/module/CPD fee for a UK university
+    #   AUD < A$5,000  — per-unit or CSP rate
+    # These match the new _GBP_INTL_MIN guard and extended _CSP_DOMESTIC_CTX
+    # added to fee.py so future scrapes won't pick them up; this clears the
+    # already-staged bad rows.
+    if university_id:
+        fee_rows = await conn.fetch(
+            f"""
+            SELECT id, course_name, international_fee, fee_currency
+            FROM scraped_courses
+            WHERE international_fee IS NOT NULL
+              AND status NOT IN ('rejected', 'approved')
+              AND (
+                  (fee_currency = 'GBP' AND international_fee < 10000)
+                  OR (fee_currency = 'AUD' AND international_fee < 5000)
+              )
+              {uni_filter}
+            ORDER BY university_id, id
+            """,
+            university_id,
+        )
+    else:
+        fee_rows = await conn.fetch(
+            """
+            SELECT id, course_name, international_fee, fee_currency
+            FROM scraped_courses
+            WHERE international_fee IS NOT NULL
+              AND status NOT IN ('rejected', 'approved')
+              AND (
+                  (fee_currency = 'GBP' AND international_fee < 10000)
+                  OR (fee_currency = 'AUD' AND international_fee < 5000)
+              )
+            ORDER BY university_id, id
+            """
+        )
+
+    print(f"\nFound {len(fee_rows)} rows with likely domestic/sub-floor fees")
+    fee_clear_ids: list[int] = []
+    for row in fee_rows:
+        cname = (row["course_name"] or "")[:45]
+        fee = row["international_fee"]
+        cur = row["fee_currency"]
+        fee_clear_ids.append(row["id"])
+        print(f"  [FEE] id={row['id']:6d} {cname!r:47s} {cur} {fee:,.0f} → clear")
+
+    if not dry_run and fee_clear_ids:
+        await conn.executemany(
+            "UPDATE scraped_courses SET international_fee = NULL, fee_term = NULL, fee_currency = NULL WHERE id = $1",
+            [(i,) for i in fee_clear_ids],
+        )
+        print(f"→ international_fee cleared on {len(fee_clear_ids)} rows")
+    elif dry_run:
+        print(f"→ (dry-run) would clear international_fee on {len(fee_clear_ids)} rows")
+
     await conn.close()
 
     if not dry_run:
-        print(f"\n✔ Done: {len(dl_updates)} degree_level fixes, {len(loc_updates)} location fixes")
+        print(
+            f"\n✔ Done: {len(dl_updates)} degree_level fixes, "
+            f"{len(loc_updates)} location fixes, "
+            f"{len(fee_clear_ids)} domestic fee clears"
+        )
     else:
         print(f"\n(dry-run complete — no changes written)")
 

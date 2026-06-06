@@ -72,6 +72,14 @@ _NAME_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"\b(b\.?nurs|b\.?mid)\b", re.IGNORECASE), "Bachelor's"),
     (re.compile(r"\bll\.?b\b", re.IGNORECASE), "Bachelor's"),
     (re.compile(r"\bm\.?pharm\b", re.IGNORECASE), "Bachelor's"),
+    # Foundation Degrees — long forms used by Wolverhampton and other UK universities:
+    #   "Fd (Arts) Early Years Services"  → Bachelor's
+    #   "Fd (Science) Sports Coaching"    → Bachelor's
+    #   "Foundation Degree in ..."        → Bachelor's
+    # The short abbreviations FdA / FdSc are kept below as a fallback.
+    (re.compile(r"\bfd\s*\(\s*arts?\s*\)", re.IGNORECASE), "Bachelor's"),
+    (re.compile(r"\bfd\s*\(\s*sci(?:ence)?\s*\)", re.IGNORECASE), "Bachelor's"),
+    (re.compile(r"\bfoundation\s+degree\b", re.IGNORECASE), "Bachelor's"),
     (re.compile(r"\bfd(?:a|sc)\b", re.IGNORECASE), "Bachelor's"),  # FdA, FdSc
     (re.compile(r"\bhn[cd]\b", re.IGNORECASE), "Bachelor's"),   # HNC, HND
     # Existing broad bachelor patterns — BSc (Hons) style covered by b\.?sc;
