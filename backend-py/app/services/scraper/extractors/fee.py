@@ -178,7 +178,11 @@ def _infer_currency_from_url(url: str) -> str | None:
 def _detect_currency(ctx: str, country: str | None) -> str:
     if re.search(r"NZ\$|NZD", ctx, re.I):
         return "NZD"
-    if re.search(r"CA\$|C\$|CAD", ctx, re.I):
+    # CA\$ = unambiguous Canadian-dollar prefix (e.g. "CA$18,645").
+    # Bare C\$ is intentionally excluded: it false-matches text like
+    # "Course$18,645" or "Contact…C $18,645" on UK university pages,
+    # producing CAD amounts that are actually GBP.
+    if re.search(r"\bCA\$|\bCAD\b", ctx, re.I):
         return "CAD"
     if re.search(r"S\$|SGD", ctx, re.I):
         return "SGD"
@@ -873,8 +877,11 @@ async def extract(
     if not (_TUITION_CTX.search(ctx) or _INTL_CTX.search(ctx)):
         return []
     currency = _detect_currency(ctx, country)
-    # Bug 10: same TLD-based override for the keyword path.
-    if currency == "AUD":
+    # TLD-based override for the keyword path: when the scanner produces
+    # AUD or CAD for a URL that implies a different currency (e.g. .ac.uk
+    # → GBP, .ac.nz → NZD), replace with the TLD-inferred value.
+    # This catches the CAD false-positive from bare C$ on UK pages.
+    if currency in ("AUD", "CAD"):
         _url_cur = _infer_currency_from_url(url)
         if _url_cur:
             currency = _url_cur
