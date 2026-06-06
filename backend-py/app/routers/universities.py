@@ -3464,6 +3464,8 @@ async def list_scraped_courses(
         """), {"uid": uni_id, "jid": job_id},
     )).mappings().all()
 
+    from app.services.scraper.response_sanitizer import sanitize_degree_level
+
     return {
         "university_id": uni_id,
         "job_id": job_id,
@@ -3475,7 +3477,7 @@ async def list_scraped_courses(
                 "completeness": c["completeness"],
                 "auto_publish_status": c["auto_publish_status"],
                 "study_mode": c["study_mode"],
-                "degree_level": c["degree_level"],
+                "degree_level": sanitize_degree_level(c["degree_level"], c["course_name"]),
                 "international_fee": c["international_fee"],
                 "ielts_overall": c["ielts_overall"],
                 "course_website": c["course_website"],

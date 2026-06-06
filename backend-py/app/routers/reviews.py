@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies import get_current_user, get_db
 from app.models import ScrapedCourse, University
+from app.services.scraper.response_sanitizer import sanitize_scraped_row
 
 log = logging.getLogger(__name__)
 
@@ -49,6 +50,8 @@ async def list_scraped_courses(
                 d["duration"] = round(float(d["duration"]), 2)
             except (TypeError, ValueError):
                 pass
+        # Apply response-level guards: canonical degree_level + garbage location.
+        sanitize_scraped_row(d)
         return d
 
     return {

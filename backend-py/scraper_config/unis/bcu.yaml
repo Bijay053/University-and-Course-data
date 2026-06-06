@@ -1,0 +1,79 @@
+# Birmingham City University
+# Hostname: www.bcu.ac.uk
+# CMS: Contensis (campus CMS; testimonial blocks adjacent to location panel)
+# Country: United Kingdom  |  Currency: GBP
+# Note: BCU renders student/staff testimonials and open-day quotes in the same
+#       DOM section as the campus location. The auto-garbage-location guard
+#       (stage_course.py) clears these automatically on every scrape.
+#       Two fee bands exist per course: ~£9,790 (City South) and ~£10,050
+#       (City Centre) — single-campus dedup keeps the higher fee.
+
+discovery:
+  always_sitemap_supplement: true
+  allow_url_patterns:
+    - '/courses/'
+  block_url_patterns:
+    - '/news/'
+    - '/events/'
+    - '/staff/'
+    - '/research/'
+    - '/alumni/'
+    - '/open-days/'
+    - '/study/'
+
+extraction:
+  fees:
+    default_currency: "GBP"
+    prefer_international: true
+    reject_keywords:
+      - "Home student"
+      - "UK student"
+      - "UK fee"
+      - "Home fee"
+      - "per module"
+      - "per credit"
+      - "CPD"
+      - "short course"
+    international_fee_keywords:
+      - "International"
+      - "International student"
+      - "International fee"
+      - "Overseas"
+
+  study_mode:
+    online_only_requires_strong_evidence: true   # "apply online" appears in nav/footer
+    prefer_location_over_online_keyword: true
+
+  english:
+    default_ielts: 6.0
+    use_default_when_missing: false
+
+  intake:
+    use_default_when_missing: true
+    default_source_note: "BCU typical intake"
+    default_by_level:
+      undergraduate:
+        - September
+      postgraduate:
+        - September
+        - January
+      doctorate:
+        - September
+        - February
+        - May
+
+  course_name:
+    strip_title_suffixes:
+      - " | BCU"
+      - " | Birmingham City University"
+      - " - Birmingham City University"
+      - "Birmingham City University"
+
+  filters:
+    online_only:
+      enabled: true
+      keep_if_location_present: true
+
+  staging:
+    reject_if_missing:
+      - course_name

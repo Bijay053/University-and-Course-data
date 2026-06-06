@@ -136,7 +136,10 @@ async def _run(dry_run: bool, university_id: int | None) -> None:
 
     conn = await asyncpg.connect(db_url)
 
+    # uni_filter is for Section 1 (DL) which passes 2 params: canonical_list=$1, university_id=$2
     uni_filter = "AND university_id = $2" if university_id else ""
+    # uni_filter_1 is for Sections 2-5 which pass only 1 param: university_id=$1
+    uni_filter_1 = "AND university_id = $1::int" if university_id else ""
 
     # ── 1. degree_level repair ────────────────────────────────────────────────
     # Fetch rows where degree_level is either:
@@ -207,15 +210,18 @@ async def _run(dry_run: bool, university_id: int | None) -> None:
         print(f"→ (dry-run) would update degree_level on {len(dl_updates)} rows")
 
     # ── 2. course_location repair ─────────────────────────────────────────────
+    # NOTE: this section uses its own $1 parameter (university_id only), NOT
+    # the shared uni_filter which uses $2 (designed for the DL section that
+    # also passes the canonical-levels array as $1).
     if university_id:
         loc_rows = await conn.fetch(
-            f"""
+            """
             SELECT id, course_name, course_location
             FROM scraped_courses
             WHERE course_location IS NOT NULL
               AND course_location != ''
               AND status NOT IN ('rejected', 'approved')
-              {uni_filter}
+              AND university_id = $1::int
             ORDER BY university_id, id
             """,
             university_id,
@@ -274,7 +280,7 @@ async def _run(dry_run: bool, university_id: int | None) -> None:
                   (currency = 'GBP' AND international_fee < 10000)
                   OR (currency = 'AUD' AND international_fee < 5000)
               )
-              {uni_filter}
+              {uni_filter_1}
             ORDER BY university_id, id
             """,
             university_id,
@@ -336,7 +342,7 @@ async def _run(dry_run: bool, university_id: int | None) -> None:
               AND sc.currency != 'GBP'
               AND sc.status NOT IN ('rejected', 'approved')
               AND ({_uk_condition})
-              {uni_filter}
+              {uni_filter_1}
             ORDER BY sc.currency, sc.university_id, sc.id
             """,
             university_id,
@@ -392,7 +398,7 @@ async def _run(dry_run: bool, university_id: int | None) -> None:
             WHERE course_location IS NOT NULL
               AND course_location != ''
               AND status NOT IN ('rejected', 'approved')
-              {uni_filter}
+              {uni_filter_1}
             ORDER BY university_id, id
             """,
             university_id,
