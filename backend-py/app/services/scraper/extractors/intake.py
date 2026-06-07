@@ -882,6 +882,47 @@ async def _extract_raw(html: str, url: str) -> list[ExtractionResult]:
 # Verified 2026-05-17 on Graduate Diploma in Legal Practice
 # (university_id QUT, course id 22761; stored ["January","March","May",
 # "July","August","October"] vs page-canonical ["January","July"]).
+def _from_bcu_panel(html: str, url: str) -> list[str] | None:
+    """BCU-specific intake extractor: reads the 'Start date' span from the
+    structured course facts panel ``div.course__key-info__inner``.
+
+    BCU renders intake dates as a comma-separated string inside the panel:
+        <span class="title">Start date</span>
+        <span class="value">September 2026, January 2027</span>
+
+    The generic regex cascade reads the full prose and can pull in extra
+    month tokens from testimonials, scholarship windows, or 'applications
+    open' paragraphs.  This reader is scoped strictly to the panel so only
+    the authoritative start-dates value is parsed.
+    """
+    from urllib.parse import urlparse as _urlparse
+
+    host = (_urlparse(url or "").hostname or "").lower()
+    if not (host == "www.bcu.ac.uk" or host.endswith(".bcu.ac.uk")):
+        return None
+    from bs4 import BeautifulSoup
+
+    soup = BeautifulSoup(html, "html.parser")
+    panel = soup.select_one("div.course__key-info__inner")
+    if not panel:
+        return None
+    for li in panel.select("li"):
+        title_el = li.select_one("span.title")
+        value_el = li.select_one("span.value")
+        if (
+            title_el
+            and value_el
+            and title_el.get_text(strip=True).lower() == "start date"
+        ):
+            raw = value_el.get_text(strip=True)
+            parsed = _classify_intake_value(raw)
+            if parsed:
+                months, _day = parsed
+                # Return months in calendar order
+                return [mo for mo in _MONTHS if mo in set(months)]
+    return None
+
+
 def _from_qut_quickbox(html: str, url: str) -> list[str] | None:
     from urllib.parse import urlparse as _urlparse
     host = (_urlparse(url or "").hostname or "").lower()
@@ -929,6 +970,24 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
     course listings for BOTH Semester 1 AND Semester 2, ensuring that
     programmes with mid-year intake are not reported as February-only.
     """
+    # BCU structural pre-pass — reads the 'Start date' span directly from
+    # the course facts panel div.course__key-info__inner.  Runs BEFORE the
+    # generic regex cascade to prevent extra month tokens from testimonials,
+    # scholarship windows, and open-day content bleeding into intake_months.
+    # Pattern mirrors the QUT pre-pass below.
+    _bcu_months = _from_bcu_panel(html, url)
+    if _bcu_months:
+        return [
+            ExtractionResult(
+                field_key="intake_months",
+                value=_bcu_months,
+                normalized={"intake_months": _bcu_months, "intake_days": None},
+                confidence=0.97,
+                snippet=f"bcu.panel: {', '.join(_bcu_months)}",
+                method="intake.bcu_panel",
+            )
+        ]
+
     # QUT structural pre-pass — see _from_qut_quickbox above.  Runs BEFORE
     # _extract_raw because the canonical `quickBoxCourseStartsINT` UL is the
     # authoritative source for QUT intake months; the generic regex cascade

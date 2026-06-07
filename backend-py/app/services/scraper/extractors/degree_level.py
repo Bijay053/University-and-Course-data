@@ -197,11 +197,89 @@ def classify_degree_level(course_name: str, page_text: str = "") -> tuple[str | 
     return None, "unknown", None
 
 
+def _from_bcu_panel(html: str) -> tuple[str | None, str, str | None]:
+    """BCU-specific degree-level extractor: reads the 'Award' field from
+    the structured course facts panel ``div.course__key-info__inner``.
+
+    BCU course pages show two related fields in the panel:
+        Award: BA (Hons) / BSc (Hons) / MSc / PhD / MBA / HND / …
+        Level: Foundation / Undergraduate / Postgraduate Taught / Postgraduate Research
+
+    Strategy: try 'Award' first (most specific), fall back to 'Level'
+    with a BCU-specific Level→canonical mapping.  Returns (degree, method,
+    snippet) matching the shape of ``classify_degree_level``.
+    """
+    try:
+        from bs4 import BeautifulSoup
+    except ImportError:  # pragma: no cover
+        return None, "unknown", None
+
+    soup = BeautifulSoup(html, "html.parser")
+    panel = soup.select_one("div.course__key-info__inner")
+    if not panel:
+        return None, "unknown", None
+
+    award: str | None = None
+    level: str | None = None
+    for li in panel.select("li"):
+        title_el = li.select_one("span.title")
+        value_el = li.select_one("span.value")
+        if not title_el or not value_el:
+            continue
+        key = title_el.get_text(strip=True).lower()
+        val = value_el.get_text(strip=True)
+        if key == "award":
+            award = val
+        elif key == "level":
+            level = val
+
+    # Primary: classify the Award field (BA (Hons), MSc, PhD, HND, etc.)
+    if award:
+        hit = _classify_text(award, _NAME_PATTERNS)
+        if hit:
+            return hit, "bcu_panel_award", award[:200]
+
+    # Secondary: map BCU's Level descriptor to canonical degree_level.
+    # BCU uses plain English descriptions, not abbreviations.
+    _BCU_LEVEL_MAP: dict[str, str] = {
+        "foundation": "Foundation",
+        "undergraduate": "Bachelor's",
+        "postgraduate taught": "Master's",
+        "postgraduate research": "Doctorate",
+        "professional": "Master's",
+    }
+    if level:
+        mapped = _BCU_LEVEL_MAP.get(level.lower().strip())
+        if mapped:
+            return mapped, "bcu_panel_level", level[:200]
+
+    return None, "unknown", None
+
+
 async def extract(html: str, url: str, course_name: str | None = None) -> list[ExtractionResult]:
     # The pipeline doesn't pass ``course_name`` directly — by the time this
     # extractor runs the course-name extractor has populated payload, but
     # extractors are independent so we re-derive a best-effort name from
     # the <title> tag if needed.
+    #
+    # BCU structural pre-pass — reads 'Award' (BA (Hons)/MSc/PhD/…) directly
+    # from the course facts panel div.course__key-info__inner, falling back
+    # to the 'Level' descriptor (Undergraduate/Postgraduate Taught/…).
+    # Runs before generic text classification to prevent degree-level noise
+    # from other-course listings, nav text, or page prose.
+    _bcu_degree, _bcu_method, _bcu_snippet = _from_bcu_panel(html)
+    if _bcu_degree:
+        return [
+            ExtractionResult(
+                field_key=field_key,
+                value=_bcu_degree,
+                normalized={"degree_level": _bcu_degree},
+                confidence=0.97,
+                method=f"degree_level:{_bcu_method}",
+                snippet=_bcu_snippet,
+            )
+        ]
+
     name = course_name or _title_from_html(html) or ""
     degree, method, snippet = classify_degree_level(name, html)
     if not degree:
