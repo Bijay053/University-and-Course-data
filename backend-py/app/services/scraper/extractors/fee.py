@@ -757,6 +757,80 @@ def _score(amount: int, ctx: str, *, prefer_year_one: bool = False) -> int:
     return s
 
 
+def _from_bcu_int_fee_panel(
+    html: str, url: str
+) -> "tuple[int, str] | None":
+    """BCU-specific fee extractor: reads the Full-Time annual fee from
+    the 'International Student' tab section of the BCU fee panel.
+
+    BCU course pages render two tab panels inside ``#fees_how_to_apply``:
+
+        div#uk-students   → UK/home fee (£9,790 – £10,050)
+        div#int-students  → International fee (£17,000 – £19,220)
+
+    The generic regex cascade has no tab-boundary awareness and reads the
+    UK fee first (it appears first in the DOM).  This reader reads only
+    ``div#int-students div.course-fees-table__mode-row ul`` rows and
+    returns the Full-Time fee, falling back to the first available row.
+
+    Returns (amount_int, ctx_string) or None when not applicable /
+    section absent.  Never returns a sentinel — callers treat None as
+    "not found, continue with fallback".
+    """
+    from urllib.parse import urlparse as _urlparse
+
+    host = (_urlparse(url or "").hostname or "").lower()
+    if not (host == "www.bcu.ac.uk" or host.endswith(".bcu.ac.uk")):
+        return None
+
+    try:
+        from bs4 import BeautifulSoup
+    except ImportError:  # pragma: no cover
+        return None
+
+    try:
+        soup = BeautifulSoup(html, "html.parser")
+    except Exception:  # pragma: no cover
+        return None
+
+    int_panel = soup.find(id="int-students") or soup.select_one(
+        ".course-fees__table--int-students"
+    )
+    if not int_panel:
+        return None
+
+    # Each mode row is: <div.course-fees-table__mode-row><ul> with
+    #   <li class="mode">, <li class="duration">, <li class="fees ...">
+    first_amount: int | None = None
+    first_ctx: str | None = None
+    for row_ul in int_panel.select("div.course-fees-table__mode-row ul"):
+        mode_li = row_ul.select_one("li.mode")
+        fees_li = row_ul.select_one("li.fees")
+        if not fees_li:
+            continue
+        raw_fee = fees_li.get_text(strip=True)
+        m = _AMOUNT_RE.search(raw_fee)
+        if not m:
+            continue
+        raw_num = m.group(2) or m.group(3) or ""
+        amount = _parse_amount(raw_num)
+        if amount is None:
+            continue
+        ctx = f"BCU int-students Full Time: {raw_fee}"
+        mode_text = (mode_li.get_text(strip=True) if mode_li else "").lower()
+        if "full" in mode_text:
+            # Exact Full-Time match — return immediately
+            return amount, ctx
+        # Keep first non-Full-Time row as fallback
+        if first_amount is None:
+            first_amount = amount
+            first_ctx = ctx
+
+    if first_amount is not None:
+        return first_amount, first_ctx  # type: ignore[return-value]
+    return None
+
+
 async def extract(
     html: str, url: str, *, country: str | None = None
 ) -> list[ExtractionResult]:
@@ -777,6 +851,32 @@ async def extract(
             prefer_yr1 = bool(_cfg.extraction.fees.prefer_year_one_over_total)
     except Exception:  # noqa: BLE001 — defensive; keep extractor working
         prefer_yr1 = False
+
+    # ── Pre-pass BCU: tab-aware International Student fee panel ─────────────
+    # BCU course pages expose two sibling div panels inside #fees_how_to_apply:
+    #   div#uk-students   — UK/home fee (£9,790–£10,050, rendered FIRST in DOM)
+    #   div#int-students  — International fee (£17k–£19k, rendered SECOND)
+    # The generic regex cascade has no tab-boundary awareness and picks the
+    # UK fee because it appears first in the flattened text.  This pre-pass
+    # reads only div#int-students and returns the Full-Time fee directly.
+    _bcu_fee = _from_bcu_int_fee_panel(html, url)
+    if _bcu_fee is not None:
+        _bcu_amount, _bcu_ctx = _bcu_fee
+        return [
+            ExtractionResult(
+                field_key="international_fee",
+                value=_bcu_amount,
+                normalized={
+                    "international_fee": _bcu_amount,
+                    "currency": "GBP",
+                    "fee_term": "Annual",
+                    "fee_year": _extract_year(_bcu_ctx),
+                },
+                confidence=0.96,
+                snippet=_bcu_ctx[:120],
+                method="fee.bcu_int_panel",
+            )
+        ]
 
     # ── Pre-pass 0: structured fee table (highest priority) ─────────────────
     # UK universities publish multi-row tables with Home / International ×
