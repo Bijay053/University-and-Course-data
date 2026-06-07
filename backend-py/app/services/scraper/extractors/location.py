@@ -1306,6 +1306,44 @@ def _from_text_block(text: str) -> str | None:
     return _normalise(window.replace(" / ", ", "))
 
 
+def _from_bcu_keyfacts(soup: BeautifulSoup) -> str | None:
+    """BCU-specific extractor: reads Location directly from the structured
+    course facts panel ``div.course__key-info__inner``.
+
+    BCU course pages render the facts panel as:
+
+        <div class="course__key-info__inner">
+          <div class="course__key-info__box-side">
+            <ul class="course__key-info__list">
+              <li>
+                <span class="title">Location</span>
+                <span class="value"><a href="...">City Centre</a></span>
+              </li>
+            </ul>
+          </div>
+        </div>
+
+    Every other page section (testimonials, graduate stories, marketing
+    quotes) is deliberately excluded — this extractor reads ONLY from
+    the panel div, so names like "Lauren Redfern" or "Ben Stones" are
+    never candidates.
+    """
+    panel = soup.select_one("div.course__key-info__inner")
+    if not panel:
+        return None
+    for li in panel.select("li"):
+        title_el = li.select_one("span.title")
+        value_el = li.select_one("span.value")
+        if (
+            title_el
+            and value_el
+            and title_el.get_text(strip=True).lower() == "location"
+        ):
+            loc = value_el.get_text(strip=True)
+            return _classify_location_value(loc) if loc else None
+    return None
+
+
 async def extract(html: str, url: str) -> list[ExtractionResult]:  # noqa: ARG001
     if not html:
         return []
@@ -1317,12 +1355,17 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:  # noqa: ARG00
     from app.services.scraper.config.context import get_uni_config  # local import avoids circular dep
     _uni_cfg = get_uni_config()
     _strip_patterns: list[re.Pattern[str]] = []
+    _allowed_values: list[str] = []
     if _uni_cfg:
         for _pat_str in _uni_cfg.extraction.text_cleaning.location.strip_patterns:
             try:
                 _strip_patterns.append(re.compile(_pat_str, re.IGNORECASE))
             except re.error:
                 pass  # bad pattern in YAML — skip rather than crash
+        _allowed_values = [
+            v.lower()
+            for v in _uni_cfg.extraction.text_cleaning.location.allowed_values
+        ]
 
     # ── UTAS page detection ──────────────────────────────────────────────────
     # Detect the hidden #tabInternational panel that UTAS injects into every
@@ -1453,6 +1496,20 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:  # noqa: ARG00
             ("heading", _from_headings(soup), 0.7),
             ("delivery_inperson", _from_delivery_mode_inperson(soup), 0.85),
         ]
+    elif "bcu.ac.uk" in (url or "").lower():
+        # BCU (Birmingham City University): the course facts panel is
+        # div.course__key-info__inner → span.title="Location" + span.value.
+        # All other page sections (testimonials, graduate stories, marketing
+        # quotes) contain person names that look like valid text to the generic
+        # strong/heading/text_block extractors — "Lauren Redfern",
+        # "Ben Stones, Station Sound", "Jocelyn Bennett" etc.
+        # Scoping extraction strictly to the keyfacts panel is the only correct
+        # fix; post-filters cannot distinguish person names from campus names.
+        # NO text_block or heading fallback — if the panel is absent (very
+        # rare) the field stays blank and routes to AI/review queue.
+        cascade_list = [
+            ("bcu_keyfacts", _from_bcu_keyfacts(soup), 0.98),
+        ]
     else:
         cascade_list = [
             # Structural pre-pass FIRST — see _from_strong_dom_walk for the
@@ -1514,6 +1571,12 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:  # noqa: ARG00
                 continue  # site-chrome string — try the next cascade method
         except Exception:  # noqa: BLE001 — never abort extraction on import error
             pass
+        # Per-uni allowed_values allowlist (YAML extraction.text_cleaning.location.allowed_values).
+        # Applied after sanitise so we compare normalised display values.
+        # Substring match (case-insensitive) so "City Centre" matches "City Centre, City South".
+        if _allowed_values:
+            if not any(av in display.lower() for av in _allowed_values):
+                continue  # extracted value not in allowlist — try next cascade method
         # Append country suffix when all tokens are unambiguous AU/NZ cities.
         # Skip for: (a) utas_intl_panel results, (b) any UTAS-domain page,
         # and (c) when the raw string already contained a country word — in

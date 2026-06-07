@@ -1607,6 +1607,17 @@ class LocationCleaningConfig(BaseModel):
             "E.g. ACAP: [r'\\^\\s*\\^.*$'] strips '^ ^Available in Perth' cruft."
         ),
     )
+    allowed_values: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Allowlist of valid campus/location strings (case-insensitive substring "
+            "match against the extracted value).  When non-empty, only values that "
+            "contain at least one entry are kept; all others are cleared to blank.  "
+            "Use for universities where the extractor may pick up person names or "
+            "testimonial copy from other page sections.  "
+            "E.g. BCU: ['City Centre', 'City South', 'Margaret Street', 'Online']."
+        ),
+    )
 
 
 class DurationCleaningConfig(BaseModel):

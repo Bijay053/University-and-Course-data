@@ -74,6 +74,20 @@ extraction:
       enabled: true
       keep_if_location_present: true
 
+  text_cleaning:
+    location:
+      # Strict allowlist — BCU has only three physical campuses plus online.
+      # Any extracted location value that does NOT contain one of these entries
+      # (case-insensitive substring) is cleared to blank. Belt-and-suspenders
+      # guard for testimonial/student-name bleed-through from other page sections.
+      allowed_values:
+        - "City Centre"
+        - "City South"
+        - "Margaret Street"
+        - "Online"
+        - "Distance Learning"
+        - "UK Campus"
+
   staging:
     reject_if_missing:
       - course_name
