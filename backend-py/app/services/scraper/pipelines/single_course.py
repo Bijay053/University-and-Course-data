@@ -964,7 +964,12 @@ def _finalize_evidence_selection(payload: dict[str, Any], evidence: list[dict[st
     for field_key, candidates in by_field.items():
         final_val = _coerce(payload.get(field_key))
         if final_val is None:
-            continue  # field not set — leave evidence as-is
+            # Field was cleared or never set — reset any stale "selected" markers
+            # left by Stage 0 or other early-write paths so the UI shows no winner.
+            for ev in candidates:
+                if ev.get("decision_status") == "selected":
+                    ev["decision_status"] = "needs_review"
+            continue
 
         # Pick the winner: value must match final_val; rank by authority then confidence.
         winner: dict[str, Any] | None = None
@@ -2073,13 +2078,12 @@ async def extract_course(
                     _stage0_covered.add(_s0_field)
                     evidence.append({
                         "field_key": _s0_field,
-                        "candidate_value": _s0_value,
-                        "extraction_method": _s0_method,
+                        "value": _s0_value,      # _persist_evidence reads "value" not "candidate_value"
+                        "method": _s0_method,    # _persist_evidence reads "method" not "extraction_method"
                         "confidence": 0.80,
                         "snippet": f"{_s0_method}: {_s0_value}",
                         "source_url": url,
-                        "selected": True,
-                        "decision_status": "selected",
+                        # Do NOT pre-mark selected — _finalize_evidence_selection decides
                     })
             if _stage0_covered:
                 log.debug(
@@ -6905,6 +6909,12 @@ async def extract_course(
                     _bcu_raw_loc, _bcu_loc_source, url,
                 )
                 payload["course_location"] = None
+                # Also reset any stale "selected" evidence rows so the UI shows no
+                # winner for course_location (prevents snippet from being rendered
+                # as the display value when candidate_value is null).
+                for _bcu_ev in evidence:
+                    if _bcu_ev.get("field_key") == "course_location" and _bcu_ev.get("decision_status") == "selected":
+                        _bcu_ev["decision_status"] = "needs_review"
         else:
             log.info(
                 "[BCU LOCATION] course_url=%s location_source=%s "
