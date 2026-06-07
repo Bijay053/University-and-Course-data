@@ -2390,9 +2390,20 @@ async def extract_course(
                 for k, v in r.normalized.items():
                     if v is None:
                         continue
-                    # First-write-wins so the highest-confidence result (which
-                    # the extractor returned first) is preserved.
-                    payload.setdefault(k, v)
+                    # Structural location extractors (method starts with "location.")
+                    # override any Stage-0 ai_rule:css value for the same field.
+                    # Stage-0 CSS rules can match testimonial or junk text on some
+                    # sites (e.g. BCU person names picked up before the keyfacts
+                    # panel extractor runs). Since Stage-0 uses setdefault too, the
+                    # structural extractor — which reads from an explicit DOM panel
+                    # and has confidence ≥ 0.90 — should always win.
+                    # _stage0_covered tracks exactly which fields Stage-0 wrote.
+                    if r.method.startswith("location.") and k in _stage0_covered:
+                        payload[k] = v  # structural extractor overrides Stage-0 guess
+                    else:
+                        # First-write-wins so the highest-confidence result (which
+                        # the extractor returned first) is preserved.
+                        payload.setdefault(k, v)
 
     # ── Field-level extraction summary log ───────────────────────────────────
     # After all static extractors have run, emit a structured per-field summary
