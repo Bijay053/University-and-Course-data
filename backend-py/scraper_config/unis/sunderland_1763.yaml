@@ -254,3 +254,8 @@ extraction:
     # on-campus course.  Suppress the rule pass so Gemini reads the actual
     # course content ("On campus", "Full-time") and classifies correctly.
     suppress_nav_rule: true
+    # "On Campus" is the physical delivery location for Sunderland, already
+    # captured in course_location.  The Mode column should show Full-time /
+    # Part-time (attendance mode), not a duplicate location label.
+    # This clears any "On Campus" study_mode set by any extractor (rule or Gemini).
+    suppress_on_campus: true

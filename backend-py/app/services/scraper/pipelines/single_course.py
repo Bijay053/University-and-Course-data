@@ -2605,6 +2605,42 @@ async def extract_course(
                 payload.get("course_name") or url,
             )
 
+    # suppress_on_campus guard: for UK universities where "On Campus" is the
+    # physical delivery location (already captured in course_location) rather
+    # than the study mode.  When extraction.study_mode.suppress_on_campus=True
+    # in the per-uni YAML, any "On Campus" study_mode — regardless of which
+    # extractor set it (rule, Gemini, location_derived) — is cleared to None.
+    # The Mode column then shows blank (or Full-time/Part-time if derivable)
+    # instead of duplicating the Course Location column.
+    if payload.get("study_mode") == "On Campus":
+        try:
+            _sc_uc = _uni_cfg if "_uni_cfg" in dir() else None
+            if _sc_uc is None:
+                from app.services.scraper.config.context import get_uni_config as _guc
+                _sc_uc = _guc()
+            if _sc_uc is not None:
+                _sc_sm_opts = getattr(_sc_uc.extraction, "study_mode", None)
+                if _sc_sm_opts is not None and getattr(_sc_sm_opts, "suppress_on_campus", False):
+                    payload["study_mode"] = None
+                    evidence.append({
+                        "field_key": "study_mode",
+                        "value": None,
+                        "confidence": 1.0,
+                        "method": "study_mode:suppress_on_campus",
+                        "snippet": (
+                            "suppress_on_campus=True: 'On Campus' cleared — "
+                            "delivery location already captured in course_location."
+                        ),
+                    })
+                    log.info(
+                        "[STUDY_MODE] suppress_on_campus: cleared 'On Campus' for %r "
+                        "(course_location=%r)",
+                        payload.get("course_name") or url,
+                        payload.get("course_location"),
+                    )
+        except Exception:
+            pass
+
     # T002: per-course Bootstrap-modal English-test extractor. Runs BEFORE
     # the per-course browser pass because (a) it's pure-CPU (no Playwright
     # spin-up, no network), (b) the english_test extractor often misses

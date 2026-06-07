@@ -1506,6 +1506,19 @@ class StudyModeConfig(BaseModel):
             "_STUDY_MODE_RULE_SUPPRESSED_HOSTS in study_mode.py."
         ),
     )
+    suppress_on_campus: bool = Field(
+        default=False,
+        description=(
+            "When True, any 'On Campus' value in study_mode (from any source "
+            "— rule, Gemini, or location_derived) is replaced with None after "
+            "all extractors have run.  Use for UK universities where "
+            "'On Campus' is the delivery location (already captured in "
+            "course_location) rather than the study mode; the expected study "
+            "mode for those universities is 'Full-time' or 'Part-time', not "
+            "a location label.  Prevents the Mode column in the review UI "
+            "from duplicating the Course Location column."
+        ),
+    )
 
 
 class IntakeConfig(BaseModel):
