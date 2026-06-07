@@ -3173,6 +3173,20 @@ async def extract_course(
                 #            Gemini's prose read.  Generic sites with no
                 #            structural label still get Gemini's value.
                 if _gp_k == "course_location":
+                    # BCU hard block: NEVER allow Gemini PRIMARY to set
+                    # course_location for bcu.ac.uk pages.  The structural
+                    # cascade (_from_bcu_keyfacts) is the ONLY permitted
+                    # source.  BCU pages contain testimonials with person
+                    # names that Gemini mistakes for campus names when the
+                    # keyfacts panel has no Location row.
+                    # Note: _is_bcu_host_gp is computed at ~line 3061.
+                    if _is_bcu_host_gp:
+                        log.info(
+                            "[BCU LOC BLOCK] Gemini PRIMARY course_location=%r "
+                            "suppressed (BCU host — panel-only rule) on %s",
+                            _gp_v, url,
+                        )
+                        continue
                     if (isinstance(_gp_v, str)
                             and _gp_v.strip().lower() in _STUDY_MODE_KEYWORDS):
                         continue  # study-mode phrase — not a real location
@@ -6852,6 +6866,52 @@ async def extract_course(
             )
     except Exception as _fcfs_exc:  # noqa: BLE001 — never break the pipeline
         log.warning("force_central_fee_stage check failed on %s: %s", url, _fcfs_exc)
+
+    # ── BCU location hard guard ──────────────────────────────────────────────
+    # Belt-and-suspenders check that runs AFTER all extractors, AI passes,
+    # repair loops, and defaults have had their chance to set course_location.
+    # For bcu.ac.uk pages:
+    #   • The ONLY valid source is location.bcu_keyfacts (div.course__key-info__inner).
+    #   • Any value NOT in the BCU campus allowlist is cleared to None.
+    #   • Covers Gemini PRIMARY / FALLBACK / repair_extractor paths that may
+    #     have returned person names or testimonial text before being blocked.
+    # Logging fields: location_source, original_location, final_location, course_url.
+    if "bcu.ac.uk" in (url or "").lower():
+        _BCU_LOCATION_ALLOWLIST = [
+            "city centre", "city south", "margaret street",
+            "royal birmingham conservatoire", "birmingham",
+            "online", "distance learning", "uk campus",
+        ]
+        _bcu_raw_loc = (payload.get("course_location") or "").strip()
+        _bcu_loc_source = "none"
+        try:
+            _bcu_loc_source = _best_ev_method("course_location") or "none"
+        except Exception:  # noqa: BLE001
+            pass
+        if _bcu_raw_loc:
+            _bcu_loc_ok = any(
+                av in _bcu_raw_loc.lower() for av in _BCU_LOCATION_ALLOWLIST
+            )
+            _bcu_final = _bcu_raw_loc if _bcu_loc_ok else ""
+            log.info(
+                "[BCU LOCATION] course_url=%s location_source=%s "
+                "original_location=%r final_location=%r allowlist_pass=%s",
+                url, _bcu_loc_source, _bcu_raw_loc, _bcu_final, _bcu_loc_ok,
+            )
+            if not _bcu_loc_ok:
+                log.warning(
+                    "[BCU LOCATION CLEARED] %r is not a recognised BCU campus "
+                    "(source=%s) — cleared to blank on %s",
+                    _bcu_raw_loc, _bcu_loc_source, url,
+                )
+                payload["course_location"] = None
+        else:
+            log.info(
+                "[BCU LOCATION] course_url=%s location_source=%s "
+                "original_location='' final_location='' allowlist_pass=n/a "
+                "(blank — keyfacts panel had no Location row)",
+                url, _bcu_loc_source,
+            )
 
     # ── Evidence selection finalisation ────────────────────────────────────
     # Mark the winning evidence row for each field as decision_status="selected"
