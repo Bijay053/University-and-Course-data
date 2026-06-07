@@ -38,6 +38,13 @@ _COURSE_URL_HINTS = (
     "/major/",
     "/majors/",
     "/discipline/",
+    # UK universities (e.g. Sunderland) use /postgraduate/<slug> and
+    # /undergraduate/<slug> as their individual course page URLs rather than
+    # nesting under /courses/ or /programme/.  Without these hints every
+    # sitemap URL for those institutions is rejected by _is_course_loc()
+    # and the sitemap fallback returns 0 candidates.
+    "/postgraduate/",
+    "/undergraduate/",
 )
 _NAV_URL_HINTS = (
     "/study",
