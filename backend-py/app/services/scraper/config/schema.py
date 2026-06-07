@@ -667,6 +667,32 @@ class DiscoveryConfig(BaseModel):
             "before extraction.  E.g. '/handbook/handbook-20' blocks old ACU handbooks."
         ),
     )
+    year_dedup_mode: str = Field(
+        default="none",
+        description=(
+            "Post-discovery year-based URL deduplication mode.  When not 'none', the "
+            "orchestrator groups discovered URLs by their course slug stripped of any "
+            "year suffix (e.g. /courses/marketing-msc-2026-27 and "
+            "/courses/marketing-msc-2027-28 → same slug group) and keeps ONE URL per "
+            "group according to this mode:\n"
+            "  'keep_latest'          — keep the highest year (most recent intake)\n"
+            "  'keep_preferred_year'  — keep year_dedup_preferred_year; fall back to latest\n"
+            "  'keep_current'         — keep the year closest to the calendar year\n"
+            "  'none' / 'keep_all'    — disabled (default)\n"
+            "URLs with no year in their path are always kept regardless of mode.\n"
+            "Courses whose slug exists in only ONE year are always kept.\n"
+            "This is the YAML alternative to the UI-recipe course_year block — use "
+            "it when you want year dedup without creating a UI recipe."
+        ),
+    )
+    year_dedup_preferred_year: Optional[int] = Field(
+        default=None,
+        description=(
+            "When year_dedup_mode='keep_preferred_year', this is the year to prefer. "
+            "If the preferred year is not found for a course slug, falls back to the "
+            "latest year available.  Example: 2027"
+        ),
+    )
     allow_url_patterns: list[str] = Field(
         default_factory=list,
         description=(

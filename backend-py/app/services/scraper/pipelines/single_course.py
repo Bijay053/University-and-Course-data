@@ -3049,7 +3049,17 @@ async def extract_course(
                         and str(ev.get("method", "")).startswith("location.")
                         for ev in evidence
                     )
-                    if not _has_structural_loc:
+                    # BCU location suppression: BCU pages contain testimonials and
+                    # graduate-story sections with person names (Lauren Redfern,
+                    # Ben Stones, Danielle, Alhage, etc.) that Gemini mistakes for
+                    # campus names when the structured panel has no Location entry.
+                    # The structural cascade already scopes BCU to ONLY the
+                    # div.course__key-info__inner panel.  When that panel returns
+                    # nothing (no Location row), the field must stay blank — never
+                    # fall through to AI.  Suppress Gemini PRIMARY location for all
+                    # bcu.ac.uk pages unconditionally.
+                    _is_bcu_host_gp = "bcu.ac.uk" in (url or "").lower()
+                    if not _has_structural_loc and not _is_bcu_host_gp:
                         _gp_filled["course_location"] = _loc
 
             # Helper: return the method of the current best evidence row for
@@ -4976,6 +4986,13 @@ async def extract_course(
         from app.services.scraper.extractors.ai_fallback import (
             validate_ai_fallback_value as _validate_ai_fallback_value,
         )
+        # BCU FALLBACK AI location suppression — must be computed once before the loop.
+        # BCU testimonial / graduate-story sections contain person names that
+        # the FALLBACK AI (Gemini) mistakes for campus names when the structured
+        # panel has no Location row.  If the structural cascade filled the field
+        # (method starts with "location."), we preserve it; if the cascade found
+        # nothing, the field stays blank — no AI fallback for location on BCU.
+        _is_bcu_host_fb = "bcu.ac.uk" in (url or "").lower()
         for k, v in ai_filled.items():
             # Discard chrome text returned by the FALLBACK AI for location fields.
             # UTAS pages have "Key Information Entry requirements Course rules"
@@ -4983,6 +5000,10 @@ async def extract_course(
             # verbatim.  Dropping it keeps course_location=None so the online-only
             # rejection filter can fire correctly.
             if k in ("location_text", "course_location") and isinstance(v, str) and _is_location_chrome(v):
+                continue
+            # BCU: suppress FALLBACK AI from filling location — person names in
+            # testimonials pollute the value when the keyfacts panel has no Location.
+            if k in ("location_text", "course_location") and _is_bcu_host_fb:
                 continue
             # Virtual-only location guard.  Newcastle Master of Nursing and
             # similar multi-campus pages render "Online | Newcastle" as a

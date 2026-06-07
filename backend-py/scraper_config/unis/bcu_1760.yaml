@@ -116,12 +116,22 @@ discovery:
     - 'applied-cancer-practice'
     - 'clinical-hypnosis'
     - 'conductive-education'
-    # Year-suffix deduplication: BCU publishes course pages for BOTH the
-    # current intake year (2027-28) AND the previous year (2026-27).
-    # Blocking the older year prevents staging duplicate rows for the same
-    # course with different fee amounts (2026-27 fees vs 2027-28 fees).
-    # Update this pattern each academic year when BCU rolls to a new cycle.
-    - '2026-27'
+
+  # Year-based URL deduplication (replaces the old hard '2026-27' block).
+  # BCU publishes course pages for BOTH the current intake year (2027-28) AND
+  # the previous year (2026-27).  A hard block of '2026-27' is too aggressive:
+  # it drops every 2026-27 URL at BFS time, including valid courses that ONLY
+  # exist in 2026-27 (no 2027-28 version yet).
+  #
+  # The 'keep_latest' mode is smarter: it groups URLs by course slug (stripped
+  # of the year suffix), then keeps only the highest-year URL per group.
+  # Courses that only appear in ONE year — whether 2025-26, 2026-27, or
+  # 2027-28 — are ALWAYS kept.  Only true duplicates (same course in multiple
+  # years) are collapsed to the newest version.
+  #
+  # Update this each cycle: 'keep_latest' is year-agnostic and will always
+  # prefer the most recent year without needing a manual YAML update.
+  year_dedup_mode: keep_latest
 
 # ── EXTRACTION ────────────────────────────────────────────────────────────────
 extraction:

@@ -2488,6 +2488,117 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 )
             links = _kept_r
 
+        # Phase A.5d — YAML-driven year dedup ────────────────────────────────────
+        # Alternative to the UI-recipe Phase A.5c above.  When the per-uni YAML
+        # sets ``discovery.year_dedup_mode`` to anything other than "none", groups
+        # discovered URLs by slug-without-year and keeps ONE URL per group.
+        # Key difference from Phase A.5c: courses whose slug exists in only ONE
+        # year are ALWAYS kept — only true duplicates (same slug, multiple years)
+        # are collapsed.  Skipped when Phase A.5c already ran (prevents double-dedup).
+        _yaml_dedup_already_ran = (
+            _cy_dup_key_r == "slug_without_year" and _cy_mode_r != "keep_all"
+        )
+        _yd_mode_y = (
+            _uni_cfg.discovery.year_dedup_mode
+            if _uni_cfg is not None
+            else "none"
+        )
+        if (
+            not _yaml_dedup_already_ran
+            and _yd_mode_y not in ("none", "keep_all", "")
+            and links
+        ):
+            from collections import defaultdict as _ddict_y
+            import datetime as _dt_y
+            import re as _re_y
+            _yd_preferred_y = (
+                _uni_cfg.discovery.year_dedup_preferred_year
+                if _uni_cfg is not None
+                else None
+            )
+            # BCU-aware regex: matches BOTH bare YYYY (2027) and academic-year
+            # pairs YYYY-YY (2026-27, 2027-28).  The pair form MUST be tried
+            # first so '-2026-27' is captured as '2026-27' (not just '2026',
+            # which would leave '-27' in the stripped slug and create different
+            # keys for otherwise-identical courses).
+            _YEAR_SEG_Y = _re_y.compile(
+                r"[/_\-](20\d{2}-\d{2})(?=[/_\?\#]|$)"   # YYYY-YY pair first
+                r"|[/_\-](20\d{2})(?=[/_\?\#]|$)"          # bare YYYY second
+            )
+
+            def _url_year_y(u: str) -> "int | None":
+                m = _YEAR_SEG_Y.search(u)
+                if m:
+                    raw = m.group(1) or m.group(2) or ""
+                    return int(raw[:4])  # start-year as sort key
+                return None
+
+            def _strip_year_y(u: str) -> str:
+                # Replace the year token (and its leading separator) so that
+                # marketing-msc-2026-27 and marketing-msc-2027-28 both become
+                # marketing-msc-YYYY and are grouped as the same course.
+                return _YEAR_SEG_Y.sub("-YYYY", u)
+
+            _yr_groups_y: "dict[str, list[tuple[int, dict]]]" = _ddict_y(list)
+            _no_yr_links_y: "list[dict]" = []
+            for _lk_y in links:
+                _url_y = _lk_y.get("url") or ""
+                _yr_y = _url_year_y(_url_y)
+                if _yr_y is None:
+                    _no_yr_links_y.append(_lk_y)
+                else:
+                    _yr_groups_y[_strip_year_y(_url_y)].append((_yr_y, _lk_y))
+
+            _kept_y: "list[dict]" = list(_no_yr_links_y)
+            _dedup_dropped_y = 0
+            _dedup_kept_single_y = 0  # courses with only one year — always kept
+            for _sk_y, _versions_y in _yr_groups_y.items():
+                if len(_versions_y) == 1:
+                    # Only one year for this slug → always keep, no dedup needed
+                    _kept_y.append(_versions_y[0][1])
+                    _dedup_kept_single_y += 1
+                    continue
+                # Multiple year versions: pick winner per mode
+                _winner_y = None
+                if _yd_mode_y == "keep_preferred_year" and _yd_preferred_y:
+                    _winner_y = next(
+                        (v for yr, v in _versions_y if yr == _yd_preferred_y), None
+                    )
+                # Fall back to latest for keep_preferred_year when preferred not found,
+                # and always use latest for keep_latest mode
+                if _winner_y is None and _yd_mode_y in ("keep_preferred_year", "keep_latest"):
+                    _winner_y = sorted(_versions_y, key=lambda x: x[0], reverse=True)[0][1]
+                elif _winner_y is None and _yd_mode_y == "keep_current":
+                    _cur_y = _dt_y.datetime.now().year
+                    _winner_y = min(_versions_y, key=lambda x: abs(x[0] - _cur_y))[1]
+                if _winner_y is None:
+                    # Final fallback: keep latest
+                    _winner_y = sorted(_versions_y, key=lambda x: x[0], reverse=True)[0][1]
+                _kept_y.append(_winner_y)
+                _dedup_dropped_y += len(_versions_y) - 1
+
+            if _dedup_dropped_y or _dedup_kept_single_y:
+                log.info(
+                    "[YAML] year dedup (mode=%s preferred=%s): dropped %d year-duplicate URLs, "
+                    "kept %d unique (%d single-year courses kept unconditionally)",
+                    _yd_mode_y, _yd_preferred_y,
+                    _dedup_dropped_y, len(_kept_y), _dedup_kept_single_y,
+                )
+                await emit(
+                    "status",
+                    (
+                        f"[YAML] Year dedup (mode={_yd_mode_y}): kept {len(_kept_y)} unique courses "
+                        f"(dropped {_dedup_dropped_y} older-year duplicates; "
+                        f"{_dedup_kept_single_y} single-year courses always kept)"
+                    ),
+                    phase="extract",
+                    kind="yaml_year_dedup",
+                    dropped=_dedup_dropped_y,
+                    kept=len(_kept_y),
+                    kept_single_year=_dedup_kept_single_y,
+                )
+            links = _kept_y
+
         # ── Post-filter discovered count ──────────────────────────────────────────
         # Now that must_contain (and any other post-discovery filters) have run,
         # lock in the true extractable count.  This is what the UI and DB show
