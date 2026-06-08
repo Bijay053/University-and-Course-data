@@ -550,6 +550,8 @@ async def fetch_html(url: str, *, retries: int = 2) -> str | None:
                 "fetch %s: Scrape.do render failed — falling back to plain httpx 200 response",
                 url,
             )
+        from app.services.scraper.snapshot_context import stage_snapshot as _stage
+        _stage(url, html_200, "httpx")
         return html_200
 
     # ── Cloudflare WAF block — tiered fallback ────────────────────────────────
@@ -557,6 +559,8 @@ async def fetch_html(url: str, *, retries: int = 2) -> str | None:
         # Tier 2: curl_cffi Chrome TLS impersonation
         cffi_result = await fetch_html_cffi(url)
         if cffi_result is not None:
+            from app.services.scraper.snapshot_context import stage_snapshot as _stage
+            _stage(url, cffi_result, "cffi")
             return cffi_result
         # Tier 2.5: Scrape.do render fast-path for explicit SPA universities.
         # When scrape_do_render=True the university is tagged as an Angular/
@@ -585,6 +589,8 @@ async def fetch_html(url: str, *, retries: int = 2) -> str | None:
         )
         wayback_result = await fetch_html_wayback(url)
         if wayback_result is not None:
+            from app.services.scraper.snapshot_context import stage_snapshot as _stage
+            _stage(url, wayback_result, "wayback")
             return wayback_result
         # Tier 4: Scrape.do static (residential proxy, no JS rendering)
         if _has_scrape_do:
