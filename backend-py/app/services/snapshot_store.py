@@ -49,16 +49,16 @@ def _bucket() -> str:
 
 
 def is_enabled() -> bool:
-    """Return True only when all required env vars are present."""
-    global _ENABLED
-    if _ENABLED is None:
-        _ENABLED = bool(
-            os.environ.get("AWS_ACCESS_KEY_ID")
-            and os.environ.get("AWS_SECRET_ACCESS_KEY")
-            and os.environ.get("AWS_S3_BUCKET_NAME")
-            and os.environ.get("AWS_S3_REGION")
-        )
-    return _ENABLED
+    """Return True only when all required env vars are present.
+
+    Not cached — credentials can be injected after module import.
+    """
+    return bool(
+        os.environ.get("AWS_ACCESS_KEY_ID")
+        and os.environ.get("AWS_SECRET_ACCESS_KEY")
+        and os.environ.get("AWS_S3_BUCKET_NAME")
+        and os.environ.get("AWS_S3_REGION")
+    )
 
 
 def url_hash(url: str) -> str:
@@ -111,10 +111,6 @@ def _make_async_session():
     )
 
 
-def _tagging_str(snapshot_type: SnapshotType) -> str:
-    return f"snapshot_type={snapshot_type}"
-
-
 async def upload_snapshot(
     content: str | bytes,
     *,
@@ -146,7 +142,6 @@ async def upload_snapshot(
                 Key=key,
                 Body=body,
                 ContentType=content_type,
-                Tagging=_tagging_str(snapshot_type),
             )
         log.info("snapshot uploaded: s3://%s/%s (%d bytes)", bucket, key, len(body))
         return key
