@@ -76,7 +76,8 @@ _NAV_TEXT_LOCATION_RE = re.compile(
     r"international\s+students?\s+home|visit\s+(?:us|the\s+campus)|"
     r"career\s+(?:outcomes?|services?)|related\s+(?:courses?|programs?)|"
     r"contact\s+us|news\s+and\s+events|open\s+day|"
-    r"research\s+(?:degrees?|programs?)|find\s+a\s+course)\b",
+    r"research\s+(?:degrees?|programs?)|find\s+a\s+course|"
+    r"ucas\s*(?:code|tariff|points?))\b",
     re.IGNORECASE,
 )
 # Country names that sometimes appear as standalone comma-split parts in a
@@ -1306,6 +1307,83 @@ def _from_text_block(text: str) -> str | None:
     return _normalise(window.replace(" / ", ", "))
 
 
+def _from_uwl_jsonld(soup: BeautifulSoup) -> str | None:
+    """UWL-specific: extract Location from JSON-LD ``CourseInstance.location.name``.
+
+    UWL Angular SPA pages embed structured data in a
+    ``<script type="application/ld+json">`` block::
+
+        {
+          "@context": "https://schema.org",
+          "@graph": [
+            {
+              "hasCourseInstance": [
+                {
+                  "@type": "CourseInstance",
+                  "location": {
+                    "@type": "place",
+                    "name": "West London Campus",
+                    "address": "GB, London, W5 5RF, ..."
+                  },
+                  ...
+                },
+                ...
+              ]
+            }
+          ]
+        }
+
+    The Angular ``<input aria-label="Location">`` carries the same value as its
+    ``value`` attribute, but BeautifulSoup's ``get_text()`` skips input values so
+    this structured data is the authoritative machine-readable source.
+
+    All unique non-empty ``location.name`` values are collected, deduplicated
+    (preserving order), joined with " / " and normalised.
+    """
+    import json as _json
+
+    for script in soup.find_all("script", type="application/ld+json"):
+        try:
+            data = _json.loads(script.string or "")
+        except Exception:
+            continue
+        graph = data.get("@graph") or [data]
+        for node in graph:
+            instances = node.get("hasCourseInstance") or []
+            if not instances:
+                continue
+            seen: list[str] = []
+            seen_lower: set[str] = set()
+            for inst in instances:
+                loc = inst.get("location") or {}
+                name = (loc.get("name") or "").strip()
+                if name and name.lower() not in seen_lower:
+                    seen_lower.add(name.lower())
+                    seen.append(name)
+            if seen:
+                v = _normalise(" / ".join(seen))
+                if v:
+                    return v
+    return None
+
+
+def _from_aria_input_value(soup: BeautifulSoup) -> str | None:
+    """Generic fallback: read ``<input aria-label="Location" value="...">`` attribute.
+
+    Angular / React SPAs sometimes bind the location value to an ``<input>``
+    element's ``value`` attribute that is present in the rendered HTML but
+    invisible to ``get_text()`` calls.  This function reads the attribute
+    directly so the value is not lost.
+    """
+    for inp in soup.find_all("input"):
+        aria = (inp.get("aria-label") or "").strip()
+        if re.fullmatch(r"location", aria, re.I):
+            val = (inp.get("value") or "").strip()
+            if val:
+                return _normalise(val)
+    return None
+
+
 def _from_bcu_keyfacts(soup: BeautifulSoup) -> str | None:
     """BCU-specific extractor: reads Location directly from the structured
     course facts panel ``div.course__key-info__inner``.
@@ -1509,6 +1587,48 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:  # noqa: ARG00
         # rare) the field stays blank and routes to AI/review queue.
         cascade_list = [
             ("bcu_keyfacts", _from_bcu_keyfacts(soup), 0.98),
+        ]
+    elif "uwl.ac.uk" in (url or "").lower():
+        # UWL (University of West London): Angular SPA.
+        #
+        # Root cause of the junk extraction ("UCAS code Overview Degree
+        # details Our students Research Entry and"):
+        #
+        #   1. The visible course summary bar renders location as an Angular
+        #      <input aria-label="Location" value="West London Campus"> —
+        #      BeautifulSoup's get_text() silently skips input[value], so no
+        #      structural method reads the value from the DOM text.
+        #
+        #   2. _from_panel_divs finds <div>Location</div> whose next sibling
+        #      is <div class="u-hidden">UCAS code</div> (the UCAS code bar
+        #      item immediately follows Location in the summary row).
+        #
+        #   3. _from_text_block's regex window captures "Location" → up to
+        #      the "fees?" lookahead stop-word, yielding
+        #      "UCAS code Overview Degree details Our students Research Entry
+        #      and" (the tab navigation text that immediately follows the
+        #      summary bar in the rendered text stream).
+        #
+        # Fix: scope the cascade to two authoritative machine-readable
+        # sources that ARE present in the rendered HTML and bypass all
+        # text-content methods:
+        #
+        #   1. JSON-LD structured data (<script type="application/ld+json">)
+        #      contains CourseInstance.location.name = "West London Campus"
+        #      for every instance — this is the primary, most reliable source.
+        #
+        #   2. <input aria-label="Location" value="West London Campus"> —
+        #      the value attribute (not text content) is readable via
+        #      BeautifulSoup's .get("value"), so _from_aria_input_value
+        #      provides a redundant fallback.
+        #
+        # NO text_block, strong, dl, div_panel, table, or heading fallbacks —
+        # all generic methods read corrupted data on this Angular SPA.
+        # If both structured sources miss (should not happen on live pages),
+        # the field stays blank and routes to AI/review queue.
+        cascade_list = [
+            ("uwl_jsonld", _from_uwl_jsonld(soup), 0.98),
+            ("aria_input", _from_aria_input_value(soup), 0.93),
         ]
     else:
         cascade_list = [
