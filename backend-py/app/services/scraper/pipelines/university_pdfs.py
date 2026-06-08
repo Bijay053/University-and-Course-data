@@ -21,7 +21,6 @@ This module:
 """
 from __future__ import annotations
 
-import asyncio
 import logging
 import re
 from typing import Any
@@ -111,9 +110,9 @@ async def _download_raw_pdf(url: str) -> bytes:
 async def _save_pdf_snapshot_safe(url: str, raw: bytes) -> None:
     """Upload raw PDF bytes to S3 and write a PageSnapshot row.
 
-    Non-blocking and non-fatal: called via asyncio.ensure_future() so it
-    never delays extraction.  All failures are logged as warnings and the
-    scrape continues normally.
+    Awaited directly after the PDF download so the snapshot is committed
+    before extraction continues.  All failures are logged as warnings and
+    the scrape continues normally (non-fatal).
 
     Respects all safeguards:
       • is_enabled()     — SNAPSHOT_ENABLED=false → skip
@@ -1349,7 +1348,7 @@ async def _parse_fee_pdf(url: str, country: str | None, emit=None) -> dict[str, 
     raw = await _download_raw_pdf(url)
     if not raw:
         return {}
-    asyncio.ensure_future(_save_pdf_snapshot_safe(url, raw))
+    await _save_pdf_snapshot_safe(url, raw)
     text = ""
     try:
         # ``download_pdf_text`` re-fetches the URL; instead reuse the
@@ -1482,7 +1481,7 @@ async def _parse_requirements_pdf(url: str, emit=None) -> dict[str, Any]:
     raw = await _download_raw_pdf(url)
     if not raw:
         return {}
-    asyncio.ensure_future(_save_pdf_snapshot_safe(url, raw))
+    await _save_pdf_snapshot_safe(url, raw)
     text = ""
     try:
         from io import BytesIO
