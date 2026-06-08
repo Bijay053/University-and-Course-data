@@ -1,28 +1,29 @@
-# University of West London  |  university_id=1881
-# Hostname: www.uwl.ac.uk  |  slug: uwl
-# Loaded as: scraper_config/unis/uwl_1881.yaml  (id-specific file takes priority over uwl.yaml)
+# University of West London
+# Hostname: www.uwl.ac.uk  |  slug: uwl  (loader key = scraper_config/unis/uwl.yaml)
 # Country: United Kingdom  |  Currency: GBP
 #
 # SITE NOTES:
 # - Angular SPA — static HTML returns Angular {{}} templates with 0 data.
 #   scrape_do_render:true routes ALL page fetches through Scrape.do headless Chrome.
-# - Live course URL pattern (confirmed from rendered search page 2026-06-08):
+# - Live course URL pattern (confirmed from rendered search page):
 #     /course/(undergraduate|postgraduate|research)/<slug>
 #   Wayback CDX has OLD archived URLs (/academic-schools/...) — these no longer exist.
-# - Course search at /courses/search?query=&page=N: ~37 courses per page, ~336 total.
-#   render_listing_pages fetches pages 0-11 via Scrape.do render to harvest all links.
-# - BFS and Playwright skipped (both return 0 on unrendered Angular templates).
+# - Course search at /courses/search?query=&page=N returns ~37 courses per page,
+#   ~336 total (pages 0–11 covers all with buffer). Rendered via Scrape.do.
+# - BFS and Playwright are skipped (both return 0 on Angular SPA static HTML).
 #
-# CRITICAL — allow_url_patterns regex rule:
+# IMPORTANT — allow_url_patterns regex note:
 #   The post-discovery filter applies re.search() against the FULL URL string
-#   (https://www.uwl.ac.uk/course/...).  Do NOT use a leading ^ anchor —
-#   it anchors to the start of the string which is "https://" not "/".
-#   Use a plain path substring like "/course/(undergraduate|...)" with no ^ prefix.
+#   (https://www.uwl.ac.uk/course/...). Do NOT use ^/ anchors — they require the
+#   string to start with "/" but full URLs start with "https://". Use an unanchored
+#   path substring pattern instead, e.g. "/course/(undergraduate|postgraduate|...)".
 
 discovery:
-  # No ^ anchor — re.search() tests the full URL string (https://www.uwl.ac.uk/course/...)
+  # No leading ^ — pattern is matched with re.search() against the full URL
   allow_url_patterns:
     - "/course/(undergraduate|postgraduate|research)/[^/]+/?$"
+  # All block patterns are prefix-anchored on / (not on https://) — they are also
+  # tested with re.search() so "/courses/" will fire on any URL containing /courses/
   block_url_patterns:
     - "/courses/"
     - "/apply"
@@ -63,15 +64,3 @@ extraction:
   scrape_do_render: true
   fees:
     default_currency: GBP
-
-# PRODUCTION DB FIX — run on prod droplet (allow pattern must also have no ^ anchor):
-#
-#   sudo -u postgres psql -d university_portal -c "
-#     UPDATE universities SET scrape_config = jsonb_set(jsonb_set(
-#       scrape_config,
-#       '{admin_config,discovery,allow_url_patterns}',
-#       '[\"/course/(undergraduate|postgraduate|research)/[^/]+/?\\$\"]'::jsonb
-#     ),
-#     '{admin_config,discovery,block_url_patterns}',
-#     '[\"/courses/\",\"/apply\",\"/contact\",\"/news\",\"/events\",\"/blog\",\"/about\",\"/alumni\",\"/outreach\",\"/parents\",\"/jobs\",\"/careers\",\"/accommodation\",\"/life-on-campus\",\"/fees-and-funding\",\"/international/living\"]'::jsonb
-#     ) WHERE id=<prod_uwl_id>;"
