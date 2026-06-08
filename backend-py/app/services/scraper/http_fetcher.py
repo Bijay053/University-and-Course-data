@@ -529,6 +529,26 @@ async def fetch_html(url: str, *, retries: int = 2) -> str | None:
         cffi_result = await fetch_html_cffi(url)
         if cffi_result is not None:
             return cffi_result
+        # Tier 2.5: Scrape.do render fast-path for explicit SPA universities.
+        # When scrape_do_render=True the university is tagged as an Angular/
+        # React SPA whose data is injected at runtime by JavaScript.  Wayback
+        # Machine archives the *unrendered* SPA shell (same {{ }} template
+        # literals, no fee/intake data) — going there first wastes a round-trip
+        # and still returns blank fees.  Skip Wayback and go straight to
+        # Scrape.do headless Chrome so JS executes and real values appear.
+        if _scrape_do_render and _has_scrape_do:
+            log.info(
+                "fetch %s: curl_cffi blocked + scrape_do_render=True"
+                " — skipping Wayback (SPA shell), using Scrape.do render",
+                url,
+            )
+            scrape_do_rendered = await fetch_html_scrape_do(url, render=True)
+            if scrape_do_rendered is not None:
+                return scrape_do_rendered
+            log.info(
+                "fetch %s: Scrape.do render failed — falling back to Wayback Machine",
+                url,
+            )
         # Tier 3: Wayback Machine archived HTML (free, zero API cost)
         log.info(
             "fetch %s: curl_cffi blocked — trying Wayback Machine archived HTML",
