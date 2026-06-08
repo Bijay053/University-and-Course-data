@@ -41,7 +41,13 @@ discovery:
     - "/life-on-campus"
     - "/fees-and-funding$"
     - "/international/living"
-  # Rendered discovery: each page returns ~37 courses. 12 pages covers 336+ total.
+  # Skip BFS and Playwright entirely — Angular SPA returns unrendered {{}} templates
+  # in static HTML so every non-rendered fetch yields 0 course links.
+  # always_browser_discover:true skips the BFS condition; skip_browser_discovery:true
+  # skips Playwright — leaving render_listing_pages as the sole discovery path.
+  always_browser_discover: true
+  skip_browser_discovery: true
+  # Rendered discovery: each search page returns ~37 courses. 12 pages covers 336+.
   render_listing_pages:
     - "https://www.uwl.ac.uk/courses/search?query=&page=0"
     - "https://www.uwl.ac.uk/courses/search?query=&page=1"
@@ -55,7 +61,6 @@ discovery:
     - "https://www.uwl.ac.uk/courses/search?query=&page=9"
     - "https://www.uwl.ac.uk/courses/search?query=&page=10"
     - "https://www.uwl.ac.uk/courses/search?query=&page=11"
-  bfs_page_budget: 50
   expected_min_courses: 300
 
 extraction:
