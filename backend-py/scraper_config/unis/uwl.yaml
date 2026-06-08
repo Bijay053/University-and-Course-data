@@ -44,6 +44,9 @@ discovery:
   # Skip BFS and Playwright — Angular SPA returns unrendered templates in static HTML.
   always_browser_discover: true
   skip_browser_discovery: true
+  # Wayback CDX is useless for UWL: archive.org only has old /academic-schools/...
+  # URLs that no longer exist on the live site.  Skipping saves the ~2-min CDX wait.
+  use_wayback: false
   # Rendered discovery: 12 pages × ~37 results covers all 336+ courses.
   render_listing_pages:
     - "https://www.uwl.ac.uk/courses/search?query=&page=0"
