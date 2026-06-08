@@ -7,42 +7,49 @@
 # - Angular SPA — course pages served as unrendered template shells in static HTML.
 #   Fees/intakes/dates appear as {{ formatCurrencyValue(...) }} / {{ startYearMonth.name }}
 #   until JS executes.  scrape_do_render: true forces headless Chrome via Scrape.do.
-# - Individual course pages follow the URL pattern /course/<level>/<slug> (singular).
-#   Listing/search pages use /courses/ (plural) and must be excluded from extraction.
-# - The course search at /courses/search?query= is Angular SPA paginated: ~37 courses
-#   per page, 336 total across ~9-10 pages (page=0..11 covers all courses with buffer).
-#   render_listing_pages fetches each page via Scrape.do render to harvest all links.
-# - Cloudflare 403 blocks direct httpx + cffi on course pages.
-#   With scrape_do_render: true, the fetch chain skips Wayback (also an SPA shell)
-#   and goes straight to Scrape.do headless Chrome (tier 2.5).
+# - Individual course pages use the pattern /academic-schools/<school>/<level>/<slug>.
+#   Search/listing pages use /courses/ (plural) and are excluded from extraction.
+# - The course search at /courses/search?query= is Angular paginated: ~37 courses per
+#   page, 336 total (page=0..11 covers all with buffer). render_listing_pages renders
+#   each page via Scrape.do headless Chrome to harvest all /academic-schools/... links.
+# - Cloudflare 403 blocks direct httpx + cffi; scrape_do_render: true routes all
+#   individual course page fetches through Scrape.do headless Chrome.
+# - BFS and Playwright discovery are skipped (always_browser_discover+skip_browser_discovery)
+#   since every static/unrendered fetch returns Angular {{}} templates with 0 links.
 #
-# DB admin_config fix applied (2026-06-08) — corrected allow_url_patterns:
-#   ^/course/(undergraduate|postgraduate|research)/[^/]+/?$
+# HISTORY:
+#   2026-06-08 v1: allow_url_patterns set to /course/<level>/<slug> — WRONG (that path
+#                  pattern is not used; actual URLs are /academic-schools/<school>/<level>/<slug>)
+#   2026-06-08 v2: corrected to /academic-schools/[^/]+/(level)/[^/]+; block patterns
+#                  all prefix-anchored so they cannot fire mid-path.
 
 discovery:
+  # UWL actual course URL shape (confirmed via Wayback CDX):
+  #   /academic-schools/<school>/<level>/<course-slug>
   allow_url_patterns:
-    - "^/course/(undergraduate|postgraduate|research)/[^/]+/?$"
+    - "^/academic-schools/[^/]+/(undergraduate|postgraduate|research|research-degrees)/[^/]+/?$"
+  # All patterns are prefix-anchored (^) so they cannot match mid-path segments
+  # e.g. the old unanchored '/research' would drop /academic-schools/school/research/slug
   block_url_patterns:
     - "^/courses/"
     - "^/study/"
-    - "/apply"
-    - "/contact"
-    - "/news"
-    - "/events"
-    - "/blog"
-    - "/about"
-    - "/research"
-    - "/alumni"
-    - "/outreach"
-    - "/parents"
-    - "/jobs"
-    - "/careers"
-    - "/accommodation"
-    - "/life-on-campus"
-    - "/fees-and-funding$"
-    - "/international/living"
-  # Skip BFS and Playwright entirely — Angular SPA returns unrendered {{}} templates
-  # in static HTML so every non-rendered fetch yields 0 course links.
+    - "^/apply"
+    - "^/contact"
+    - "^/news"
+    - "^/events"
+    - "^/blog"
+    - "^/about"
+    - "^/alumni"
+    - "^/outreach"
+    - "^/parents"
+    - "^/jobs"
+    - "^/careers"
+    - "^/accommodation"
+    - "^/life-on-campus"
+    - "^/fees-and-funding"
+    - "^/international/living"
+  # Skip BFS and Playwright — Angular SPA returns unrendered {{}} templates in static
+  # HTML so every non-rendered fetch yields 0 course links.
   # always_browser_discover:true skips the BFS condition; skip_browser_discovery:true
   # skips Playwright — leaving render_listing_pages as the sole discovery path.
   always_browser_discover: true
@@ -68,15 +75,16 @@ extraction:
   fees:
     default_currency: GBP
 
-# PRODUCTION FIX — run this on prod to correct stale admin_config allow_url_patterns:
+# PRODUCTION FIX — run on prod droplet after git pull:
 #
-#   sudo -u postgres psql -d university_portal -c "
-#     UPDATE universities
-#     SET scrape_config = jsonb_set(jsonb_set(
-#       scrape_config,
-#       '{admin_config,discovery,allow_url_patterns}',
-#       '[\"^/course/(undergraduate|postgraduate|research)/[^/]+/?\\$\"]'::jsonb
-#     ),
-#     '{admin_config,discovery,block_url_patterns}',
-#     '[\"^/courses/\",\"^/study/\",\"/apply\",\"/contact\",\"/news\",\"/events\",\"/blog\",\"/about\",\"/research\",\"/alumni\",\"/outreach\",\"/parents\",\"/jobs\",\"/careers\",\"/accommodation\",\"/life-on-campus\",\"/fees-and-funding\\$\",\"/international/living\"]'::jsonb
-#     ) WHERE id=1881;"
+#   sudo -u postgres psql -d university_portal << 'SQL'
+#   UPDATE universities
+#   SET scrape_config = jsonb_set(jsonb_set(
+#     scrape_config,
+#     '{admin_config,discovery,allow_url_patterns}',
+#     '[\"^/academic-schools/[^/]+/(undergraduate|postgraduate|research|research-degrees)/[^/]+/?$\"]'::jsonb
+#   ),
+#   '{admin_config,discovery,block_url_patterns}',
+#   '[\"^/courses/\",\"^/study/\",\"^/apply\",\"^/contact\",\"^/news\",\"^/events\",\"^/blog\",\"^/about\",\"^/alumni\",\"^/outreach\",\"^/parents\",\"^/jobs\",\"^/careers\",\"^/accommodation\",\"^/life-on-campus\",\"^/fees-and-funding\",\"^/international/living\"]'::jsonb
+#   ) WHERE id=1881;
+#   SQL
