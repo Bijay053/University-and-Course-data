@@ -61,6 +61,8 @@ discovery:
 
 extraction:
   scrape_do_render: true
+  scrape_do_skip_fallbacks: true
+  max_parallel_fetch: 8
   fees:
     default_currency: GBP
 

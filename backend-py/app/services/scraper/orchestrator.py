@@ -2758,20 +2758,22 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # "[EXTRACT] N/total: <name>" as each page is *picked up* (not at the
         # end). The counter is mutated only inside the semaphore, so it is
         # effectively serialised.
-        # Per-uni YAML can cap the semaphore below the global default to avoid
-        # Cloudflare 429 storms on heavily-protected sites (e.g. UTAS).  When
-        # max_parallel_fetch is set in extraction config, use the smaller of the
-        # two values — the global cap is still an absolute ceiling.
+        # Per-uni YAML can tune the semaphore above OR below the global default.
+        # Lower it to avoid Cloudflare 429 storms (e.g. UTAS = 2).
+        # Raise it for Scrape.do-only sites where network latency is the
+        # bottleneck and there is no per-host rate limit (e.g. UWL = 8).
+        # Hard ceiling: 16 slots (beyond that we risk OOM on the Celery worker).
+        _MAX_PER_UNI_PARALLEL = 16
         try:
             _uc_max = getattr(get_uni_config().extraction, "max_parallel_fetch", None)
             _effective_parallel = (
-                min(_MAX_PARALLEL_FETCH, _uc_max) if _uc_max else _MAX_PARALLEL_FETCH
+                min(_uc_max, _MAX_PER_UNI_PARALLEL) if _uc_max else _MAX_PARALLEL_FETCH
             )
         except Exception:  # noqa: BLE001
             _effective_parallel = _MAX_PARALLEL_FETCH
         if _effective_parallel != _MAX_PARALLEL_FETCH:
             log.info(
-                "[CONCURRENCY] per-uni max_parallel_fetch=%d overrides global %d",
+                "[CONCURRENCY] per-uni max_parallel_fetch=%d (global default=%d)",
                 _effective_parallel, _MAX_PARALLEL_FETCH,
             )
         sem = asyncio.Semaphore(_effective_parallel)

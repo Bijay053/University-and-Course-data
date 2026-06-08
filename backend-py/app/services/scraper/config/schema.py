@@ -2066,6 +2066,18 @@ class ExtractionConfig(BaseModel):
             "responses are empty SPA shells (Canterbury, Sunderland, etc.)."
         ),
     )
+    scrape_do_skip_fallbacks: bool = Field(
+        default=False,
+        description=(
+            "When True (and scrape_do_render is also True), fetch_html() skips "
+            "the httpx and curl_cffi fallback attempts entirely and goes straight "
+            "to Scrape.do headless render for every course page.  Use for Angular/"
+            "React SPA sites behind Cloudflare WAF where direct HTTP always returns "
+            "a challenge page (e.g. UWL) — skipping the two doomed attempts saves "
+            "~1-2s per course which compounds to several minutes across a full run. "
+            "Has no effect unless SCRAPE_DO_TOKEN is set and scrape_do_render is True."
+        ),
+    )
     skip_ai_when_text_empty: bool = Field(
         default=False,
         description=(

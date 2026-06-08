@@ -453,6 +453,23 @@ async def fetch_html(url: str, *, retries: int = 2) -> str | None:
     _scrape_do_render = _scrape_do_render_active.get()
     _has_scrape_do = bool(os.environ.get("SCRAPE_DO_TOKEN"))
 
+    # Fast-path: skip httpx + curl_cffi entirely when the university has
+    # scrape_do_skip_fallbacks=True.  For Angular/React SPA sites behind
+    # Cloudflare WAF (e.g. UWL) every direct-HTTP attempt returns a challenge
+    # page — skipping them saves ~1-2s per course (several minutes per full run).
+    if _scrape_do_render and _has_scrape_do:
+        try:
+            from app.services.scraper.config.context import get_uni_config
+            _skip_fallbacks = get_uni_config().extraction.scrape_do_skip_fallbacks
+        except Exception:  # noqa: BLE001
+            _skip_fallbacks = False
+        if _skip_fallbacks:
+            log.info(
+                "fetch %s: scrape_do_skip_fallbacks=True — going straight to Scrape.do render",
+                url,
+            )
+            return await fetch_html_scrape_do(url, render=True)
+
     last_exc: Exception | None = None
     got_cloudflare_block = False
     got_hard_403 = False
