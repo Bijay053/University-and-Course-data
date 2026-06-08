@@ -9,11 +9,15 @@
 #   until JS executes.  scrape_do_render: true forces headless Chrome via Scrape.do.
 # - Individual course pages follow the URL pattern /course/<level>/<slug> (singular).
 #   Listing/search pages use /courses/ (plural) and must be excluded from extraction.
-# - allow_url_patterns is set in YAML and must override admin_config (update DB too —
-#   see comment at bottom of file for the SQL command to clear the stale admin_config).
-# - Discovery seeds: search/?level= pages return a handful of pre-rendered links but
-#   the full catalogue requires JS-rendered pagination.  BFS page budget raised to 50
-#   so that links discovered from the few pre-rendered search pages can be followed.
+# - The course search at /courses/search?query= is Angular SPA paginated: ~37 courses
+#   per page, 336 total across ~9-10 pages (page=0..11 covers all courses with buffer).
+#   render_listing_pages fetches each page via Scrape.do render to harvest all links.
+# - Cloudflare 403 blocks direct httpx + cffi on course pages.
+#   With scrape_do_render: true, the fetch chain skips Wayback (also an SPA shell)
+#   and goes straight to Scrape.do headless Chrome (tier 2.5).
+#
+# DB admin_config fix applied (2026-06-08) — corrected allow_url_patterns:
+#   ^/course/(undergraduate|postgraduate|research)/[^/]+/?$
 
 discovery:
   allow_url_patterns:
@@ -37,24 +41,37 @@ discovery:
     - "/life-on-campus"
     - "/fees-and-funding$"
     - "/international/living"
-  seed_urls:
-    - "https://www.uwl.ac.uk/courses/search?query=&f%5B0%5D=level%3AUndergraduate&per_page=100"
-    - "https://www.uwl.ac.uk/courses/search?query=&f%5B0%5D=level%3APostgraduate&per_page=100"
-    - "https://www.uwl.ac.uk/courses/search?query=&f%5B0%5D=level%3AResearch&per_page=100"
+  # Rendered discovery: each page returns ~37 courses. 12 pages covers 336+ total.
+  render_listing_pages:
+    - "https://www.uwl.ac.uk/courses/search?query=&page=0"
+    - "https://www.uwl.ac.uk/courses/search?query=&page=1"
+    - "https://www.uwl.ac.uk/courses/search?query=&page=2"
+    - "https://www.uwl.ac.uk/courses/search?query=&page=3"
+    - "https://www.uwl.ac.uk/courses/search?query=&page=4"
+    - "https://www.uwl.ac.uk/courses/search?query=&page=5"
+    - "https://www.uwl.ac.uk/courses/search?query=&page=6"
+    - "https://www.uwl.ac.uk/courses/search?query=&page=7"
+    - "https://www.uwl.ac.uk/courses/search?query=&page=8"
+    - "https://www.uwl.ac.uk/courses/search?query=&page=9"
+    - "https://www.uwl.ac.uk/courses/search?query=&page=10"
+    - "https://www.uwl.ac.uk/courses/search?query=&page=11"
   bfs_page_budget: 50
+  expected_min_courses: 300
 
 extraction:
   scrape_do_render: true
   fees:
     default_currency: GBP
 
-# PRODUCTION FIX — run this on prod to clear the stale admin_config allow_url_patterns:
+# PRODUCTION FIX — run this on prod to correct stale admin_config allow_url_patterns:
 #
 #   sudo -u postgres psql -d university_portal -c "
 #     UPDATE universities
-#     SET scrape_config = jsonb_set(
+#     SET scrape_config = jsonb_set(jsonb_set(
 #       scrape_config,
 #       '{admin_config,discovery,allow_url_patterns}',
-#       '[\"^/course/(undergraduate|postgraduate|research)/[^/]+/?\\$\"]'
-#     )
-#     WHERE id=1881;"
+#       '[\"^/course/(undergraduate|postgraduate|research)/[^/]+/?\\$\"]'::jsonb
+#     ),
+#     '{admin_config,discovery,block_url_patterns}',
+#     '[\"^/courses/\",\"^/study/\",\"/apply\",\"/contact\",\"/news\",\"/events\",\"/blog\",\"/about\",\"/research\",\"/alumni\",\"/outreach\",\"/parents\",\"/jobs\",\"/careers\",\"/accommodation\",\"/life-on-campus\",\"/fees-and-funding\\$\",\"/international/living\"]'::jsonb
+#     ) WHERE id=1881;"

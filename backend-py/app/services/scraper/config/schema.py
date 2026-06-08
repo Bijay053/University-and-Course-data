@@ -886,6 +886,22 @@ class DiscoveryConfig(BaseModel):
             "seed_urls or config changes are needed."
         ),
     )
+    render_listing_pages: list[str] = Field(
+        default_factory=list,
+        description=(
+            "List of course listing/search page URLs to fetch via Scrape.do headless "
+            "Chrome during the discovery phase.  Each page is rendered with JS enabled "
+            "and course links matching allow_url_patterns are extracted and added to "
+            "the candidate pool.  Use for Angular/React SPA catalogues that paginate "
+            "results and are only fully accessible after JavaScript execution — e.g. "
+            "a search page that shows page=0..N of results.  Runs AFTER BFS/browser "
+            "discovery so it supplements (not replaces) standard tiers.  Each URL "
+            "costs one Scrape.do render call (~$0.006).  Example:\n"
+            "  render_listing_pages:\n"
+            "    - 'https://example.com/courses/search?page=0'\n"
+            "    - 'https://example.com/courses/search?page=1'"
+        ),
+    )
 
 
 # ── Extraction sub-configs ───────────────────────────────────────────────────

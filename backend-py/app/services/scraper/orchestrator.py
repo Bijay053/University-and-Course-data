@@ -1471,6 +1471,75 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     _injected, _moved, _insert_pos, len(links), uni_name,
                 )
 
+        # ── Rendered listing pages: Scrape.do render for Angular/React SPA catalogues ──
+        # When discovery.render_listing_pages is set the orchestrator renders each URL
+        # via Scrape.do headless Chrome and harvests course links from the live DOM.
+        # Use for paginated SPA search pages that expose different courses per page=N
+        # and whose full catalogue is invisible to plain static fetching (e.g. UWL
+        # Angular search at /courses/search?query=&page=N, 37 results per page).
+        # Runs AFTER all other tiers so it supplements rather than replaces BFS.
+        _render_pages = list(getattr(_uni_cfg.discovery, "render_listing_pages", None) or [])
+        if _render_pages:
+            from app.services.scraper.http_fetcher import fetch_html_scrape_do
+            import re as _re_rlp
+            from urllib.parse import urlparse as _urlparse_rlp
+            _rlp_allow = [_re_rlp.compile(p) for p in (_uni_cfg.discovery.allow_url_patterns or [])]
+            _rlp_block = [_re_rlp.compile(p) for p in (_uni_cfg.discovery.block_url_patterns or [])]
+            _existing_urls = {item["url"] for item in links}
+            _rlp_total_added = 0
+            _rlp_parsed_base = _urlparse_rlp(scrape_url)
+            _rlp_base = f"{_rlp_parsed_base.scheme}://{_rlp_parsed_base.netloc}"
+            _rlp_host = _rlp_parsed_base.netloc
+            log.info("[RENDER_PAGES] fetching %d listing page(s) via Scrape.do render", len(_render_pages))
+            await emit(
+                "status",
+                f"[DISCOVER] Rendering {len(_render_pages)} listing page(s) to harvest SPA course links...",
+                phase="discover",
+            )
+            for _rlp_url in _render_pages:
+                try:
+                    _rlp_html = await fetch_html_scrape_do(_rlp_url, render=True)
+                    if not _rlp_html:
+                        log.warning("[RENDER_PAGES] no response from %s", _rlp_url)
+                        continue
+                    _rlp_hrefs = _re_rlp.findall(r'href=["\']([^"\'<> ]+)["\']', _rlp_html)
+                    _added_this = 0
+                    for _h in _rlp_hrefs:
+                        # Normalise to absolute URL
+                        if _h.startswith("http"):
+                            _abs = _h
+                        elif _h.startswith("/"):
+                            _abs = _rlp_base + _h
+                        else:
+                            continue
+                        _p = _urlparse_rlp(_abs)
+                        # Same host only
+                        if _p.netloc != _rlp_host:
+                            continue
+                        _path = _p.path
+                        # apply allow_url_patterns (must match at least one)
+                        if _rlp_allow and not any(p.search(_path) for p in _rlp_allow):
+                            continue
+                        # apply block_url_patterns
+                        if _rlp_block and any(p.search(_path) for p in _rlp_block):
+                            continue
+                        _abs_clean = f"{_rlp_base}{_path}"
+                        if _abs_clean not in _existing_urls:
+                            links.append({"url": _abs_clean, "name": ""})
+                            _existing_urls.add(_abs_clean)
+                            _added_this += 1
+                            _rlp_total_added += 1
+                    log.info("[RENDER_PAGES] %s → +%d new link(s)", _rlp_url[:90], _added_this)
+                except Exception as _rlp_exc:
+                    log.warning("[RENDER_PAGES] failed %s: %s", _rlp_url, _rlp_exc)
+            if _rlp_total_added:
+                log.info("[RENDER_PAGES] +%d total new course link(s) from rendered listing pages", _rlp_total_added)
+                await emit(
+                    "status",
+                    f"[DISCOVER] Rendered listing pages: +{_rlp_total_added} new course link(s)",
+                    phase="discover",
+                )
+
         # ── Raw discovery count (before any post-filter like must_contain) ───────
         # summary["discovered"] will be updated again after must_contain filtering
         # so the DB and UI always reflect the *extractable* count, not the raw one.
