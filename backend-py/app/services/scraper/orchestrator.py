@@ -1541,9 +1541,19 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             )
             for _rlp_url in _render_pages:
                 try:
-                    _rlp_html = await fetch_html_scrape_do(_rlp_url, render=True)
+                    _rlp_html = None
+                    for _rlp_attempt in range(3):
+                        _rlp_html = await fetch_html_scrape_do(_rlp_url, render=True)
+                        if _rlp_html:
+                            break
+                        _rlp_wait = (_rlp_attempt + 1) * 12
+                        log.warning(
+                            "[RENDER_PAGES] render=True failed for %s — retry %d/3 in %ds",
+                            _rlp_url, _rlp_attempt + 1, _rlp_wait,
+                        )
+                        await asyncio.sleep(_rlp_wait)
                     if not _rlp_html:
-                        log.warning("[RENDER_PAGES] no response from %s", _rlp_url)
+                        log.warning("[RENDER_PAGES] no response from %s after 3 attempts", _rlp_url)
                         continue
                     _rlp_hrefs = _re_rlp.findall(r'href=["\']([^"\'<> ]+)["\']', _rlp_html)
                     _added_this = 0

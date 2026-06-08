@@ -480,7 +480,22 @@ async def fetch_html(url: str, *, retries: int = 2) -> str | None:
                 "fetch %s: scrape_do_skip_fallbacks=True — going straight to Scrape.do render",
                 url,
             )
-            return await fetch_html_scrape_do(url, render=True)
+            _rendered = await fetch_html_scrape_do(url, render=True)
+            if _rendered is not None:
+                return _rendered
+            # Render returned 502 / None (e.g. Scrape.do rate-limited under
+            # concurrent load).  Fall back to Scrape.do static before giving up —
+            # for many Cloudflare-protected SPAs (e.g. UWL) the residential proxy
+            # path returns fully hydrated HTML even without headless Chrome.
+            log.info(
+                "fetch %s: scrape_do_skip_fallbacks fast-path: render=True failed"
+                " — falling back to Scrape.do static",
+                url,
+            )
+            _static = await fetch_html_scrape_do(url, render=False)
+            if _static is not None and not _is_spa_shell(_static):
+                return _static
+            return None
 
     last_exc: Exception | None = None
     got_cloudflare_block = False
