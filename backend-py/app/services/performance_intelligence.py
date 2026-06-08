@@ -80,7 +80,8 @@ async def _compute(job_id: str, db: Any) -> dict:
     job_row = (await db.execute(
         _sql("""
             SELECT university_id, university_name, status,
-                   started_at, completed_at, total_gemini_cost_usd
+                   started_at, completed_at, total_gemini_cost_usd,
+                   scrape_do_render_calls, scrape_do_static_calls
             FROM scrape_runtime_jobs WHERE runtime_job_id = :j
         """),
         {"j": job_id},
@@ -151,6 +152,16 @@ async def _compute(job_id: str, db: Any) -> dict:
 
     def _pct(k: str) -> float:
         return round(src[k] / total_ev, 4) if total_ev else 0.0
+
+    # 6a. Scrape.do call counts from job row
+    _SCRAPE_DO_RENDER_COST = 0.006    # USD per render call
+    _SCRAPE_DO_STATIC_COST = 0.0005   # USD per static call
+    sd_render_calls = int(job_row.get("scrape_do_render_calls") or 0)
+    sd_static_calls = int(job_row.get("scrape_do_static_calls") or 0)
+    sd_cost = round(
+        sd_render_calls * _SCRAPE_DO_RENDER_COST + sd_static_calls * _SCRAPE_DO_STATIC_COST,
+        6,
+    )
 
     # 6. Gemini cost from gemini_call_log (fallback: scrape_runtime_jobs.total_gemini_cost_usd)
     gem_row = (await db.execute(
@@ -224,6 +235,7 @@ async def _compute(job_id: str, db: Any) -> dict:
                 browser_retry_fired, quality_optimizer_fired, human_intervention_needed,
                 pct_html, pct_api, pct_pdf, pct_ai_rules, pct_gemini, pct_pattern,
                 gemini_calls, gemini_cost_usd,
+                scrape_do_render_calls, scrape_do_static_calls, scrape_do_cost_usd,
                 patterns_reused,
                 p7_inline_improved, p7_celery_dispatched,
                 job_started_at, job_completed_at
@@ -234,34 +246,38 @@ async def _compute(job_id: str, db: Any) -> dict:
                 :cascade, :repair, :pdf_gate, :browser, :qopt, :human,
                 :pct_html, :pct_api, :pct_pdf, :pct_ai, :pct_gem, :pct_pat,
                 :gcalls, :gcost,
+                :sd_render, :sd_static, :sd_cost,
                 :preuse,
                 :p7imp, :p7cel,
                 :started, :completed
             )
             ON CONFLICT (runtime_job_id) DO UPDATE SET
-                final_completeness       = EXCLUDED.final_completeness,
-                completeness_gain        = EXCLUDED.completeness_gain,
-                crossed_85_threshold     = EXCLUDED.crossed_85_threshold,
-                courses_staged           = EXCLUDED.courses_staged,
-                courses_auto_published   = EXCLUDED.courses_auto_published,
-                cascade_fired            = EXCLUDED.cascade_fired,
-                repair_extractor_fired   = EXCLUDED.repair_extractor_fired,
-                pdf_quality_gate_fired   = EXCLUDED.pdf_quality_gate_fired,
-                browser_retry_fired      = EXCLUDED.browser_retry_fired,
-                quality_optimizer_fired  = EXCLUDED.quality_optimizer_fired,
+                final_completeness        = EXCLUDED.final_completeness,
+                completeness_gain         = EXCLUDED.completeness_gain,
+                crossed_85_threshold      = EXCLUDED.crossed_85_threshold,
+                courses_staged            = EXCLUDED.courses_staged,
+                courses_auto_published    = EXCLUDED.courses_auto_published,
+                cascade_fired             = EXCLUDED.cascade_fired,
+                repair_extractor_fired    = EXCLUDED.repair_extractor_fired,
+                pdf_quality_gate_fired    = EXCLUDED.pdf_quality_gate_fired,
+                browser_retry_fired       = EXCLUDED.browser_retry_fired,
+                quality_optimizer_fired   = EXCLUDED.quality_optimizer_fired,
                 human_intervention_needed = EXCLUDED.human_intervention_needed,
-                pct_html                 = EXCLUDED.pct_html,
-                pct_api                  = EXCLUDED.pct_api,
-                pct_pdf                  = EXCLUDED.pct_pdf,
-                pct_ai_rules             = EXCLUDED.pct_ai_rules,
-                pct_gemini               = EXCLUDED.pct_gemini,
-                pct_pattern              = EXCLUDED.pct_pattern,
-                gemini_calls             = EXCLUDED.gemini_calls,
-                gemini_cost_usd          = EXCLUDED.gemini_cost_usd,
-                patterns_reused          = EXCLUDED.patterns_reused,
-                p7_inline_improved       = EXCLUDED.p7_inline_improved,
-                p7_celery_dispatched     = EXCLUDED.p7_celery_dispatched,
-                recorded_at              = NOW()
+                pct_html                  = EXCLUDED.pct_html,
+                pct_api                   = EXCLUDED.pct_api,
+                pct_pdf                   = EXCLUDED.pct_pdf,
+                pct_ai_rules              = EXCLUDED.pct_ai_rules,
+                pct_gemini                = EXCLUDED.pct_gemini,
+                pct_pattern               = EXCLUDED.pct_pattern,
+                gemini_calls              = EXCLUDED.gemini_calls,
+                gemini_cost_usd           = EXCLUDED.gemini_cost_usd,
+                scrape_do_render_calls    = EXCLUDED.scrape_do_render_calls,
+                scrape_do_static_calls    = EXCLUDED.scrape_do_static_calls,
+                scrape_do_cost_usd        = EXCLUDED.scrape_do_cost_usd,
+                patterns_reused           = EXCLUDED.patterns_reused,
+                p7_inline_improved        = EXCLUDED.p7_inline_improved,
+                p7_celery_dispatched      = EXCLUDED.p7_celery_dispatched,
+                recorded_at               = NOW()
         """),
         {
             "job_id": job_id, "uni_id": university_id, "uni_name": university_name,
@@ -272,6 +288,7 @@ async def _compute(job_id: str, db: Any) -> dict:
             "pct_html": _pct("html"), "pct_api": _pct("api"), "pct_pdf": _pct("pdf"),
             "pct_ai": _pct("ai_rules"), "pct_gem": _pct("gemini"), "pct_pat": _pct("pattern"),
             "gcalls": gemini_calls, "gcost": gemini_cost,
+            "sd_render": sd_render_calls, "sd_static": sd_static_calls, "sd_cost": sd_cost,
             "preuse": patterns_reused,
             "p7imp": p7_inline_improved, "p7cel": p7_dispatched,
             "started": _as_utc(job_row.get("started_at")),

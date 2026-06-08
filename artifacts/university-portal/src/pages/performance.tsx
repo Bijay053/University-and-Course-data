@@ -46,6 +46,9 @@ type Summary = {
   total_courses_auto_published: number;
   total_gemini_calls: number;
   total_gemini_cost_usd: number;
+  total_scrape_do_render_calls: number;
+  total_scrape_do_static_calls: number;
+  total_scrape_do_cost_usd: number;
   total_patterns_reused: number;
   total_p7_inline_improved: number;
   oldest_recorded_at: string | null;
@@ -62,6 +65,9 @@ type TrendMonth = {
   jobs_crossed_85: number;
   auto_publish_rate: number;
   gemini_cost_usd: number;
+  scrape_do_render_calls: number;
+  scrape_do_static_calls: number;
+  scrape_do_cost_usd: number;
   patterns_reused: number;
   avg_pct_html: number;
   avg_pct_gemini: number;
@@ -231,7 +237,8 @@ export default function PerformancePage() {
 
   const costChartData = trend.map(m => ({
     month: m.month,
-    "Cost (USD)": Number(m.gemini_cost_usd.toFixed(4)),
+    "Gemini (USD)": Number(m.gemini_cost_usd.toFixed(4)),
+    "Scrape.do (USD)": Number((m.scrape_do_cost_usd ?? 0).toFixed(4)),
     "Patterns Reused": m.patterns_reused,
   }));
 
@@ -326,7 +333,7 @@ export default function PerformancePage() {
 
       {/* KPI Cards */}
       {summary && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
           <KpiCard
             title="Avg Completeness Gain"
             value={pct(summary.avg_completeness_gain)}
@@ -347,6 +354,13 @@ export default function PerformancePage() {
             sub={`${summary.total_gemini_calls.toLocaleString()} calls · ${summary.total_jobs} jobs`}
             icon={DollarSign}
             color={summary.total_gemini_cost_usd < 1 ? "text-emerald-600" : "text-amber-600"}
+          />
+          <KpiCard
+            title="Scrape.do Cost (Period)"
+            value={money(summary.total_scrape_do_cost_usd ?? 0)}
+            sub={`${(summary.total_scrape_do_render_calls ?? 0).toLocaleString()} render · ${(summary.total_scrape_do_static_calls ?? 0).toLocaleString()} static`}
+            icon={DollarSign}
+            color={(summary.total_scrape_do_cost_usd ?? 0) < 1 ? "text-emerald-600" : "text-amber-600"}
           />
           <KpiCard
             title="Pattern Reuse Events"
@@ -532,12 +546,12 @@ export default function PerformancePage() {
         </Card>
       </div>
 
-      {/* Charts Row 3: Gemini Cost + Cost per Job trend */}
+      {/* Charts Row 3: API Cost Trend + Pattern Reuse Growth */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">Gemini Cost Over Time</CardTitle>
-            <CardDescription>Monthly AI spend — downward trend means patterns + rules are working</CardDescription>
+            <CardTitle className="text-base">API Cost Over Time</CardTitle>
+            <CardDescription>Gemini + Scrape.do monthly spend — downward trend means patterns + rules are working</CardDescription>
           </CardHeader>
           <CardContent>
             {costChartData.length === 0 ? (
@@ -549,7 +563,9 @@ export default function PerformancePage() {
                   <XAxis dataKey="month" tick={{ fontSize: 11 }} />
                   <YAxis tickFormatter={v => `$${v.toFixed(3)}`} tick={{ fontSize: 10 }} />
                   <Tooltip content={<CustomTooltip formatter={(v) => `$${v}`} />} />
-                  <Bar dataKey="Cost (USD)" fill="#f472b6" radius={[3, 3, 0, 0]} />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Bar dataKey="Gemini (USD)" fill="#f472b6" radius={[3, 3, 0, 0]} stackId="cost" />
+                  <Bar dataKey="Scrape.do (USD)" fill="#fb923c" radius={[3, 3, 0, 0]} stackId="cost" />
                 </BarChart>
               </ResponsiveContainer>
             )}

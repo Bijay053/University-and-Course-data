@@ -58,6 +58,36 @@ _scrape_do_render_active: ContextVar[bool] = ContextVar(
 # operators can see how many paid render calls were consumed.
 _scrape_do_render_call_count: int = 0
 
+# Per-job mutable counter dict: {"render": N, "static": N}.
+# Set to a fresh dict at the start of each run_scrape() call via
+# scrape_do_counter_scope().  All coroutines that share the same asyncio
+# context reference the SAME dict object, so increments are visible across
+# gather() boundaries.  None (default) means "no job scope active".
+_scrape_do_job_counters: ContextVar[dict | None] = ContextVar(
+    "_scrape_do_job_counters", default=None
+)
+
+
+@contextmanager
+def scrape_do_counter_scope() -> "Generator[dict, None, None]":
+    """Context manager: start a fresh Scrape.do call counter for one job.
+
+    Usage (orchestrator.py)::
+
+        from app.services.scraper.http_fetcher import scrape_do_counter_scope
+
+        with scrape_do_counter_scope() as sd_counters:
+            ...  # run the whole scrape job
+        render_calls = sd_counters["render"]
+        static_calls = sd_counters["static"]
+    """
+    counters: dict = {"render": 0, "static": 0}
+    token = _scrape_do_job_counters.set(counters)
+    try:
+        yield counters
+    finally:
+        _scrape_do_job_counters.reset(token)
+
 
 @contextmanager
 def scrape_do_render_scope():
@@ -216,6 +246,13 @@ async def fetch_html_scrape_do(
                     render,
                     len(r.text),
                 )
+                # Per-job call counter (shared mutable dict via ContextVar).
+                _sd_ctrs = _scrape_do_job_counters.get()
+                if _sd_ctrs is not None:
+                    if render:
+                        _sd_ctrs["render"] += 1
+                    else:
+                        _sd_ctrs["static"] += 1
                 return _unescape_json_html(r.text)
             log.warning(
                 "scrape.do fetch %s render=%s -> %s (%d chars)",

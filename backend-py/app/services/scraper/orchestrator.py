@@ -404,6 +404,16 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
     if not job:
         log.warning("run_scrape: no job %s", runtime_job_id)
         return {"ok": False, "reason": "job_not_found"}
+
+    # Start per-job Scrape.do call counter.  All coroutines spawned within
+    # this job share the same mutable dict via ContextVar, so gather() batches
+    # also contribute their counts without any explicit plumbing.
+    from app.services.scraper.http_fetcher import (
+        _scrape_do_job_counters as _sd_cv,
+    )
+    _sd_job_ctrs: dict = {"render": 0, "static": 0}
+    _sd_cv.set(_sd_job_ctrs)
+
     _seq = [1]
     async def emit(event: str, message: str, **kw):
         # Allocate the sequence number BEFORE awaiting the insert. asyncio is
@@ -3804,6 +3814,17 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # Gemini cost tracking (Component 3 & 4)
         job.total_gemini_cost_usd = round(_total_gemini_cost_usd, 8)
         job.cost_ceiling_hit = _cost_monitor.aborted
+        # Scrape.do call counters (per-job ContextVar dict)
+        job.scrape_do_render_calls = _sd_job_ctrs["render"]
+        job.scrape_do_static_calls = _sd_job_ctrs["static"]
+        if _sd_job_ctrs["render"] or _sd_job_ctrs["static"]:
+            log.info(
+                "[SCRAPE_DO] run=%s render_calls=%d static_calls=%d cost_est=$%.4f",
+                runtime_job_id,
+                _sd_job_ctrs["render"],
+                _sd_job_ctrs["static"],
+                _sd_job_ctrs["render"] * 0.006 + _sd_job_ctrs["static"] * 0.0005,
+            )
         # ── Phase 9: Confidence Trend — store per-job avg confidence ──────────
         # Query the mean avg_verification_confidence of all courses staged in
         # this run. Stored on the job row so the trend API can look back over
