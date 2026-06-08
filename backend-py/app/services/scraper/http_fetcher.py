@@ -120,61 +120,6 @@ def scrape_do_render_scope():
 _wayback_ts_cache: dict[str, str] = {}
 
 
-async def _save_html_snapshot(
-    url: str,
-    html: str,
-    *,
-    fetch_method: str,
-    status_code: int = 200,
-) -> None:
-    """Fire-and-forget: persist a rendered HTML snapshot to S3 + DB index.
-
-    Runs as a background Task via asyncio.ensure_future() so it NEVER blocks
-    the live scrape.  Any exception is swallowed — snapshot failure must not
-    break the scrape pipeline.
-    """
-    try:
-        from app.services.scraper.snapshot_context import get_snapshot_context, is_replay_mode
-        if is_replay_mode():
-            return  # never overwrite snapshots during replay
-        uni_id, job_id = get_snapshot_context()
-        if not uni_id or not job_id:
-            return  # no active scrape scope — skip (e.g. during discovery/central pages)
-        from app.services.snapshot_store import upload_snapshot, url_hash as _url_hash, is_enabled
-        if not is_enabled():
-            return
-        key = await upload_snapshot(
-            html,
-            university_id=uni_id,
-            scrape_job_id=job_id,
-            url=url,
-            snapshot_type="html",
-            content_type="text/html; charset=utf-8",
-        )
-        if not key:
-            return
-        # Write the DB index row
-        from app.database import AsyncSessionLocal
-        from app.models.page_snapshot import PageSnapshot
-        from datetime import datetime, timezone
-        async with AsyncSessionLocal() as db:
-            snap = PageSnapshot(
-                university_id=uni_id,
-                scrape_job_id=job_id,
-                course_url=url,
-                url_hash=_url_hash(url),
-                snapshot_type="html",
-                storage_path=key,
-                status_code=status_code,
-                content_length=len(html.encode("utf-8")),
-                fetch_method=fetch_method,
-                fetched_at=datetime.now(timezone.utc),
-            )
-            db.add(snap)
-            await db.commit()
-    except Exception as exc:
-        log.debug("_save_html_snapshot failed (non-fatal): %s", exc)
-
 
 def set_wayback_timestamps(url_timestamps: dict[str, str]) -> None:
     """Register Wayback CDX timestamps found during discovery.
@@ -310,14 +255,15 @@ async def fetch_html_scrape_do(
                     else:
                         _sd_ctrs["static"] += 1
                 html_result = _unescape_json_html(r.text)
-                # Save snapshot to S3 (fire-and-forget, never blocks the scrape)
-                asyncio.ensure_future(
-                    _save_html_snapshot(
-                        url,
-                        html_result,
-                        fetch_method="scrape_do_render" if render else "scrape_do_static",
-                        status_code=200,
-                    )
+                # Stage the final fetched HTML so _extract_only() can save it
+                # to S3 *after* extract_course() completes.  This ensures only
+                # the winning fetch (not retries or intermediate fallbacks) is
+                # stored, and the original extraction result is attached.
+                from app.services.scraper.snapshot_context import stage_snapshot
+                stage_snapshot(
+                    url,
+                    html_result,
+                    fetch_method="scrape_do_render" if render else "scrape_do_static",
                 )
                 return html_result
             log.warning(

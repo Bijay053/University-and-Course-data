@@ -7,6 +7,7 @@ index for lookup, replay, and audit.
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from typing import Any
 
 from sqlalchemy import (
     BigInteger,
@@ -16,6 +17,7 @@ from sqlalchemy import (
     Integer,
     Text,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -55,8 +57,19 @@ class PageSnapshot(Base):
     # How the page was fetched: httpx | curl_cffi | scrape_do | browser | wayback | api
     fetch_method: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    # Extractor version string (git short SHA or semver) if available
-    extractor_version: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Version provenance — lets replay compare across extractor generations
+    # git short SHA of the scraper process that saved this snapshot
+    scraper_commit: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # SHA-256 (8 chars) of the university YAML used during extraction
+    yaml_version: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Extracted field values from the original scrape run.
+    # Used as the baseline (left side) when replaying extractors against the
+    # saved HTML/JSON — so replay diffs "V1 extraction" vs "V2 extraction"
+    # rather than diffing against whatever currently lives in scraped_courses.
+    original_extraction: Mapped[dict[str, Any] | None] = mapped_column(
+        JSONB, nullable=True
+    )
 
     fetched_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

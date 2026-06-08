@@ -2,18 +2,32 @@
 
 Flow:
   1. Load all page_snapshots for a given scrape_job_id from the DB.
-  2. For each snapshot, download the HTML from S3.
-  3. Run extract_course() with the cached HTML (no live fetch).
-  4. Compare with the previously staged scraped_course row.
-  5. Return a diff report; only update the DB if commit=True.
+  2. For each snapshot, download the HTML/JSON from S3.
+  3. Re-run extraction with the cached content (no live fetch, no Gemini).
+  4. Compare with the ORIGINAL extraction stored in snapshot.original_extraction
+     (NOT scraped_courses — that may have been updated since the run).
+  5. Return a diff report; only update scraped_courses if commit=True.
 
-This lets operators fix an extractor or YAML bug and immediately see the
-corrected extraction on historical HTML — without paying Scrape.do again
-or risking a Cloudflare block.
+Supported snapshot types
+------------------------
+  html   — re-run extract_course() with the saved HTML
+  repair — same as html
+  json   — deserialise the JSON payload; re-apply post-processing guards
+           (used for API providers: SearchStax, Funnelback, Algolia, etc.)
+
+Why diff against original_extraction (not scraped_courses)?
+-----------------------------------------------------------
+  Diffing against scraped_courses shows "what changed vs current DB state",
+  which conflates extractor improvements with manual edits and approved data.
+  Diffing against original_extraction isolates purely the extractor delta:
+    V1 HTML → original_extraction  (what the old code produced)
+    V1 HTML → new_extraction       (what the new code produces from same HTML)
+  This lets you quantify an extractor change cleanly.
 """
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 from datetime import datetime, timezone
 from typing import Any
@@ -28,7 +42,7 @@ from app.services.snapshot_store import download_snapshot
 
 log = logging.getLogger(__name__)
 
-# Fields compared in the diff (extracted vs. previously staged)
+# Fields compared in the diff
 _DIFF_FIELDS = [
     "course_name",
     "degree_level",
@@ -57,7 +71,6 @@ def _diff_course(old: dict[str, Any], new: dict[str, Any]) -> dict[str, Any]:
     for field in _DIFF_FIELDS:
         ov = old.get(field)
         nv = new.get(field)
-        # Normalise for comparison
         ov_s = str(ov).strip() if ov is not None else ""
         nv_s = str(nv).strip() if nv is not None else ""
         if ov_s != nv_s:
@@ -94,7 +107,6 @@ async def replay_job(
     own_db = db is None
     if own_db:
         db = AsyncSessionLocal()
-
     try:
         return await _replay_job_inner(
             scrape_job_id,
@@ -118,7 +130,7 @@ async def _replay_job_inner(
     result = await db.execute(
         select(PageSnapshot)
         .where(PageSnapshot.scrape_job_id == scrape_job_id)
-        .where(PageSnapshot.snapshot_type.in_(["html", "repair"]))
+        .where(PageSnapshot.snapshot_type.in_(["html", "repair", "json"]))
         .where(PageSnapshot.storage_path.isnot(None))
         .limit(max_courses)
     )
@@ -133,16 +145,19 @@ async def _replay_job_inner(
             "errors": 0,
             "commit": commit,
             "diffs": [],
-            "message": "No HTML snapshots found for this job.",
+            "message": "No HTML/JSON snapshots found for this job.",
         }
 
     log.info(
-        "[REPLAY] job=%s found=%d snapshots commit=%s",
-        scrape_job_id, len(snapshots), commit,
+        "[REPLAY] job=%s found=%d snapshots (html=%d json=%d) commit=%s",
+        scrape_job_id,
+        len(snapshots),
+        sum(1 for s in snapshots if s.snapshot_type != "json"),
+        sum(1 for s in snapshots if s.snapshot_type == "json"),
+        commit,
     )
 
     # ── 2. Load the uni config so extractors have context ───────────────────
-    # We need university_id + scrape_url to build UniConfig.
     uni_id_result = await db.execute(
         text(
             "SELECT j.university_id, u.scrape_url, u.name, j.scrape_config "
@@ -170,7 +185,6 @@ async def _replay_job_inner(
     uni_name: str = job_row[2] or ""
     db_scrape_config: dict | None = job_row[3]
 
-    # Set UniConfig contextvar so extractors get the right YAML
     try:
         from urllib.parse import urlparse as _urlparse
         from app.services.scraper.config import get_config_for_host, set_uni_config
@@ -186,13 +200,14 @@ async def _replay_job_inner(
     except Exception as exc:
         log.warning("[REPLAY] could not set UniConfig: %s", exc)
 
-    # ── 3. Load existing staged courses for diff comparison ─────────────────
-    sc_result = await db.execute(
-        select(ScrapedCourse).where(ScrapedCourse.scrape_job_id == scrape_job_id)
-    )
-    staged: dict[str, ScrapedCourse] = {
-        sc.course_url: sc for sc in sc_result.scalars().all()
-    }
+    # ── 3. Load existing staged courses for commit path only ─────────────────
+    # We only need scraped_courses when commit=True (to apply new values).
+    staged: dict[str, ScrapedCourse] = {}
+    if commit:
+        sc_result = await db.execute(
+            select(ScrapedCourse).where(ScrapedCourse.scrape_job_id == scrape_job_id)
+        )
+        staged = {sc.course_url: sc for sc in sc_result.scalars().all()}
 
     # ── 4. Replay extraction ─────────────────────────────────────────────────
     from app.services.scraper.pipelines.single_course import extract_course
@@ -201,33 +216,43 @@ async def _replay_job_inner(
     diffs: list[dict] = []
     replayed = changed = unchanged = errors = 0
 
-    sem = asyncio.Semaphore(4)  # modest concurrency for replay
+    sem = asyncio.Semaphore(4)  # modest concurrency — replay is CPU-bound
 
     async def _replay_one(snap: PageSnapshot) -> None:
         nonlocal replayed, changed, unchanged, errors
         try:
-            html_bytes = await download_snapshot(snap.storage_path)
-            if not html_bytes:
+            raw_bytes = await download_snapshot(snap.storage_path)
+            if not raw_bytes:
                 log.warning("[REPLAY] S3 download failed for %s", snap.storage_path)
                 errors += 1
                 return
-            html = html_bytes.decode("utf-8", errors="replace")
 
             async with sem:
                 with replay_mode_scope():
-                    new_data = await extract_course(
-                        snap.course_url,
-                        html=html,
-                        use_ai_fallback=False,  # replay = deterministic, no Gemini
-                    )
+                    if snap.snapshot_type == "json":
+                        # API JSON snapshot — deserialise and re-apply guards
+                        new_data = _replay_from_json(raw_bytes, snap.course_url)
+                    else:
+                        # HTML snapshot — re-run full extractor (no Gemini)
+                        html = raw_bytes.decode("utf-8", errors="replace")
+                        new_data = await extract_course(
+                            snap.course_url,
+                            html=html,
+                            use_ai_fallback=False,
+                        )
+
             replayed += 1
 
-            # Build old-data dict from staged course
-            old_sc = staged.get(snap.course_url)
-            old_data: dict[str, Any] = {}
-            if old_sc:
-                for f in _DIFF_FIELDS:
-                    old_data[f] = getattr(old_sc, f, None)
+            # ── Diff against original_extraction, NOT scraped_courses ────────
+            # This compares V1 extractor output vs V2 extractor output on the
+            # same HTML — isolating the extractor delta cleanly.
+            old_data: dict[str, Any] = snap.original_extraction or {}
+            # Fallback: if snapshot predates original_extraction column,
+            # fall back to scraped_courses (graceful degradation).
+            if not old_data:
+                old_sc = staged.get(snap.course_url) if commit else None
+                if old_sc:
+                    old_data = {f: getattr(old_sc, f, None) for f in _DIFF_FIELDS}
 
             diff = _diff_course(old_data, new_data)
             if diff:
@@ -235,20 +260,23 @@ async def _replay_job_inner(
                 diffs.append({
                     "url": snap.course_url,
                     "snapshot_key": snap.storage_path,
+                    "snapshot_type": snap.snapshot_type,
                     "fetch_method": snap.fetch_method,
                     "fetched_at": snap.fetched_at.isoformat() if snap.fetched_at else None,
+                    "scraper_commit": snap.scraper_commit,
+                    "yaml_version": snap.yaml_version,
                     "changes": diff,
                     "new_name": new_data.get("course_name", ""),
                 })
-
-                if commit and old_sc:
-                    # Apply new values to the staged course row
-                    for field, change in diff.items():
-                        try:
-                            setattr(old_sc, field, change["new"])
-                        except Exception:
-                            pass
-                    old_sc.updated_at = datetime.now(timezone.utc)
+                if commit:
+                    old_sc = staged.get(snap.course_url)
+                    if old_sc:
+                        for field, change in diff.items():
+                            try:
+                                setattr(old_sc, field, change["new"])
+                            except Exception:
+                                pass
+                        old_sc.updated_at = datetime.now(timezone.utc)
             else:
                 unchanged += 1
 
@@ -279,3 +307,19 @@ async def _replay_job_inner(
             + (" Changes committed." if commit and changed > 0 else "")
         ),
     }
+
+
+def _replay_from_json(raw_bytes: bytes, url: str) -> dict[str, Any]:
+    """Re-apply guards/post-processing to a stored API JSON payload.
+
+    For API providers (SearchStax, Funnelback, Algolia, Solr, Elastic) the
+    JSON IS the extraction result — no HTML parsing needed.  Replay just
+    re-deserialises the stored payload and returns the diffable fields.
+    """
+    try:
+        payload = json.loads(raw_bytes.decode("utf-8", errors="replace"))
+        # Payload is already in extracted-field format from the provider
+        return {f: payload.get(f) for f in _DIFF_FIELDS}
+    except Exception as exc:
+        log.warning("[REPLAY] json decode failed for %s: %s", url, exc)
+        return {}

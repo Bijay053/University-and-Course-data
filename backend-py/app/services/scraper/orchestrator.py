@@ -262,6 +262,11 @@ async def _extract_only(
     # function's normal output: {name, url, payload, evidence}.
     _pre = link.get("searchstax_result")
     if _pre is not None:
+        # Save the JSON payload as a snapshot so replay can re-apply guards
+        # independently of the HTML path.
+        asyncio.ensure_future(
+            _save_api_json_snapshot_safe(link["url"], _pre)
+        )
         return _pre
 
     # Scrapy rich-mode: spider pre-built the full payload + evidence rows.
@@ -288,6 +293,15 @@ async def _extract_only(
         )
     except Exception as exc:  # noqa: BLE001
         return {"name": name, "url": url, "error": f"extract: {exc}"}
+
+    # Save the final HTML snapshot + original extraction result.
+    # Fires after extract_course() succeeds — only the winning HTML is saved,
+    # not retries or intermediate fallbacks.
+    if not out.get("_retry_after") and not out.get("error"):
+        asyncio.ensure_future(
+            _save_extraction_snapshot_safe(out)
+        )
+
     # Prefer the course_name the extractor produced (e.g. "MBA – Digital
     # Management") over the discovery-phase slug-derived name (e.g.
     # "Digital Management").  The extractor has access to the page's H1,
@@ -296,6 +310,25 @@ async def _extract_only(
     extracted_name = ((out.get("payload") or {}).get("course_name") or "").strip()
     final_name = extracted_name if extracted_name else name
     return {"name": final_name, "url": url, **out}
+
+
+async def _save_extraction_snapshot_safe(extraction_result: dict) -> None:
+    """Fire-and-forget wrapper — swallows all exceptions."""
+    try:
+        from app.services.scraper.snapshot_save import save_extraction_snapshot
+        await save_extraction_snapshot(extraction_result)
+    except Exception as exc:
+        log.debug("_save_extraction_snapshot_safe: %s", exc)
+
+
+async def _save_api_json_snapshot_safe(url: str, api_result: dict) -> None:
+    """Fire-and-forget wrapper for API JSON snapshots — swallows all exceptions."""
+    try:
+        from app.services.scraper.snapshot_save import save_api_json_snapshot
+        payload = api_result.get("payload") or api_result
+        await save_api_json_snapshot(url, payload, api_result)
+    except Exception as exc:
+        log.debug("_save_api_json_snapshot_safe: %s", exc)
 
 
 async def _clear_stale_dedup(

@@ -10,13 +10,24 @@ Storage layout
   universities/{university_id}/{scrape_job_id}/api/{endpoint_hash}/page_1.json
   universities/{university_id}/{scrape_job_id}/pdf/{file_hash}/document.pdf
 
-Lifecycle tags (applied per object so S3 lifecycle rules can act on them)
---------------------------------------------------------------------------
-  snapshot_type=html        → 90 days
-  snapshot_type=json        → 12 months
-  snapshot_type=pdf         → 12 months
-  snapshot_type=repair      → 180 days
-  snapshot_type=failed      → 180 days
+Compression
+-----------
+  All HTML and JSON uploads are gzip-compressed before upload
+  (ContentEncoding: gzip).  This gives ~70% size reduction:
+
+  Storage estimate at 300-uni scale:
+    300 unis × 200 courses × 150 KB (gzip avg) × 52 scrapes/year = ~468 GB/year raw
+    With 90-day lifecycle expiry: ~115 GB retained at any time
+    S3 Standard @ $0.023/GB/month ≈ $2.65/month ≈ $32/year
+
+  PDF and binary content is uploaded as-is (already compressed formats).
+
+Lifecycle (prefix-based, no per-object tagging required):
+-----------
+  Prefix                     Expiry
+  universities/*/*/...html   90 days
+  universities/*/*/api/...   365 days
+  universities/*/*/pdf/...   365 days
 
 Configuration (env / secrets)
 -----------------------------
@@ -28,6 +39,7 @@ Configuration (env / secrets)
 """
 from __future__ import annotations
 
+import gzip
 import hashlib
 import logging
 import os
@@ -129,7 +141,18 @@ async def upload_snapshot(
         return None
     key = build_s3_key(university_id, scrape_job_id, url, snapshot_type, page_number=page_number)
     bucket = _bucket()
-    body = content.encode("utf-8") if isinstance(content, str) else content
+    raw = content.encode("utf-8") if isinstance(content, str) else content
+
+    # Gzip-compress HTML and JSON to reduce storage by ~70%.
+    # PDF is already compressed; skip it.
+    compress = snapshot_type in ("html", "json", "repair", "failed")
+    if compress:
+        body = gzip.compress(raw, compresslevel=6)
+        encoding_header: dict = {"ContentEncoding": "gzip"}
+    else:
+        body = raw
+        encoding_header = {}
+
     try:
         session = _make_async_session()
         endpoint = os.environ.get("AWS_S3_ENDPOINT_URL")
@@ -142,8 +165,12 @@ async def upload_snapshot(
                 Key=key,
                 Body=body,
                 ContentType=content_type,
+                **encoding_header,
             )
-        log.info("snapshot uploaded: s3://%s/%s (%d bytes)", bucket, key, len(body))
+        log.info(
+            "snapshot uploaded: s3://%s/%s raw=%d gz=%d bytes",
+            bucket, key, len(raw), len(body),
+        )
         return key
     except Exception as exc:
         log.warning("snapshot upload failed for %s: %s", url, exc)
@@ -164,6 +191,9 @@ async def download_snapshot(key: str) -> bytes | None:
         async with session.client("s3", **extra) as s3:
             resp = await s3.get_object(Bucket=bucket, Key=key)
             data = await resp["Body"].read()
+        # Decompress gzip-encoded objects transparently
+        if resp.get("ContentEncoding") == "gzip":
+            data = gzip.decompress(data)
         return data
     except Exception as exc:
         log.warning("snapshot download failed for key %s: %s", key, exc)
