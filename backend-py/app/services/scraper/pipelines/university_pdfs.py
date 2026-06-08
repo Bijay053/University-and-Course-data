@@ -21,6 +21,7 @@ This module:
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
 from typing import Any
@@ -105,6 +106,82 @@ async def _download_raw_pdf(url: str) -> bytes:
     except Exception as exc:  # noqa: BLE001
         log.debug("_download_raw_pdf failed for %s: %s", url, exc)
         return b""
+
+
+async def _save_pdf_snapshot_safe(url: str, raw: bytes) -> None:
+    """Upload raw PDF bytes to S3 and write a PageSnapshot row.
+
+    Non-blocking and non-fatal: called via asyncio.ensure_future() so it
+    never delays extraction.  All failures are logged as warnings and the
+    scrape continues normally.
+
+    Respects all safeguards:
+      • is_enabled()     — SNAPSHOT_ENABLED=false → skip
+      • is_replay_mode() — skip during replay so snapshots are not overwritten
+      • get_snapshot_context() → missing uni_id/job_id → skip silently
+    """
+    try:
+        from app.services.scraper.snapshot_context import (
+            get_snapshot_context,
+            is_replay_mode,
+        )
+        if is_replay_mode():
+            return
+
+        uni_id, job_id = get_snapshot_context()
+        if not uni_id or not job_id:
+            return
+
+        from app.services.snapshot_store import (
+            is_enabled,
+            upload_snapshot,
+            url_hash as _url_hash,
+        )
+        if not is_enabled():
+            return
+
+        key = await upload_snapshot(
+            raw,
+            university_id=uni_id,
+            scrape_job_id=job_id,
+            url=url,
+            snapshot_type="pdf",
+            content_type="application/pdf",
+        )
+        if not key:
+            return
+
+        from datetime import datetime, timezone
+
+        from app.database import AsyncSessionLocal
+        from app.models.page_snapshot import PageSnapshot
+
+        async with AsyncSessionLocal() as db:
+            snap = PageSnapshot(
+                university_id=uni_id,
+                scrape_job_id=job_id,
+                course_url=url,
+                url_hash=_url_hash(url),
+                snapshot_type="pdf",
+                storage_path=key,
+                status_code=200,
+                content_length=len(raw),
+                fetch_method="pdf_pipeline",
+                fetched_at=datetime.now(timezone.utc),
+            )
+            db.add(snap)
+            await db.commit()
+
+        log.debug(
+            "pdf snapshot saved: uni=%s job=%s url=%s bytes=%d",
+            uni_id, job_id, url, len(raw),
+        )
+
+    except Exception as exc:  # noqa: BLE001
+        log.warning(
+            "pdf snapshot save failed (non-fatal — scrape continues): %s: %s",
+            type(exc).__name__, exc,
+        )
 
 
 async def _vision_fallback_text(pdf_bytes: bytes, kind: str, url: str, emit) -> str:
@@ -1272,6 +1349,7 @@ async def _parse_fee_pdf(url: str, country: str | None, emit=None) -> dict[str, 
     raw = await _download_raw_pdf(url)
     if not raw:
         return {}
+    asyncio.ensure_future(_save_pdf_snapshot_safe(url, raw))
     text = ""
     try:
         # ``download_pdf_text`` re-fetches the URL; instead reuse the
@@ -1404,6 +1482,7 @@ async def _parse_requirements_pdf(url: str, emit=None) -> dict[str, Any]:
     raw = await _download_raw_pdf(url)
     if not raw:
         return {}
+    asyncio.ensure_future(_save_pdf_snapshot_safe(url, raw))
     text = ""
     try:
         from io import BytesIO
