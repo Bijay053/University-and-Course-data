@@ -160,7 +160,7 @@ async def _replay_job_inner(
     # ── 2. Load the uni config so extractors have context ───────────────────
     uni_id_result = await db.execute(
         text(
-            "SELECT j.university_id, u.scrape_url, u.name, j.scrape_config "
+            "SELECT j.university_id, u.scrape_url, u.name, u.scrape_config "
             "FROM scrape_runtime_jobs j "
             "JOIN universities u ON u.id = j.university_id "
             "WHERE j.runtime_job_id = :jid"

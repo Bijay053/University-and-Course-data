@@ -235,6 +235,18 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
   const [now, setNow] = useState(Date.now());
   const [resultSummary, setResultSummary] = useState<{ imported: number; skipped: number; errors: number } | null>(null);
   const [completedJobId, setCompletedJobId] = useState<string | null>(null);
+
+  // Snapshot badge state — loaded after job completes
+  type SnapshotSummary = {
+    snapshot_count: number;
+    has_snapshots: boolean;
+    replay_available: boolean;
+    latest_snapshot_at: string | null;
+    s3_enabled: boolean;
+  };
+  const [snapshotSummary, setSnapshotSummary] = useState<SnapshotSummary | null>(null);
+  const [snapshotSummaryLoading, setSnapshotSummaryLoading] = useState(false);
+
   const [qualityData, setQualityData] = useState<QualityData | null>(null);
   const [qualityLoading, setQualityLoading] = useState(false);
   const [qualityError, setQualityError] = useState<string | null>(null);
@@ -243,6 +255,19 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
   const [showQualityPanel, setShowQualityPanel] = useState(true);
   const qualityPollRef = useRef<number | null>(null);
   const qualityTriggerTimeRef = useRef<number>(0);
+
+  // Fetch snapshot summary once when a job completes
+  useEffect(() => {
+    if (!completedJobId) { setSnapshotSummary(null); return; }
+    let cancelled = false;
+    setSnapshotSummaryLoading(true);
+    fetch(`/api/scrape/snapshots/${completedJobId}/summary`, { credentials: "include" })
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => { if (!cancelled && data) setSnapshotSummary(data as SnapshotSummary); })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setSnapshotSummaryLoading(false); });
+    return () => { cancelled = true; };
+  }, [completedJobId]);
 
   // Pipeline optimisation savings from the done event
   const [performanceSavings, setPerformanceSavings] = useState<{
@@ -427,6 +452,8 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
     setResultSummary(null);
     setPerformanceSavings(null);
     setCompletedJobId(null);
+    setSnapshotSummary(null);
+    setSnapshotSummaryLoading(false);
     setQualityData(null);
     setQualityError(null);
     setQualityStatus("idle");
@@ -1985,6 +2012,53 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
                 </div>
               );
             })()}
+
+            {/* ── Snapshot status badge ────────────────────────────── */}
+            {completedJobId && (
+              <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs flex-wrap">
+                <span className="font-semibold text-gray-600 shrink-0">Snapshots</span>
+                <span className="text-gray-300">·</span>
+                {snapshotSummaryLoading ? (
+                  <Loader2 className="w-3 h-3 animate-spin text-gray-400" />
+                ) : snapshotSummary ? (
+                  <>
+                    <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-medium ${
+                      snapshotSummary.has_snapshots
+                        ? "bg-emerald-100 text-emerald-700"
+                        : "bg-gray-100 text-gray-500"
+                    }`}>
+                      {snapshotSummary.has_snapshots ? "✓ Available" : "None"}
+                    </span>
+                    <span className="text-gray-300">·</span>
+                    <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-medium ${
+                      snapshotSummary.replay_available
+                        ? "bg-blue-100 text-blue-700"
+                        : "bg-gray-100 text-gray-500"
+                    }`}>
+                      Replay: {snapshotSummary.replay_available ? "Ready" : "N/A"}
+                    </span>
+                    {snapshotSummary.snapshot_count > 0 && (
+                      <>
+                        <span className="text-gray-300">·</span>
+                        <span className="text-gray-500">
+                          {snapshotSummary.snapshot_count} snapshot{snapshotSummary.snapshot_count !== 1 ? "s" : ""}
+                        </span>
+                      </>
+                    )}
+                    {snapshotSummary.latest_snapshot_at && (
+                      <>
+                        <span className="text-gray-300">·</span>
+                        <span className="text-gray-400">
+                          Latest: {new Date(snapshotSummary.latest_snapshot_at).toISOString().replace("T", " ").slice(0, 16)} UTC
+                        </span>
+                      </>
+                    )}
+                  </>
+                ) : (
+                  <span className="text-gray-400 italic">unavailable</span>
+                )}
+              </div>
+            )}
 
             {/* ── Quality Optimizer panel ─────────────────────────── */}
             {completedJobId && (

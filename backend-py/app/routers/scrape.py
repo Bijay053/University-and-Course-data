@@ -837,8 +837,9 @@ async def history_list(
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
 ) -> dict:
-    """Match Node: returns {runs, total, limit, offset} with stagedCount/approvedCount/rejectedCount."""
+    """Match Node: returns {runs, total, limit, offset} with stagedCount/approvedCount/rejectedCount/snapshotCount."""
     from app.models import ScrapedCourse
+    from app.models.page_snapshot import PageSnapshot
     from sqlalchemy import select as _select, func as _func, case
     
     # Counts subquery: per scrape_job_id, get total/approved/rejected staged
@@ -848,6 +849,13 @@ async def history_list(
         _func.sum(case((ScrapedCourse.status == "approved", 1), else_=0)).label("approved"),
         _func.sum(case((ScrapedCourse.status == "rejected", 1), else_=0)).label("rejected"),
     ).group_by(ScrapedCourse.scrape_job_id).subquery()
+
+    # Snapshot count subquery: how many page_snapshots exist per job
+    snap_q = _select(
+        PageSnapshot.scrape_job_id.label("sjid"),
+        _func.count().label("snap_count"),
+        _func.max(PageSnapshot.fetched_at).label("latest_snap_at"),
+    ).group_by(PageSnapshot.scrape_job_id).subquery()
     
     stmt = (
         _select(
@@ -855,8 +863,11 @@ async def history_list(
             counts_q.c.staged,
             counts_q.c.approved,
             counts_q.c.rejected,
+            snap_q.c.snap_count,
+            snap_q.c.latest_snap_at,
         )
         .outerjoin(counts_q, counts_q.c.jid == ScrapeRuntimeJob.runtime_job_id)
+        .outerjoin(snap_q, snap_q.c.sjid == ScrapeRuntimeJob.runtime_job_id)
         .order_by(desc(ScrapeRuntimeJob.started_at))
         .offset(offset)
         .limit(limit)
@@ -865,7 +876,7 @@ async def history_list(
     total = (await db.execute(_select(_func.count()).select_from(ScrapeRuntimeJob))).scalar_one()
     
     runs = []
-    for r, staged, approved, rejected in rows:
+    for r, staged, approved, rejected, snap_count, latest_snap_at in rows:
         from datetime import datetime, timezone
         end = r.completed_at or datetime.now(timezone.utc)
         duration_ms = int((end - r.started_at).total_seconds() * 1000) if r.started_at else 0
@@ -888,6 +899,8 @@ async def history_list(
             "approvedCount": int(approved or 0),
             "rejectedCount": int(rejected or 0),
             "requeueCount": int(r.requeue_count or 0),
+            "snapshotCount": int(snap_count or 0),
+            "latestSnapshotAt": latest_snap_at.isoformat() if latest_snap_at else None,
         })
     return {"runs": runs, "total": int(total), "limit": limit, "offset": offset}
 

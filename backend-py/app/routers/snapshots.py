@@ -12,7 +12,7 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -73,6 +73,28 @@ class ReplayRequest(BaseModel):
 
 
 # ── Endpoints ────────────────────────────────────────────────────────────────
+
+@router.get("/snapshots/{job_id}/summary")
+async def snapshot_summary(
+    job_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Lightweight summary for the UI badge — count + latest date, no S3 listing."""
+    row = (await db.execute(
+        select(func.count(), func.max(PageSnapshot.fetched_at))
+        .where(PageSnapshot.scrape_job_id == job_id)
+    )).one()
+    count, latest_at = int(row[0]), row[1]
+    has = count > 0
+    return {
+        "job_id": job_id,
+        "snapshot_count": count,
+        "has_snapshots": has,
+        "replay_available": has and is_enabled(),
+        "latest_snapshot_at": latest_at.isoformat() if latest_at else None,
+        "s3_enabled": is_enabled(),
+    }
+
 
 @router.get("/snapshots/{job_id}", response_model=SnapshotListResponse)
 async def list_snapshots(

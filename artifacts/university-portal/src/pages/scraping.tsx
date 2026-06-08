@@ -665,6 +665,8 @@ export default function Scraping() {
     approvedCount: number;
     rejectedCount: number;
     requeueCount: number;
+    snapshotCount: number;
+    latestSnapshotAt: string | null;
   };
   type HistoryLogEntry = { sequence: number; event: string; createdAt: string; message?: string; phase?: string; [k: string]: unknown };
   // History staged course is now the full StagedCourse + evidence array
@@ -3287,7 +3289,7 @@ export default function Scraping() {
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3 text-xs text-gray-600 whitespace-nowrap">
+                    <div className="flex items-center gap-3 text-xs text-gray-600 whitespace-nowrap flex-wrap">
                       <span>Found: <span className="font-semibold text-gray-800">{run.totalFound ?? 0}</span></span>
                       <span>Staged: <span className="font-semibold text-gray-800">{run.stagedCount}</span></span>
                       <span>Approved: <span className="font-semibold text-green-700">{run.approvedCount}</span></span>
@@ -3300,6 +3302,19 @@ export default function Scraping() {
                           }`}
                         >
                           ↺ {run.requeueCount}
+                        </span>
+                      )}
+                      {/* Snapshot badge */}
+                      {(run.snapshotCount ?? 0) > 0 ? (
+                        <span
+                          title={`${run.snapshotCount} snapshot${run.snapshotCount !== 1 ? "s" : ""} saved · Latest: ${run.latestSnapshotAt ? new Date(run.latestSnapshotAt).toISOString().replace("T", " ").slice(0, 16) + " UTC" : "—"}`}
+                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 font-medium"
+                        >
+                          ⬡ {run.snapshotCount} snap{run.snapshotCount !== 1 ? "s" : ""} · Replay ready
+                        </span>
+                      ) : (
+                        <span className="px-1.5 py-0.5 rounded bg-gray-100 text-gray-400 font-medium">
+                          No snapshots
                         </span>
                       )}
                     </div>
