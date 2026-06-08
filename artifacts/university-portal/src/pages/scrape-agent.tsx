@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { SnapshotReplayPanel } from "@/components/snapshot-replay-panel";
 import { useParams, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -2844,6 +2845,11 @@ export default function ScrapeAgentPage() {
 
       {/* ── Recipe Coverage Audit ─────────────────────────────────────────── */}
       <RecipeCoveragePanel />
+
+      {/* ── HTML Snapshot Replay ──────────────────────────────────────────── */}
+      {config?.latest_job_id && (
+        <SnapshotReplayPanel jobId={config.latest_job_id} />
+      )}
 
       {appliedConfig && (
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-center gap-3">
