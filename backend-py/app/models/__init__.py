@@ -43,6 +43,7 @@ from app.models.university_location import UniversityLocation
 from app.models.country_pattern import CountryPattern
 from app.models.university_watcher import UniversityWatcher
 from app.models.publishing_ledger import PublishingLedger
+from app.models.page_snapshot import PageSnapshot
 
 __all__ = [
     "AcademicLevelOption",
@@ -84,4 +85,5 @@ __all__ = [
     "UniversityLocation",
     "CountryPattern",
     "UniversityWatcher",
+    "PageSnapshot",
 ]

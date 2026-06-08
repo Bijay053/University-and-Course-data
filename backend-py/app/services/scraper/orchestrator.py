@@ -414,6 +414,16 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
     _sd_job_ctrs: dict = {"render": 0, "static": 0}
     _sd_cv.set(_sd_job_ctrs)
 
+    # Snapshot context — makes university_id + runtime_job_id available to
+    # http_fetcher's _save_html_snapshot() without threading them through every
+    # call in the pipeline.  Reset in the finally block at job end.
+    from app.services.scraper.snapshot_context import (
+        _snapshot_university_id as _snap_uid_cv,
+        _snapshot_job_id as _snap_jid_cv,
+    )
+    _snap_uid_token = _snap_uid_cv.set(job.university_id)
+    _snap_jid_token = _snap_jid_cv.set(runtime_job_id)
+
     _seq = [1]
     async def emit(event: str, message: str, **kw):
         # Allocate the sequence number BEFORE awaiting the insert. asyncio is
@@ -4333,5 +4343,13 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         try:
             from app.services.scraper.http_fetcher import clear_wayback_timestamps
             clear_wayback_timestamps()
+        except Exception:  # noqa: BLE001
+            pass
+
+        # Reset snapshot context ContextVars so they don't bleed into the
+        # next job on the same worker process.
+        try:
+            _snap_uid_cv.reset(_snap_uid_token)
+            _snap_jid_cv.reset(_snap_jid_token)
         except Exception:  # noqa: BLE001
             pass

@@ -39,6 +39,7 @@ from app.routers import (
     scrape_health,
     scraper_configs,
     search,
+    snapshots,
     universities,
     users,
     verification,
@@ -117,3 +118,4 @@ app.include_router(knowledge_graph.router, prefix="/api", tags=["knowledge-graph
 app.include_router(country_intelligence.router, prefix="/api", tags=["country-intelligence"])
 app.include_router(monitoring.router, prefix="/api", tags=["monitoring"])
 app.include_router(publishing.router, prefix="/api", tags=["publishing"])
+app.include_router(snapshots.router, prefix="/api/scrape", tags=["snapshots"])
