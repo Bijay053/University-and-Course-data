@@ -61,10 +61,14 @@ def _bucket() -> str:
 
 
 def is_enabled() -> bool:
-    """Return True only when all required env vars are present.
+    """Return True when snapshot storage is active.
 
-    Not cached — credentials can be injected after module import.
+    Enabled when all four AWS credentials are present AND the
+    kill-switch env var SNAPSHOT_ENABLED is not explicitly set to
+    'false' or '0'.  Not cached — env vars can be injected after import.
     """
+    if os.environ.get("SNAPSHOT_ENABLED", "").lower() in ("false", "0", "no", "off"):
+        return False
     return bool(
         os.environ.get("AWS_ACCESS_KEY_ID")
         and os.environ.get("AWS_SECRET_ACCESS_KEY")

@@ -145,7 +145,10 @@ async def save_extraction_snapshot(extraction_result: dict[str, Any]) -> None:
         )
 
     except Exception as exc:
-        log.debug("save_extraction_snapshot failed (non-fatal): %s", exc)
+        log.warning(
+            "snapshot save failed (non-fatal — scrape continues): %s: %s",
+            type(exc).__name__, exc,
+        )
 
 
 async def save_api_json_snapshot(
@@ -214,4 +217,7 @@ async def save_api_json_snapshot(
         log.debug("api json snapshot saved: s3 key=%s url=%s", key, url)
 
     except Exception as exc:
-        log.debug("save_api_json_snapshot failed (non-fatal): %s", exc)
+        log.warning(
+            "api_json snapshot save failed (non-fatal — scrape continues): %s: %s",
+            type(exc).__name__, exc,
+        )

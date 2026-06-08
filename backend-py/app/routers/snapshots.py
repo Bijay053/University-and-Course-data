@@ -96,6 +96,96 @@ async def snapshot_summary(
     }
 
 
+@router.get("/snapshots/storage-stats")
+async def storage_stats(
+    db: AsyncSession = Depends(get_db),
+):
+    """S3 storage monitor — aggregate counts from page_snapshots DB table.
+
+    Returns per-university and per-type breakdowns so operators can spot
+    storage growth after the first 10-20 university runs without needing
+    direct AWS console access.
+    """
+    from app.models import University
+
+    # Total counts + size estimate by snapshot_type
+    type_rows = (await db.execute(
+        select(
+            PageSnapshot.snapshot_type,
+            func.count().label("snap_count"),
+            func.sum(PageSnapshot.content_length).label("raw_bytes"),
+        )
+        .group_by(PageSnapshot.snapshot_type)
+        .order_by(func.count().desc())
+    )).all()
+
+    # Per-university breakdown (top 50 by count)
+    uni_rows = (await db.execute(
+        select(
+            PageSnapshot.university_id,
+            func.count().label("snap_count"),
+            func.sum(PageSnapshot.content_length).label("raw_bytes"),
+            func.min(PageSnapshot.fetched_at).label("first_snap"),
+            func.max(PageSnapshot.fetched_at).label("latest_snap"),
+        )
+        .group_by(PageSnapshot.university_id)
+        .order_by(func.count().desc())
+        .limit(50)
+    )).all()
+
+    # Resolve university names
+    uni_ids = [r[0] for r in uni_rows]
+    name_map: dict[int, str] = {}
+    if uni_ids:
+        name_rows = (await db.execute(
+            select(University.id, University.name).where(University.id.in_(uni_ids))
+        )).all()
+        name_map = {r[0]: r[1] for r in name_rows}
+
+    # Total summary
+    total_row = (await db.execute(
+        select(func.count(), func.sum(PageSnapshot.content_length))
+    )).one()
+    total_count = int(total_row[0] or 0)
+    total_raw_bytes = int(total_row[1] or 0)
+    # Gzip saves ~70%; multiply by 0.30 for estimated S3 size
+    estimated_s3_bytes = int(total_raw_bytes * 0.30)
+
+    # Jobs with snapshots (distinct scrape_job_id count)
+    job_count_row = (await db.execute(
+        select(func.count(func.distinct(PageSnapshot.scrape_job_id)))
+    )).scalar_one()
+
+    return {
+        "s3_enabled": is_enabled(),
+        "total_snapshots": total_count,
+        "distinct_jobs_with_snapshots": int(job_count_row or 0),
+        "total_raw_bytes": total_raw_bytes,
+        "estimated_s3_bytes": estimated_s3_bytes,
+        "estimated_s3_mb": round(estimated_s3_bytes / 1_048_576, 2),
+        "by_type": [
+            {
+                "snapshot_type": r[0],
+                "count": int(r[1]),
+                "raw_bytes": int(r[2] or 0),
+            }
+            for r in type_rows
+        ],
+        "by_university": [
+            {
+                "university_id": r[0],
+                "university_name": name_map.get(r[0], f"uni_{r[0]}"),
+                "count": int(r[1]),
+                "raw_bytes": int(r[2] or 0),
+                "first_snapshot_at": r[3].isoformat() if r[3] else None,
+                "latest_snapshot_at": r[4].isoformat() if r[4] else None,
+            }
+            for r in uni_rows
+        ],
+        "note": "raw_bytes is pre-gzip size; estimated_s3_bytes applies 0.30 ratio (70% gzip reduction).",
+    }
+
+
 @router.get("/snapshots/{job_id}", response_model=SnapshotListResponse)
 async def list_snapshots(
     job_id: str,

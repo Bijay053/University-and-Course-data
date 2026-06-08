@@ -68,6 +68,23 @@ async def lifespan(app: FastAPI):  # noqa: ARG001
         log.info("pg_trgm extension ensured")
     except Exception:  # noqa: BLE001
         log.exception("pg_trgm setup failed (fuzzy search unavailable)")
+    try:
+        from app.services.snapshot_store import is_enabled as _snap_enabled, setup_lifecycle_rules
+        if _snap_enabled():
+            import asyncio as _asyncio
+            ok = await _asyncio.get_event_loop().run_in_executor(None, setup_lifecycle_rules)
+            if ok:
+                log.info("[SNAPSHOT] enabled — S3 lifecycle rules applied (html=90d, json/pdf=365d)")
+            else:
+                log.warning(
+                "[SNAPSHOT] enabled — lifecycle rule apply failed "
+                "(grant s3:PutLifecycleConfiguration to the IAM user, "
+                "or apply rules manually via AWS Console → S3 → Management → Lifecycle rules)"
+            )
+        else:
+            log.info("[SNAPSHOT] disabled (set AWS_* env vars to enable; SNAPSHOT_ENABLED=false to suppress)")
+    except Exception:  # noqa: BLE001
+        log.exception("[SNAPSHOT] startup check failed (non-fatal)")
     yield
     log.info("Python backend shutting down")
 

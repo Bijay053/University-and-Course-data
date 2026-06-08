@@ -1276,6 +1276,93 @@ def repair_conflicts(
         raise self.retry(exc=exc, countdown=60)
 
 
+@celery_app.task(name="scrape.snapshot_storage_monitor", bind=True, max_retries=0)
+def snapshot_storage_monitor(self) -> dict:  # type: ignore[override]
+    """Weekly S3 snapshot storage report (Monday 05:00 UTC).
+
+    Logs per-type and per-university counts + estimated S3 size.
+    Warns if estimated total exceeds 500 MB — operator should review
+    and consider running cleanup before the next scrape cycle.
+
+    Does NOT delete anything.  Kill switch: set SNAPSHOT_ENABLED=false.
+    """
+    async def _run() -> dict:
+        from app.services.snapshot_store import is_enabled
+        if not is_enabled():
+            log.info("[SNAPSHOT MONITOR] snapshots disabled — skipping storage report")
+            return {"ok": True, "skipped": True, "reason": "snapshots disabled"}
+
+        from sqlalchemy import func, select, text as _text
+        from app.models.page_snapshot import PageSnapshot
+
+        async with AsyncSessionLocal() as db:
+            # Totals
+            total_row = (await db.execute(
+                select(func.count(), func.sum(PageSnapshot.content_length))
+            )).one()
+            total_count = int(total_row[0] or 0)
+            total_raw_bytes = int(total_row[1] or 0)
+            estimated_s3_bytes = int(total_raw_bytes * 0.30)  # ~70% gzip reduction
+            estimated_s3_mb = round(estimated_s3_bytes / 1_048_576, 2)
+
+            # Per-type breakdown
+            type_rows = (await db.execute(
+                select(PageSnapshot.snapshot_type, func.count(), func.sum(PageSnapshot.content_length))
+                .group_by(PageSnapshot.snapshot_type)
+                .order_by(func.count().desc())
+            )).all()
+
+            # Distinct jobs
+            job_count = (await db.execute(
+                select(func.count(func.distinct(PageSnapshot.scrape_job_id)))
+            )).scalar_one() or 0
+
+            # Top 10 universities by count
+            top_unis = (await db.execute(
+                select(PageSnapshot.university_id, func.count(), func.sum(PageSnapshot.content_length))
+                .group_by(PageSnapshot.university_id)
+                .order_by(func.count().desc())
+                .limit(10)
+            )).all()
+
+        # Log summary
+        log.info(
+            "[SNAPSHOT MONITOR] total=%d snaps across %d jobs | raw=%d MB | est_s3=%.1f MB",
+            total_count, job_count, total_raw_bytes // 1_048_576, estimated_s3_mb,
+        )
+        for t in type_rows:
+            raw_mb = int(t[2] or 0) // 1_048_576
+            log.info("[SNAPSHOT MONITOR]   type=%-8s count=%d  raw=%d MB", t[0], t[1], raw_mb)
+        for u in top_unis:
+            raw_mb = int(u[2] or 0) // 1_048_576
+            log.info("[SNAPSHOT MONITOR]   uni_id=%-4d count=%d  raw=%d MB", u[0], u[1], raw_mb)
+
+        _WARN_THRESHOLD_MB = 500
+        if estimated_s3_mb >= _WARN_THRESHOLD_MB:
+            log.warning(
+                "[SNAPSHOT MONITOR] ⚠ estimated S3 usage %.1f MB exceeds %d MB threshold — "
+                "review /api/scrape/snapshots/storage-stats and consider cleanup before "
+                "next scrape cycle. S3 lifecycle rules auto-expire html after 90 days.",
+                estimated_s3_mb, _WARN_THRESHOLD_MB,
+            )
+
+        return {
+            "ok": True,
+            "total_snapshots": total_count,
+            "distinct_jobs": int(job_count),
+            "total_raw_bytes": total_raw_bytes,
+            "estimated_s3_bytes": estimated_s3_bytes,
+            "estimated_s3_mb": estimated_s3_mb,
+        }
+
+    _sync_dispose()
+    try:
+        return asyncio.run(_run())
+    except Exception as exc:
+        log.exception("[SNAPSHOT MONITOR] task failed: %s", exc)
+        return {"ok": False, "reason": str(exc)}
+
+
 @celery_app.task(name="scrape.refresh_baselines", bind=True, max_retries=0)
 def refresh_baselines_weekly(self) -> dict:  # type: ignore[override]
     """Celery beat task — recompute fill-rate baselines from the trailing 30 days.
