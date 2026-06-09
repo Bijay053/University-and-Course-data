@@ -838,6 +838,18 @@ def _from_uwl_nationality_select(
     if not (host == "www.uwl.ac.uk" or host.endswith(".uwl.ac.uk")):
         return None
 
+    # Research-degree pages (/course/research/…) MUST be checked before the
+    # blob.  All research pages share a single generic blob value (int=14000,
+    # uk=4400) — it is NOT a per-course fee.  The actual per-course fee is only
+    # available via the JS-rendered <select> (e.g. PhD Media = £16,000), which
+    # is empty in static HTML (render=False mode).  Extracting the generic blob
+    # value would produce the same wrong fee (£14,000) for every research
+    # course.  Return domestic-only so the no_international_fee gate skips the
+    # course; operators can fill in the correct research fee manually.
+    _path = (_urlparse(url or "").path or "").lower()
+    if "/course/research/" in _path:
+        return _UWL_DOMESTIC_ONLY
+
     # Authoritative source FIRST: the Angular SSR JSON blob is embedded in both
     # static (render=False) and headless (render=True) HTML and always reflects
     # the real fees.  The JS-rendered <select> below is unreliable on static

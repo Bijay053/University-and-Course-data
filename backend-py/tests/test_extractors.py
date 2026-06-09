@@ -200,21 +200,22 @@ def test_english_ielts_uwl_phd_no_element_under_extract():
 # a nationality-pricing select (e.g. a newly-added programme not yet wired to
 # the widget), the generic fee scanner must NOT extract the domestic PhD rate
 # (e.g. £6,000) as the international fee.  The safety net returns domestic-only.
-def test_fee_uwl_research_no_select_returns_domestic_only():
-    # Minimal HTML: no blob, no select — just the UK self-funded fee in prose.
+def test_fee_uwl_research_returns_domestic_only_before_blob():
+    # UWL /course/research/ pages carry a shared generic blob value (int=14000)
+    # that is NOT per-course.  The URL-path guard fires BEFORE the blob check
+    # so even a page with the blob present returns domestic-only.
+    # Simulate a research page that HAS the blob embedded but should still be
+    # rejected (the blob value is the same for all research courses).
     html = (
         "<html><body>"
+        '<script>{"field_p_cv_int_main_fee":{"und":[{"name":"14000"}]},'
+        '"field_p_cv_uk_eu_main_fee":{"und":[{"name":"4400"}]}}</script>'
         "<p>Annual tuition fees: £6,000 per year (UK students).</p>"
-        "<p>Please contact us for international student fees.</p>"
+        "<p>Contact us for international student fees.</p>"
         "</body></html>"
     )
-    from unittest.mock import patch
-    with patch(
-        "app.services.scraper.extractors.fee._from_uwl_json_blob",
-        return_value=None,
-    ):
-        results = _run(fee.extract(html, "https://www.uwl.ac.uk/course/research/mathematics", country="United Kingdom"))
-    # Must produce no international_fee (domestic-only gate fires)
+    results = _run(fee.extract(html, "https://www.uwl.ac.uk/course/research/mathematics", country="United Kingdom"))
+    # Must produce no international_fee — URL guard fires before blob is read
     intl_fees = [r for r in results if r.normalized and r.normalized.get("international_fee")]
     assert intl_fees == [], f"Expected no international fee for UWL research page, got {intl_fees}"
 
