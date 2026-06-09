@@ -363,6 +363,13 @@ export default function PerformancePage() {
             color={(summary.total_scrape_do_cost_usd ?? 0) < 1 ? "text-emerald-600" : "text-amber-600"}
           />
           <KpiCard
+            title="API Credits Used (Period)"
+            value={((summary.total_scrape_do_render_calls ?? 0) * 5 + (summary.total_scrape_do_static_calls ?? 0)).toLocaleString()}
+            sub={`${(summary.total_scrape_do_render_calls ?? 0).toLocaleString()} render×5 · ${(summary.total_scrape_do_static_calls ?? 0).toLocaleString()} static×1`}
+            icon={Zap}
+            color="text-orange-500"
+          />
+          <KpiCard
             title="Pattern Reuse Events"
             value={summary.total_patterns_reused.toLocaleString()}
             sub={`${summary.total_p7_inline_improved} courses improved inline by P7`}
