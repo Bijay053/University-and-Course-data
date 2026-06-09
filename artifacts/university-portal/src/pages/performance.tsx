@@ -355,20 +355,33 @@ export default function PerformancePage() {
             icon={DollarSign}
             color={summary.total_gemini_cost_usd < 1 ? "text-emerald-600" : "text-amber-600"}
           />
-          <KpiCard
-            title="Scrape.do Cost (Period)"
-            value={money(summary.total_scrape_do_cost_usd ?? 0)}
-            sub={`${(summary.total_scrape_do_render_calls ?? 0).toLocaleString()} render · ${(summary.total_scrape_do_static_calls ?? 0).toLocaleString()} static`}
-            icon={DollarSign}
-            color={(summary.total_scrape_do_cost_usd ?? 0) < 1 ? "text-emerald-600" : "text-amber-600"}
-          />
-          <KpiCard
-            title="API Credits Used (Period)"
-            value={((summary.total_scrape_do_render_calls ?? 0) * 5 + (summary.total_scrape_do_static_calls ?? 0)).toLocaleString()}
-            sub={`${(summary.total_scrape_do_render_calls ?? 0).toLocaleString()} render×5 · ${(summary.total_scrape_do_static_calls ?? 0).toLocaleString()} static×1`}
-            icon={Zap}
-            color="text-orange-500"
-          />
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Scrape.do (Period)</CardTitle>
+              <DollarSign className={`h-4 w-4 ${(summary.total_scrape_do_cost_usd ?? 0) < 1 ? "text-emerald-600" : "text-amber-600"}`} />
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-end gap-4">
+                <div>
+                  <div className={`text-2xl font-bold ${(summary.total_scrape_do_cost_usd ?? 0) < 1 ? "text-emerald-600" : "text-amber-600"}`}>
+                    {money(summary.total_scrape_do_cost_usd ?? 0)}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">cost</p>
+                </div>
+                <div className="w-px h-8 bg-border self-center" />
+                <div>
+                  <div className="text-2xl font-bold text-orange-500 flex items-center gap-1">
+                    <Zap className="h-4 w-4" />
+                    {((summary.total_scrape_do_render_calls ?? 0) * 5 + (summary.total_scrape_do_static_calls ?? 0)).toLocaleString()}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">API credits</p>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                {(summary.total_scrape_do_render_calls ?? 0).toLocaleString()} render · {(summary.total_scrape_do_static_calls ?? 0).toLocaleString()} static
+              </p>
+            </CardContent>
+          </Card>
           <KpiCard
             title="Pattern Reuse Events"
             value={summary.total_patterns_reused.toLocaleString()}
