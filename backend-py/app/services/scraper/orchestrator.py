@@ -1536,7 +1536,8 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             log.info("[RENDER_PAGES] fetching %d listing page(s) via Scrape.do render", len(_render_pages))
             await emit(
                 "status",
-                f"[DISCOVER] Rendering {len(_render_pages)} listing page(s) to harvest SPA course links...",
+                f"[DISCOVER] Scanning {len(_render_pages)} catalogue page(s) for course links "
+                f"(each page lists many courses — this is not the final course count)...",
                 phase="discover",
             )
             for _rlp_url in _render_pages:

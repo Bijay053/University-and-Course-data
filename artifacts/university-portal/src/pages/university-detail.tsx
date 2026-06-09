@@ -1141,6 +1141,7 @@ export default function UniversityDetail() {
   const [bulkApproveProgress, setBulkApproveProgress] = useState<{ done: number; total: number }>({ done: 0, total: 0 });
   const [bulkRejectRunning, setBulkRejectRunning] = useState(false);
   const [showBulkRejectConfirm, setShowBulkRejectConfirm] = useState(false);
+  const [showForceApproveConfirm, setShowForceApproveConfirm] = useState(false);
   const [bulkRejectReason, setBulkRejectReason] = useState("");
   const [bulkRejectFieldKey, setBulkRejectFieldKey] = useState("general");
 
@@ -1184,7 +1185,7 @@ export default function UniversityDetail() {
     }
   };
 
-  const handleBulkApprove = async () => {
+  const handleBulkApprove = async (force = false) => {
     if (rawSelectedIds.size === 0) return;
     setBulkApproveRunning(true);
     const ids = Array.from(rawSelectedIds);
@@ -1194,7 +1195,11 @@ export default function UniversityDetail() {
 
     const approveOne = async (courseId: number) => {
       try {
-        const res = await fetch(`${BASE}/api/scrape/staged/${courseId}/approve`, { method: "POST" });
+        const res = await fetch(`${BASE}/api/scrape/staged/${courseId}/approve`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ force }),
+        });
         if (res.ok) {
           approved++;
         } else {
@@ -1223,8 +1228,8 @@ export default function UniversityDetail() {
     if (confidenceBlocked > 0) failParts.push(`${confidenceBlocked} blocked (low confidence)`);
     if (otherFailed > 0) failParts.push(`${otherFailed} failed`);
     toast({
-      title: "Bulk approve complete",
-      description: `${approved} approved${failParts.length ? `, ${failParts.join(", ")}` : ""}`,
+      title: force ? "Force approve complete" : "Bulk approve complete",
+      description: `${approved} approved${force ? " (gate bypassed)" : ""}${failParts.length ? `, ${failParts.join(", ")}` : ""}`,
       variant: approved === 0 && failParts.length > 0 ? "destructive" : "default",
     });
     setRawSelectedIds(new Set());
@@ -1431,10 +1436,14 @@ export default function UniversityDetail() {
     } catch (e) { toast({ title: "Delete failed", description: String(e), variant: "destructive" }); }
   };
 
-  async function handleApprove(courseId: number) {
+  async function handleApprove(courseId: number, force = false) {
     setApprovingId(courseId);
     try {
-      const res = await fetch(`${BASE}/api/scrape/staged/${courseId}/approve`, { method: "POST" });
+      const res = await fetch(`${BASE}/api/scrape/staged/${courseId}/approve`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ force }),
+      });
       const data = await res.json();
       if (!res.ok) {
         const detail = data?.detail;
@@ -1443,7 +1452,7 @@ export default function UniversityDetail() {
           : (typeof detail === "string" ? detail : data.error || "Approve failed");
         throw new Error(msg);
       }
-      toast({ title: "Approved", description: "Course imported to production." });
+      toast({ title: force ? "Force approved" : "Approved", description: force ? "Course imported (confidence gate bypassed)." : "Course imported to production." });
       await fetchRawData();
       await queryClient.invalidateQueries({ queryKey: getListCoursesQueryKey({ universityId: id, limit: 500 }) });
       await queryClient.invalidateQueries({ queryKey: getGetUniversityQueryKey(id) });
@@ -4302,7 +4311,7 @@ export default function UniversityDetail() {
                 <Button
                   size="sm"
                   disabled={bulkMapRunning || bulkApproveRunning}
-                  onClick={handleBulkApprove}
+                  onClick={() => handleBulkApprove(false)}
                   className="h-7 text-xs bg-green-600 hover:bg-green-700 text-white"
                 >
                   {bulkApproveRunning
@@ -4311,6 +4320,17 @@ export default function UniversityDetail() {
                   {bulkApproveRunning
                     ? `Approving ${bulkApproveProgress.done}/${bulkApproveProgress.total}…`
                     : `Approve (${rawSelectedIds.size})`}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={bulkMapRunning || bulkApproveRunning || bulkRejectRunning}
+                  onClick={() => setShowForceApproveConfirm(true)}
+                  className="h-7 text-xs border-amber-400 text-amber-700 bg-amber-50 hover:bg-amber-100"
+                  title="Approve even if confidence is below the 60-point minimum"
+                >
+                  <AlertTriangle className="h-3.5 w-3.5 mr-1" />
+                  {`Force Approve (${rawSelectedIds.size})`}
                 </Button>
                 <Button
                   size="sm"
@@ -4335,6 +4355,40 @@ export default function UniversityDetail() {
           )}
 
           {/* Bulk reject with reason dialog */}
+          <Dialog open={showForceApproveConfirm} onOpenChange={setShowForceApproveConfirm}>
+            <DialogContent className="max-w-lg">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 text-amber-700">
+                  <AlertTriangle className="w-5 h-5 shrink-0" />
+                  Force Approve {rawSelectedIds.size} Course{rawSelectedIds.size !== 1 ? "s" : ""}
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-3 text-sm text-gray-600">
+                <p>
+                  This bypasses the <strong>60-point confidence gate</strong> and publishes the
+                  selected course{rawSelectedIds.size !== 1 ? "s" : ""} to production
+                  <strong> even if critical fields (fee, English test, intake, duration) are missing</strong>.
+                </p>
+                <p className="rounded-md bg-amber-50 border border-amber-200 px-3 py-2 text-amber-800 text-xs">
+                  Use this only when you knowingly want to publish incomplete data. Courses that
+                  already pass the gate will approve normally either way.
+                </p>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowForceApproveConfirm(false)} className="cursor-pointer">
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => { setShowForceApproveConfirm(false); void handleBulkApprove(true); }}
+                  className="bg-amber-600 hover:bg-amber-700 text-white cursor-pointer"
+                >
+                  <AlertTriangle className="h-4 w-4 mr-1.5" />
+                  Force Approve {rawSelectedIds.size}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
           <Dialog open={showBulkRejectConfirm} onOpenChange={(o) => {
             if (!o) {
               setShowBulkRejectConfirm(false);

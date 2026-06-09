@@ -2679,9 +2679,20 @@ async def staged_dedup(
 
 
 @router.post("/staged/{sc_id}/approve")
-async def staged_approve(sc_id: int, db: Annotated[AsyncSession, Depends(get_db)]) -> dict:
+async def staged_approve(
+    sc_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    body: dict | None = Body(default=None),
+) -> dict:
+    """Approve a staged course → import into the live ``courses`` table.
+
+    Body (optional): ``{"force": true}`` bypasses the < 60 confidence gate
+    so an operator can knowingly publish an incomplete row. Everything else
+    (dedup, mapping, import) runs identically.
+    """
     from app.models import ScrapedCourse
     from datetime import datetime, timezone
+    force = bool((body or {}).get("force", False))
     sc = await db.get(ScrapedCourse, sc_id)
     if not sc:
         raise HTTPException(status_code=404, detail="Not found")
@@ -2707,7 +2718,7 @@ async def staged_approve(sc_id: int, db: Annotated[AsyncSession, Depends(get_db)
         "study_mode":         sc.study_mode,
     }
     _cg = _sp(_payload_snap)
-    if _cg["score"] < 60:
+    if _cg["score"] < 60 and not force:
         raise HTTPException(
             status_code=422,
             detail={
@@ -2720,6 +2731,12 @@ async def staged_approve(sc_id: int, db: Annotated[AsyncSession, Depends(get_db)
                 "score": _cg["score"],
                 "missing": _cg.get("missing", []),
             },
+        )
+    if _cg["score"] < 60 and force:
+        log.warning(
+            "staged_approve: FORCE-approving sc_id=%s with confidence %s/100 "
+            "(missing: %s) — operator override",
+            sc_id, _cg["score"], ", ".join(_cg.get("missing", [])),
         )
 
     # Promote to the live courses table (creates/updates Course record, sets course_id)
