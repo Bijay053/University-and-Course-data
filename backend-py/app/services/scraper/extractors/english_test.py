@@ -348,6 +348,33 @@ def _ielts(text: str) -> dict[str, float] | None:
                 return {"overall": ov, "listening": floor, "reading": floor, "writing": floor, "speaking": floor}
             return {"overall": ov, "listening": None, "reading": None, "writing": None, "speaking": None}
 
+    # Pattern 4.6 (split overall/band — UWL phrasing): the overall score sits in
+    # a banner ("6.0 IELTS or above" or "IELTS 6.0 or above") while the per-band
+    # floor lives in the body prose ("a minimum of IELTS 5.5 for each of the four
+    # individual components (Reading, Writing, Speaking and Listening)").
+    # University of West London is the canonical case.  Without this, Pattern 5's
+    # broad fallback grabs the 5.5 (per-band floor) as the overall and drops the
+    # true 6.0 overall.  Both signals must be present, so this cannot false-positive
+    # on a page that only states a single bare score.
+    m_ov = re.search(
+        r"(?:ielts\s+([4-9](?:\.[0-9])?)|([4-9](?:\.[0-9])?)\s+ielts)"
+        r"\s+or\s+(?:above|higher|more)",
+        text,
+        re.I,
+    )
+    m_band = re.search(
+        r"(?:minimum|min\.?|at\s+least)\s+(?:of\s+)?ielts\s+([4-9](?:\.[0-9])?)\s+"
+        r"(?:for|in|of)\s+each\s+(?:of\s+the\s+(?:four|4)\s+)?"
+        r"(?:individual\s+)?(?:components?|bands?|sections?|skills?)",
+        text,
+        re.I,
+    )
+    if m_ov and m_band:
+        ov = float(m_ov.group(1) or m_ov.group(2))
+        bd = float(m_band.group(1))
+        if 4 <= ov <= 9 and 4 <= bd <= 9 and bd <= ov:
+            return {"overall": ov, "listening": bd, "reading": bd, "writing": bd, "speaking": bd}
+
     # Pattern 5: broad "minimum IELTS 6.0", "IELTS 6.0 or higher", "IELTS: 6.5",
     # "IELTS (Academic): 6.5" — bridge uses [^\n0-9] (not [^a-z0-9]) so it
     # can cross lowercase words like "(Academic)" without stopping early.

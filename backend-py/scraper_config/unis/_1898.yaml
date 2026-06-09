@@ -1,0 +1,15 @@
+# Repair Eng-Existing University
+# Hostname: 
+# Country: United States  |  Currency: USD
+# Slug: 
+# Auto-generated: 2026-06-09
+#
+# This stub was created automatically on the first scrape of this university.
+# Review and expand it to improve discovery and extraction quality.
+# See scraper_config/defaults.yaml for all available options.
+
+discovery: {}
+
+extraction:
+  fees:
+    default_currency: USD

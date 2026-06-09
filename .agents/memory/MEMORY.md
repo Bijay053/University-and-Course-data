@@ -25,3 +25,4 @@
 - [scrape.do browser-fallback gap](scrape-do-browser-gap.md) — [BROWSER↑] path in single_course.py bypasses http_fetcher.py's scrape.do chain; must re-check _http_fetcher_mod._scrape_do_enabled after browser retries exhaust.
 - [UK structured fee table extractor](uk-fee-table-extractor.md) — Pre-pass 0 in fee.extract(); _FEE_TABLE_FOUND_NO_INTL sentinel → return []; picks Intl+FT latest-year row; part-time-only courses get no fee.
 - [UWL Scrape.do cost](uwl-scrape-do-cost.md) — UWL is SSR not JS-required (render=false identical, direct curl_cffi free); render_listing_pages_static flag; {slug}_{id}.yaml SHADOWS {slug}.yaml — edit both.
+- [IELTS split overall/band trap](ielts-split-overall-band.md) — overall in banner + per-band floor in prose; "each component" cue marks a floor; resolve split BEFORE any broad first-score fallback or it downgrades overall to the band.

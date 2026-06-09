@@ -65,6 +65,55 @@ def test_english_ielts_overall_with_no_band_below():
     assert n["ielts_overall"] == 6.5 and n["ielts_listening"] == 6.0
 
 
+# --- UWL regression: split overall (banner) + per-band floor (prose) ---------
+# https://www.uwl.ac.uk/course/undergraduate/forensic-science states the overall
+# in a banner ("6.0 IELTS or above") and the per-band floor in body prose
+# ("a minimum of IELTS 5.5 for each of the four individual components"). Before
+# the fix the broad fallback grabbed the per-band 5.5 as the overall, so the UI
+# showed IELTS 5.5 instead of the true overall 6.0 / each band 5.5.
+def test_english_ielts_uwl_split_banner_and_prose():
+    html = (
+        "<p>6.0 IELTS or above. You need to meet our English language requirement "
+        "- a minimum of IELTS 5.5 for each of the four individual components "
+        "(Reading, Writing, Speaking and Listening).</p>"
+    )
+    out = {r.field_key: r for r in _run(english_test.extract(html, "https://www.uwl.ac.uk"))}
+    assert "ielts_overall" in out
+    n = out["ielts_overall"].normalized
+    assert n["ielts_overall"] == 6.0
+    assert n["ielts_listening"] == 5.5 and n["ielts_reading"] == 5.5
+    assert n["ielts_writing"] == 5.5 and n["ielts_speaking"] == 5.5
+
+
+def test_english_ielts_uwl_split_ielts_first_order():
+    # Same split structure but the overall states the keyword first:
+    # "IELTS 6.5 or above ... minimum of IELTS 6.0 in each component".
+    html = (
+        "<p>IELTS 6.5 or above with a minimum of IELTS 6.0 in each component.</p>"
+    )
+    out = {r.field_key: r for r in _run(english_test.extract(html, "https://x"))}
+    assert "ielts_overall" in out
+    n = out["ielts_overall"].normalized
+    assert n["ielts_overall"] == 6.5 and n["ielts_listening"] == 6.0
+
+
+def test_english_ielts_single_signal_does_not_trigger_split_pattern():
+    # Pattern 4.6 requires BOTH an overall "or above" clause AND a per-band
+    # "each component" clause. When only the per-band clause is present (no
+    # overall banner), Pattern 4.6 must NOT fire — it must fall through to the
+    # broad fallback rather than fabricate a higher overall. Asserted at the
+    # _ielts() unit level to isolate pattern precedence from extract()'s
+    # evidence-guarding of bare overalls.
+    from app.services.scraper.extractors.english_test import _ielts
+
+    res = _ielts("a minimum of IELTS 5.5 for each of the four individual components")
+    assert res is not None
+    # Broad fallback result (single bare score → overall, no per-band floor),
+    # NOT the split-pattern result that would set all four bands to 5.5.
+    assert res["overall"] == 5.5
+    assert res["listening"] is None
+
+
 def test_english_pte_score():
     html = "<p>PTE Academic 64 overall.</p>"
     out = {r.field_key: r for r in _run(english_test.extract(html, "https://x"))}
