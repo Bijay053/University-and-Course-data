@@ -8,17 +8,23 @@ description: Why UWL no longer needs headless render, and the id-specific YAML s
 UWL was forcing Scrape.do headless-Chrome render (`render=true`, ~5 credits) on
 EVERY fetch: 12 listing pages + ~340 course pages ≈ 1,760 credits per scrape.
 
-**Verified 2026-06-09 against live www.uwl.ac.uk** (curl_cffi + scrape.do):
-- Course detail pages are **server-side rendered** — `render=false` returns the
-  identical fee/IELTS/duration data as `render=true`. They are even reachable via
-  a **free direct curl_cffi fetch** (status 200, full data, no Cloudflare block).
+**Verified 2026-06-09 against live www.uwl.ac.uk**:
+- Course detail pages are **server-side rendered** — Scrape.do `render=false`
+  (static residential proxy, ~1 credit) returns the identical fee/IELTS/duration
+  data as `render=true`, and is NOT an SPA shell.
 - The `/courses/search?page=N` listing pages are also SSR — `render=false` returns
-  the same 57 course links per page as `render=true`.
+  the same course links per page as `render=true`.
+- **In-pipeline, curl_cffi gets 403** (UWL Cloudflare blocks datacenter IPs). A
+  one-off standalone curl_cffi can get 200 — do not trust that; the fleet runs from
+  datacenter IPs and gets blocked. So the realistic "cheap" path is Scrape.do
+  *static* (~1 credit), NOT a free direct fetch.
 
-**Fix:** `extraction.scrape_do_render: false` (course pages → free curl_cffi first,
-scrape.do static ~1 credit only as fallback) + new `discovery.render_listing_pages_static: true`
-flag (listing pages use scrape.do render=False ~1 credit). Removed `scrape_do_skip_fallbacks`
-(it forced straight-to-paid-render, skipping the free path). ~90%+ credit reduction.
+**Fix:** `extraction.scrape_do_render: false` + new `discovery.render_listing_pages_static: true`
+flag. Per-course fetch chain becomes httpx(CF-blocked) → curl_cffi(403) →
+Wayback(empty) → Scrape.do static (~1 credit, full page). Listing pages use
+Scrape.do render=False (~1 credit). Removed `scrape_do_skip_fallbacks` (it forced
+straight-to-paid-render). **~1 credit/page vs ~5 = ~80% reduction.**
+Validated live: 2 course pages = 0 render + 2 static calls, full data each.
 
 **Why this matters generally:** "Angular/React SPA" does NOT automatically mean
 render is required. Many SPAs server-side render the first paint. Always A/B test

@@ -6,17 +6,20 @@
 # - Angular SPA, BUT the pages are server-side rendered: both the course detail
 #   pages AND the /courses/search listing pages return the full course data and
 #   links in the raw HTML *without* JS execution.  Verified 2026-06-09 by
-#   comparing render=False vs render=True (identical fee/IELTS/duration data and
-#   identical course-link counts).  Course detail pages are even reachable via a
-#   FREE direct curl_cffi fetch (status 200, full data) — no Scrape.do needed.
+#   comparing Scrape.do render=False vs render=True (identical fee/IELTS/duration data and
+#   identical course-link counts; static result is NOT an SPA shell).
 # - COST OPTIMISATION (2026-06-09): previously every listing page AND every one
 #   of ~340 course pages was a Scrape.do headless-Chrome render call (~5 credits
 #   each = ~1,760 credits/scrape).  Now:
-#     * extraction.scrape_do_render: false  -> course pages fetch via free
-#       curl_cffi first, Scrape.do *static* (~1 credit) only as fallback.
+#     * extraction.scrape_do_render: false  -> per-course fetch chain is
+#       httpx (Cloudflare-blocked) -> curl_cffi (403, UWL blocks datacenter IPs)
+#       -> Wayback (empty) -> Scrape.do *static* render=False (~1 credit) which
+#       returns the full hydrated page.  No paid headless-render calls.
 #     * discovery.render_listing_pages_static: true -> the 12 listing pages use
 #       Scrape.do render=False (~1 credit) instead of render=True (~5 credits).
-#   Expected ~90%+ reduction in Scrape.do credit consumption for UWL.
+#   Net: ~1 credit/page instead of ~5 = ~80% reduction in Scrape.do credits.
+#   Validated 2026-06-09: live fetch of 2 course pages = 0 render + 2 static
+#   calls, both returning full fee/IELTS data.
 # - Live course URL pattern (confirmed from search page):
 #     /course/(undergraduate|postgraduate|research)/<slug>
 #   Wayback CDX has OLD archived URLs (/academic-schools/...) — these no longer exist.
@@ -81,13 +84,14 @@ discovery:
   expected_min_courses: 300
 
 extraction:
-  # scrape_do_render:false — UWL course detail pages are server-side rendered and
-  # reachable via free direct curl_cffi (verified 2026-06-09: status 200 with full
-  # fee/IELTS data, no Cloudflare block).  fetch_html() tries curl_cffi first (free),
-  # then Scrape.do *static* (~1 credit) only if blocked.  No headless-render calls.
+  # scrape_do_render:false — UWL course detail pages are server-side rendered, so
+  # Scrape.do *static* (render=False, ~1 credit) returns the full hydrated page
+  # (verified 2026-06-09: 0 render + 2 static calls, full fee/IELTS data, not an
+  # SPA shell).  fetch_html() falls through httpx/curl_cffi/Wayback to Scrape.do
+  # static; no paid headless-render calls.  ~80% cheaper than render (~5 credits).
   scrape_do_render: false
-  # scrape_do_skip_fallbacks removed: it would skip the free direct-fetch path and
-  # go straight to a paid render.  With scrape_do_render:false it has no effect anyway.
+  # scrape_do_skip_fallbacks removed: it forced straight-to-paid-render, skipping
+  # the cheap static path.  With scrape_do_render:false it has no effect anyway.
   max_parallel_fetch: 8
   fees:
     default_currency: GBP
