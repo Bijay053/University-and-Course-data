@@ -757,6 +757,105 @@ def _score(amount: int, ctx: str, *, prefer_year_one: bool = False) -> int:
     return s
 
 
+_UWL_DOMESTIC_ONLY = object()  # sentinel: select exists, no International option
+
+
+def _from_uwl_nationality_select(
+    html: str, url: str
+) -> "tuple[int, str] | None | object":
+    """UWL-specific fee extractor: reads the annual fee from the
+    ``<select id="nationality_pricing_input_mobile">`` dropdown.
+
+    UWL Angular SPA pages expose a nationality-switcher select element
+    rendered by Scrape.do::
+
+        <select id="nationality_pricing_input_mobile">
+          <option value="[object Object]">£16,750 – International</option>
+          <option value="[object Object]">£9,790 – UK</option>
+        </select>
+
+    The generic text scanner has no boundary awareness and may mis-score
+    the UK option when "– International" from the adjacent first option
+    appears in the context window of the second option's amount.
+
+    Return values:
+      * ``(amount, ctx)``   — International option found; use this fee.
+      * ``_UWL_DOMESTIC_ONLY`` — select exists but has NO "– International"
+        option.  The caller returns ``[]`` so ``international_fee`` is
+        left blank and the ``no_international_fee`` guard rejects the
+        course (domestic-only course — never available to international
+        students).
+      * ``None``            — not a UWL page or select not found; fall
+        through to the generic extractor cascade.
+    """
+    from urllib.parse import urlparse as _urlparse
+
+    host = (_urlparse(url or "").hostname or "").lower()
+    if not (host == "www.uwl.ac.uk" or host.endswith(".uwl.ac.uk")):
+        return None
+
+    try:
+        from bs4 import BeautifulSoup as _BS4
+    except ImportError:  # pragma: no cover
+        return None
+
+    try:
+        soup = _BS4(html, "html.parser")
+    except Exception:  # pragma: no cover
+        return None
+
+    # Prefer the named select; fall back to ANY select whose options contain
+    # the "– International" / "– UK" UWL fee pattern.
+    _INTL_OPT_RE = re.compile(r"–\s*international", re.IGNORECASE)
+    _UWL_FEE_OPT_RE = re.compile(r"£\s*[\d,]+\s*–\s*(international|uk)", re.IGNORECASE)
+
+    select = soup.find("select", id="nationality_pricing_input_mobile")
+    if select is None:
+        # Try to find any select whose options match the UWL fee pattern
+        for sel in soup.find_all("select"):
+            opts = sel.find_all("option")
+            if any(_UWL_FEE_OPT_RE.search(o.get_text(strip=True)) for o in opts):
+                select = sel
+                break
+
+    if select is None:
+        # Select element not present — page may be a different layout.
+        # Fall through to the generic cascade so we don't silently drop fees.
+        return None
+
+    # Select is present.  Look for the "– International" option.
+    intl_option_text: str | None = None
+    has_any_option = False
+    for opt in select.find_all("option"):
+        opt_text = opt.get_text(strip=True)
+        if not opt_text:
+            continue
+        has_any_option = True
+        if _INTL_OPT_RE.search(opt_text):
+            intl_option_text = opt_text
+            break
+
+    if not has_any_option:
+        # Empty select — fall through; don't block on incomplete render.
+        return None
+
+    if intl_option_text is None:
+        # Select exists and has options, but NONE are "– International".
+        # This is a domestic-only course.
+        return _UWL_DOMESTIC_ONLY
+
+    # Parse the amount out of the option text (e.g. "£16,750 – International").
+    m = _AMOUNT_RE.search(intl_option_text)
+    if not m:
+        return None
+    raw_num = m.group(2) or m.group(3) or ""
+    amount = _parse_amount(raw_num)
+    if amount is None:
+        return None
+    ctx = f"UWL nationality select: {intl_option_text}"
+    return amount, ctx
+
+
 def _from_bcu_int_fee_panel(
     html: str, url: str
 ) -> "tuple[int, str] | None":
@@ -851,6 +950,42 @@ async def extract(
             prefer_yr1 = bool(_cfg.extraction.fees.prefer_year_one_over_total)
     except Exception:  # noqa: BLE001 — defensive; keep extractor working
         prefer_yr1 = False
+
+    # ── Pre-pass UWL: nationality-pricing select ─────────────────────────────
+    # UWL (University of West London) Angular SPA pages expose a
+    # nationality-switcher select (#nationality_pricing_input_mobile) with
+    # options "£X – International" and "£Y – UK".  The generic text scanner
+    # cannot distinguish these two options and occasionally picks the lower
+    # UK amount because "– International" from the adjacent first option
+    # bleeds into the context window of the second option's GBP figure,
+    # giving it a spurious _INTL_CTX score.
+    #
+    # Three outcomes from _from_uwl_nationality_select:
+    #   (amount, ctx)        → return the International fee immediately.
+    #   _UWL_DOMESTIC_ONLY   → select present, no International option →
+    #                          return [] (no fee) so the guard rejects the
+    #                          course as domestic-only.
+    #   None                 → not a UWL page or select absent → fall
+    #                          through to the BCU / table / generic cascade.
+    _uwl_result = _from_uwl_nationality_select(html, url)
+    if _uwl_result is _UWL_DOMESTIC_ONLY:
+        return []
+    if _uwl_result is not None:
+        _uwl_amount, _uwl_ctx = _uwl_result  # type: ignore[misc]
+        return [
+            ExtractionResult(
+                field_key="international_fee",
+                value=_uwl_amount,
+                normalized={
+                    "international_fee": _uwl_amount,
+                    "currency": "GBP",
+                    "fee_term": "Annual",
+                },
+                confidence=0.97,
+                snippet=_uwl_ctx[:120],
+                method="fee.uwl_nationality_select",
+            )
+        ]
 
     # ── Pre-pass BCU: tab-aware International Student fee panel ─────────────
     # BCU course pages expose two sibling div panels inside #fees_how_to_apply:

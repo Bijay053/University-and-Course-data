@@ -68,6 +68,9 @@ extraction:
   max_parallel_fetch: 8
   fees:
     default_currency: GBP
+  filters:
+    domestic_only:
+      enabled: true
 
 # PRODUCTION DB FIX — run on prod droplet (allow pattern must also have no ^ anchor):
 #
