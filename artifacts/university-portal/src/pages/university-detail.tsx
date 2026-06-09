@@ -1129,6 +1129,7 @@ export default function UniversityDetail() {
   const [editForm, setEditForm] = useState<EditForm | null>(null);
   const [saving, setSaving] = useState(false);
   const [approvingId, setApprovingId] = useState<number | null>(null);
+  const [forceApproveRowId, setForceApproveRowId] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [importingAll, setImportingAll] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
@@ -4389,6 +4390,43 @@ export default function UniversityDetail() {
             </DialogContent>
           </Dialog>
 
+          {/* Per-row force approve confirm */}
+          <Dialog open={forceApproveRowId !== null} onOpenChange={(o) => { if (!o) setForceApproveRowId(null); }}>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 text-amber-700">
+                  <AlertTriangle className="w-5 h-5 shrink-0" />
+                  Force Approve Course
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-3 text-sm text-gray-600">
+                <p>
+                  This bypasses the <strong>60-point confidence gate</strong> and publishes the course to production
+                  <strong> even if critical fields (fee, English test, intake, duration) are missing</strong>.
+                </p>
+                <p className="rounded-md bg-amber-50 border border-amber-200 px-3 py-2 text-amber-800 text-xs">
+                  Use only when you knowingly want to publish incomplete data.
+                </p>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setForceApproveRowId(null)} className="cursor-pointer">
+                  Cancel
+                </Button>
+                <Button
+                  className="bg-amber-600 hover:bg-amber-700 text-white cursor-pointer"
+                  onClick={() => {
+                    const id = forceApproveRowId!;
+                    setForceApproveRowId(null);
+                    void handleApprove(id, true);
+                  }}
+                >
+                  <AlertTriangle className="h-4 w-4 mr-1.5" />
+                  Force Approve
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
           <Dialog open={showBulkRejectConfirm} onOpenChange={(o) => {
             if (!o) {
               setShowBulkRejectConfirm(false);
@@ -4669,6 +4707,14 @@ export default function UniversityDetail() {
                                 className="p-1 rounded hover:bg-green-100 text-green-600 disabled:opacity-40 cursor-pointer"
                               >
                                 <CheckCircle2 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => setForceApproveRowId(c.id)}
+                                disabled={approvingId === c.id}
+                                title="Force Approve (bypass confidence gate)"
+                                className="p-1 rounded hover:bg-amber-100 text-amber-600 disabled:opacity-40 cursor-pointer"
+                              >
+                                <AlertTriangle className="w-3.5 h-3.5" />
                               </button>
                             </>
                           )}
@@ -5313,18 +5359,33 @@ export default function UniversityDetail() {
                 Cancel
               </Button>
               {editingCourse.status === "pending" && (
-                <Button
-                  variant="default"
-                  className="bg-green-600 hover:bg-green-700"
-                  disabled={saving || approvingId === editingCourse.id}
-                  onClick={async () => {
-                    await handleSaveEdit();
-                    await handleApprove(editingCourse.id);
-                  }}
-                >
-                  <Upload className="w-4 h-4 mr-1.5" />
-                  Save & Import
-                </Button>
+                <>
+                  <Button
+                    variant="default"
+                    className="bg-green-600 hover:bg-green-700"
+                    disabled={saving || approvingId === editingCourse.id}
+                    onClick={async () => {
+                      await handleSaveEdit();
+                      await handleApprove(editingCourse.id);
+                    }}
+                  >
+                    <Upload className="w-4 h-4 mr-1.5" />
+                    Save & Import
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="border-amber-400 text-amber-700 bg-amber-50 hover:bg-amber-100"
+                    disabled={saving || approvingId === editingCourse.id}
+                    title="Bypass confidence gate and import regardless of missing fields"
+                    onClick={async () => {
+                      await handleSaveEdit();
+                      await handleApprove(editingCourse.id, true);
+                    }}
+                  >
+                    <AlertTriangle className="w-4 h-4 mr-1.5" />
+                    Save & Force Import
+                  </Button>
+                </>
               )}
               <Button onClick={handleSaveEdit} disabled={saving}>
                 {saving ? "Saving…" : "Save Changes"}
