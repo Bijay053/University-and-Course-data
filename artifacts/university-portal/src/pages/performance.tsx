@@ -357,7 +357,7 @@ export default function PerformancePage() {
           />
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Scrape.do (Period)</CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground">Scrape.do Cost &amp; API Credits (Period)</CardTitle>
               <DollarSign className={`h-4 w-4 ${(summary.total_scrape_do_cost_usd ?? 0) < 1 ? "text-emerald-600" : "text-amber-600"}`} />
             </CardHeader>
             <CardContent>
@@ -366,7 +366,7 @@ export default function PerformancePage() {
                   <div className={`text-2xl font-bold ${(summary.total_scrape_do_cost_usd ?? 0) < 1 ? "text-emerald-600" : "text-amber-600"}`}>
                     {money(summary.total_scrape_do_cost_usd ?? 0)}
                   </div>
-                  <p className="text-xs text-muted-foreground mt-0.5">cost</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Scrape.do cost</p>
                 </div>
                 <div className="w-px h-8 bg-border self-center" />
                 <div>
@@ -374,7 +374,7 @@ export default function PerformancePage() {
                     <Zap className="h-4 w-4" />
                     {((summary.total_scrape_do_render_calls ?? 0) * 5 + (summary.total_scrape_do_static_calls ?? 0)).toLocaleString()}
                   </div>
-                  <p className="text-xs text-muted-foreground mt-0.5">API credits</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Scrape.do API credits</p>
                 </div>
               </div>
               <p className="text-xs text-muted-foreground mt-2">
