@@ -1138,6 +1138,7 @@ export default function UniversityDetail() {
   const [rawSelectedIds, setRawSelectedIds] = useState<Set<number>>(new Set());
   const [bulkMapRunning, setBulkMapRunning] = useState(false);
   const [bulkApproveRunning, setBulkApproveRunning] = useState(false);
+  const [bulkApproveProgress, setBulkApproveProgress] = useState<{ done: number; total: number }>({ done: 0, total: 0 });
   const [bulkRejectRunning, setBulkRejectRunning] = useState(false);
   const [showBulkRejectConfirm, setShowBulkRejectConfirm] = useState(false);
   const [bulkRejectReason, setBulkRejectReason] = useState("");
@@ -1186,8 +1187,12 @@ export default function UniversityDetail() {
   const handleBulkApprove = async () => {
     if (rawSelectedIds.size === 0) return;
     setBulkApproveRunning(true);
+    const ids = Array.from(rawSelectedIds);
+    setBulkApproveProgress({ done: 0, total: ids.length });
     let approved = 0; let confidenceBlocked = 0; let otherFailed = 0;
-    for (const courseId of rawSelectedIds) {
+    let done = 0;
+
+    const approveOne = async (courseId: number) => {
       try {
         const res = await fetch(`${BASE}/api/scrape/staged/${courseId}/approve`, { method: "POST" });
         if (res.ok) {
@@ -1198,7 +1203,22 @@ export default function UniversityDetail() {
           else otherFailed++;
         }
       } catch { otherFailed++; }
-    }
+      done++;
+      setBulkApproveProgress({ done, total: ids.length });
+    };
+
+    // Run with a bounded concurrency pool so 300+ rows finish in seconds
+    // instead of one-at-a-time. 8 in flight keeps the API responsive.
+    const CONCURRENCY = 8;
+    let cursor = 0;
+    const worker = async () => {
+      while (cursor < ids.length) {
+        const idx = cursor++;
+        await approveOne(ids[idx]);
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(CONCURRENCY, ids.length) }, worker));
+
     const failParts: string[] = [];
     if (confidenceBlocked > 0) failParts.push(`${confidenceBlocked} blocked (low confidence)`);
     if (otherFailed > 0) failParts.push(`${otherFailed} failed`);
@@ -1214,6 +1234,7 @@ export default function UniversityDetail() {
       await queryClient.invalidateQueries({ queryKey: getGetUniversityQueryKey(id) });
     }
     setBulkApproveRunning(false);
+    setBulkApproveProgress({ done: 0, total: 0 });
   };
 
   const handleBulkRejectSelected = async () => {
@@ -4284,8 +4305,12 @@ export default function UniversityDetail() {
                   onClick={handleBulkApprove}
                   className="h-7 text-xs bg-green-600 hover:bg-green-700 text-white"
                 >
-                  <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
-                  {bulkApproveRunning ? "Approving…" : `Approve (${rawSelectedIds.size})`}
+                  {bulkApproveRunning
+                    ? <RefreshCw className="h-3.5 w-3.5 mr-1 animate-spin" />
+                    : <CheckCircle2 className="h-3.5 w-3.5 mr-1" />}
+                  {bulkApproveRunning
+                    ? `Approving ${bulkApproveProgress.done}/${bulkApproveProgress.total}…`
+                    : `Approve (${rawSelectedIds.size})`}
                 </Button>
                 <Button
                   size="sm"
@@ -4381,7 +4406,27 @@ export default function UniversityDetail() {
 
           {/* Table */}
           {rawLoading ? (
-            <div className="border rounded-xl py-16 text-center text-muted-foreground">Loading raw data…</div>
+            <div className="border rounded-xl overflow-hidden">
+              <div className="flex items-center gap-2 px-4 py-2.5 border-b bg-gray-50 text-xs font-medium text-muted-foreground">
+                <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                Loading {rawStatus === "all" ? "all" : rawStatus} courses…
+              </div>
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="flex items-center gap-4 px-4 py-3 border-b last:border-b-0 animate-pulse"
+                  style={{ animationDelay: `${i * 60}ms` }}
+                >
+                  <div className="h-4 w-6 rounded bg-gray-200" />
+                  <div className="h-4 flex-1 max-w-[260px] rounded bg-gray-200" />
+                  <div className="h-4 w-20 rounded bg-gray-200" />
+                  <div className="h-4 w-24 rounded bg-gray-200" />
+                  <div className="h-4 w-16 rounded bg-gray-200" />
+                  <div className="h-4 w-20 rounded bg-gray-200" />
+                  <div className="h-4 w-28 rounded bg-gray-200" />
+                </div>
+              ))}
+            </div>
           ) : filteredRaw.length === 0 ? (
             <div className="border rounded-xl py-16 text-center text-muted-foreground">
               <Database className="w-10 h-10 mx-auto mb-3 opacity-20" />
