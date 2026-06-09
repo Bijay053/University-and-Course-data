@@ -60,9 +60,23 @@ class SearchStaxConfig(BaseModel):
             "falls through to BFS / browser discovery."
         ),
     )
-    endpoint: str = Field(
-        description="Full Solr select URL (e.g. '.../emselect').",
+    endpoint: Union[str, list[str]] = Field(
+        description=(
+            "Full Solr select URL (e.g. '.../emselect').  May be a single URL "
+            "string or a list of URLs when the university splits its catalogue "
+            "across multiple Solr models (e.g. one endpoint for UG, another for "
+            "PG).  The provider pages through each endpoint in turn and merges "
+            "all results."
+        ),
     )
+
+    @property
+    def endpoints(self) -> list[str]:
+        """Always return endpoint(s) as a list, regardless of YAML spelling."""
+        if isinstance(self.endpoint, list):
+            return [e for e in self.endpoint if e]
+        return [self.endpoint] if self.endpoint else []
+
     authorization_token: Optional[str] = Field(
         default=None,
         description=(

@@ -1157,19 +1157,12 @@ async def _fetch_links_only(cfg: SearchStaxConfig, emit=None) -> tuple[list[dict
     skipped = 0
     title_excl_prefix = 0  # rejected by exclude_title_prefixes
     title_excl_sub = 0     # rejected by exclude_title_substrings
-    start = 0
     page_size = max(1, int(cfg.page_size or 100))
-    total: Optional[int] = None
-    _retried_unfiltered = False
+    _grand_total = 0  # sum of numFound across all endpoints
 
     # Pre-compute lowercased filter lists once (avoid rebuilding every doc).
     _excl_prefixes = [p.lower() for p in (cfg.exclude_title_prefixes or [])]
     _excl_subs     = [s.lower() for s in (cfg.exclude_title_substrings or [])]
-
-    await _emit(
-        f"[SEARCHSTAX links_only] Querying Solr "
-        f"({'fq=' + _filter if _filter else 'unfiltered'}) ..."
-    )
 
     # Resolve field names from field_map (YAML-configurable) with defaults.
     # Default keys match the original WLV field names for backward compatibility.
@@ -1188,130 +1181,145 @@ async def _fetch_links_only(cfg: SearchStaxConfig, emit=None) -> tuple[list[dict
         _mode_field, _dur_field, _date_field, _cat_field,
     })
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        while True:
-            params: dict = {
-                "q": "*:*",
-                "rows": str(page_size),
-                "start": str(start),
-                "fl": _fl_fields,
-                "wt": "json",
-            }
-            if _filter:
-                params["fq"] = _filter
-            params.update(cfg.extra_params or {})
+    for _endpoint_url in cfg.endpoints:
+        # Per-endpoint state — reset for each URL so pagination and the
+        # unfiltered-fallback don't bleed across endpoints.
+        start = 0
+        total: Optional[int] = None
+        _retried_unfiltered = False
+        _filter = cfg.filter_query or ""
 
-            try:
-                resp = await client.get(cfg.endpoint, params=params, headers=headers)
-                resp.raise_for_status()
-                data = resp.json()
-            except Exception as exc:
-                log.error("[SEARCHSTAX links_only] fetch failed (start=%d): %s", start, exc)
-                break
+        await _emit(
+            f"[SEARCHSTAX links_only] Querying Solr "
+            f"({'fq=' + _filter if _filter else 'unfiltered'}) "
+            f"endpoint={_endpoint_url} ..."
+        )
 
-            response = data.get("response", {})
-            docs = response.get("docs", [])
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            while True:
+                params: dict = {
+                    "q": "*:*",
+                    "rows": str(page_size),
+                    "start": str(start),
+                    "fl": _fl_fields,
+                    "wt": "json",
+                }
+                if _filter:
+                    params["fq"] = _filter
+                params.update(cfg.extra_params or {})
 
-            # Auto-fallback: if the filter returned 0 on the first page, retry
-            # without it — some cores use different sectionType values.
-            if start == 0 and not docs and _filter and not _retried_unfiltered:
-                _retried_unfiltered = True
-                await _emit(f"[SEARCHSTAX links_only] {_filter!r} returned 0 — retrying unfiltered ...")
-                log.info("[SEARCHSTAX links_only] fq=%r returned 0 — retrying unfiltered", _filter)
-                _filter = ""
-                continue
+                try:
+                    resp = await client.get(_endpoint_url, params=params, headers=headers)
+                    resp.raise_for_status()
+                    data = resp.json()
+                except Exception as exc:
+                    log.error("[SEARCHSTAX links_only] fetch failed (start=%d): %s", start, exc)
+                    break
 
-            if total is None:
-                total = int(response.get("numFound", 0))
-                await _emit(f"[SEARCHSTAX links_only] {total} course docs found.")
+                response = data.get("response", {})
+                docs = response.get("docs", [])
 
-            if not docs:
-                break
-
-            for doc in docs:
-                # URL: try mapped field first, then 'id' as universal fallback
-                url = _first_str(doc, _url_field, "id")
-                if not url:
-                    skipped += 1
+                # Auto-fallback: if the filter returned 0 on the first page, retry
+                # without it — some cores use different sectionType values.
+                if start == 0 and not docs and _filter and not _retried_unfiltered:
+                    _retried_unfiltered = True
+                    await _emit(f"[SEARCHSTAX links_only] {_filter!r} returned 0 — retrying unfiltered ...")
+                    log.info("[SEARCHSTAX links_only] fq=%r returned 0 — retrying unfiltered", _filter)
+                    _filter = ""
                     continue
-                title = _first_str(doc, _name_field)
-                award = _first_str(doc, _type_field)
-                # Build name: prepend award/degree-type when not already the prefix
-                if title:
-                    if award and not title.lower().startswith(award.lower()):
-                        name = f"{award} {title}"
-                    else:
-                        name = title
-                elif award:
-                    name = award
-                else:
-                    # Derive readable name from URL slug rather than using raw URL
-                    name = _slug_to_name(url)
 
-                # ── Title-based CPD/professional module pre-filter ────────────
-                # Reject before any HTTP/Gemini/browser call so we never waste
-                # AI budget on domestic-only practitioner courses.
-                if _excl_prefixes or _excl_subs:
-                    _name_lc = name.lower()
-                    _matched_reason: str | None = None
-                    _matched_pattern: str | None = None
-                    for _pfx in _excl_prefixes:
-                        if _name_lc.startswith(_pfx):
-                            _matched_reason = "exclude_title_prefixes"
-                            _matched_pattern = _pfx
-                            break
-                    if _matched_reason is None:
-                        for _sub in _excl_subs:
-                            if _sub in _name_lc:
-                                _matched_reason = "exclude_title_substrings"
-                                _matched_pattern = _sub
-                                break
-                    if _matched_reason is not None:
-                        if _matched_reason == "exclude_title_prefixes":
-                            title_excl_prefix += 1
-                        else:
-                            title_excl_sub += 1
-                        log.info(
-                            '[SEARCHSTAX FILTER] excluded title=%r reason=%s pattern=%r url=%s',
-                            name, _matched_reason, _matched_pattern, url,
-                        )
+                if total is None:
+                    total = int(response.get("numFound", 0))
+                    _grand_total += total
+                    await _emit(f"[SEARCHSTAX links_only] {total} course docs found.")
+
+                if not docs:
+                    break
+
+                for doc in docs:
+                    # URL: try mapped field first, then 'id' as universal fallback
+                    url = _first_str(doc, _url_field, "id")
+                    if not url:
+                        skipped += 1
                         continue
+                    title = _first_str(doc, _name_field)
+                    award = _first_str(doc, _type_field)
+                    # Build name: prepend award/degree-type when not already the prefix
+                    if title:
+                        if award and not title.lower().startswith(award.lower()):
+                            name = f"{award} {title}"
+                        else:
+                            name = title
+                    elif award:
+                        name = award
+                    else:
+                        # Derive readable name from URL slug rather than using raw URL
+                        name = _slug_to_name(url)
 
-                link: dict = {"name": name, "url": url}
-                # Carry pre-fetched structured metadata on the link dict so
-                # the per-course extractor can use it as authoritative hints.
-                prefetch: dict = {}
-                lv = _first_str(doc, _level_field)
-                if lv:
-                    prefetch["degree_level_hint"] = lv
-                mo = _first_str(doc, _mode_field)
-                if mo:
-                    prefetch["study_mode_hint"] = mo
-                du = _first_str(doc, _dur_field)
-                if du:
-                    prefetch["duration_hint"] = du
-                da = _first_str(doc, _date_field)
-                if da:
-                    prefetch["intake_dates_hint"] = da
-                ca = _first_str(doc, _cat_field)
-                if ca:
-                    prefetch["category_hint"] = ca
-                if prefetch:
-                    link["_prefetch"] = prefetch
-                links.append(link)
+                    # ── Title-based CPD/professional module pre-filter ────────────
+                    # Reject before any HTTP/Gemini/browser call so we never waste
+                    # AI budget on domestic-only practitioner courses.
+                    if _excl_prefixes or _excl_subs:
+                        _name_lc = name.lower()
+                        _matched_reason: str | None = None
+                        _matched_pattern: str | None = None
+                        for _pfx in _excl_prefixes:
+                            if _name_lc.startswith(_pfx):
+                                _matched_reason = "exclude_title_prefixes"
+                                _matched_pattern = _pfx
+                                break
+                        if _matched_reason is None:
+                            for _sub in _excl_subs:
+                                if _sub in _name_lc:
+                                    _matched_reason = "exclude_title_substrings"
+                                    _matched_pattern = _sub
+                                    break
+                        if _matched_reason is not None:
+                            if _matched_reason == "exclude_title_prefixes":
+                                title_excl_prefix += 1
+                            else:
+                                title_excl_sub += 1
+                            log.info(
+                                '[SEARCHSTAX FILTER] excluded title=%r reason=%s pattern=%r url=%s',
+                                name, _matched_reason, _matched_pattern, url,
+                            )
+                            continue
 
-            start += len(docs)
-            if total is not None and start >= total:
-                break
-            if cfg.max_courses and len(links) >= cfg.max_courses:
-                links = links[: cfg.max_courses]
-                break
-            await asyncio.sleep(0)
+                    link: dict = {"name": name, "url": url}
+                    # Carry pre-fetched structured metadata on the link dict so
+                    # the per-course extractor can use it as authoritative hints.
+                    prefetch: dict = {}
+                    lv = _first_str(doc, _level_field)
+                    if lv:
+                        prefetch["degree_level_hint"] = lv
+                    mo = _first_str(doc, _mode_field)
+                    if mo:
+                        prefetch["study_mode_hint"] = mo
+                    du = _first_str(doc, _dur_field)
+                    if du:
+                        prefetch["duration_hint"] = du
+                    da = _first_str(doc, _date_field)
+                    if da:
+                        prefetch["intake_dates_hint"] = da
+                    ca = _first_str(doc, _cat_field)
+                    if ca:
+                        prefetch["category_hint"] = ca
+                    if prefetch:
+                        link["_prefetch"] = prefetch
+                    links.append(link)
+
+                start += len(docs)
+                if total is not None and start >= total:
+                    break
+                if cfg.max_courses and len(links) >= cfg.max_courses:
+                    links = links[: cfg.max_courses]
+                    break
+                await asyncio.sleep(0)
 
     _title_excluded = title_excl_prefix + title_excl_sub
     await _emit(
         f"[SEARCHSTAX links_only] "
-        f"SearchStax URLs found: {total or 0} | "
+        f"SearchStax URLs found: {_grand_total} | "
         f"Excluded by title prefix: {title_excl_prefix} | "
         f"Excluded by title substring: {title_excl_sub} | "
         f"Queued for extraction: {len(links)}"
@@ -1413,15 +1421,8 @@ async def fetch_searchstax_links(
 
     links: list[dict] = []
     skipped = 0
-    start = 0
     page_size = max(1, int(cfg.page_size or 100))
-    total: Optional[int] = None
-    _filter = cfg.filter_query or ""
-
-    await _emit(
-        f"[SEARCHSTAX] Querying Solr core "
-        f"({'fq=' + _filter if _filter else 'unfiltered'}) ..."
-    )
+    _grand_total = 0  # sum of numFound across all endpoints
 
     # When using field_map_as_payload, request the mapped Solr field names
     # (e.g. Durham's PascalCase fields like Degreename_t, Degreetype_ss, ...).
@@ -1448,68 +1449,82 @@ async def fetch_searchstax_links(
     else:
         _fl = _FIELDS
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    for _endpoint_url in cfg.endpoints:
+        # Per-endpoint state — reset for each URL so pagination and the
+        # unfiltered-fallback don't bleed across endpoints.
+        start = 0
+        total: Optional[int] = None
         _retried_unfiltered = False
-        while True:
-            params: dict[str, Any] = {
-                "q": "*:*",
-                "rows": str(page_size),
-                "start": str(start),
-                "fl": _fl,
-                "wt": "json",
-            }
-            if _filter:
-                params["fq"] = _filter
-            # Merge university-specific extra params (override builtins if same key)
-            params.update(cfg.extra_params or {})
+        _filter = cfg.filter_query or ""
 
-            try:
-                resp = await client.get(cfg.endpoint, params=params, headers=headers)
-                resp.raise_for_status()
-                data = resp.json()
-            except Exception as _fetch_exc:
-                log.error("[SEARCHSTAX] fetch failed (start=%d): %s", start, _fetch_exc)
-                break
+        await _emit(
+            f"[SEARCHSTAX] Querying Solr core "
+            f"({'fq=' + _filter if _filter else 'unfiltered'}) "
+            f"endpoint={_endpoint_url} ..."
+        )
 
-            response = data.get("response", {})
-            docs = response.get("docs", [])
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            while True:
+                params: dict[str, Any] = {
+                    "q": "*:*",
+                    "rows": str(page_size),
+                    "start": str(start),
+                    "fl": _fl,
+                    "wt": "json",
+                }
+                if _filter:
+                    params["fq"] = _filter
+                # Merge university-specific extra params (override builtins if same key)
+                params.update(cfg.extra_params or {})
 
-            # Auto-fallback: if the filter returned 0 on the first page, retry
-            # without it — some cores use different sectionType values.
-            if start == 0 and not docs and _filter and not _retried_unfiltered:
-                _retried_unfiltered = True
-                await _emit(
-                    f"[SEARCHSTAX] {_filter!r} returned 0 — retrying unfiltered ..."
-                )
-                log.info("[SEARCHSTAX] fq=%r returned 0 docs — retrying without filter", _filter)
-                _filter = ""
-                continue
+                try:
+                    resp = await client.get(_endpoint_url, params=params, headers=headers)
+                    resp.raise_for_status()
+                    data = resp.json()
+                except Exception as _fetch_exc:
+                    log.error("[SEARCHSTAX] fetch failed (start=%d): %s", start, _fetch_exc)
+                    break
 
-            if total is None:
-                total = int(response.get("numFound", 0))
-                await _emit(f"[SEARCHSTAX] {total} course docs found.")
-                if not token:
+                response = data.get("response", {})
+                docs = response.get("docs", [])
+
+                # Auto-fallback: if the filter returned 0 on the first page, retry
+                # without it — some cores use different sectionType values.
+                if start == 0 and not docs and _filter and not _retried_unfiltered:
+                    _retried_unfiltered = True
                     await _emit(
-                        "[SEARCHSTAX] WARNING: no token configured — requests are "
-                        "unauthenticated.  Set authorization_token in the YAML, "
-                        "token_env, or the SEARCHSTAX_TOKEN environment variable."
+                        f"[SEARCHSTAX] {_filter!r} returned 0 — retrying unfiltered ..."
                     )
+                    log.info("[SEARCHSTAX] fq=%r returned 0 docs — retrying without filter", _filter)
+                    _filter = ""
+                    continue
 
-            if not docs:
-                break
-            for doc in docs:
-                mapped = _mapper(doc)
-                if mapped is not None:
-                    links.append(mapped)
-                else:
-                    skipped += 1
-            start += len(docs)
-            if total is not None and start >= total:
-                break
-            if cfg.max_courses and len(links) >= cfg.max_courses:
-                links = links[: cfg.max_courses]
-                break
-            await asyncio.sleep(0)  # cooperative yield between pages
+                if total is None:
+                    total = int(response.get("numFound", 0))
+                    _grand_total += total
+                    await _emit(f"[SEARCHSTAX] {total} course docs found.")
+                    if not token:
+                        await _emit(
+                            "[SEARCHSTAX] WARNING: no token configured — requests are "
+                            "unauthenticated.  Set authorization_token in the YAML, "
+                            "token_env, or the SEARCHSTAX_TOKEN environment variable."
+                        )
+
+                if not docs:
+                    break
+                for doc in docs:
+                    mapped = _mapper(doc)
+                    if mapped is not None:
+                        links.append(mapped)
+                    else:
+                        skipped += 1
+                start += len(docs)
+                if total is not None and start >= total:
+                    break
+                if cfg.max_courses and len(links) >= cfg.max_courses:
+                    links = links[: cfg.max_courses]
+                    break
+                await asyncio.sleep(0)  # cooperative yield between pages
 
     await _emit(
         f"[SEARCHSTAX] Built {len(links)} course record(s) "
@@ -1517,6 +1532,6 @@ async def fetch_searchstax_links(
     )
     log.info(
         "[SEARCHSTAX] fetched=%s mapped=%s skipped=%s token=%s",
-        total, len(links), skipped, "yes" if token else "NO",
+        _grand_total, len(links), skipped, "yes" if token else "NO",
     )
     return links
