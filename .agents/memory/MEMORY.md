@@ -26,3 +26,4 @@
 - [UK structured fee table extractor](uk-fee-table-extractor.md) — Pre-pass 0 in fee.extract(); _FEE_TABLE_FOUND_NO_INTL sentinel → return []; picks Intl+FT latest-year row; part-time-only courses get no fee.
 - [UWL Scrape.do cost](uwl-scrape-do-cost.md) — UWL is SSR not JS-required (render=false identical, direct curl_cffi free); render_listing_pages_static flag; {slug}_{id}.yaml SHADOWS {slug}.yaml — edit both.
 - [IELTS split overall/band trap](ielts-split-overall-band.md) — overall in banner + per-band floor in prose; "each component" cue marks a floor; resolve split BEFORE any broad first-score fallback or it downgrades overall to the band.
+- [UWL intl fee = SSR JSON blob](uwl-json-blob-fee.md) — static render=false makes the nationality <select> an empty shell; read field_p_cv_int_main_fee from the SSR blob first; switching a uni to static must re-verify fields exist in static HTML.

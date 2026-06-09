@@ -759,6 +759,50 @@ def _score(amount: int, ctx: str, *, prefer_year_one: bool = False) -> int:
 
 _UWL_DOMESTIC_ONLY = object()  # sentinel: select exists, no International option
 
+# UWL Angular SSR JSON-blob fee fields (present in static render=False HTML).
+#   field_p_cv_int_main_fee   → International annual fee (£16,750)
+#   field_p_cv_uk_eu_main_fee → UK/EU annual fee (£9,790)
+# Each is a `"field_…":{"target_id":N,"name":"<digits>"}` object.  The FIRST
+# int_main_fee is the headline full-time international fee shown in the fees
+# panel; later occurrences belong to linked/related courses on the same page.
+_UWL_JSON_INT_FEE_RE = re.compile(
+    r'field_p_cv_int_main_fee"?\s*:\s*\{[^}]*?"name"\s*:\s*"(\d[\d,]*)"'
+)
+_UWL_JSON_UK_FEE_RE = re.compile(
+    r'field_p_cv_uk_eu_main_fee"?\s*:\s*\{[^}]*?"name"\s*:\s*"(\d[\d,]*)"'
+)
+
+
+def _from_uwl_json_blob(html: str) -> "tuple[int, str] | None | object":
+    """Fallback UWL fee reader for static (Scrape.do render=False) pages.
+
+    The nationality-switcher ``<select>`` options are populated by Angular at
+    runtime, so on the *static* SSR HTML the select is an empty shell and
+    :func:`_from_uwl_nationality_select` finds no option text.  But the SSR
+    JSON blob still embeds the fees as ``field_p_cv_int_main_fee`` (International)
+    and ``field_p_cv_uk_eu_main_fee`` (UK/EU).
+
+    Rule (per operator policy): *if a course is offered to international
+    students it always has an international fee* — so whenever an
+    ``int_main_fee`` value is present we capture it as the international fee.
+
+    Returns:
+      * ``(amount, ctx)``   — International fee found in the blob.
+      * ``_UWL_DOMESTIC_ONLY`` — no international fee but a UK fee exists →
+        domestic-only course; caller returns ``[]``.
+      * ``None``            — no UWL fee blob at all → fall through to the
+        generic cascade.
+    """
+    m = _UWL_JSON_INT_FEE_RE.search(html)
+    if m:
+        amount = _parse_amount(m.group(1))
+        if amount is not None:
+            return amount, f"UWL int_main_fee JSON blob: £{m.group(1)}"
+    if _UWL_JSON_UK_FEE_RE.search(html):
+        # UK fee present, no international fee → domestic-only course.
+        return _UWL_DOMESTIC_ONLY
+    return None
+
 
 def _from_uwl_nationality_select(
     html: str, url: str
@@ -794,6 +838,16 @@ def _from_uwl_nationality_select(
     if not (host == "www.uwl.ac.uk" or host.endswith(".uwl.ac.uk")):
         return None
 
+    # Authoritative source FIRST: the Angular SSR JSON blob is embedded in both
+    # static (render=False) and headless (render=True) HTML and always reflects
+    # the real fees.  The JS-rendered <select> below is unreliable on static
+    # HTML — its options are populated client-side, so on render=False pages it
+    # can carry a partial/UK-only option set and yield a FALSE domestic-only
+    # verdict even when an international fee exists.  Trust the blob when present.
+    _blob = _from_uwl_json_blob(html)
+    if _blob is not None:
+        return _blob
+
     try:
         from bs4 import BeautifulSoup as _BS4
     except ImportError:  # pragma: no cover
@@ -819,8 +873,8 @@ def _from_uwl_nationality_select(
                 break
 
     if select is None:
-        # Select element not present — page may be a different layout.
-        # Fall through to the generic cascade so we don't silently drop fees.
+        # No JSON blob (checked above) AND no select — not a recognisable UWL
+        # fee layout.  Fall through to the generic cascade.
         return None
 
     # Select is present.  Look for the "– International" option.
@@ -836,7 +890,8 @@ def _from_uwl_nationality_select(
             break
 
     if not has_any_option:
-        # Empty select — fall through; don't block on incomplete render.
+        # Empty select and no JSON blob (checked above) — don't block on
+        # incomplete render; fall through to the generic cascade.
         return None
 
     if intl_option_text is None:

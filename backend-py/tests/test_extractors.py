@@ -56,6 +56,54 @@ def test_fee_picks_intl_over_domestic_when_both_present():
     assert out and out[0].normalized["international_fee"] == 45000
 
 
+# --- UWL regression: international fee from Angular SSR JSON blob -------------
+# UWL course pages are served statically (Scrape.do render=False). The
+# nationality-switcher <select> options are populated client-side, so on the
+# static HTML it carries only a partial/UK option set and used to yield a FALSE
+# "domestic only" verdict — dropping the international fee even though the SSR
+# JSON blob (field_p_cv_int_main_fee) clearly contains it. Per operator policy:
+# if a course is offered to international students it always has an intl fee.
+def test_fee_uwl_json_blob_international_fee():
+    # JSON blob present with both intl + UK fees; an empty (JS-populated) select
+    # is also present. The blob must win and produce the £16,750 intl fee.
+    html = (
+        '<select id="nationality_pricing_input_mobile"></select>'
+        '<script>window.data={'
+        '"field_p_cv_int_main_fee":{"target_id":1994,"name":"16750"},'
+        '"field_p_cv_uk_eu_main_fee":{"target_id":2012,"name":"9790"}'
+        '};</script>'
+    )
+    out = _run(fee.extract(html, "https://www.uwl.ac.uk/course/undergraduate/forensic-science"))
+    assert out and out[0].normalized["international_fee"] == 16750
+    assert out[0].normalized["currency"] == "GBP"
+
+
+def test_fee_uwl_json_blob_domestic_only_when_no_intl_fee():
+    # UK fee only, no int_main_fee → domestic-only course → no fee emitted.
+    html = (
+        '<select id="nationality_pricing_input_mobile"></select>'
+        '<script>window.data={'
+        '"field_p_cv_uk_eu_main_fee":{"target_id":2012,"name":"9790"}'
+        '};</script>'
+    )
+    out = _run(fee.extract(html, "https://www.uwl.ac.uk/course/undergraduate/learning-disabilities-nursing-foundation"))
+    assert out == []
+
+
+def test_fee_uwl_json_blob_picks_first_intl_fee():
+    # Two int_main_fee entries (main course + a linked/related course). The
+    # FIRST is the headline full-time fee shown in the fees panel.
+    html = (
+        '<script>window.data={'
+        '"field_p_cv_int_main_fee":{"target_id":1994,"name":"16750"},'
+        '"field_p_cv_uk_eu_main_fee":{"target_id":2012,"name":"9790"},'
+        '"field_p_cv_int_main_fee":{"target_id":1996,"name":"11160"}'
+        '};</script>'
+    )
+    out = _run(fee.extract(html, "https://www.uwl.ac.uk/course/undergraduate/forensic-science"))
+    assert out and out[0].normalized["international_fee"] == 16750
+
+
 # --- IELTS / PTE / TOEFL / Cambridge / Duolingo -----------------------------
 def test_english_ielts_overall_with_no_band_below():
     html = "<p>IELTS Academic overall 6.5 with no individual band below 6.0.</p>"
