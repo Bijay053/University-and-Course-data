@@ -1,33 +1,32 @@
 ---
 name: UWL research-degree page template
-description: /course/research/ pages share a GENERIC blob (int=14000 all courses); actual per-course fee is JS-only; "no element under" is PhD IELTS phrasing.
+description: /course/research/ pages have 4 fee options in SSR blob; max = full-time £16,000; "no element under" is PhD IELTS phrasing.
 ---
 
-## UWL research-degree page template differences
+## UWL research-degree fee blob structure
 
-**URL pattern**: `https://www.uwl.ac.uk/course/research/<slug>`  
-(vs taught courses at `/course/undergraduate/<slug>` and `/course/postgraduate/<slug>`)
+**URL pattern**: `https://www.uwl.ac.uk/course/research/<slug>`
 
-### Fee extraction — critical finding
+### Fee extraction — CRITICAL: 4 fee options in SSR blob
 
-Research degree pages **DO have the Angular SSR JSON blob** but it is a **shared generic placeholder**:
-- `field_p_cv_int_main_fee` → `14000` (same for ALL research courses)
-- `field_p_cv_uk_eu_main_fee` → `4400` (same for ALL research courses)
+All research pages embed **4 distinct fee entries** in `field_p_cv_int_main_fee` across the SSR JSON blob (UWL embeds the blob twice so each option appears twice):
 
-This is NOT a per-course fee. Actual per-course fees differ:
-- PhD Media: £16,000 (from screenshot / JS-rendered select)
-- PhD Mathematics: different (not £14,000)
-- PhD Law: different
+| Fee | Role |
+|-----|------|
+| 14000 | **Generic CMS placeholder** — FIRST in blob, NOT a real fee |
+| 16000 | **Full-time international** ← CORRECT (shown in JS dropdown) |
+|  8000 | Part-time per-year rate A |
+|  7000 | Part-time per-year rate B |
 
-The actual per-course fee is ONLY in the **JS-rendered `<select>`** which is **empty in static HTML** (render=False mode).
+The standard blob reader takes the FIRST match (14000) → WRONG for all research courses.
 
-**Fix (2026-06-09)**: Added a URL-path guard at the TOP of `_from_uwl_nationality_select`, BEFORE the blob check. For any URL containing `/course/research/`, the function immediately returns `_UWL_DOMESTIC_ONLY` — blob is never read, generic select is never searched. These courses are skipped by the `no_international_fee` gate. Operators must fill in research degree fees manually.
+**Fix**: the `/course/research/` URL guard collects ALL `field_p_cv_int_main_fee` values and returns the MAXIMUM. Since 16000 > 14000 > 8000 > 7000, the maximum is always the full-time fee. Verified across: law, media, mathematics, engineering, business, criminology, design, aviation.
 
-**Why the guard must be BEFORE the blob check**: if placed after, the generic £14,000 blob value is returned for every PhD research course, giving the same wrong fee to all courses.
+**UG/PG courses are unaffected** — the guard only fires for `/course/research/` URLs.
 
 ### Select options (static HTML)
 
-All research pages: select options are **empty** in static HTML — JS-populated only. Confirmed for media, law, mathematics, aviation.
+All research pages: the select is **empty in static HTML** (JS-populated). The blob max-fee approach is the only reliable static-mode extraction for research degrees.
 
 ### IELTS phrasing
 
@@ -37,4 +36,6 @@ Taught-course phrasing: `"IELTS 6.5 or above with a minimum of 5.5 for each of t
 
 **Fix**: added `"element"` to `_PER_BAND_FLOOR_RE` and Pattern 1b alternation so "no element under X.0" is captured as the per-band floor.
 
-**How to apply:** If a UWL research course scrape shows fees (non-empty), something is bypassing the URL guard — check the URL path extracted by urlparse. If IELTS bands are missing for PhD courses, check that "element" is in the Pattern 1b and `_PER_BAND_FLOOR_RE` alternations.
+**Why:** The CMS placeholder 14000 always appears FIRST because it's a top-level course-node default in the Drupal content type. The actual study-option entries (16000/8000/7000) are nested in `field_p_cv_study_options` and follow it in the serialized JSON.
+
+**How to apply:** If a UWL research course shows a wrong fee, check that the max-blob logic fires (URL must contain `/course/research/`). If the scraper shows £14,000 for a research course, the `/course/research/` guard is not matching the URL — check urlparse path extraction.

@@ -200,24 +200,30 @@ def test_english_ielts_uwl_phd_no_element_under_extract():
 # a nationality-pricing select (e.g. a newly-added programme not yet wired to
 # the widget), the generic fee scanner must NOT extract the domestic PhD rate
 # (e.g. £6,000) as the international fee.  The safety net returns domestic-only.
-def test_fee_uwl_research_returns_domestic_only_before_blob():
-    # UWL /course/research/ pages carry a shared generic blob value (int=14000)
-    # that is NOT per-course.  The URL-path guard fires BEFORE the blob check
-    # so even a page with the blob present returns domestic-only.
-    # Simulate a research page that HAS the blob embedded but should still be
-    # rejected (the blob value is the same for all research courses).
+def test_fee_uwl_research_max_blob_returns_fulltime_fee():
+    # UWL /course/research/ pages embed 4 fee options in the SSR blob:
+    #   14000 (generic CMS placeholder), 16000 (full-time international ← correct),
+    #   7000 and 8000 (part-time per-year rates).
+    # The research URL guard takes the MAX of all int blob values so the
+    # full-time fee (16000) wins over the generic placeholder (14000).
+    # This is consistent with the JS dropdown default shown to users.
     html = (
         "<html><body>"
-        '<script>{"field_p_cv_int_main_fee":{"und":[{"name":"14000"}]},'
-        '"field_p_cv_uk_eu_main_fee":{"und":[{"name":"4400"}]}}</script>'
-        "<p>Annual tuition fees: £6,000 per year (UK students).</p>"
-        "<p>Contact us for international student fees.</p>"
+        # Two blob sections (UWL embeds SSR JSON twice)
+        '<script>"field_p_cv_int_main_fee":{"target_id":1,"name":"14000"},'
+        '"field_p_cv_uk_eu_main_fee":{"target_id":2,"name":"4400"}</script>'
+        '<script>"field_p_cv_int_main_fee":{"target_id":228,"name":"16000"},'
+        '"field_p_cv_uk_eu_main_fee":{"target_id":1586,"name":"4900"},'
+        '"field_p_cv_int_main_fee":{"target_id":3,"name":"7000"},'
+        '"field_p_cv_int_main_fee":{"target_id":4,"name":"8000"}</script>'
         "</body></html>"
     )
     results = _run(fee.extract(html, "https://www.uwl.ac.uk/course/research/mathematics", country="United Kingdom"))
-    # Must produce no international_fee — URL guard fires before blob is read
     intl_fees = [r for r in results if r.normalized and r.normalized.get("international_fee")]
-    assert intl_fees == [], f"Expected no international fee for UWL research page, got {intl_fees}"
+    assert intl_fees, "Expected international_fee for UWL research page with multi-option blob"
+    assert intl_fees[0].normalized["international_fee"] == 16000, (
+        f"Expected 16000 (full-time max), got {intl_fees[0].normalized['international_fee']}"
+    )
 
 
 def test_english_pte_score():

@@ -838,17 +838,36 @@ def _from_uwl_nationality_select(
     if not (host == "www.uwl.ac.uk" or host.endswith(".uwl.ac.uk")):
         return None
 
-    # Research-degree pages (/course/research/…) MUST be checked before the
-    # blob.  All research pages share a single generic blob value (int=14000,
-    # uk=4400) — it is NOT a per-course fee.  The actual per-course fee is only
-    # available via the JS-rendered <select> (e.g. PhD Media = £16,000), which
-    # is empty in static HTML (render=False mode).  Extracting the generic blob
-    # value would produce the same wrong fee (£14,000) for every research
-    # course.  Return domestic-only so the no_international_fee gate skips the
-    # course; operators can fill in the correct research fee manually.
+    # Research-degree pages (/course/research/…) MUST be handled before the
+    # standard blob reader.  All research pages embed a shared generic blob
+    # entry (int=14000 / uk=4400) as the FIRST occurrence of the fee key —
+    # this is a CMS placeholder, not a real fee.  The actual per-study-option
+    # fees follow it in the SSR JSON:
+    #   14000 → generic placeholder (skip)
+    #   16000 → Full-time international  ← CORRECT (shown in JS dropdown)
+    #    8000 → Part-time per-year rate A
+    #    7000 → Part-time per-year rate B
+    # The standard blob reader takes the first match (14000) and returns the
+    # wrong fee for every research course.
+    #
+    # Fix: take the MAXIMUM int fee across ALL blob occurrences.  For research
+    # courses the maximum is always the full-time fee (16000 > 14000 > 8000 >
+    # 7000).  UG/PG courses are not affected — this branch only fires for
+    # /course/research/ URLs.
     _path = (_urlparse(url or "").path or "").lower()
     if "/course/research/" in _path:
-        return _UWL_DOMESTIC_ONLY
+        _all_int_fees = re.findall(
+            r'"field_p_cv_int_main_fee"\s*:\s*\{[^}]*"name"\s*:\s*"(\d+)"',
+            html,
+        )
+        if _all_int_fees:
+            _max_fee = max(int(f) for f in _all_int_fees)
+            if _max_fee > 0:
+                _amt = _parse_amount(str(_max_fee))
+                if _amt is not None:
+                    return _amt, f"UWL research blob max int_main_fee: £{_max_fee}"
+        # No int blob at all — fall through to select / safety net below.
+        # (If there IS a UK fee only the trailing guard returns domestic-only.)
 
     # Authoritative source FIRST: the Angular SSR JSON blob is embedded in both
     # static (render=False) and headless (render=True) HTML and always reflects
