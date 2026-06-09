@@ -55,7 +55,7 @@ field_keys = (
 
 _PER_BAND_FLOOR_RE = re.compile(
     r"no\s+(?:individual\s+|sub[\s-]?score\s+|skill\s+)?"
-    r"(?:band|score|skill|section|component)\s+"
+    r"(?:band|score|skill|section|component|element)\s+"
     r"(?:less\s+than|below|lower\s+than|under)\s+"
     r"(\d+(?:\.\d)?)",
     re.IGNORECASE,
@@ -114,7 +114,7 @@ def _ielts(text: str) -> dict[str, float] | None:
     m = re.search(
         r"(?:academic\s+)?ielts(?:\s+academic)?\s+"
         r"([0-9]+(?:\.[0-9]+)?)"
-        r"[^0-9\n]{0,50}?(?:no\s+(?:individual\s+)?(?:band|component|score)\s+(?:below|less\s+than|under)|"
+        r"[^0-9\n]{0,50}?(?:no\s+(?:individual\s+)?(?:band|component|score|element)\s+(?:below|less\s+than|under)|"
         r"not\s+less\s+than|minimum\s+(?:band\s+)?(?:of\s+)?)"
         r"\s*([0-9]+(?:\.[0-9]+)?)",
         text,

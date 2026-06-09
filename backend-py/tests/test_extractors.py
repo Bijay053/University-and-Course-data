@@ -162,6 +162,63 @@ def test_english_ielts_single_signal_does_not_trigger_split_pattern():
     assert res["listening"] is None
 
 
+# --- UWL PhD regression: "no element under" IELTS band phrasing --------------
+# UWL research-degree pages (/course/research/…) use a different phrase:
+# "IELTS score of 6.5 (with no element under 6.0)" instead of the taught-
+# course phrase "no band below".  Pattern 1b must capture the band floor
+# because "element" was not in the alternation before this fix.
+def test_english_ielts_uwl_phd_no_element_under():
+    from app.services.scraper.extractors.english_test import _ielts
+
+    text = (
+        "IELTS 6.5 (with no element under 6.0). "
+        "We look for individuals with a strong academic background."
+    )
+    res = _ielts(text)
+    assert res is not None, "Pattern 1b must match 'no element under'"
+    assert res["overall"] == 6.5
+    assert res["listening"] == 6.0
+    assert res["reading"] == 6.0
+
+
+def test_english_ielts_uwl_phd_no_element_under_extract():
+    # End-to-end via extract() to confirm the ExtractionResult includes bands.
+    html = (
+        "<p>6.5 IELTS or above</p>"
+        "<p>An IELTS (International English Language Testing System) score of "
+        "6.5 (with no element under 6.0). We look for individuals with:</p>"
+    )
+    out = {r.field_key: r for r in _run(english_test.extract(html, "https://www.uwl.ac.uk"))}
+    assert "ielts_overall" in out
+    n = out["ielts_overall"].normalized
+    assert n["ielts_overall"] == 6.5
+    assert n["ielts_listening"] == 6.0 and n["ielts_reading"] == 6.0
+
+
+# --- UWL research-degree fee: no-blob + no-select safety net -----------------
+# When a UWL /course/research/ page has neither the Angular SSR JSON blob nor
+# a nationality-pricing select (e.g. a newly-added programme not yet wired to
+# the widget), the generic fee scanner must NOT extract the domestic PhD rate
+# (e.g. £6,000) as the international fee.  The safety net returns domestic-only.
+def test_fee_uwl_research_no_select_returns_domestic_only():
+    # Minimal HTML: no blob, no select — just the UK self-funded fee in prose.
+    html = (
+        "<html><body>"
+        "<p>Annual tuition fees: £6,000 per year (UK students).</p>"
+        "<p>Please contact us for international student fees.</p>"
+        "</body></html>"
+    )
+    from unittest.mock import patch
+    with patch(
+        "app.services.scraper.extractors.fee._from_uwl_json_blob",
+        return_value=None,
+    ):
+        results = _run(fee.extract(html, "https://www.uwl.ac.uk/course/research/mathematics", country="United Kingdom"))
+    # Must produce no international_fee (domestic-only gate fires)
+    intl_fees = [r for r in results if r.normalized and r.normalized.get("international_fee")]
+    assert intl_fees == [], f"Expected no international fee for UWL research page, got {intl_fees}"
+
+
 def test_english_pte_score():
     html = "<p>PTE Academic 64 overall.</p>"
     out = {r.field_key: r for r in _run(english_test.extract(html, "https://x"))}

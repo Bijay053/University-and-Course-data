@@ -873,8 +873,21 @@ def _from_uwl_nationality_select(
                 break
 
     if select is None:
-        # No JSON blob (checked above) AND no select — not a recognisable UWL
-        # fee layout.  Fall through to the generic cascade.
+        # No JSON blob (checked above) AND no select.
+        # UWL research-degree pages (/course/research/…) use a completely
+        # different Angular template that has neither the nationality-pricing
+        # widget nor the SSR JSON blob.  Those pages expose a self-funded fee
+        # schedule containing only the UK home rate (e.g. £6,000/yr), with no
+        # explicit international split.  Letting the generic scanner run would
+        # extract the domestic rate as the international fee — wrong.
+        # Return domestic-only so these courses are skipped by the
+        # no_international_fee gate and operators can fill the fee manually.
+        from urllib.parse import urlparse as _up_res
+        _path = (_up_res(url or "").path or "").lower()
+        if "/course/research/" in _path:
+            return _UWL_DOMESTIC_ONLY
+        # Not a research page and no recognisable UWL fee layout — fall
+        # through to the generic cascade.
         return None
 
     # Select is present.  Look for the "– International" option.

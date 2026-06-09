@@ -27,3 +27,4 @@
 - [UWL Scrape.do cost](uwl-scrape-do-cost.md) — UWL is SSR not JS-required (render=false identical, direct curl_cffi free); render_listing_pages_static flag; {slug}_{id}.yaml SHADOWS {slug}.yaml — edit both.
 - [IELTS split overall/band trap](ielts-split-overall-band.md) — overall in banner + per-band floor in prose; "each component" cue marks a floor; resolve split BEFORE any broad first-score fallback or it downgrades overall to the band.
 - [UWL intl fee = SSR JSON blob](uwl-json-blob-fee.md) — static render=false makes the nationality <select> an empty shell; read field_p_cv_int_main_fee from the SSR blob first; switching a uni to static must re-verify fields exist in static HTML.
+- [UWL research-degree page template](uwl-research-degree.md) — /course/research/ pages have no SSR blob but DO have a nationality select with correct international fees; "no element under" is PhD IELTS phrasing (not "no band/component below").
