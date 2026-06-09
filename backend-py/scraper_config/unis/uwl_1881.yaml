@@ -4,13 +4,25 @@
 # Country: United Kingdom  |  Currency: GBP
 #
 # SITE NOTES:
-# - Angular SPA — static HTML returns Angular {{}} templates with 0 data.
-#   scrape_do_render:true routes ALL page fetches through Scrape.do headless Chrome.
-# - Live course URL pattern (confirmed from rendered search page 2026-06-08):
+# - Angular SPA, BUT the pages are server-side rendered: both the course detail
+#   pages AND the /courses/search listing pages return the full course data and
+#   links in the raw HTML *without* JS execution.  Verified 2026-06-09 by
+#   comparing render=False vs render=True (identical fee/IELTS/duration data and
+#   identical course-link counts).  Course detail pages are even reachable via a
+#   FREE direct curl_cffi fetch (status 200, full data) — no Scrape.do needed.
+# - COST OPTIMISATION (2026-06-09): previously every listing page AND every one
+#   of ~340 course pages was a Scrape.do headless-Chrome render call (~5 credits
+#   each = ~1,760 credits/scrape).  Now:
+#     * extraction.scrape_do_render: false  -> course pages fetch via free
+#       curl_cffi first, Scrape.do *static* (~1 credit) only as fallback.
+#     * discovery.render_listing_pages_static: true -> the 12 listing pages use
+#       Scrape.do render=False (~1 credit) instead of render=True (~5 credits).
+#   Expected ~90%+ reduction in Scrape.do credit consumption for UWL.
+# - Live course URL pattern (confirmed from search page 2026-06-08):
 #     /course/(undergraduate|postgraduate|research)/<slug>
 #   Wayback CDX has OLD archived URLs (/academic-schools/...) — these no longer exist.
 # - Course search at /courses/search?query=&page=N: ~37 courses per page, ~336 total.
-#   render_listing_pages fetches pages 0-11 via Scrape.do render to harvest all links.
+#   render_listing_pages fetches pages 0-11 to harvest all links.
 # - BFS and Playwright skipped (both return 0 on unrendered Angular templates).
 #
 # CRITICAL — allow_url_patterns regex rule:
@@ -46,7 +58,12 @@ discovery:
   # Wayback CDX is useless for UWL: archive.org only has old /academic-schools/...
   # URLs that no longer exist on the live site.  Skipping saves the ~2-min CDX wait.
   use_wayback: false
-  # Rendered discovery: 12 pages × ~37 results covers all 336+ courses.
+  # Listing discovery: 12 pages × ~37 results covers all 336+ courses.
+  # render_listing_pages_static:true fetches them with Scrape.do render=False
+  # (~1 credit each) — the search results are server-side rendered so the course
+  # links are present without JS (verified: render=False and render=True both
+  # return the same 57 links per page).
+  render_listing_pages_static: true
   render_listing_pages:
     - "https://www.uwl.ac.uk/courses/search?query=&page=0"
     - "https://www.uwl.ac.uk/courses/search?query=&page=1"
@@ -63,8 +80,13 @@ discovery:
   expected_min_courses: 300
 
 extraction:
-  scrape_do_render: true
-  scrape_do_skip_fallbacks: true
+  # scrape_do_render:false — UWL course detail pages are server-side rendered and
+  # reachable via free direct curl_cffi (verified 2026-06-09: status 200 with full
+  # fee/IELTS data, no Cloudflare block).  fetch_html() tries curl_cffi first (free),
+  # then Scrape.do *static* (~1 credit) only if blocked.  No headless-render calls.
+  scrape_do_render: false
+  # scrape_do_skip_fallbacks removed: it would skip the free direct-fetch path and
+  # go straight to a paid render.  With scrape_do_render:false it has no effect anyway.
   max_parallel_fetch: 8
   fees:
     default_currency: GBP

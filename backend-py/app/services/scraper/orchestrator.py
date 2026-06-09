@@ -1533,7 +1533,14 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             _rlp_parsed_base = _urlparse_rlp(scrape_url)
             _rlp_base = f"{_rlp_parsed_base.scheme}://{_rlp_parsed_base.netloc}"
             _rlp_host = _rlp_parsed_base.netloc
-            log.info("[RENDER_PAGES] fetching %d listing page(s) via Scrape.do render", len(_render_pages))
+            # When render_listing_pages_static is set, the listing pages are
+            # server-side rendered and the course links are present in the raw
+            # HTML without JS — use the cheaper render=False call (~1 credit vs ~5).
+            _rlp_render = not bool(getattr(_uni_cfg.discovery, "render_listing_pages_static", False))
+            log.info(
+                "[RENDER_PAGES] fetching %d listing page(s) via Scrape.do (render=%s)",
+                len(_render_pages), _rlp_render,
+            )
             await emit(
                 "status",
                 f"[DISCOVER] Scanning {len(_render_pages)} catalogue page(s) for course links "
@@ -1544,13 +1551,13 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 try:
                     _rlp_html = None
                     for _rlp_attempt in range(3):
-                        _rlp_html = await fetch_html_scrape_do(_rlp_url, render=True)
+                        _rlp_html = await fetch_html_scrape_do(_rlp_url, render=_rlp_render)
                         if _rlp_html:
                             break
                         _rlp_wait = (_rlp_attempt + 1) * 12
                         log.warning(
-                            "[RENDER_PAGES] render=True failed for %s — retry %d/3 in %ds",
-                            _rlp_url, _rlp_attempt + 1, _rlp_wait,
+                            "[RENDER_PAGES] render=%s failed for %s — retry %d/3 in %ds",
+                            _rlp_render, _rlp_url, _rlp_attempt + 1, _rlp_wait,
                         )
                         await asyncio.sleep(_rlp_wait)
                     if not _rlp_html:

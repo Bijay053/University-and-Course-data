@@ -902,6 +902,18 @@ class DiscoveryConfig(BaseModel):
             "    - 'https://example.com/courses/search?page=1'"
         ),
     )
+    render_listing_pages_static: bool = Field(
+        default=False,
+        description=(
+            "When True, fetch render_listing_pages with Scrape.do render=False "
+            "(static, ~1 credit) instead of render=True (headless Chrome, ~5 "
+            "credits).  Use when the SPA's search results are server-side "
+            "rendered and the course links are present in the raw HTML without "
+            "JS execution — confirmed by comparing render=False vs render=True "
+            "link counts.  Saves ~80% of the per-listing-page Scrape.do cost.  "
+            "Has no effect unless render_listing_pages is non-empty."
+        ),
+    )
 
 
 # ── Extraction sub-configs ───────────────────────────────────────────────────
