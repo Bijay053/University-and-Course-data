@@ -1,0 +1,80 @@
+# Queen Mary University of London (QMUL)
+# Hostname: www.qmul.ac.uk
+#
+# ── URL STRUCTURE ─────────────────────────────────────────────────────────────
+# Real UG course pages:  /undergraduate/coursefinder/courses/{slug}/
+# Real PG taught pages:  /postgraduate/taught/coursefinder/courses/{slug}/
+# Real PG research:      /postgraduate/research/projects/{slug}/ (vary)
+#
+# SPA entry pages (NOT individual courses — must be blocked):
+#   /undergraduate/coursefinder/
+#   /undergraduate/coursefinder/index.html
+#   /postgraduate/coursefinder/index.html
+#   /postgraduate/taught/coursefinder/
+#   /postgraduate/pgrcoursefinder/index.html
+#
+# BFS listing pages (visit to find course links, do NOT add as candidates):
+#   /study/{subject}/  — subject-area category pages
+#   /study/            — root study page
+#
+# ── KNOWN ISSUES (fixed in this YAML) ────────────────────────────────────────
+#
+#  SPA FINDER PAGES STAGED AS COURSES:
+#    /coursefinder/ roots and /coursefinder/index.html are JavaScript SPAs —
+#    they return empty page text and have no fee/IELTS data.  block_url_patterns
+#    below removes them from the candidate set AFTER BFS completes.
+#
+#  FEES SHOWN AS "AUD" WITH LOW-FEE WARNINGS:
+#    QMUL is a UK university — all fees are GBP.  Without default_currency: GBP
+#    the system defaults to AUD and fires annual_fee_too_low_warning for all
+#    valid £15k–£35k fees.  Fixed below.
+#
+#  ONLY ~160 COURSES FOUND (BFS PAGE CAP):
+#    The BFS default of 25 pages caps discovery at ~25 subject areas.  QMUL has
+#    many more.  Increased to 60 below.
+#
+# ── DEPLOYMENT ────────────────────────────────────────────────────────────────
+# After editing this file, trigger a new scrape from the Scraping Jobs page.
+# No code restart needed — the YAML is re-read on every scrape job start.
+# ─────────────────────────────────────────────────────────────────────────────
+
+discovery:
+  # BFS page budget: default 25 misses many QMUL subject areas.
+  # Each subject page (/study/{subject}/) counts as one BFS page.
+  # QMUL has 20+ subject areas — 60 covers all subjects with room for
+  # pagination and sub-pages.
+  bfs_page_budget: 60
+
+  # Remove known non-course pages from the candidate set after BFS.
+  # These patterns match the SPA entry pages and listing roots that the
+  # generic page classifier incorrectly accepts as "course-like".
+  # Applied case-insensitively against the full URL.
+  block_url_patterns:
+    # SPA entry pages — return empty JS shell, no extractable data
+    - "/coursefinder/index\\.html$"
+    - "/pgrcoursefinder/index\\.html$"
+    # SPA roots (trailing slash optional) — NOT individual courses.
+    # The regex anchors at end-of-string, so it does NOT match
+    # /coursefinder/courses/{slug}/ which follows the same prefix.
+    - "/coursefinder/?$"
+    - "/pgrcoursefinder/?$"
+    # /study/ root listing page (not a course)
+    - "qmul\\.ac\\.uk/study/?$"
+    # A-Z listing pages
+    - "/a-z-of-"
+
+
+extraction:
+  fees:
+    # QMUL is in the UK — all fees are quoted in GBP.
+    # Without this, the system defaults to AUD and fires low-fee warnings
+    # for valid £15,000–£35,000 annual fees.
+    default_currency: "GBP"
+    prefer_international: true
+
+  filters:
+    domestic_only:
+      enabled: false
+    online_only:
+      # QMUL offers some online programmes — skip them.
+      enabled: true

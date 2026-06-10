@@ -24,6 +24,7 @@
 - [95% YAML scraper control](yaml-scraper-control.md) — new unis need only YAML edits; 5 new fields replace 5 hardcoded host lists.
 - [scrape.do browser-fallback gap](scrape-do-browser-gap.md) — [BROWSER↑] path in single_course.py bypasses http_fetcher.py's scrape.do chain; must re-check _http_fetcher_mod._scrape_do_enabled after browser retries exhaust.
 - [UK structured fee table extractor](uk-fee-table-extractor.md) — Pre-pass 0 in fee.extract(); _FEE_TABLE_FOUND_NO_INTL sentinel → return []; picks Intl+FT latest-year row; part-time-only courses get no fee.
+- [SearchStax multi-endpoint + use_generic_mapper trap](searchstax-multi-endpoint.md) — endpoint is Union[str,list]; missing use_generic_mapper:true silently falls back to HUD mapper and rejects most docs (200 vs 1000+); model= must be per-endpoint URL not extra_params.
 - [UWL Scrape.do cost](uwl-scrape-do-cost.md) — UWL is SSR not JS-required (render=false identical, direct curl_cffi free); render_listing_pages_static flag; {slug}_{id}.yaml SHADOWS {slug}.yaml — edit both.
 - [IELTS split overall/band trap](ielts-split-overall-band.md) — overall in banner + per-band floor in prose; "each component" cue marks a floor; resolve split BEFORE any broad first-score fallback or it downgrades overall to the band.
 - [UWL intl fee = SSR JSON blob](uwl-json-blob-fee.md) — static render=false makes the nationality <select> an empty shell; read field_p_cv_int_main_fee from the SSR blob first; switching a uni to static must re-verify fields exist in static HTML.
