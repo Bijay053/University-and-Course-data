@@ -71,6 +71,12 @@ discovery:
       spellcheck.correct: "true"
       hl.fragsize: "200"
 
+    # IMPORTANT: Do NOT enable links_only for QMU.
+    # QMU's live website is Cloudflare-protected — per-course page fetches fail
+    # universally (1003/1003 fetch errors).  All data must come from Solr directly.
+    # This explicit false overrides any links_only: true stored in the DB admin_config.
+    links_only: false
+
     # Use the generic field mapper (not the Huddersfield-specific one).
     # QMU does not use HUD's fee band schedule or title reformatting.
     use_generic_mapper: true
