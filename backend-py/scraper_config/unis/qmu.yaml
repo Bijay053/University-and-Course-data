@@ -15,12 +15,16 @@
 #      is used as a last-resort fallback for ALL SearchStax universities.
 #
 #  TOO FEW COURSES?
-#    QMU uses model=coursefinder-ug for undergraduate courses.  If there
-#    are also postgraduate courses on a different model, add:
-#      extra_params:
-#        model: coursefinder-pg
-#        language: en
-#    in a separate scrape job, or check if the filter_query needs changing.
+#    Two endpoints are configured: coursefinder-ug (UG) and coursefinder-pg
+#    (PG).  The model= param is embedded in each endpoint URL so each
+#    endpoint independently paginates its own model.  Do NOT put model= in
+#    extra_params — it would override the per-endpoint URL value for the
+#    second endpoint.
+#
+#  ONLY ~200 COURSES INSTEAD OF 1000+?
+#    Most likely cause: use_generic_mapper is missing or false.  Without it
+#    the HUD-specific mapper runs and rejects most QMU docs as unclassifiable.
+#    Always keep use_generic_mapper: true for QMU.
 #
 #  WRONG FILTER (0 RESULTS)?
 #    The provider automatically retries without filter_query when the first
@@ -45,8 +49,13 @@ discovery:
   searchstax:
     enabled: true
 
-    # SearchStax Solr endpoint for QMU's course finder
-    endpoint: "https://searchcloud-1-eu-west-2.searchstax.com/29847/qmu-1736/emselect"
+    # Two endpoints — UG and PG models are separate Solr collections at QMU.
+    # The model= param is embedded in each URL; _strip_endpoint_url_params
+    # extracts it and re-adds it to the httpx params dict so pagination works.
+    # Do NOT add model= to extra_params — it would override the per-endpoint value.
+    endpoint:
+      - "https://searchcloud-1-eu-west-2.searchstax.com/29847/qmu-1736/emselect?model=coursefinder-ug"
+      - "https://searchcloud-1-eu-west-2.searchstax.com/29847/qmu-1736/emselect?model=coursefinder-pg"
 
     # Authentication token — this is the public client token the QMU SPA
     # sends from every browser session.  It is NOT a server secret, but
@@ -60,13 +69,9 @@ discovery:
     # The provider auto-retries without this filter if it returns 0 results.
     filter_query: "sectionType_s:course"
 
-    # QMU-specific Solr params required by their course-finder model.
-    # model=coursefinder-ug: selects QMU's undergraduate course model
-    # language=en: filters to English-language courses
-    # spellcheck.correct=true: Solr spellcheck correction
-    # hl.fragsize=200: highlighting fragment size (safe to include)
+    # Params that apply to both endpoints.
+    # Do NOT add model= here — it is already embedded per-endpoint above.
     extra_params:
-      model: "coursefinder-ug"
       language: "en"
       spellcheck.correct: "true"
       hl.fragsize: "200"
@@ -77,8 +82,9 @@ discovery:
     # This explicit false overrides any links_only: true stored in the DB admin_config.
     links_only: false
 
-    # Use the generic field mapper (not the Huddersfield-specific one).
-    # QMU does not use HUD's fee band schedule or title reformatting.
+    # CRITICAL: keep this true for QMU.
+    # Without it the HUD-specific mapper runs and rejects most QMU docs,
+    # producing only ~200 links instead of 1000+.
     use_generic_mapper: true
 
     # Pagination
