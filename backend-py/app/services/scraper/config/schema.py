@@ -204,6 +204,29 @@ class SearchStaxConfig(BaseModel):
             "  intake_dates: DegreeStartDate_ss, category: Department_ss}"
         ),
     )
+    url_fields: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Ordered list of Solr field names to try when extracting the "
+            "course page URL.  The first non-empty value wins.  Use when the "
+            "university's Solr core uses a non-standard URL field name and "
+            "you need to try multiple fallback fields.  "
+            "Takes priority over field_map['url'].  "
+            "Example (QMUL): url_fields: [coursepageurl_t]"
+        ),
+    )
+    title_fields: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Ordered list of Solr field names used to build the course title.  "
+            "title_fields[0] is the main course title (mapped to field_map.name).  "
+            "title_fields[1], if present, is the degree-type prefix (e.g. 'MSc', "
+            "'BSc (Hons)') that is prepended to the title when it is not already "
+            "the opening token — mapped to field_map.degree_type.  "
+            "Takes priority over field_map['name'] / field_map['degree_type'].  "
+            "Example (QMUL): title_fields: [coursetitle_t, awardname_t]"
+        ),
+    )
     field_map_as_payload: bool = Field(
         default=False,
         description=(

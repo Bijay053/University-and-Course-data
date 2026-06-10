@@ -30,6 +30,7 @@ import logging
 import os
 import re
 from typing import Any, Optional
+from urllib.parse import parse_qsl, urlsplit, urlunsplit
 
 import httpx
 
@@ -1118,6 +1119,31 @@ def _map_doc_field_map(
     }
 
 
+def _strip_endpoint_url_params(endpoint_url: str) -> tuple[str, dict[str, str]]:
+    """Split embedded query params out of an endpoint URL.
+
+    httpx REPLACES the entire query string when ``params=`` is passed to
+    ``client.get()``.  This means params baked into the endpoint URL (e.g.
+    ``?model=coursefinder-ug&language=en``) are silently dropped.
+
+    This helper separates the URL from its pre-embedded params so the caller
+    can merge them into the programmatic params dict *before* calling httpx,
+    ensuring model-specific overrides survive.
+
+    Returns:
+        (clean_url, url_params) where clean_url has no query string and
+        url_params is a dict of the pre-embedded key/value pairs.
+        Blank-value params (e.g. ``?q=``) are excluded — they would shadow
+        the ``q=*:*`` the code sets programmatically.
+    """
+    parts = urlsplit(endpoint_url)
+    if not parts.query:
+        return endpoint_url, {}
+    url_params = dict(parse_qsl(parts.query, keep_blank_values=False))
+    clean_url = urlunsplit(parts._replace(query=""))
+    return clean_url, url_params
+
+
 async def _fetch_links_only(cfg: SearchStaxConfig, emit=None) -> tuple[list[dict], dict]:
     """SearchStax discovery-only mode (``cfg.links_only = True``).
 
@@ -1167,17 +1193,22 @@ async def _fetch_links_only(cfg: SearchStaxConfig, emit=None) -> tuple[list[dict
     # Resolve field names from field_map (YAML-configurable) with defaults.
     # Default keys match the original WLV field names for backward compatibility.
     _fm = cfg.field_map or {}
-    _url_field    = _fm.get("url",          "url_t")
-    _name_field   = _fm.get("name",         "title_t")
-    _type_field   = _fm.get("degree_type",  "award_s")
+    # url_fields / title_fields take priority over field_map entries.
+    # url_fields → try each field in order, first non-empty wins (passed to _first_str).
+    # title_fields[0] → main course title (field_map.name fallback).
+    # title_fields[1] → degree-type prefix  (field_map.degree_type fallback).
+    _url_fields_to_try: list[str] = list(cfg.url_fields) if cfg.url_fields else [_fm.get("url", "url_t")]
+    _name_field   = cfg.title_fields[0] if cfg.title_fields else _fm.get("name",        "title_t")
+    _type_field   = (cfg.title_fields[1] if len(cfg.title_fields) > 1
+                     else _fm.get("degree_type", "award_s"))
     _level_field  = _fm.get("degree_level", "study_level_s")
     _mode_field   = _fm.get("study_mode",   "mode_s")
     _dur_field    = _fm.get("duration",     "duration_t")
     _date_field   = _fm.get("intake_dates", "start_dates_s")
     _cat_field    = _fm.get("category",     "subject_s")
-    # Request only the fields we will actually use.
+    # Request only the fields we will actually use (include all url fallback fields).
     _fl_fields = ",".join({
-        _url_field, _name_field, _type_field, _level_field,
+        *_url_fields_to_try, _name_field, _type_field, _level_field,
         _mode_field, _dur_field, _date_field, _cat_field,
     })
 
@@ -1188,6 +1219,10 @@ async def _fetch_links_only(cfg: SearchStaxConfig, emit=None) -> tuple[list[dict
         total: Optional[int] = None
         _retried_unfiltered = False
         _filter = cfg.filter_query or ""
+        # Strip query params baked into the endpoint URL (httpx would otherwise
+        # drop them when params= is passed).  URL-embedded params win over
+        # extra_params — this lets each endpoint carry its own model= override.
+        _base_url, _embedded_params = _strip_endpoint_url_params(_endpoint_url)
 
         await _emit(
             f"[SEARCHSTAX links_only] Querying Solr "
@@ -1207,9 +1242,10 @@ async def _fetch_links_only(cfg: SearchStaxConfig, emit=None) -> tuple[list[dict
                 if _filter:
                     params["fq"] = _filter
                 params.update(cfg.extra_params or {})
+                params.update(_embedded_params)  # per-endpoint overrides (e.g. model=)
 
                 try:
-                    resp = await client.get(_endpoint_url, params=params, headers=headers)
+                    resp = await client.get(_base_url, params=params, headers=headers)
                     resp.raise_for_status()
                     data = resp.json()
                 except Exception as exc:
@@ -1237,8 +1273,8 @@ async def _fetch_links_only(cfg: SearchStaxConfig, emit=None) -> tuple[list[dict
                     break
 
                 for doc in docs:
-                    # URL: try mapped field first, then 'id' as universal fallback
-                    url = _first_str(doc, _url_field, "id")
+                    # URL: try each url_field in order, then 'id' as universal fallback
+                    url = _first_str(doc, *_url_fields_to_try, "id")
                     if not url:
                         skipped += 1
                         continue
@@ -1456,6 +1492,10 @@ async def fetch_searchstax_links(
         total: Optional[int] = None
         _retried_unfiltered = False
         _filter = cfg.filter_query or ""
+        # Strip query params baked into the endpoint URL (httpx would otherwise
+        # drop them when params= is passed).  URL-embedded params win over
+        # extra_params — this lets each endpoint carry its own model= override.
+        _base_url, _embedded_params = _strip_endpoint_url_params(_endpoint_url)
 
         await _emit(
             f"[SEARCHSTAX] Querying Solr core "
@@ -1476,9 +1516,10 @@ async def fetch_searchstax_links(
                     params["fq"] = _filter
                 # Merge university-specific extra params (override builtins if same key)
                 params.update(cfg.extra_params or {})
+                params.update(_embedded_params)  # per-endpoint overrides (e.g. model=)
 
                 try:
-                    resp = await client.get(_endpoint_url, params=params, headers=headers)
+                    resp = await client.get(_base_url, params=params, headers=headers)
                     resp.raise_for_status()
                     data = resp.json()
                 except Exception as _fetch_exc:
