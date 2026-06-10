@@ -2,15 +2,53 @@
 # Hostname: www.kingston.ac.uk
 #
 # Cloudflare WAF site — cffi (TLS impersonation) bypasses it successfully.
-# Do NOT pre-seed paginated listing pages; BFS discovers them naturally.
 # Parallelism MUST stay low (≤2) — page 11+ triggers 429 at higher concurrency.
 # Wayback disabled: archive.org has no useful snapshots and adds latency for nothing.
+#
+# NOTE: Kingston's paginated listing pages use capital letters in the URL:
+#   /study/undergraduate/Courses?Page=4  (not /courses?page=4)
+# listing_only_patterns below handles this case-insensitively.  Without it,
+# the BFS adds paginated listing pages to the candidate set and the extraction
+# gate drops them with "category_landing_page_url_block" — noisy and wasteful.
 
 discovery:
   seed_urls:
     - https://www.kingston.ac.uk/study/undergraduate/courses
+    - https://www.kingston.ac.uk/study/undergraduate/courses?page=2
+    - https://www.kingston.ac.uk/study/undergraduate/courses?page=3
+    - https://www.kingston.ac.uk/study/undergraduate/courses?page=4
+    - https://www.kingston.ac.uk/study/undergraduate/courses?page=5
+    - https://www.kingston.ac.uk/study/undergraduate/courses?page=6
+    - https://www.kingston.ac.uk/study/undergraduate/courses?page=7
+    - https://www.kingston.ac.uk/study/undergraduate/courses?page=8
+    - https://www.kingston.ac.uk/study/undergraduate/courses?page=9
+    - https://www.kingston.ac.uk/study/undergraduate/courses?page=10
+    - https://www.kingston.ac.uk/study/undergraduate/courses?page=11
+    - https://www.kingston.ac.uk/study/undergraduate/courses?page=12
+    - https://www.kingston.ac.uk/study/undergraduate/courses?page=13
     - https://www.kingston.ac.uk/study/postgraduate/courses
+    - https://www.kingston.ac.uk/study/postgraduate/courses?page=2
+    - https://www.kingston.ac.uk/study/postgraduate/courses?page=3
+    - https://www.kingston.ac.uk/study/postgraduate/courses?page=4
+    - https://www.kingston.ac.uk/study/postgraduate/courses?page=5
+    - https://www.kingston.ac.uk/study/postgraduate/courses?page=6
+    - https://www.kingston.ac.uk/study/postgraduate/courses?page=7
+    - https://www.kingston.ac.uk/study/postgraduate/courses?page=8
+    - https://www.kingston.ac.uk/study/postgraduate/courses?page=9
+    - https://www.kingston.ac.uk/study/postgraduate/courses?page=10
+    - https://www.kingston.ac.uk/study/postgraduate/courses?page=11
+    - https://www.kingston.ac.uk/study/postgraduate/courses?page=12
+    - https://www.kingston.ac.uk/study/postgraduate/courses?page=13
     - https://www.kingston.ac.uk/study/foundation/courses
+    - https://www.kingston.ac.uk/study/foundation/courses?page=2
+
+  # Mark paginated listing pages as listing-only: BFS visits them to harvest
+  # course links but does NOT add them to the course candidate set.
+  # (?i) = case-insensitive → matches both /courses?page= AND /Courses?Page=
+  # The (\?|/?$) suffix matches roots and pagination but NOT course detail URLs
+  # like /courses/introduction-to-computing-bsc/ (which have a slug after /courses/).
+  listing_only_patterns:
+    - '(?i)/courses(\?|/?$)'
 
   allow_url_patterns:
     - '/undergraduate/'
@@ -129,3 +167,5 @@ extraction:
   staging:
     reject_if_missing:
       - course_name
+    skip_degree_qualifier_check: true
+    require_international_fee: false
