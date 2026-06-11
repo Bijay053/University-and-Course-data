@@ -1,0 +1,149 @@
+# University of the West of England (UWE Bristol)
+# Hostname: courses.uwe.ac.uk
+# Country: United Kingdom  |  Currency: GBP
+#
+# Discovery root cause (confirmed 2026-06-11):
+#   The search endpoint honours pageSize but the BFS HTML parser truncates
+#   responses above ~300KB.  pageSize=700 returns a 1.18MB page; BFS only
+#   parses the first ~71 courses (alphabetical A-slice).  Fix: seed 7 pages
+#   of pageSize=100 (~256KB each, fully parsed) → exactly 642 unique courses.
+#   Pages 1-6: 100 courses each; page 7: 42 courses.
+
+discovery:
+  seed_urls:
+    - "https://courses.uwe.ac.uk/search?words=&e=2026&page=1&pageSize=100"
+    - "https://courses.uwe.ac.uk/search?words=&e=2026&page=2&pageSize=100"
+    - "https://courses.uwe.ac.uk/search?words=&e=2026&page=3&pageSize=100"
+    - "https://courses.uwe.ac.uk/search?words=&e=2026&page=4&pageSize=100"
+    - "https://courses.uwe.ac.uk/search?words=&e=2026&page=5&pageSize=100"
+    - "https://courses.uwe.ac.uk/search?words=&e=2026&page=6&pageSize=100"
+    - "https://courses.uwe.ac.uk/search?words=&e=2026&page=7&pageSize=100"
+
+  # Treat search result pages as listing-only: BFS visits them to harvest
+  # course links but does NOT add the search pages themselves as candidates.
+  listing_only_patterns:
+    - 'courses\.uwe\.ac\.uk/search'
+
+  # 7 listing pages + 8 spare for any parent-course variant pages the BFS follows.
+  bfs_page_budget: 15
+
+  max_candidates: 800
+  expected_min_courses: 600
+
+  auto_api_discovery: false
+  use_stealth_browser: false
+  always_sitemap_supplement: false
+  always_browser_discover: false
+  skip_browser_discovery: true
+  use_wayback: false
+
+  allow_url_patterns:
+    - 'courses\.uwe\.ac\.uk/'
+
+  block_url_patterns:
+    - '/about'
+    - '/contact'
+    - '/news'
+    - '/events'
+    - '/staff/'
+    - '/student-life/'
+    - '/fees-and-funding'
+    - '/accommodation'
+    - '/open-days'
+    - '/clearing'
+    - '/how-to-apply'
+    - '/international/'
+    - '\.pdf$'
+
+extraction:
+  max_parallel_fetch: 12
+  skip_browser_rescue: false
+  skip_per_course_browser: false
+  browser_wait_strategy: domcontentloaded
+  browser_dcl_settle_ms: 800
+
+  filters:
+    domestic_only:
+      enabled: false
+    online_only:
+      enabled: false
+
+  fees:
+    default_currency: GBP
+    prefer_international: true
+    prefer_annual_over_total: true
+    prefer_year_one_over_total: true
+    fee_year: "2026"
+    reject_keywords:
+      - Home student
+      - Home fee
+      - Home fees
+      - UK student
+      - UK fee
+      - Domestic
+      - England
+      - Student Finance England
+
+  english:
+    trust_vision_ocr: false
+    trust_tier1_vision_ocr_english: false
+    default_ielts: 6.0
+    default_pte: 60
+    default_toefl: 80
+
+  selectors:
+    course_list:
+      xpath: "//div[contains(@class, 'c-card')]//a"
+
+    course_name:
+      xpath: "//h1[contains(@class, 'title')] | //main//h1 | //h1"
+
+    course_link:
+      xpath: "./@href"
+
+    city:
+      value: "Bristol"
+
+    duration:
+      xpath: "//div[contains(@class, 'big-data-table')]//th[contains(text(), 'Duration')]/../../tbody/tr/td[2]/text() | //dt[contains(., 'Duration')]/following-sibling::dd[1]/text()"
+      also_use_as_study_load: true
+
+    study_load:
+      xpath: "//div[contains(@class, 'big-data-table')]//th[contains(text(), 'Mode')]/../../tbody/tr/td[1]/text() | //dt[contains(text(), 'Delivery')]/following-sibling::dd[1]/text()"
+
+    intake_month:
+      xpath: "//div[contains(@class, 'big-data-table')]//th[contains(text(), 'Start')]/../../tbody/tr/td[3]/text() | //dt[contains(text(), 'Start')]/following-sibling::dd[1]/text()"
+
+    course_description:
+      xpath: "//div[contains(@id, 'introduction')] | //h2[contains(text(), 'Introduction')]/following-sibling::div[1]"
+
+    course_structure:
+      xpath: "//div[contains(@id, 'structure')] | //h2[contains(text(), 'Structure')]/following-sibling::div[1]"
+
+    career:
+      xpath: "//div[contains(@id, 'careers')] | //h2[contains(text(), 'Career')]/following-sibling::div[1]"
+
+    other_requirements:
+      xpath: "//h2[contains(text(), 'Entry')]/following-sibling::div[1]"
+
+    fee_international:
+      primary:
+        xpath: "//*[contains(text(), 'International') or contains(text(), 'Overseas')]/following-sibling::*[contains(text(), '£')]/text()"
+      fallback_1:
+        xpath: "//*[contains(text(), 'International Fee')]/following-sibling::text()[contains(., '£')]"
+
+  text_cleaning:
+    global_substring_blocklist:
+      - Apply now
+      - Book an open day
+      - Request information
+      - Contact us
+      - Download prospectus
+      - Chat to us
+      - How to apply
+
+  staging:
+    reject_if_missing:
+      - course_name
+    skip_degree_qualifier_check: true
+    require_international_fee: false
