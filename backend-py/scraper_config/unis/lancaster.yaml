@@ -3,38 +3,62 @@
 # Country: United Kingdom  |  Currency: GBP
 #
 # Discovery strategy (2026-06-12):
-#   Lancaster's listing pages (/study/undergraduate/courses/ and
-#   /study/postgraduate/postgraduate-courses/) are JS-rendered but the
-#   Vue 3 <course-listing> component receives ALL course data via a
-#   server-rendered :courses-data prop embedded directly in the SSR HTML.
-#   Plain httpx fetches both pages and extracts the JSON prop → 538 course
-#   URLs for 2026 entry (371 UG + 167 PG) with zero Playwright required.
-#   Individual course DETAIL pages are fully SSR — plain httpx works fine.
+#   Lancaster's listing pages use a Vue 3 <course-listing> component. While
+#   the rendered course list requires JavaScript, the :courses-data Vue prop
+#   is SERVER-RENDERED directly into the HTML as a JSON array — plain httpx
+#   fetches it without any browser.  538 courses for 2026 entry (371 UG +
+#   167 PG).  Individual course detail pages are also fully SSR.
 #
-# Previous attempts (pre 2026-06-12):
-#   - course_detail_url_patterns mismatch dropped 100% of BFS candidates → 0 staged
-#   - cookie-consent modal h1 was being extracted as course_name
-#   - BFS budget was wasted on non-course pages
-#   All resolved by the lancaster_listing provider which bypasses BFS entirely.
+# This config uses the generic ssr_prop_discovery feature (available to any
+# university with server-rendered JSON data embedded in HTML attributes).
+# The lancaster_listing: true key (legacy shorthand) is kept as a fallback.
 
 discovery:
-  lancaster_listing: true
-  lancaster_listing_year: 2026
+  # ── Generic SSR-prop discovery (primary path) ──────────────────────────
+  # Fetches both listing pages, extracts the :courses-data JSON prop, and
+  # builds course URLs.  No browser required.  Auto-falls back to Playwright
+  # (browser_fallback_xpath) if the prop is ever missing.
+  ssr_prop_discovery:
+    listing_pages:
+      - url: "https://www.lancaster.ac.uk/study/undergraduate/courses/"
+        url_prefix: "https://www.lancaster.ac.uk/study/undergraduate/courses/"
+        label: "Undergraduate"
+      - url: "https://www.lancaster.ac.uk/study/postgraduate/postgraduate-courses/"
+        url_prefix: "https://www.lancaster.ac.uk/study/postgraduate/postgraduate-courses/"
+        label: "Postgraduate"
 
-  # course_detail_url_patterns: validates that URLs returned by the listing
-  # provider are in the correct shape before extraction.
+    # Vue prop attribute that holds the JSON courses array (SSR-embedded)
+    prop_attr: ":courses-data"
+
+    # Fields in each JSON course object
+    slug_field: "slug"
+    name_field: "title"
+
+    # URL construction: {url_prefix}/{slug}{url_suffix}
+    # {year} → 4-digit entry year (e.g. 2026)
+    url_suffix: "/{year}/"
+
+    # Entry-year filter: Lancaster's format is "26/27", so filter on prefix "26/"
+    year_field: "entryYear"
+    year_filter_prefix: "{short_year}/"
+
+    # Browser fallback XPath — used automatically if the SSR prop is not found.
+    # The Vue component renders an A-Z nav client-side; once mounted, this XPath
+    # extracts all course links from the rendered DOM.
+    # Confirmed 2026-06-12 via browser DevTools inspection.
+    browser_fallback_xpath: "//nav[contains(@class, 'a-z')]//li/a/@href"
+    browser_wait_selector: "nav.a-z"
+
+    # Regex to validate hrefs extracted by the browser fallback
+    course_url_pattern: '/study/(undergraduate/courses|postgraduate/postgraduate-courses)/[^/]+/20\d{2}/?$'
+
+  # course_detail_url_patterns: validates URLs from both discovery paths
+  # before extraction begins.
   course_detail_url_patterns:
     - '/study/undergraduate/courses/[^/]+/20\d{2}/?$'
     - '/study/postgraduate/postgraduate-courses/[^/]+/20\d{2}/?$'
 
-  # Browser fallback XPath (used automatically by lancaster_listing.py if the
-  # SSR :courses-data prop is missing).  The Vue component renders an A-Z
-  # navigation client-side; once mounted this XPath extracts all course links:
-  #   //nav[contains(@class, 'a-z')]//li/a/@href
-  # No YAML flag needed — the python provider activates this path automatically.
-
-  # BFS is skipped when lancaster_listing returns ≥1 link.
-  # These settings are kept as a safe fallback if the listing provider fails.
+  # ── BFS fallback (if ssr_prop_discovery returns 0 links) ───────────────
   seed_urls:
     - https://www.lancaster.ac.uk/study/undergraduate/courses/computer-science-bsc-hons-g400/2026/
     - https://www.lancaster.ac.uk/study/postgraduate/postgraduate-courses/artificial-intelligence-msc/2026/
@@ -126,9 +150,6 @@ extraction:
 
   selectors:
     course_name:
-      # Returns the course-title div which contains both:
-      #   <h1>Computer Science</h1>  and  <p class='qualification'>BSc Hons</p>
-      # Extractor joins all text → "Computer Science BSc Hons".
       # MUST NOT use //h1 — cookie-consent modal uses h1 first:
       #   <div id='biccy-prompt'><h1>Our use of cookies</h1></div>
       xpath: "//div[contains(@class,'course-title')] | //main//h1[not(ancestor::*[@id='biccy-prompt'])]"
@@ -160,7 +181,7 @@ extraction:
     fee_international:
       primary:
         # Lancaster fee table: <table class='fees-table'>
-        #   Row 1 headers: Home | International  (no £ sign)
+        #   Row 1 headers: Home | International
         #   Row 2 values:  £9,790 | £X  ← td[2] = International fee
         xpath: "//table[contains(@class,'fees-table')]//tr[contains(.,'£')]/td[2]/text()"
       fallback_1:

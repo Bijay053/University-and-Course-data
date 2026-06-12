@@ -926,17 +926,60 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 await db.commit()
                 return
 
-        # ── Lancaster University listing-page discovery ───────────────────────
-        # When discovery.lancaster_listing is true, fetch the two SSR listing
-        # pages (UG + PG), extract the :courses-data Vue prop (server-rendered
-        # JSON), and build course URLs.  No Playwright required — the prop is
-        # embedded in the raw HTML by the server.  Per-course extraction still
-        # runs normally against the individual course detail pages.
+        # ── Generic SSR-prop discovery ────────────────────────────────────────
+        # When discovery.ssr_prop_discovery is set in the per-uni YAML, fetch
+        # each configured listing page with plain httpx, extract the named HTML
+        # attribute (e.g. :courses-data for Vue, data-courses for React) which
+        # contains a JSON array of course objects, and build course URLs from
+        # the slug field.  No browser required — the JSON is server-rendered.
+        # A Playwright browser fallback fires automatically if the prop is
+        # missing.  Any university can use this — just add ssr_prop_discovery:
+        # to their YAML.  See SsrPropDiscoveryConfig in config/schema.py.
+        _ssr_cfg = getattr(_uni_cfg.discovery, "ssr_prop_discovery", None)
+        if not links and _ssr_cfg is not None:
+            _ssr_year = getattr(_uni_cfg.discovery, "lancaster_listing_year", None)
+            log.info(
+                "[SSR_PROP] ssr_prop_discovery configured — fetching %d listing page(s) (year=%s)",
+                len(getattr(_ssr_cfg, "listing_pages", [])),
+                _ssr_year or "current",
+            )
+            await emit(
+                "status",
+                "[DISCOVER] SSR-prop: extracting course list from server-rendered JSON...",
+                phase="discover",
+            )
+            try:
+                from app.services.scraper.ssr_prop_discovery import fetch_ssr_prop_links
+                _ssr_links = await fetch_ssr_prop_links(_ssr_cfg, year=_ssr_year, emit=emit)
+            except Exception as _ssr_exc:
+                log.error("[SSR_PROP] provider failed: %s", _ssr_exc, exc_info=True)
+                _ssr_links = []
+            if _ssr_links:
+                links = _ssr_links
+                _always_browser = False
+                log.info(
+                    "[SSR_PROP] %d course links from SSR prop — skipping BFS",
+                    len(links),
+                )
+                await emit(
+                    "status",
+                    f"[DISCOVER] SSR-prop: {len(links)} courses found — skipping BFS",
+                    phase="discover",
+                )
+            else:
+                log.warning(
+                    "[SSR_PROP] provider returned 0 links — falling through to BFS"
+                )
+
+        # ── Lancaster shorthand (legacy alias for ssr_prop_discovery) ─────────
+        # lancaster_listing: true in the YAML is a convenience shorthand that
+        # wires up Lancaster's two listing pages automatically.  New universities
+        # should use the full ssr_prop_discovery block instead.
         _lancaster_listing = getattr(_uni_cfg.discovery, "lancaster_listing", False)
         if not links and _lancaster_listing:
             _lancaster_year = getattr(_uni_cfg.discovery, "lancaster_listing_year", None)
             log.info(
-                "[LANCASTER] lancaster_listing=true — fetching listing pages (year=%s)",
+                "[LANCASTER] lancaster_listing=true — calling generic SSR-prop provider (year=%s)",
                 _lancaster_year or "current",
             )
             await emit(

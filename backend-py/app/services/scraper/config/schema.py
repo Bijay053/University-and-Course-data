@@ -619,6 +619,118 @@ class BodyPaginationConfig(BaseModel):
 GenericSearchApiConfig.model_rebuild()
 
 
+class SsrPropListingPageConfig(BaseModel):
+    """One listing page entry for the generic SSR-prop discovery provider."""
+
+    url: str = Field(description="Listing page URL to fetch (plain httpx, no browser).")
+    url_prefix: str = Field(
+        description=(
+            "Base URL prepended to each slug to form the course URL. "
+            "E.g. 'https://www.lancaster.ac.uk/study/undergraduate/courses/'. "
+            "The trailing slash is normalised automatically."
+        )
+    )
+    label: str = Field(
+        default="",
+        description="Human-readable label for logs, e.g. 'Undergraduate'.",
+    )
+
+
+class SsrPropDiscoveryConfig(BaseModel):
+    """Generic discovery from server-rendered JSON props embedded in HTML.
+
+    Activated by ``discovery.ssr_prop_discovery`` in any university's YAML.
+    The scraper fetches each listing page with plain httpx, locates an HTML
+    attribute (e.g. ``:courses-data``) whose value is a JSON array of course
+    objects, extracts slugs, and builds course URLs — no JavaScript required.
+    A Playwright browser fallback is used automatically when the prop is absent.
+
+    Lancaster example::
+
+        discovery:
+          ssr_prop_discovery:
+            listing_pages:
+              - url: "https://www.lancaster.ac.uk/study/undergraduate/courses/"
+                url_prefix: "https://www.lancaster.ac.uk/study/undergraduate/courses/"
+                label: "Undergraduate"
+            prop_attr: ":courses-data"
+            slug_field: "slug"
+            name_field: "title"
+            url_suffix: "/{year}/"
+            year_field: "entryYear"
+            year_filter_prefix: "{short_year}/"
+            browser_fallback_xpath: "//nav[contains(@class, 'a-z')]//li/a/@href"
+            browser_wait_selector: "nav.a-z"
+    """
+
+    listing_pages: list[SsrPropListingPageConfig] = Field(
+        description=(
+            "One entry per catalogue/listing page to fetch. "
+            "Each has: url (listing page), url_prefix (base for course URLs), label (log label)."
+        )
+    )
+    prop_attr: str = Field(
+        default=":courses-data",
+        description=(
+            "Name of the HTML attribute containing the JSON courses array. "
+            "Vue prop example: ':courses-data'. "
+            "React/Next.js example: 'data-courses' or 'data-initial-props'."
+        ),
+    )
+    slug_field: str = Field(
+        default="slug",
+        description="Field in each JSON object whose value is the URL slug.",
+    )
+    name_field: str = Field(
+        default="title",
+        description="Field in each JSON object whose value is the course name.",
+    )
+    url_suffix: str = Field(
+        default="/{year}/",
+        description=(
+            "Appended after '{url_prefix}/{slug}' to form the final course URL. "
+            "Supports tokens: {year} (4-digit, e.g. 2026), {short_year} (2-digit, e.g. 26)."
+        ),
+    )
+    year_field: Optional[str] = Field(
+        default=None,
+        description=(
+            "Optional. When set, only JSON objects whose year_field value starts "
+            "with year_filter_prefix are included. Leave null to include all objects."
+        ),
+    )
+    year_filter_prefix: str = Field(
+        default="{short_year}/",
+        description=(
+            "Prefix matched against year_field. Tokens: {year} and {short_year}. "
+            "Lancaster uses '{short_year}/' because its format is '26/27'. "
+            "A university with plain '2026' values would use '{year}'."
+        ),
+    )
+    browser_fallback_xpath: Optional[str] = Field(
+        default=None,
+        description=(
+            "XPath evaluated in a Playwright browser when the SSR prop is missing. "
+            "Lancaster: '//nav[contains(@class, \"a-z\")]//li/a/@href'. "
+            "Leave null to skip browser fallback."
+        ),
+    )
+    browser_wait_selector: Optional[str] = Field(
+        default=None,
+        description=(
+            "CSS selector to wait for before evaluating browser_fallback_xpath. "
+            "Lancaster: 'nav.a-z'. Only used when browser_fallback_xpath is set."
+        ),
+    )
+    course_url_pattern: Optional[str] = Field(
+        default=None,
+        description=(
+            "Optional regex to filter hrefs extracted by the browser fallback. "
+            "Lancaster: '/study/(undergraduate|postgraduate)/courses/[^/]+/20\\\\d{2}/?$'."
+        ),
+    )
+
+
 class DiscoveryConfig(BaseModel):
     """Safe to replay against unknown universities (Tier-3 playbook matching)."""
 
@@ -629,19 +741,25 @@ class DiscoveryConfig(BaseModel):
             "Solr provider instead of HTML crawling. See SearchStaxConfig."
         ),
     )
+    ssr_prop_discovery: Optional[SsrPropDiscoveryConfig] = Field(
+        default=None,
+        description=(
+            "Generic SSR-prop discovery. When present, fetches each listing page "
+            "configured under ssr_prop_discovery.listing_pages, extracts a JSON "
+            "courses array from a server-rendered HTML attribute (e.g. :courses-data "
+            "for Vue, data-courses for React), and builds course URLs — no browser "
+            "required.  A Playwright browser fallback is triggered automatically if "
+            "the prop is missing.  See SsrPropDiscoveryConfig for full field docs "
+            "and examples."
+        ),
+    )
     lancaster_listing: bool = Field(
         default=False,
         description=(
-            "Lancaster University listing-page discovery. When true, fetches the "
-            "Undergraduate and Postgraduate listing pages from lancaster.ac.uk, "
-            "extracts the server-rendered :courses-data Vue prop (JSON array of "
-            "all courses embedded in the SSR HTML), and builds course URLs for the "
-            "current entry year — no browser rendering or Playwright required. "
-            "Returns ~538 course URLs (371 UG + 167 PG for 2026 entry). "
-            "Per-course extraction still runs against individual course pages "
-            "(which are SSR and work fine with plain httpx). "
-            "Use lancaster_listing_year to pin a specific entry year; defaults to "
-            "the current calendar year."
+            "Lancaster University shorthand for ssr_prop_discovery. "
+            "Sets up Lancaster's two listing pages (:courses-data Vue prop) "
+            "automatically. Prefer ssr_prop_discovery for new universities. "
+            "Use lancaster_listing_year to pin a specific entry year."
         ),
     )
     lancaster_listing_year: Optional[int] = Field(
