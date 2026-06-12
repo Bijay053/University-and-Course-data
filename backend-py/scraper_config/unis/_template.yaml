@@ -136,6 +136,40 @@ discovery:
   #   max_pages: 20
   #   max_courses: null                       # debug cap; null = no limit
 
+  # ── Tier 1c: SSR-prop discovery ────────────────────────────────────────────
+  # Use when the university's LISTING pages embed the full course catalogue as
+  # a JSON array inside a server-rendered HTML attribute (Vue :prop, React
+  # data-*, Next.js data-initial-props, etc.). Plain httpx fetches — no browser
+  # or Playwright needed unless the prop is absent (auto browser fallback).
+  #
+  # How to detect:
+  #   DevTools → Elements → search for the attribute name (e.g. ":courses-data")
+  #   or right-click → View Page Source and search for the slug of a known course.
+  #   If a JSON array of course objects appears in the raw HTML, use this tier.
+  #
+  # Lancaster example (shipped in lancaster.yaml):
+  #   Vue 3 <course-listing :courses-data='[...]'>
+  #   → 538 courses extracted with zero Playwright (2026-06-12 verified)
+  #
+  # ssr_prop_discovery:
+  #   listing_pages:
+  #     - url: "https://www.myuni.edu.au/courses/undergraduate/"
+  #       url_prefix: "https://www.myuni.edu.au/courses/undergraduate/"
+  #       label: "Undergraduate"
+  #     - url: "https://www.myuni.edu.au/courses/postgraduate/"
+  #       url_prefix: "https://www.myuni.edu.au/courses/postgraduate/"
+  #       label: "Postgraduate"
+  #   prop_attr: ":courses-data"      # HTML attribute containing the JSON array
+  #                                   # Vue: ":courses-data" | React: "data-courses"
+  #   slug_field: "slug"              # JSON field → URL slug
+  #   name_field: "title"             # JSON field → course name
+  #   url_suffix: "/{year}/"          # tokens: {year}=2026, {short_year}=26
+  #   year_field: "entryYear"         # optional: filter JSON objects by year value
+  #   year_filter_prefix: "{short_year}/"  # Lancaster="26/", plain-year uni="{year}"
+  #   browser_fallback_xpath: "//nav[contains(@class, 'a-z')]//li/a/@href"
+  #   browser_wait_selector: "nav.a-z"
+  #   course_url_pattern: '/courses/[a-z0-9-]+/20\d{2}/?$'  # href filter for browser fallback
+
   # ── Tier 2: Scrapy spider ─────────────────────────────────────────────────
   # Run a custom Scrapy spider for discovery. Output feeds the normal staging
   # pipeline. Falls through to BFS/sitemap if the spider returns 0 links.

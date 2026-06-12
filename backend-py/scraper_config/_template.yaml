@@ -67,6 +67,40 @@ discovery:
   #   max_pages: 20
   #   currency: "AUD"
 
+  # ── SSR-prop discovery ────────────────────────────────────────────────────
+  # Use when the university's listing pages embed the course catalogue as a
+  # JSON array inside a server-rendered HTML attribute.  Fetches with plain
+  # httpx — no browser needed.  Playwright browser fallback fires automatically
+  # when the prop is missing.
+  #
+  # How to detect (DevTools):
+  #   View Page Source → search for a known course slug. If the slug appears
+  #   inside a JSON array embedded in an HTML attribute, this tier applies.
+  #   Common attribute names: :courses-data (Vue), data-courses (React),
+  #   data-initial-props (Next.js custom), __NEXT_DATA__ (Next.js JSON script).
+  #
+  # Lancaster reference implementation (lancaster.yaml):
+  #   Vue 3 <course-listing :courses-data='[{"slug":"...", "title":"...", ...}]'>
+  #   → 538 courses with zero browser, 0 Gemini cost (2026-06-12 verified).
+  #
+  # ssr_prop_discovery:
+  #   listing_pages:
+  #     - url: "https://www.myuni.edu.au/courses/undergraduate/"
+  #       url_prefix: "https://www.myuni.edu.au/courses/undergraduate/"
+  #       label: "Undergraduate"
+  #     - url: "https://www.myuni.edu.au/courses/postgraduate/"
+  #       url_prefix: "https://www.myuni.edu.au/courses/postgraduate/"
+  #       label: "Postgraduate"
+  #   prop_attr: ":courses-data"       # HTML attribute with the JSON array
+  #   slug_field: "slug"               # JSON field → URL slug
+  #   name_field: "title"              # JSON field → course name
+  #   url_suffix: "/{year}/"           # {year}=2026, {short_year}=26
+  #   year_field: "entryYear"          # omit to include all JSON objects
+  #   year_filter_prefix: "{short_year}/"  # Lancaster="26/" | plain-year="{year}"
+  #   browser_fallback_xpath: "//nav[contains(@class, 'a-z')]//li/a/@href"
+  #   browser_wait_selector: "nav.a-z"
+  #   course_url_pattern: '/courses/[a-z0-9-]+/20\d{2}/?$'
+
   # ── Scrapy spider (alternative discovery engine) ──────────────────────────
   # Use instead of BFS when the site needs a custom crawl strategy.
   # Copy backend-py/spiders/template_spider.py as a starting point.

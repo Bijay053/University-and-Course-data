@@ -58,6 +58,25 @@ interface SearchStaxConfig {
   max_pages?: number;
 }
 
+interface SsrPropListingPage {
+  url: string;
+  url_prefix: string;
+  label: string;
+}
+
+interface SsrPropDiscovery {
+  listing_pages: SsrPropListingPage[];
+  prop_attr: string;
+  slug_field: string;
+  name_field: string;
+  url_suffix: string;
+  year_field: string;
+  year_filter_prefix: string;
+  browser_fallback_xpath: string;
+  browser_wait_selector: string;
+  course_url_pattern: string;
+}
+
 interface ApiConfig {
   endpoint: string;
   method: string;
@@ -198,6 +217,7 @@ interface Recipe {
   url_rewrites: { host: string; path_contains?: string; append_query: string }[];
   degree_level_defaults: Record<string, DegreeEnglishTier>;
   searchstax?: SearchStaxConfig;
+  ssr_prop_discovery?: SsrPropDiscovery;
 }
 
 const EMPTY_RECIPE: Recipe = {
@@ -251,6 +271,7 @@ const EMPTY_RECIPE: Recipe = {
   url_rewrites: [],
   degree_level_defaults: {},
   searchstax: undefined,
+  ssr_prop_discovery: undefined,
 };
 
 const STANDARD_FIELDS = [
@@ -1029,6 +1050,30 @@ export default function RecipeEditorPage() {
     setRecipe(r => ({ ...r, searchstax: { ...EMPTY_SEARCHSTAX, ...(r.searchstax || {}), ...patch } }));
   const patchSearchStaxFieldMap = (patch: Partial<SearchStaxFieldMap>) =>
     setRecipe(r => ({ ...r, searchstax: { ...EMPTY_SEARCHSTAX, ...(r.searchstax || {}), field_map: { ...(r.searchstax?.field_map || {}), ...patch } } }));
+
+  const EMPTY_SSR_PROP: SsrPropDiscovery = {
+    listing_pages: [],
+    prop_attr: ":courses-data",
+    slug_field: "slug",
+    name_field: "title",
+    url_suffix: "/{year}/",
+    year_field: "",
+    year_filter_prefix: "{short_year}/",
+    browser_fallback_xpath: "",
+    browser_wait_selector: "",
+    course_url_pattern: "",
+  };
+  const patchSsrProp = (patch: Partial<SsrPropDiscovery>) =>
+    setRecipe(r => ({ ...r, ssr_prop_discovery: { ...EMPTY_SSR_PROP, ...(r.ssr_prop_discovery || {}), ...patch } }));
+  const addSsrListingPage = () =>
+    patchSsrProp({ listing_pages: [...(recipe.ssr_prop_discovery?.listing_pages ?? []), { url: "", url_prefix: "", label: "" }] });
+  const removeSsrListingPage = (i: number) =>
+    patchSsrProp({ listing_pages: (recipe.ssr_prop_discovery?.listing_pages ?? []).filter((_, j) => j !== i) });
+  const patchSsrListingPage = (i: number, patch: Partial<SsrPropListingPage>) => {
+    const pages = [...(recipe.ssr_prop_discovery?.listing_pages ?? [])];
+    pages[i] = { ...pages[i], ...patch };
+    patchSsrProp({ listing_pages: pages });
+  };
 
   if (loading) {
     return (
@@ -1881,6 +1926,7 @@ export default function RecipeEditorPage() {
         <TabsList className="flex flex-wrap h-auto gap-1">
           <TabsTrigger value="discovery" className="flex items-center gap-1"><Globe className="h-3 w-3" /> Discovery</TabsTrigger>
           <TabsTrigger value="searchstax" className="flex items-center gap-1"><Zap className="h-3 w-3" /> SearchStax</TabsTrigger>
+          <TabsTrigger value="ssr_prop" className="flex items-center gap-1"><Code2 className="h-3 w-3" /> SSR Prop</TabsTrigger>
           <TabsTrigger value="api" className="flex items-center gap-1"><Database className="h-3 w-3" /> JSON API</TabsTrigger>
           <TabsTrigger value="filters" className="flex items-center gap-1"><Filter className="h-3 w-3" /> URL Filters</TabsTrigger>
           <TabsTrigger value="selectors" className="flex items-center gap-1"><Code2 className="h-3 w-3" /> Field Selectors</TabsTrigger>
@@ -2245,6 +2291,313 @@ export default function RecipeEditorPage() {
                     <p className="text-xs text-muted-foreground mt-1">Safety cap on Solr pagination. Raise for universities with &gt;4000 courses.</p>
                   </div>
                 </div>
+              </CardContent>
+            )}
+          </Card>
+        </TabsContent>
+
+        {/* ── 1c. SSR Prop Discovery ──────────────────────────────────────── */}
+        <TabsContent value="ssr_prop">
+          <Card>
+            <CardHeader>
+              <div className="flex items-start justify-between">
+                <div>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Code2 className="h-4 w-4" /> SSR Prop Discovery
+                  </CardTitle>
+                  <CardDescription className="mt-1">
+                    For universities whose listing pages embed the full course catalogue as a JSON array
+                    inside a server-rendered HTML attribute — no browser or Playwright needed.
+                    <br />
+                    <span className="font-medium">How to detect:</span> View Page Source → search for a
+                    known course slug. If a JSON array appears inside an HTML attribute (e.g.{" "}
+                    <code className="text-xs">:courses-data</code>,{" "}
+                    <code className="text-xs">data-courses</code>), use this tier.
+                    Lancaster University is the reference implementation (538 courses, 0 Gemini cost).
+                  </CardDescription>
+                </div>
+                <div className="flex items-center gap-2 shrink-0 ml-4">
+                  <span className="text-xs text-muted-foreground">
+                    {recipe.ssr_prop_discovery ? "Configured" : "Not configured"}
+                  </span>
+                  <Switch
+                    checked={!!recipe.ssr_prop_discovery}
+                    onCheckedChange={v =>
+                      v
+                        ? patchSsrProp({})
+                        : setRecipe(r => ({ ...r, ssr_prop_discovery: undefined }))
+                    }
+                  />
+                </div>
+              </div>
+            </CardHeader>
+            {recipe.ssr_prop_discovery && (
+              <CardContent className="space-y-6">
+
+                {/* Listing pages */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label>Listing Pages</Label>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        One entry per catalogue page. Each page is fetched with plain HTTP and the JSON
+                        prop is extracted. Course URLs are built as{" "}
+                        <code className="text-xs">{"{url_prefix}/{slug}{url_suffix}"}</code>.
+                      </p>
+                    </div>
+                    <Button type="button" variant="outline" size="sm" onClick={addSsrListingPage}>
+                      <Plus className="h-3 w-3 mr-1" /> Add Page
+                    </Button>
+                  </div>
+
+                  {recipe.ssr_prop_discovery.listing_pages.length === 0 && (
+                    <p className="text-xs text-muted-foreground italic">
+                      No listing pages yet — click "Add Page" to add the undergraduate/postgraduate
+                      listing URLs.
+                    </p>
+                  )}
+
+                  {recipe.ssr_prop_discovery.listing_pages.map((page, i) => (
+                    <Card key={i} className="border-dashed">
+                      <CardContent className="pt-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-semibold text-muted-foreground">
+                            Page {i + 1}
+                          </span>
+                          <button
+                            onClick={() => removeSsrListingPage(i)}
+                            className="text-destructive hover:opacity-70"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                        <div>
+                          <Label className="text-xs">Listing Page URL</Label>
+                          <Input
+                            value={page.url}
+                            onChange={e => patchSsrListingPage(i, { url: e.target.value })}
+                            placeholder="https://www.myuni.edu.au/courses/undergraduate/"
+                            className="mt-1 text-sm font-mono"
+                          />
+                          <p className="text-xs text-muted-foreground mt-1">
+                            The page fetched via httpx to extract the JSON prop.
+                          </p>
+                        </div>
+                        <div>
+                          <Label className="text-xs">URL Prefix (base for course URLs)</Label>
+                          <Input
+                            value={page.url_prefix}
+                            onChange={e => patchSsrListingPage(i, { url_prefix: e.target.value })}
+                            placeholder="https://www.myuni.edu.au/courses/undergraduate/"
+                            className="mt-1 text-sm font-mono"
+                          />
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Prepended to each slug: <code className="text-xs">{"{url_prefix}/{slug}{url_suffix}"}</code>.
+                            Usually the same as the listing page URL.
+                          </p>
+                        </div>
+                        <div>
+                          <Label className="text-xs">Label <span className="font-normal text-muted-foreground">(for logs)</span></Label>
+                          <Input
+                            value={page.label}
+                            onChange={e => patchSsrListingPage(i, { label: e.target.value })}
+                            placeholder="Undergraduate"
+                            className="mt-1 text-sm"
+                          />
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+
+                <Separator />
+
+                {/* Prop config */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>HTML Prop Attribute</Label>
+                    <Input
+                      value={recipe.ssr_prop_discovery.prop_attr}
+                      onChange={e => patchSsrProp({ prop_attr: e.target.value })}
+                      placeholder=":courses-data"
+                      className="mt-1 text-sm font-mono"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      HTML attribute whose value is the JSON array.
+                      Vue: <code className="text-xs">:courses-data</code> ·
+                      React: <code className="text-xs">data-courses</code>
+                    </p>
+                  </div>
+                  <div>
+                    <Label>URL Suffix</Label>
+                    <Input
+                      value={recipe.ssr_prop_discovery.url_suffix}
+                      onChange={e => patchSsrProp({ url_suffix: e.target.value })}
+                      placeholder="/{year}/"
+                      className="mt-1 text-sm font-mono"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Appended after slug.
+                      Tokens: <code className="text-xs">{"{year}"}</code> = 2026,{" "}
+                      <code className="text-xs">{"{short_year}"}</code> = 26.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Slug Field</Label>
+                    <Input
+                      value={recipe.ssr_prop_discovery.slug_field}
+                      onChange={e => patchSsrProp({ slug_field: e.target.value })}
+                      placeholder="slug"
+                      className="mt-1 text-sm font-mono"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      JSON field whose value is the URL slug.
+                    </p>
+                  </div>
+                  <div>
+                    <Label>Name Field</Label>
+                    <Input
+                      value={recipe.ssr_prop_discovery.name_field}
+                      onChange={e => patchSsrProp({ name_field: e.target.value })}
+                      placeholder="title"
+                      className="mt-1 text-sm font-mono"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      JSON field whose value is the course name.
+                    </p>
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* Year filter */}
+                <div>
+                  <Label className="text-sm font-medium">Year Filter <span className="font-normal text-muted-foreground">(optional)</span></Label>
+                  <p className="text-xs text-muted-foreground mt-0.5 mb-3">
+                    When set, only JSON objects whose year field starts with the prefix are included.
+                    Leave blank to include all objects regardless of year.
+                  </p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-xs">Year Field</Label>
+                      <Input
+                        value={recipe.ssr_prop_discovery.year_field}
+                        onChange={e => patchSsrProp({ year_field: e.target.value })}
+                        placeholder="entryYear"
+                        className="mt-1 text-sm font-mono"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        JSON field to check (e.g. <code className="text-xs">entryYear</code>).
+                        Leave blank to skip year filtering.
+                      </p>
+                    </div>
+                    <div>
+                      <Label className="text-xs">Year Filter Prefix</Label>
+                      <Input
+                        value={recipe.ssr_prop_discovery.year_filter_prefix}
+                        onChange={e => patchSsrProp({ year_filter_prefix: e.target.value })}
+                        placeholder="{short_year}/"
+                        className="mt-1 text-sm font-mono"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Lancaster: <code className="text-xs">{"{short_year}/"}</code> (format "26/27") ·
+                        Plain year: <code className="text-xs">{"{year}"}</code> (format "2026")
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* Browser fallback */}
+                <div>
+                  <Label className="text-sm font-medium">Browser Fallback <span className="font-normal text-muted-foreground">(optional)</span></Label>
+                  <p className="text-xs text-muted-foreground mt-0.5 mb-3">
+                    Triggered automatically if the SSR prop is not found in the raw HTML.
+                    Launches Playwright, waits for the selector, then evaluates the XPath to extract hrefs.
+                  </p>
+                  <div className="grid grid-cols-1 gap-4">
+                    <div>
+                      <Label className="text-xs">Browser Fallback XPath</Label>
+                      <Input
+                        value={recipe.ssr_prop_discovery.browser_fallback_xpath}
+                        onChange={e => patchSsrProp({ browser_fallback_xpath: e.target.value })}
+                        placeholder='//nav[contains(@class, "a-z")]//li/a/@href'
+                        className="mt-1 text-sm font-mono"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        XPath returning course hrefs from the rendered page.
+                        Lancaster: <code className="text-xs">{"//nav[contains(@class, 'a-z')]//li/a/@href"}</code>
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label className="text-xs">Browser Wait Selector</Label>
+                        <Input
+                          value={recipe.ssr_prop_discovery.browser_wait_selector}
+                          onChange={e => patchSsrProp({ browser_wait_selector: e.target.value })}
+                          placeholder="nav.a-z"
+                          className="mt-1 text-sm font-mono"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          CSS selector to wait for before evaluating XPath.
+                        </p>
+                      </div>
+                      <div>
+                        <Label className="text-xs">Course URL Pattern <span className="font-normal text-muted-foreground">(regex)</span></Label>
+                        <Input
+                          value={recipe.ssr_prop_discovery.course_url_pattern}
+                          onChange={e => patchSsrProp({ course_url_pattern: e.target.value })}
+                          placeholder='/courses/[a-z0-9-]+/20\d{2}/?$'
+                          className="mt-1 text-sm font-mono"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Filters hrefs from the browser fallback. Leave blank to keep all.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Lancaster quick-fill */}
+                <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <div>
+                      <div className="text-sm font-medium text-blue-800">Lancaster University preset</div>
+                      <div className="text-xs text-blue-600 mt-0.5">
+                        Fills all fields with Lancaster's verified config (538 courses, 0 Gemini cost).
+                        Edit the listing page URLs for your university.
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="border-blue-300 text-blue-700 hover:bg-blue-100 shrink-0 ml-4"
+                      onClick={() => patchSsrProp({
+                        listing_pages: [
+                          { url: "https://www.lancaster.ac.uk/study/undergraduate/courses/", url_prefix: "https://www.lancaster.ac.uk/study/undergraduate/courses/", label: "Undergraduate" },
+                          { url: "https://www.lancaster.ac.uk/study/postgraduate/postgraduate-courses/", url_prefix: "https://www.lancaster.ac.uk/study/postgraduate/postgraduate-courses/", label: "Postgraduate" },
+                        ],
+                        prop_attr: ":courses-data",
+                        slug_field: "slug",
+                        name_field: "title",
+                        url_suffix: "/{year}/",
+                        year_field: "entryYear",
+                        year_filter_prefix: "{short_year}/",
+                        browser_fallback_xpath: "//nav[contains(@class, 'a-z')]//li/a/@href",
+                        browser_wait_selector: "nav.a-z",
+                        course_url_pattern: "/study/(undergraduate/courses|postgraduate/postgraduate-courses)/[^/]+/20\\d{2}/?$",
+                      })}
+                    >
+                      Load Preset
+                    </Button>
+                  </div>
+                </div>
+
               </CardContent>
             )}
           </Card>
@@ -3997,6 +4350,31 @@ function buildYamlPreview(recipe: Recipe): string {
     }
     if (ss.page_size != null) discLines.push(`    page_size: ${ss.page_size}`);
     if (ss.max_pages != null) discLines.push(`    max_pages: ${ss.max_pages}`);
+  }
+
+  // SSR Prop Discovery
+  if (recipe.ssr_prop_discovery) {
+    const sp = recipe.ssr_prop_discovery;
+    discLines.push("  ssr_prop_discovery:");
+    if (sp.listing_pages.length > 0) {
+      discLines.push("    listing_pages:");
+      sp.listing_pages.forEach(p => {
+        if (p.url) discLines.push(`      - url: ${_yq(p.url)}`);
+        if (p.url_prefix) discLines.push(`        url_prefix: ${_yq(p.url_prefix)}`);
+        if (p.label) discLines.push(`        label: ${_yq(p.label)}`);
+      });
+    }
+    if (sp.prop_attr && sp.prop_attr !== ":courses-data") discLines.push(`    prop_attr: ${_yq(sp.prop_attr)}`);
+    else if (sp.prop_attr === ":courses-data") discLines.push(`    prop_attr: ":courses-data"`);
+    if (sp.slug_field && sp.slug_field !== "slug") discLines.push(`    slug_field: ${_yq(sp.slug_field)}`);
+    if (sp.name_field && sp.name_field !== "title") discLines.push(`    name_field: ${_yq(sp.name_field)}`);
+    if (sp.url_suffix && sp.url_suffix !== "/{year}/") discLines.push(`    url_suffix: ${_yq(sp.url_suffix)}`);
+    if (sp.year_field) discLines.push(`    year_field: ${_yq(sp.year_field)}`);
+    if (sp.year_filter_prefix && sp.year_filter_prefix !== "{short_year}/") discLines.push(`    year_filter_prefix: ${_yq(sp.year_filter_prefix)}`);
+    else if (sp.year_filter_prefix === "{short_year}/") discLines.push(`    year_filter_prefix: "{short_year}/"`);
+    if (sp.browser_fallback_xpath) discLines.push(`    browser_fallback_xpath: ${_yq(sp.browser_fallback_xpath)}`);
+    if (sp.browser_wait_selector) discLines.push(`    browser_wait_selector: ${_yq(sp.browser_wait_selector)}`);
+    if (sp.course_url_pattern) discLines.push(`    course_url_pattern: ${_yq(sp.course_url_pattern)}`);
   }
 
   if (recipe.seed_urls.length > 0) {
