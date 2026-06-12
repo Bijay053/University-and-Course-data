@@ -783,6 +783,29 @@ extraction:
   # with zero benefit).
   skip_browser_rescue: false
 
+  # ── Scrape.do proxy controls ─────────────────────────────────────────────
+  #
+  # scrape_do_static: bool (default false)
+  #   Skip httpx/cffi entirely for per-course fetches and route through
+  #   Scrape.do's residential proxy without JS rendering (~$0.0005/call).
+  #   Use when course pages return geo-targeted content for US IPs even though
+  #   the HTTP response is 200 OK (Lancaster pattern: "We welcome applications
+  #   from the United States of America" / "Our Use of Cookies" course names).
+  #   Does NOT execute JavaScript — use scrape_do_render for JS-rendered SPAs.
+  #   Cost estimate: ~$0.27 per 538-course run.
+  scrape_do_static: false
+  #
+  # scrape_do_geo: ISO 3166-1 alpha-2 country code (default "" = auto)
+  #   Pin the Scrape.do exit-node to a specific country. Applies to both
+  #   scrape_do_static and scrape_do_render calls.  Use when the university
+  #   site shows geo-targeted content (different fees, entry requirements, or
+  #   overlays) based on visitor country.  NP (Nepal) is a neutral non-US/
+  #   non-UK country that gets standard international-student course pages.
+  scrape_do_geo: ""
+  #   scrape_do_geo: NP   # Nepal — neutral non-US/non-UK, international fees
+  #   scrape_do_geo: GB   # United Kingdom — domestic content test
+  #   scrape_do_geo: AU   # Australia — domestic content test
+
   # ── Per-course browser controls (YAML alternative to code changes) ──────────
   #
   # skip_per_course_browser: true

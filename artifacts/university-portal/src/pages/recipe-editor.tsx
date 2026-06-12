@@ -162,6 +162,8 @@ interface Recipe {
   course_detail_url_patterns: string[];
   block_url_patterns: string[];
   fetch_detail_page: boolean;
+  scrape_do_static: boolean;
+  scrape_do_geo: string;
   selectors: Record<string, FieldSelector>;
   ielts?: {
     overall_regex: string;
@@ -236,6 +238,8 @@ const EMPTY_RECIPE: Recipe = {
   course_detail_url_patterns: [],
   block_url_patterns: [],
   fetch_detail_page: true,
+  scrape_do_static: false,
+  scrape_do_geo: "",
   selectors: {},
   fee_currency: "AUD",
   fee_year: null,
@@ -3500,6 +3504,48 @@ export default function RecipeEditorPage() {
                 </div>
               </div>
 
+              <Separator />
+
+              {/* ── Scrape.do Proxy ─────────────────────────────────────── */}
+              <div className="space-y-3">
+                <div>
+                  <Label className="font-semibold text-sm">Scrape.do Proxy</Label>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Route per-course fetches through Scrape.do's residential proxy to bypass geo-detection or Cloudflare blocks.
+                    Requires the <code className="text-xs">SCRAPE_DO_TOKEN</code> secret.
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Switch
+                    checked={recipe.scrape_do_static}
+                    onCheckedChange={v => patchRecipe({ scrape_do_static: v })}
+                  />
+                  <div>
+                    <Label className="text-sm">Static proxy (no JS rendering)</Label>
+                    <p className="text-xs text-muted-foreground">
+                      ~$0.0005/call. Use when pages return geo-targeted content for US IPs (200 OK but wrong content).
+                      Lancaster pattern: "Our Use of Cookies" course names.
+                    </p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3 items-end">
+                  <div>
+                    <Label className="text-xs">Exit-node country code (ISO 3166-1 alpha-2)</Label>
+                    <Input
+                      value={recipe.scrape_do_geo}
+                      onChange={e => patchRecipe({ scrape_do_geo: e.target.value.toUpperCase().slice(0, 2) })}
+                      placeholder="e.g. NP (Nepal), GB, AU"
+                      maxLength={2}
+                      className="mt-1 text-xs font-mono uppercase w-28"
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground pb-1">
+                    Pins the proxy exit-node to a specific country. <strong>NP</strong> (Nepal) = neutral non-US/non-UK, gets standard international fees.
+                    Leave empty for auto.
+                  </p>
+                </div>
+              </div>
+
               {recipe.fetch_detail_page && (
                 <>
                   <Separator />
@@ -4590,6 +4636,9 @@ function buildYamlPreview(recipe: Recipe): string {
       recipe.block_publish_if.forEach(c => extLines.push(`      - ${c}`));
     }
   }
+
+  if (recipe.scrape_do_static) extLines.push("  scrape_do_static: true");
+  if (recipe.scrape_do_geo.trim()) extLines.push(`  scrape_do_geo: ${recipe.scrape_do_geo.trim().toUpperCase()}`);
 
   if (extLines.length > 0) {
     lines.push("extraction:");

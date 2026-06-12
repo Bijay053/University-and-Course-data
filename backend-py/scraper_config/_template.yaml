@@ -292,6 +292,29 @@ extraction:
   # on a browser retry that always returns an empty page. Notre Dame / JCU pattern.
   skip_browser_rescue: false
 
+  # ── Scrape.do proxy controls ──────────────────────────────────────────────
+  #
+  # scrape_do_static: bool (default false)
+  #   Skip httpx/cffi entirely and route per-course fetches through Scrape.do's
+  #   residential proxy WITHOUT JavaScript rendering (~$0.0005/call). Use when
+  #   course pages return geo-targeted content for US IPs even though the HTTP
+  #   status is 200 OK (Lancaster pattern: US welcome overlay → "Our Use of
+  #   Cookies" course names). Requires SCRAPE_DO_TOKEN secret. Does NOT execute
+  #   JavaScript — use scrape_do_render for JS-rendered SPAs.
+  #   Cost estimate: ~$0.27 per 538-course run.
+  scrape_do_static: false
+
+  # scrape_do_geo: ISO 3166-1 alpha-2 country code (default "" = Scrape.do auto)
+  #   Pin the Scrape.do exit-node to a specific country.  Applies to BOTH
+  #   scrape_do_static and scrape_do_render calls.  Use when the university
+  #   shows different fees, requirements, or overlays based on visitor country.
+  #   NP (Nepal) is a neutral non-US/non-UK country that gets standard
+  #   international-student pages without triggering US geo-detection.
+  scrape_do_geo: ""
+  #   scrape_do_geo: NP   # Nepal   — neutral, gets international fees
+  #   scrape_do_geo: GB   # United Kingdom — see domestic page content
+  #   scrape_do_geo: AU   # Australia — see domestic/local page content
+
   # ── Prefer blended over on-campus ────────────────────────────────────────
   # When true and the study-mode extractor emits "Online" at low confidence
   # AND a physical campus was also found, set study_mode="Blended" instead of
