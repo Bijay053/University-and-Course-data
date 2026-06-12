@@ -35,7 +35,7 @@ from app.services.scraper.extractors import (
     study_mode,
 )
 from app.services.scraper.extractors.base import ExtractionResult
-from app.services.scraper.http_fetcher import fetch_html, scrape_do_render_scope
+from app.services.scraper.http_fetcher import fetch_html, scrape_do_render_scope, scrape_do_static_scope
 from app.services.scraper.provenance import build_course_page_provenance_footer
 
 log = logging.getLogger(__name__)
@@ -1249,6 +1249,11 @@ async def extract_course(
     _use_scrape_do_render: bool = bool(
         getattr(getattr(_uc, "extraction", None), "scrape_do_render", False)
     )
+    # Geo-block bypass: SSR pages that serve country-welcome overlays for US
+    # IPs (Lancaster).  Uses Scrape.do static proxy (~$0.0005/call), no JS.
+    _use_scrape_do_static: bool = bool(
+        getattr(getattr(_uc, "extraction", None), "scrape_do_static", False)
+    )
 
     # ── YAML-driven per-host URL rewrites ──────────────────────────────────
     # Generic version of the hardcoded UNE/UOW/ACU/UniSQ blocks below. Reads
@@ -1437,6 +1442,9 @@ async def extract_course(
         else:
             if _use_scrape_do_render:
                 with scrape_do_render_scope():
+                    html = await fetch_html(url)
+            elif _use_scrape_do_static:
+                with scrape_do_static_scope():
                     html = await fetch_html(url)
             else:
                 html = await fetch_html(url)

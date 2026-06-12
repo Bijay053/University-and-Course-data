@@ -108,6 +108,15 @@ extraction:
   skip_browser_rescue: false
   skip_per_course_browser: false
 
+  # Lancaster geo-block fix: the server detects US IPs and returns
+  # "We welcome applications from the United States of America" with
+  # "Our Use of Cookies" as the page title — wrong content entirely.
+  # scrape_do_static routes each per-course fetch through Scrape.do's
+  # residential proxy (render=False, ~$0.0005/call) which provides a
+  # UK/EU IP so the actual course page is returned.  No JS rendering
+  # needed — pages are fully SSR.  Cost: ~$0.27 per full 538-course run.
+  scrape_do_static: true
+
   filters:
     domestic_only:
       enabled: false

@@ -2267,6 +2267,21 @@ class ExtractionConfig(BaseModel):
             "Has no effect unless SCRAPE_DO_TOKEN is set and scrape_do_render is True."
         ),
     )
+    scrape_do_static: bool = Field(
+        default=False,
+        description=(
+            "When True, fetch_html() skips httpx/cffi entirely and routes each "
+            "per-course fetch through Scrape.do's residential proxy in static "
+            "(non-rendering) mode (~$0.0005/call).  Use for SSR universities "
+            "whose pages return geo-targeted content for US IPs even though the "
+            "HTTP response is 200 OK — the residential proxy provides a non-US IP "
+            "so the actual course page is returned instead of a country-welcome "
+            "overlay.  Lancaster is the canonical case: fetching from a US IP "
+            "returns 'We welcome applications from the United States of America' "
+            "with 'Our Use of Cookies' as the extracted course name.  Does NOT "
+            "execute JavaScript — use scrape_do_render for JS-rendered pages."
+        ),
+    )
     skip_ai_when_text_empty: bool = Field(
         default=False,
         description=(

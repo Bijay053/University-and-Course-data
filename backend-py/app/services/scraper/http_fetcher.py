@@ -111,6 +111,44 @@ def scrape_do_render_scope():
     finally:
         _scrape_do_render_active.reset(token)
 
+
+# ---------------------------------------------------------------------------
+# Scrape.do *static* gate — geo-block bypass without JS rendering
+# ---------------------------------------------------------------------------
+# When active, fetch_html() skips httpx/cffi entirely and goes straight to
+# fetch_html_scrape_do(url, render=False).  This routes the request through
+# Scrape.do's residential proxy network (~$0.0005/call) which returns a
+# non-US IP, bypassing server-side geo-detection (Lancaster returns a US
+# welcome page when fetched from a US IP even though the response is 200).
+# Unlike scrape_do_render this does NOT execute JavaScript — use only for
+# fully SSR pages where the geo-block is the sole obstacle.
+_scrape_do_static_active: ContextVar[bool] = ContextVar(
+    "scrape_do_static_active", default=False
+)
+
+
+@contextmanager
+def scrape_do_static_scope():
+    """Context manager: activate Scrape.do static proxy for the enclosed fetch.
+
+    Routes per-course HTTP fetches through Scrape.do's residential proxy
+    (render=False, ~$0.0005/call) to bypass server-side geo-detection.
+    Use when course pages return geo-targeted content for US IPs even though
+    the HTTP status is 200 (Lancaster is the canonical case).
+
+    Usage (single_course.py)::
+
+        from app.services.scraper.http_fetcher import scrape_do_static_scope
+
+        with scrape_do_static_scope():
+            html = await fetch_html(url)
+    """
+    token = _scrape_do_static_active.set(True)
+    try:
+        yield
+    finally:
+        _scrape_do_static_active.reset(token)
+
 # Per-job Wayback timestamp cache: normalised-url → CDX timestamp string.
 # Populated by wayback_discover() during the discovery phase so that
 # fetch_html_wayback() can use the exact timestamp from the CDX index
@@ -463,7 +501,28 @@ async def fetch_html(url: str, *, retries: int = 2) -> str | None:
     # i.e. during per-course extraction in single_course.extract_course().
     # It is NEVER True during discovery / sitemap / central-page phases.
     _scrape_do_render = _scrape_do_render_active.get()
+    _scrape_do_static = _scrape_do_static_active.get()
     _has_scrape_do = bool(os.environ.get("SCRAPE_DO_TOKEN"))
+
+    # Geo-block bypass: skip httpx/cffi entirely and proxy through Scrape.do
+    # static (render=False, ~$0.0005/call).  Activated by scrape_do_static=true
+    # in extraction YAML for SSR universities that serve geo-targeted content
+    # when the request comes from a US IP (Lancaster is the canonical case).
+    if _scrape_do_static and _has_scrape_do:
+        log.info(
+            "fetch %s: scrape_do_static=True — routing via Scrape.do proxy (render=False)",
+            url,
+        )
+        _static = await fetch_html_scrape_do(url, render=False)
+        if _static is not None:
+            from app.services.scraper.snapshot_context import stage_snapshot as _stage
+            _stage(url, _static, "scrape_do_static")
+            return _static
+        # Proxy failed — fall through to normal httpx so we get *something*
+        log.warning(
+            "fetch %s: Scrape.do static proxy failed — falling back to direct httpx",
+            url,
+        )
 
     # Fast-path: skip httpx + curl_cffi entirely when the university has
     # scrape_do_skip_fallbacks=True.  For Angular/React SPA sites behind
