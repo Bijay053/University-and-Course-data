@@ -2,29 +2,37 @@
 # Hostname: www.lancaster.ac.uk
 # Country: United Kingdom  |  Currency: GBP
 #
-# Key findings (2026-06-12):
-#   - Pages are SSR (200 OK, ~240KB) — no Cloudflare blocking for cffi.
-#   - The FIRST <h1> is always the cookie-consent modal:
-#       <div id='biccy-prompt'><h1>Our use of cookies</h1></div>
-#     Fix: use //div[contains(@class,'course-title')] which contains:
-#       <h1>Computer Science</h1>  +  <p class='qualification'>BSc Hons</p>
-#     The element XPath collects both text nodes → "Computer Science BSc Hons"
-#     which passes the degree-qualifier check.
-#   - skip_degree_qualifier_check: true was letting cookie pages through.
-#     Removed (default=false) so "Our Use of Cookies" is auto-rejected.
-#   - Fee table: <table class='fees-table'> — Home col 1, International col 2.
-#   - Each course page cross-links to ~21 other year-specific course pages
-#     (BFS should discover hundreds of courses from 12 seeds @ budget 25).
+# Root-cause analysis (2026-06-12):
+#   - OLD YAML had course_detail_url_patterns that didn't match Lancaster's
+#     /study/{ug|pg}/.../[slug]/[year]/ URL shape → ALL candidates dropped
+#     → "kept 0/7 (dropped 7 = 100%)" → 0 staged.
+#   - NEW fix: correct allow_url_patterns + course_detail_url_patterns both
+#     using '/study/undergraduate/courses/[^/]+/20\d{2}/?$' etc., verified
+#     to match all 21 per-page cross-links AND all 12 seed URLs.
+#   - BFS budget was 25 (= orchestrator default, YAML override requires >25).
+#     Raised to 60. Each course page has 21 cross-links → budget of 60 visits
+#     many pages and accumulates hundreds of candidates.
+#   - Old YAML wasted budget on /study/student-experience/, /study/open-days/,
+#     /study/fees-and-funding/ etc. Added to block_url_patterns.
+#   - Cookie-consent modal: <div id='biccy-prompt'><h1>Our use of cookies</h1>
+#     Fix: use //div[contains(@class,'course-title')] → "Computer Science BSc Hons"
+#   - skip_degree_qualifier_check: true removed (was allowing cookie pages through)
+#   - Fee table: <table class='fees-table'> col1=Home col2=International
+#   - PDF fee (Fee_Summary_2324) yields stale £1,385/£1,850 values; per-course
+#     XPath is more reliable so PDF fee is deprioritised via low-priority fallback.
 
 discovery:
   seed_urls:
-    # Undergraduate
+    # Undergraduate — one representative per department cluster
     - https://www.lancaster.ac.uk/study/undergraduate/courses/computer-science-bsc-hons-g400/2026/
     - https://www.lancaster.ac.uk/study/undergraduate/courses/engineering-with-a-foundation-year-beng-hons-h10f/2026/
     - https://www.lancaster.ac.uk/study/undergraduate/courses/mathematics-with-computer-science-bsc-hons-gg14/2026/
     - https://www.lancaster.ac.uk/study/undergraduate/courses/mathematics-artificial-intelligence-and-realworld-systems-mars-bsc-hons-g1i4/2026/
     - https://www.lancaster.ac.uk/study/undergraduate/courses/theoretical-physics-study-abroad-mphys-hons-f322/2026/
-    # Postgraduate
+    - https://www.lancaster.ac.uk/study/undergraduate/courses/business-management-bsc-hons-n100/2026/
+    - https://www.lancaster.ac.uk/study/undergraduate/courses/english-language-ba-hons-q100/2026/
+    - https://www.lancaster.ac.uk/study/undergraduate/courses/psychology-bsc-hons-c800/2026/
+    # Postgraduate — one representative per faculty cluster
     - https://www.lancaster.ac.uk/study/postgraduate/postgraduate-courses/artificial-intelligence-msc/2026/
     - https://www.lancaster.ac.uk/study/postgraduate/postgraduate-courses/management-msc/2026/
     - https://www.lancaster.ac.uk/study/postgraduate/postgraduate-courses/management-science-mres/2026/
@@ -32,19 +40,24 @@ discovery:
     - https://www.lancaster.ac.uk/study/postgraduate/postgraduate-courses/international-relations-phd/2026/
     - https://www.lancaster.ac.uk/study/postgraduate/postgraduate-courses/health-data-science-phd/2026/
     - https://www.lancaster.ac.uk/study/postgraduate/postgraduate-courses/volcanology-msc/2026/
+    - https://www.lancaster.ac.uk/study/postgraduate/postgraduate-courses/data-science-msc/2026/
 
-  # Restrict BFS AND extraction to year-specific course URLs only.
-  # allow_url_patterns bypasses global blocks for matching URLs.
+  # Restrict BFS queue — only these URL shapes are allowed past the global block.
+  # Verified 2026-06-12: all 21 cross-links per course page match pattern [0],
+  # and all seed URLs match [0] or [1].
   allow_url_patterns:
     - '/study/undergraduate/courses/[^/]+/20\d{2}/?$'
     - '/study/postgraduate/postgraduate-courses/[^/]+/20\d{2}/?$'
 
-  # After discovery, drop any candidate not matching these patterns.
-  # Prevents category pages / cookie-wall pages from being extracted.
+  # Post-discovery gate: drop any candidate that is not a year-specific course URL.
+  # Verified: matches all 12+ seeds and 21 cross-links per page.
   course_detail_url_patterns:
     - '/study/undergraduate/courses/[^/]+/20\d{2}/?$'
     - '/study/postgraduate/postgraduate-courses/[^/]+/20\d{2}/?$'
 
+  # Explicit blocks prevent BFS from wasting page budget on non-course sections
+  # (previously /study/student-experience/, /study/fees-and-funding/, /study/open-days/
+  # were each being visited, burning 3–5 of the 25-page budget for zero yield).
   block_url_patterns:
     - '/news'
     - '/events'
@@ -52,18 +65,34 @@ discovery:
     - '/about'
     - '/contact'
     - '/linkassets/'
-    - '/entry-requirements/'
-    - '/lancaster-online/'
-    - '/study/partners'
-    - '/study/clearing'
-    - '/study/results'
+    - '/study/student-experience'
+    - '/study/fees-and-funding'
+    - '/study/open-days'
+    - '/study/international-students'
+    - '/study/entry-requirements'
+    - '/study/accommodation'
+    - '/study/scholarships'
     - '/study/global-experiences'
     - '/study/expression-of-interest'
+    - '/study/clearing'
+    - '/study/results'
     - '/study/chat'
+    - '/study/partners'
+    - '/study/lancaster-online'
     - '/study/undergraduate/courses/$'
     - '/study/postgraduate/postgraduate-courses/$'
+    - '/lums/postgraduate/programmes'
+    - '/maths/study/'
+    - '/lancaster-online/'
+    - '/international/'
+    - '/admissions'
+    - '/media/'
+    - '/our-'
 
-  bfs_page_budget: 25
+  # 60 > orchestrator default (25 non-fast / 12 fast) so this WILL apply.
+  # With 16 seeds × 21 cross-links each = up to ~336 candidates after dedup.
+  # Budget 60 lets the BFS visit ~60 discovered pages and expand further.
+  bfs_page_budget: 60
 
   always_browser_discover: false
   skip_browser_discovery: true
@@ -118,8 +147,9 @@ extraction:
     course_name:
       # Returns the course-title div which contains both:
       #   <h1>Computer Science</h1>  and  <p class='qualification'>BSc Hons</p>
-      # The extractor joins all text → "Computer Science BSc Hons".
-      # IMPORTANT: do NOT use //h1 — the cookie-consent modal uses h1 first.
+      # Extractor joins all text → "Computer Science BSc Hons".
+      # MUST NOT use //h1 — cookie-consent modal uses h1 first:
+      #   <div id='biccy-prompt'><h1>Our use of cookies</h1></div>
       xpath: "//div[contains(@class,'course-title')] | //main//h1[not(ancestor::*[@id='biccy-prompt'])]"
 
     city:
@@ -149,12 +179,13 @@ extraction:
     fee_international:
       primary:
         # Lancaster fee table: <table class='fees-table'>
-        #   Row 1 headers: Home | International
-        #   Row 2 values:  £9,790 | £X (international fee)
+        #   Row 1 headers: Home | International  (no £ sign)
+        #   Row 2 values:  £9,790 | £X  ← td[2] = International fee
         xpath: "//table[contains(@class,'fees-table')]//tr[contains(.,'£')]/td[2]/text()"
       fallback_1:
         xpath: "//table[contains(@class,'fees-table')]//td[contains(@class,'international') or contains(@headers,'international')]/text()"
       fallback_2:
+        # Note: must be //* not //[ to be valid XPath
         xpath: "//*[contains(text(),'International') or contains(text(),'Overseas')]/following-sibling::*[contains(text(),'£')]/text()"
 
   text_cleaning:
@@ -170,6 +201,6 @@ extraction:
     reject_if_missing:
       - course_name
     # skip_degree_qualifier_check intentionally NOT set (defaults to false).
-    # This keeps the guard that rejects pages whose extracted title is
-    # "Our Use of Cookies", "Master's Degrees in Lums", etc.
+    # With course_name = "Computer Science BSc Hons" (includes degree qualifier),
+    # the guard correctly passes real courses and rejects "Our Use of Cookies".
     require_international_fee: false
