@@ -2132,9 +2132,30 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         if is_blocked_page is not None and links:
             kept: list[dict] = []
             block_counts: dict[str, int] = {}
+
+            # Pre-compile course_detail_url_patterns so they act as an allow-list
+            # BEFORE the is_blocked_page gate.  Without this, universities like
+            # Lancaster whose course URLs contain a prefix that the global block
+            # list matches (e.g. /study/undergraduate → category_landing_page_url_block)
+            # would have every SSR-prop-discovered link dropped here.
+            _gate_detail_pats_raw = list(
+                getattr(_uni_cfg.discovery, "course_detail_url_patterns", None) or []
+            )
+            _gate_detail_pats: list[re.Pattern] = []
+            for _gdp in _gate_detail_pats_raw:
+                try:
+                    _gate_detail_pats.append(re.compile(_gdp))
+                except Exception:  # noqa: BLE001 — skip invalid regex
+                    pass
+
             for _lk in links:
                 _u = (_lk.get("url") or "").strip()
                 _n = (_lk.get("name") or "").strip()
+                # If the URL is explicitly whitelisted by course_detail_url_patterns,
+                # bypass the global block-list entirely.
+                if _gate_detail_pats and any(p.search(_u) for p in _gate_detail_pats):
+                    kept.append(_lk)
+                    continue
                 try:
                     _b, _r = is_blocked_page(_u, _n)
                 except Exception:  # noqa: BLE001
