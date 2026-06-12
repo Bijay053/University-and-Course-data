@@ -1,0 +1,175 @@
+# Lancaster University
+# Hostname: www.lancaster.ac.uk
+# Country: United Kingdom  |  Currency: GBP
+#
+# Key findings (2026-06-12):
+#   - Pages are SSR (200 OK, ~240KB) — no Cloudflare blocking for cffi.
+#   - The FIRST <h1> is always the cookie-consent modal:
+#       <div id='biccy-prompt'><h1>Our use of cookies</h1></div>
+#     Fix: use //div[contains(@class,'course-title')] which contains:
+#       <h1>Computer Science</h1>  +  <p class='qualification'>BSc Hons</p>
+#     The element XPath collects both text nodes → "Computer Science BSc Hons"
+#     which passes the degree-qualifier check.
+#   - skip_degree_qualifier_check: true was letting cookie pages through.
+#     Removed (default=false) so "Our Use of Cookies" is auto-rejected.
+#   - Fee table: <table class='fees-table'> — Home col 1, International col 2.
+#   - Each course page cross-links to ~21 other year-specific course pages
+#     (BFS should discover hundreds of courses from 12 seeds @ budget 25).
+
+discovery:
+  seed_urls:
+    # Undergraduate
+    - https://www.lancaster.ac.uk/study/undergraduate/courses/computer-science-bsc-hons-g400/2026/
+    - https://www.lancaster.ac.uk/study/undergraduate/courses/engineering-with-a-foundation-year-beng-hons-h10f/2026/
+    - https://www.lancaster.ac.uk/study/undergraduate/courses/mathematics-with-computer-science-bsc-hons-gg14/2026/
+    - https://www.lancaster.ac.uk/study/undergraduate/courses/mathematics-artificial-intelligence-and-realworld-systems-mars-bsc-hons-g1i4/2026/
+    - https://www.lancaster.ac.uk/study/undergraduate/courses/theoretical-physics-study-abroad-mphys-hons-f322/2026/
+    # Postgraduate
+    - https://www.lancaster.ac.uk/study/postgraduate/postgraduate-courses/artificial-intelligence-msc/2026/
+    - https://www.lancaster.ac.uk/study/postgraduate/postgraduate-courses/management-msc/2026/
+    - https://www.lancaster.ac.uk/study/postgraduate/postgraduate-courses/management-science-mres/2026/
+    - https://www.lancaster.ac.uk/study/postgraduate/postgraduate-courses/mathematics-phd/2026/
+    - https://www.lancaster.ac.uk/study/postgraduate/postgraduate-courses/international-relations-phd/2026/
+    - https://www.lancaster.ac.uk/study/postgraduate/postgraduate-courses/health-data-science-phd/2026/
+    - https://www.lancaster.ac.uk/study/postgraduate/postgraduate-courses/volcanology-msc/2026/
+
+  # Restrict BFS AND extraction to year-specific course URLs only.
+  # allow_url_patterns bypasses global blocks for matching URLs.
+  allow_url_patterns:
+    - '/study/undergraduate/courses/[^/]+/20\d{2}/?$'
+    - '/study/postgraduate/postgraduate-courses/[^/]+/20\d{2}/?$'
+
+  # After discovery, drop any candidate not matching these patterns.
+  # Prevents category pages / cookie-wall pages from being extracted.
+  course_detail_url_patterns:
+    - '/study/undergraduate/courses/[^/]+/20\d{2}/?$'
+    - '/study/postgraduate/postgraduate-courses/[^/]+/20\d{2}/?$'
+
+  block_url_patterns:
+    - '/news'
+    - '/events'
+    - '/staff/'
+    - '/about'
+    - '/contact'
+    - '/linkassets/'
+    - '/entry-requirements/'
+    - '/lancaster-online/'
+    - '/study/partners'
+    - '/study/clearing'
+    - '/study/results'
+    - '/study/global-experiences'
+    - '/study/expression-of-interest'
+    - '/study/chat'
+    - '/study/undergraduate/courses/$'
+    - '/study/postgraduate/postgraduate-courses/$'
+
+  bfs_page_budget: 25
+
+  always_browser_discover: false
+  skip_browser_discovery: true
+  use_wayback: false
+
+extraction:
+  max_parallel_fetch: 8
+  skip_browser_rescue: false
+  skip_per_course_browser: false
+
+  filters:
+    domestic_only:
+      enabled: false
+    online_only:
+      enabled: false
+
+  fees:
+    default_currency: GBP
+    prefer_international: true
+    prefer_annual_over_total: true
+    fee_year: "2026"
+    fee_term: "year"
+    reject_keywords:
+      - "Home"
+      - "UK"
+      - "Channel Islands"
+      - "Isle of Man"
+
+  english:
+    source: course_page
+    source_xpath: "//section[contains(@id, 'entry-requirements')] | //div[contains(@id, 'requirements')] | //main"
+
+    ielts:
+      raw_xpath: ".//*[contains(text(), 'IELTS')] | .//li[contains(., 'IELTS')]"
+      remove_tags: true
+      patterns:
+        overall:
+          - 'overall\sscore\sof\s*(\d\.?\d*)'
+          - 'IELTS.?(\d\.?\d)\s*overall'
+          - 'score\sof\s(\d\.?\d*)'
+        each:
+          - 'minimum\sof\s(\d\.?\d*)'
+          - '(\d\.?\d*)\sin\seach\s*element'
+          - 'no\selement\sless\sthan\s(\d\.?\d*)'
+      apply_each_to:
+        - ielts_reading
+        - ielts_writing
+        - ielts_listening
+        - ielts_speaking
+
+  selectors:
+    course_name:
+      # Returns the course-title div which contains both:
+      #   <h1>Computer Science</h1>  and  <p class='qualification'>BSc Hons</p>
+      # The extractor joins all text → "Computer Science BSc Hons".
+      # IMPORTANT: do NOT use //h1 — the cookie-consent modal uses h1 first.
+      xpath: "//div[contains(@class,'course-title')] | //main//h1[not(ancestor::*[@id='biccy-prompt'])]"
+
+    city:
+      value: "Lancaster"
+
+    study_load:
+      xpath: "//div[contains(@class,'course-meta')]//*[contains(text(),'Mode')]/following-sibling::text() | //li[contains(.,'Full-time') or contains(.,'Part-time')]/text()"
+
+    duration:
+      xpath: "//div[contains(@class,'course-meta')]//*[contains(text(),'Duration') or contains(text(),'Length')]/following-sibling::text() | //li[contains(.,'year') or contains(.,'Duration')]/text()"
+
+    intake_month:
+      xpath: "//div[contains(@class,'course-meta')]//*[contains(text(),'Start')]/following-sibling::text()"
+
+    course_description:
+      xpath: "//section[contains(@id,'overview')] | //div[contains(@class,'course-overview')] | //div[contains(@id,'course-description')]"
+
+    course_structure:
+      xpath: "//section[contains(@id,'course-structure')] | //div[contains(@id,'modules')] | //div[contains(@class,'modules-content')]"
+
+    career:
+      xpath: "//section[contains(@id,'careers')] | //div[contains(@class,'careers-content')] | //div[contains(@id,'opportunities')]"
+
+    other_requirements:
+      xpath: "//section[contains(@id,'entry-requirements')] | //div[contains(@id,'requirements-content')]"
+
+    fee_international:
+      primary:
+        # Lancaster fee table: <table class='fees-table'>
+        #   Row 1 headers: Home | International
+        #   Row 2 values:  £9,790 | £X (international fee)
+        xpath: "//table[contains(@class,'fees-table')]//tr[contains(.,'£')]/td[2]/text()"
+      fallback_1:
+        xpath: "//table[contains(@class,'fees-table')]//td[contains(@class,'international') or contains(@headers,'international')]/text()"
+      fallback_2:
+        xpath: "//*[contains(text(),'International') or contains(text(),'Overseas')]/following-sibling::*[contains(text(),'£')]/text()"
+
+  text_cleaning:
+    global_substring_blocklist:
+      - Apply now
+      - Find out more
+      - Book an open day
+      - Request a prospectus
+      - Chat with a student
+      - Our use of cookies
+
+  staging:
+    reject_if_missing:
+      - course_name
+    # skip_degree_qualifier_check intentionally NOT set (defaults to false).
+    # This keeps the guard that rejects pages whose extracted title is
+    # "Our Use of Cookies", "Master's Degrees in Lums", etc.
+    require_international_fee: false
