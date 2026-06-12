@@ -205,6 +205,7 @@ async def stage_course(
     payload: dict[str, Any],
     evidence: list[dict[str, Any]] | None = None,
     source_url: str | None = None,
+    skip_url_block: bool = False,
 ) -> StageResult:
     name = (course_name or "").strip()
     if len(name) < 3:
@@ -223,7 +224,14 @@ async def stage_course(
     # is on the page blocklist (apply / fees / news / faculty / etc.).
     # Discovery should have caught this earlier; if a regression there
     # ever lets one through, this stops the bad row from being saved.
-    if source_url:
+    # skip_url_block=True is passed by the orchestrator when the URL already
+    # matched discovery.course_detail_url_patterns — those patterns act as an
+    # explicit allow-list, so running the global block-list check a second time
+    # here would incorrectly reject valid detail pages whose URL paths happen to
+    # contain a segment that is also a known listing-page substring
+    # (e.g. Lancaster's /study/postgraduate/postgraduate-courses/… which
+    # matches the global "/study/postgraduate/" pattern).
+    if source_url and not skip_url_block:
         blocked, block_reason = is_blocked_page(source_url, payload.get("page_title"))
         if blocked:
             log.info("blocked_page rejected %r: %s (%s)", name, block_reason, source_url)

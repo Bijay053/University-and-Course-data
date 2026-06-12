@@ -2129,24 +2129,24 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             from app.services.scraper.guards import is_blocked_page
         except Exception:  # noqa: BLE001 — never abort the run on import failure
             is_blocked_page = None  # type: ignore[assignment]
+        # Pre-compile course_detail_url_patterns once here so they are
+        # accessible both in the pre-extraction link gate below AND later
+        # at the stage_course call site (which needs skip_url_block=True for
+        # URLs that match — see ~line 3663).  Initialised unconditionally so
+        # the variable is always in scope even when the is_blocked_page import
+        # fails or links is empty at this point.
+        _gate_detail_pats_raw = list(
+            getattr(_uni_cfg.discovery, "course_detail_url_patterns", None) or []
+        )
+        _gate_detail_pats: list[re.Pattern] = []
+        for _gdp in _gate_detail_pats_raw:
+            try:
+                _gate_detail_pats.append(re.compile(_gdp))
+            except Exception:  # noqa: BLE001 — skip invalid regex
+                pass
         if is_blocked_page is not None and links:
             kept: list[dict] = []
             block_counts: dict[str, int] = {}
-
-            # Pre-compile course_detail_url_patterns so they act as an allow-list
-            # BEFORE the is_blocked_page gate.  Without this, universities like
-            # Lancaster whose course URLs contain a prefix that the global block
-            # list matches (e.g. /study/undergraduate → category_landing_page_url_block)
-            # would have every SSR-prop-discovered link dropped here.
-            _gate_detail_pats_raw = list(
-                getattr(_uni_cfg.discovery, "course_detail_url_patterns", None) or []
-            )
-            _gate_detail_pats: list[re.Pattern] = []
-            for _gdp in _gate_detail_pats_raw:
-                try:
-                    _gate_detail_pats.append(re.compile(_gdp))
-                except Exception:  # noqa: BLE001 — skip invalid regex
-                    pass
 
             for _lk in links:
                 _u = (_lk.get("url") or "").strip()
@@ -3650,6 +3650,17 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                         )
 
                 async with AsyncSessionLocal() as stage_db:
+                    # If the URL already matched course_detail_url_patterns during
+                    # the pre-extraction link gate (lines ~2154), skip the global
+                    # is_blocked_page() check inside stage_course.  Those patterns
+                    # are an explicit allow-list; re-running the block-list would
+                    # falsely reject courses whose URL contains a listing-page
+                    # substring (e.g. Lancaster /study/postgraduate/…).
+                    _cur_url = r.get("url") or ""
+                    _skip_url_block = bool(
+                        _gate_detail_pats
+                        and any(p.search(_cur_url) for p in _gate_detail_pats)
+                    )
                     res = await stage_course(
                         stage_db,
                         scrape_job_id=runtime_job_id,
@@ -3661,6 +3672,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                         # render it instead of a blank body.
                         evidence=r.get("evidence") or [],
                         source_url=r.get("url"),
+                        skip_url_block=_skip_url_block,
                     )
                     # ── Phase 9: Verification Engine ──────────────────────────
                     # Runs inside the same session (already committed by

@@ -132,11 +132,11 @@ extraction:
     prefer_annual_over_total: true
     fee_year: "2026"
     fee_term: "year"
-    reject_keywords:
-      - "Home"
-      - "UK"
-      - "Channel Islands"
-      - "Isle of Man"
+    # reject_keywords intentionally omitted: the fee XPath already targets
+    # td[2] (the International column) directly, so Home/UK keywords in the
+    # evidence context come from the adjacent Home column — they are NOT an
+    # indicator that we scraped the domestic fee.  Keeping these keywords
+    # caused FEE_REJECT on every course even when £30,770 was correct.
 
   english:
     source: course_page
@@ -167,6 +167,16 @@ extraction:
     # title is always inside <div class="course-title"><h1>...</h1></div>.
     # This CSS selector targets that div specifically and skips the modal.
     h1_css_selector: "div.course-title h1"
+    # The H1 inside div.course-title contains only the bare subject name
+    # (e.g. "Artificial Intelligence") with no degree qualifier.  The full
+    # degree name including the level abbreviation is only in <title>:
+    #   "Artificial Intelligence MSc - Lancaster University"
+    # prefer_title_over_h1 promotes the cleaned <title> (conf 0.85) above
+    # the H1 (conf 0.6) so the effective_name carries a degree qualifier
+    # and passes _name_has_degree_qualifier in the staging gate.
+    prefer_title_over_h1: true
+    strip_title_suffixes:
+      - " - Lancaster University"
 
   selectors:
     course_name:
