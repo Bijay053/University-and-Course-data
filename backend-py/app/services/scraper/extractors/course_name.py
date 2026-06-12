@@ -237,7 +237,33 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:  # noqa: ARG00
         return []
     soup = BeautifulSoup(html, "html.parser")
     candidates: list[tuple[str, str, float]] = []
-    h1 = soup.find("h1")
+
+    # Per-uni YAML option: h1_css_selector — use a targeted CSS selector instead
+    # of a bare soup.find("h1") when the page has multiple H1 elements and the
+    # first is not the course title.  Canonical case: Lancaster University whose
+    # cookie-consent modal injects <div id="biccy-prompt"><h1>Our use of
+    # cookies</h1></div> before the main content, causing bare soup.find("h1")
+    # to return the wrong element.  Falls back to soup.find("h1") if the selector
+    # matches nothing so existing behaviour is preserved for all other unis.
+    _h1_css: str | None = None
+    _prefer_title = False
+    try:
+        from app.services.scraper.config.context import (  # noqa: PLC0415
+            get_uni_config as _get_uni_config_cn,
+        )
+        _cn_cfg = _get_uni_config_cn()
+        if _cn_cfg is not None and _cn_cfg.extraction is not None:
+            _prefer_title = bool(
+                getattr(_cn_cfg.extraction.course_name, "prefer_title_over_h1", False)
+            )
+            _h1_css = getattr(_cn_cfg.extraction.course_name, "h1_css_selector", None) or None
+    except Exception:  # noqa: BLE001
+        pass
+
+    if _h1_css:
+        h1 = soup.select_one(_h1_css) or soup.find("h1")
+    else:
+        h1 = soup.find("h1")
     if h1:
         candidates.append(("h1", h1.get_text(" ", strip=True), 0.9))
     title = soup.find("title")
@@ -250,18 +276,6 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:  # noqa: ARG00
     # degree name ("Business and Management degree - BA (Hons)") appears only in
     # the <title>.  When True, swap title to front before any other promotion
     # logic runs.  strip_title_suffixes in YAML removes the provider suffix.
-    _prefer_title = False
-    try:
-        from app.services.scraper.config.context import (  # noqa: PLC0415
-            get_uni_config as _get_uni_config_cn,
-        )
-        _cn_cfg = _get_uni_config_cn()
-        if _cn_cfg is not None and _cn_cfg.extraction is not None:
-            _prefer_title = bool(
-                getattr(_cn_cfg.extraction.course_name, "prefer_title_over_h1", False)
-            )
-    except Exception:  # noqa: BLE001
-        pass
 
     if _prefer_title and len(candidates) == 2:
         # Promote title (conf 0.85) over H1 (conf 0.6) so the full degree name

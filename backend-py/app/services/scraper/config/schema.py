@@ -1987,6 +1987,19 @@ class CourseNameConfig(BaseModel):
             "strip_title_suffixes to remove the provider suffix from the title."
         ),
     )
+    h1_css_selector: str | None = Field(
+        default=None,
+        description=(
+            "CSS selector used to find the course-name H1 instead of a bare "
+            "soup.find('h1').  Required when the page has multiple H1 elements "
+            "and the first one is NOT the course title (e.g. Lancaster whose "
+            "cookie-consent modal injects <h1>Our use of cookies</h1> before "
+            "the main content area).  "
+            "Example (Lancaster): 'div.course-title h1' — targets the H1 "
+            "inside the .course-title div which always holds the real degree name.  "
+            "Falls back to soup.find('h1') if the selector matches nothing."
+        ),
+    )
     university_aliases: list[str] = Field(
         default_factory=list,
         description=(

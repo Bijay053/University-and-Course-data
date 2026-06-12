@@ -30,3 +30,4 @@
 - [UWL intl fee = SSR JSON blob](uwl-json-blob-fee.md) — static render=false makes the nationality <select> an empty shell; read field_p_cv_int_main_fee from the SSR blob first; switching a uni to static must re-verify fields exist in static HTML.
 - [UWL research-degree page template](uwl-research-degree.md) — /course/research/ pages have no SSR blob but DO have a nationality select with correct international fees; "no element under" is PhD IELTS phrasing (not "no band/component below").
 - [Lancaster SSR Vue prop discovery](lancaster-listing.md) — listing pages are JS-rendered visually but :courses-data prop is SSR JSON; plain httpx gets 538 courses (371 UG+167 PG); entryYear field is "26/27" not "26".
+- [Lancaster cookie-modal H1 trap](lancaster-cookie-modal-h1.md) — biccy-prompt modal h1 beats course title in soup.find("h1"); fix is h1_css_selector YAML + CourseNameConfig field; YAML selectors.course_name.xpath is AI-rule path, NOT the built-in extractor.

@@ -160,11 +160,20 @@ extraction:
         - ielts_listening
         - ielts_speaking
 
+  course_name:
+    # Lancaster's cookie-consent modal injects <div id="biccy-prompt">
+    # <h1>Our use of cookies</h1></div> BEFORE the main content area, so
+    # a bare soup.find("h1") returns the wrong element. The real course
+    # title is always inside <div class="course-title"><h1>...</h1></div>.
+    # This CSS selector targets that div specifically and skips the modal.
+    h1_css_selector: "div.course-title h1"
+
   selectors:
     course_name:
-      # MUST NOT use //h1 — cookie-consent modal uses h1 first:
-      #   <div id='biccy-prompt'><h1>Our use of cookies</h1></div>
-      xpath: "//div[contains(@class,'course-title')] | //main//h1[not(ancestor::*[@id='biccy-prompt'])]"
+      # Phase-2 AI-rule XPath (used by ai_extractor_run, not course_name.py).
+      # The h1_css_selector above fixes the built-in extractor.
+      # MUST NOT use bare //h1 — cookie modal h1 comes first in the DOM.
+      xpath: "//div[contains(@class,'course-title')]/h1"
 
     city:
       value: "Lancaster"
