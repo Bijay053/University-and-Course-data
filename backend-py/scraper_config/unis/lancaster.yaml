@@ -27,6 +27,12 @@ discovery:
     - '/study/undergraduate/courses/[^/]+/20\d{2}/?$'
     - '/study/postgraduate/postgraduate-courses/[^/]+/20\d{2}/?$'
 
+  # Browser fallback XPath (used automatically by lancaster_listing.py if the
+  # SSR :courses-data prop is missing).  The Vue component renders an A-Z
+  # navigation client-side; once mounted this XPath extracts all course links:
+  #   //nav[contains(@class, 'a-z')]//li/a/@href
+  # No YAML flag needed — the python provider activates this path automatically.
+
   # BFS is skipped when lancaster_listing returns ≥1 link.
   # These settings are kept as a safe fallback if the listing provider fails.
   seed_urls:
