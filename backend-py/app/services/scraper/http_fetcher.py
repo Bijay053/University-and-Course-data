@@ -243,6 +243,7 @@ async def fetch_html_scrape_do(
     *,
     render: bool = False,
     wait_for_ms: int = 3000,
+    geo_code: str | None = None,
 ) -> str | None:
     """Fetch via Scrape.do residential proxy — paid tier-4/5 Cloudflare bypass.
 
@@ -276,6 +277,8 @@ async def fetch_html_scrape_do(
         if render:
             params["render"] = "true"
             params["waitFor"] = str(wait_for_ms)
+        if geo_code:
+            params["geoCode"] = geo_code.upper()
         async with httpx.AsyncClient(timeout=90, follow_redirects=True) as c:
             r = await c.get("https://api.scrape.do", params=params)
             if r.status_code == 200 and len(r.text) > 500:
@@ -504,16 +507,25 @@ async def fetch_html(url: str, *, retries: int = 2) -> str | None:
     _scrape_do_static = _scrape_do_static_active.get()
     _has_scrape_do = bool(os.environ.get("SCRAPE_DO_TOKEN"))
 
+    # Read per-university geo code (ISO 3166-1 alpha-2) for Scrape.do pinning.
+    _scrape_do_geo: str | None = None
+    if _scrape_do_static or _scrape_do_render:
+        try:
+            from app.services.scraper.config.context import get_uni_config as _guc
+            _scrape_do_geo = getattr(_guc().extraction, "scrape_do_geo", "") or None
+        except Exception:  # noqa: BLE001
+            pass
+
     # Geo-block bypass: skip httpx/cffi entirely and proxy through Scrape.do
     # static (render=False, ~$0.0005/call).  Activated by scrape_do_static=true
     # in extraction YAML for SSR universities that serve geo-targeted content
     # when the request comes from a US IP (Lancaster is the canonical case).
     if _scrape_do_static and _has_scrape_do:
         log.info(
-            "fetch %s: scrape_do_static=True — routing via Scrape.do proxy (render=False)",
-            url,
+            "fetch %s: scrape_do_static=True geo=%s — routing via Scrape.do proxy (render=False)",
+            url, _scrape_do_geo or "auto",
         )
-        _static = await fetch_html_scrape_do(url, render=False)
+        _static = await fetch_html_scrape_do(url, render=False, geo_code=_scrape_do_geo)
         if _static is not None:
             from app.services.scraper.snapshot_context import stage_snapshot as _stage
             _stage(url, _static, "scrape_do_static")

@@ -116,6 +116,9 @@ extraction:
   # UK/EU IP so the actual course page is returned.  No JS rendering
   # needed — pages are fully SSR.  Cost: ~$0.27 per full 538-course run.
   scrape_do_static: true
+  # Use a Nepal exit-node IP so Lancaster serves international (non-US) content.
+  # NP is a neutral non-US/non-UK country that gets standard international fees.
+  scrape_do_geo: NP
 
   filters:
     domestic_only:

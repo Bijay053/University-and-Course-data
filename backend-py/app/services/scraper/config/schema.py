@@ -2282,6 +2282,18 @@ class ExtractionConfig(BaseModel):
             "execute JavaScript — use scrape_do_render for JS-rendered pages."
         ),
     )
+    scrape_do_geo: str = Field(
+        default="",
+        description=(
+            "ISO 3166-1 alpha-2 country code passed to Scrape.do as the "
+            "'geoCode' parameter, pinning the exit-node IP to that country. "
+            "Applies to both scrape_do_static and scrape_do_render calls. "
+            "Example: 'NP' (Nepal) makes the university site see a Nepalese "
+            "visitor — useful when fee/requirement pages show international "
+            "student content only for certain origin countries. "
+            "Leave empty to let Scrape.do choose the nearest residential IP."
+        ),
+    )
     skip_ai_when_text_empty: bool = Field(
         default=False,
         description=(
