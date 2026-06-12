@@ -629,6 +629,28 @@ class DiscoveryConfig(BaseModel):
             "Solr provider instead of HTML crawling. See SearchStaxConfig."
         ),
     )
+    lancaster_listing: bool = Field(
+        default=False,
+        description=(
+            "Lancaster University listing-page discovery. When true, fetches the "
+            "Undergraduate and Postgraduate listing pages from lancaster.ac.uk, "
+            "extracts the server-rendered :courses-data Vue prop (JSON array of "
+            "all courses embedded in the SSR HTML), and builds course URLs for the "
+            "current entry year — no browser rendering or Playwright required. "
+            "Returns ~538 course URLs (371 UG + 167 PG for 2026 entry). "
+            "Per-course extraction still runs against individual course pages "
+            "(which are SSR and work fine with plain httpx). "
+            "Use lancaster_listing_year to pin a specific entry year; defaults to "
+            "the current calendar year."
+        ),
+    )
+    lancaster_listing_year: Optional[int] = Field(
+        default=None,
+        description=(
+            "4-digit entry year for lancaster_listing discovery (e.g. 2026). "
+            "Defaults to the current calendar year when not set."
+        ),
+    )
     scrapy: Optional[ScrapyConfig] = Field(
         default=None,
         description=(

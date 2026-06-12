@@ -926,6 +926,54 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 await db.commit()
                 return
 
+        # ── Lancaster University listing-page discovery ───────────────────────
+        # When discovery.lancaster_listing is true, fetch the two SSR listing
+        # pages (UG + PG), extract the :courses-data Vue prop (server-rendered
+        # JSON), and build course URLs.  No Playwright required — the prop is
+        # embedded in the raw HTML by the server.  Per-course extraction still
+        # runs normally against the individual course detail pages.
+        _lancaster_listing = getattr(_uni_cfg.discovery, "lancaster_listing", False)
+        if not links and _lancaster_listing:
+            _lancaster_year = getattr(_uni_cfg.discovery, "lancaster_listing_year", None)
+            log.info(
+                "[LANCASTER] lancaster_listing=true — fetching listing pages (year=%s)",
+                _lancaster_year or "current",
+            )
+            await emit(
+                "status",
+                "[DISCOVER] Lancaster: extracting course list from SSR listing pages...",
+                phase="discover",
+            )
+            try:
+                from app.services.scraper.lancaster_listing import (
+                    fetch_lancaster_listing_links,
+                )
+                _lancaster_links = await fetch_lancaster_listing_links(
+                    year=_lancaster_year,
+                    emit=emit,
+                )
+            except Exception as _lanc_exc:
+                log.error(
+                    "[LANCASTER] listing provider failed: %s", _lanc_exc, exc_info=True
+                )
+                _lancaster_links = []
+            if _lancaster_links:
+                links = _lancaster_links
+                _always_browser = False
+                log.info(
+                    "[LANCASTER] %d course links from listing pages — skipping BFS",
+                    len(links),
+                )
+                await emit(
+                    "status",
+                    f"[DISCOVER] Lancaster: {len(links)} courses found in listing pages",
+                    phase="discover",
+                )
+            else:
+                log.warning(
+                    "[LANCASTER] listing provider returned 0 links — falling through to BFS"
+                )
+
         # ── YAML-driven generic search API ───────────────────────────────────
         # When discovery.generic_search_api is set in the per-uni YAML, run
         # it NOW — before BFS/browser/Wayback — so operator-configured APIs

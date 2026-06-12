@@ -2,62 +2,41 @@
 # Hostname: www.lancaster.ac.uk
 # Country: United Kingdom  |  Currency: GBP
 #
-# Root-cause analysis (2026-06-12):
-#   - OLD YAML had course_detail_url_patterns that didn't match Lancaster's
-#     /study/{ug|pg}/.../[slug]/[year]/ URL shape → ALL candidates dropped
-#     → "kept 0/7 (dropped 7 = 100%)" → 0 staged.
-#   - NEW fix: correct allow_url_patterns + course_detail_url_patterns both
-#     using '/study/undergraduate/courses/[^/]+/20\d{2}/?$' etc., verified
-#     to match all 21 per-page cross-links AND all 12 seed URLs.
-#   - BFS budget was 25 (= orchestrator default, YAML override requires >25).
-#     Raised to 60. Each course page has 21 cross-links → budget of 60 visits
-#     many pages and accumulates hundreds of candidates.
-#   - Old YAML wasted budget on /study/student-experience/, /study/open-days/,
-#     /study/fees-and-funding/ etc. Added to block_url_patterns.
-#   - Cookie-consent modal: <div id='biccy-prompt'><h1>Our use of cookies</h1>
-#     Fix: use //div[contains(@class,'course-title')] → "Computer Science BSc Hons"
-#   - skip_degree_qualifier_check: true removed (was allowing cookie pages through)
-#   - Fee table: <table class='fees-table'> col1=Home col2=International
-#   - PDF fee (Fee_Summary_2324) yields stale £1,385/£1,850 values; per-course
-#     XPath is more reliable so PDF fee is deprioritised via low-priority fallback.
+# Discovery strategy (2026-06-12):
+#   Lancaster's listing pages (/study/undergraduate/courses/ and
+#   /study/postgraduate/postgraduate-courses/) are JS-rendered but the
+#   Vue 3 <course-listing> component receives ALL course data via a
+#   server-rendered :courses-data prop embedded directly in the SSR HTML.
+#   Plain httpx fetches both pages and extracts the JSON prop → 538 course
+#   URLs for 2026 entry (371 UG + 167 PG) with zero Playwright required.
+#   Individual course DETAIL pages are fully SSR — plain httpx works fine.
+#
+# Previous attempts (pre 2026-06-12):
+#   - course_detail_url_patterns mismatch dropped 100% of BFS candidates → 0 staged
+#   - cookie-consent modal h1 was being extracted as course_name
+#   - BFS budget was wasted on non-course pages
+#   All resolved by the lancaster_listing provider which bypasses BFS entirely.
 
 discovery:
-  seed_urls:
-    # Undergraduate — one representative per department cluster
-    - https://www.lancaster.ac.uk/study/undergraduate/courses/computer-science-bsc-hons-g400/2026/
-    - https://www.lancaster.ac.uk/study/undergraduate/courses/engineering-with-a-foundation-year-beng-hons-h10f/2026/
-    - https://www.lancaster.ac.uk/study/undergraduate/courses/mathematics-with-computer-science-bsc-hons-gg14/2026/
-    - https://www.lancaster.ac.uk/study/undergraduate/courses/mathematics-artificial-intelligence-and-realworld-systems-mars-bsc-hons-g1i4/2026/
-    - https://www.lancaster.ac.uk/study/undergraduate/courses/theoretical-physics-study-abroad-mphys-hons-f322/2026/
-    - https://www.lancaster.ac.uk/study/undergraduate/courses/business-management-bsc-hons-n100/2026/
-    - https://www.lancaster.ac.uk/study/undergraduate/courses/english-language-ba-hons-q100/2026/
-    - https://www.lancaster.ac.uk/study/undergraduate/courses/psychology-bsc-hons-c800/2026/
-    # Postgraduate — one representative per faculty cluster
-    - https://www.lancaster.ac.uk/study/postgraduate/postgraduate-courses/artificial-intelligence-msc/2026/
-    - https://www.lancaster.ac.uk/study/postgraduate/postgraduate-courses/management-msc/2026/
-    - https://www.lancaster.ac.uk/study/postgraduate/postgraduate-courses/management-science-mres/2026/
-    - https://www.lancaster.ac.uk/study/postgraduate/postgraduate-courses/mathematics-phd/2026/
-    - https://www.lancaster.ac.uk/study/postgraduate/postgraduate-courses/international-relations-phd/2026/
-    - https://www.lancaster.ac.uk/study/postgraduate/postgraduate-courses/health-data-science-phd/2026/
-    - https://www.lancaster.ac.uk/study/postgraduate/postgraduate-courses/volcanology-msc/2026/
-    - https://www.lancaster.ac.uk/study/postgraduate/postgraduate-courses/data-science-msc/2026/
+  lancaster_listing: true
+  lancaster_listing_year: 2026
 
-  # Restrict BFS queue — only these URL shapes are allowed past the global block.
-  # Verified 2026-06-12: all 21 cross-links per course page match pattern [0],
-  # and all seed URLs match [0] or [1].
-  allow_url_patterns:
-    - '/study/undergraduate/courses/[^/]+/20\d{2}/?$'
-    - '/study/postgraduate/postgraduate-courses/[^/]+/20\d{2}/?$'
-
-  # Post-discovery gate: drop any candidate that is not a year-specific course URL.
-  # Verified: matches all 12+ seeds and 21 cross-links per page.
+  # course_detail_url_patterns: validates that URLs returned by the listing
+  # provider are in the correct shape before extraction.
   course_detail_url_patterns:
     - '/study/undergraduate/courses/[^/]+/20\d{2}/?$'
     - '/study/postgraduate/postgraduate-courses/[^/]+/20\d{2}/?$'
 
-  # Explicit blocks prevent BFS from wasting page budget on non-course sections
-  # (previously /study/student-experience/, /study/fees-and-funding/, /study/open-days/
-  # were each being visited, burning 3–5 of the 25-page budget for zero yield).
+  # BFS is skipped when lancaster_listing returns ≥1 link.
+  # These settings are kept as a safe fallback if the listing provider fails.
+  seed_urls:
+    - https://www.lancaster.ac.uk/study/undergraduate/courses/computer-science-bsc-hons-g400/2026/
+    - https://www.lancaster.ac.uk/study/postgraduate/postgraduate-courses/artificial-intelligence-msc/2026/
+
+  allow_url_patterns:
+    - '/study/undergraduate/courses/[^/]+/20\d{2}/?$'
+    - '/study/postgraduate/postgraduate-courses/[^/]+/20\d{2}/?$'
+
   block_url_patterns:
     - '/news'
     - '/events'
@@ -89,11 +68,7 @@ discovery:
     - '/media/'
     - '/our-'
 
-  # 60 > orchestrator default (25 non-fast / 12 fast) so this WILL apply.
-  # With 16 seeds × 21 cross-links each = up to ~336 candidates after dedup.
-  # Budget 60 lets the BFS visit ~60 discovered pages and expand further.
   bfs_page_budget: 60
-
   always_browser_discover: false
   skip_browser_discovery: true
   use_wayback: false
@@ -185,7 +160,6 @@ extraction:
       fallback_1:
         xpath: "//table[contains(@class,'fees-table')]//td[contains(@class,'international') or contains(@headers,'international')]/text()"
       fallback_2:
-        # Note: must be //* not //[ to be valid XPath
         xpath: "//*[contains(text(),'International') or contains(text(),'Overseas')]/following-sibling::*[contains(text(),'£')]/text()"
 
   text_cleaning:
@@ -200,7 +174,4 @@ extraction:
   staging:
     reject_if_missing:
       - course_name
-    # skip_degree_qualifier_check intentionally NOT set (defaults to false).
-    # With course_name = "Computer Science BSc Hons" (includes degree qualifier),
-    # the guard correctly passes real courses and rejects "Our Use of Cookies".
     require_international_fee: false
