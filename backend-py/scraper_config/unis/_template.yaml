@@ -223,11 +223,22 @@ discovery:
   #   - '/courses/interest-areas/'
   #   - '\?'           # any URL with a query string
 
-  # Post-discovery extraction gate: only candidate URLs matching at least one
-  # of these patterns are sent to the extractor. Lets the BFS crawl listing
-  # pages freely while restricting extraction to genuine course-detail URLs.
-  # Emits: [DISCOVER] YAML course detail filter: dropped listing URL <url>
+  # Post-discovery extraction gate (allow-list + global-block bypass).
+  # Two effects in one field:
+  #   1. ALLOW: only URLs matching at least one pattern reach the extractor.
+  #      Lets BFS crawl listing/category pages freely while keeping extraction
+  #      restricted to genuine course-detail URLs.
+  #   2. BYPASS: URLs that match skip the global is_blocked_page() classifier.
+  #      Critical when your course URLs contain a globally-blocked prefix such
+  #      as /study/undergraduate, /study/postgraduate, /study/international —
+  #      without this, those courses are silently dropped before extraction even
+  #      starts. (Lancaster lesson: 538 SSR-prop courses dropped until this was
+  #      set to match /study/undergraduate|postgraduate/courses/[^/]+/20\d{2}/)
+  # Emits: [EXTRACT] course_detail_url_patterns bypass: N URLs exempted from gate
+  #        [DISCOVER] YAML course detail filter: kept <url>
   course_detail_url_patterns: []
+  #   - '/study/undergraduate/courses/[^/]+/20\d{2}/?$'
+  #   - '/study/postgraduate/postgraduate-courses/[^/]+/20\d{2}/?$'
   #   - '^https://www\.bathspa\.ac\.uk/courses/(ug|pg|ify|phd|edd|pgce)-[a-z0-9-]+/?$'
 
   # Regex blocklist: matching URLs are dropped before extraction.

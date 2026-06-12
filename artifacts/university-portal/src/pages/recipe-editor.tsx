@@ -159,6 +159,7 @@ interface Recipe {
   fallback_strategy: string;
   api?: ApiConfig;
   must_contain: string[];
+  course_detail_url_patterns: string[];
   block_url_patterns: string[];
   fetch_detail_page: boolean;
   selectors: Record<string, FieldSelector>;
@@ -232,6 +233,7 @@ const EMPTY_RECIPE: Recipe = {
   bfs_page_budget: null,
   fallback_strategy: "bfs",
   must_contain: [],
+  course_detail_url_patterns: [],
   block_url_patterns: [],
   fetch_detail_page: true,
   selectors: {},
@@ -3215,6 +3217,20 @@ export default function RecipeEditorPage() {
               />
               <Separator />
               <StringListEditor
+                label="Course Detail URL Patterns (extraction allow-list)"
+                values={recipe.course_detail_url_patterns}
+                onChange={v => patchRecipe({ course_detail_url_patterns: v })}
+                placeholder="e.g. /study/undergraduate/courses/[^/]+/20\d{2}/?$"
+                helpText={
+                  <span>
+                    Regex allow-list applied <strong>at the extraction gate</strong>. Any URL matching one of these patterns is sent directly to the extractor, bypassing the global block-list entirely.{" "}
+                    <strong>Critical for universities</strong> whose course URLs contain globally-blocked prefixes (e.g. <code className="text-xs">/study/undergraduate</code>, <code className="text-xs">/study/postgraduate</code>).{" "}
+                    Lancaster example: <code className="text-xs">/study/undergraduate/courses/[^/]+/20\d{"{2}"}/?$</code>
+                  </span>
+                }
+              />
+              <Separator />
+              <StringListEditor
                 label="Block URL Patterns (regex blocklist)"
                 values={recipe.block_url_patterns}
                 onChange={v => patchRecipe({ block_url_patterns: v })}
@@ -4380,6 +4396,10 @@ function buildYamlPreview(recipe: Recipe): string {
   if (recipe.seed_urls.length > 0) {
     discLines.push("  seed_urls:");
     recipe.seed_urls.forEach(u => discLines.push(`    - ${_yq(u)}`));
+  }
+  if (recipe.course_detail_url_patterns.length > 0) {
+    discLines.push("  course_detail_url_patterns:");
+    recipe.course_detail_url_patterns.forEach(p => discLines.push(`    - ${_yq(p)}`));
   }
   if (recipe.block_url_patterns.length > 0) {
     discLines.push("  block_url_patterns:");

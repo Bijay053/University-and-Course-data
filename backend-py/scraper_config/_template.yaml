@@ -196,20 +196,30 @@ discovery:
   #   - '/courses/interest-areas/'
   #   - '\?'                          # any URL with a query string
 
-  # ── Post-discovery extraction gate ────────────────────────────────────────
-  # Regex whitelist applied AFTER all discovery tiers, as the final filter
-  # before extraction begins. When non-empty, only candidate URLs matching at
-  # least one pattern are sent to the extractor. Unlike allow_url_patterns
-  # (which restricts BFS crawling), this filter lets the BFS crawl listing
-  # and category pages freely while restricting extraction to URLs that look
-  # like genuine course-detail pages.
+  # ── Post-discovery extraction gate (allow-list + global-block bypass) ─────
+  # Two effects in one field:
+  #   1. ALLOW — only URLs matching at least one pattern reach the extractor.
+  #      Lets the BFS crawl listing/category pages freely while restricting
+  #      extraction to genuine course-detail pages.
+  #   2. BYPASS — matching URLs skip the global is_blocked_page() classifier.
+  #      Essential when course URLs contain a globally-blocked prefix such as
+  #      /study/undergraduate, /study/postgraduate, or /study/international.
+  #      Without this, those courses are silently dropped at the extraction
+  #      gate before any fetching occurs.
+  #      (Lancaster lesson: 538 SSR-prop-discovered courses were dropped at the
+  #      gate because /study/undergraduate matched the global block-list; adding
+  #      course_detail_url_patterns fixed it.)
   #
-  # Emits:
+  # Log emits:
+  #   [EXTRACT] course_detail_url_patterns bypass: N URLs exempted from gate
   #   [DISCOVER] YAML course detail filter: kept <url>
   #   [DISCOVER] YAML course detail filter: dropped listing URL <url>
   #
-  # Bath Spa example:
-  #   course_detail_url_patterns:
+  # Examples:
+  #   Lancaster:
+  #     - '/study/undergraduate/courses/[^/]+/20\d{2}/?$'
+  #     - '/study/postgraduate/postgraduate-courses/[^/]+/20\d{2}/?$'
+  #   Bath Spa:
   #     - '^https://www\.bathspa\.ac\.uk/courses/(ug|pg|ify|phd|edd|pgce)-[a-z0-9-]+/?$'
   course_detail_url_patterns: []
   #   - '^https://www\.myuni\.ac\.uk/courses/(ug|pg|phd)-[a-z0-9-]+/?$'
