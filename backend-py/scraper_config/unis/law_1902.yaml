@@ -46,6 +46,7 @@ extraction:
         - Start dates
         - Key facts
         - How to apply
+        - Newcastle University
       # University of Law campuses — only these are accepted as valid locations.
       # Any extracted location not containing at least one of these strings is
       # cleared so reviewers see blank rather than a garbage nav fragment.

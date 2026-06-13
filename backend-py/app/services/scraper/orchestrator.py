@@ -1865,9 +1865,18 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     _p6_links = await _p6_discover(scrape_url, emit=emit)
                     _p6_cached = [lnk.to_dict() for lnk in _p6_links[:10]]
                     if _p6_cached:
-                        # Persist into auto_config for reuse on next run
+                        # Persist into auto_config for reuse on next run.
+                        # IMPORTANT: if uni_scrape_config was None when _p6_pages
+                        # was created (line above), _p6_pages pointed at a temporary
+                        # detached dict.  After reassigning uni_scrape_config to a
+                        # real dict we must re-anchor _p6_pages so that subsequent
+                        # _p6_pages["feesPdf"] writes reach the live config dict
+                        # (otherwise effective_config never sees feesPdf, has_fee_page
+                        # stays False, and discover_fee_url_from_course_pages fires
+                        # unexpectedly — its exception silently aborts central_pages).
                         if uni_scrape_config is None:
                             uni_scrape_config = {}
+                            _p6_pages = uni_scrape_config.setdefault("uniPages", {})
                         uni_scrape_config.setdefault("auto_config", {}).update(
                             {"_discovered_pdfs": _p6_cached}
                         )
@@ -2136,6 +2145,13 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             )
         except Exception as exc:  # noqa: BLE001
             log.warning("central_pages prefetch failed: %s", exc)
+            await emit(
+                "status",
+                f"[CENTRAL ERROR] prefetch failed: {type(exc).__name__}: {exc}",
+                phase="discover",
+                kind="central_error",
+                error=str(exc),
+            )
             central_data = None
 
         # Phase A.5 — pre-extraction gate.  Drop candidates whose URL or

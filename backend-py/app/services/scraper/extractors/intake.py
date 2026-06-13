@@ -126,7 +126,9 @@ _APPLICATION_TIMELINE_REJECT_RE = re.compile(
     r"applications?\s+close[sd]?\b|"
     r"interview[s]?\s+from\b|"
     r"outcomes?\s+from\b|"
-    r"block\s+\d+\s+study\s+period\s+start"
+    r"block\s+\d+\s+study\s+period\s+start|"
+    r"application\s+deadline[s]?|"
+    r"intake[s]?\s+are\s+as\s+follows"
     r")\b",
     re.I,
 )
@@ -139,6 +141,22 @@ _APPLICATION_TIMELINE_REJECT_RE = re.compile(
 # "Orientation Mon/Tue/…" pattern is a View-dates table slice — discard it.
 _ORIENTATION_DATE_REJECT_RE = re.compile(
     rf"\bOrientation\s+{_WEEKDAY_ABBR_STR}\b",
+    re.I,
+)
+
+# Deadline-block strip for the raw-text fallback (Pass 1/2).
+# When _scoped_chunks returns [] because every intake-keyword chunk was
+# rejected by the deadline filter, the fallback path scans text[:12000]
+# directly — bypassing those same filters — and picks up deadline months
+# (e.g. "3 August" / "11 September" from "application deadlines for our
+# October 2026 intake are as follows: ... Monday, 3 August 2026").
+# This pattern removes such deadline blocks from the fallback search string
+# so that Pass 1/2 only sees genuine start-date mentions.
+# Matches from the deadline signal to the end of the paragraph (lines until
+# the next blank line).
+_DEADLINE_BLOCK_STRIP_RE = re.compile(
+    r"\b(?:application\s+deadline[s]?|intake[s]?\s+are\s+as\s+follows)\b"
+    r"[^\n]*(?:\n(?!\n)[^\n]*)*",
     re.I,
 )
 _FULL_DATE = re.compile(
@@ -807,7 +825,15 @@ async def _extract_raw(html: str, url: str) -> list[ExtractionResult]:
         return []
 
     chunks = _scoped_chunks(text)
-    search = " | ".join(chunks) if chunks else text[:12000]
+    if chunks:
+        search = " | ".join(chunks)
+    else:
+        # No intake-keyword chunks survived the deadline filter.  Strip
+        # deadline paragraphs from the raw text before Pass 1/2 so that
+        # "3 August" / "11 September" in an application-deadline block
+        # are not captured as intake months (e.g. University of Law LLM
+        # pages: "intake are as follows: ... Monday, 3 August 2026").
+        search = _DEADLINE_BLOCK_STRIP_RE.sub("", text[:12000])
 
     months: list[str] = []
     days: list[int] = []
