@@ -248,6 +248,10 @@ _NON_COURSE_URL_HOST_EXCEPTIONS: dict[str, frozenset[str]] = {
     # they falsely block every ARU course URL at both the sitemap and
     # BFS link-sweep stages.
     "www.aru.ac.uk": frozenset({"/study/undergraduate", "/study/postgraduate"}),
+    # University of Law: all degree pages follow /study/undergraduate/<subject>/<slug>/
+    # and /study/postgraduate/<subject>/<slug>/ — the UTAS/Flinders substring patterns
+    # block every ULaw course URL in the sitemap parser and BFS stages.
+    "www.law.ac.uk": frozenset({"/study/undergraduate", "/study/postgraduate"}),
 }
 
 # Last-segment junk suffix regex (Node routes/scrape.ts:5540) — even

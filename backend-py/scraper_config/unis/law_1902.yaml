@@ -1,0 +1,60 @@
+# University of Law
+# Hostname: www.law.ac.uk
+# Country: United Kingdom  |  Currency: GBP
+# uni_id: 1902
+#
+# ROOT CAUSE (fixed in discovery.py + guards.py):
+#   _NON_COURSE_URL_PATTERNS contains "/study/undergraduate" and "/study/postgraduate"
+#   as substring blocks (added for UTAS/Flinders).  ULaw's entire course catalogue
+#   follows /study/undergraduate/<subject>/<slug>/ and /study/postgraduate/<subject>/<slug>/
+#   so EVERY course URL was blocked at both the sitemap parser and staging gate stages.
+#   Fix: www.law.ac.uk added to _NON_COURSE_URL_HOST_EXCEPTIONS (discovery.py) and
+#        _BLOCK_URL_SUBSTRINGS_HOST_EXCEPTIONS (guards.py) — same approach as ARU.
+#
+# DISCOVERY STRATEGY:
+#   The sitemap (sitemap.xml) contains ~175 real course URLs, the majority ending
+#   in /online/.  BFS from the homepage is blocked because /study/undergraduate/
+#   is a category hub at the global level; sitemap is the reliable discovery path.
+#
+# COURSE URL STRUCTURE (5-level deep):
+#   /study/postgraduate/<subject>/<course-slug>/online/
+#   /study/undergraduate/<subject>/<course-slug>/online/
+#   e.g. /study/postgraduate/law/llm-sqe-1-and-2/online/
+#        /study/undergraduate/law/llb-hons-law/online/
+
+discovery:
+  # Whitelist: only keep URLs that look like real course detail pages.
+  # Law.ac.uk courses are always 4+ levels under undergraduate/ or postgraduate/.
+  # This rejects career guides (/employability/...), HRA training (/study/legal-training/...),
+  # faculty pages (/study/psychology-faculty/), and all other non-course sitemap entries.
+  allow_url_patterns:
+    - /study/(?:undergraduate|postgraduate)/[^/]+/[^/]+/
+
+  # Belt-and-suspenders blocks for the specific non-course sections that appeared
+  # in the first (broken) scrape.  allow_url_patterns above already excludes these,
+  # but explicit blocks add a clear audit trail.
+  block_url_patterns:
+    - /employability/
+    - /study/legal-training/
+    - /study/study-modes/
+    - /study/course-demands/
+    - /study/fee-status-classification/
+    - /study/psychology-faculty/
+    - /study/criminology-and-policing-faculty/
+    - /study/higher-rights-of-audience-assessment/
+    - /contact-form/
+    - /study/psychology/psychology-competition/
+    - /study/postgraduate/continue-your-studies/
+
+  # course_detail_url_patterns: URLs matching this bypass is_blocked_page() in
+  # stage_course.py (skip_url_block mechanism added for Lancaster).  Required
+  # because guards.py still applies is_blocked_page() independently of discovery;
+  # the guards.py host exception handles the global substring block, but this
+  # provides defence-in-depth for future global-block changes.
+  course_detail_url_patterns:
+    - /study/undergraduate/[^/]+/[^/]+/
+    - /study/postgraduate/[^/]+/[^/]+/
+
+extraction:
+  fees:
+    default_currency: GBP

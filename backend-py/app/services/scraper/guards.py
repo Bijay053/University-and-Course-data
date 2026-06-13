@@ -1370,6 +1370,14 @@ _BLOCK_URL_SUBSTRINGS_HOST_EXCEPTIONS: dict[str, frozenset[str]] = {
         "/study/undergraduate",
         "/study/postgraduate/",
     }),
+    # University of Law: all degree pages are at /study/undergraduate/<subject>/<slug>/
+    # and /study/postgraduate/<subject>/<slug>/.  The UTAS (/study/undergraduate) and
+    # Flinders (/study/postgraduate/) global blocks incorrectly reject every ULaw
+    # course URL at both discovery and staging stages.
+    "www.law.ac.uk": frozenset({
+        "/study/undergraduate",
+        "/study/postgraduate/",
+    }),
     # NOTE: Bath Spa was here but has been moved to bathspa.yaml
     # allow_url_patterns.  The YAML-override mechanism in discovery.py now
     # checks allow_url_patterns BEFORE is_blocked_page(), so per-university
