@@ -16,6 +16,7 @@ import {
   Globe, Zap, Loader2, X, ExternalLink, Bot, ArrowRight,
   Eye, Pencil, Trash2, Check, XCircle, CheckCheck, Save,
   Square, StopCircle, Play, ShieldCheck, Info, PlusCircle, ChevronDown, AlertTriangle, Sparkles,
+  Database, Download,
 } from "lucide-react";
 import { Link } from "wouter";
 import { getFetchErrorMessage, readResponseJson } from "@/lib/readResponseJson";
@@ -718,6 +719,26 @@ export default function Scraping() {
   const [comparing, setComparing] = useState(false);
   const [compareResult, setCompareResult] = useState<CompareResult | null>(null);
   const [restoring, setRestoring] = useState<string | null>(null);
+
+  // Raw snapshot source dialog state
+  type SnapItem = {
+    id: number;
+    snapshot_type: string;
+    fetch_method: string | null;
+    content_length: number | null;
+    fetched_at: string | null;
+    scraper_commit: string | null;
+    yaml_version: string | null;
+    original_extraction: Record<string, unknown>;
+    download_url: string | null;
+    has_text: boolean;
+  };
+  const [sourceDialogCourse, setSourceDialogCourse] = useState<StagedCourse | null>(null);
+  const [courseSnaps, setCourseSnaps] = useState<SnapItem[]>([]);
+  const [courseSnapsLoading, setCourseSnapsLoading] = useState(false);
+  const [courseSnapsError, setCourseSnapsError] = useState<string | null>(null);
+  const [promptTexts, setPromptTexts] = useState<Record<number, string | null>>({});
+  const [promptTextsLoading, setPromptTextsLoading] = useState<Record<number, boolean>>({});
 
   const fetchHistory = useCallback(async () => {
     setLoadingHistory(true);
@@ -1925,6 +1946,43 @@ export default function Scraping() {
 
   const progressLog = scrapeLogs.findLast((l) => l.event === "progress");
 
+  const openSourceDialog = useCallback(async (course: StagedCourse) => {
+    setSourceDialogCourse(course);
+    setCourseSnaps([]);
+    setCourseSnapsError(null);
+    setPromptTexts({});
+    setPromptTextsLoading({});
+    if (!course.courseWebsite || !course.scrapeJobId) {
+      setCourseSnapsError("No course URL or job ID available for this course.");
+      return;
+    }
+    setCourseSnapsLoading(true);
+    try {
+      const params = new URLSearchParams({ job_id: course.scrapeJobId, course_url: course.courseWebsite });
+      const res = await fetch(`/api/scrape/snapshot/for-course?${params}`);
+      if (!res.ok) throw new Error(`Server returned ${res.status}`);
+      const data = await res.json();
+      setCourseSnaps(data.snapshots ?? []);
+    } catch (e) {
+      setCourseSnapsError(e instanceof Error ? e.message : "Failed to load snapshots.");
+    } finally {
+      setCourseSnapsLoading(false);
+    }
+  }, []);
+
+  const loadSnapshotText = useCallback(async (snapId: number) => {
+    setPromptTextsLoading(prev => ({ ...prev, [snapId]: true }));
+    try {
+      const res = await fetch(`/api/scrape/snapshot/text/${snapId}`);
+      const text = await res.text();
+      setPromptTexts(prev => ({ ...prev, [snapId]: res.ok ? text : `Error: ${text}` }));
+    } catch (e) {
+      setPromptTexts(prev => ({ ...prev, [snapId]: `Error: ${String(e)}` }));
+    } finally {
+      setPromptTextsLoading(prev => ({ ...prev, [snapId]: false }));
+    }
+  }, []);
+
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
@@ -2507,6 +2565,15 @@ export default function Scraping() {
                                 title="Edit"
                               >
                                 <Pencil className="w-3.5 h-3.5" />
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-7 w-7 text-purple-600 hover:bg-purple-50"
+                                onClick={() => openSourceDialog(course)}
+                                title="View raw scrape snapshots (HTML, AI prompt)"
+                              >
+                                <Database className="w-3.5 h-3.5" />
                               </Button>
                               <Button
                                 size="icon"
@@ -3681,6 +3748,155 @@ export default function Scraping() {
           </div>
         )}
       </div>
+
+      {/* ── Raw Snapshot Source Dialog ─────────────────────────────────────── */}
+      <Dialog open={!!sourceDialogCourse} onOpenChange={(o) => { if (!o) setSourceDialogCourse(null); }}>
+        <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Database className="w-4 h-4 text-purple-600" />
+              Raw Scrape Snapshots
+              {sourceDialogCourse && (
+                <span className="font-normal text-muted-foreground text-sm truncate max-w-xs">
+                  — {sourceDialogCourse.courseName}
+                </span>
+              )}
+            </DialogTitle>
+            {sourceDialogCourse?.courseWebsite && (
+              <p className="text-xs text-muted-foreground truncate mt-0.5">
+                {sourceDialogCourse.courseWebsite}
+              </p>
+            )}
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto pr-1 space-y-3 mt-2">
+            {courseSnapsLoading && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground py-6 justify-center">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Loading snapshots…
+              </div>
+            )}
+
+            {courseSnapsError && !courseSnapsLoading && (
+              <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded p-3">
+                {courseSnapsError}
+              </div>
+            )}
+
+            {!courseSnapsLoading && !courseSnapsError && courseSnaps.length === 0 && (
+              <div className="text-sm text-muted-foreground text-center py-8">
+                <Database className="w-8 h-8 mx-auto mb-2 text-gray-300" />
+                No snapshots found for this course.
+                {!sourceDialogCourse?.courseWebsite && (
+                  <p className="mt-1 text-xs">Course has no URL recorded.</p>
+                )}
+              </div>
+            )}
+
+            {courseSnaps.map((snap) => {
+              const typeColors: Record<string, string> = {
+                html: "bg-blue-100 text-blue-700 border-blue-200",
+                ai_prompt: "bg-purple-100 text-purple-700 border-purple-200",
+                json: "bg-green-100 text-green-700 border-green-200",
+                pdf: "bg-orange-100 text-orange-700 border-orange-200",
+                repair: "bg-yellow-100 text-yellow-700 border-yellow-200",
+                failed: "bg-red-100 text-red-700 border-red-200",
+              };
+              const typeColor = typeColors[snap.snapshot_type] ?? "bg-gray-100 text-gray-700 border-gray-200";
+              const sizeKb = snap.content_length ? (snap.content_length / 1024).toFixed(1) : null;
+              const dateStr = snap.fetched_at ? new Date(snap.fetched_at).toLocaleString() : null;
+              const meta = snap.original_extraction ?? {};
+              const isAiPrompt = snap.snapshot_type === "ai_prompt";
+              const textLoaded = snap.id in promptTexts;
+              const textLoading = promptTextsLoading[snap.id] ?? false;
+
+              return (
+                <div key={snap.id} className="border rounded-lg p-3 space-y-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded border ${typeColor}`}>
+                        {snap.snapshot_type}
+                      </span>
+                      {snap.fetch_method && (
+                        <span className="text-xs text-muted-foreground">{snap.fetch_method}</span>
+                      )}
+                      {sizeKb && (
+                        <span className="text-xs text-muted-foreground">{sizeKb} KB</span>
+                      )}
+                      {dateStr && (
+                        <span className="text-xs text-muted-foreground">{dateStr}</span>
+                      )}
+                      {snap.scraper_commit && (
+                        <span className="text-xs font-mono text-gray-400">commit {snap.scraper_commit}</span>
+                      )}
+                    </div>
+                    <div className="flex gap-1 shrink-0">
+                      {snap.has_text && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-xs px-2"
+                          onClick={() => { if (!textLoaded && !textLoading) loadSnapshotText(snap.id); }}
+                          disabled={textLoading}
+                        >
+                          {textLoading
+                            ? <Loader2 className="w-3 h-3 animate-spin" />
+                            : <Eye className="w-3 h-3 mr-1" />}
+                          {textLoaded ? "Loaded" : "View text"}
+                        </Button>
+                      )}
+                      {snap.download_url && (
+                        <a href={snap.download_url} target="_blank" rel="noopener noreferrer">
+                          <Button size="sm" variant="outline" className="h-7 text-xs px-2">
+                            <Download className="w-3 h-3 mr-1" />
+                            Download
+                          </Button>
+                        </a>
+                      )}
+                    </div>
+                  </div>
+
+                  {Object.keys(meta).length > 0 && (
+                    <div className="text-xs text-muted-foreground flex gap-3">
+                      {Object.entries(meta).map(([k, v]) => (
+                        <span key={k}><span className="font-medium">{k}:</span> {String(v)}</span>
+                      ))}
+                    </div>
+                  )}
+
+                  {textLoaded && promptTexts[snap.id] !== null && (
+                    <div className="mt-2">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                          {isAiPrompt ? "Gemini Prompt Text" : "Page Source"}
+                        </span>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-5 text-[10px] px-1 text-muted-foreground"
+                          onClick={() => setPromptTexts(prev => { const n = { ...prev }; delete n[snap.id]; return n; })}
+                        >
+                          Hide
+                        </Button>
+                      </div>
+                      <pre className="bg-gray-950 text-green-300 text-xs p-3 rounded overflow-auto max-h-72 whitespace-pre-wrap break-words font-mono leading-relaxed">
+                        {promptTexts[snap.id]}
+                      </pre>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          <DialogFooter className="mt-3 pt-3 border-t">
+            <span className="text-xs text-muted-foreground mr-auto">
+              {courseSnaps.length} snapshot{courseSnaps.length !== 1 ? "s" : ""} found
+            </span>
+            <Button variant="outline" onClick={() => setSourceDialogCourse(null)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -19,10 +19,12 @@ from app.database import get_db
 from app.models.page_snapshot import PageSnapshot
 from app.services.scraper.replay_extraction import replay_job
 from app.services.snapshot_store import (
+    get_snapshot_bytes,
     is_enabled,
     list_snapshots_for_job,
     presign_url,
     setup_lifecycle_rules,
+    url_hash as _url_hash,
 )
 
 log = logging.getLogger(__name__)
@@ -300,3 +302,92 @@ async def apply_s3_lifecycle():
     if not ok:
         raise HTTPException(status_code=500, detail="Failed to apply lifecycle rules — check logs.")
     return {"ok": True, "message": "S3 lifecycle rules applied successfully."}
+
+
+@router.get("/snapshot/for-course")
+async def get_snapshots_for_course(
+    job_id: str = Query(..., description="Scrape runtime job ID"),
+    course_url: str = Query(..., description="Course page URL"),
+    db: AsyncSession = Depends(get_db),
+):
+    """List all snapshots captured for a specific course URL within a scrape job.
+
+    Returns DB metadata + presigned download URLs for each snapshot.
+    Powers the 'View raw source' button in the staged-course review panel.
+    """
+    h = _url_hash(course_url)
+    result = await db.execute(
+        select(PageSnapshot)
+        .where(
+            PageSnapshot.scrape_job_id == job_id,
+            PageSnapshot.url_hash == h,
+        )
+        .order_by(PageSnapshot.snapshot_type, PageSnapshot.fetched_at.desc())
+    )
+    records = list(result.scalars().all())
+
+    snaps = []
+    for r in records:
+        download_url = None
+        if r.storage_path and is_enabled():
+            download_url = await presign_url(r.storage_path)
+        snaps.append({
+            "id": r.id,
+            "snapshot_type": r.snapshot_type,
+            "fetch_method": r.fetch_method,
+            "content_length": r.content_length,
+            "fetched_at": r.fetched_at.isoformat() if r.fetched_at else None,
+            "scraper_commit": r.scraper_commit,
+            "yaml_version": r.yaml_version,
+            "original_extraction": r.original_extraction or {},
+            "download_url": download_url,
+            "storage_path": r.storage_path,
+            "has_text": r.snapshot_type in ("ai_prompt", "html", "repair"),
+        })
+
+    return {
+        "job_id": job_id,
+        "course_url": course_url,
+        "url_hash": h,
+        "snapshots": snaps,
+        "s3_enabled": is_enabled(),
+        "total": len(snaps),
+    }
+
+
+@router.get("/snapshot/text/{snapshot_id}")
+async def get_snapshot_text(
+    snapshot_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """Return decompressed UTF-8 text content of an ai_prompt, html, or repair snapshot.
+
+    Fetches the gzip from S3 and decompresses server-side so the browser
+    can display the raw prompt or HTML inline without S3 CORS concerns.
+    """
+    import gzip as _gzip
+    from fastapi.responses import PlainTextResponse
+
+    r = await db.get(PageSnapshot, snapshot_id)
+    if not r:
+        raise HTTPException(status_code=404, detail="Snapshot not found.")
+    if r.snapshot_type not in ("ai_prompt", "html", "repair"):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Text view not supported for snapshot type '{r.snapshot_type}'.",
+        )
+    if not r.storage_path:
+        raise HTTPException(status_code=404, detail="No storage path recorded for this snapshot.")
+    if not is_enabled():
+        raise HTTPException(status_code=503, detail="S3 storage not configured.")
+
+    raw = await get_snapshot_bytes(r.storage_path)
+    if raw is None:
+        raise HTTPException(status_code=502, detail="Failed to fetch snapshot bytes from S3.")
+
+    try:
+        text = _gzip.decompress(raw).decode("utf-8", errors="replace")
+    except Exception:
+        text = raw.decode("utf-8", errors="replace")
+
+    return PlainTextResponse(content=text)

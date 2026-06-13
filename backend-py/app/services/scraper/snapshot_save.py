@@ -221,3 +221,76 @@ async def save_api_json_snapshot(
             "api_json snapshot save failed (non-fatal — scrape continues): %s: %s",
             type(exc).__name__, exc,
         )
+
+
+async def save_ai_prompt_snapshot(
+    url: str,
+    prompt_text: str,
+    *,
+    model_name: str = "gemini",
+    call_type: str = "primary",
+    chunk: int = 1,
+) -> None:
+    """Save the exact Gemini prompt string sent to the AI as an ai_prompt snapshot.
+
+    Fire-and-forget. Never raises. Called from gemini_primary and ai_fallback
+    immediately after the prompt string is assembled — before calling the API.
+    This lets operators replay or audit exactly what text was sent to Gemini.
+    """
+    try:
+        from app.services.scraper.snapshot_context import (
+            get_snapshot_context, is_replay_mode,
+        )
+        if is_replay_mode():
+            return
+
+        uni_id, job_id = get_snapshot_context()
+        if not uni_id or not job_id:
+            return
+
+        from app.services.snapshot_store import upload_snapshot, url_hash as _url_hash, is_enabled
+        if not is_enabled():
+            return
+
+        body = prompt_text.encode("utf-8")
+
+        key = await upload_snapshot(
+            body,
+            university_id=uni_id,
+            scrape_job_id=job_id,
+            url=url,
+            snapshot_type="ai_prompt",
+            content_type="text/plain; charset=utf-8",
+            page_number=chunk,
+        )
+        if not key:
+            return
+
+        from app.database import AsyncSessionLocal
+        from app.models.page_snapshot import PageSnapshot
+        async with AsyncSessionLocal() as db:
+            snap = PageSnapshot(
+                university_id=uni_id,
+                scrape_job_id=job_id,
+                course_url=url,
+                url_hash=_url_hash(url),
+                snapshot_type="ai_prompt",
+                storage_path=key,
+                status_code=200,
+                content_length=len(body),
+                fetch_method=model_name,
+                scraper_commit=_get_scraper_commit(),
+                yaml_version=_yaml_version(),
+                original_extraction={"call_type": call_type, "chunk": chunk},
+                fetched_at=datetime.now(timezone.utc),
+            )
+            db.add(snap)
+            await db.commit()
+
+        log.debug("ai_prompt snapshot saved: call_type=%s chunk=%d url=%s", call_type, chunk, url)
+
+    except Exception as exc:
+        log.warning(
+            "ai_prompt snapshot save failed (non-fatal): %s: %s",
+            type(exc).__name__, exc,
+        )

@@ -786,6 +786,15 @@ async def extract_primary(
 
     prompt = _PROMPT_TEMPLATE.format(fields_block=fields_block, url=url, text=text)
 
+    # Save exact prompt sent to Gemini — fire-and-forget, never blocks extraction.
+    try:
+        from app.services.scraper.snapshot_save import save_ai_prompt_snapshot as _save_ai_prompt
+        _asyncio.create_task(
+            _save_ai_prompt(url, prompt, model_name="gemini", call_type="primary")
+        )
+    except Exception:
+        pass
+
     try:
         resp = await _asyncio.wait_for(
             gemini_client.generate(prompt, max_output_tokens=768),

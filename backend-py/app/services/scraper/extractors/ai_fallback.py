@@ -307,6 +307,17 @@ async def fill_missing(
     prompt = _PROMPT_TEMPLATE.format(
         fields_block=fields_block, url=url, text=text
     )
+
+    # Save exact prompt sent to Gemini — fire-and-forget, never blocks extraction.
+    try:
+        import asyncio as _asyncio_snap
+        from app.services.scraper.snapshot_save import save_ai_prompt_snapshot as _save_ai_prompt
+        _asyncio_snap.create_task(
+            _save_ai_prompt(url, prompt, model_name="gemini", call_type="fallback")
+        )
+    except Exception:
+        pass
+
     resp = await gemini_client.generate(prompt, max_output_tokens=2048)
     if resp.skipped:
         log.info("AI fallback skipped for %s: %s", url, resp.skip_reason)

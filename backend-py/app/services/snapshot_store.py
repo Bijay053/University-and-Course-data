@@ -57,7 +57,7 @@ from typing import Literal
 
 log = logging.getLogger(__name__)
 
-SnapshotType = Literal["html", "json", "pdf", "repair", "failed"]
+SnapshotType = Literal["html", "json", "pdf", "repair", "failed", "ai_prompt"]
 
 _BUCKET: str | None = None
 _ENABLED: bool | None = None
@@ -98,7 +98,11 @@ def _lifecycle_tag(snapshot_type: SnapshotType) -> str:
     json objects live under /api/ so their tag is 'api' to match the
     lifecycle rule that targets the /api/ path segment.
     """
-    return "api" if snapshot_type == "json" else snapshot_type
+    if snapshot_type == "json":
+        return "api"
+    if snapshot_type == "ai_prompt":
+        return "ai_prompt"
+    return snapshot_type
 
 
 def build_s3_key(
@@ -123,6 +127,8 @@ def build_s3_key(
         return f"universities/{university_id}/{scrape_job_id}/api/{h}/page_{page_number}.json.gz"
     if snapshot_type == "pdf":
         return f"universities/{university_id}/{scrape_job_id}/pdf/{h}/document.pdf"
+    if snapshot_type == "ai_prompt":
+        return f"universities/{university_id}/{scrape_job_id}/ai_prompt/{h}/chunk_{page_number}.txt.gz"
     # html / repair / failed — type is the prefix segment
     return f"universities/{university_id}/{scrape_job_id}/{snapshot_type}/{h}.html.gz"
 
@@ -175,7 +181,7 @@ async def upload_snapshot(
 
     # Gzip-compress HTML and JSON to reduce storage by ~70%.
     # PDF is already compressed; skip it.
-    compress = snapshot_type in ("html", "json", "repair", "failed")
+    compress = snapshot_type in ("html", "json", "repair", "failed", "ai_prompt")
     if compress:
         body = gzip.compress(raw, compresslevel=6)
         encoding_header: dict = {"ContentEncoding": "gzip"}
@@ -363,6 +369,12 @@ def setup_lifecycle_rules() -> bool:
                 "Filter": {"Tag": {"Key": "snapshot_type", "Value": "failed"}},
                 "Expiration": {"Days": 30},
             },
+            {
+                "ID": "expire-ai-prompt-snapshots-90d",
+                "Status": "Enabled",
+                "Filter": {"Tag": {"Key": "snapshot_type", "Value": "ai_prompt"}},
+                "Expiration": {"Days": 90},
+            },
         ]
         client.put_bucket_lifecycle_configuration(
             Bucket=bucket,
@@ -373,3 +385,26 @@ def setup_lifecycle_rules() -> bool:
     except Exception as exc:
         log.warning("Failed to apply lifecycle rules to %s: %s", bucket, exc)
         return False
+
+
+async def get_snapshot_bytes(storage_path: str) -> bytes | None:
+    """Download the raw (gzip-compressed) bytes for a snapshot object from S3.
+
+    Caller is responsible for decompression.
+    Never raises — returns None on any failure.
+    """
+    if not is_enabled():
+        return None
+    bucket = _bucket()
+    try:
+        session = _make_async_session()
+        endpoint = os.environ.get("AWS_S3_ENDPOINT_URL")
+        extra: dict = {}
+        if endpoint:
+            extra["endpoint_url"] = endpoint
+        async with session.client("s3", **extra) as s3:
+            resp = await s3.get_object(Bucket=bucket, Key=storage_path)
+            return await resp["Body"].read()
+    except Exception as exc:
+        log.warning("get_snapshot_bytes failed for %s: %s", storage_path, exc)
+        return None
