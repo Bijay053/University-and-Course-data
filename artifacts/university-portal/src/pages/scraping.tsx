@@ -16,7 +16,7 @@ import {
   Globe, Zap, Loader2, X, ExternalLink, Bot, ArrowRight,
   Eye, Pencil, Trash2, Check, XCircle, CheckCheck, Save,
   Square, StopCircle, Play, ShieldCheck, Info, PlusCircle, ChevronDown, AlertTriangle, Sparkles,
-  Database, Download,
+  Database, Download, RotateCcw,
 } from "lucide-react";
 import { Link } from "wouter";
 import { getFetchErrorMessage, readResponseJson } from "@/lib/readResponseJson";
@@ -739,6 +739,34 @@ export default function Scraping() {
   const [courseSnapsError, setCourseSnapsError] = useState<string | null>(null);
   const [promptTexts, setPromptTexts] = useState<Record<number, string | null>>({});
   const [promptTextsLoading, setPromptTextsLoading] = useState<Record<number, boolean>>({});
+
+  // Replay dialog state
+  type ReplayDiff = {
+    url: string;
+    new_name: string;
+    snapshot_type: string;
+    fetch_method: string | null;
+    fetched_at: string | null;
+    scraper_commit: string | null;
+    changes: Record<string, { old: unknown; new: unknown }>;
+  };
+  type ReplayResult = {
+    job_id: string;
+    replayed: number;
+    changed: number;
+    unchanged: number;
+    errors: number;
+    commit: boolean;
+    message: string;
+    diffs: ReplayDiff[];
+  };
+  const [replayDialogOpen, setReplayDialogOpen] = useState(false);
+  const [replayTargetJobId, setReplayTargetJobId] = useState<string | null>(null);
+  const [replayCourseUrl, setReplayCourseUrl] = useState<string | null>(null);
+  const [replayResult, setReplayResult] = useState<ReplayResult | null>(null);
+  const [replayLoading, setReplayLoading] = useState(false);
+  const [replayError, setReplayError] = useState<string | null>(null);
+  const [replayCommitting, setReplayCommitting] = useState(false);
 
   const fetchHistory = useCallback(async () => {
     setLoadingHistory(true);
@@ -1983,6 +2011,47 @@ export default function Scraping() {
     }
   }, []);
 
+  const runReplay = useCallback(async (jobId: string, courseUrl?: string) => {
+    setReplayDialogOpen(true);
+    setReplayTargetJobId(jobId);
+    setReplayCourseUrl(courseUrl ?? null);
+    setReplayResult(null);
+    setReplayError(null);
+    setReplayLoading(true);
+    try {
+      const params = courseUrl ? `?course_url=${encodeURIComponent(courseUrl)}` : "";
+      const res = await fetch(`/api/scrape/replay/${jobId}${params}`, { method: "POST" });
+      if (!res.ok) {
+        const msg = await res.text().catch(() => String(res.status));
+        throw new Error(`Server returned ${res.status}: ${msg}`);
+      }
+      setReplayResult(await res.json());
+    } catch (e) {
+      setReplayError(e instanceof Error ? e.message : "Replay failed.");
+    } finally {
+      setReplayLoading(false);
+    }
+  }, []);
+
+  const commitReplay = useCallback(async () => {
+    if (!replayTargetJobId) return;
+    setReplayCommitting(true);
+    setReplayError(null);
+    try {
+      const params = replayCourseUrl ? `?course_url=${encodeURIComponent(replayCourseUrl)}` : "";
+      const res = await fetch(`/api/scrape/replay/${replayTargetJobId}/commit${params}`, { method: "POST" });
+      if (!res.ok) {
+        const msg = await res.text().catch(() => String(res.status));
+        throw new Error(`Server returned ${res.status}: ${msg}`);
+      }
+      setReplayResult(await res.json());
+    } catch (e) {
+      setReplayError(e instanceof Error ? e.message : "Commit failed.");
+    } finally {
+      setReplayCommitting(false);
+    }
+  }, [replayTargetJobId, replayCourseUrl]);
+
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
@@ -2574,6 +2643,16 @@ export default function Scraping() {
                                 title="View raw scrape snapshots (HTML, AI prompt)"
                               >
                                 <Database className="w-3.5 h-3.5" />
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-7 w-7 text-emerald-600 hover:bg-emerald-50"
+                                onClick={() => void runReplay(course.scrapeJobId, course.courseWebsite ?? undefined)}
+                                title="Replay extraction for this course from stored snapshot"
+                                disabled={!course.courseWebsite}
+                              >
+                                <RotateCcw className="w-3.5 h-3.5" />
                               </Button>
                               <Button
                                 size="icon"
@@ -3400,6 +3479,17 @@ export default function Scraping() {
                       >
                         View Courses
                       </Button>
+                      {(run.snapshotCount ?? 0) > 0 && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-emerald-700 border-emerald-300 hover:bg-emerald-50"
+                          onClick={() => void runReplay(run.runtimeJobId)}
+                        >
+                          <RotateCcw className="w-3.5 h-3.5 mr-1" />
+                          Replay from Snapshot
+                        </Button>
+                      )}
                     </div>
                   </div>
 
@@ -3748,6 +3838,187 @@ export default function Scraping() {
           </div>
         )}
       </div>
+
+      {/* ── Replay from Snapshot Dialog ────────────────────────────────────── */}
+      <Dialog open={replayDialogOpen} onOpenChange={(o) => { if (!replayLoading && !replayCommitting) setReplayDialogOpen(o); }}>
+        <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <RotateCcw className="w-4 h-4 text-emerald-600" />
+              Replay from Snapshot
+              {replayCourseUrl && (
+                <span className="text-sm font-normal text-muted-foreground">— single course</span>
+              )}
+            </DialogTitle>
+            {replayTargetJobId && (
+              <p className="text-xs text-muted-foreground font-mono mt-0.5 truncate">{replayTargetJobId}</p>
+            )}
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto space-y-4 pr-1 mt-2">
+            {/* Loading */}
+            {replayLoading && (
+              <div className="flex flex-col items-center gap-3 py-16">
+                <RotateCcw className="w-8 h-8 animate-spin text-emerald-600" />
+                <p className="text-sm text-muted-foreground font-medium">Re-extracting from stored snapshots…</p>
+                <p className="text-xs text-gray-400">This runs the full extraction pipeline without hitting the university website.</p>
+              </div>
+            )}
+
+            {/* Error */}
+            {replayError && !replayLoading && (
+              <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg p-3 flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                {replayError}
+              </div>
+            )}
+
+            {/* Result */}
+            {replayResult && !replayLoading && (() => {
+              const FIELD_LABELS: Record<string, string> = {
+                course_name: "Course Name", degree_level: "Degree Level",
+                international_fee: "Fee (Intl)", study_mode: "Study Mode",
+                course_location: "Location", duration: "Duration",
+                intake_months: "Intakes", ielts_overall: "IELTS Overall",
+                ielts_reading: "IELTS Reading", ielts_writing: "IELTS Writing",
+                ielts_speaking: "IELTS Speaking", ielts_listening: "IELTS Listening",
+                pte_overall: "PTE Overall", academic_level: "Academic Level",
+                academic_score: "Academic Score", other_requirement: "Entry Req.",
+                description: "Description", category: "Category",
+              };
+              const snapTypeBadge = (t: string) => {
+                const styles: Record<string, string> = {
+                  html: "bg-blue-100 text-blue-700",
+                  json: "bg-green-100 text-green-700",
+                  repair: "bg-yellow-100 text-yellow-700",
+                };
+                return (
+                  <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${styles[t] ?? "bg-gray-100 text-gray-600"}`}>
+                    {t}
+                  </span>
+                );
+              };
+              return (
+                <>
+                  {/* Summary counts */}
+                  <div className="grid grid-cols-4 gap-2">
+                    {[
+                      { label: "Replayed", value: replayResult.replayed, cls: "text-gray-800", bg: "" },
+                      { label: "Changed", value: replayResult.changed, cls: "text-amber-700", bg: "bg-amber-50 border-amber-200" },
+                      { label: "Unchanged", value: replayResult.unchanged, cls: "text-green-700", bg: "bg-green-50 border-green-200" },
+                      { label: "Errors", value: replayResult.errors, cls: "text-red-700", bg: "bg-red-50 border-red-200" },
+                    ].map(({ label, value, cls, bg }) => (
+                      <div key={label} className={`text-center border rounded-lg p-3 ${bg}`}>
+                        <div className={`text-2xl font-bold ${cls}`}>{value}</div>
+                        <div className="text-xs text-muted-foreground mt-0.5">{label}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Committed confirmation */}
+                  {replayResult.commit && replayResult.changed > 0 && (
+                    <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">
+                      <CheckCircle2 className="w-4 h-4 shrink-0" />
+                      <span>
+                        <strong>{replayResult.changed}</strong> course{replayResult.changed !== 1 ? "s" : ""} updated in staged_courses. Changes will appear when you refresh the review table.
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Changed courses */}
+                  {replayResult.diffs.length > 0 ? (
+                    <div className="space-y-2">
+                      <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                        <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-100 text-amber-700 text-xs font-bold">{replayResult.diffs.length}</span>
+                        Changed courses
+                      </h3>
+                      {replayResult.diffs.map((diff, i) => (
+                        <div key={i} className="border rounded-lg overflow-hidden">
+                          <div className="bg-amber-50 px-3 py-2 flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium text-gray-800">{diff.new_name || "(unnamed)"}</p>
+                              <p className="text-xs text-muted-foreground truncate">{diff.url}</p>
+                            </div>
+                            <div className="flex items-center gap-1.5 shrink-0 text-xs text-gray-400">
+                              {diff.snapshot_type && snapTypeBadge(diff.snapshot_type)}
+                              {diff.fetched_at && (
+                                <span title="Snapshot captured at">{new Date(diff.fetched_at).toLocaleDateString()}</span>
+                              )}
+                              {diff.scraper_commit && (
+                                <span className="font-mono opacity-60">@{diff.scraper_commit.slice(0, 7)}</span>
+                              )}
+                            </div>
+                          </div>
+                          <table className="w-full text-xs">
+                            <thead>
+                              <tr className="bg-gray-50 border-b">
+                                <th className="text-left px-3 py-1.5 font-medium text-gray-500 w-36">Field</th>
+                                <th className="text-left px-3 py-1.5 font-medium text-red-600 w-1/2">Old</th>
+                                <th className="text-left px-3 py-1.5 font-medium text-green-700">New</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {Object.entries(diff.changes).map(([field, change]) => (
+                                <tr key={field} className="border-b last:border-0">
+                                  <td className="px-3 py-1.5 font-medium text-gray-600 whitespace-nowrap">
+                                    {FIELD_LABELS[field] ?? field}
+                                  </td>
+                                  <td className="px-3 py-1.5 text-red-700 bg-red-50/30 font-mono break-all">
+                                    {change.old !== null && change.old !== undefined ? String(change.old) : <span className="text-gray-400 italic">empty</span>}
+                                  </td>
+                                  <td className="px-3 py-1.5 text-green-700 bg-green-50/30 font-mono break-all">
+                                    {change.new !== null && change.new !== undefined ? String(change.new) : <span className="text-gray-400 italic">empty</span>}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      ))}
+                    </div>
+                  ) : replayResult.replayed > 0 ? (
+                    <div className="text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg p-4 flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 shrink-0" />
+                      No field changes detected — the current extractors produce the same results as the original scrape.
+                    </div>
+                  ) : (
+                    <div className="text-sm text-muted-foreground bg-gray-50 border rounded-lg p-4 text-center">
+                      <p className="font-medium">No replayable snapshots found</p>
+                      <p className="text-xs mt-1 text-gray-400">
+                        {replayCourseUrl
+                          ? "No HTML or JSON snapshot was saved for this course URL."
+                          : "This job has no HTML or JSON snapshots. Only ai_prompt and pdf types are stored — those are not used for re-extraction."}
+                      </p>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
+          </div>
+
+          <DialogFooter className="mt-3 pt-3 border-t flex-wrap gap-2">
+            {replayResult && !replayResult.commit && replayResult.changed > 0 && !replayError && (
+              <Button
+                onClick={() => void commitReplay()}
+                disabled={replayCommitting}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white"
+              >
+                {replayCommitting
+                  ? <><Loader2 className="w-4 h-4 mr-1.5 animate-spin" />Committing…</>
+                  : <><Check className="w-4 h-4 mr-1.5" />Commit Replay ({replayResult.changed} course{replayResult.changed !== 1 ? "s" : ""})</>
+                }
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              onClick={() => setReplayDialogOpen(false)}
+              disabled={replayLoading || replayCommitting}
+            >
+              {replayResult?.commit ? "Done" : "Close"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* ── Raw Snapshot Source Dialog ─────────────────────────────────────── */}
       <Dialog open={!!sourceDialogCourse} onOpenChange={(o) => { if (!o) setSourceDialogCourse(null); }}>

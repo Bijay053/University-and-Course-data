@@ -237,10 +237,14 @@ async def list_snapshots(
 @router.post("/replay/{job_id}", response_model=ReplayResponse)
 async def replay_scrape_job(
     job_id: str,
+    course_url: str | None = Query(None, description="Filter to a single course URL (for per-course replay)"),
     body: ReplayRequest = ReplayRequest(),
     db: AsyncSession = Depends(get_db),
 ):
-    """Replay extraction from S3 snapshots — returns diff without committing."""
+    """Replay extraction from S3 snapshots — returns diff without committing.
+
+    Pass course_url to replay a single course instead of the whole job.
+    """
     if not is_enabled():
         raise HTTPException(status_code=503, detail="S3 snapshot storage is not configured.")
     try:
@@ -248,6 +252,7 @@ async def replay_scrape_job(
             job_id,
             commit=False,
             max_courses=body.max_courses,
+            course_url=course_url,
             db=db,
         )
         return ReplayResponse(**result)
@@ -259,10 +264,14 @@ async def replay_scrape_job(
 @router.post("/replay/{job_id}/commit", response_model=ReplayResponse)
 async def replay_and_commit(
     job_id: str,
+    course_url: str | None = Query(None, description="Filter to a single course URL (for per-course replay)"),
     body: ReplayRequest = ReplayRequest(),
     db: AsyncSession = Depends(get_db),
 ):
-    """Replay extraction from S3 snapshots AND commit changes to scraped_courses."""
+    """Replay extraction from S3 snapshots AND commit changes to scraped_courses.
+
+    Pass course_url to replay and commit a single course only.
+    """
     if not is_enabled():
         raise HTTPException(status_code=503, detail="S3 snapshot storage is not configured.")
     try:
@@ -270,6 +279,7 @@ async def replay_and_commit(
             job_id,
             commit=True,
             max_courses=body.max_courses,
+            course_url=course_url,
             db=db,
         )
         return ReplayResponse(**result)

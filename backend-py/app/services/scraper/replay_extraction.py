@@ -83,6 +83,7 @@ async def replay_job(
     *,
     commit: bool = False,
     max_courses: int = 500,
+    course_url: str | None = None,
     db: AsyncSession | None = None,
 ) -> dict[str, Any]:
     """Re-extract all snapshots for a job and return a diff report.
@@ -112,6 +113,7 @@ async def replay_job(
             scrape_job_id,
             commit=commit,
             max_courses=max_courses,
+            course_url=course_url,
             db=db,
         )
     finally:
@@ -124,16 +126,19 @@ async def _replay_job_inner(
     *,
     commit: bool,
     max_courses: int,
+    course_url: str | None = None,
     db: AsyncSession,
 ) -> dict[str, Any]:
     # ── 1. Load snapshots for this job ──────────────────────────────────────
-    result = await db.execute(
+    q = (
         select(PageSnapshot)
         .where(PageSnapshot.scrape_job_id == scrape_job_id)
         .where(PageSnapshot.snapshot_type.in_(["html", "repair", "json"]))
         .where(PageSnapshot.storage_path.isnot(None))
-        .limit(max_courses)
     )
+    if course_url:
+        q = q.where(PageSnapshot.course_url == course_url)
+    result = await db.execute(q.limit(max_courses))
     snapshots: list[PageSnapshot] = list(result.scalars().all())
 
     if not snapshots:
