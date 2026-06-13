@@ -268,12 +268,39 @@ async def run_repair(db: AsyncSession, runtime_job_id: str) -> dict:
                 phase="complete",
                 level="info",
             )
+
+        # Shared dedup set for the whole repair run: if two repair targets point
+        # to the same PDF URL (e.g. two courses whose course_website is a shared
+        # fee-schedule PDF), only the first call fetches the document.
+        # Mirrors the seen_pdf_urls guard in run_recovery_pass / extract_from_url.
+        seen_pdf_urls: set[str] = set()
+
         for idx, tgt in enumerate(targets, start=1):
             course_id = int(tgt.get("course_id") or 0)
             url = str(tgt.get("url") or "").strip()
             if not course_id or not url:
                 summary["skipped"] += 1
                 continue
+
+            # If the target URL is itself a PDF, skip it when we have already
+            # fetched it for an earlier course in this repair run.
+            if url.lower().endswith(".pdf"):
+                if url in seen_pdf_urls:
+                    log.debug(
+                        "[REPAIR] PDF %r already fetched in this run — skipping course %s",
+                        url, course_id,
+                    )
+                    summary["skipped"] += 1
+                    await emit(
+                        "status",
+                        f"[STAGE] skipped: course {course_id} "
+                        f"(PDF already fetched in this repair run: {url})",
+                        phase="stage",
+                        kind="stage_skipped",
+                        url=url,
+                    )
+                    continue
+                seen_pdf_urls.add(url)
 
             # Re-load the course inside the per-iteration transaction so we
             # always merge against the current DB state — the user may have

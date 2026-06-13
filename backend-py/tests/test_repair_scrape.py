@@ -525,3 +525,116 @@ async def test_run_repair_skips_when_course_has_existing_english(
             text("DELETE FROM universities WHERE id = :i"), {"i": uni_id}
         )
         await db.commit()
+
+
+# ─── seen_pdf_urls dedup guard ─────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_repair_pdf_url_only_extracted_once(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """When two repair targets share the same PDF URL, _extract_only must be
+    called exactly once. The second target must be counted as skipped.
+
+    This mirrors the seen_pdf_urls guard in run_recovery_pass / extract_from_url
+    (Task 160 / Task 165).
+    """
+    import uuid as _uuid
+
+    pdf_url = "https://example.test/shared/fees.pdf"
+
+    async with AsyncSessionLocal() as db:
+        uni_id = (
+            await db.execute(
+                text(
+                    "INSERT INTO universities (name, country, city) "
+                    "VALUES (:n, 'Australia', 'Sydney') RETURNING id"
+                ),
+                {"n": "Repair PDF Dedup University"},
+            )
+        ).scalar_one()
+        # Two courses, both pointing at the same PDF URL.
+        c1 = (
+            await db.execute(
+                text(
+                    "INSERT INTO courses "
+                    "(university_id, name, status, course_website) "
+                    "VALUES (:u, :n, 'active', :url) RETURNING id"
+                ),
+                {"u": uni_id, "n": "Bachelor of PDF One", "url": pdf_url},
+            )
+        ).scalar_one()
+        c2 = (
+            await db.execute(
+                text(
+                    "INSERT INTO courses "
+                    "(university_id, name, status, course_website) "
+                    "VALUES (:u, :n, 'active', :url) RETURNING id"
+                ),
+                {"u": uni_id, "n": "Bachelor of PDF Two", "url": pdf_url},
+            )
+        ).scalar_one()
+        job_id = f"repair_{_uuid.uuid4().hex[:12]}"
+        await db.execute(
+            text(
+                "INSERT INTO scrape_runtime_jobs "
+                "(runtime_job_id, university_id, university_name, url, "
+                " job_type, status, request_payload) "
+                "VALUES (:j, :u, :n, :url, 'repair', 'queued', "
+                "        CAST(:pl AS jsonb))"
+            ),
+            {
+                "j": job_id,
+                "u": uni_id,
+                "n": "Repair PDF Dedup University",
+                "url": "https://example.test/",
+                "pl": (
+                    '{"universityId": ' + str(uni_id) + ', '
+                    '"repair_targets": ['
+                    '{"course_id": ' + str(c1) + ', "url": "' + pdf_url + '"}, '
+                    '{"course_id": ' + str(c2) + ', "url": "' + pdf_url + '"}'
+                    ']}'
+                ),
+            },
+        )
+        await db.commit()
+
+    # Track how many times _extract_only is called.
+    extract_call_count: list[int] = [0]
+
+    async def _fake_extract(link: dict, country, uni_pdf_data, emit=None) -> dict:  # noqa: ANN001
+        extract_call_count[0] += 1
+        return {
+            "name": link["name"],
+            "url": link["url"],
+            "payload": {"duration": 2},
+            "evidence": [],
+        }
+
+    from app.services.scraper import repair as repair_mod
+
+    monkeypatch.setattr(repair_mod, "_extract_only", _fake_extract)
+
+    async with AsyncSessionLocal() as db:
+        result = await repair_mod.run_repair(db, job_id)
+
+    # _extract_only must only have been called once — the second target shares
+    # the same PDF URL and must be skipped by the seen_pdf_urls guard.
+    assert extract_call_count[0] == 1, (
+        f"_extract_only called {extract_call_count[0]} times; "
+        "expected exactly 1 (second PDF URL must be deduped)"
+    )
+    # One target processed, one skipped.
+    assert result["skipped"] >= 1, result
+
+    # Cleanup.
+    async with AsyncSessionLocal() as db:
+        await db.execute(
+            text("DELETE FROM scrape_runtime_jobs WHERE runtime_job_id = :j"),
+            {"j": job_id},
+        )
+        await db.execute(
+            text("DELETE FROM universities WHERE id = :i"), {"i": uni_id}
+        )
+        await db.commit()
