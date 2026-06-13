@@ -296,6 +296,12 @@ _MAX_LINKED_PDFS = 5
 # (e.g. one PDF per faculty) from inflating recovery runtime unpredictably.
 MAX_PDFS_PER_RECOVERY_RUN = 10
 
+# Tighter cap used when recovery is triggered for a single course rather than
+# a full batch run.  A single-course trigger only needs a small number of PDFs
+# to fill its missing fields; using the full batch cap here would allow more
+# PDF fetches than necessary for one course.
+_SINGLE_COURSE_PDF_BUDGET = 3
+
 
 def score_pdf_link(pdf_url: str, anchor_text: str, categories: set[str]) -> int:
     """Return a relevance score for a PDF link against the needed categories.

@@ -525,7 +525,7 @@ async def run_single_course_recovery(
     )
     from app.services.scraper.recovery.extractor import (
         extract_from_url,
-        MAX_PDFS_PER_RECOVERY_RUN,
+        _SINGLE_COURSE_PDF_BUDGET,
     )
     from app.services.scraper.recovery.mapper import map_results_to_course
 
@@ -627,10 +627,9 @@ async def run_single_course_recovery(
     # Track which categories produced at least one result with a non-None value
     categories_with_results: set[str] = set()
 
-    # Per-university PDF budget — shared across all URL fetches so the total
-    # number of PDFs fetched remains bounded even if many candidate pages each
-    # link several PDFs.
-    pdf_budget: list[int] = [MAX_PDFS_PER_RECOVERY_RUN]
+    # Per-course PDF budget — tighter than the batch cap because a single-course
+    # trigger only needs a handful of PDFs to fill its missing fields.
+    pdf_budget: list[int] = [_SINGLE_COURSE_PDF_BUDGET]
 
     for url, url_cats in url_to_categories.items():
         meta: dict[str, str] = {}

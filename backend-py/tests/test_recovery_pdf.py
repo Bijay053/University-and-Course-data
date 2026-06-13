@@ -1189,10 +1189,78 @@ class TestSingleCourseRecoveryBroadPdf:
         assert isinstance(budget, list), (
             "pdf_budget must be a mutable list (not %r)" % type(budget)
         )
-        from app.services.scraper.recovery.extractor import MAX_PDFS_PER_RECOVERY_RUN
-        assert budget[0] == MAX_PDFS_PER_RECOVERY_RUN - 1, (
+        from app.services.scraper.recovery.extractor import _SINGLE_COURSE_PDF_BUDGET
+        assert budget[0] == _SINGLE_COURSE_PDF_BUDGET - 1, (
             "pdf_budget must be decremented by 1 after processing a direct PDF URL; "
-            "expected %d, got %d" % (MAX_PDFS_PER_RECOVERY_RUN - 1, budget[0])
+            "expected %d, got %d" % (_SINGLE_COURSE_PDF_BUDGET - 1, budget[0])
+        )
+
+    def test_single_course_pdf_budget_lower_than_batch_cap(self):
+        """run_single_course_recovery must initialise its pdf_budget with
+        _SINGLE_COURSE_PDF_BUDGET, which must be strictly lower than
+        MAX_PDFS_PER_RECOVERY_RUN (the batch cap).  This prevents a
+        single-course trigger from consuming as many PDF fetches as a full
+        batch pass."""
+        from app.services.scraper.recovery.extractor import (
+            _SINGLE_COURSE_PDF_BUDGET,
+            MAX_PDFS_PER_RECOVERY_RUN,
+        )
+        assert _SINGLE_COURSE_PDF_BUDGET < MAX_PDFS_PER_RECOVERY_RUN, (
+            "_SINGLE_COURSE_PDF_BUDGET (%d) must be strictly less than "
+            "MAX_PDFS_PER_RECOVERY_RUN (%d) so that single-course recovery "
+            "triggers consume fewer PDF fetches than a full batch pass."
+            % (_SINGLE_COURSE_PDF_BUDGET, MAX_PDFS_PER_RECOVERY_RUN)
+        )
+
+        from app.services.scraper.recovery.run_recovery import run_single_course_recovery
+
+        sc = self._mock_sc()
+        db = self._mock_db(sc)
+        initial_budgets: list[int] = []
+
+        async def mock_extract(url, cats, country=None, metadata=None, pdf_budget=None):
+            if pdf_budget is not None and not initial_budgets:
+                initial_budgets.append(pdf_budget[0])
+            if metadata is not None:
+                metadata["source_type"] = "html"
+            return []
+
+        async def _run():
+            from contextlib import ExitStack
+            patches = self._common_patches(sc) + [
+                patch(
+                    "app.services.scraper.recovery.searcher.search_candidate_pages",
+                    new=AsyncMock(return_value=[self._broad_candidate()]),
+                ),
+                patch(
+                    "app.services.scraper.recovery.extractor.extract_from_url",
+                    side_effect=mock_extract,
+                ),
+                patch(
+                    "app.services.scraper.recovery.mapper.map_results_to_course",
+                    return_value=({}, {}),
+                ),
+            ]
+            with ExitStack() as stack:
+                for p in patches:
+                    stack.enter_context(p)
+                return await run_single_course_recovery(self._SC_ID, db)
+
+        self._run(_run())
+
+        assert initial_budgets, (
+            "extract_from_url was never called with a pdf_budget; "
+            "run_single_course_recovery must pass its pdf_budget list to extract_from_url"
+        )
+        assert initial_budgets[0] == _SINGLE_COURSE_PDF_BUDGET, (
+            "run_single_course_recovery must initialise pdf_budget with "
+            "_SINGLE_COURSE_PDF_BUDGET (%d), got %d"
+            % (_SINGLE_COURSE_PDF_BUDGET, initial_budgets[0])
+        )
+        assert initial_budgets[0] < MAX_PDFS_PER_RECOVERY_RUN, (
+            "Single-course pdf_budget initial value (%d) must be lower than "
+            "the batch cap MAX_PDFS_PER_RECOVERY_RUN (%d)"
+            % (initial_budgets[0], MAX_PDFS_PER_RECOVERY_RUN)
         )
 
     def test_no_candidates_writes_trace_rows(self):
