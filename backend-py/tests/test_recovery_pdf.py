@@ -584,3 +584,338 @@ class TestBroadScorerSummaryCount:
             "HTML results from a broad-scorer URL must keep source_type='html'; "
             "got %r" % results[0]["source_type"]
         )
+
+
+# ---------------------------------------------------------------------------
+# run_recovery_pass: fallback-discovered PDF flows through to extraction
+# ---------------------------------------------------------------------------
+
+class TestRunRecoveryPassFallbackPdf:
+    """End-to-end: a via_broad_scorer=True PDF candidate flows through
+    run_recovery_pass and produces an actionable recovery result.
+
+    Tests verify three things:
+    1. The candidate is passed to extract_from_url (not silently dropped).
+    2. The result is tagged source_type='pdf_broad' because the URL is in
+       url_is_broad.
+    3. pdf_budget is decremented when extract_from_url handles a direct PDF URL.
+    """
+
+    _GAP_PDF_URL = "https://uni.edu.au/download/2024-international-prospectus.pdf"
+    _SEED_URL = "https://uni.edu.au"
+    _SCRAPE_RUN_ID = "test-run-fallback-pdf-001"
+
+    def _run(self, coro):
+        return asyncio.get_event_loop().run_until_complete(coro)
+
+    def _fake_course(self) -> dict:
+        return {
+            "id": 1,
+            "university_id": 99,
+            "course_name": "Bachelor of Commerce",
+            "degree_level": "bachelor",
+            "international_fee": None,
+            "ielts_overall": 6.5,
+            "intake_months": "February,July",
+            "course_location": "Sydney",
+            "other_requirement": None,
+            "course_website": self._SEED_URL + "/courses/commerce",
+            "status": "pending",
+        }
+
+    def _broad_candidate(self) -> dict:
+        """Candidate dict for the gap PDF, surfaced only by the broad scorer."""
+        return {
+            "url": self._GAP_PDF_URL,
+            "category": "fees",
+            "score": 3,
+            "path_score": 1,
+            "matched_keyword": "international",
+            "via_broad_scorer": True,
+        }
+
+    def _fee_result(self) -> dict:
+        """A fee extraction result as would be returned by _extract_from_pdf."""
+        return {
+            "field": "international_fee",
+            "value": 28000.0,
+            "normalized": 28000.0,
+            "confidence": 0.85,
+            "snippet": "International tuition fee: AUD 28,000 per year",
+            "method": "table",
+            "source_url": self._GAP_PDF_URL,
+            "source_type": "pdf",
+        }
+
+    def test_fallback_pdf_candidate_reaches_extractor(self):
+        """run_recovery_pass must call extract_from_url with the gap PDF URL
+        when it is in candidates (via_broad_scorer=True).  A candidate that
+        enters the searcher output but is silently dropped before extraction
+        would leave this assertion failing."""
+        from app.services.scraper.recovery.run_recovery import run_recovery_pass
+
+        extract_calls: list[tuple] = []
+
+        async def mock_extract(url, categories, **kwargs):
+            extract_calls.append((url, categories))
+            if url == self._GAP_PDF_URL:
+                return [dict(self._fee_result())]
+            return []
+
+        db = AsyncMock()
+
+        async def _run():
+            with patch(
+                "app.services.scraper.recovery.run_recovery._get_courses_for_run",
+                new=AsyncMock(return_value=[self._fake_course()]),
+            ), patch(
+                "app.services.scraper.recovery.run_recovery._get_evidence_for_courses",
+                new=AsyncMock(return_value={1: []}),
+            ), patch(
+                "app.services.scraper.recovery.run_recovery._get_university_info",
+                new=AsyncMock(return_value={
+                    "scrape_url": self._SEED_URL,
+                    "country": "AU",
+                    "scrape_config": {},
+                }),
+            ), patch(
+                "app.services.scraper.recovery.detector.detect_missing_fields",
+                return_value=["international_fee"],
+            ), patch(
+                "app.services.scraper.recovery.searcher.search_candidate_pages",
+                new=AsyncMock(return_value=[self._broad_candidate()]),
+            ), patch(
+                "app.services.scraper.recovery.extractor.extract_from_url",
+                side_effect=mock_extract,
+            ), patch(
+                "app.services.scraper.recovery.run_recovery._existing_recovery_fields",
+                new=AsyncMock(return_value=set()),
+            ), patch(
+                "app.services.scraper.recovery.run_recovery._write_recovery_results",
+                new=AsyncMock(return_value=1),
+            ):
+                return await run_recovery_pass(self._SCRAPE_RUN_ID, db)
+
+        self._run(_run())
+
+        pdf_calls = [url for url, _ in extract_calls if ".pdf" in url]
+        assert pdf_calls, (
+            "extract_from_url was never called with the gap PDF URL.\n"
+            "calls seen: %r\n"
+            "The fallback-discovered PDF candidate must not be silently dropped "
+            "between searcher output and the extraction step." % extract_calls
+        )
+        assert any(self._GAP_PDF_URL in url for url in pdf_calls), (
+            "Expected extract_from_url to be called with %r; "
+            "got calls: %r" % (self._GAP_PDF_URL, extract_calls)
+        )
+
+    def test_fallback_pdf_summary_counts_broad_scorer_pdf(self):
+        """run_recovery_pass summary must report pdfs_via_broad_scorer >= 1
+        when a via_broad_scorer=True candidate is present in the candidates list."""
+        from app.services.scraper.recovery.run_recovery import run_recovery_pass
+
+        db = AsyncMock()
+
+        async def _run():
+            with patch(
+                "app.services.scraper.recovery.run_recovery._get_courses_for_run",
+                new=AsyncMock(return_value=[self._fake_course()]),
+            ), patch(
+                "app.services.scraper.recovery.run_recovery._get_evidence_for_courses",
+                new=AsyncMock(return_value={1: []}),
+            ), patch(
+                "app.services.scraper.recovery.run_recovery._get_university_info",
+                new=AsyncMock(return_value={
+                    "scrape_url": self._SEED_URL,
+                    "country": "AU",
+                    "scrape_config": {},
+                }),
+            ), patch(
+                "app.services.scraper.recovery.detector.detect_missing_fields",
+                return_value=["international_fee"],
+            ), patch(
+                "app.services.scraper.recovery.searcher.search_candidate_pages",
+                new=AsyncMock(return_value=[self._broad_candidate()]),
+            ), patch(
+                "app.services.scraper.recovery.extractor.extract_from_url",
+                new=AsyncMock(return_value=[dict(self._fee_result())]),
+            ), patch(
+                "app.services.scraper.recovery.run_recovery._existing_recovery_fields",
+                new=AsyncMock(return_value=set()),
+            ), patch(
+                "app.services.scraper.recovery.run_recovery._write_recovery_results",
+                new=AsyncMock(return_value=1),
+            ):
+                return await run_recovery_pass(self._SCRAPE_RUN_ID, db)
+
+        summary = self._run(_run())
+
+        assert summary["pdfs_via_broad_scorer"] >= 1, (
+            "Expected pdfs_via_broad_scorer >= 1 in summary when a "
+            "via_broad_scorer=True candidate is in the candidates list; "
+            "got summary=%r" % summary
+        )
+        assert summary["results_written"] >= 1, (
+            "Expected results_written >= 1 (at least one recovery result from "
+            "the fallback PDF); got summary=%r" % summary
+        )
+
+    def test_fallback_pdf_result_tagged_pdf_broad(self):
+        """The run_recovery_pass orchestrator re-tags PDF results whose source
+        URL is in url_is_broad from 'pdf' to 'pdf_broad'.  This test captures
+        the dict passed to map_results_to_course and asserts the tagging happened
+        before mapping — so results written to the DB carry 'pdf_broad'."""
+        from app.services.scraper.recovery.run_recovery import run_recovery_pass
+
+        captured_map_inputs: list[list] = []
+
+        def mock_map(all_results, degree_level=None, course_name=None):
+            captured_map_inputs.append(list(all_results))
+            # Return a minimal mapped dict so _write_recovery_results is called
+            pdf_result = next((r for r in all_results if r.get("field") == "international_fee"), None)
+            if pdf_result:
+                return {"international_fee": pdf_result}
+            return {}
+
+        db = AsyncMock()
+
+        async def _run():
+            with patch(
+                "app.services.scraper.recovery.run_recovery._get_courses_for_run",
+                new=AsyncMock(return_value=[self._fake_course()]),
+            ), patch(
+                "app.services.scraper.recovery.run_recovery._get_evidence_for_courses",
+                new=AsyncMock(return_value={1: []}),
+            ), patch(
+                "app.services.scraper.recovery.run_recovery._get_university_info",
+                new=AsyncMock(return_value={
+                    "scrape_url": self._SEED_URL,
+                    "country": "AU",
+                    "scrape_config": {},
+                }),
+            ), patch(
+                "app.services.scraper.recovery.detector.detect_missing_fields",
+                return_value=["international_fee"],
+            ), patch(
+                "app.services.scraper.recovery.searcher.search_candidate_pages",
+                new=AsyncMock(return_value=[self._broad_candidate()]),
+            ), patch(
+                "app.services.scraper.recovery.extractor.extract_from_url",
+                new=AsyncMock(return_value=[dict(self._fee_result())]),
+            ), patch(
+                "app.services.scraper.recovery.mapper.map_results_to_course",
+                side_effect=mock_map,
+            ), patch(
+                "app.services.scraper.recovery.run_recovery._existing_recovery_fields",
+                new=AsyncMock(return_value=set()),
+            ), patch(
+                "app.services.scraper.recovery.run_recovery._write_recovery_results",
+                new=AsyncMock(return_value=1),
+            ):
+                return await run_recovery_pass(self._SCRAPE_RUN_ID, db)
+
+        self._run(_run())
+
+        assert captured_map_inputs, (
+            "map_results_to_course was never called — the extraction result was "
+            "dropped before reaching the mapping step"
+        )
+        all_results_seen = [r for batch in captured_map_inputs for r in batch]
+        fee_results = [r for r in all_results_seen if r.get("field") == "international_fee"]
+        assert fee_results, (
+            "No international_fee result reached map_results_to_course; "
+            "all results seen: %r" % all_results_seen
+        )
+        for r in fee_results:
+            assert r.get("source_type") == "pdf_broad", (
+                "Result from a via_broad_scorer PDF must have source_type='pdf_broad' "
+                "by the time it reaches map_results_to_course; "
+                "got source_type=%r for result=%r" % (r.get("source_type"), r)
+            )
+            assert r.get("source_url") == self._GAP_PDF_URL, (
+                "source_url must be the gap PDF URL; got %r" % r.get("source_url")
+            )
+
+    def test_pdf_budget_decremented_for_direct_pdf_url(self):
+        """extract_from_url must decrement pdf_budget[0] by 1 when the URL
+        itself is a PDF (source_type='pdf_direct') and the budget is provided.
+
+        This confirms that fallback-discovered PDFs are subject to the shared
+        per-university PDF budget and cannot exhaust recovery runtime
+        unboundedly even when many broad-scorer PDFs exist."""
+        from app.services.scraper.recovery.extractor import extract_from_url
+
+        fee_result = dict(self._fee_result())
+
+        async def _run():
+            budget = [10]
+            with patch(
+                "app.services.scraper.recovery.extractor._fetch_html",
+                new=AsyncMock(return_value=("", "pdf_direct")),
+            ), patch(
+                "app.services.scraper.recovery.extractor._extract_from_pdf",
+                new=AsyncMock(return_value=[fee_result]),
+            ):
+                results = await extract_from_url(
+                    self._GAP_PDF_URL,
+                    {"fees"},
+                    pdf_budget=budget,
+                )
+            return results, budget
+
+        results, budget = self._run(_run())
+
+        assert budget[0] == 9, (
+            "pdf_budget must be decremented by exactly 1 for a direct PDF URL; "
+            "expected budget[0]=9, got %d" % budget[0]
+        )
+        assert results, (
+            "extract_from_url must return extraction results even when the URL "
+            "is a direct PDF (source_type='pdf_direct')"
+        )
+        assert results[0].get("source_url") == self._GAP_PDF_URL, (
+            "Result source_url must be the PDF URL; got %r" % results[0].get("source_url")
+        )
+
+    def test_pdf_budget_exhausted_skips_direct_pdf(self):
+        """When pdf_budget[0] == 0, extract_from_url must skip the direct PDF
+        and return an empty list — confirming the budget guard is active for
+        fallback-discovered PDFs."""
+        from app.services.scraper.recovery.extractor import extract_from_url
+
+        async def _run():
+            budget = [0]
+            extract_pdf_calls: list[str] = []
+
+            async def mock_extract_from_pdf(pdf_url, categories):
+                extract_pdf_calls.append(pdf_url)
+                return [dict(self._fee_result())]
+
+            with patch(
+                "app.services.scraper.recovery.extractor._fetch_html",
+                new=AsyncMock(return_value=("", "pdf_direct")),
+            ), patch(
+                "app.services.scraper.recovery.extractor._extract_from_pdf",
+                side_effect=mock_extract_from_pdf,
+            ):
+                results = await extract_from_url(
+                    self._GAP_PDF_URL,
+                    {"fees"},
+                    pdf_budget=budget,
+                )
+            return results, budget, extract_pdf_calls
+
+        results, budget, calls = self._run(_run())
+
+        assert results == [], (
+            "extract_from_url must return [] when pdf_budget is exhausted; "
+            "got: %r" % results
+        )
+        assert calls == [], (
+            "_extract_from_pdf must not be called when pdf_budget[0]==0; "
+            "got calls: %r" % calls
+        )
+        assert budget[0] == 0, (
+            "pdf_budget must remain 0 when the PDF was skipped; got %d" % budget[0]
+        )
