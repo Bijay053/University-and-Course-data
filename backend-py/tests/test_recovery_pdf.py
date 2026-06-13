@@ -21,8 +21,8 @@ import pytest
 
 class TestScorePdfLink:
     def setup_method(self):
-        from app.services.scraper.recovery.extractor import _score_pdf_link
-        self._fn = _score_pdf_link
+        from app.services.scraper.recovery.extractor import score_pdf_link
+        self._fn = score_pdf_link
 
     def test_fee_pdf_scores_for_fees_category(self):
         score = self._fn(
@@ -348,10 +348,10 @@ class TestSearcherHomepagePdf:
         )
 
     def test_pdf_scorer_gives_positive_for_gap_url(self):
-        """Precondition: _score_pdf_link must give > 0 for the same URL."""
-        from app.services.scraper.recovery.extractor import _score_pdf_link
+        """Precondition: score_pdf_link must give > 0 for the same URL."""
+        from app.services.scraper.recovery.extractor import score_pdf_link
 
-        score = _score_pdf_link(self._GAP_PDF_URL, self._GAP_PDF_ANCHOR, {"fees"})
+        score = score_pdf_link(self._GAP_PDF_URL, self._GAP_PDF_ANCHOR, {"fees"})
         assert score > 0, (
             "_score_pdf_link should give > 0 because 'international' appears in "
             "_PDF_CATEGORY_KEYWORDS['fees'] and in the URL"

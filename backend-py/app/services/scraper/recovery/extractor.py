@@ -297,8 +297,34 @@ _MAX_LINKED_PDFS = 5
 MAX_PDFS_PER_RECOVERY_RUN = 10
 
 
-def _score_pdf_link(pdf_url: str, anchor_text: str, categories: set[str]) -> int:
-    """Return a relevance score for a PDF link against the needed categories."""
+def score_pdf_link(pdf_url: str, anchor_text: str, categories: set[str]) -> int:
+    """Return a relevance score for a PDF link against the needed categories.
+
+    This is a public API used by both this module and :mod:`searcher` as a
+    fallback scorer for PDF links discovered during BFS traversal.  The
+    keyword vocabulary (``_PDF_CATEGORY_KEYWORDS``) is intentionally broader
+    than the HTML-page scoring dicts in ``searcher.py`` — it includes tokens
+    such as ``"international"`` and ``"schedule"`` that appear in PDF file
+    names and anchor text but not in HTML page headings.
+
+    Parameters
+    ----------
+    pdf_url:
+        Absolute URL of the PDF link (used for keyword matching against the
+        URL path and filename).
+    anchor_text:
+        Visible link text from the ``<a>`` element.
+    categories:
+        Set of category names to score against (e.g. ``{"fees", "english"}``).
+        An empty set always returns 0.
+
+    Returns
+    -------
+    int
+        Sum of keyword hits across all requested categories.  Higher scores
+        indicate stronger relevance.  Returns 0 when no keywords match or
+        ``categories`` is empty.
+    """
     combined = (pdf_url.lower() + " " + anchor_text.lower())
     score = 0
     for cat in categories:
@@ -334,7 +360,7 @@ async def _find_linked_pdfs(
                 continue
             seen.add(full)
             anchor_text = a.get_text(" ", strip=True)
-            score = _score_pdf_link(full, anchor_text, categories or set()) if categories else 0
+            score = score_pdf_link(full, anchor_text, categories or set()) if categories else 0
             scored.append((score, full))
             log.debug(
                 "[RECOVERY:extract] PDF link found: url=%r anchor=%r score=%d",

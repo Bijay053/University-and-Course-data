@@ -224,7 +224,7 @@ async def search_candidate_pages(
     # don't contain the HTML page keywords.  Non-fatal if extractor unavailable.
     try:
         from app.services.scraper.recovery.extractor import (
-            _score_pdf_link as _pdf_link_scorer,
+            score_pdf_link as _pdf_link_scorer,
         )
     except ImportError:
         _pdf_link_scorer = None  # type: ignore[assignment]
