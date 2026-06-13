@@ -613,9 +613,15 @@ function RecoveryPanel({ courseId, readOnly, onAction }: { courseId: number; rea
                       <span className="font-mono text-[11px] font-semibold text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded">
                         {_FIELD_LABELS[res.field] ?? res.field}
                       </span>
-                      <Badge variant="outline" className="text-[10px] text-slate-500 border-slate-200 py-0">
-                        {res.sourceType ?? "html"}
-                      </Badge>
+                      {res.sourceType === "pdf" ? (
+                        <Badge className="text-[10px] bg-amber-100 text-amber-800 border border-amber-300 py-0 hover:bg-amber-100">
+                          PDF
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-[10px] text-slate-500 border-slate-200 py-0">
+                          {res.sourceType ?? "html"}
+                        </Badge>
+                      )}
                     </div>
                     {!readOnly && (
                       <div className="flex items-center gap-1.5">
@@ -672,15 +678,22 @@ function RecoveryPanel({ courseId, readOnly, onAction }: { courseId: number; rea
                     {res.sourceUrl && (
                       <div>
                         <div className="text-[10px] text-slate-400 mb-0.5">Source</div>
-                        <a
-                          href={res.sourceUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 hover:underline text-[11px] break-all"
-                        >
-                          <ExternalLink className="w-2.5 h-2.5 flex-shrink-0" />
-                          {res.sourceUrl}
-                        </a>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <a
+                            href={res.sourceUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 hover:underline text-[11px] break-all"
+                          >
+                            <ExternalLink className="w-2.5 h-2.5 flex-shrink-0" />
+                            {res.sourceUrl}
+                          </a>
+                          {res.sourceType === "pdf" && (
+                            <span className="inline-flex items-center text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-300 px-1.5 py-0.5 rounded flex-shrink-0">
+                              PDF
+                            </span>
+                          )}
+                        </div>
                       </div>
                     )}
 
