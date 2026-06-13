@@ -20,6 +20,7 @@ class AgentRecoveryResult(Base):
     recovered_value: Mapped[str | None] = mapped_column(Text)
     source_url: Mapped[str | None] = mapped_column(Text)
     source_type: Mapped[str | None] = mapped_column(Text)
+    category: Mapped[str | None] = mapped_column(Text)
     evidence_text: Mapped[str | None] = mapped_column(Text)
     confidence: Mapped[float | None] = mapped_column(Double)
     mapping_reason: Mapped[str | None] = mapped_column(Text)

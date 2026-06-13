@@ -153,11 +153,11 @@ async def _write_recovery_results(
                 """
                 INSERT INTO agent_recovery_results
                     (scraped_course_id, scrape_run_id, field, recovered_value,
-                     source_url, source_type, evidence_text, confidence,
+                     source_url, source_type, category, evidence_text, confidence,
                      mapping_reason, status, created_at)
                 VALUES
                     (:sc_id, :run_id, :field, :value,
-                     :source_url, :source_type, :evidence_text, :confidence,
+                     :source_url, :source_type, :category, :evidence_text, :confidence,
                      :mapping_reason, 'pending', NOW())
                 """
             ),
@@ -168,6 +168,7 @@ async def _write_recovery_results(
                 "value": value_str,
                 "source_url": result.get("source_url"),
                 "source_type": result.get("source_type", "html"),
+                "category": result.get("category"),
                 "evidence_text": result.get("snippet"),
                 "confidence": result.get("confidence"),
                 "mapping_reason": result.get("mapping_reason"),
@@ -189,22 +190,25 @@ async def _write_trace_row(
     *,
     source_url: str | None = None,
     evidence_text: str | None = None,
+    category: str | None = None,
 ) -> None:
     """Write a diagnostic trace row explaining why recovery found nothing.
 
     Trace rows have recovered_value=NULL and status in _TRACE_STATUSES.
     They are shown in the UI as a "Search Trace" section, never as actionable results.
+    The ``category`` column records which budget category (e.g. 'fees' or 'english')
+    the search was attributed to, so operators can debug budget exhaustion by type.
     """
     await db.execute(
         text(
             """
             INSERT INTO agent_recovery_results
                 (scraped_course_id, scrape_run_id, field, recovered_value,
-                 source_url, source_type, evidence_text, confidence,
+                 source_url, source_type, category, evidence_text, confidence,
                  mapping_reason, status, created_at)
             VALUES
                 (:sc_id, :run_id, :field, NULL,
-                 :source_url, 'trace', :evidence_text, NULL,
+                 :source_url, 'trace', :category, :evidence_text, NULL,
                  :reason, :status, NOW())
             """
         ),
@@ -213,6 +217,7 @@ async def _write_trace_row(
             "run_id": scrape_run_id,
             "field": field,
             "source_url": source_url,
+            "category": category,
             "evidence_text": evidence_text,
             "reason": reason,
             "status": status,
@@ -227,8 +232,8 @@ async def _fetch_all_rows_for_course(
     rows = (await db.execute(
         text(
             "SELECT id, scraped_course_id, scrape_run_id, field, recovered_value, "
-            "source_url, source_type, evidence_text, confidence, mapping_reason, "
-            "status, created_at "
+            "source_url, source_type, category, evidence_text, confidence, "
+            "mapping_reason, status, created_at "
             "FROM agent_recovery_results "
             "WHERE scraped_course_id = :sc_id "
             "ORDER BY id DESC"
@@ -245,6 +250,7 @@ async def _fetch_all_rows_for_course(
             "recoveredValue": r.recovered_value,
             "sourceUrl": r.source_url,
             "sourceType": r.source_type,
+            "category": r.category,
             "evidenceText": r.evidence_text,
             "confidence": r.confidence,
             "mappingReason": r.mapping_reason,
@@ -599,6 +605,7 @@ async def run_single_course_recovery(
                 db, scraped_course_id, scrape_run_id, field,
                 "no_source",
                 "No candidate pages found during BFS domain search for this field category",
+                category=FIELD_TO_CATEGORY.get(field),
             )
         await db.commit()
         return await _fetch_all_rows_for_course(db, scraped_course_id)
@@ -711,6 +718,7 @@ async def run_single_course_recovery(
                 best_rej.get("reason", "Value found but rejected by degree-level check"),
                 source_url=best_rej.get("source_url"),
                 evidence_text=evidence,
+                category=cat,
             )
 
         elif browser_failed_urls:
@@ -721,6 +729,7 @@ async def run_single_course_recovery(
                 "Page fetch failed — site may require JavaScript rendering or "
                 "Cloudflare protection blocked the request",
                 source_url=browser_failed_urls[0],
+                category=cat,
             )
 
         elif pdf_urls and field not in fields_with_extracted_value:
@@ -730,6 +739,7 @@ async def run_single_course_recovery(
                 "pdf_failed",
                 "PDF found but text extraction returned no usable data for this field",
                 source_url=pdf_urls[0],
+                category=cat,
             )
 
         elif cat and cat not in categories_with_results:
@@ -740,6 +750,7 @@ async def run_single_course_recovery(
                 "Candidate pages were found but no value for this field could be "
                 "extracted from the page content",
                 source_url=cat_urls[0] if cat_urls else None,
+                category=cat,
             )
 
         else:
@@ -750,6 +761,7 @@ async def run_single_course_recovery(
                 "Related fields were extracted from the page but this specific "
                 "field was not found",
                 source_url=cat_urls[0] if cat_urls else None,
+                category=cat,
             )
 
     await db.commit()

@@ -150,8 +150,8 @@ async def get_recovery_results(
     rows = (await db.execute(
         text(
             "SELECT id, scraped_course_id, scrape_run_id, field, recovered_value, "
-            "source_url, source_type, evidence_text, confidence, mapping_reason, "
-            "status, created_at "
+            "source_url, source_type, category, evidence_text, confidence, "
+            "mapping_reason, status, created_at "
             "FROM agent_recovery_results "
             "WHERE scraped_course_id = :sc_id "
             "ORDER BY status, confidence DESC NULLS LAST, id"
@@ -168,6 +168,7 @@ async def get_recovery_results(
             "recoveredValue": r.recovered_value,
             "sourceUrl": r.source_url,
             "sourceType": r.source_type,
+            "category": r.category,
             "evidenceText": r.evidence_text,
             "confidence": r.confidence,
             "mappingReason": r.mapping_reason,

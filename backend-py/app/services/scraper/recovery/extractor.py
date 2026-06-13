@@ -206,6 +206,7 @@ async def _run_extractor(
                 "method": method,
                 "source_url": url,
                 "source_type": "html",
+                "category": category,
             })
     except Exception as exc:
         log.warning(
@@ -507,9 +508,10 @@ async def _extract_from_pdf(pdf_url: str, categories: set[str]) -> list[dict[str
             for r in cat_results:
                 r["source_type"] = "pdf"
                 r["source_url"] = pdf_url
+                r["category"] = cat
                 log.debug(
-                    "[RECOVERY:extract] PDF field extracted: pdf=%r field=%r value=%r confidence=%s",
-                    pdf_url, r.get("field"), r.get("value"), r.get("confidence"),
+                    "[RECOVERY:extract] PDF field extracted: pdf=%r category=%r field=%r value=%r confidence=%s",
+                    pdf_url, cat, r.get("field"), r.get("value"), r.get("confidence"),
                 )
             if cat_results:
                 log.info(
