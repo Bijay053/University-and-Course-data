@@ -302,13 +302,13 @@ const API_FIELDS = [
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 function StringListEditor({
-  label, values, onChange, placeholder, helpText
+  label, values, onChange, placeholder, helpText,
 }: {
   label: string;
   values: string[];
   onChange: (v: string[]) => void;
   placeholder?: string;
-  helpText?: string;
+  helpText?: React.ReactNode;
 }) {
   const [draft, setDraft] = useState("");
   const [bulkOpen, setBulkOpen] = useState(false);
@@ -828,6 +828,14 @@ export default function RecipeEditorPage() {
   const [filterSimError, setFilterSimError] = useState<string | null>(null);
   const [filterSimAllowPats, setFilterSimAllowPats] = useState<string[]>([]);
 
+  // ── Listing-page link fetcher ──
+  const [listingFetchUrl, setListingFetchUrl] = useState("");
+  const [fetchingListing, setFetchingListing] = useState(false);
+  const [listingFetchResult, setListingFetchResult] = useState<{
+    links: string[]; method: string; total_raw: number; needs_browser: boolean; error?: string;
+  } | null>(null);
+  const [selectedListingLinks, setSelectedListingLinks] = useState<Set<string>>(new Set());
+
   // Local raw-text state for year textareas — avoids the "can't type partial year"
   // problem that occurs when the controlled value is derived from number[] and the
   // onChange filter strips any value < 2001 (so "202" disappears mid-keystroke).
@@ -904,6 +912,47 @@ export default function RecipeEditorPage() {
       setFilterSimLoading(false);
     }
   }, [filterSimUrls, filterSimAllowPats, recipe.must_contain, recipe.block_url_patterns]);
+
+  // ── Listing-page link fetcher handler ──
+  const fetchListingLinks = useCallback(async () => {
+    const url = listingFetchUrl.trim();
+    if (!url) return;
+    setFetchingListing(true);
+    setListingFetchResult(null);
+    setSelectedListingLinks(new Set());
+    try {
+      const resp = await fetch("/api/scrape/fetch-listing-links", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url, uni_id: id ? Number(id) : undefined }),
+      });
+      const data = await resp.json();
+      setListingFetchResult(data);
+      if (data.links?.length) {
+        setSelectedListingLinks(new Set(data.links as string[]));
+      }
+    } catch (e: any) {
+      setListingFetchResult({ links: [], method: "none", total_raw: 0, needs_browser: false, error: String(e) });
+    } finally {
+      setFetchingListing(false);
+    }
+  }, [listingFetchUrl, id]);
+
+  const addSelectedListingLinks = useCallback(() => {
+    if (!selectedListingLinks.size) return;
+    const existing = new Set(recipe.extra_course_urls);
+    const toAdd = [...selectedListingLinks].filter(l => !existing.has(l));
+    if (!toAdd.length) {
+      toast({ title: "All links already in Extra Course URLs" });
+      return;
+    }
+    patchRecipe({ extra_course_urls: [...recipe.extra_course_urls, ...toAdd] });
+    toast({ title: `Added ${toAdd.length} course URL${toAdd.length !== 1 ? "s" : ""}` });
+    setListingFetchResult(null);
+    setListingFetchUrl("");
+    setSelectedListingLinks(new Set());
+  }, [selectedListingLinks, recipe.extra_course_urls]);
 
   // ── Save ──
   const save = useCallback(async () => {
@@ -2094,6 +2143,116 @@ export default function RecipeEditorPage() {
                 placeholder="https://example.com/study/specific-course"
                 helpText="Individual course pages injected directly after discovery — bypasses all crawling. Use for courses that no crawler can find."
               />
+
+              {/* ── Listing-page link fetcher ─────────────────────────────── */}
+              <div className="rounded-lg border border-dashed bg-muted/30 p-4 space-y-3">
+                <div>
+                  <p className="text-sm font-medium flex items-center gap-2">
+                    <Link className="h-4 w-4 text-muted-foreground" />
+                    Fetch courses from a search or listing page
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Paste any course-listing or search-results URL. The system fetches the page and extracts all course links automatically — no manual copying needed.
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <Input
+                    className="text-xs font-mono"
+                    placeholder="https://www.example.ac.uk/study/search?level=undergraduate"
+                    value={listingFetchUrl}
+                    onChange={e => { setListingFetchUrl(e.target.value); setListingFetchResult(null); }}
+                    onKeyDown={e => e.key === "Enter" && fetchListingLinks()}
+                  />
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={fetchListingLinks}
+                    disabled={fetchingListing || !listingFetchUrl.trim()}
+                    className="shrink-0"
+                  >
+                    {fetchingListing
+                      ? <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> Fetching…</>
+                      : <><Play className="h-3.5 w-3.5 mr-1" /> Fetch</>}
+                  </Button>
+                </div>
+
+                {listingFetchResult && (
+                  <div className="space-y-2">
+                    {listingFetchResult.error && !listingFetchResult.links.length && (
+                      <div className="rounded-md bg-destructive/10 border border-destructive/20 p-3 text-xs text-destructive">
+                        {listingFetchResult.error}
+                      </div>
+                    )}
+
+                    {listingFetchResult.needs_browser && !listingFetchResult.links.length && (
+                      <div className="rounded-md bg-amber-50 border border-amber-200 p-3 space-y-2">
+                        <p className="text-xs font-medium text-amber-800 flex items-center gap-1.5">
+                          <AlertTriangle className="h-3.5 w-3.5" />
+                          No course links found — this looks like a JavaScript-rendered page
+                        </p>
+                        <p className="text-xs text-amber-700">
+                          The page returned {listingFetchResult.total_raw} links total but none matched course URL patterns.
+                          JS-rendered pages need a browser to load their content. Try either:
+                        </p>
+                        <ul className="text-xs text-amber-700 list-disc pl-4 space-y-1">
+                          <li>Add the URL to <strong>Discovery Seed URLs</strong> above and set Discovery Strategy to <strong>Browser</strong></li>
+                          <li>Use the sitemap — check <code className="bg-amber-100 px-1 rounded">{new URL(listingFetchUrl.trim()).origin}/sitemap.xml</code></li>
+                        </ul>
+                      </div>
+                    )}
+
+                    {listingFetchResult.links.length > 0 && (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs text-muted-foreground">
+                            Found <strong>{listingFetchResult.links.length}</strong> course link{listingFetchResult.links.length !== 1 ? "s" : ""}
+                            {" "}via {listingFetchResult.method === "static" ? "direct HTTP" : listingFetchResult.method === "static_proxy" ? "proxy" : listingFetchResult.method}
+                            {" "}({listingFetchResult.total_raw} total links on page)
+                          </p>
+                          <div className="flex gap-1.5">
+                            <Button type="button" variant="ghost" size="sm" className="h-6 text-xs px-2"
+                              onClick={() => setSelectedListingLinks(new Set(listingFetchResult.links))}>
+                              All
+                            </Button>
+                            <Button type="button" variant="ghost" size="sm" className="h-6 text-xs px-2"
+                              onClick={() => setSelectedListingLinks(new Set())}>
+                              None
+                            </Button>
+                          </div>
+                        </div>
+                        <div className="max-h-48 overflow-y-auto rounded-md border bg-background divide-y text-xs">
+                          {listingFetchResult.links.map(link => (
+                            <label key={link} className="flex items-center gap-2 px-3 py-1.5 hover:bg-muted/40 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                className="h-3 w-3 accent-primary"
+                                checked={selectedListingLinks.has(link)}
+                                onChange={e => {
+                                  const next = new Set(selectedListingLinks);
+                                  e.target.checked ? next.add(link) : next.delete(link);
+                                  setSelectedListingLinks(next);
+                                }}
+                              />
+                              <span className="font-mono truncate text-muted-foreground">{link}</span>
+                            </label>
+                          ))}
+                        </div>
+                        <Button
+                          type="button"
+                          size="sm"
+                          className="w-full"
+                          disabled={!selectedListingLinks.size}
+                          onClick={addSelectedListingLinks}
+                        >
+                          <Plus className="h-3.5 w-3.5 mr-1" />
+                          Add {selectedListingLinks.size > 0 ? selectedListingLinks.size : ""} selected to Extra Course URLs
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

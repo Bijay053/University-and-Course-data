@@ -369,3 +369,162 @@ async def apply_api_config(
         "git_pushed": git_result.get("ok", False),
         "git_message": git_result.get("message") or git_result.get("error", ""),
     }
+
+
+# ── Listing-page link extractor ───────────────────────────────────────────────
+
+class FetchListingLinksRequest(BaseModel):
+    url: str
+    uni_id: int | None = None
+    allow_patterns: list[str] | None = None
+
+
+@router.post("/fetch-listing-links")
+async def fetch_listing_links(
+    body: FetchListingLinksRequest,
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """
+    Fetch a listing / search-results page and return the course-shaped links
+    found on it.  Used by the Recipe-editor "Fetch from listing page" feature.
+
+    Strategy
+    --------
+    1. Static HTTP (cffi / Scrape.do static) — zero browser cost.
+    2. Parse all same-host ``<a href>`` links.
+    3. Filter out obvious non-course URLs (global guards).
+    4. If the university has ``allow_url_patterns`` in its YAML, apply them.
+    5. Return results + ``needs_browser`` hint when the page appears JS-only.
+    """
+    import os
+    import re as _re
+    from urllib.parse import urlparse as _up
+
+    from app.services.scraper.discovery import _is_known_non_course_url
+    from app.services.scraper.guards import is_blocked_page
+
+    raw_url = body.url.strip()
+    if not raw_url.startswith("http"):
+        return {"ok": False, "error": "URL must start with http:// or https://"}
+
+    parsed_base = _up(raw_url)
+    base_origin = f"{parsed_base.scheme}://{parsed_base.netloc}"
+
+    # ── 1. Fetch ──────────────────────────────────────────────────────────────
+    html: str | None = None
+    method = "none"
+
+    try:
+        from app.services.scraper.http_fetcher import fetch_html_cffi
+        html = await fetch_html_cffi(raw_url)
+        if html:
+            method = "static"
+    except Exception:
+        log.debug("fetch_listing_links: cffi failed for %s", raw_url)
+
+    if not html and os.environ.get("SCRAPE_DO_TOKEN"):
+        try:
+            from app.services.scraper.http_fetcher import fetch_html_scrape_do
+            html = await fetch_html_scrape_do(raw_url, render=False)
+            if html:
+                method = "static_proxy"
+        except Exception:
+            log.debug("fetch_listing_links: scrape.do static failed for %s", raw_url)
+
+    if not html:
+        return {
+            "ok": True,
+            "links": [],
+            "method": "none",
+            "total_raw": 0,
+            "needs_browser": True,
+            "error": "Could not fetch the page (network error or Cloudflare block)",
+        }
+
+    # ── 2. Extract all same-host links ────────────────────────────────────────
+    href_re = _re.compile(r'href=["\']((?:https?://[^\s"\'<>]+|/[^\s"\'<>]*))["\']', _re.IGNORECASE)
+    raw_hrefs: list[str] = href_re.findall(html)
+
+    abs_links: list[str] = []
+    netloc = parsed_base.netloc
+    for href in raw_hrefs:
+        href = href.split("#")[0].rstrip("/") or "/"
+        if href.startswith("//"):
+            href = parsed_base.scheme + ":" + href
+        if href.startswith("/"):
+            candidate = base_origin + href
+        elif href.startswith("http"):
+            candidate = href
+        else:
+            continue
+        if _up(candidate).netloc != netloc:
+            continue
+        abs_links.append(candidate)
+
+    # Deduplicate (preserve order)
+    seen: set[str] = set()
+    same_host: list[str] = []
+    for lnk in abs_links:
+        if lnk not in seen:
+            seen.add(lnk)
+            same_host.append(lnk)
+
+    total_raw = len(same_host)
+
+    # ── 3. Global guard filters ───────────────────────────────────────────────
+    course_links: list[str] = []
+    for link in same_host:
+        if _is_known_non_course_url(link):
+            continue
+        blocked, _ = is_blocked_page(link)
+        if blocked:
+            continue
+        course_links.append(link)
+
+    # ── 4. Per-university allow_url_patterns (YAML) ───────────────────────────
+    allow_pats: list[str] = list(body.allow_patterns or [])
+
+    if not allow_pats and body.uni_id:
+        try:
+            from app.services.scraper.config.loader import load_uni_config
+            row = (await db.execute(
+                text("SELECT name, scrape_url FROM universities WHERE id = :id"),
+                {"id": body.uni_id},
+            )).mappings().first()
+            if row:
+                uni_cfg = load_uni_config(
+                    slug=_up(row["scrape_url"]).netloc.lstrip("www.").split(".")[0] if row["scrape_url"] else "unknown",
+                    name=row["name"] or "",
+                    scrape_url=row["scrape_url"] or "",
+                    university_id=body.uni_id,
+                )
+                allow_pats = list(getattr(uni_cfg.discovery, "allow_url_patterns", None) or [])
+        except Exception:
+            log.debug("fetch_listing_links: could not load YAML allow_url_patterns for uni_id=%s", body.uni_id)
+
+    if allow_pats:
+        compiled_pats = []
+        for pat in allow_pats:
+            try:
+                compiled_pats.append(_re.compile(pat, _re.IGNORECASE))
+            except Exception:
+                pass
+        if compiled_pats:
+            course_links = [l for l in course_links if any(p.search(l) for p in compiled_pats)]
+
+    # ── 5. Needs-browser hint ─────────────────────────────────────────────────
+    # Heuristic: if we got an HTML page but almost no links overall, it's
+    # almost certainly a JS-only SPA shell that needs Playwright rendering.
+    needs_browser = (len(course_links) == 0 and total_raw < 15)
+
+    log.info(
+        "fetch_listing_links: url=%s → raw=%d same_host=%d filtered=%d needs_browser=%s",
+        raw_url, len(raw_hrefs), total_raw, len(course_links), needs_browser,
+    )
+    return {
+        "ok": True,
+        "links": course_links,
+        "method": method,
+        "total_raw": total_raw,
+        "needs_browser": needs_browser,
+    }

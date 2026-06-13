@@ -345,6 +345,7 @@ type DiscoveryTest = {
   safety_level: "safe" | "warning" | "dangerous";
   agg_status: "ok" | "warning" | "critical";
   filter_config: { allow_url_patterns: string[]; must_contain: string[]; block_url_patterns: string[] };
+  total_found?: number;
   error?: string;
 };
 
