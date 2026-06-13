@@ -395,11 +395,16 @@ async def run_recovery_pass(
         # inflating recovery runtime unpredictably.
         pdf_budget: list[int] = [MAX_PDFS_PER_RECOVERY_RUN]
 
+        # Shared dedup set: a PDF URL that appears both as a direct candidate
+        # and as a linked PDF on another HTML page must only be downloaded once.
+        seen_pdf_urls: set[str] = set()
+
         extracted_by_category: dict[str, list[dict[str, Any]]] = {}
         for url, url_cats in url_to_categories.items():
             try:
                 page_results = await extract_from_url(
-                    url, url_cats, country=country, pdf_budget=pdf_budget
+                    url, url_cats, country=country,
+                    pdf_budget=pdf_budget, seen_pdf_urls=seen_pdf_urls,
                 )
                 # Tag PDF results from broad-scorer-discovered URLs as 'pdf_broad'
                 # so operators can distinguish them from standard PDF results.

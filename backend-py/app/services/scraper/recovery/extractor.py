@@ -433,6 +433,7 @@ async def extract_from_url(
     timeout: float = 12.0,
     metadata: dict | None = None,
     pdf_budget: list[int] | None = None,
+    seen_pdf_urls: set[str] | None = None,
 ) -> list[dict[str, Any]]:
     """Fetch a URL once and run ALL specified category extractors on it.
 
@@ -459,6 +460,13 @@ async def extract_from_url(
         logged and no further PDFs are fetched for this university.  If
         ``None``, no cross-URL budget is enforced (``_MAX_LINKED_PDFS`` still
         caps per-page PDF discovery).
+    seen_pdf_urls:
+        Optional mutable set shared across all ``extract_from_url`` calls for a
+        single university in one recovery pass.  Any PDF URL (direct or linked)
+        already present in the set is skipped; new PDF URLs are added before
+        fetching.  This prevents the same PDF from being downloaded twice when
+        it appears both as a direct candidate URL and as a linked PDF on another
+        HTML page in the same run.
 
     Returns
     -------
@@ -482,6 +490,15 @@ async def extract_from_url(
         # Pass categories so only relevant PDFs are fetched.
         pdf_links = await _find_linked_pdfs(html, url, categories=categories)
         for pdf_url in pdf_links:
+            # Skip PDFs already processed in this recovery run.
+            if seen_pdf_urls is not None:
+                if pdf_url in seen_pdf_urls:
+                    log.debug(
+                        "[RECOVERY:extract] PDF %r already fetched in this run — skipping",
+                        pdf_url,
+                    )
+                    continue
+                seen_pdf_urls.add(pdf_url)
             # Honour the per-university PDF budget when provided.
             if pdf_budget is not None:
                 if pdf_budget[0] <= 0:
@@ -498,7 +515,15 @@ async def extract_from_url(
             results.extend(pdf_results)
 
     elif source_type in ("pdf_direct", "pdf_content_type"):
-        # The URL itself is a PDF — counts against the budget too.
+        # The URL itself is a PDF — check dedup set first.
+        if seen_pdf_urls is not None:
+            if url in seen_pdf_urls:
+                log.debug(
+                    "[RECOVERY:extract] PDF %r already fetched in this run — skipping", url
+                )
+                return results
+            seen_pdf_urls.add(url)
+        # Counts against the budget too.
         if pdf_budget is not None:
             if pdf_budget[0] <= 0:
                 log.warning(
