@@ -3038,6 +3038,17 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # of racing past the cache check.
         vision_image_cache: VisionImageCache = new_vision_image_cache()
 
+        # Cross-course PDF dedup — mirrors the seen_pdf_urls guard already
+        # present in repair.py and recovery/extractor.py.  Universities that
+        # link the same fee-schedule PDF from dozens of course pages would
+        # otherwise download (and Gemini-process) it once per course.
+        #
+        # Thread-safety: asyncio.gather() uses cooperative multitasking on a
+        # single OS thread.  Coroutines only yield at `await` points, so two
+        # coroutines can never mutate the set simultaneously.  A plain set is
+        # therefore safe here — no asyncio.Lock is required.
+        seen_pdf_urls: set[str] = set()
+
         async def _bounded(link: dict) -> dict:
             # Loop supports at most one 429-cooldown retry per URL.
             # When extract_course returns {"_retry_after": N, ...} the
@@ -3104,6 +3115,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                         vision_image_cache=vision_image_cache,
                         central_data=central_data,
                         extraction_rules=_ac_ext_rules,
+                        seen_pdf_urls=seen_pdf_urls,
                     )
                 # ── semaphore released here ──────────────────────────────────
                 # Check for 429-cooldown retry sentinel AFTER exiting `async
