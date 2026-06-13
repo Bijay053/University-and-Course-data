@@ -2233,7 +2233,6 @@ export default function Scraping() {
               onRemove={() => removeSlot(id)}
               canRemove={slotIds.length > 1}
               forceResetKey={forceResetKey}
-              onReplay={runReplay}
             />
           ))}
         </div>

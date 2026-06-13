@@ -125,8 +125,6 @@ export type ScrapeJobCardProps = {
   canRemove?: boolean;
   /** Incremented by the parent's "Cancel All" action to force-reset this card. */
   forceResetKey?: number;
-  /** Called when the operator clicks "Replay from Snapshot" — passes the latest replay-ready job id. */
-  onReplay?: (jobId: string) => void;
 };
 
 const MAX_LOGS = 5000;
@@ -205,7 +203,7 @@ function UniPicker({ value, onChange, universities, disabled }: {
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
-export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove, canRemove, forceResetKey, onReplay }: ScrapeJobCardProps) {
+export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove, canRemove, forceResetKey }: ScrapeJobCardProps) {
   const { toast } = useToast();
   const slotKey = `scrape_slot_${slotIndex}_jobId`;
   const startTimeKey = `scrape_slot_${slotIndex}_startTime`;
@@ -251,6 +249,17 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
 
   // Latest replay-ready job for the selected university (used by "Replay from Snapshot" button)
   const [latestReplayJobId, setLatestReplayJobId] = useState<string | null>(null);
+
+  // ── Inline replay state ───────────────────────────────────────────────────
+  type ReplayLog = { event: string; message: string; current?: number; total?: number };
+  type ReplayResult = { staged?: number; imported?: number; errors?: number; job_id?: string };
+  const [replayPhase, setReplayPhase] = useState<"idle" | "running" | "done" | "error">("idle");
+  const [replayLogs, setReplayLogs] = useState<ReplayLog[]>([]);
+  const [replayElapsed, setReplayElapsed] = useState(0);
+  const [replayResult, setReplayResult] = useState<ReplayResult | null>(null);
+  const [replayError, setReplayError] = useState<string | null>(null);
+  const replayAbortRef = useRef<AbortController | null>(null);
+  const replayLogContainerRef = useRef<HTMLDivElement>(null);
 
   const [qualityData, setQualityData] = useState<QualityData | null>(null);
   const [qualityLoading, setQualityLoading] = useState(false);
@@ -437,6 +446,21 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
     }
   }, [phase, logs]);
 
+  // Autoscroll replay log panel
+  useEffect(() => {
+    const el = replayLogContainerRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+  }, [replayLogs]);
+
+  // Tick elapsed timer while replay is running
+  useEffect(() => {
+    if (replayPhase !== "running") { setReplayElapsed(0); return; }
+    setReplayElapsed(0);
+    const t = setInterval(() => setReplayElapsed(s => s + 1), 1000);
+    return () => clearInterval(t);
+  }, [replayPhase]);
+
   const resetToIdle = useCallback(() => {
     if (pollRef.current) clearTimeout(pollRef.current);
     pollRef.current = null;
@@ -484,6 +508,64 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
     setApplyStates({});
     if (apiDiscPollRef.current) { clearTimeout(apiDiscPollRef.current); apiDiscPollRef.current = null; }
   }, [slotKey, startTimeKey]);
+
+  // ── Inline replay handlers ────────────────────────────────────────────────
+  const resetReplay = useCallback(() => {
+    if (replayAbortRef.current) { replayAbortRef.current.abort(); replayAbortRef.current = null; }
+    setReplayPhase("idle");
+    setReplayLogs([]);
+    setReplayResult(null);
+    setReplayError(null);
+  }, []);
+
+  const handleReplay = useCallback(async () => {
+    if (!latestReplayJobId) return;
+    setReplayPhase("running");
+    setReplayLogs([]);
+    setReplayResult(null);
+    setReplayError(null);
+    const abort = new AbortController();
+    replayAbortRef.current = abort;
+    try {
+      const res = await fetch(`/api/scrape/replay/${latestReplayJobId}/stream`, {
+        signal: abort.signal,
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const msg = await res.text().catch(() => String(res.status));
+        throw new Error(`Server returned ${res.status}: ${msg}`);
+      }
+      const reader = res.body!.getReader();
+      const decoder = new TextDecoder();
+      let buf = "";
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const chunks = buf.split("\n\n");
+        buf = chunks.pop() ?? "";
+        for (const chunk of chunks) {
+          const match = chunk.match(/^data: (.+)$/m);
+          if (!match) continue;
+          const data = JSON.parse(match[1]) as { event: string; message?: string; result?: ReplayResult; current?: number; total?: number };
+          if (data.event === "done") {
+            setReplayResult(data.result ?? {});
+            setReplayPhase("done");
+            return;
+          } else if (data.event === "error") {
+            throw new Error(data.message ?? "Replay error");
+          } else {
+            setReplayLogs(prev => [...prev, { event: data.event, message: data.message ?? data.event, current: data.current, total: data.total }]);
+          }
+        }
+      }
+      setReplayPhase("done");
+    } catch (e) {
+      if ((e as Error).name === "AbortError") { setReplayPhase("idle"); return; }
+      setReplayError(e instanceof Error ? e.message : "Replay failed.");
+      setReplayPhase("error");
+    }
+  }, [latestReplayJobId]);
 
   // ── Auto API Discovery ────────────────────────────────────────────────────
   const handleDiscoverApi = useCallback(async () => {
@@ -592,10 +674,9 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
     }
   }, [apiDiscJobId]);
 
-  // Auto-load repair candidates when done with a URL filter warning
   // Fetch latest replay-ready job when university selection changes
   useEffect(() => {
-    if (!onReplay || !selectedUni || selectedUni === ALL) {
+    if (!selectedUni || selectedUni === ALL) {
       setLatestReplayJobId(null);
       return;
     }
@@ -611,7 +692,7 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
       })
       .catch(() => { if (!cancelled) setLatestReplayJobId(null); });
     return () => { cancelled = true; };
-  }, [selectedUni, onReplay]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selectedUni]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (phase === "done" && urlFilterWarning && urlFilterWarning.kind !== "category_pages" && completedJobId && repairCandidates === null && !repairLoading) {
@@ -1115,8 +1196,13 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
   const elapsed = startTime ? fmt(now - startTime) : null;
 
   // ── Render ────────────────────────────────────────────────────────────────
+  const replayUniName = universities.find(u => String(u.id) === selectedUni)?.name ?? uniName;
+
   return (
     <div className={`relative flex flex-col rounded-xl border bg-white shadow-sm overflow-hidden ${
+      replayPhase === "running" ? "border-emerald-300 shadow-emerald-50" :
+      replayPhase === "done"    ? "border-emerald-200 shadow-emerald-50" :
+      replayPhase === "error"   ? "border-red-200" :
       phase === "running" && jobStatus === "queued" ? "border-amber-300 shadow-amber-50" :
       phase === "running" ? "border-blue-300 shadow-blue-100" :
       phase === "done"    ? "border-green-300 shadow-green-50" :
@@ -1124,34 +1210,51 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
     }`}>
       {/* Header */}
       <div className={`flex items-center justify-between px-4 py-2.5 border-b text-sm font-medium ${
+        replayPhase === "running" ? "bg-emerald-50 border-emerald-200 text-emerald-800" :
+        replayPhase === "done"    ? "bg-emerald-50 border-emerald-200 text-emerald-800" :
+        replayPhase === "error"   ? "bg-red-50 border-red-200 text-red-700" :
         phase === "running" && jobStatus === "queued" ? "bg-amber-50 border-amber-200 text-amber-800" :
         phase === "running" ? "bg-blue-50 border-blue-200 text-blue-800" :
         phase === "done"    ? "bg-green-50 border-green-200 text-green-800" :
         phase === "error"   ? "bg-red-50 border-red-200 text-red-700" : "bg-gray-50 border-gray-200 text-gray-700"
       }`}>
         <div className="flex items-center gap-2">
-          {phase === "running" && jobStatus === "queued" && <span className="text-base leading-none">⏳</span>}
-          {phase === "running" && jobStatus !== "queued" && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-          {phase === "done"    && <CheckCircle2 className="w-3.5 h-3.5" />}
-          {phase === "error"   && <AlertCircle className="w-3.5 h-3.5" />}
+          {replayPhase === "running" && <RotateCcw className="w-3.5 h-3.5 animate-spin" />}
+          {replayPhase === "done"    && <CheckCircle2 className="w-3.5 h-3.5" />}
+          {replayPhase === "error"   && <AlertCircle className="w-3.5 h-3.5" />}
+          {replayPhase === "idle" && phase === "running" && jobStatus === "queued" && <span className="text-base leading-none">⏳</span>}
+          {replayPhase === "idle" && phase === "running" && jobStatus !== "queued" && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+          {replayPhase === "idle" && phase === "done"  && <CheckCircle2 className="w-3.5 h-3.5" />}
+          {replayPhase === "idle" && phase === "error" && <AlertCircle className="w-3.5 h-3.5" />}
           <span>
-            {phase === "idle"    && `Slot ${slotIndex + 1}`}
-            {phase === "running" && jobStatus === "queued" && (uniName ? `${uniName} — Queued` : `Slot ${slotIndex + 1} — Queued`)}
-            {phase === "running" && jobStatus !== "queued" && (uniName || `Slot ${slotIndex + 1} — Running`)}
-            {phase === "done"    && (uniName || `Slot ${slotIndex + 1} — Done`)}
-            {phase === "error"   && (uniName || `Slot ${slotIndex + 1} — Error`)}
+            {replayPhase === "running" && (replayUniName ? `${replayUniName} — Replaying` : `Slot ${slotIndex + 1} — Replaying`)}
+            {replayPhase === "done"    && (replayUniName ? `${replayUniName} — Replay done` : `Slot ${slotIndex + 1} — Replay done`)}
+            {replayPhase === "error"   && (replayUniName ? `${replayUniName} — Replay error` : `Slot ${slotIndex + 1} — Replay error`)}
+            {replayPhase === "idle" && phase === "idle"    && `Slot ${slotIndex + 1}`}
+            {replayPhase === "idle" && phase === "running" && jobStatus === "queued" && (uniName ? `${uniName} — Queued` : `Slot ${slotIndex + 1} — Queued`)}
+            {replayPhase === "idle" && phase === "running" && jobStatus !== "queued" && (uniName || `Slot ${slotIndex + 1} — Running`)}
+            {replayPhase === "idle" && phase === "done"    && (uniName || `Slot ${slotIndex + 1} — Done`)}
+            {replayPhase === "idle" && phase === "error"   && (uniName || `Slot ${slotIndex + 1} — Error`)}
           </span>
-          {elapsed && phase === "running" && (
+          {replayPhase === "running" && (
+            <span className="text-xs font-normal tabular-nums text-emerald-500">({replayElapsed}s)</span>
+          )}
+          {replayPhase === "idle" && elapsed && phase === "running" && (
             <span className={`text-xs font-normal tabular-nums ${jobStatus === "queued" ? "text-amber-500" : "text-blue-500"}`}>({elapsed})</span>
           )}
         </div>
         <div className="flex items-center gap-1">
-          {phase === "idle" && canRemove && (
+          {replayPhase !== "idle" && (
+            <button onClick={resetReplay} className="p-1 rounded hover:bg-gray-200 text-gray-500 hover:text-gray-700" title="Back to idle">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+          {replayPhase === "idle" && phase === "idle" && canRemove && (
             <button onClick={onRemove} className="p-1 rounded hover:bg-gray-200 text-gray-400 hover:text-gray-600">
               <X className="w-3.5 h-3.5" />
             </button>
           )}
-          {(phase === "done" || phase === "error") && (
+          {replayPhase === "idle" && (phase === "done" || phase === "error") && (
             <button onClick={resetToIdle} className="p-1 rounded hover:bg-gray-200 text-gray-500 hover:text-gray-700" title="New scrape">
               <RefreshCw className="w-3.5 h-3.5" />
             </button>
@@ -1222,10 +1325,10 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
               <Button onClick={handleStart} disabled={!scrapeUrl.trim()} className="h-9 flex-1 bg-blue-600 hover:bg-blue-700">
                 <Play className="w-4 h-4 mr-2" />Start Scrape
               </Button>
-              {onReplay && latestReplayJobId && (
+              {latestReplayJobId && (
                 <Button
                   variant="outline"
-                  onClick={() => onReplay(latestReplayJobId)}
+                  onClick={handleReplay}
                   className="h-9 text-emerald-700 border-emerald-300 hover:bg-emerald-50"
                   title={`Replay latest snapshot: ${latestReplayJobId}`}
                 >
@@ -1236,8 +1339,69 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
           </>
         )}
 
+        {/* ── REPLAYING: Inline log view ──────────────────────────────── */}
+        {replayPhase !== "idle" && (
+          <>
+            <div
+              ref={replayLogContainerRef}
+              className="flex-1 min-h-[160px] max-h-[420px] overflow-y-auto bg-gray-950 rounded-lg p-2 font-mono text-[10px] leading-relaxed"
+            >
+              {replayLogs.length === 0 ? (
+                <span className="text-gray-500">Starting replay…</span>
+              ) : replayLogs.map((l, i) => (
+                <div key={i} className={`${logColor(l.event)} break-words`}>
+                  {l.event === "progress" && l.total != null
+                    ? <><span className="text-gray-600">[{l.current}/{l.total}]</span> {l.message}</>
+                    : l.message || l.event
+                  }
+                </div>
+              ))}
+            </div>
+
+            {replayPhase === "running" && (
+              <Button
+                onClick={() => { replayAbortRef.current?.abort(); setReplayPhase("idle"); }}
+                variant="outline"
+                size="sm"
+                className="w-full border-red-300 text-red-700 hover:bg-red-50"
+              >
+                <StopCircle className="w-3.5 h-3.5 mr-1.5" />Stop
+              </Button>
+            )}
+
+            {replayPhase === "done" && (
+              <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-sm space-y-2">
+                <p className="font-semibold text-emerald-800 flex items-center gap-1.5">
+                  <CheckCircle2 className="w-4 h-4" />Replay complete
+                </p>
+                {replayResult && (
+                  <div className="flex gap-4 text-xs text-emerald-700">
+                    <span>Staged: <b>{replayResult.staged ?? replayResult.imported ?? "—"}</b></span>
+                    <span>Errors: <b>{replayResult.errors ?? 0}</b></span>
+                  </div>
+                )}
+                <Button size="sm" onClick={resetReplay} variant="outline" className="h-7 text-xs">
+                  <RefreshCw className="w-3 h-3 mr-1.5" />Back
+                </Button>
+              </div>
+            )}
+
+            {replayPhase === "error" && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm space-y-2">
+                <p className="font-semibold text-red-700 flex items-center gap-1.5">
+                  <AlertCircle className="w-4 h-4" />Replay error
+                </p>
+                <p className="text-xs text-red-600 break-words">{replayError}</p>
+                <Button size="sm" onClick={resetReplay} variant="outline" className="h-7 text-xs">
+                  <RefreshCw className="w-3 h-3 mr-1.5" />Back
+                </Button>
+              </div>
+            )}
+          </>
+        )}
+
         {/* ── RUNNING / ERROR: Log view ─────────────────────────────── */}
-        {(phase === "running" || phase === "error") && (
+        {replayPhase === "idle" && (phase === "running" || phase === "error") && (
           <>
             {/* Progress bar */}
             {progressLog && progressLog.total ? (() => {
@@ -1387,7 +1551,7 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
         )}
 
         {/* ── DONE: Result summary ──────────────────────────────────── */}
-        {phase === "done" && (
+        {replayPhase === "idle" && phase === "done" && (
           <>
             {/* URL filter warning persists into done state */}
             {urlFilterWarning && (
