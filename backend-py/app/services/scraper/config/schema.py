@@ -1420,7 +1420,33 @@ class DegreeEnglishDefaults(BaseModel):
 class EnglishConfig(BaseModel):
     central_page: Optional[str] = Field(
         default=None,
-        description="URL of the university-wide English requirements page.",
+        description=(
+            "URL of the university-wide English requirements page — applied to ALL "
+            "courses when no degree-level-specific URLs are configured.  "
+            "If the page contains 'Undergraduate' / 'Postgraduate' headings or a "
+            "column-keyed table the parser splits the values automatically.  "
+            "Use central_page_ug + central_page_pg for universities that publish "
+            "requirements on completely separate pages."
+        ),
+    )
+    central_page_ug: Optional[str] = Field(
+        default=None,
+        description=(
+            "URL of the undergraduate English requirements page.  "
+            "When set, values from this page are applied ONLY to Undergraduate / "
+            "Bachelor / Diploma-level courses.  Takes precedence over central_page "
+            "for those levels.  Set alongside central_page_pg to ensure every "
+            "degree level gets the correct IELTS score."
+        ),
+    )
+    central_page_pg: Optional[str] = Field(
+        default=None,
+        description=(
+            "URL of the postgraduate English requirements page.  "
+            "When set, values from this page are applied ONLY to Postgraduate / "
+            "Master / Doctorate-level courses.  Takes precedence over central_page "
+            "for those levels.  Typically has a higher IELTS score than UG."
+        ),
     )
     requirements_pdf_url: Optional[str] = Field(
         default=None,

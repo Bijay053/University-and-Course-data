@@ -20,10 +20,13 @@ extraction:
   fees:
     default_currency: GBP
   english:
-    # University of Law publishes IELTS/English requirements on a central page,
-    # not on individual course pages.  The orchestrator fetches this once before
-    # the course loop and applies results to all courses.
-    central_page: "https://www.law.ac.uk/study/undergraduate/entry-requirements/"
-    # Postgraduate entry requirements are on a separate page:
-    # central_page_pg: "https://www.law.ac.uk/study/postgraduate/entry-requirements/"
-    # (add as a second scrape run targeting only PG courses if needed)
+    # University of Law publishes IELTS / English-requirements on separate
+    # pages for undergraduate and postgraduate programmes.  Using separate
+    # URLs ensures UG courses never inherit PG IELTS values (which are
+    # typically higher) and vice-versa.
+    #
+    # The orchestrator fetches each page once before the course loop and
+    # routes results into the correct english_by_level bucket.  No YAML
+    # central_page needed when both _ug and _pg are provided.
+    central_page_ug: "https://www.law.ac.uk/study/undergraduate/entry-requirements/"
+    central_page_pg: "https://www.law.ac.uk/study/postgraduate/entry-requirements/"

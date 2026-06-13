@@ -1175,6 +1175,13 @@ async def prefetch_central_pages(
         or uni_pages.get("requirementsPage")
         or uni_pages.get("requirementsPdf")
     )
+    # Degree-level-specific English pages — set when UG and PG requirements
+    # live on separate pages (e.g. University of Law).  When present they are
+    # fetched individually, their results go straight into english_by_level
+    # (the correct routing bucket), and the flat english dict is left empty so
+    # the single_course.py "Path 2" fallback never cross-contaminates levels.
+    english_ug_url: str | None = uni_pages.get("entryPageUG")
+    english_pg_url: str | None = uni_pages.get("entryPagePG")
 
     # Always preserve the pg_skip flag — single_course.py reads it to gate
     # the PG clear-out pass regardless of whether any central pages exist.
@@ -1193,14 +1200,14 @@ async def prefetch_central_pages(
     except Exception:
         pass
 
-    if not fee_url and not english_url:
+    if not fee_url and not english_url and not english_ug_url and not english_pg_url:
         return {**empty, "central_english_pg_skip": _pg_skip}
 
     result: CentralData = {
         "fees": [],
         "english": {},
         "fee_page_url": fee_url,
-        "english_page_url": english_url,
+        "english_page_url": english_url or english_ug_url or english_pg_url,
         "central_english_pg_skip": _pg_skip,
     }
 
@@ -1412,7 +1419,165 @@ async def prefetch_central_pages(
                 university_id,
             )
 
-    # ── Fetch English-requirements page ────────────────────────────────────
+    # ── Degree-level-specific English pages (UG / PG split) ────────────────
+    # When the university publishes UG and PG requirements on completely
+    # *separate* pages (e.g. University of Law: /study/undergraduate/entry-
+    # requirements/ vs /study/postgraduate/entry-requirements/), fetch each
+    # one individually and route the parsed results into the correct
+    # ``english_by_level`` bucket.
+    #
+    # This prevents PG IELTS values (often higher) from being applied to UG
+    # courses and vice-versa.  When split URLs are used:
+    #   1. ``result["english"]`` (flat) is left empty → single_course.py Path 2
+    #      never cross-contaminates degree levels.
+    #   2. ``result["english_by_level"]`` carries the correct per-level data for
+    #      Path 1 in single_course.py (which already routes by ``_level_bucket``).
+    #   3. ``result["english_page_url_ug"]`` / ``english_page_url_pg`` are stored
+    #      so evidence snippets can reference the authoritative source URL.
+    #
+    # Cache: each page is stored under its own page_type key so UG and PG
+    # caches are independent and can be invalidated separately.
+    _use_browser_for_english = _pg_skip or _stealth_for_english
+
+    if english_ug_url or english_pg_url:
+        _split_by_level: dict[str, Any] = {}
+        for _split_url, _split_bucket, _split_cache_key in (
+            (english_ug_url, "undergraduate", "english_requirements_ug"),
+            (english_pg_url, "postgraduate", "english_requirements_pg"),
+        ):
+            if not _split_url:
+                continue
+            try:
+                # ── Cache check ──────────────────────────────────────────────
+                _sc = None
+                if university_id is not None:
+                    _sc = await _cache_get(university_id, _split_cache_key)
+                    if _sc is not None:
+                        _slots = _sc.get("slots") or {}
+                        if _slots:
+                            _split_by_level[_split_bucket] = _slots
+                        if emit:
+                            _cs = ", ".join(f"{k}={v}" for k, v in sorted(_slots.items())) or "no values"
+                            await emit(
+                                "status",
+                                f"[CACHE] {_split_cache_key} hit → {_cs}",
+                                phase="discover",
+                                kind="central_english_split_cache_hit",
+                                bucket=_split_bucket,
+                                values=_slots,
+                                url=_split_url,
+                            )
+                        log.info("[CACHE] %s hit for uni %s (%s)", _split_cache_key, university_id, _slots)
+                        continue
+
+                # ── Fetch ────────────────────────────────────────────────────
+                if _use_browser_for_english:
+                    _split_html = await asyncio.wait_for(
+                        _fetch_english_with_browser(_split_url),
+                        timeout=75,
+                    )
+                else:
+                    _split_html = await asyncio.wait_for(
+                        fetch_html(_split_url),
+                        timeout=45,
+                    )
+                if not _split_html:
+                    log.warning("central_pages: %s english page returned no HTML (%s)", _split_bucket, _split_url)
+                    continue
+
+                # ── Parse ────────────────────────────────────────────────────
+                _split_slots = await _parse_english_page_html_async(_split_html, _split_url)
+
+                # Auto browser-fallback when HTTP returned a JS shell
+                if (
+                    not _split_slots
+                    and not _use_browser_for_english
+                    and _html_has_js_rendering_signal(_split_html)
+                ):
+                    log.info(
+                        "central_pages: %s english page %s looks JS-rendered — retrying with browser",
+                        _split_bucket,
+                        _split_url,
+                    )
+                    try:
+                        _br_html = await asyncio.wait_for(
+                            _fetch_english_with_browser(_split_url),
+                            timeout=75,
+                        )
+                        if _br_html:
+                            _split_slots = await _parse_english_page_html_async(_br_html, _split_url)
+                    except Exception as _br_exc:
+                        log.warning(
+                            "central_pages: browser fallback for %s english page failed (%s): %s",
+                            _split_bucket, _split_url, _br_exc,
+                        )
+
+                if _split_slots:
+                    _split_by_level[_split_bucket] = _split_slots
+                    if university_id is not None:
+                        await _cache_set(
+                            university_id,
+                            _split_cache_key,
+                            _split_url,
+                            {"slots": _split_slots, "bucket": _split_bucket, "english_by_level": {_split_bucket: _split_slots}},
+                        )
+                    log.info(
+                        "central_pages: %s english page parsed → %s from %s",
+                        _split_bucket, _split_slots, _split_url,
+                    )
+                    if emit:
+                        await emit(
+                            "status",
+                            f"[CENTRAL] {_split_bucket} english page → "
+                            + ", ".join(f"{k}={v}" for k, v in sorted(_split_slots.items())),
+                            phase="discover",
+                            kind="central_english_split_parsed",
+                            bucket=_split_bucket,
+                            values=_split_slots,
+                            url=_split_url,
+                        )
+                else:
+                    log.warning(
+                        "central_pages: %s english page parsed 0 slots from %s",
+                        _split_bucket, _split_url,
+                    )
+
+            except Exception as exc:
+                log.warning(
+                    "central_pages: %s english page fetch/parse failed (%s): %s",
+                    _split_bucket, _split_url, exc,
+                )
+
+        if _split_by_level:
+            result["english_by_level"] = _split_by_level
+            # Track per-level source URLs so evidence snippets reference the
+            # correct authoritative page (not a mix).
+            if english_ug_url:
+                result["english_page_url_ug"] = english_ug_url
+            if english_pg_url:
+                result["english_page_url_pg"] = english_pg_url
+            # Suppress the general entryPage fetch — level-specific pages are
+            # more authoritative and we don't want their flat parse to clobber
+            # the by_level dict we just built.
+            english_url = None
+            log.info(
+                "central_pages: split english fetch complete — by_level=%s",
+                {k: list(v.keys()) for k, v in _split_by_level.items()},
+            )
+            if emit:
+                await emit(
+                    "status",
+                    "[CENTRAL] split english fetch complete: "
+                    + "; ".join(
+                        f"{k}: {', '.join(f'{sk}={sv}' for sk,sv in sorted(sv.items()))}"
+                        for k, sv in _split_by_level.items()
+                    ),
+                    phase="discover",
+                    kind="central_english_split_complete",
+                    by_level={k: list(v.keys()) for k, v in _split_by_level.items()},
+                )
+
+    # ── Fetch English-requirements page (general / single-page path) ────────
     # Default: plain HTTP only, bounded at 45 s.  Some servers (ASA, etc.)
     # accept the TCP handshake but never send data — the wait_for cap
     # ensures a single slow host can't stall the Celery worker.
@@ -1427,7 +1592,8 @@ async def prefetch_central_pages(
     # Use browser for English when: pg_skip (JS-rendered PG section) OR stealth
     # mode is active (Cloudflare-protected — plain HTTP returns a 403 challenge
     # before any JS-signal can be detected, so no point trying HTTP first).
-    _use_browser_for_english = _pg_skip or _stealth_for_english
+    # NOTE: ``english_url`` is set to None above when split UG/PG pages are
+    # configured, so this block is skipped entirely in that case.
 
     if english_url and not english_url.endswith(".pdf"):
         # Check cache first when university_id is known

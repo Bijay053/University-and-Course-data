@@ -3179,7 +3179,7 @@ export default function SettingsScraperConfigs() {
   const [fullValidationLoading, setFullValidationLoading] = useState(false);
 
   // ── Quick Settings (central pages + auto_interact_all) ────────────────────
-  const [quickSettings, setQuickSettings] = useState<{ central_english_url: string; central_fees_url: string; auto_interact_all: boolean } | null>(null);
+  const [quickSettings, setQuickSettings] = useState<{ central_english_url: string; central_english_ug_url: string; central_english_pg_url: string; central_fees_url: string; auto_interact_all: boolean } | null>(null);
   const [quickSettingsLoading, setQuickSettingsLoading] = useState(false);
   const [quickSettingsSaving, setQuickSettingsSaving] = useState(false);
   const [quickSettingsOpen, setQuickSettingsOpen] = useState(false);
@@ -3232,6 +3232,8 @@ export default function SettingsScraperConfigs() {
       const data = await res.json();
       setQuickSettings({
         central_english_url: data.central_english_url ?? "",
+        central_english_ug_url: data.central_english_ug_url ?? "",
+        central_english_pg_url: data.central_english_pg_url ?? "",
         central_fees_url: data.central_fees_url ?? "",
         auto_interact_all: data.auto_interact_all ?? false,
       });
@@ -3242,7 +3244,7 @@ export default function SettingsScraperConfigs() {
     }
   }, [toast]);
 
-  const saveQuickSettings = useCallback(async (slug: string, patch: { central_english_url?: string; central_fees_url?: string; auto_interact_all?: boolean }) => {
+  const saveQuickSettings = useCallback(async (slug: string, patch: { central_english_url?: string; central_english_ug_url?: string; central_english_pg_url?: string; central_fees_url?: string; auto_interact_all?: boolean }) => {
     setQuickSettingsSaving(true);
     try {
       const res = await fetchWithAuth(`${BASE}/api/settings/scraper-configs/${slug}/quick-settings`, {
@@ -5338,7 +5340,7 @@ export default function SettingsScraperConfigs() {
                           <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                           Quick Settings
                           {quickSettingsLoading && <span className="ml-1 opacity-60">(loading…)</span>}
-                          {quickSettings && (quickSettings.central_english_url || quickSettings.central_fees_url || quickSettings.auto_interact_all) && (
+                          {quickSettings && (quickSettings.central_english_url || quickSettings.central_english_ug_url || quickSettings.central_english_pg_url || quickSettings.central_fees_url || quickSettings.auto_interact_all) && (
                             <span className="ml-1 inline-flex items-center rounded-full bg-blue-100 dark:bg-blue-900/40 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 dark:text-blue-300">active</span>
                           )}
                         </span>
@@ -5350,27 +5352,76 @@ export default function SettingsScraperConfigs() {
                             These settings are saved to the university database record and take effect on the next scrape — no YAML editing needed.
                           </p>
 
-                          {/* Central English / Requirements page URL */}
-                          <div className="flex flex-col gap-1">
-                            <label className="text-xs font-medium">Central English Requirements URL</label>
-                            <p className="text-[11px] text-muted-foreground leading-snug">
-                              If IELTS / English requirements are listed on a shared page (not per-course), paste that URL here. The scraper will fetch this page once and apply it to all courses.
-                            </p>
-                            <div className="flex gap-2 items-center">
-                              <input
-                                type="url"
-                                className="flex-1 h-7 rounded border border-border bg-background px-2 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-ring"
-                                placeholder="https://www.example.edu/entry-requirements/"
-                                value={quickSettings?.central_english_url ?? ""}
-                                onChange={e => setQuickSettings(q => q ? { ...q, central_english_url: e.target.value } : { central_english_url: e.target.value, central_fees_url: "", auto_interact_all: false })}
-                              />
-                              <button
-                                className="shrink-0 h-7 px-2.5 rounded border border-border bg-background text-xs hover:bg-muted/60 disabled:opacity-50 transition-colors"
-                                disabled={quickSettingsSaving || quickSettingsLoading}
-                                onClick={() => selected && void saveQuickSettings(selected, { central_english_url: quickSettings?.central_english_url ?? "" })}
-                              >
-                                {quickSettingsSaving ? "Saving…" : "Save"}
-                              </button>
+                          {/* Central English Requirements URLs (UG / PG / General) */}
+                          <div className="flex flex-col gap-2.5">
+                            <div>
+                              <label className="text-xs font-medium">Central English Requirements</label>
+                              <p className="text-[11px] text-muted-foreground leading-snug mt-0.5">
+                                Use separate UG / PG URLs when the university publishes requirements on different pages per degree level (e.g. University of Law). The scraper fetches each page once and applies values only to courses at the matching degree level — no cross-contamination. Use the general URL when all courses share the same page.
+                              </p>
+                            </div>
+
+                            {/* Undergraduate English URL */}
+                            <div className="flex flex-col gap-1">
+                              <label className="text-[11px] font-medium text-muted-foreground">Undergraduate English URL</label>
+                              <div className="flex gap-2 items-center">
+                                <input
+                                  type="url"
+                                  className="flex-1 h-7 rounded border border-border bg-background px-2 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-ring"
+                                  placeholder="https://www.example.edu/study/undergraduate/entry-requirements/"
+                                  value={quickSettings?.central_english_ug_url ?? ""}
+                                  onChange={e => setQuickSettings(q => q ? { ...q, central_english_ug_url: e.target.value } : { central_english_url: "", central_english_ug_url: e.target.value, central_english_pg_url: "", central_fees_url: "", auto_interact_all: false })}
+                                />
+                                <button
+                                  className="shrink-0 h-7 px-2.5 rounded border border-border bg-background text-xs hover:bg-muted/60 disabled:opacity-50 transition-colors"
+                                  disabled={quickSettingsSaving || quickSettingsLoading}
+                                  onClick={() => selected && void saveQuickSettings(selected, { central_english_ug_url: quickSettings?.central_english_ug_url ?? "" })}
+                                >
+                                  {quickSettingsSaving ? "Saving…" : "Save"}
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Postgraduate English URL */}
+                            <div className="flex flex-col gap-1">
+                              <label className="text-[11px] font-medium text-muted-foreground">Postgraduate English URL</label>
+                              <div className="flex gap-2 items-center">
+                                <input
+                                  type="url"
+                                  className="flex-1 h-7 rounded border border-border bg-background px-2 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-ring"
+                                  placeholder="https://www.example.edu/study/postgraduate/entry-requirements/"
+                                  value={quickSettings?.central_english_pg_url ?? ""}
+                                  onChange={e => setQuickSettings(q => q ? { ...q, central_english_pg_url: e.target.value } : { central_english_url: "", central_english_ug_url: "", central_english_pg_url: e.target.value, central_fees_url: "", auto_interact_all: false })}
+                                />
+                                <button
+                                  className="shrink-0 h-7 px-2.5 rounded border border-border bg-background text-xs hover:bg-muted/60 disabled:opacity-50 transition-colors"
+                                  disabled={quickSettingsSaving || quickSettingsLoading}
+                                  onClick={() => selected && void saveQuickSettings(selected, { central_english_pg_url: quickSettings?.central_english_pg_url ?? "" })}
+                                >
+                                  {quickSettingsSaving ? "Saving…" : "Save"}
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* General English URL (all-levels fallback) */}
+                            <div className="flex flex-col gap-1">
+                              <label className="text-[11px] font-medium text-muted-foreground">General English URL <span className="font-normal opacity-70">(all levels, used when no UG/PG URL is set)</span></label>
+                              <div className="flex gap-2 items-center">
+                                <input
+                                  type="url"
+                                  className="flex-1 h-7 rounded border border-border bg-background px-2 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-ring"
+                                  placeholder="https://www.example.edu/entry-requirements/"
+                                  value={quickSettings?.central_english_url ?? ""}
+                                  onChange={e => setQuickSettings(q => q ? { ...q, central_english_url: e.target.value } : { central_english_url: e.target.value, central_english_ug_url: "", central_english_pg_url: "", central_fees_url: "", auto_interact_all: false })}
+                                />
+                                <button
+                                  className="shrink-0 h-7 px-2.5 rounded border border-border bg-background text-xs hover:bg-muted/60 disabled:opacity-50 transition-colors"
+                                  disabled={quickSettingsSaving || quickSettingsLoading}
+                                  onClick={() => selected && void saveQuickSettings(selected, { central_english_url: quickSettings?.central_english_url ?? "" })}
+                                >
+                                  {quickSettingsSaving ? "Saving…" : "Save"}
+                                </button>
+                              </div>
                             </div>
                           </div>
 
@@ -5386,7 +5437,7 @@ export default function SettingsScraperConfigs() {
                                 className="flex-1 h-7 rounded border border-border bg-background px-2 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-ring"
                                 placeholder="https://www.example.edu/fees/"
                                 value={quickSettings?.central_fees_url ?? ""}
-                                onChange={e => setQuickSettings(q => q ? { ...q, central_fees_url: e.target.value } : { central_english_url: "", central_fees_url: e.target.value, auto_interact_all: false })}
+                                onChange={e => setQuickSettings(q => q ? { ...q, central_fees_url: e.target.value } : { central_english_url: "", central_english_ug_url: "", central_english_pg_url: "", central_fees_url: e.target.value, auto_interact_all: false })}
                               />
                               <button
                                 className="shrink-0 h-7 px-2.5 rounded border border-border bg-background text-xs hover:bg-muted/60 disabled:opacity-50 transition-colors"
@@ -5409,7 +5460,7 @@ export default function SettingsScraperConfigs() {
                               disabled={quickSettingsSaving || quickSettingsLoading}
                               onClick={() => {
                                 const next = !(quickSettings?.auto_interact_all ?? false);
-                                setQuickSettings(q => q ? { ...q, auto_interact_all: next } : { central_english_url: "", central_fees_url: "", auto_interact_all: next });
+                                setQuickSettings(q => q ? { ...q, auto_interact_all: next } : { central_english_url: "", central_english_ug_url: "", central_english_pg_url: "", central_fees_url: "", auto_interact_all: next });
                                 if (selected) void saveQuickSettings(selected, { auto_interact_all: next });
                               }}
                             >

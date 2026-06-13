@@ -2009,6 +2009,27 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                         kind="yaml_english_page",
                         url=_yaml_eng.central_page,
                     )
+                # Degree-level-specific English pages (central_page_ug / central_page_pg).
+                # These override the general central_page for their respective degree
+                # levels and are fetched separately so UG courses never inherit PG IELTS.
+                if _yaml_eng.central_page_ug and not _yaml_pages.get("entryPageUG"):
+                    _yaml_pages["entryPageUG"] = _yaml_eng.central_page_ug
+                    await emit(
+                        "status",
+                        f"[YAML] undergraduate english page: {_yaml_eng.central_page_ug}",
+                        phase="discover",
+                        kind="yaml_english_page_ug",
+                        url=_yaml_eng.central_page_ug,
+                    )
+                if _yaml_eng.central_page_pg and not _yaml_pages.get("entryPagePG"):
+                    _yaml_pages["entryPagePG"] = _yaml_eng.central_page_pg
+                    await emit(
+                        "status",
+                        f"[YAML] postgraduate english page: {_yaml_eng.central_page_pg}",
+                        phase="discover",
+                        kind="yaml_english_page_pg",
+                        url=_yaml_eng.central_page_pg,
+                    )
 
             # ── Priority 1: request-body overrides (UI Advanced fields) ─────
             # The router stores these in job.request_payload so the orchestrator

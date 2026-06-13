@@ -998,6 +998,8 @@ async def save_scraper_config(
 
 class QuickSettingsBody(BaseModel):
     central_english_url: Optional[str] = None
+    central_english_ug_url: Optional[str] = None
+    central_english_pg_url: Optional[str] = None
     central_fees_url: Optional[str] = None
     auto_interact_all: Optional[bool] = None
 
@@ -1048,10 +1050,16 @@ async def get_quick_settings(
     _validate_slug(slug)
     resolved = await _resolve_uni_for_slug(slug, db)
     if not resolved:
-        return JSONResponse(content={"ok": True, "central_english_url": None, "central_fees_url": None, "auto_interact_all": False, "university_id": None})
+        return JSONResponse(content={
+            "ok": True, "central_english_url": None, "central_english_ug_url": None,
+            "central_english_pg_url": None, "central_fees_url": None,
+            "auto_interact_all": False, "university_id": None,
+        })
     uni_id, cfg = resolved
     uni_pages = cfg.get("uniPages") or {}
     english_url = uni_pages.get("entryPage") or uni_pages.get("requirementsPage") or uni_pages.get("englishPage")
+    english_ug_url = uni_pages.get("entryPageUG")
+    english_pg_url = uni_pages.get("entryPagePG")
     fees_url = uni_pages.get("feePage") or uni_pages.get("feesPage")
     # Also check admin_config extraction section
     admin_cfg = cfg.get("admin_config") or {}
@@ -1061,6 +1069,8 @@ async def get_quick_settings(
         "ok": True,
         "university_id": uni_id,
         "central_english_url": english_url,
+        "central_english_ug_url": english_ug_url,
+        "central_english_pg_url": english_pg_url,
         "central_fees_url": fees_url,
         "auto_interact_all": auto_interact,
     })
@@ -1076,9 +1086,11 @@ async def save_quick_settings(
     """Save central-page URLs and/or auto_interact_all for this university.
 
     Writes to ``universities.scrape_config``:
-      - central_english_url → uniPages.entryPage
-      - central_fees_url    → uniPages.feePage
-      - auto_interact_all   → admin_config.extraction.auto_interact_all
+      - central_english_url    → uniPages.entryPage   (general / all-levels)
+      - central_english_ug_url → uniPages.entryPageUG (undergraduate only)
+      - central_english_pg_url → uniPages.entryPagePG (postgraduate only)
+      - central_fees_url       → uniPages.feePage
+      - auto_interact_all      → admin_config.extraction.auto_interact_all
     """
     _validate_slug(slug)
     resolved = await _resolve_uni_for_slug(slug, db)
@@ -1098,6 +1110,24 @@ async def save_quick_settings(
             for k in ("entryPage", "requirementsPage", "englishPage"):
                 uni_pages.pop(k, None)
             changed.append("central_english_url cleared")
+
+    if body.central_english_ug_url is not None:
+        uni_pages = cfg.setdefault("uniPages", {})
+        if body.central_english_ug_url.strip():
+            uni_pages["entryPageUG"] = body.central_english_ug_url.strip()
+            changed.append(f"central_english_ug_url = {body.central_english_ug_url.strip()!r}")
+        else:
+            uni_pages.pop("entryPageUG", None)
+            changed.append("central_english_ug_url cleared")
+
+    if body.central_english_pg_url is not None:
+        uni_pages = cfg.setdefault("uniPages", {})
+        if body.central_english_pg_url.strip():
+            uni_pages["entryPagePG"] = body.central_english_pg_url.strip()
+            changed.append(f"central_english_pg_url = {body.central_english_pg_url.strip()!r}")
+        else:
+            uni_pages.pop("entryPagePG", None)
+            changed.append("central_english_pg_url cleared")
 
     if body.central_fees_url is not None:
         uni_pages = cfg.setdefault("uniPages", {})

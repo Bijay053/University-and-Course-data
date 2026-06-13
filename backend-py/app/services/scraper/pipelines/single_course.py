@@ -5611,6 +5611,10 @@ async def extract_course(
             _central_english: dict = central_data.get("english") or {}
             _central_fee_url: str | None = central_data.get("fee_page_url")
             _central_eng_url: str | None = central_data.get("english_page_url")
+            # Per-level source URLs (populated when separate UG/PG pages are configured).
+            # Used in evidence snippets so reviewers can navigate to the exact page.
+            _central_eng_url_ug: str | None = central_data.get("english_page_url_ug")
+            _central_eng_url_pg: str | None = central_data.get("english_page_url_pg")
 
             # ── Fee fallback ─────────────────────────────────────────────
             _fee_slots = ("international_fee", "domestic_fee", "currency", "fee_term", "fee_year")
@@ -5847,12 +5851,17 @@ async def extract_course(
                             ev for ev in evidence if ev.get("field_key") != _k
                         ]
                     payload[_k] = _v
+                    # Prefer the level-specific source URL when separate UG/PG pages
+                    # are configured — gives reviewers a direct link to the right page.
+                    _level_src_url = (
+                        _central_eng_url_pg if _level_bucket == "postgraduate" else _central_eng_url_ug
+                    ) or _central_eng_url or url
                     evidence.append({
                         "field_key": _k,
                         "value": _v,
                         "confidence": 0.55,
                         "method": "central_page:english_level",
-                        "source_url": _central_eng_url or url,
+                        "source_url": _level_src_url,
                         "snippet": f"central_page english_level ({_level_bucket}): {_k}={_v}",
                     })
                     _eng_filled.append(_k)
