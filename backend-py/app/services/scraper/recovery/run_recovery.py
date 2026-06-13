@@ -400,7 +400,18 @@ async def run_recovery_pass(
         # university.  Each category (fees, english, …) has its own independent
         # counter so a university with many fees PDFs cannot crowd out
         # english-requirements PDF fetches in the same pass.
-        pdf_budget: dict[str, int] = make_pdf_budget(single_course=False)
+        # Per-uni YAML overrides (extraction.pdf_budget_overrides) are merged on
+        # top of the built-in defaults when present.
+        from app.services.scraper.config.context import get_uni_config as _get_uc_budget
+        _uc_budget = _get_uc_budget()
+        _pdf_overrides = (
+            dict(_uc_budget.extraction.pdf_budget_overrides)
+            if _uc_budget is not None
+            else None
+        )
+        pdf_budget: dict[str, int] = make_pdf_budget(
+            single_course=False, overrides=_pdf_overrides
+        )
 
         # Shared dedup set: a PDF URL that appears both as a direct candidate
         # and as a linked PDF on another HTML page must only be downloaded once.

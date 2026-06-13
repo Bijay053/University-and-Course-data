@@ -138,6 +138,18 @@ extraction:
     reject_if_missing:
       - course_name
 
+  # Per-category PDF budget overrides for recovery passes.
+  # Merged on top of the built-in defaults so you only need to specify the
+  # categories you want to change.  Valid keys: fees, english, intakes,
+  # location, requirements.  Only affects batch recovery (single-course
+  # triggers always use the tighter fixed caps).
+  # Built-in batch defaults: fees=5, english=5, intakes=3, location=3, requirements=3
+  # Example — raise the fees cap for a university with a large fee schedule:
+  #   pdf_budget_overrides:
+  #     fees: 10
+  #     english: 8
+  pdf_budget_overrides: {}
+
 # ── Currency detection ───────────────────────────────────────────────────────
 # Controls how the scraper resolves fee currency when no explicit currency
 # marker is present in the extracted fee text.

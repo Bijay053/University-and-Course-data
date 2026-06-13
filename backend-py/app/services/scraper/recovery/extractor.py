@@ -322,7 +322,11 @@ _SINGLE_COURSE_PDF_BUDGET_PER_CATEGORY: dict[str, int] = {
 }
 
 
-def make_pdf_budget(*, single_course: bool = False) -> dict[str, int]:
+def make_pdf_budget(
+    *,
+    single_course: bool = False,
+    overrides: dict[str, int] | None = None,
+) -> dict[str, int]:
     """Return a fresh mutable per-category PDF-budget dict for one recovery pass.
 
     Always use this helper instead of constructing budget objects inline.
@@ -341,7 +345,15 @@ def make_pdf_budget(*, single_course: bool = False) -> dict[str, int]:
                     ``_SINGLE_COURSE_PDF_BUDGET_PER_CATEGORY`` caps.
         ``False`` → batch recovery pass that processes all staged courses for
                     an entire university in one go.  Uses
-                    ``_BATCH_PDF_BUDGET_PER_CATEGORY`` caps.
+                    ``_BATCH_PDF_BUDGET_PER_CATEGORY`` caps, then merges any
+                    per-university ``overrides`` on top.
+    overrides:
+        Optional dict of per-category budget overrides sourced from the
+        per-university YAML (``extraction.pdf_budget_overrides``).  Only
+        applied when ``single_course=False``; single-course triggers always
+        use the tighter fixed caps.  Keys not present in the base template
+        are silently ignored.  Pass ``None`` (default) or ``{}`` for no
+        overrides — behaviour is identical to the two-argument form.
 
     Returns
     -------
@@ -361,7 +373,17 @@ def make_pdf_budget(*, single_course: bool = False) -> dict[str, int]:
         if single_course
         else _BATCH_PDF_BUDGET_PER_CATEGORY
     )
-    return dict(template)
+    budget = dict(template)
+    if not single_course and overrides:
+        for category, cap in overrides.items():
+            if category in budget:
+                budget[category] = cap
+            else:
+                log.debug(
+                    "make_pdf_budget: ignoring unknown category %r in overrides",
+                    category,
+                )
+    return budget
 
 
 def _budget_remaining_categories(

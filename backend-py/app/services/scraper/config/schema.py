@@ -2424,6 +2424,27 @@ class ExtractionConfig(BaseModel):
             "extraction.auto_interact_all: true"
         ),
     )
+    pdf_budget_overrides: dict[str, int] = Field(
+        default_factory=dict,
+        description=(
+            "Per-category PDF budget overrides for recovery passes.  Merged on top "
+            "of the built-in defaults (_BATCH_PDF_BUDGET_PER_CATEGORY) so you only "
+            "need to specify the categories you want to change.  "
+            "Valid category keys: fees, english, intakes, location, requirements.  "
+            "A university with a very large fee schedule may need a higher 'fees' "
+            "cap (e.g. 10); a small university might lower all caps to 2 to keep "
+            "recovery fast.  Only affects batch recovery passes "
+            "(single_course=False); single-course triggers always use the tighter "
+            "_SINGLE_COURSE_PDF_BUDGET_PER_CATEGORY caps and are not overridable "
+            "here.  "
+            "Example:\n"
+            "  extraction:\n"
+            "    pdf_budget_overrides:\n"
+            "      fees: 10\n"
+            "      english: 8\n"
+            "      intakes: 5"
+        ),
+    )
 
 
 # ── Merged UniConfig ─────────────────────────────────────────────────────────
