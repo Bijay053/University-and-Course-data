@@ -193,9 +193,11 @@ async def search_candidate_pages(
     Returns
     -------
     list of dicts with keys:
-        url, category, score, path_score, matched_keyword
+        url, category, score, path_score, matched_keyword, via_broad_scorer
     At most MAX_CANDIDATE_PAGES total entries, balanced across categories.
     Sorted by score descending.
+    via_broad_scorer=True means the standard _score_link gave 0 and the PDF
+    was surfaced only by the broader _score_pdf_link fallback.
     """
     if not scrape_url or not needed_categories:
         return []
@@ -241,6 +243,7 @@ async def search_candidate_pages(
     candidates: dict[tuple[str, str], dict[str, Any]] = {}
     visited: set[str] = set()
     pages_fetched = 0
+    broad_scorer_count = 0  # candidates added exclusively via the broad PDF fallback scorer
 
     # BFS frontier: list of (url, depth)
     frontier: deque[tuple[str, int]] = deque()
@@ -295,6 +298,7 @@ async def search_candidate_pages(
                             ),
                             anchor_text[:60],
                         )
+                        was_new = key not in candidates
                         candidates[key] = {
                             "url": full_url,
                             "category": cat,
@@ -306,6 +310,10 @@ async def search_candidate_pages(
                             # orchestrator to count and tag 'pdf_broad' results.
                             "via_broad_scorer": _via_broad,
                         }
+                        # Count each distinct (url, category) pair that reached
+                        # the candidates dict exclusively via the broad fallback scorer.
+                        if _via_broad and was_new:
+                            broad_scorer_count += 1
 
                 # Add high-scoring links to BFS frontier for deeper traversal.
                 # PDFs are skipped here — they cannot be crawled for more links and
@@ -327,8 +335,9 @@ async def search_candidate_pages(
                     )
 
     log.info(
-        "[RECOVERY:search] BFS complete — visited %d pages, found %d raw candidates",
-        pages_fetched, len(candidates),
+        "[RECOVERY:search] BFS complete — visited %d pages, found %d raw candidates"
+        " (broad_scorer_count=%d)",
+        pages_fetched, len(candidates), broad_scorer_count,
     )
 
     # Sort all candidates by score desc, pick top MAX_CANDIDATE_PAGES globally,

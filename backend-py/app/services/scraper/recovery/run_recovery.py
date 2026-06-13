@@ -274,7 +274,8 @@ async def run_recovery_pass(
 
     Returns
     -------
-    dict with keys: courses_examined, fields_recovered, results_written
+    dict with keys: courses_examined, fields_recovered, results_written,
+                    pdfs_via_broad_scorer
     """
     from app.services.scraper.recovery.detector import detect_missing_fields
     from app.services.scraper.recovery.searcher import (
