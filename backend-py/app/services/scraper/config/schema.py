@@ -2372,6 +2372,21 @@ class ExtractionConfig(BaseModel):
         default_factory=list,
         description="Ordered list of browser interaction steps to execute after page load.",
     )
+    auto_interact_all: bool = Field(
+        default=False,
+        description=(
+            "When True, after the Playwright browser loads the page and runs any "
+            "YAML-configured actions, a generic pass automatically clicks every "
+            "collapsed accordion, closed <details> element, and "
+            "[aria-expanded='false'] button visible on the page. "
+            "Use for pages where IELTS requirements, fees, or intake dates are "
+            "hidden inside expandable sections that the scraper cannot see in the "
+            "static HTML.  Runs before `html = page.content()` so the saved "
+            "snapshot and all extractors see the fully-expanded DOM. "
+            "Enable via the UI Quick Settings panel or YAML: "
+            "extraction.auto_interact_all: true"
+        ),
+    )
 
 
 # ── Merged UniConfig ─────────────────────────────────────────────────────────

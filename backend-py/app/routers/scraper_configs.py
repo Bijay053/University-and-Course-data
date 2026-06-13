@@ -994,6 +994,141 @@ async def save_scraper_config(
     })
 
 
+# ── Quick Settings (central pages + auto_interact_all) ────────────────────────
+
+class QuickSettingsBody(BaseModel):
+    central_english_url: Optional[str] = None
+    central_fees_url: Optional[str] = None
+    auto_interact_all: Optional[bool] = None
+
+
+async def _resolve_uni_for_slug(slug: str, db: AsyncSession) -> tuple[int, dict] | None:
+    """Return (university_id, current_scrape_config) for the given YAML slug.
+
+    Resolves by matching the hostname extracted from the YAML file against
+    the universities table — same logic as the list endpoint.
+    Returns None when the slug file doesn't exist or no university matches.
+    """
+    path = _slug_path(slug)
+    if not path.exists():
+        return None
+    raw = _read_yaml_raw(path)
+    hostname = _extract_hostname_from_yaml(raw)
+    if not hostname:
+        return None
+    h_bare = re.sub(r"^www\.", "", hostname.lower())
+    rows = (await db.execute(
+        text("""
+            SELECT id,
+                   COALESCE(scrape_config, '{}'::jsonb) AS scrape_config,
+                   LOWER(REGEXP_REPLACE(
+                       COALESCE(scrape_url, website, ''),
+                       '^https?://', ''
+                   )) AS bare_url
+            FROM universities
+            WHERE COALESCE(scrape_url, website, '') != ''
+        """)
+    )).all()
+    for uni_id, scrape_cfg, bare_url in rows:
+        if not bare_url:
+            continue
+        url_host = re.sub(r"^www\.", "", bare_url.split("/")[0])
+        if url_host == h_bare or url_host.endswith("." + h_bare):
+            return (int(uni_id), dict(scrape_cfg) if scrape_cfg else {})
+    return None
+
+
+@router.get("/scraper-configs/{slug}/quick-settings")
+async def get_quick_settings(
+    slug: str,
+    _user: Annotated[dict, Depends(require_permission("settings.view"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> JSONResponse:
+    """Return the current central-page URLs and auto_interact_all flag for this university."""
+    _validate_slug(slug)
+    resolved = await _resolve_uni_for_slug(slug, db)
+    if not resolved:
+        return JSONResponse(content={"ok": True, "central_english_url": None, "central_fees_url": None, "auto_interact_all": False, "university_id": None})
+    uni_id, cfg = resolved
+    uni_pages = cfg.get("uniPages") or {}
+    english_url = uni_pages.get("entryPage") or uni_pages.get("requirementsPage") or uni_pages.get("englishPage")
+    fees_url = uni_pages.get("feePage") or uni_pages.get("feesPage")
+    # Also check admin_config extraction section
+    admin_cfg = cfg.get("admin_config") or {}
+    extr = admin_cfg.get("extraction") or {}
+    auto_interact = bool((extr.get("auto_interact_all")) or False)
+    return JSONResponse(content={
+        "ok": True,
+        "university_id": uni_id,
+        "central_english_url": english_url,
+        "central_fees_url": fees_url,
+        "auto_interact_all": auto_interact,
+    })
+
+
+@router.patch("/scraper-configs/{slug}/quick-settings")
+async def save_quick_settings(
+    slug: str,
+    body: QuickSettingsBody,
+    user: Annotated[dict, Depends(require_permission("settings.edit"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> JSONResponse:
+    """Save central-page URLs and/or auto_interact_all for this university.
+
+    Writes to ``universities.scrape_config``:
+      - central_english_url → uniPages.entryPage
+      - central_fees_url    → uniPages.feePage
+      - auto_interact_all   → admin_config.extraction.auto_interact_all
+    """
+    _validate_slug(slug)
+    resolved = await _resolve_uni_for_slug(slug, db)
+    if not resolved:
+        raise HTTPException(status_code=404, detail=f"No university matched config slug '{slug}'")
+    uni_id, cfg = resolved
+
+    changed: list[str] = []
+
+    # ── uniPages (central pages) ──────────────────────────────────────────────
+    if body.central_english_url is not None:
+        uni_pages = cfg.setdefault("uniPages", {})
+        if body.central_english_url.strip():
+            uni_pages["entryPage"] = body.central_english_url.strip()
+            changed.append(f"central_english_url = {body.central_english_url.strip()!r}")
+        else:
+            for k in ("entryPage", "requirementsPage", "englishPage"):
+                uni_pages.pop(k, None)
+            changed.append("central_english_url cleared")
+
+    if body.central_fees_url is not None:
+        uni_pages = cfg.setdefault("uniPages", {})
+        if body.central_fees_url.strip():
+            uni_pages["feePage"] = body.central_fees_url.strip()
+            changed.append(f"central_fees_url = {body.central_fees_url.strip()!r}")
+        else:
+            for k in ("feePage", "feesPage"):
+                uni_pages.pop(k, None)
+            changed.append("central_fees_url cleared")
+
+    # ── admin_config.extraction.auto_interact_all ─────────────────────────────
+    if body.auto_interact_all is not None:
+        admin_cfg = cfg.setdefault("admin_config", {})
+        extr = admin_cfg.setdefault("extraction", {})
+        extr["auto_interact_all"] = bool(body.auto_interact_all)
+        changed.append(f"auto_interact_all = {body.auto_interact_all}")
+
+    if not changed:
+        return JSONResponse(content={"ok": True, "changed": [], "message": "Nothing to update"})
+
+    import json as _json
+    await db.execute(
+        text("UPDATE universities SET scrape_config = CAST(:cfg AS jsonb) WHERE id = :id"),
+        {"cfg": _json.dumps(cfg), "id": uni_id},
+    )
+    await db.commit()
+    log.info("quick-settings saved for slug=%r uni_id=%s: %s", slug, uni_id, changed)
+    return JSONResponse(content={"ok": True, "changed": changed, "university_id": uni_id})
+
+
 # ── Delete ────────────────────────────────────────────────────────────────────
 
 @router.delete("/scraper-configs/{slug}")

@@ -241,6 +241,66 @@ class BrowserPool:
             finally:
                 await ctx.close()
 
+    # ── Generic expand-all helpers ────────────────────────────────────────────
+
+    _GENERIC_EXPAND_ALL_JS = """
+() => {
+  const clicked = [];
+  // 1. Closed <details> elements — click the <summary> trigger
+  for (const el of document.querySelectorAll('details:not([open]) > summary')) {
+    const style = window.getComputedStyle(el);
+    if (style.display === 'none' || style.visibility === 'hidden') continue;
+    el.click();
+    clicked.push('details:' + (el.textContent || '').trim().slice(0, 60));
+  }
+  // 2. Elements with aria-expanded=false (accordion headers, tab panels, etc.)
+  for (const el of document.querySelectorAll('[aria-expanded="false"]')) {
+    const style = window.getComputedStyle(el);
+    if (style.display === 'none' || style.visibility === 'hidden') continue;
+    // Skip nav / header / footer elements (site navigation)
+    let inNav = false;
+    let p = el.parentElement;
+    while (p) {
+      const tag = p.tagName.toLowerCase();
+      if (tag === 'nav' || tag === 'header' || tag === 'footer') { inNav = true; break; }
+      p = p.parentElement;
+    }
+    if (inNav) continue;
+    el.click();
+    clicked.push('aria:' + (el.textContent || '').trim().slice(0, 60));
+  }
+  return clicked;
+}
+"""
+
+    @staticmethod
+    def _should_auto_interact_all() -> bool:
+        """Read auto_interact_all from the per-uni contextvar.
+
+        Returns False when the contextvar is unset (e.g. in tests or during
+        discovery BFS calls that run without a scrape job context).
+        """
+        try:
+            from app.services.scraper.config.context import get_uni_config
+            cfg = get_uni_config()
+            return bool(cfg and cfg.extraction.auto_interact_all)
+        except Exception:  # noqa: BLE001
+            return False
+
+    async def _generic_expand_all(self, page: Any) -> list[str]:
+        """Click every collapsed accordion / <details> on the page.
+
+        Returns a list of short labels for each element that was clicked,
+        for debug logging.  Errors are swallowed — the expand pass is
+        best-effort and must never abort the main extraction.
+        """
+        try:
+            result = await page.evaluate(self._GENERIC_EXPAND_ALL_JS)
+            return result if isinstance(result, list) else []
+        except Exception as exc:  # noqa: BLE001
+            log.debug("_generic_expand_all failed: %s", exc)
+            return []
+
     async def _execute_actions(self, page: Any, actions: list[dict]) -> None:
         """Execute a YAML-driven list of browser interaction actions.
 
@@ -508,6 +568,18 @@ class BrowserPool:
                     _all_actions.extend(actions)
                 if _all_actions:
                     await self._execute_actions(page, _all_actions)
+                # Generic expand pass — auto-click ALL collapsed accordions,
+                # closed <details> elements, and [aria-expanded=false] triggers.
+                # Reads auto_interact_all from the per-uni contextvar so no
+                # parameter threading is needed across every call site.
+                if self._should_auto_interact_all():
+                    click_log = await self._generic_expand_all(page)
+                    if click_log:
+                        log.debug(
+                            "auto_interact_all: expanded %d element(s) on %s: %s",
+                            len(click_log), url, click_log[:8],
+                        )
+                        await page.wait_for_timeout(800)
                 html = await page.content()
                 return html
         except Exception as exc:

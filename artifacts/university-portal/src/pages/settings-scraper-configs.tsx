@@ -3178,6 +3178,12 @@ export default function SettingsScraperConfigs() {
   const [fullValidationResult, setFullValidationResult] = useState<FullValidationResult | null>(null);
   const [fullValidationLoading, setFullValidationLoading] = useState(false);
 
+  // ── Quick Settings (central pages + auto_interact_all) ────────────────────
+  const [quickSettings, setQuickSettings] = useState<{ central_english_url: string; central_fees_url: string; auto_interact_all: boolean } | null>(null);
+  const [quickSettingsLoading, setQuickSettingsLoading] = useState(false);
+  const [quickSettingsSaving, setQuickSettingsSaving] = useState(false);
+  const [quickSettingsOpen, setQuickSettingsOpen] = useState(false);
+
   // ── AI Diagnose & Fix ─────────────────────────────────────────────────────
   const [diagnosing, setDiagnosing] = useState(false);
   const [diagnosisOpen, setDiagnosisOpen] = useState(false);
@@ -3214,6 +3220,44 @@ export default function SettingsScraperConfigs() {
       toast({ title: "Failed to load configs", description: (err as Error).message, variant: "destructive" });
     } finally {
       setLoading(false);
+    }
+  }, [toast]);
+
+  // ── Quick Settings callbacks ───────────────────────────────────────────────
+  const fetchQuickSettings = useCallback(async (slug: string) => {
+    setQuickSettingsLoading(true);
+    try {
+      const res = await fetchWithAuth(`${BASE}/api/settings/scraper-configs/${slug}/quick-settings`);
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      setQuickSettings({
+        central_english_url: data.central_english_url ?? "",
+        central_fees_url: data.central_fees_url ?? "",
+        auto_interact_all: data.auto_interact_all ?? false,
+      });
+    } catch (err) {
+      toast({ title: "Failed to load quick settings", description: (err as Error).message, variant: "destructive" });
+    } finally {
+      setQuickSettingsLoading(false);
+    }
+  }, [toast]);
+
+  const saveQuickSettings = useCallback(async (slug: string, patch: { central_english_url?: string; central_fees_url?: string; auto_interact_all?: boolean }) => {
+    setQuickSettingsSaving(true);
+    try {
+      const res = await fetchWithAuth(`${BASE}/api/settings/scraper-configs/${slug}/quick-settings`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      const changed: string[] = data.changed ?? [];
+      toast({ title: "Quick settings saved", description: changed.length ? changed.join("; ") : "No changes", variant: "default" });
+    } catch (err) {
+      toast({ title: "Failed to save quick settings", description: (err as Error).message, variant: "destructive" });
+    } finally {
+      setQuickSettingsSaving(false);
     }
   }, [toast]);
 
@@ -3634,6 +3678,10 @@ export default function SettingsScraperConfigs() {
       setEditorYaml(cfg.yaml);
       setDraftBanner(null);
     }
+    // Load quick settings for this slug (non-blocking)
+    setQuickSettings(null);
+    setQuickSettingsOpen(false);
+    void fetchQuickSettings(slug);
   };
 
   const handleSelectConfig = (slug: string) => {
@@ -5277,14 +5325,116 @@ export default function SettingsScraperConfigs() {
                   }}
                 />
               ) : (
-                <textarea
-                  ref={textareaRef}
-                  className="flex-1 resize-none font-mono text-xs p-4 bg-muted/20 focus:outline-none focus:bg-background transition-colors"
-                  value={editorYaml}
-                  onChange={e => setEditorYaml(e.target.value)}
-                  spellCheck={false}
-                  placeholder={`# University Name\n# Hostname: www.example.edu.au\n\ndiscovery: {}\nextraction:\n  fees:\n    default_currency: "AUD"\n`}
-                />
+                <>
+                  {/* ── Quick Settings panel ────────────────────────────────── */}
+                  {selected && (
+                    <div className="border-b bg-muted/10">
+                      <button
+                        className="w-full flex items-center justify-between px-4 py-2 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-colors"
+                        onClick={() => setQuickSettingsOpen(o => !o)}
+                        title="Non-developer settings: central page URLs and generic JS expand"
+                      >
+                        <span className="flex items-center gap-1.5">
+                          <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                          Quick Settings
+                          {quickSettingsLoading && <span className="ml-1 opacity-60">(loading…)</span>}
+                          {quickSettings && (quickSettings.central_english_url || quickSettings.central_fees_url || quickSettings.auto_interact_all) && (
+                            <span className="ml-1 inline-flex items-center rounded-full bg-blue-100 dark:bg-blue-900/40 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 dark:text-blue-300">active</span>
+                          )}
+                        </span>
+                        <svg className={`h-3.5 w-3.5 transition-transform ${quickSettingsOpen ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                      </button>
+                      {quickSettingsOpen && (
+                        <div className="px-4 pb-4 pt-2 flex flex-col gap-3">
+                          <p className="text-[11px] text-muted-foreground leading-snug">
+                            These settings are saved to the university database record and take effect on the next scrape — no YAML editing needed.
+                          </p>
+
+                          {/* Central English / Requirements page URL */}
+                          <div className="flex flex-col gap-1">
+                            <label className="text-xs font-medium">Central English Requirements URL</label>
+                            <p className="text-[11px] text-muted-foreground leading-snug">
+                              If IELTS / English requirements are listed on a shared page (not per-course), paste that URL here. The scraper will fetch this page once and apply it to all courses.
+                            </p>
+                            <div className="flex gap-2 items-center">
+                              <input
+                                type="url"
+                                className="flex-1 h-7 rounded border border-border bg-background px-2 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-ring"
+                                placeholder="https://www.example.edu/entry-requirements/"
+                                value={quickSettings?.central_english_url ?? ""}
+                                onChange={e => setQuickSettings(q => q ? { ...q, central_english_url: e.target.value } : { central_english_url: e.target.value, central_fees_url: "", auto_interact_all: false })}
+                              />
+                              <button
+                                className="shrink-0 h-7 px-2.5 rounded border border-border bg-background text-xs hover:bg-muted/60 disabled:opacity-50 transition-colors"
+                                disabled={quickSettingsSaving || quickSettingsLoading}
+                                onClick={() => selected && void saveQuickSettings(selected, { central_english_url: quickSettings?.central_english_url ?? "" })}
+                              >
+                                {quickSettingsSaving ? "Saving…" : "Save"}
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Central Fees page URL */}
+                          <div className="flex flex-col gap-1">
+                            <label className="text-xs font-medium">Central Fees URL</label>
+                            <p className="text-[11px] text-muted-foreground leading-snug">
+                              If international fees are listed on a shared page (e.g. a tuition fees PDF or table), paste that URL here.
+                            </p>
+                            <div className="flex gap-2 items-center">
+                              <input
+                                type="url"
+                                className="flex-1 h-7 rounded border border-border bg-background px-2 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-ring"
+                                placeholder="https://www.example.edu/fees/"
+                                value={quickSettings?.central_fees_url ?? ""}
+                                onChange={e => setQuickSettings(q => q ? { ...q, central_fees_url: e.target.value } : { central_english_url: "", central_fees_url: e.target.value, auto_interact_all: false })}
+                              />
+                              <button
+                                className="shrink-0 h-7 px-2.5 rounded border border-border bg-background text-xs hover:bg-muted/60 disabled:opacity-50 transition-colors"
+                                disabled={quickSettingsSaving || quickSettingsLoading}
+                                onClick={() => selected && void saveQuickSettings(selected, { central_fees_url: quickSettings?.central_fees_url ?? "" })}
+                              >
+                                {quickSettingsSaving ? "Saving…" : "Save"}
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Auto-interact-all toggle */}
+                          <div className="flex items-start gap-3 pt-1">
+                            <button
+                              role="switch"
+                              aria-checked={quickSettings?.auto_interact_all ?? false}
+                              className={`relative mt-0.5 h-5 w-9 shrink-0 rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                                (quickSettings?.auto_interact_all ?? false) ? "bg-blue-600" : "bg-input"
+                              }`}
+                              disabled={quickSettingsSaving || quickSettingsLoading}
+                              onClick={() => {
+                                const next = !(quickSettings?.auto_interact_all ?? false);
+                                setQuickSettings(q => q ? { ...q, auto_interact_all: next } : { central_english_url: "", central_fees_url: "", auto_interact_all: next });
+                                if (selected) void saveQuickSettings(selected, { auto_interact_all: next });
+                              }}
+                            >
+                              <span className={`pointer-events-none block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform ${(quickSettings?.auto_interact_all ?? false) ? "translate-x-4" : "translate-x-0"}`} />
+                            </button>
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-xs font-medium">Auto-expand all collapsed sections</span>
+                              <span className="text-[11px] text-muted-foreground leading-snug">
+                                When enabled, after the browser loads each course page the scraper automatically clicks every collapsed accordion and <code className="font-mono">&lt;details&gt;</code> element before reading the page. Use when IELTS or fee information is hidden behind expandable sections.
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  <textarea
+                    ref={textareaRef}
+                    className="flex-1 resize-none font-mono text-xs p-4 bg-muted/20 focus:outline-none focus:bg-background transition-colors"
+                    value={editorYaml}
+                    onChange={e => setEditorYaml(e.target.value)}
+                    spellCheck={false}
+                    placeholder={`# University Name\n# Hostname: www.example.edu.au\n\ndiscovery: {}\nextraction:\n  fees:\n    default_currency: "AUD"\n`}
+                  />
+                </>
               )}
 
               <div className="px-4 py-1.5 border-t bg-muted/30 text-xs text-muted-foreground flex items-center gap-4">

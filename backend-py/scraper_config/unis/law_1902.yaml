@@ -19,3 +19,11 @@ discovery:
 extraction:
   fees:
     default_currency: GBP
+  english:
+    # University of Law publishes IELTS/English requirements on a central page,
+    # not on individual course pages.  The orchestrator fetches this once before
+    # the course loop and applies results to all courses.
+    central_page: "https://www.law.ac.uk/study/undergraduate/entry-requirements/"
+    # Postgraduate entry requirements are on a separate page:
+    # central_page_pg: "https://www.law.ac.uk/study/postgraduate/entry-requirements/"
+    # (add as a second scrape run targeting only PG courses if needed)
