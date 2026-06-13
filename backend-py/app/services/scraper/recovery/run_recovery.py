@@ -284,7 +284,7 @@ async def run_recovery_pass(
     )
     from app.services.scraper.recovery.extractor import (
         extract_from_url,
-        MAX_PDFS_PER_RECOVERY_RUN,
+        make_pdf_budget,
     )
     from app.services.scraper.recovery.mapper import map_results_to_course
 
@@ -393,7 +393,7 @@ async def run_recovery_pass(
         # One mutable budget counter shared across all candidate-URL fetches for
         # this university.  Prevents universities with many PDF links from
         # inflating recovery runtime unpredictably.
-        pdf_budget: list[int] = [MAX_PDFS_PER_RECOVERY_RUN]
+        pdf_budget: list[int] = make_pdf_budget(single_course=False)
 
         # Shared dedup set: a PDF URL that appears both as a direct candidate
         # and as a linked PDF on another HTML page must only be downloaded once.
@@ -525,7 +525,7 @@ async def run_single_course_recovery(
     )
     from app.services.scraper.recovery.extractor import (
         extract_from_url,
-        _SINGLE_COURSE_PDF_BUDGET,
+        make_pdf_budget,
     )
     from app.services.scraper.recovery.mapper import map_results_to_course
 
@@ -629,7 +629,7 @@ async def run_single_course_recovery(
 
     # Per-course PDF budget — tighter than the batch cap because a single-course
     # trigger only needs a handful of PDFs to fill its missing fields.
-    pdf_budget: list[int] = [_SINGLE_COURSE_PDF_BUDGET]
+    pdf_budget: list[int] = make_pdf_budget(single_course=True)
 
     for url, url_cats in url_to_categories.items():
         meta: dict[str, str] = {}

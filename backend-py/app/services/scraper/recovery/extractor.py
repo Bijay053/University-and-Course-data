@@ -303,6 +303,34 @@ MAX_PDFS_PER_RECOVERY_RUN = 10
 _SINGLE_COURSE_PDF_BUDGET = 3
 
 
+def make_pdf_budget(*, single_course: bool = False) -> list[int]:
+    """Return a fresh mutable PDF-budget counter for one recovery pass.
+
+    Always use this helper instead of constructing ``[CONSTANT]`` inline.
+    It is the single authoritative place that maps *call-site intent* to the
+    right cap, so new entry points cannot accidentally use the wrong constant.
+
+    Parameters
+    ----------
+    single_course:
+        ``True``  → single-course trigger (API "re-run recovery" button, or any
+                    future targeted repair path).  Uses ``_SINGLE_COURSE_PDF_BUDGET``
+                    (currently 3) — tight enough to fill one course's missing
+                    fields without over-fetching.
+        ``False`` → batch recovery pass that processes all staged courses for
+                    an entire university in one go.  Uses
+                    ``MAX_PDFS_PER_RECOVERY_RUN`` (currently 10).
+
+    Returns
+    -------
+    list[int]
+        A one-element mutable list ``[cap]`` ready to be passed as the
+        ``pdf_budget`` argument to :func:`extract_from_url`.
+    """
+    cap = _SINGLE_COURSE_PDF_BUDGET if single_course else MAX_PDFS_PER_RECOVERY_RUN
+    return [cap]
+
+
 def score_pdf_link(pdf_url: str, anchor_text: str, categories: set[str]) -> int:
     """Return a relevance score for a PDF link against the needed categories.
 
