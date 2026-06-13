@@ -1,7 +1,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, ExternalLink, ChevronRight, ChevronDown, RefreshCw, RotateCcw, CheckCircle2, XCircle, Loader2 } from "lucide-react";
+import { AlertTriangle, ExternalLink, ChevronRight, ChevronDown, RefreshCw, RotateCcw, CheckCircle2, XCircle, Loader2, SearchX, FileSearch, Ban, Globe, FileWarning } from "lucide-react";
 
 export type ReviewEvidenceItem = {
   id: number;
@@ -195,6 +195,54 @@ const _FIELD_LABELS: Record<string, string> = {
   intake_months: "Intake Months",
   course_location: "Course Location",
   other_requirement: "Entry Requirements",
+};
+
+// Trace status → display config
+type TraceStatus = "no_source" | "no_value" | "level_mismatch" | "browser_failed" | "pdf_failed";
+const _TRACE_STATUSES = new Set<string>(["no_source", "no_value", "level_mismatch", "browser_failed", "pdf_failed"]);
+
+const _TRACE_CONFIG: Record<TraceStatus, {
+  label: string;
+  description: string;
+  icon: React.ElementType;
+  colorClass: string;
+  borderClass: string;
+}> = {
+  no_source: {
+    label: "No source found",
+    description: "BFS domain search found no candidate pages for this field category.",
+    icon: SearchX,
+    colorClass: "text-slate-500",
+    borderClass: "border-slate-200 bg-slate-50",
+  },
+  no_value: {
+    label: "No value extracted",
+    description: "Candidate pages were found but the extractor found no value for this field.",
+    icon: FileSearch,
+    colorClass: "text-slate-500",
+    borderClass: "border-slate-200 bg-slate-50",
+  },
+  level_mismatch: {
+    label: "Degree level mismatch",
+    description: "A value was extracted but the mapper rejected it — the source page targets a different degree level.",
+    icon: Ban,
+    colorClass: "text-amber-600",
+    borderClass: "border-amber-200 bg-amber-50",
+  },
+  browser_failed: {
+    label: "Fetch failed",
+    description: "The page could not be loaded — it may require JavaScript rendering or Cloudflare protection blocked the request.",
+    icon: Globe,
+    colorClass: "text-red-500",
+    borderClass: "border-red-200 bg-red-50",
+  },
+  pdf_failed: {
+    label: "PDF extraction failed",
+    description: "A PDF was found at the source URL but text extraction returned no usable data.",
+    icon: FileWarning,
+    colorClass: "text-red-500",
+    borderClass: "border-red-200 bg-red-50",
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -480,8 +528,13 @@ function RecoveryPanel({ courseId, readOnly, onAction }: { courseId: number; rea
     );
   }
 
-  const pending = results?.filter((r) => r.status === "pending") ?? [];
-  const actioned = results?.filter((r) => r.status !== "pending") ?? [];
+  const pending  = results?.filter((r) => r.status === "pending") ?? [];
+  const actioned = results?.filter((r) => r.status === "applied" || r.status === "rejected") ?? [];
+  const traces   = results?.filter((r) => _TRACE_STATUSES.has(r.status)) ?? [];
+
+  // Has the recovery engine been run at least once for this course?
+  // True when there are any rows (pending, actioned, or trace).
+  const hasRun = (results?.length ?? 0) > 0;
 
   return (
     <div className="bg-amber-50 border-t border-amber-200">
@@ -533,8 +586,8 @@ function RecoveryPanel({ courseId, readOnly, onAction }: { courseId: number; rea
         </div>
       )}
 
-      {/* No results yet */}
-      {!loading && pending.length === 0 && actioned.length === 0 && (
+      {/* Never been run yet */}
+      {!loading && !hasRun && (
         <div className="px-4 py-3 text-xs text-amber-700 italic">
           No recovery results yet. Click <strong>Run Recovery</strong> to search the university domain for missing field values.
         </div>
@@ -645,6 +698,71 @@ function RecoveryPanel({ courseId, readOnly, onAction }: { courseId: number; rea
               );
             })}
           </div>
+        </div>
+      )}
+
+      {/* Search Trace — diagnostic rows explaining WHY recovery found nothing */}
+      {hasRun && traces.length > 0 && (
+        <div className="px-4 py-3 border-t border-amber-100">
+          <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide mb-2">
+            Search trace — {traces.length} field{traces.length === 1 ? "" : "s"} not recovered
+          </div>
+          <div className="space-y-1.5">
+            {traces.map((res) => {
+              const cfg = _TRACE_CONFIG[res.status as TraceStatus] ?? {
+                label: res.status,
+                description: res.mappingReason ?? "",
+                icon: SearchX,
+                colorClass: "text-slate-500",
+                borderClass: "border-slate-200 bg-slate-50",
+              };
+              const Icon = cfg.icon;
+              return (
+                <div
+                  key={res.id}
+                  className={`flex items-start gap-2.5 px-3 py-2 rounded-lg border text-xs ${cfg.borderClass}`}
+                >
+                  <Icon className={`w-3.5 h-3.5 mt-0.5 flex-shrink-0 ${cfg.colorClass}`} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-semibold text-slate-700">
+                        {_FIELD_LABELS[res.field] ?? res.field}
+                      </span>
+                      <span className={`text-[10px] font-medium ${cfg.colorClass}`}>
+                        {cfg.label}
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-slate-500 mt-0.5">
+                      {res.mappingReason ?? cfg.description}
+                    </div>
+                    {res.evidenceText && (
+                      <div className="text-[10px] text-slate-400 italic mt-0.5 truncate">
+                        {res.evidenceText}
+                      </div>
+                    )}
+                    {res.sourceUrl && (
+                      <a
+                        href={res.sourceUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-[10px] text-blue-500 hover:text-blue-700 hover:underline mt-0.5 break-all"
+                      >
+                        <ExternalLink className="w-2 h-2 flex-shrink-0" />
+                        {res.sourceUrl.length > 60 ? res.sourceUrl.slice(0, 60) + "…" : res.sourceUrl}
+                      </a>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Ran but found nothing at all and no traces (shouldn't normally happen) */}
+      {hasRun && pending.length === 0 && traces.length === 0 && actioned.length === 0 && (
+        <div className="px-4 py-3 text-xs text-slate-500 italic">
+          Recovery ran but found no missing fields for this course. Click <strong>Run Recovery</strong> to search again.
         </div>
       )}
 

@@ -333,6 +333,7 @@ async def extract_from_url(
     *,
     country: str | None = None,
     timeout: float = 12.0,
+    metadata: dict | None = None,
 ) -> list[dict[str, Any]]:
     """Fetch a URL once and run ALL specified category extractors on it.
 
@@ -360,6 +361,8 @@ async def extract_from_url(
     log.info("[RECOVERY:extract] fetching url=%r for categories=%s", url, categories)
 
     html, source_type = await _fetch_html(url, timeout=timeout)
+    if metadata is not None:
+        metadata["source_type"] = source_type
     results: list[dict[str, Any]] = []
 
     if html:

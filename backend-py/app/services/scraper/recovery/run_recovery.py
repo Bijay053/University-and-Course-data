@@ -27,6 +27,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 log = logging.getLogger(__name__)
 
+# Trace-only statuses — written to record WHY recovery found nothing.
+# These rows have recovered_value=NULL and should never be applied/rejected.
+_TRACE_STATUSES = frozenset({
+    "no_source",
+    "no_value",
+    "level_mismatch",
+    "browser_failed",
+    "pdf_failed",
+})
+
 
 async def _get_courses_for_run(
     db: AsyncSession, scrape_run_id: str
@@ -167,6 +177,82 @@ async def _write_recovery_results(
     if written:
         await db.commit()
     return written
+
+
+async def _write_trace_row(
+    db: AsyncSession,
+    scraped_course_id: int,
+    scrape_run_id: str | None,
+    field: str,
+    status: str,
+    reason: str,
+    *,
+    source_url: str | None = None,
+    evidence_text: str | None = None,
+) -> None:
+    """Write a diagnostic trace row explaining why recovery found nothing.
+
+    Trace rows have recovered_value=NULL and status in _TRACE_STATUSES.
+    They are shown in the UI as a "Search Trace" section, never as actionable results.
+    """
+    await db.execute(
+        text(
+            """
+            INSERT INTO agent_recovery_results
+                (scraped_course_id, scrape_run_id, field, recovered_value,
+                 source_url, source_type, evidence_text, confidence,
+                 mapping_reason, status, created_at)
+            VALUES
+                (:sc_id, :run_id, :field, NULL,
+                 :source_url, 'trace', :evidence_text, NULL,
+                 :reason, :status, NOW())
+            """
+        ),
+        {
+            "sc_id": scraped_course_id,
+            "run_id": scrape_run_id,
+            "field": field,
+            "source_url": source_url,
+            "evidence_text": evidence_text,
+            "reason": reason,
+            "status": status,
+        },
+    )
+
+
+async def _fetch_all_rows_for_course(
+    db: AsyncSession, scraped_course_id: int
+) -> list[dict[str, Any]]:
+    """Return all agent_recovery_results rows for a course, newest first."""
+    rows = (await db.execute(
+        text(
+            "SELECT id, scraped_course_id, scrape_run_id, field, recovered_value, "
+            "source_url, source_type, evidence_text, confidence, mapping_reason, "
+            "status, created_at "
+            "FROM agent_recovery_results "
+            "WHERE scraped_course_id = :sc_id "
+            "ORDER BY id DESC"
+        ),
+        {"sc_id": scraped_course_id},
+    )).all()
+
+    return [
+        {
+            "id": r.id,
+            "scrapedCourseId": r.scraped_course_id,
+            "scrapeRunId": r.scrape_run_id,
+            "field": r.field,
+            "recoveredValue": r.recovered_value,
+            "sourceUrl": r.source_url,
+            "sourceType": r.source_type,
+            "evidenceText": r.evidence_text,
+            "confidence": r.confidence,
+            "mappingReason": r.mapping_reason,
+            "status": r.status,
+            "createdAt": r.created_at.isoformat() if r.created_at else None,
+        }
+        for r in rows
+    ]
 
 
 async def run_recovery_pass(
@@ -371,8 +457,10 @@ async def run_single_course_recovery(
 ) -> list[dict[str, Any]]:
     """Run a fresh recovery pass for a single staged course.
 
-    Used by the API trigger endpoint.  Deletes existing pending results for
-    this course before re-running so operators always see fresh results.
+    Used by the API trigger endpoint.  Deletes all non-final rows before
+    re-running so operators always see fresh results.  Writes diagnostic
+    trace rows at each failure point so the panel shows WHY recovery found
+    nothing (not just a silent empty state).
 
     Returns
     -------
@@ -432,69 +520,162 @@ async def run_single_course_recovery(
 
     needed_categories = {FIELD_TO_CATEGORY[f] for f in needed if f in FIELD_TO_CATEGORY}
 
-    # Delete existing pending results for this course so we get fresh results
+    # Delete all non-final rows (pending + all trace statuses) so we start fresh.
+    # Applied and rejected rows are preserved — they represent operator decisions.
     await db.execute(
         text(
             "DELETE FROM agent_recovery_results "
-            "WHERE scraped_course_id = :sc_id AND status = 'pending'"
+            "WHERE scraped_course_id = :sc_id "
+            "  AND status NOT IN ('applied', 'rejected')"
         ),
         {"sc_id": scraped_course_id},
     )
     await db.commit()
 
+    # ------------------------------------------------------------------ #
+    # STEP 1 — BFS search for candidate pages                             #
+    # ------------------------------------------------------------------ #
     candidates = await search_candidate_pages(scrape_url, needed_categories)
     if not candidates:
-        return []
+        log.info("[RECOVERY] trigger: course %s — no candidates found", scraped_course_id)
+        # Write a no_source trace for every needed field
+        for field in needed:
+            await _write_trace_row(
+                db, scraped_course_id, scrape_run_id, field,
+                "no_source",
+                "No candidate pages found during BFS domain search for this field category",
+            )
+        await db.commit()
+        return await _fetch_all_rows_for_course(db, scraped_course_id)
 
-    # Group by URL to avoid duplicate fetches when a URL covers multiple categories
+    # ------------------------------------------------------------------ #
+    # STEP 2 — Fetch each URL once, run all relevant extractors           #
+    # ------------------------------------------------------------------ #
     url_to_categories: dict[str, set[str]] = {}
     for cand in candidates:
         url_to_categories.setdefault(cand["url"], set()).add(cand["category"])
 
+    # Track which categories had candidates at all
+    categories_searched: set[str] = {cand["category"] for cand in candidates}
+    # Track source_type per URL (html_empty = both HTTP and browser failed)
+    url_source_types: dict[str, str] = {}
+    # Accumulate all extracted results
     all_results: list[dict[str, Any]] = []
+    # Track which categories produced at least one result with a non-None value
+    categories_with_results: set[str] = set()
+
     for url, url_cats in url_to_categories.items():
+        meta: dict[str, str] = {}
         try:
-            page_results = await extract_from_url(url, url_cats, country=country)
+            page_results = await extract_from_url(url, url_cats, country=country, metadata=meta)
+            url_source_types[url] = meta.get("source_type", "html")
+            for r in page_results:
+                if r.get("value") is not None:
+                    cat = FIELD_TO_CATEGORY.get(r.get("field", ""), "")
+                    if cat:
+                        categories_with_results.add(cat)
             all_results.extend(page_results)
         except Exception as exc:
             log.warning("[RECOVERY] trigger extract error %r: %s", url, exc)
+            url_source_types[url] = "html_empty"
 
-    mapped = map_results_to_course(
+    # ------------------------------------------------------------------ #
+    # STEP 3 — Map results to the course (with rejection tracking)        #
+    # ------------------------------------------------------------------ #
+    mapped, rejects = map_results_to_course(
         all_results,
         degree_level=sc.degree_level,
         course_name=sc.course_name,
+        return_rejects=True,
     )
     mapped_for_course = {f: v for f, v in mapped.items() if f in needed}
 
+    # Write the successful recovery results first
     await _write_recovery_results(db, scraped_course_id, scrape_run_id, mapped_for_course)
 
-    # Return fresh results from DB
-    rows = (await db.execute(
-        text(
-            "SELECT id, scraped_course_id, scrape_run_id, field, recovered_value, "
-            "source_url, source_type, evidence_text, confidence, mapping_reason, "
-            "status, created_at "
-            "FROM agent_recovery_results "
-            "WHERE scraped_course_id = :sc_id "
-            "ORDER BY id DESC"
-        ),
-        {"sc_id": scraped_course_id},
-    )).all()
+    # ------------------------------------------------------------------ #
+    # STEP 4 — Write diagnostic trace rows for every needed field that    #
+    # was NOT successfully recovered                                       #
+    # ------------------------------------------------------------------ #
+    # Fields whose extractor returned a non-None value (may still have been
+    # mapper-rejected)
+    fields_with_extracted_value = {
+        r.get("field") for r in all_results if r.get("value") is not None
+    }
 
-    return [
-        {
-            "id": r.id,
-            "scrapedCourseId": r.scraped_course_id,
-            "scrapeRunId": r.scrape_run_id,
-            "field": r.field,
-            "recoveredValue": r.recovered_value,
-            "sourceUrl": r.source_url,
-            "sourceType": r.source_type,
-            "evidenceText": r.evidence_text,
-            "confidence": r.confidence,
-            "mappingReason": r.mapping_reason,
-            "status": r.status,
-            "createdAt": r.created_at.isoformat() if r.created_at else None,
-        }
-        for r in rows
-    ]
+    for field in needed:
+        if field in mapped_for_course:
+            continue  # Successfully recovered — no trace needed
+
+        cat = FIELD_TO_CATEGORY.get(field)
+
+        # Which URLs were candidates for this field's category?
+        cat_urls = [
+            url for url, url_cats in url_to_categories.items()
+            if cat in url_cats
+        ] if cat else []
+
+        # URL-level failure signals
+        browser_failed_urls = [
+            url for url in cat_urls
+            if url_source_types.get(url) == "html_empty"
+        ]
+        pdf_urls = [
+            url for url in cat_urls
+            if url_source_types.get(url) in ("pdf_direct", "pdf_content_type")
+        ]
+
+        if field in rejects:
+            # The extractor found a value, but the mapper disqualified it
+            best_rej = rejects[field][0]
+            extracted_val = best_rej.get("value")
+            evidence = f"Extracted: {extracted_val}" if extracted_val else None
+            await _write_trace_row(
+                db, scraped_course_id, scrape_run_id, field,
+                "level_mismatch",
+                best_rej.get("reason", "Value found but rejected by degree-level check"),
+                source_url=best_rej.get("source_url"),
+                evidence_text=evidence,
+            )
+
+        elif browser_failed_urls:
+            # Fetch failed for the URL(s) covering this field's category
+            await _write_trace_row(
+                db, scraped_course_id, scrape_run_id, field,
+                "browser_failed",
+                "Page fetch failed — site may require JavaScript rendering or "
+                "Cloudflare protection blocked the request",
+                source_url=browser_failed_urls[0],
+            )
+
+        elif pdf_urls and field not in fields_with_extracted_value:
+            # A PDF URL was identified but extraction returned no data
+            await _write_trace_row(
+                db, scraped_course_id, scrape_run_id, field,
+                "pdf_failed",
+                "PDF found but text extraction returned no usable data for this field",
+                source_url=pdf_urls[0],
+            )
+
+        elif cat and cat not in categories_with_results:
+            # Candidates were found for this category but extractor found nothing
+            await _write_trace_row(
+                db, scraped_course_id, scrape_run_id, field,
+                "no_value",
+                "Candidate pages were found but no value for this field could be "
+                "extracted from the page content",
+                source_url=cat_urls[0] if cat_urls else None,
+            )
+
+        else:
+            # Other fields in the same category were extracted, but not this one
+            await _write_trace_row(
+                db, scraped_course_id, scrape_run_id, field,
+                "no_value",
+                "Related fields were extracted from the page but this specific "
+                "field was not found",
+                source_url=cat_urls[0] if cat_urls else None,
+            )
+
+    await db.commit()
+    return await _fetch_all_rows_for_course(db, scraped_course_id)

@@ -145,10 +145,16 @@ async def act_on_recovery_result(
 
     row = await _fetch_result(db, result_id)
 
-    if row["status"] in ("applied", "rejected"):
+    if row["status"] != "pending":
+        # Trace rows (no_source, no_value, level_mismatch, browser_failed, pdf_failed)
+        # are diagnostic only and cannot be applied or rejected.
+        # Applied/rejected rows represent final operator decisions.
+        status = row["status"]
+        if status in ("applied", "rejected"):
+            raise HTTPException(status_code=409, detail=f"Result already {status}")
         raise HTTPException(
             status_code=409,
-            detail=f"Result already {row['status']}",
+            detail=f"Row is a diagnostic trace ({status}) — only 'pending' results can be applied or rejected",
         )
 
     sc_id = row["scraped_course_id"]

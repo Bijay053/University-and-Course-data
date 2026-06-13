@@ -198,7 +198,8 @@ def map_results_to_course(
     *,
     degree_level: str | None,
     course_name: str | None,
-) -> dict[str, dict[str, Any]]:
+    return_rejects: bool = False,
+) -> "dict[str, dict[str, Any]] | tuple[dict[str, dict[str, Any]], dict[str, list[dict[str, Any]]]]":
     """Select the best recovery result per field for the target course.
 
     Parameters
@@ -209,16 +210,20 @@ def map_results_to_course(
         The target course's degree_level (e.g. "Bachelor's", "Master's").
     course_name:
         The target course's name for subject-area matching.
+    return_rejects:
+        If True, return a tuple (accepted, rejected) where rejected maps
+        field → list of dicts with keys: reason, source_url, value.
 
     Returns
     -------
     dict mapping field_name → best_result_dict (with mapping_reason added).
-    Returns an empty dict when no usable results are found.
+    When return_rejects=True, returns (accepted_dict, rejected_dict).
     """
     target_bucket = _normalise_level(degree_level)
     cname = (course_name or "").strip()
 
     best: dict[str, tuple[int, dict[str, Any]]] = {}
+    rejects: dict[str, list[dict[str, Any]]] = {}
 
     for result in results:
         field = result.get("field")
@@ -239,6 +244,12 @@ def map_results_to_course(
                 "[RECOVERY:map] field=%r source=%r — REJECTED: %s",
                 field, result.get("source_url"), disq_reason,
             )
+            if return_rejects:
+                rejects.setdefault(field, []).append({
+                    "reason": disq_reason,
+                    "source_url": result.get("source_url"),
+                    "value": str(val)[:200] if val is not None else None,
+                })
             continue
 
         score, reason = _score_result(result, target_bucket, cname)
@@ -255,4 +266,7 @@ def map_results_to_course(
             result_with_reason["mapping_score"] = score
             best[field] = (score, result_with_reason)
 
-    return {field: item for field, (_, item) in best.items()}
+    accepted = {field: item for field, (_, item) in best.items()}
+    if return_rejects:
+        return accepted, rejects
+    return accepted
