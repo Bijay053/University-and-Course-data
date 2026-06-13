@@ -1,0 +1,302 @@
+"""Agent Recovery API endpoints.
+
+GET  /api/scrape/recovery/{scraped_course_id}
+    Returns all agent_recovery_results rows for a course.
+
+PATCH /api/scrape/recovery/{result_id}
+    Body: { "action": "apply" | "reject" }
+    - apply: writes recovered value into scraped_courses, inserts evidence row,
+             sets status = 'applied'.
+    - reject: sets status = 'rejected' only.
+
+POST /api/scrape/recovery/trigger
+    Body: { "scraped_course_id": 123 }
+    Runs a fresh single-course recovery pass and returns new results.
+"""
+from __future__ import annotations
+
+import json
+import logging
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.dependencies import get_db
+
+log = logging.getLogger(__name__)
+router = APIRouter()
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+_FIELD_TO_COLUMN: dict[str, str] = {
+    "international_fee": "international_fee",
+    "ielts_overall": "ielts_overall",
+    "intake_months": "intake_months",
+    "course_location": "course_location",
+    "other_requirement": "other_requirement",
+}
+
+
+def _parse_recovered_value(field: str, raw: str | None) -> object:
+    """Coerce the stored string back to the correct Python type."""
+    if raw is None:
+        return None
+    if field == "international_fee":
+        try:
+            return float(raw)
+        except (ValueError, TypeError):
+            return None
+    if field == "ielts_overall":
+        try:
+            return float(raw)
+        except (ValueError, TypeError):
+            return None
+    if field == "intake_months":
+        try:
+            val = json.loads(raw)
+            if isinstance(val, list):
+                return val
+        except (ValueError, TypeError):
+            pass
+        return [raw] if raw else None
+    # string fields
+    return raw
+
+
+async def _fetch_result(db: AsyncSession, result_id: int) -> dict:
+    row = (await db.execute(
+        text(
+            "SELECT id, scraped_course_id, scrape_run_id, field, recovered_value, "
+            "source_url, source_type, evidence_text, confidence, mapping_reason, "
+            "status, created_at "
+            "FROM agent_recovery_results WHERE id = :id"
+        ),
+        {"id": result_id},
+    )).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Recovery result not found")
+    return dict(row._mapping)
+
+
+# ---------------------------------------------------------------------------
+# GET /api/scrape/recovery/{scraped_course_id}
+# ---------------------------------------------------------------------------
+
+@router.get("/recovery/{scraped_course_id}")
+async def get_recovery_results(
+    scraped_course_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> dict:
+    """Return all agent_recovery_results for a staged course."""
+    rows = (await db.execute(
+        text(
+            "SELECT id, scraped_course_id, scrape_run_id, field, recovered_value, "
+            "source_url, source_type, evidence_text, confidence, mapping_reason, "
+            "status, created_at "
+            "FROM agent_recovery_results "
+            "WHERE scraped_course_id = :sc_id "
+            "ORDER BY status, confidence DESC NULLS LAST, id"
+        ),
+        {"sc_id": scraped_course_id},
+    )).all()
+
+    results = [
+        {
+            "id": r.id,
+            "scrapedCourseId": r.scraped_course_id,
+            "scrapeRunId": r.scrape_run_id,
+            "field": r.field,
+            "recoveredValue": r.recovered_value,
+            "sourceUrl": r.source_url,
+            "sourceType": r.source_type,
+            "evidenceText": r.evidence_text,
+            "confidence": r.confidence,
+            "mappingReason": r.mapping_reason,
+            "status": r.status,
+            "createdAt": r.created_at.isoformat() if r.created_at else None,
+        }
+        for r in rows
+    ]
+    return {"results": results, "total": len(results)}
+
+
+# ---------------------------------------------------------------------------
+# PATCH /api/scrape/recovery/{result_id}
+# ---------------------------------------------------------------------------
+
+class RecoveryActionBody(BaseModel):
+    action: str  # "apply" | "reject"
+
+
+@router.patch("/recovery/{result_id}")
+async def act_on_recovery_result(
+    result_id: int,
+    body: RecoveryActionBody,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> dict:
+    """Apply or reject a recovery result."""
+    if body.action not in ("apply", "reject"):
+        raise HTTPException(status_code=400, detail="action must be 'apply' or 'reject'")
+
+    row = await _fetch_result(db, result_id)
+
+    if row["status"] in ("applied", "rejected"):
+        raise HTTPException(
+            status_code=409,
+            detail=f"Result already {row['status']}",
+        )
+
+    sc_id = row["scraped_course_id"]
+    field = row["field"]
+
+    if body.action == "reject":
+        await db.execute(
+            text("UPDATE agent_recovery_results SET status='rejected' WHERE id=:id"),
+            {"id": result_id},
+        )
+        await db.commit()
+        log.info("[RECOVERY:api] result=%d rejected for course=%s field=%r", result_id, sc_id, field)
+        return {"ok": True, "action": "rejected", "resultId": result_id}
+
+    # === APPLY ===
+    if field not in _FIELD_TO_COLUMN:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Field {field!r} is not yet supported for apply",
+        )
+
+    raw_value = row["recovered_value"]
+    value = _parse_recovered_value(field, raw_value)
+
+    if value is None:
+        raise HTTPException(status_code=422, detail="Recovered value could not be parsed")
+
+    col = _FIELD_TO_COLUMN[field]
+
+    # Write value into scraped_courses
+    if field == "intake_months":
+        # JSONB column
+        await db.execute(
+            text(f"UPDATE scraped_courses SET {col} = CAST(:v AS jsonb) WHERE id=:id"),
+            {"v": json.dumps(value), "id": sc_id},
+        )
+    elif field in ("international_fee", "ielts_overall"):
+        await db.execute(
+            text(f"UPDATE scraped_courses SET {col} = :v WHERE id=:id"),
+            {"v": float(value), "id": sc_id},
+        )
+    else:
+        await db.execute(
+            text(f"UPDATE scraped_courses SET {col} = :v WHERE id=:id"),
+            {"v": str(value), "id": sc_id},
+        )
+
+    # Insert evidence row
+    source_url = row.get("source_url")
+    snippet = row.get("evidence_text")
+    confidence = row.get("confidence")
+
+    await db.execute(
+        text(
+            """
+            INSERT INTO scraped_field_evidence
+                (scraped_course_id, field_key, candidate_value, normalized_value,
+                 source_url, extraction_method, snippet, confidence,
+                 decision_status, selected)
+            VALUES
+                (:sc_id, :field, :cval, :nval,
+                 :source_url, 'agent_recovery', :snippet, :conf,
+                 'selected', true)
+            ON CONFLICT DO NOTHING
+            """
+        ),
+        {
+            "sc_id": sc_id,
+            "field": field,
+            "cval": raw_value,
+            "nval": raw_value,
+            "source_url": source_url,
+            "snippet": str(snippet)[:1000] if snippet else None,
+            "conf": confidence,
+        },
+    )
+
+    # Mark recovery result as applied
+    await db.execute(
+        text("UPDATE agent_recovery_results SET status='applied' WHERE id=:id"),
+        {"id": result_id},
+    )
+
+    await db.commit()
+    log.info(
+        "[RECOVERY:api] result=%d APPLIED for course=%s field=%r value=%r",
+        result_id, sc_id, field, value,
+    )
+
+    # Recompute completeness for the course
+    try:
+        from app.models import ScrapedCourse
+        from app.services.scraper.completeness import compute_completeness, decide_eligibility
+        sc = await db.get(ScrapedCourse, sc_id)
+        if sc:
+            comp = compute_completeness(sc)
+            dec = decide_eligibility(sc, comp)
+            await db.execute(
+                text(
+                    "UPDATE scraped_courses SET completeness=:c, "
+                    "eligibility_status=:es, eligibility_reason=:er WHERE id=:id"
+                ),
+                {
+                    "c": comp.score,
+                    "es": dec.status,
+                    "er": dec.reason,
+                    "id": sc_id,
+                },
+            )
+            await db.commit()
+    except Exception as exc:
+        log.warning("[RECOVERY:api] completeness recompute failed for course=%s: %s", sc_id, exc)
+
+    return {
+        "ok": True,
+        "action": "applied",
+        "resultId": result_id,
+        "field": field,
+        "value": raw_value,
+    }
+
+
+# ---------------------------------------------------------------------------
+# POST /api/scrape/recovery/trigger
+# ---------------------------------------------------------------------------
+
+class RecoveryTriggerBody(BaseModel):
+    scraped_course_id: int
+
+
+@router.post("/recovery/trigger")
+async def trigger_recovery(
+    body: RecoveryTriggerBody,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> dict:
+    """Run a fresh single-course recovery pass."""
+    from app.services.scraper.recovery.run_recovery import run_single_course_recovery
+
+    log.info("[RECOVERY:api] trigger requested for course=%s", body.scraped_course_id)
+    try:
+        results = await run_single_course_recovery(body.scraped_course_id, db)
+    except Exception as exc:
+        log.exception("[RECOVERY:api] trigger failed for course=%s: %s", body.scraped_course_id, exc)
+        raise HTTPException(status_code=500, detail=f"Recovery pass failed: {exc}")
+
+    return {
+        "ok": True,
+        "scrapedCourseId": body.scraped_course_id,
+        "results": results,
+        "total": len(results),
+    }

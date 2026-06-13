@@ -44,8 +44,10 @@ from app.models.country_pattern import CountryPattern
 from app.models.university_watcher import UniversityWatcher
 from app.models.publishing_ledger import PublishingLedger
 from app.models.page_snapshot import PageSnapshot
+from app.models.agent_recovery import AgentRecoveryResult
 
 __all__ = [
+    "AgentRecoveryResult",
     "AcademicLevelOption",
     "DiscoveryFailureAlert",
     "GeminiCallLog",

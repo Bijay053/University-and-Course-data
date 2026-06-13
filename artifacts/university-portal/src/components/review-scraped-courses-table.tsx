@@ -1,7 +1,7 @@
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, ExternalLink, ChevronRight, ChevronDown, RefreshCw } from "lucide-react";
+import { AlertTriangle, ExternalLink, ChevronRight, ChevronDown, RefreshCw, RotateCcw, CheckCircle2, XCircle, Loader2 } from "lucide-react";
 
 export type ReviewEvidenceItem = {
   id: number;
@@ -44,7 +44,32 @@ export type ReviewStagedCourse = {
   completeness: number | null;
   scrapeWarnings?: string[] | null;
   evidence?: ReviewEvidenceItem[];
+  /** Count of pending agent_recovery_results rows for this course. */
+  recoveryCount?: number;
 };
+
+// ---------------------------------------------------------------------------
+// Recovery types
+// ---------------------------------------------------------------------------
+
+type RecoveryResult = {
+  id: number;
+  scrapedCourseId: number;
+  scrapeRunId: string;
+  field: string;
+  recoveredValue: string | null;
+  sourceUrl: string | null;
+  sourceType: string | null;
+  evidenceText: string | null;
+  confidence: number | null;
+  mappingReason: string | null;
+  status: string;
+  createdAt: string | null;
+};
+
+// ---------------------------------------------------------------------------
+// Props
+// ---------------------------------------------------------------------------
 
 interface Props {
   courses: ReviewStagedCourse[];
@@ -59,7 +84,14 @@ interface Props {
   /** Callback fired when the operator triggers a per-course re-scrape.
    *  Receives the scraped_course id(s) to rescrape. */
   onRescrape?: (courseId: number) => void;
+  /** Callback fired after an agent recovery result is applied or rejected.
+   *  Use this to invalidate/refresh the parent staged-course query. */
+  onCourseUpdated?: () => void;
 }
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
 function feeDisplay(c: ReviewStagedCourse) {
   if (c.internationalFee == null || c.internationalFee === "") return null;
@@ -113,9 +145,6 @@ function toCamel(s: string): string {
 
 /**
  * Map evidence field_key → the matching value on the saved course record.
- * Evidence field_keys arrive as snake_case from the API (e.g. "ielts_overall",
- * "international_fee"). The switch normalises them to camelCase first so they
- * match the TypeScript course object properties.
  */
 function finalValueForField(course: ReviewStagedCourse, fieldKey: string): string | null {
   const v = (x: unknown): string | null => {
@@ -147,12 +176,6 @@ function finalValueForField(course: ReviewStagedCourse, fieldKey: string): strin
   }
 }
 
-/**
- * Loose equality: trim, lower-case, strip currency markers, compare as
- * numeric when both sides parse, otherwise string compare. Used to decide
- * whether the `selected=true` evidence row actually matches the value the
- * scraper persisted on the course.
- */
 function looselyEqual(a: string | null, b: string | null): boolean {
   if (a == null && b == null) return true;
   if (a == null || b == null) return false;
@@ -163,12 +186,22 @@ function looselyEqual(a: string | null, b: string | null): boolean {
   const pa = parseFloat(na.replace(/,/g, ""));
   const pb = parseFloat(nb.replace(/,/g, ""));
   if (Number.isFinite(pa) && Number.isFinite(pb)) return Math.abs(pa - pb) < 1e-6;
-  // year vs years tolerance
   return na.replace(/s$/, "") === nb.replace(/s$/, "");
 }
 
+const _FIELD_LABELS: Record<string, string> = {
+  international_fee: "International Fee",
+  ielts_overall: "IELTS Overall",
+  intake_months: "Intake Months",
+  course_location: "Course Location",
+  other_requirement: "Entry Requirements",
+};
+
+// ---------------------------------------------------------------------------
+// EvidencePanel
+// ---------------------------------------------------------------------------
+
 function EvidencePanel({ evidence, course }: { evidence: ReviewEvidenceItem[]; course?: ReviewStagedCourse }) {
-  // tracks which individually-suppressed fields the user has opted to show
   const [enabledSuppressed, setEnabledSuppressed] = useState<Set<string>>(new Set());
 
   const grouped = useMemo(() => {
@@ -178,13 +211,9 @@ function EvidencePanel({ evidence, course }: { evidence: ReviewEvidenceItem[]; c
       arr.push(e);
       m.set(e.fieldKey, arr);
     }
-    // already pre-sorted by API: field_key ASC, selected DESC, decision_score DESC
     return Array.from(m.entries()).sort(([a], [b]) => a.localeCompare(b));
   }, [evidence]);
 
-  // A field group is "suppressed" when nothing was selected AND the final value
-  // on the course record is empty — i.e. the extractor found a candidate value
-  // but negative-suppression (or coherence gates) rejected it entirely.
   const { visibleGrouped, suppressedFields } = useMemo(() => {
     const visible: [string, ReviewEvidenceItem[]][] = [];
     const suppressed: [string, ReviewEvidenceItem[]][] = [];
@@ -271,7 +300,7 @@ function EvidencePanel({ evidence, course }: { evidence: ReviewEvidenceItem[]; c
                       ) : null}
                       {e.snippet ? (
                         <div className="text-[10px] text-slate-500 mt-1 italic line-clamp-2" title={e.snippet}>
-                          “{e.snippet}”
+                          "{e.snippet}"
                         </div>
                       ) : null}
                     </td>
@@ -356,9 +385,305 @@ function EvidencePanel({ evidence, course }: { evidence: ReviewEvidenceItem[]; c
   );
 }
 
-export function ReviewScrapedCoursesTable({ courses, readOnly, showEvidence, universityId, onRescrape }: Props) {
+// ---------------------------------------------------------------------------
+// RecoveryPanel — Agent Recovery results for a single staged course
+// ---------------------------------------------------------------------------
+
+function ConfidenceBar({ value }: { value: number | null }) {
+  if (value == null) return <span className="text-slate-400 text-[10px]">—</span>;
+  const pct = Math.round(value * 100);
+  const color = pct >= 70 ? "bg-green-500" : pct >= 45 ? "bg-yellow-400" : "bg-red-400";
+  const textColor = pct >= 70 ? "text-green-700" : pct >= 45 ? "text-yellow-700" : "text-red-600";
+  return (
+    <div className="flex items-center gap-1.5">
+      <div className="w-14 h-1.5 rounded-full bg-slate-200 overflow-hidden">
+        <div className={`h-full rounded-full ${color}`} style={{ width: `${pct}%` }} />
+      </div>
+      <span className={`text-[10px] font-mono ${textColor}`}>{pct}%</span>
+    </div>
+  );
+}
+
+function RecoveryPanel({ courseId, readOnly, onAction }: { courseId: number; readOnly?: boolean; onAction?: () => void }) {
+  const [results, setResults] = useState<RecoveryResult[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [triggering, setTriggering] = useState(false);
+  const [acting, setActing] = useState<Record<number, "apply" | "reject">>({});
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchResults = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const r = await fetch(`/api/scrape/recovery/${courseId}`, { credentials: "include" });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const data = await r.json();
+      setResults(data.results ?? []);
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setLoading(false);
+    }
+  }, [courseId]);
+
+  // Load on mount
+  useEffect(() => { void fetchResults(); }, [fetchResults]);
+
+  const handleTrigger = async () => {
+    setTriggering(true);
+    setError(null);
+    try {
+      const r = await fetch("/api/scrape/recovery/trigger", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ scraped_course_id: courseId }),
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      await fetchResults();
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setTriggering(false);
+    }
+  };
+
+  const handleAction = async (resultId: number, action: "apply" | "reject") => {
+    setActing((prev) => ({ ...prev, [resultId]: action }));
+    try {
+      const r = await fetch(`/api/scrape/recovery/${resultId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ action }),
+      });
+      if (!r.ok) {
+        const body = await r.json().catch(() => ({}));
+        throw new Error(body.detail ?? `HTTP ${r.status}`);
+      }
+      // Refresh recovery panel and notify parent to refresh staged-course list
+      await fetchResults();
+      onAction?.();
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setActing((prev) => { const n = { ...prev }; delete n[resultId]; return n; });
+    }
+  };
+
+  if (loading && results === null) {
+    return (
+      <div className="flex items-center gap-2 px-4 py-3 text-sm text-slate-500">
+        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+        Loading recovery results…
+      </div>
+    );
+  }
+
+  const pending = results?.filter((r) => r.status === "pending") ?? [];
+  const actioned = results?.filter((r) => r.status !== "pending") ?? [];
+
+  return (
+    <div className="bg-amber-50 border-t border-amber-200">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-3 px-4 py-2 border-b border-amber-200">
+        <div className="flex items-center gap-2">
+          <RotateCcw className="w-3.5 h-3.5 text-amber-600" />
+          <span className="text-xs font-semibold text-amber-800 uppercase tracking-wide">
+            Agent Recovery
+          </span>
+          {pending.length > 0 && (
+            <Badge className="text-[10px] bg-amber-600 text-white border-0 py-0">
+              {pending.length} pending
+            </Badge>
+          )}
+          <span className="text-[11px] text-amber-600 italic">
+            — recovered values need your approval before they are applied
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          {!readOnly && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-6 text-[11px] px-2 text-amber-700 border-amber-300 hover:bg-amber-100"
+              onClick={handleTrigger}
+              disabled={triggering || loading}
+              title="Run a fresh recovery search for this course"
+            >
+              {triggering ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <RotateCcw className="w-3 h-3 mr-1" />}
+              Run Recovery
+            </Button>
+          )}
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-6 text-[11px] px-2 text-amber-600"
+            onClick={fetchResults}
+            disabled={loading}
+          >
+            {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+          </Button>
+        </div>
+      </div>
+
+      {error && (
+        <div className="px-4 py-2 text-xs text-red-700 bg-red-50 border-b border-red-200">
+          ⚠ {error}
+        </div>
+      )}
+
+      {/* No results yet */}
+      {!loading && pending.length === 0 && actioned.length === 0 && (
+        <div className="px-4 py-3 text-xs text-amber-700 italic">
+          No recovery results yet. Click <strong>Run Recovery</strong> to search the university domain for missing field values.
+        </div>
+      )}
+
+      {/* Pending results table */}
+      {pending.length > 0 && (
+        <div className="p-3">
+          <div className="text-[10px] font-semibold text-amber-700 uppercase tracking-wide mb-2">
+            Pending — review and apply or reject each result
+          </div>
+          <div className="space-y-2">
+            {pending.map((res) => {
+              const isActing = res.id in acting;
+              return (
+                <div
+                  key={res.id}
+                  className="bg-white border border-amber-200 rounded-lg overflow-hidden"
+                >
+                  {/* Row header */}
+                  <div className="flex items-center justify-between gap-2 px-3 py-2 bg-amber-50 border-b border-amber-100">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-[11px] font-semibold text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded">
+                        {_FIELD_LABELS[res.field] ?? res.field}
+                      </span>
+                      <Badge variant="outline" className="text-[10px] text-slate-500 border-slate-200 py-0">
+                        {res.sourceType ?? "html"}
+                      </Badge>
+                    </div>
+                    {!readOnly && (
+                      <div className="flex items-center gap-1.5">
+                        <Button
+                          size="sm"
+                          className="h-6 text-[11px] px-2 bg-green-600 hover:bg-green-700 text-white"
+                          disabled={isActing}
+                          onClick={() => handleAction(res.id, "apply")}
+                          title="Apply this value to the staged course"
+                        >
+                          {isActing && acting[res.id] === "apply"
+                            ? <Loader2 className="w-3 h-3 animate-spin" />
+                            : <CheckCircle2 className="w-3 h-3 mr-1" />}
+                          Apply
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-6 text-[11px] px-2 text-red-600 border-red-200 hover:bg-red-50"
+                          disabled={isActing}
+                          onClick={() => handleAction(res.id, "reject")}
+                          title="Reject — dismiss this recovery result"
+                        >
+                          {isActing && acting[res.id] === "reject"
+                            ? <Loader2 className="w-3 h-3 animate-spin" />
+                            : <XCircle className="w-3 h-3 mr-1" />}
+                          Reject
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Value + evidence body */}
+                  <div className="px-3 py-2 grid grid-cols-1 gap-1.5 text-xs">
+                    {/* Recovered value */}
+                    <div className="flex items-start gap-3 flex-wrap">
+                      <div>
+                        <div className="text-[10px] text-slate-400 mb-0.5">Recovered value</div>
+                        <div className="font-semibold text-slate-800 font-mono">{res.recoveredValue ?? "—"}</div>
+                      </div>
+                      <div>
+                        <div className="text-[10px] text-slate-400 mb-0.5">Confidence</div>
+                        <ConfidenceBar value={res.confidence} />
+                      </div>
+                      {res.mappingReason && (
+                        <div className="flex-1 min-w-[180px]">
+                          <div className="text-[10px] text-slate-400 mb-0.5">Mapping reason</div>
+                          <div className="text-[11px] text-slate-600 italic">{res.mappingReason}</div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Source URL */}
+                    {res.sourceUrl && (
+                      <div>
+                        <div className="text-[10px] text-slate-400 mb-0.5">Source</div>
+                        <a
+                          href={res.sourceUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 hover:underline text-[11px] break-all"
+                        >
+                          <ExternalLink className="w-2.5 h-2.5 flex-shrink-0" />
+                          {res.sourceUrl}
+                        </a>
+                      </div>
+                    )}
+
+                    {/* Evidence snippet */}
+                    {res.evidenceText && (
+                      <div>
+                        <div className="text-[10px] text-slate-400 mb-0.5">Evidence text</div>
+                        <div className="text-[11px] text-slate-600 italic bg-slate-50 border border-slate-200 rounded px-2 py-1 line-clamp-3">
+                          "{res.evidenceText}"
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Actioned results (collapsed summary) */}
+      {actioned.length > 0 && (
+        <div className="px-4 py-2 border-t border-amber-100">
+          <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
+            Previously actioned ({actioned.length})
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {actioned.map((res) => (
+              <span
+                key={res.id}
+                className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border ${
+                  res.status === "applied"
+                    ? "bg-green-50 border-green-200 text-green-700"
+                    : "bg-slate-50 border-slate-200 text-slate-500 line-through"
+                }`}
+                title={`${res.field}: ${res.recoveredValue ?? "—"} (${res.status})`}
+              >
+                {res.status === "applied" ? <CheckCircle2 className="w-2.5 h-2.5" /> : <XCircle className="w-2.5 h-2.5" />}
+                {_FIELD_LABELS[res.field] ?? res.field}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main table
+// ---------------------------------------------------------------------------
+
+export function ReviewScrapedCoursesTable({ courses, readOnly, showEvidence, universityId, onRescrape, onCourseUpdated }: Props) {
   const [rescraping, setRescraping] = useState<Set<number>>(new Set());
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
+  const [recoveryOpen, setRecoveryOpen] = useState<Set<number>>(new Set());
 
   const handleRescrape = async (course: ReviewStagedCourse) => {
     if (!universityId) return;
@@ -372,7 +697,7 @@ export function ReviewScrapedCoursesTable({ courses, readOnly, showEvidence, uni
       });
       onRescrape?.(course.id);
     } catch {
-      /* ignore — user can see job in scrape log */
+      /* ignore */
     } finally {
       setRescraping((prev) => { const s = new Set(prev); s.delete(course.id); return s; });
     }
@@ -380,6 +705,14 @@ export function ReviewScrapedCoursesTable({ courses, readOnly, showEvidence, uni
 
   const toggle = (id: number) => {
     setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleRecovery = (id: number) => {
+    setRecoveryOpen((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id); else next.add(id);
       return next;
@@ -419,7 +752,10 @@ export function ReviewScrapedCoursesTable({ courses, readOnly, showEvidence, uni
           <tbody className="divide-y">
             {courses.map((course) => {
               const isOpen = expanded.has(course.id);
+              const isRecoveryOpen = recoveryOpen.has(course.id);
               const evidenceCount = course.evidence?.length ?? 0;
+              const recoveryCount = course.recoveryCount ?? 0;
+              const colSpan = (showEvidence ? 1 : 0) + 13 + (readOnly ? 0 : 1);
               return (
                 <Fragment key={course.id}>
                   <tr className="hover:bg-gray-50">
@@ -481,6 +817,25 @@ export function ReviewScrapedCoursesTable({ courses, readOnly, showEvidence, uni
                           }`}>
                             Eligibility: {course.eligibilityStatus}
                           </Badge>
+                        )}
+                        {/* Agent Recovery toggle — always visible so operators can trigger a fresh pass */}
+                        {!readOnly && (
+                          <button
+                            className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded border text-[10px] font-medium transition-colors cursor-pointer ${
+                              recoveryCount > 0
+                                ? "bg-amber-100 border-amber-300 text-amber-700 hover:bg-amber-200"
+                                : "bg-slate-50 border-slate-200 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                            }`}
+                            title={
+                              recoveryCount > 0
+                                ? `${recoveryCount} recovered value${recoveryCount === 1 ? "" : "s"} available — click to review or trigger again`
+                                : "Run Agent Recovery — search the university domain for missing field values"
+                            }
+                            onClick={() => toggleRecovery(course.id)}
+                          >
+                            <RotateCcw className="w-2.5 h-2.5 flex-shrink-0" />
+                            {recoveryCount > 0 ? `↻ ${recoveryCount} recoverable` : "↻ Recover"}
+                          </button>
                         )}
                         {course.scrapeWarnings && course.scrapeWarnings.length > 0 && (
                           <ScrapeWarningsBadge warnings={course.scrapeWarnings} />
@@ -588,10 +943,21 @@ export function ReviewScrapedCoursesTable({ courses, readOnly, showEvidence, uni
                       </td>
                     ) : null}
                   </tr>
+
+                  {/* Evidence panel (expand row) */}
                   {showEvidence && isOpen ? (
                     <tr>
-                      <td colSpan={readOnly ? 15 : 16} className="p-0">
+                      <td colSpan={colSpan} className="p-0">
                         <EvidencePanel evidence={course.evidence ?? []} course={course} />
+                      </td>
+                    </tr>
+                  ) : null}
+
+                  {/* Recovery panel (inline, toggled by amber badge) */}
+                  {isRecoveryOpen ? (
+                    <tr>
+                      <td colSpan={colSpan} className="p-0">
+                        <RecoveryPanel courseId={course.id} readOnly={readOnly} onAction={onCourseUpdated} />
                       </td>
                     </tr>
                   ) : null}
@@ -599,7 +965,7 @@ export function ReviewScrapedCoursesTable({ courses, readOnly, showEvidence, uni
               );
             })}
             {courses.length === 0 ? (
-              <tr><td colSpan={(showEvidence ? 15 : 14) + (readOnly ? 0 : 1)} className="p-4 text-center text-gray-400">No courses recorded.</td></tr>
+              <tr><td colSpan={(showEvidence ? 1 : 0) + 13 + (readOnly ? 0 : 1)} className="p-4 text-center text-gray-400">No courses recorded.</td></tr>
             ) : null}
           </tbody>
         </table>

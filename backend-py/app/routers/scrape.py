@@ -144,6 +144,9 @@ def _staged_row_to_dict(r) -> dict:
     d["fees"] = _nan_to_none(r.international_fee)
     # Default empty so UI's `course.evidence?.length` is a number, not undefined.
     d["evidence"] = []
+    # Agent Recovery — populated by _attach_recovery_counts_bulk
+    d["recoveryCount"] = 0
+    d["recovery_count"] = 0
     return d
 
 
@@ -269,6 +272,43 @@ async def _apply_inherited_suppression(
             if db_field in suppress[cid]:
                 d[camel_key] = None
                 d[snake_key] = None
+
+
+async def _attach_recovery_counts_bulk(
+    db: AsyncSession, course_dicts: list[dict]
+) -> None:
+    """Bulk-load pending agent_recovery_results counts and attach to each course dict.
+
+    Adds ``recoveryCount`` (camelCase) and ``recovery_count`` (snake_case) to
+    every course dict.  A count > 0 means the Agent Recovery pass found at
+    least one candidate value for the course that the operator has not yet
+    acted on.
+
+    Silently skips if the table does not yet exist (migration not applied).
+    """
+    if not course_dicts:
+        return
+    ids = [d["id"] for d in course_dicts if d.get("id") is not None]
+    if not ids:
+        return
+    try:
+        rows = (await db.execute(
+            text(
+                "SELECT scraped_course_id, COUNT(*) AS cnt "
+                "FROM agent_recovery_results "
+                "WHERE scraped_course_id = ANY(:ids) AND status = 'pending' "
+                "GROUP BY scraped_course_id"
+            ),
+            {"ids": ids},
+        )).all()
+    except Exception:
+        # Table not yet created — migration not applied yet; degrade gracefully
+        return
+    counts: dict[int, int] = {r.scraped_course_id: int(r.cnt) for r in rows}
+    for d in course_dicts:
+        n = counts.get(d.get("id", -1), 0)
+        d["recoveryCount"] = n
+        d["recovery_count"] = n
 
 
 @router.get("/jobs")
@@ -1255,6 +1295,7 @@ async def history_one(job_id: str, db: Annotated[AsyncSession, Depends(get_db)])
     } for s in sc_rows]
     await _attach_evidence_bulk(db, staged)
     await _apply_inherited_suppression(db, staged)
+    await _attach_recovery_counts_bulk(db, staged)
 
     return {
         "job": {
@@ -1924,6 +1965,7 @@ async def staged_list(
     dicts = [_staged_row_to_dict(r) for r in rows]
     await _attach_evidence_bulk(db, dicts)
     await _apply_inherited_suppression(db, dicts)
+    await _attach_recovery_counts_bulk(db, dicts)
     return dicts
 
 
@@ -1948,6 +1990,7 @@ async def staged_one(
         )).scalars().all()
         courses = [_staged_row_to_dict(s) for s in rows]
         await _attach_evidence_bulk(db, courses)
+        await _attach_recovery_counts_bulk(db, courses)
         job = await db.get(ScrapeRuntimeJob, sc_id_or_job)
         last_scrape = None
         if job:

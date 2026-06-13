@@ -33,6 +33,7 @@ from app.routers import (
     per_course_resources,
     publishing,
     auto_repair,
+    recovery,
     regression_alerts,
     reviews,
     scrape,
@@ -136,3 +137,4 @@ app.include_router(country_intelligence.router, prefix="/api", tags=["country-in
 app.include_router(monitoring.router, prefix="/api", tags=["monitoring"])
 app.include_router(publishing.router, prefix="/api", tags=["publishing"])
 app.include_router(snapshots.router, prefix="/api/scrape", tags=["snapshots"])
+app.include_router(recovery.router, prefix="/api/scrape", tags=["recovery"])

@@ -4478,6 +4478,21 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     runtime_job_id, _p8_exc,
                 )
 
+        # ── Agent Recovery pass ─────────────────────────────────────────────
+        # Runs after Phase 8, never allowed to fail the scrape job.
+        try:
+            from app.services.scraper.recovery.run_recovery import run_recovery_pass as _recovery
+            _recovery_summary = await _recovery(runtime_job_id, db, emit=emit)
+            log.info(
+                "[RECOVERY] post-pass finished for run %s: %s",
+                runtime_job_id, _recovery_summary,
+            )
+        except Exception as _rec_exc:  # noqa: BLE001
+            log.warning(
+                "[RECOVERY] post-pass raised an exception for run %s (non-fatal): %s",
+                runtime_job_id, _rec_exc,
+            )
+
         return {"ok": finished_cleanly, **summary}
     except Exception as exc:
         log.exception("Scrape job %s failed: %s", runtime_job_id, exc)
