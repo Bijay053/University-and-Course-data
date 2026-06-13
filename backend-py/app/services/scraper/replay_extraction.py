@@ -86,7 +86,7 @@ async def replay_job(
     max_courses: int = 500,
     course_url: str | None = None,
     db: AsyncSession | None = None,
-    emit: Callable[[str, str], Awaitable[None]] | None = None,
+    emit: Callable[..., Awaitable[None]] | None = None,
 ) -> dict[str, Any]:
     """Re-extract all snapshots for a job and return a diff report.
 
@@ -131,7 +131,7 @@ async def _replay_job_inner(
     max_courses: int,
     course_url: str | None = None,
     db: AsyncSession,
-    emit: Callable[[str, str], Awaitable[None]] | None = None,
+    emit: Callable[..., Awaitable[None]] | None = None,
 ) -> dict[str, Any]:
     # ── 1. Load snapshots for this job ──────────────────────────────────────
     q = (
@@ -234,8 +234,16 @@ async def _replay_job_inner(
 
     sem = asyncio.Semaphore(4)  # modest concurrency — replay is CPU-bound
 
-    async def _replay_one(snap: PageSnapshot) -> None:
+    async def _replay_one(snap: PageSnapshot, snap_idx: int) -> None:
         nonlocal replayed, changed, unchanged, errors
+        # Early emit so the console shows activity immediately, before the S3
+        # download and extraction complete.  All tasks fire this as soon as
+        # asyncio.gather launches them, giving the user instant visual feedback.
+        if emit:
+            await emit(
+                "status",
+                f"↪ [{snap_idx}/{len(snapshots)}] {snap.course_url[:85]}",
+            )
         try:
             raw_bytes = await download_snapshot(snap.storage_path)
             if not raw_bytes:
@@ -263,7 +271,7 @@ async def _replay_job_inner(
             if emit:
                 await emit(
                     "progress",
-                    f"[{replayed}/{len(snapshots)}] {snap.course_url[:90]}",
+                    f"[{replayed}/{len(snapshots)}] ✓ {snap.course_url[:85]}",
                     current=replayed,
                     total=len(snapshots),
                 )
@@ -311,7 +319,7 @@ async def _replay_job_inner(
             if emit:
                 await emit("warn", f"Error on {snap.course_url[:60]}: {exc}")
 
-    await asyncio.gather(*[_replay_one(s) for s in snapshots])
+    await asyncio.gather(*[_replay_one(s, i + 1) for i, s in enumerate(snapshots)])
     if emit:
         await emit(
             "status",
