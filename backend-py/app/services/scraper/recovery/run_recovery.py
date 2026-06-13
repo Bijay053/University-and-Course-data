@@ -281,7 +281,10 @@ async def run_recovery_pass(
         search_candidate_pages,
         FIELD_TO_CATEGORY,
     )
-    from app.services.scraper.recovery.extractor import extract_from_url
+    from app.services.scraper.recovery.extractor import (
+        extract_from_url,
+        MAX_PDFS_PER_RECOVERY_RUN,
+    )
     from app.services.scraper.recovery.mapper import map_results_to_course
 
     log.info("[RECOVERY] starting recovery pass for run %r", scrape_run_id)
@@ -368,10 +371,17 @@ async def run_recovery_pass(
         for cand in candidates:
             url_to_categories.setdefault(cand["url"], set()).add(cand["category"])
 
+        # One mutable budget counter shared across all candidate-URL fetches for
+        # this university.  Prevents universities with many PDF links from
+        # inflating recovery runtime unpredictably.
+        pdf_budget: list[int] = [MAX_PDFS_PER_RECOVERY_RUN]
+
         extracted_by_category: dict[str, list[dict[str, Any]]] = {}
         for url, url_cats in url_to_categories.items():
             try:
-                page_results = await extract_from_url(url, url_cats, country=country)
+                page_results = await extract_from_url(
+                    url, url_cats, country=country, pdf_budget=pdf_budget
+                )
                 for res in page_results:
                     field = res.get("field", "")
                     res_cat = FIELD_TO_CATEGORY.get(field, "")
@@ -472,7 +482,10 @@ async def run_single_course_recovery(
         search_candidate_pages,
         FIELD_TO_CATEGORY,
     )
-    from app.services.scraper.recovery.extractor import extract_from_url
+    from app.services.scraper.recovery.extractor import (
+        extract_from_url,
+        MAX_PDFS_PER_RECOVERY_RUN,
+    )
     from app.services.scraper.recovery.mapper import map_results_to_course
 
     sc = await db.get(ScrapedCourse, scraped_course_id)
@@ -564,10 +577,17 @@ async def run_single_course_recovery(
     # Track which categories produced at least one result with a non-None value
     categories_with_results: set[str] = set()
 
+    # Per-university PDF budget — shared across all URL fetches so the total
+    # number of PDFs fetched remains bounded even if many candidate pages each
+    # link several PDFs.
+    pdf_budget: list[int] = [MAX_PDFS_PER_RECOVERY_RUN]
+
     for url, url_cats in url_to_categories.items():
         meta: dict[str, str] = {}
         try:
-            page_results = await extract_from_url(url, url_cats, country=country, metadata=meta)
+            page_results = await extract_from_url(
+                url, url_cats, country=country, metadata=meta, pdf_budget=pdf_budget
+            )
             url_source_types[url] = meta.get("source_type", "html")
             for r in page_results:
                 if r.get("value") is not None:

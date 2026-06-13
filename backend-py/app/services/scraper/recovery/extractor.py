@@ -291,6 +291,11 @@ _PDF_CATEGORY_KEYWORDS: dict[str, list[str]] = {
 
 _MAX_LINKED_PDFS = 5
 
+# Hard cap on total PDFs fetched across ALL candidate pages for a single
+# university in one recovery pass.  Prevents a fee-schedule-heavy university
+# (e.g. one PDF per faculty) from inflating recovery runtime unpredictably.
+MAX_PDFS_PER_RECOVERY_RUN = 10
+
 
 def _score_pdf_link(pdf_url: str, anchor_text: str, categories: set[str]) -> int:
     """Return a relevance score for a PDF link against the needed categories."""
@@ -401,6 +406,7 @@ async def extract_from_url(
     country: str | None = None,
     timeout: float = 12.0,
     metadata: dict | None = None,
+    pdf_budget: list[int] | None = None,
 ) -> list[dict[str, Any]]:
     """Fetch a URL once and run ALL specified category extractors on it.
 
@@ -418,6 +424,15 @@ async def extract_from_url(
         Country hint for fee currency detection.
     timeout:
         HTTP fetch timeout in seconds.
+    metadata:
+        Optional dict that will be updated with ``source_type`` after fetching.
+    pdf_budget:
+        Optional mutable one-element list ``[remaining]`` shared across all
+        ``extract_from_url`` calls for a single university in one recovery pass.
+        Each PDF fetched decrements the counter; when it reaches 0 a WARNING is
+        logged and no further PDFs are fetched for this university.  If
+        ``None``, no cross-URL budget is enforced (``_MAX_LINKED_PDFS`` still
+        caps per-page PDF discovery).
 
     Returns
     -------
@@ -441,11 +456,33 @@ async def extract_from_url(
         # Pass categories so only relevant PDFs are fetched.
         pdf_links = await _find_linked_pdfs(html, url, categories=categories)
         for pdf_url in pdf_links:
+            # Honour the per-university PDF budget when provided.
+            if pdf_budget is not None:
+                if pdf_budget[0] <= 0:
+                    log.warning(
+                        "[RECOVERY:extract] PDF budget exhausted (MAX_PDFS_PER_RECOVERY_RUN=%d)"
+                        " — skipping remaining PDFs for this university (next skipped: %r)",
+                        MAX_PDFS_PER_RECOVERY_RUN,
+                        pdf_url,
+                    )
+                    break
+                pdf_budget[0] -= 1
             log.info("[RECOVERY:extract] following linked PDF %r — running extractors", pdf_url)
             pdf_results = await _extract_from_pdf(pdf_url, categories)
             results.extend(pdf_results)
 
     elif source_type in ("pdf_direct", "pdf_content_type"):
+        # The URL itself is a PDF — counts against the budget too.
+        if pdf_budget is not None:
+            if pdf_budget[0] <= 0:
+                log.warning(
+                    "[RECOVERY:extract] PDF budget exhausted (MAX_PDFS_PER_RECOVERY_RUN=%d)"
+                    " — skipping direct PDF %r",
+                    MAX_PDFS_PER_RECOVERY_RUN,
+                    url,
+                )
+                return results
+            pdf_budget[0] -= 1
         pdf_results = await _extract_from_pdf(url, categories)
         results.extend(pdf_results)
 
