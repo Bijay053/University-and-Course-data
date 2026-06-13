@@ -117,6 +117,14 @@ extraction:
       # Applied left-to-right.  Use for site-specific formatting noise
       # (e.g. ACAP: strip '^Available in ...' prefixes).
       strip_patterns: []
+      # Strings that, if found (case-insensitive substring), cause the location
+      # to be cleared.  Use for nav/page-section headings the extractor picks
+      # up erroneously.  Per-uni YAML wins when non-empty.
+      reject_values: []
+      # Allowlist of valid campus/location strings (case-insensitive substring).
+      # When non-empty, any extracted location not containing at least one entry
+      # is cleared.  Leave empty globally; set per-uni only when needed.
+      allowed_values: []
 
     duration:
       # Split compound duration strings on '/' before parsing.

@@ -30,3 +30,33 @@ extraction:
     # central_page needed when both _ug and _pg are provided.
     central_page_ug: "https://www.law.ac.uk/study/undergraduate/entry-requirements/"
     central_page_pg: "https://www.law.ac.uk/study/postgraduate/entry-requirements/"
+  text_cleaning:
+    location:
+      # Nav/section headings mistakenly picked up as campus names — clear them.
+      # Checked as case-insensitive substring match; applied BEFORE allowed_values.
+      reject_values:
+        - Fees
+        - Course fees
+        - Tuition fees
+        - Funding
+        - Apply
+        - Entry requirements
+        - Study mode
+        - Duration
+        - Start dates
+        - Key facts
+        - How to apply
+      # University of Law campuses — only these are accepted as valid locations.
+      # Any extracted location not containing at least one of these strings is
+      # cleared so reviewers see blank rather than a garbage nav fragment.
+      allowed_values:
+        - Birmingham
+        - Bristol
+        - Leeds
+        - London Bloomsbury
+        - London Moorgate
+        - Manchester
+        - Nottingham
+        - Newcastle
+        - Online
+        - Hong Kong

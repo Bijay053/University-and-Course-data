@@ -3659,6 +3659,18 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                         _bv = getattr(_yaml_fees, _bk, None)
                         if _bv is not None:
                             _recipe_rules_cfg[_bk] = _bv
+                    # Bridge YAML extraction.text_cleaning.location fields into the
+                    # recipe dict.  YAML non-empty list wins over DB empty-list default.
+                    # This allows operators to configure campus allowlists and nav-text
+                    # reject patterns in per-uni YAMLs without touching the DB recipe.
+                    try:
+                        _yaml_loc = _yaml_uni_cfg.extraction.text_cleaning.location
+                        if _yaml_loc.reject_values:
+                            _recipe_rules_cfg["location_reject_values"] = list(_yaml_loc.reject_values)
+                        if _yaml_loc.allowed_values:
+                            _recipe_rules_cfg["location_allowed_values"] = list(_yaml_loc.allowed_values)
+                    except Exception:  # noqa: BLE001
+                        pass
                 if _recipe_rules_cfg:
                     try:
                         from app.services.scraper.recipe_rules import apply_recipe_rules

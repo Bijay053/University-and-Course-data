@@ -249,3 +249,151 @@ def test_strip_patterns_not_applied_without_config():
         assert out[0].value == "Sydney, Melbourne"
     finally:
         set_uni_config(_BARE_CFG)
+
+
+# ── LocationCleaningConfig.reject_values + allowed_values (UWL / law.ac.uk) ──
+#
+# These tests cover the new YAML-configurable location filtering fields:
+#   extraction.text_cleaning.location.reject_values   → recipe location_reject_values
+#   extraction.text_cleaning.location.allowed_values  → recipe location_allowed_values
+#
+# The filtering itself lives in recipe_rules._apply_location_rules; the YAML
+# bridge in the orchestrator wires the YAML values into the recipe dict before
+# apply_recipe_rules() is called.  These tests verify schema, recipe-rules
+# behaviour, and round-trip YAML loading.
+
+
+def test_location_cleaning_config_reject_values_field_exists():
+    """LocationCleaningConfig must accept reject_values after schema extension."""
+    from app.services.scraper.config.schema import LocationCleaningConfig
+    cfg = LocationCleaningConfig(
+        reject_values=["Fees", "Apply"],
+        allowed_values=["London", "Online"],
+    )
+    assert cfg.reject_values == ["Fees", "Apply"]
+    assert cfg.allowed_values == ["London", "Online"]
+
+
+def test_recipe_rules_location_reject_values_clears_fees_exact():
+    """'Fees' in location_reject_values must clear course_location='Fees' (UWL bug)."""
+    from app.services.scraper.recipe_rules import apply_recipe_rules
+    payload = {"course_location": "Fees", "course_name": "MSc Data Science and AI"}
+    recipe = {"location_reject_values": ["Fees", "Course fees", "Funding"]}
+    out = apply_recipe_rules(payload, recipe)
+    assert out["course_location"] is None, (
+        "location_reject_values must clear 'Fees' location; got %r" % out["course_location"]
+    )
+
+
+def test_recipe_rules_location_reject_values_case_insensitive():
+    """reject_values match is case-insensitive — 'fees' rejects 'FEES AND FUNDING'."""
+    from app.services.scraper.recipe_rules import apply_recipe_rules
+    payload = {"course_location": "FEES AND FUNDING"}
+    recipe = {"location_reject_values": ["fees"]}
+    out = apply_recipe_rules(payload, recipe)
+    assert out["course_location"] is None, (
+        "Case-insensitive reject must clear 'FEES AND FUNDING'; got %r" % out["course_location"]
+    )
+
+
+def test_recipe_rules_location_reject_values_preserves_valid_campus():
+    """reject_values must NOT clear a valid campus like 'Newcastle'."""
+    from app.services.scraper.recipe_rules import apply_recipe_rules
+    payload = {"course_location": "Newcastle"}
+    recipe = {
+        "location_reject_values": ["fees", "apply", "entry requirements"],
+        "location_allowed_values": ["Newcastle", "Birmingham", "London Bloomsbury"],
+    }
+    out = apply_recipe_rules(payload, recipe)
+    assert out["course_location"] == "Newcastle", (
+        "Valid campus 'Newcastle' must survive reject+allowlist; got %r" % out["course_location"]
+    )
+
+
+def test_recipe_rules_location_allowed_values_clears_section_heading():
+    """allowed_values clears 'Study Mode' — a section heading, not a campus."""
+    from app.services.scraper.recipe_rules import apply_recipe_rules
+    payload = {"course_location": "Study Mode"}
+    recipe = {
+        "location_reject_values": ["fees", "apply"],
+        "location_allowed_values": ["Birmingham", "Leeds", "Online"],
+    }
+    out = apply_recipe_rules(payload, recipe)
+    assert out["course_location"] is None, (
+        "'Study Mode' not in campus allowlist; must be cleared. Got %r" % out["course_location"]
+    )
+
+
+def test_recipe_rules_location_allowed_values_normalises_compound_location():
+    """allowed_values filter preserves both campus tokens from a compound location."""
+    from app.services.scraper.recipe_rules import apply_recipe_rules
+    payload = {"course_location": "London Bloomsbury, London Moorgate"}
+    recipe = {
+        "location_allowed_values": [
+            "London Bloomsbury", "London Moorgate", "Birmingham",
+        ],
+    }
+    out = apply_recipe_rules(payload, recipe)
+    assert out["course_location"] is not None
+    assert "London Bloomsbury" in out["course_location"]
+    assert "London Moorgate" in out["course_location"]
+
+
+def test_recipe_rules_location_reject_takes_priority_over_allowed():
+    """reject_values fires before allowed_values — reject wins if both would match."""
+    from app.services.scraper.recipe_rules import apply_recipe_rules
+    payload = {"course_location": "Fees"}
+    recipe = {
+        "location_reject_values": ["fees"],
+        "location_allowed_values": ["Fees"],
+    }
+    out = apply_recipe_rules(payload, recipe)
+    assert out["course_location"] is None, (
+        "reject_values must fire before allowed_values; got %r" % out["course_location"]
+    )
+
+
+def test_uwl_yaml_location_config_round_trips():
+    """law_1902.yaml reject_values and allowed_values load correctly via YAML loader."""
+    from app.services.scraper.config.loader import load_uni_config
+    cfg = load_uni_config(
+        slug="law_1902",
+        name="University of Law",
+        scrape_url="https://www.law.ac.uk/study/",
+    )
+    loc = cfg.extraction.text_cleaning.location
+    assert "Fees" in loc.reject_values, (
+        "UWL YAML must list 'Fees' in location reject_values"
+    )
+    assert "Birmingham" in loc.allowed_values, (
+        "UWL YAML must list 'Birmingham' in location allowed_values"
+    )
+    assert "London Bloomsbury" in loc.allowed_values
+    assert "Online" in loc.allowed_values
+
+
+def test_uwl_yaml_central_english_pages_configured():
+    """law_1902.yaml must have both central_page_ug and central_page_pg set."""
+    from app.services.scraper.config.loader import load_uni_config
+    cfg = load_uni_config(
+        slug="law_1902",
+        name="University of Law",
+        scrape_url="https://www.law.ac.uk/study/",
+    )
+    assert cfg.extraction.english.central_page_ug == (
+        "https://www.law.ac.uk/study/undergraduate/entry-requirements/"
+    ), "UG English central page must be set in law_1902.yaml"
+    assert cfg.extraction.english.central_page_pg == (
+        "https://www.law.ac.uk/study/postgraduate/entry-requirements/"
+    ), "PG English central page must be set in law_1902.yaml"
+
+
+def test_empty_reject_and_allowed_values_are_no_ops():
+    """Empty reject_values and allowed_values in recipe must leave location unchanged."""
+    from app.services.scraper.recipe_rules import apply_recipe_rules
+    payload = {"course_location": "Melbourne"}
+    recipe = {"location_reject_values": [], "location_allowed_values": []}
+    out = apply_recipe_rules(payload, recipe)
+    assert out["course_location"] == "Melbourne", (
+        "Empty lists must not alter location; got %r" % out["course_location"]
+    )

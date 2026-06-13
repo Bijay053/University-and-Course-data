@@ -1877,6 +1877,17 @@ class LocationCleaningConfig(BaseModel):
             "E.g. ACAP: [r'\\^\\s*\\^.*$'] strips '^ ^Available in Perth' cruft."
         ),
     )
+    reject_values: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Strings to reject (case-insensitive substring match).  When any entry "
+            "appears anywhere in the extracted location string, the location is cleared "
+            "entirely.  Applied before allowed_values.  Use for nav/section headings "
+            "that the extractor mistakenly picks up as a campus name.  "
+            "E.g. law.ac.uk: ['Fees', 'Course fees', 'Apply', 'Entry requirements', "
+            "'Duration', 'Start dates']."
+        ),
+    )
     allowed_values: list[str] = Field(
         default_factory=list,
         description=(
