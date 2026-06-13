@@ -1222,6 +1222,7 @@ async def extract_course(
     vision_image_cache: "VisionImageCache | None" = None,
     central_data: dict[str, Any] | None = None,
     extraction_rules: dict[str, Any] | None = None,
+    seen_pdf_urls: set[str] | None = None,
 ) -> dict[str, Any]:
     """Fetch (if needed) and run all extractors. Returns merged payload + raw evidence.
 
@@ -3542,6 +3543,20 @@ async def extract_course(
                     for _fee_fl_url in _fee_followed_urls:
                         if payload.get("international_fee") is not None:
                             break
+                        # PDF dedup: if this linked URL is a PDF already fetched
+                        # in this repair/scrape run, skip without re-downloading.
+                        if (
+                            seen_pdf_urls is not None
+                            and _fee_fl_url.lower().endswith(".pdf")
+                        ):
+                            if _fee_fl_url in seen_pdf_urls:
+                                log.debug(
+                                    "[FEE_FOLLOW] PDF %r already fetched this run"
+                                    " — skipping (seen_pdf_urls guard)",
+                                    _fee_fl_url,
+                                )
+                                continue
+                            seen_pdf_urls.add(_fee_fl_url)
                         _fee_fl_html = None
                         try:
                             async with _httpx_fee.AsyncClient(
@@ -3646,6 +3661,20 @@ async def extract_course(
                             if len(_followed_urls) >= 3:
                                 break
                     for _fl_url in _followed_urls:
+                        # PDF dedup: if this linked URL is a PDF already fetched
+                        # in this repair/scrape run, skip without re-downloading.
+                        if (
+                            seen_pdf_urls is not None
+                            and _fl_url.lower().endswith(".pdf")
+                        ):
+                            if _fl_url in seen_pdf_urls:
+                                log.debug(
+                                    "[FOLLOW_LINK] PDF %r already fetched this run"
+                                    " — skipping (seen_pdf_urls guard)",
+                                    _fl_url,
+                                )
+                                continue
+                            seen_pdf_urls.add(_fl_url)
                         _fl_html = None
                         try:
                             async with _httpx_en.AsyncClient(

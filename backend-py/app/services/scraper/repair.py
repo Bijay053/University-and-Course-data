@@ -341,7 +341,11 @@ async def run_repair(db: AsyncSession, runtime_job_id: str) -> dict:
             )
 
             res = await _extract_only(
-                {"name": course.name, "url": url}, uni_country, None, emit=emit
+                {"name": course.name, "url": url},
+                uni_country,
+                None,
+                emit=emit,
+                seen_pdf_urls=seen_pdf_urls,
             )
             payload: dict[str, Any] = res.get("payload") or {}
             if res.get("error") or not payload:

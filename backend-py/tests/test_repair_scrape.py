@@ -342,7 +342,7 @@ async def test_run_repair_back_fills_blanks_only_and_inserts_english(
     # back-fill branches: a duration, a location (which must be
     # ignored because the curated value wins) and an IELTS overall
     # so an english_requirements row gets inserted.
-    async def _fake_extract(link: dict, country: str | None, uni_pdf_data, emit=None) -> dict:  # noqa: ANN001
+    async def _fake_extract(link: dict, country: str | None, uni_pdf_data, emit=None, seen_pdf_urls=None) -> dict:  # noqa: ANN001
         return {
             "name": link["name"],
             "url": link["url"],
@@ -482,7 +482,7 @@ async def test_run_repair_skips_when_course_has_existing_english(
         )
         await db.commit()
 
-    async def _fake_extract(link: dict, country, uni_pdf_data, emit=None) -> dict:  # noqa: ANN001
+    async def _fake_extract(link: dict, country, uni_pdf_data, emit=None, seen_pdf_urls=None) -> dict:  # noqa: ANN001
         return {
             "name": link["name"],
             "url": link["url"],
@@ -603,7 +603,7 @@ async def test_repair_pdf_url_only_extracted_once(
     # Track how many times _extract_only is called.
     extract_call_count: list[int] = [0]
 
-    async def _fake_extract(link: dict, country, uni_pdf_data, emit=None) -> dict:  # noqa: ANN001
+    async def _fake_extract(link: dict, country, uni_pdf_data, emit=None, seen_pdf_urls=None) -> dict:  # noqa: ANN001
         extract_call_count[0] += 1
         return {
             "name": link["name"],
@@ -627,6 +627,140 @@ async def test_repair_pdf_url_only_extracted_once(
     )
     # One target processed, one skipped.
     assert result["skipped"] >= 1, result
+
+    # Cleanup.
+    async with AsyncSessionLocal() as db:
+        await db.execute(
+            text("DELETE FROM scrape_runtime_jobs WHERE runtime_job_id = :j"),
+            {"j": job_id},
+        )
+        await db.execute(
+            text("DELETE FROM universities WHERE id = :i"), {"i": uni_id}
+        )
+        await db.commit()
+
+
+@pytest.mark.asyncio
+async def test_repair_html_linked_pdf_fetched_once(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Two DISTINCT HTML course URLs that both internally link to the same PDF
+    must result in only ONE PDF fetch during a repair run.
+
+    This exercises the seen_pdf_urls thread-through:
+      repair.py → _extract_only(seen_pdf_urls=...) → extract_course(seen_pdf_urls=...)
+
+    The fake extract_course simulates the follow_links PDF-fetching path: the first
+    call adds the shared PDF URL to seen_pdf_urls and counts the fetch; the second
+    call finds it already present and skips.  Both HTML course URLs are distinct
+    (do not end in .pdf) so repair.py's pre-call .pdf guard does NOT skip them —
+    the dedup must happen inside extract_course via seen_pdf_urls.
+    """
+    import uuid as _uuid
+
+    shared_pdf = "https://example.test/shared/fee-schedule.pdf"
+    html_url_1 = "https://example.test/course-html-1"
+    html_url_2 = "https://example.test/course-html-2"
+
+    async with AsyncSessionLocal() as db:
+        uni_id = (
+            await db.execute(
+                text(
+                    "INSERT INTO universities (name, country, city) "
+                    "VALUES (:n, 'Australia', 'Sydney') RETURNING id"
+                ),
+                {"n": "Repair HTML PDF Dedup University"},
+            )
+        ).scalar_one()
+        c1 = (
+            await db.execute(
+                text(
+                    "INSERT INTO courses "
+                    "(university_id, name, status, course_website) "
+                    "VALUES (:u, :n, 'active', :url) RETURNING id"
+                ),
+                {"u": uni_id, "n": "HTML Course One", "url": html_url_1},
+            )
+        ).scalar_one()
+        c2 = (
+            await db.execute(
+                text(
+                    "INSERT INTO courses "
+                    "(university_id, name, status, course_website) "
+                    "VALUES (:u, :n, 'active', :url) RETURNING id"
+                ),
+                {"u": uni_id, "n": "HTML Course Two", "url": html_url_2},
+            )
+        ).scalar_one()
+        job_id = f"repair_{_uuid.uuid4().hex[:12]}"
+        await db.execute(
+            text(
+                "INSERT INTO scrape_runtime_jobs "
+                "(runtime_job_id, university_id, university_name, url, "
+                " job_type, status, request_payload) "
+                "VALUES (:j, :u, :n, :url, 'repair', 'queued', "
+                "        CAST(:pl AS jsonb))"
+            ),
+            {
+                "j": job_id,
+                "u": uni_id,
+                "n": "Repair HTML PDF Dedup University",
+                "url": "https://example.test/",
+                "pl": (
+                    '{"universityId": ' + str(uni_id) + ', '
+                    '"repair_targets": ['
+                    '{"course_id": ' + str(c1) + ', "url": "' + html_url_1 + '"}, '
+                    '{"course_id": ' + str(c2) + ', "url": "' + html_url_2 + '"}'
+                    ']}'
+                ),
+            },
+        )
+        await db.commit()
+
+    # Track how many times the shared PDF is "fetched" inside extract_course.
+    # The fake simulates the follow_links path: first call adds the PDF URL
+    # to seen_pdf_urls and counts the fetch; second call finds it already in the
+    # set and skips (just like the real dedup guard does).
+    pdf_fetch_count: list[int] = [0]
+
+    async def _fake_extract_course(
+        url: str,
+        *,
+        seen_pdf_urls: set | None = None,
+        **kwargs: object,
+    ) -> dict:
+        # Simulate: this HTML course page internally follows a link to the
+        # shared PDF (e.g. via the fee follow_links pipeline).
+        if seen_pdf_urls is not None:
+            if shared_pdf in seen_pdf_urls:
+                pass  # PDF already fetched — skip (dedup working correctly)
+            else:
+                pdf_fetch_count[0] += 1
+                seen_pdf_urls.add(shared_pdf)
+        else:
+            # seen_pdf_urls was not threaded in — count unconditionally so
+            # the assertion below will fail and expose the regression.
+            pdf_fetch_count[0] += 1
+        return {
+            "payload": {"course_name": "Test Course", "duration": 2},
+            "evidence": [],
+        }
+
+    # Patch at the orchestrator's import site (where _extract_only calls it).
+    from app.services.scraper import orchestrator as _orch_mod
+    from app.services.scraper import repair as repair_mod
+    monkeypatch.setattr(_orch_mod, "extract_course", _fake_extract_course)
+
+    async with AsyncSessionLocal() as db:
+        result = await repair_mod.run_repair(db, job_id)
+
+    # The shared PDF must have been "fetched" exactly once despite two HTML
+    # course targets both linking to it.
+    assert pdf_fetch_count[0] == 1, (
+        f"PDF fetched {pdf_fetch_count[0]} times; "
+        "expected exactly 1 (seen_pdf_urls guard must dedup across HTML course pages)"
+    )
+    assert result["staged"] == 2, result  # both courses updated (duration filled)
 
     # Cleanup.
     async with AsyncSessionLocal() as db:

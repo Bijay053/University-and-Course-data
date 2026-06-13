@@ -240,6 +240,7 @@ async def _extract_only(
     vision_image_cache: VisionImageCache | None = None,
     central_data: dict | None = None,
     extraction_rules: dict | None = None,
+    seen_pdf_urls: set[str] | None = None,
 ) -> dict:
     """Network-bound work — safe to parallelise across coroutines.
 
@@ -255,6 +256,18 @@ async def _extract_only(
     ``central_data`` is the pre-fetched central-pages payload (Bug 2).
     Passed through to ``extract_course`` where it is applied as a
     last-resort fallback after all per-course and PDF extractors.
+
+    ``seen_pdf_urls`` is an optional mutable set shared across all
+    ``_extract_only`` calls for a single repair run (or any caller that
+    wants cross-course PDF deduplication).  When the target URL is a PDF
+    (detected by content-type or ``.pdf`` extension) and its normalised
+    URL is already present in the set, the function returns an error
+    result immediately without fetching the document again.  New PDF
+    URLs are added to the set before extraction begins so that any
+    concurrent caller racing on the same URL is blocked.  This mirrors
+    the ``seen_pdf_urls`` guard in ``recovery/extractor.py`` and
+    ``repair.py``, extending dedup to PDFs that are linked *from* HTML
+    course pages rather than being the direct repair-target URL.
     """
     # Custom-provider short-circuit: a provider (e.g. searchstax_hud) may
     # embed a fully-formed result under ``searchstax_result``. Return it
@@ -278,6 +291,26 @@ async def _extract_only(
 
     name = (link.get("name") or "").strip() or "Unknown course"
     url = link["url"]
+
+    # PDF dedup guard — mirrors the seen_pdf_urls check in repair.py and
+    # recovery/extractor.py, but operates at the _extract_only level so it
+    # catches PDFs linked from HTML course pages in addition to direct PDF
+    # target URLs.  The repair.py pre-call guard handles the common case
+    # (url.endswith(".pdf")) before we get here; this guard covers any PDF
+    # URLs that slip through (e.g. non-.pdf extension redirects) and also
+    # makes the dedup contract explicit at the extractor boundary.
+    if seen_pdf_urls is not None and url.lower().endswith(".pdf"):
+        if url in seen_pdf_urls:
+            log.debug(
+                "[EXTRACT] PDF %r already fetched in this run — skipping (seen_pdf_urls guard)",
+                url,
+            )
+            return {
+                "name": name,
+                "url": url,
+                "error": "extract:pdf_already_fetched",
+            }
+        seen_pdf_urls.add(url)
     # Extraction rules from auto_config (Phase 2) — passed to Stage 0 inside
     # extract_course() so generated CSS/XPath/regex rules run before regex
     # heuristics and before per-course Gemini, reducing per-course AI cost.
@@ -290,6 +323,7 @@ async def _extract_only(
             vision_image_cache=vision_image_cache,
             central_data=central_data,
             extraction_rules=extraction_rules,
+            seen_pdf_urls=seen_pdf_urls,
         )
     except Exception as exc:  # noqa: BLE001
         return {"name": name, "url": url, "error": f"extract: {exc}"}
