@@ -30,7 +30,7 @@ import asyncio
 import json
 import logging
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Awaitable, Callable
 
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -86,6 +86,7 @@ async def replay_job(
     max_courses: int = 500,
     course_url: str | None = None,
     db: AsyncSession | None = None,
+    emit: Callable[[str, str], Awaitable[None]] | None = None,
 ) -> dict[str, Any]:
     """Re-extract all snapshots for a job and return a diff report.
 
@@ -116,6 +117,7 @@ async def replay_job(
             max_courses=max_courses,
             course_url=course_url,
             db=db,
+            emit=emit,
         )
     finally:
         if own_db:
@@ -129,6 +131,7 @@ async def _replay_job_inner(
     max_courses: int,
     course_url: str | None = None,
     db: AsyncSession,
+    emit: Callable[[str, str], Awaitable[None]] | None = None,
 ) -> dict[str, Any]:
     # ── 1. Load snapshots for this job ──────────────────────────────────────
     q = (
@@ -143,6 +146,8 @@ async def _replay_job_inner(
     snapshots: list[PageSnapshot] = list(result.scalars().all())
 
     if not snapshots:
+        if emit:
+            await emit("status", "No HTML/JSON snapshots found for this job.")
         return {
             "job_id": scrape_job_id,
             "replayed": 0,
@@ -162,6 +167,11 @@ async def _replay_job_inner(
         sum(1 for s in snapshots if s.snapshot_type == "json"),
         commit,
     )
+    if emit:
+        await emit(
+            "status",
+            f"Found {len(snapshots)} snapshot(s) — re-extracting (no live fetch, no AI)…",
+        )
 
     # ── 2. Load the uni config so extractors have context ───────────────────
     uni_id_result = await db.execute(
@@ -231,6 +241,8 @@ async def _replay_job_inner(
             if not raw_bytes:
                 log.warning("[REPLAY] S3 download failed for %s", snap.storage_path)
                 errors += 1
+                if emit:
+                    await emit("warn", f"S3 download failed: {snap.course_url[:80]}")
                 return
 
             async with sem:
@@ -248,6 +260,13 @@ async def _replay_job_inner(
                         )
 
             replayed += 1
+            if emit:
+                await emit(
+                    "progress",
+                    f"[{replayed}/{len(snapshots)}] {snap.course_url[:90]}",
+                    current=replayed,
+                    total=len(snapshots),
+                )
 
             # ── Diff against original_extraction, NOT scraped_courses ────────
             # This compares V1 extractor output vs V2 extractor output on the
@@ -289,8 +308,15 @@ async def _replay_job_inner(
         except Exception as exc:
             log.warning("[REPLAY] error replaying %s: %s", snap.course_url, exc)
             errors += 1
+            if emit:
+                await emit("warn", f"Error on {snap.course_url[:60]}: {exc}")
 
     await asyncio.gather(*[_replay_one(s) for s in snapshots])
+    if emit:
+        await emit(
+            "status",
+            f"Done: {changed} changed, {unchanged} unchanged, {errors} error(s).",
+        )
 
     if commit and changed > 0:
         try:

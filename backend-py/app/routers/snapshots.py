@@ -2,15 +2,19 @@
 
 GET  /api/scrape/snapshots/{job_id}          — list snapshots for a job
 POST /api/scrape/replay/{job_id}             — trigger replay extraction (diff only)
+GET  /api/scrape/replay/{job_id}/stream      — SSE stream of replay progress (diff only)
 POST /api/scrape/replay/{job_id}/commit      — replay and commit changes to DB
 GET  /api/scrape/snapshot/download/{job_id}  — presign URL for a specific snapshot key
 POST /api/scrape/snapshot/setup-lifecycle    — apply S3 lifecycle rules (admin)
 """
 from __future__ import annotations
 
+import asyncio
+import json as _json
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -259,6 +263,68 @@ async def replay_scrape_job(
     except Exception as exc:
         log.exception("replay failed for job %s", job_id)
         raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.get("/replay/{job_id}/stream")
+async def replay_stream(
+    job_id: str,
+    course_url: str | None = Query(None),
+    max_courses: int = Query(500, ge=1, le=500),
+    db: AsyncSession = Depends(get_db),
+):
+    """SSE stream of replay-extraction progress (diff-only, no commit).
+
+    Streams server-sent events while re-extracting snapshots.
+    Each event is ``data: <json>\\n\\n`` where json has keys:
+      event   — "status" | "progress" | "warn" | "done" | "error"
+      message — human-readable text
+      (done also carries a ``result`` key with the full ReplayResponse dict)
+    """
+    if not is_enabled():
+        raise HTTPException(status_code=503, detail="S3 snapshot storage is not configured.")
+
+    queue: asyncio.Queue[dict | None] = asyncio.Queue()
+
+    async def _emit(event: str, message: str, **kwargs: object) -> None:
+        await queue.put({"event": event, "message": message, **kwargs})
+
+    async def _run() -> None:
+        try:
+            result = await replay_job(
+                job_id,
+                commit=False,
+                max_courses=max_courses,
+                course_url=course_url,
+                db=db,
+                emit=_emit,
+            )
+            await queue.put({"event": "done", "message": result["message"], "result": result})
+        except Exception as exc:
+            log.exception("replay stream failed for job %s", job_id)
+            await queue.put({"event": "error", "message": str(exc)})
+        finally:
+            await queue.put(None)  # sentinel
+
+    async def _generate():
+        task = asyncio.create_task(_run())
+        try:
+            while True:
+                try:
+                    item = await asyncio.wait_for(queue.get(), timeout=120)
+                except asyncio.TimeoutError:
+                    yield ": keepalive\n\n"
+                    continue
+                if item is None:
+                    break
+                yield f"data: {_json.dumps(item)}\n\n"
+        finally:
+            task.cancel()
+
+    return StreamingResponse(
+        _generate(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @router.post("/replay/{job_id}/commit", response_model=ReplayResponse)

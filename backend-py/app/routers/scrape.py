@@ -876,6 +876,7 @@ async def history_list(
     db: Annotated[AsyncSession, Depends(get_db)],
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
+    university_id: int | None = Query(default=None),
 ) -> dict:
     """Match Node: returns {runs, total, limit, offset} with stagedCount/approvedCount/rejectedCount/snapshotCount."""
     from app.models import ScrapedCourse
@@ -897,6 +898,10 @@ async def history_list(
         _func.max(PageSnapshot.fetched_at).label("latest_snap_at"),
     ).group_by(PageSnapshot.scrape_job_id).subquery()
     
+    base_where = []
+    if university_id is not None:
+        base_where.append(ScrapeRuntimeJob.university_id == university_id)
+
     stmt = (
         _select(
             ScrapeRuntimeJob,
@@ -908,12 +913,16 @@ async def history_list(
         )
         .outerjoin(counts_q, counts_q.c.jid == ScrapeRuntimeJob.runtime_job_id)
         .outerjoin(snap_q, snap_q.c.sjid == ScrapeRuntimeJob.runtime_job_id)
+        .where(*base_where)
         .order_by(desc(ScrapeRuntimeJob.started_at))
         .offset(offset)
         .limit(limit)
     )
     rows = (await db.execute(stmt)).all()
-    total = (await db.execute(_select(_func.count()).select_from(ScrapeRuntimeJob))).scalar_one()
+    count_stmt = _select(_func.count()).select_from(ScrapeRuntimeJob)
+    if base_where:
+        count_stmt = count_stmt.where(*base_where)
+    total = (await db.execute(count_stmt)).scalar_one()
     
     runs = []
     for r, staged, approved, rejected, snap_count, latest_snap_at in rows:

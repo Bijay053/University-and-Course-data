@@ -775,6 +775,8 @@ export default function Scraping() {
   const [replayLoading, setReplayLoading] = useState(false);
   const [replayError, setReplayError] = useState<string | null>(null);
   const [replayCommitting, setReplayCommitting] = useState(false);
+  const [replayLogs, setReplayLogs] = useState<Array<{ event: string; message: string; current?: number; total?: number }>>([]);
+  const replayLogEndRef = useRef<HTMLDivElement>(null);
 
   // Source-dialog inline replay state (resets when dialog closes)
   const [sdReplayLoading, setSdReplayLoading] = useState(false);
@@ -944,6 +946,10 @@ export default function Scraping() {
   useEffect(() => {
     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
   }, [scrapeLogs]);
+
+  useEffect(() => {
+    if (replayLogEndRef.current) replayLogEndRef.current.scrollIntoView({ behavior: "smooth" });
+  }, [replayLogs]);
 
   const toggleQualityExpanded = useCallback((id: number) => {
     setQualityExpanded((prev) => {
@@ -2042,15 +2048,41 @@ export default function Scraping() {
     setReplayCourseUrl(courseUrl ?? null);
     setReplayResult(null);
     setReplayError(null);
+    setReplayLogs([]);
     setReplayLoading(true);
     try {
-      const params = courseUrl ? `?course_url=${encodeURIComponent(courseUrl)}` : "";
-      const res = await fetch(`/api/scrape/replay/${jobId}${params}`, { method: "POST" });
+      const params = new URLSearchParams();
+      if (courseUrl) params.set("course_url", courseUrl);
+      const qs = params.size > 0 ? `?${params}` : "";
+      const res = await fetch(`/api/scrape/replay/${jobId}/stream${qs}`);
       if (!res.ok) {
         const msg = await res.text().catch(() => String(res.status));
         throw new Error(`Server returned ${res.status}: ${msg}`);
       }
-      setReplayResult(await res.json());
+      const reader = res.body!.getReader();
+      const decoder = new TextDecoder();
+      let buf = "";
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const chunks = buf.split("\n\n");
+        buf = chunks.pop() ?? "";
+        for (const chunk of chunks) {
+          const match = chunk.match(/^data: (.+)$/m);
+          if (!match) continue;
+          const data = JSON.parse(match[1]);
+          if (data.event === "done") {
+            setReplayResult(data.result);
+            setReplayLoading(false);
+            return;
+          } else if (data.event === "error") {
+            throw new Error(data.message);
+          } else {
+            setReplayLogs(prev => [...prev, data]);
+          }
+        }
+      }
     } catch (e) {
       setReplayError(e instanceof Error ? e.message : "Replay failed.");
     } finally {
@@ -2193,6 +2225,7 @@ export default function Scraping() {
               onRemove={() => removeSlot(id)}
               canRemove={slotIds.length > 1}
               forceResetKey={forceResetKey}
+              onReplay={runReplay}
             />
           ))}
         </div>
@@ -3965,12 +3998,33 @@ export default function Scraping() {
           </DialogHeader>
 
           <div className="flex-1 overflow-y-auto space-y-4 pr-1 mt-2">
-            {/* Loading */}
+            {/* Loading + live log stream */}
             {replayLoading && (
-              <div className="flex flex-col items-center gap-3 py-16">
-                <RotateCcw className="w-8 h-8 animate-spin text-emerald-600" />
-                <p className="text-sm text-muted-foreground font-medium">Re-extracting from stored snapshots…</p>
-                <p className="text-xs text-gray-400">This runs the full extraction pipeline without hitting the university website.</p>
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center gap-2 px-1">
+                  <RotateCcw className="w-4 h-4 animate-spin text-emerald-600 shrink-0" />
+                  <p className="text-sm text-muted-foreground font-medium">Re-extracting from stored snapshots…</p>
+                </div>
+                {replayLogs.length === 0 ? (
+                  <p className="text-xs text-gray-400 px-1">This runs the full extraction pipeline without hitting the university website.</p>
+                ) : (
+                  <div className="bg-gray-950 rounded-lg border border-gray-800 p-3 max-h-72 overflow-y-auto font-mono text-xs space-y-0.5">
+                    {replayLogs.map((entry, i) => {
+                      const color = entry.event === "warn" ? "text-amber-400"
+                        : entry.event === "progress" ? "text-emerald-400"
+                        : "text-gray-300";
+                      return (
+                        <p key={i} className={color}>
+                          {entry.event === "progress" && entry.total
+                            ? <span className="text-gray-500 mr-1">[{entry.current}/{entry.total}]</span>
+                            : null}
+                          {entry.message}
+                        </p>
+                      );
+                    })}
+                    <div ref={replayLogEndRef} />
+                  </div>
+                )}
               </div>
             )}
 

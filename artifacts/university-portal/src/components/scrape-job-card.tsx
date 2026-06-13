@@ -6,7 +6,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import {
   Play, StopCircle, Loader2, Globe, CheckCircle2, AlertCircle,
   ChevronsUpDown, Search, Eye, RefreshCw, ChevronDown, X, Zap, TrendingUp,
-  Bot, AlertTriangle, CheckCheck, Copy, Check, Radar,
+  Bot, AlertTriangle, CheckCheck, Copy, Check, Radar, RotateCcw,
 } from "lucide-react";
 import { getFetchErrorMessage, readResponseJson } from "@/lib/readResponseJson";
 import { CountrySelect } from "@/components/country-select";
@@ -125,6 +125,8 @@ export type ScrapeJobCardProps = {
   canRemove?: boolean;
   /** Incremented by the parent's "Cancel All" action to force-reset this card. */
   forceResetKey?: number;
+  /** Called when the operator clicks "Replay from Snapshot" — passes the latest replay-ready job id. */
+  onReplay?: (jobId: string) => void;
 };
 
 const MAX_LOGS = 5000;
@@ -203,7 +205,7 @@ function UniPicker({ value, onChange, universities, disabled }: {
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
-export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove, canRemove, forceResetKey }: ScrapeJobCardProps) {
+export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove, canRemove, forceResetKey, onReplay }: ScrapeJobCardProps) {
   const { toast } = useToast();
   const slotKey = `scrape_slot_${slotIndex}_jobId`;
   const startTimeKey = `scrape_slot_${slotIndex}_startTime`;
@@ -246,6 +248,9 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
   };
   const [snapshotSummary, setSnapshotSummary] = useState<SnapshotSummary | null>(null);
   const [snapshotSummaryLoading, setSnapshotSummaryLoading] = useState(false);
+
+  // Latest replay-ready job for the selected university (used by "Replay from Snapshot" button)
+  const [latestReplayJobId, setLatestReplayJobId] = useState<string | null>(null);
 
   const [qualityData, setQualityData] = useState<QualityData | null>(null);
   const [qualityLoading, setQualityLoading] = useState(false);
@@ -588,6 +593,26 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
   }, [apiDiscJobId]);
 
   // Auto-load repair candidates when done with a URL filter warning
+  // Fetch latest replay-ready job when university selection changes
+  useEffect(() => {
+    if (!onReplay || !selectedUni || selectedUni === ALL) {
+      setLatestReplayJobId(null);
+      return;
+    }
+    const uniId = Number(selectedUni);
+    if (isNaN(uniId)) { setLatestReplayJobId(null); return; }
+    let cancelled = false;
+    fetch(`/api/scrape/history?limit=5&university_id=${uniId}`)
+      .then(r => r.ok ? r.json() : null)
+      .then((data: { runs?: Array<{ runtimeJobId: string; snapshotCount: number }> } | null) => {
+        if (cancelled) return;
+        const job = data?.runs?.find(r => (r.snapshotCount ?? 0) > 0);
+        setLatestReplayJobId(job?.runtimeJobId ?? null);
+      })
+      .catch(() => { if (!cancelled) setLatestReplayJobId(null); });
+    return () => { cancelled = true; };
+  }, [selectedUni, onReplay]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     if (phase === "done" && urlFilterWarning && urlFilterWarning.kind !== "category_pages" && completedJobId && repairCandidates === null && !repairLoading) {
       setRepairLoading(true);
@@ -1193,9 +1218,21 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
               </div>
             )}
 
-            <Button onClick={handleStart} disabled={!scrapeUrl.trim()} className="h-9 bg-blue-600 hover:bg-blue-700 mt-1">
-              <Play className="w-4 h-4 mr-2" />Start Scrape
-            </Button>
+            <div className="flex gap-2 mt-1">
+              <Button onClick={handleStart} disabled={!scrapeUrl.trim()} className="h-9 flex-1 bg-blue-600 hover:bg-blue-700">
+                <Play className="w-4 h-4 mr-2" />Start Scrape
+              </Button>
+              {onReplay && latestReplayJobId && (
+                <Button
+                  variant="outline"
+                  onClick={() => onReplay(latestReplayJobId)}
+                  className="h-9 text-emerald-700 border-emerald-300 hover:bg-emerald-50"
+                  title={`Replay latest snapshot: ${latestReplayJobId}`}
+                >
+                  <RotateCcw className="w-4 h-4 mr-2" />Replay
+                </Button>
+              )}
+            </div>
           </>
         )}
 
