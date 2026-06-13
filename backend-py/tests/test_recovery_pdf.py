@@ -300,3 +300,138 @@ class TestSearcherPdfHandling:
             {"fees"},
         )
         assert scores.get("fees", 0) == 0
+
+
+# ---------------------------------------------------------------------------
+# searcher: PDF links found on any BFS-visited page (Task #145)
+# ---------------------------------------------------------------------------
+
+class TestSearcherHomepagePdf:
+    """PDF links discovered on any BFS-visited page must be returned as
+    candidates, even when their URL + anchor text score 0 via _score_link.
+
+    The searcher uses _score_pdf_link (from extractor) as a fallback scorer
+    for PDFs.  _score_pdf_link uses a broader keyword list — e.g. "international"
+    and "schedule" — that _score_link's HTML-page dictionaries don't include.
+
+    Test URL: https://uni.edu.au/download/2024-international-prospectus.pdf
+    Anchor:   "Download"
+    _score_link("fees") = 0  (no fee/tuition/cost/pricing in path or anchor)
+    _score_pdf_link("fees") > 0  ("international" is in _PDF_CATEGORY_KEYWORDS["fees"])
+    """
+
+    _GAP_PDF_URL = "https://uni.edu.au/download/2024-international-prospectus.pdf"
+    _GAP_PDF_ANCHOR = "Download"
+    _SEED_URL = "https://uni.edu.au"
+
+    def _run(self, coro):
+        return asyncio.get_event_loop().run_until_complete(coro)
+
+    def _seed_html(self, extra_links: list[tuple[str, str]] | None = None) -> str:
+        """Build a seed page HTML containing the gap PDF link."""
+        links = [(self._GAP_PDF_URL, self._GAP_PDF_ANCHOR)]
+        if extra_links:
+            links.extend(extra_links)
+        items = "".join(f'<a href="{href}">{text}</a>' for href, text in links)
+        return f"<html><body>{items}</body></html>"
+
+    # --- unit: confirm the gap exists ---
+
+    def test_score_link_gives_zero_for_gap_url(self):
+        """Precondition: _score_link must give 0 for the gap URL + anchor."""
+        from app.services.scraper.recovery.searcher import _score_link
+
+        scores = _score_link(self._GAP_PDF_URL, self._GAP_PDF_ANCHOR, {"fees"})
+        assert scores.get("fees", 0) == 0, (
+            "_score_link should give 0 for a PDF whose path and anchor contain "
+            "no HTML-page fee keywords ('fee', 'tuition', 'cost', 'pricing')"
+        )
+
+    def test_pdf_scorer_gives_positive_for_gap_url(self):
+        """Precondition: _score_pdf_link must give > 0 for the same URL."""
+        from app.services.scraper.recovery.extractor import _score_pdf_link
+
+        score = _score_pdf_link(self._GAP_PDF_URL, self._GAP_PDF_ANCHOR, {"fees"})
+        assert score > 0, (
+            "_score_pdf_link should give > 0 because 'international' appears in "
+            "_PDF_CATEGORY_KEYWORDS['fees'] and in the URL"
+        )
+
+    # --- integration: end-to-end through search_candidate_pages ---
+
+    def test_homepage_pdf_appears_in_candidates(self):
+        """After the fix: a PDF that scores 0 via _score_link but > 0 via
+        _score_pdf_link must be returned in the candidates list by
+        search_candidate_pages."""
+        from app.services.scraper.recovery.searcher import search_candidate_pages
+
+        seed_html = self._seed_html()
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.text = seed_html
+
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(return_value=mock_response)
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+
+        async def _run():
+            with patch("httpx.AsyncClient", return_value=mock_client):
+                return await search_candidate_pages(self._SEED_URL, {"fees"})
+
+        candidates = self._run(_run())
+
+        pdf_candidates = [c for c in candidates if ".pdf" in c["url"]]
+        assert pdf_candidates, (
+            "Expected the gap PDF to appear in candidates, but got none.\n"
+            f"PDF URL: {self._GAP_PDF_URL!r}\n"
+            "Fix: searcher must use _score_pdf_link as a fallback when "
+            "_score_link gives 0 for a PDF link."
+        )
+        assert any(
+            "international-prospectus.pdf" in c["url"] for c in pdf_candidates
+        ), f"Expected the gap PDF URL in candidates; got: {[c['url'] for c in candidates]}"
+
+    def test_pdf_candidate_has_required_keys(self):
+        """A PDF candidate returned via the fallback scorer has the standard
+        candidate shape (url, category, score, path_score, matched_keyword)."""
+        from app.services.scraper.recovery.searcher import search_candidate_pages
+
+        seed_html = self._seed_html()
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.text = seed_html
+
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(return_value=mock_response)
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+
+        async def _run():
+            with patch("httpx.AsyncClient", return_value=mock_client):
+                return await search_candidate_pages(self._SEED_URL, {"fees"})
+
+        candidates = self._run(_run())
+        pdf_c = next(
+            (c for c in candidates if "international-prospectus.pdf" in c["url"]), None
+        )
+        assert pdf_c is not None, "Gap PDF should be in candidates"
+        for key in ("url", "category", "score", "path_score", "matched_keyword"):
+            assert key in pdf_c, f"Candidate dict missing key {key!r}: {pdf_c}"
+        assert pdf_c["category"] == "fees"
+        assert pdf_c["score"] > 0
+
+    def test_already_scoring_pdfs_are_not_double_counted(self):
+        """A PDF that already scores > 0 via _score_link is not scored again
+        via _score_pdf_link (i.e. the fallback only fires when scores is empty)."""
+        from app.services.scraper.recovery.searcher import _score_link
+
+        # A PDF with "fees" in the URL path scores > 0 via _score_link
+        well_scored_url = "https://uni.edu.au/fees/schedule.pdf"
+        scores = _score_link(well_scored_url, "Fee schedule", {"fees"})
+        assert scores.get("fees", 0) > 0, (
+            "Sanity: a PDF with 'fees' in path should already score > 0 via "
+            "_score_link — the fallback must not override this"
+        )

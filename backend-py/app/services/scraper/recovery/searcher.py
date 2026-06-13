@@ -216,6 +216,17 @@ async def search_candidate_pages(
         log.warning("[RECOVERY:search] httpx not available — skipping search")
         return []
 
+    # Import PDF-specific scorer for use as a fallback when the standard HTML
+    # scorer gives 0.  The PDF scorer uses a broader keyword list (e.g.
+    # "international", "schedule") that catches PDFs whose URL or anchor text
+    # don't contain the HTML page keywords.  Non-fatal if extractor unavailable.
+    try:
+        from app.services.scraper.recovery.extractor import (
+            _score_pdf_link as _pdf_link_scorer,
+        )
+    except ImportError:
+        _pdf_link_scorer = None  # type: ignore[assignment]
+
     _HEADERS = {
         "User-Agent": (
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -256,6 +267,20 @@ async def search_candidate_pages(
             links = _extract_links(html, url, apex)
             for full_url, anchor_text in links:
                 scores = _score_link(full_url, anchor_text, needed_categories)
+
+                # PDF fallback: if the standard HTML scorer gives 0 for every
+                # category, try the broader PDF-specific keyword scorer from
+                # extractor.py.  It covers tokens like "international" and
+                # "schedule" that appear in _PDF_CATEGORY_KEYWORDS but not in
+                # the HTML-page scoring dicts.  This ensures PDFs are surfaced
+                # from *any* BFS-visited page, not only from pages that are
+                # themselves high-scoring HTML candidates.
+                if full_url.lower().endswith(".pdf") and not scores and _pdf_link_scorer is not None:
+                    for cat in needed_categories:
+                        ps = _pdf_link_scorer(full_url, anchor_text, {cat})
+                        if ps > 0:
+                            scores[cat] = ps
+
                 for cat, score in scores.items():
                     key = (full_url, cat)
                     if key not in candidates or score > candidates[key]["score"]:
