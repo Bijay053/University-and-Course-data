@@ -925,3 +925,264 @@ class TestPerCategoryBudgetIsolation:
             assert mock_pdf.call_count == 2, (
                 "english PDF must be fetched even though fees budget is exhausted"
             )
+
+
+# ---------------------------------------------------------------------------
+# Test: mixed-category PDF URL — the primary scenario from task-175
+#
+# A PDF like "international-fees-and-requirements.pdf" contains keywords for
+# BOTH the "fees" category ("fee", "fees") AND the "requirements" category
+# ("requirement").  When two separate extract_from_url calls are made — the
+# first with categories={"fees"} and the second with categories={"requirements"}
+# — the shared seen_pdf_urls set must ensure the PDF is fetched exactly once.
+# ---------------------------------------------------------------------------
+
+_MIXED_PDF_URL = "https://uni.edu/international-fees-and-requirements.pdf"
+
+_HTML_LINKING_MIXED_PDF = (
+    "<html><body>"
+    f"<a href='{_MIXED_PDF_URL}'>Fees and Requirements</a>"
+    "</body></html>"
+)
+
+
+class TestSeenPdfUrlsMixedCategory:
+    """seen_pdf_urls deduplicates a PDF that scores for two separate categories
+    when separate extract_from_url calls are made — one per category.
+
+    The motivating URL is "international-fees-and-requirements.pdf" which
+    contains both fee keywords and requirements keywords.  Without the
+    seen_pdf_urls guard, a recovery orchestrator that issues one call per
+    category would download the same PDF twice.
+    """
+
+    def test_mixed_pdf_url_scores_for_both_fees_and_requirements(self):
+        """Precondition: confirm the mixed URL does score > 0 for both
+        categories so the dedup scenario is realistic."""
+        from app.services.scraper.recovery.extractor import score_pdf_link
+
+        fees_score = score_pdf_link(_MIXED_PDF_URL, "Fees and Requirements", {"fees"})
+        reqs_score = score_pdf_link(_MIXED_PDF_URL, "Fees and Requirements", {"requirements"})
+        assert fees_score > 0, (
+            f"Expected fees score > 0 for {_MIXED_PDF_URL!r}; got {fees_score}"
+        )
+        assert reqs_score > 0, (
+            f"Expected requirements score > 0 for {_MIXED_PDF_URL!r}; got {reqs_score}"
+        )
+
+    def test_linked_mixed_pdf_fetched_once_across_two_category_calls(self):
+        """A linked PDF that scores for both fees and requirements is fetched
+        exactly once when two separate calls are made — first with {"fees"},
+        then with {"requirements"} — sharing seen_pdf_urls."""
+        seen: set[str] = set()
+
+        with (
+            patch(
+                "app.services.scraper.recovery.extractor._fetch_html",
+                new=AsyncMock(return_value=(_HTML_LINKING_MIXED_PDF, "html")),
+            ),
+            patch(
+                "app.services.scraper.recovery.extractor._run_extractor",
+                new=AsyncMock(return_value=[]),
+            ),
+            patch(
+                "app.services.scraper.recovery.extractor._find_linked_pdfs",
+                new=AsyncMock(return_value=[_MIXED_PDF_URL]),
+            ),
+            patch(
+                "app.services.scraper.recovery.extractor._extract_from_pdf",
+                new=AsyncMock(return_value=[]),
+            ) as mock_pdf,
+        ):
+            from app.services.scraper.recovery.extractor import extract_from_url
+
+            # Call 1: fees category — PDF must be fetched and added to seen
+            _run(
+                extract_from_url(
+                    "https://uni.edu/fees-page",
+                    {"fees"},
+                    seen_pdf_urls=seen,
+                )
+            )
+            assert mock_pdf.call_count == 1, (
+                "First call (fees) must fetch the mixed PDF exactly once"
+            )
+            assert _MIXED_PDF_URL in seen, (
+                "Mixed PDF URL must be in seen_pdf_urls after first call"
+            )
+
+            # Call 2: requirements category — PDF must NOT be fetched again
+            _run(
+                extract_from_url(
+                    "https://uni.edu/requirements-page",
+                    {"requirements"},
+                    seen_pdf_urls=seen,
+                )
+            )
+            assert mock_pdf.call_count == 1, (
+                "Second call (requirements) must skip the PDF because it is "
+                "already in seen_pdf_urls — even though the URL scores for "
+                "requirements too"
+            )
+
+    def test_direct_mixed_pdf_fetched_once_across_two_category_calls(self):
+        """The same dedup guarantee holds when the mixed PDF URL appears as a
+        direct candidate (pdf_direct source_type) in both calls."""
+        seen: set[str] = set()
+
+        with (
+            patch(
+                "app.services.scraper.recovery.extractor._fetch_html",
+                new=AsyncMock(return_value=(None, "pdf_direct")),
+            ),
+            patch(
+                "app.services.scraper.recovery.extractor._extract_from_pdf",
+                new=AsyncMock(return_value=[]),
+            ) as mock_pdf,
+        ):
+            from app.services.scraper.recovery.extractor import extract_from_url
+
+            # Call 1: fees — fetches and marks seen
+            _run(
+                extract_from_url(
+                    _MIXED_PDF_URL, {"fees"}, seen_pdf_urls=seen,
+                )
+            )
+            assert mock_pdf.call_count == 1
+            assert _MIXED_PDF_URL in seen
+
+            # Call 2: requirements — must be skipped
+            _run(
+                extract_from_url(
+                    _MIXED_PDF_URL, {"requirements"}, seen_pdf_urls=seen,
+                )
+            )
+            assert mock_pdf.call_count == 1, (
+                "Direct mixed PDF submitted a second time with a different "
+                "category must be skipped by the seen_pdf_urls guard"
+            )
+
+    def test_mixed_category_order_reversed_still_fetches_once(self):
+        """Dedup works regardless of which category is encountered first."""
+        seen: set[str] = set()
+
+        with (
+            patch(
+                "app.services.scraper.recovery.extractor._fetch_html",
+                new=AsyncMock(return_value=(_HTML_LINKING_MIXED_PDF, "html")),
+            ),
+            patch(
+                "app.services.scraper.recovery.extractor._run_extractor",
+                new=AsyncMock(return_value=[]),
+            ),
+            patch(
+                "app.services.scraper.recovery.extractor._find_linked_pdfs",
+                new=AsyncMock(return_value=[_MIXED_PDF_URL]),
+            ),
+            patch(
+                "app.services.scraper.recovery.extractor._extract_from_pdf",
+                new=AsyncMock(return_value=[]),
+            ) as mock_pdf,
+        ):
+            from app.services.scraper.recovery.extractor import extract_from_url
+
+            # Call 1: requirements first this time
+            _run(
+                extract_from_url(
+                    "https://uni.edu/requirements-page",
+                    {"requirements"},
+                    seen_pdf_urls=seen,
+                )
+            )
+            assert mock_pdf.call_count == 1
+            assert _MIXED_PDF_URL in seen
+
+            # Call 2: fees — must be skipped
+            _run(
+                extract_from_url(
+                    "https://uni.edu/fees-page",
+                    {"fees"},
+                    seen_pdf_urls=seen,
+                )
+            )
+            assert mock_pdf.call_count == 1, (
+                "PDF already in seen_pdf_urls must be skipped even when the "
+                "second call uses a different category (fees vs requirements)"
+            )
+
+    def test_mixed_pdf_budget_charged_once_across_two_category_calls(self):
+        """The per-category budget is decremented exactly once for the mixed
+        PDF even when two separate calls are made with different categories."""
+        seen: set[str] = set()
+        budget: dict[str, int] = {"fees": 5, "requirements": 5}
+
+        with (
+            patch(
+                "app.services.scraper.recovery.extractor._fetch_html",
+                new=AsyncMock(return_value=(_HTML_LINKING_MIXED_PDF, "html")),
+            ),
+            patch(
+                "app.services.scraper.recovery.extractor._run_extractor",
+                new=AsyncMock(return_value=[]),
+            ),
+            patch(
+                "app.services.scraper.recovery.extractor._find_linked_pdfs",
+                new=AsyncMock(return_value=[_MIXED_PDF_URL]),
+            ),
+            patch(
+                "app.services.scraper.recovery.extractor._extract_from_pdf",
+                new=AsyncMock(return_value=[]),
+            ),
+        ):
+            from app.services.scraper.recovery.extractor import extract_from_url
+
+            # Call 1: fees page — PDF fetched, fees budget decremented
+            _run(
+                extract_from_url(
+                    "https://uni.edu/fees-page",
+                    {"fees"},
+                    pdf_budget=budget,
+                    seen_pdf_urls=seen,
+                )
+            )
+            assert budget["fees"] == 4, "fees budget must be decremented by 1 on first fetch"
+            assert budget["requirements"] == 5, "requirements budget must be untouched"
+
+            # Call 2: requirements page — PDF in seen, no budget consumed
+            _run(
+                extract_from_url(
+                    "https://uni.edu/requirements-page",
+                    {"requirements"},
+                    pdf_budget=budget,
+                    seen_pdf_urls=seen,
+                )
+            )
+            assert budget["fees"] == 4, "fees budget must be unchanged after deduped call"
+            assert budget["requirements"] == 5, (
+                "requirements budget must not be decremented when PDF is skipped "
+                "because it was already seen"
+            )
+
+    def test_without_seen_set_mixed_pdf_fetched_twice(self):
+        """When seen_pdf_urls is None the same PDF URL is NOT deduplicated
+        across separate calls — each call fetches it independently.
+        This documents the existing (pre-seen_pdf_urls) behaviour."""
+        with (
+            patch(
+                "app.services.scraper.recovery.extractor._fetch_html",
+                new=AsyncMock(return_value=(None, "pdf_direct")),
+            ),
+            patch(
+                "app.services.scraper.recovery.extractor._extract_from_pdf",
+                new=AsyncMock(return_value=[]),
+            ) as mock_pdf,
+        ):
+            from app.services.scraper.recovery.extractor import extract_from_url
+
+            _run(extract_from_url(_MIXED_PDF_URL, {"fees"}))
+            _run(extract_from_url(_MIXED_PDF_URL, {"requirements"}))
+
+            assert mock_pdf.call_count == 2, (
+                "Without seen_pdf_urls the same PDF is fetched once per call — "
+                "callers must pass a shared seen set to get deduplication"
+            )

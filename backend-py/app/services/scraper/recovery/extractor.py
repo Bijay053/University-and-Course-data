@@ -596,6 +596,20 @@ async def extract_from_url(
         it appears both as a direct candidate URL and as a linked PDF on another
         HTML page in the same run.
 
+        **Mixed-category interaction**: A PDF whose URL contains keywords for
+        multiple budget categories (e.g. ``international-fees-and-requirements.pdf``
+        scores positively for both ``fees`` AND ``requirements``) could in
+        principle be submitted to two separate ``extract_from_url`` calls —
+        once with ``categories={"fees"}`` and once with
+        ``categories={"requirements"}``.  The ``seen_pdf_urls`` guard handles
+        this correctly: the first call fetches the PDF and adds its URL to
+        ``seen_pdf_urls``; the second call finds the URL already in the set and
+        skips the fetch entirely, regardless of which category set the second
+        call was given.  The PDF is therefore downloaded exactly once even
+        though it is relevant to both categories.  The per-category budget
+        (``pdf_budget``) is decremented only for the first fetch; the skipped
+        second call does NOT consume any budget slot.
+
     Returns
     -------
     list of extraction result dicts with keys:
