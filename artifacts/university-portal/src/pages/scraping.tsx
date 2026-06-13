@@ -776,6 +776,7 @@ export default function Scraping() {
   const [replayError, setReplayError] = useState<string | null>(null);
   const [replayCommitting, setReplayCommitting] = useState(false);
   const [replayLogs, setReplayLogs] = useState<Array<{ event: string; message: string; current?: number; total?: number }>>([]);
+  const [replayElapsed, setReplayElapsed] = useState(0);
   const replayLogEndRef = useRef<HTMLDivElement>(null);
 
   // Source-dialog inline replay state (resets when dialog closes)
@@ -950,6 +951,13 @@ export default function Scraping() {
   useEffect(() => {
     if (replayLogEndRef.current) replayLogEndRef.current.scrollIntoView({ behavior: "smooth" });
   }, [replayLogs]);
+
+  useEffect(() => {
+    if (!replayLoading) { setReplayElapsed(0); return; }
+    setReplayElapsed(0);
+    const t = setInterval(() => setReplayElapsed(s => s + 1), 1000);
+    return () => clearInterval(t);
+  }, [replayLoading]);
 
   const toggleQualityExpanded = useCallback((id: number) => {
     setQualityExpanded((prev) => {
@@ -4004,6 +4012,9 @@ export default function Scraping() {
                 <div className="flex items-center gap-2 px-1">
                   <RotateCcw className="w-4 h-4 animate-spin text-emerald-600 shrink-0" />
                   <p className="text-sm text-muted-foreground font-medium">Re-extracting from stored snapshots…</p>
+                  <span className="ml-auto text-xs tabular-nums text-gray-400 font-mono shrink-0">
+                    {replayElapsed}s
+                  </span>
                 </div>
                 {replayLogs.length === 0 ? (
                   <p className="text-xs text-gray-400 px-1">This runs the full extraction pipeline without hitting the university website.</p>
