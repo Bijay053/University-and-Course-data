@@ -604,3 +604,324 @@ class TestSeenPdfUrlsFullScenario:
             mock_fetch.return_value = (None, "pdf_direct")
             _run(extract_from_url(pdf_url, {"fees"}, seen_pdf_urls=seen))
             assert mock_pdf.call_count == 1  # still only fetched once
+
+
+# ---------------------------------------------------------------------------
+# Test: per-category budget isolation (dict[str, int] format)
+# ---------------------------------------------------------------------------
+
+_FAKE_HTML_WITH_TWO_PDFS = (
+    "<html><body>"
+    "<a href='https://uni.edu/fees.pdf'>Fee schedule</a>"
+    "<a href='https://uni.edu/english.pdf'>English requirements</a>"
+    "</body></html>"
+)
+
+
+class TestPerCategoryBudgetIsolation:
+    """Exhausting the fees budget must NOT prevent English-requirements PDFs
+    from being fetched, and vice-versa.
+
+    These tests use the new dict[str, int] budget format returned by
+    make_pdf_budget().
+    """
+
+    def test_fees_budget_exhausted_does_not_block_english_pdfs(self):
+        """When fees budget is 0 but english budget is > 0, an english-category
+        linked PDF must still be fetched."""
+        fees_pdf = "https://uni.edu/fees.pdf"
+        english_pdf = "https://uni.edu/english.pdf"
+        budget: dict[str, int] = {"fees": 0, "english": 3}
+        seen: set[str] = set()
+        fetched_calls: list[tuple] = []
+
+        async def mock_extract_from_pdf(pdf_url, cats):
+            fetched_calls.append((pdf_url, frozenset(cats)))
+            return []
+
+        with (
+            patch(
+                "app.services.scraper.recovery.extractor._fetch_html",
+                new=AsyncMock(return_value=(_FAKE_HTML_WITH_TWO_PDFS, "html")),
+            ),
+            patch(
+                "app.services.scraper.recovery.extractor._run_extractor",
+                new=AsyncMock(return_value=[]),
+            ),
+            patch(
+                "app.services.scraper.recovery.extractor._find_linked_pdfs",
+                new=AsyncMock(return_value=[fees_pdf, english_pdf]),
+            ),
+            patch(
+                "app.services.scraper.recovery.extractor._extract_from_pdf",
+                side_effect=mock_extract_from_pdf,
+            ),
+        ):
+            from app.services.scraper.recovery.extractor import extract_from_url
+
+            _run(
+                extract_from_url(
+                    "https://uni.edu/admissions",
+                    {"fees", "english"},
+                    pdf_budget=budget,
+                    seen_pdf_urls=seen,
+                )
+            )
+
+        fetched_urls = [url for url, _ in fetched_calls]
+        assert fees_pdf not in fetched_urls, (
+            "fees PDF must be skipped when fees budget is 0; fetched: %r" % fetched_urls
+        )
+        assert english_pdf in fetched_urls, (
+            "english PDF must still be fetched when fees budget is 0 but english budget > 0"
+        )
+        assert budget["fees"] == 0, "fees budget must remain 0"
+        assert budget["english"] == 2, "english budget must be decremented by 1"
+
+    def test_english_budget_exhausted_does_not_block_fees_pdfs(self):
+        """Mirror of the above: english budget exhausted must not prevent fees PDFs."""
+        fees_pdf = "https://uni.edu/fees.pdf"
+        english_pdf = "https://uni.edu/english.pdf"
+        budget: dict[str, int] = {"fees": 3, "english": 0}
+        seen: set[str] = set()
+        fetched_calls: list[tuple] = []
+
+        async def mock_extract_from_pdf(pdf_url, cats):
+            fetched_calls.append((pdf_url, frozenset(cats)))
+            return []
+
+        with (
+            patch(
+                "app.services.scraper.recovery.extractor._fetch_html",
+                new=AsyncMock(return_value=(_FAKE_HTML_WITH_TWO_PDFS, "html")),
+            ),
+            patch(
+                "app.services.scraper.recovery.extractor._run_extractor",
+                new=AsyncMock(return_value=[]),
+            ),
+            patch(
+                "app.services.scraper.recovery.extractor._find_linked_pdfs",
+                new=AsyncMock(return_value=[fees_pdf, english_pdf]),
+            ),
+            patch(
+                "app.services.scraper.recovery.extractor._extract_from_pdf",
+                side_effect=mock_extract_from_pdf,
+            ),
+        ):
+            from app.services.scraper.recovery.extractor import extract_from_url
+
+            _run(
+                extract_from_url(
+                    "https://uni.edu/admissions",
+                    {"fees", "english"},
+                    pdf_budget=budget,
+                    seen_pdf_urls=seen,
+                )
+            )
+
+        fetched_urls = [url for url, _ in fetched_calls]
+        assert english_pdf not in fetched_urls, (
+            "english PDF must be skipped when english budget is 0; fetched: %r" % fetched_urls
+        )
+        assert fees_pdf in fetched_urls, (
+            "fees PDF must still be fetched when english budget is 0 but fees budget > 0"
+        )
+        assert budget["english"] == 0, "english budget must remain 0"
+        assert budget["fees"] == 2, "fees budget must be decremented by 1"
+
+    def test_both_budgets_exhausted_skips_all_pdfs(self):
+        """When both fees and english budgets are 0, no PDFs are fetched."""
+        fees_pdf = "https://uni.edu/fees.pdf"
+        english_pdf = "https://uni.edu/english.pdf"
+        budget: dict[str, int] = {"fees": 0, "english": 0}
+        seen: set[str] = set()
+
+        with (
+            patch(
+                "app.services.scraper.recovery.extractor._fetch_html",
+                new=AsyncMock(return_value=(_FAKE_HTML_WITH_TWO_PDFS, "html")),
+            ),
+            patch(
+                "app.services.scraper.recovery.extractor._run_extractor",
+                new=AsyncMock(return_value=[]),
+            ),
+            patch(
+                "app.services.scraper.recovery.extractor._find_linked_pdfs",
+                new=AsyncMock(return_value=[fees_pdf, english_pdf]),
+            ),
+            patch(
+                "app.services.scraper.recovery.extractor._extract_from_pdf",
+                new=AsyncMock(return_value=[]),
+            ) as mock_pdf,
+        ):
+            from app.services.scraper.recovery.extractor import extract_from_url
+
+            _run(
+                extract_from_url(
+                    "https://uni.edu/admissions",
+                    {"fees", "english"},
+                    pdf_budget=budget,
+                    seen_pdf_urls=seen,
+                )
+            )
+
+        mock_pdf.assert_not_called()
+
+    def test_make_pdf_budget_returns_dict_with_independent_categories(self):
+        """make_pdf_budget() must return a dict[str, int] with independent per-category
+        counters — fees and english must each have their own key."""
+        from app.services.scraper.recovery.extractor import make_pdf_budget
+
+        batch = make_pdf_budget(single_course=False)
+        assert isinstance(batch, dict), (
+            "make_pdf_budget() must return a dict; got %r" % type(batch)
+        )
+        assert "fees" in batch and "english" in batch, (
+            "batch budget must have 'fees' and 'english' keys; got %r" % batch
+        )
+        assert batch["fees"] > 0 and batch["english"] > 0
+
+        single = make_pdf_budget(single_course=True)
+        assert isinstance(single, dict)
+        assert "fees" in single and "english" in single
+        assert single["fees"] > 0 and single["english"] > 0
+
+        assert single["fees"] <= batch["fees"], (
+            "single-course fees budget must be <= batch budget"
+        )
+        assert single["english"] <= batch["english"], (
+            "single-course english budget must be <= batch budget"
+        )
+
+    def test_per_category_budgets_are_independent_across_calls(self):
+        """Decrementing the fees budget must not affect the english budget
+        and vice-versa when using the dict format."""
+        from app.services.scraper.recovery.extractor import (
+            _budget_decrement,
+            _budget_remaining_categories,
+        )
+
+        budget: dict[str, int] = {"fees": 2, "english": 2}
+
+        # Decrement fees twice
+        _budget_decrement(budget, {"fees"})
+        _budget_decrement(budget, {"fees"})
+
+        assert budget["fees"] == 0, "fees should be 0 after 2 decrements"
+        assert budget["english"] == 2, "english must be unaffected by fees decrements"
+
+        # fees is exhausted; english still has budget
+        remaining = _budget_remaining_categories(budget, {"fees", "english"})
+        assert "english" in remaining, "english must still be in remaining when english budget > 0"
+        assert "fees" not in remaining, "fees must not be in remaining when fees budget == 0"
+
+    def test_skipped_pdf_not_marked_seen_so_later_english_call_can_fetch_it(self):
+        """Critical regression: when a fees-exhausted call skips english.pdf, the URL
+        must NOT be added to seen_pdf_urls — so a later extract_from_url call with
+        categories={'english'} and remaining english budget can still fetch it.
+
+        This was the original bug: seen_pdf_urls.add() fired before the budget check,
+        so any PDF skipped by one category's exhausted budget was permanently blocked
+        from other categories too.
+        """
+        english_pdf = "https://uni.edu/english-requirements.pdf"
+        shared_seen: set[str] = set()
+        shared_budget: dict[str, int] = {"fees": 0, "english": 3}
+        fetched_urls: list[str] = []
+
+        async def mock_extract_from_pdf(pdf_url, cats):
+            fetched_urls.append(pdf_url)
+            return []
+
+        # Both calls link to english_pdf.  First call has categories={"fees"};
+        # fees budget is 0, so the PDF is skipped — but must NOT be marked seen.
+        # Second call has categories={"english"}; english budget is 3 — must fetch.
+        with (
+            patch(
+                "app.services.scraper.recovery.extractor._fetch_html",
+                new=AsyncMock(return_value=(_FAKE_HTML_WITH_TWO_PDFS, "html")),
+            ),
+            patch(
+                "app.services.scraper.recovery.extractor._run_extractor",
+                new=AsyncMock(return_value=[]),
+            ),
+            patch(
+                "app.services.scraper.recovery.extractor._find_linked_pdfs",
+                new=AsyncMock(return_value=[english_pdf]),
+            ),
+            patch(
+                "app.services.scraper.recovery.extractor._extract_from_pdf",
+                side_effect=mock_extract_from_pdf,
+            ),
+        ):
+            from app.services.scraper.recovery.extractor import extract_from_url
+
+            # Call 1: fees page, fees budget exhausted — english.pdf skipped
+            _run(
+                extract_from_url(
+                    "https://uni.edu/fees-page",
+                    {"fees"},
+                    pdf_budget=shared_budget,
+                    seen_pdf_urls=shared_seen,
+                )
+            )
+            assert english_pdf not in shared_seen, (
+                "english.pdf must NOT be in seen_pdf_urls after being skipped by fees budget"
+            )
+            assert english_pdf not in fetched_urls, "english.pdf must not have been fetched yet"
+
+            # Call 2: english page, english budget available — english.pdf must be fetched
+            _run(
+                extract_from_url(
+                    "https://uni.edu/english-page",
+                    {"english"},
+                    pdf_budget=shared_budget,
+                    seen_pdf_urls=shared_seen,
+                )
+            )
+            assert english_pdf in fetched_urls, (
+                "english.pdf must be fetched by the english-category call even though "
+                "a previous fees-category call encountered and skipped it"
+            )
+            assert english_pdf in shared_seen, (
+                "english.pdf must be in seen_pdf_urls after being successfully fetched"
+            )
+            assert shared_budget["english"] == 2, "english budget must be decremented by 1"
+
+    def test_direct_pdf_fees_budget_exhausted_does_not_affect_english_call(self):
+        """When a direct fees PDF exhausts its budget, a subsequent english-category
+        extract_from_url call must still be able to fetch PDFs."""
+        fees_pdf = "https://uni.edu/fees.pdf"
+        english_pdf = "https://uni.edu/english.pdf"
+        budget: dict[str, int] = {"fees": 1, "english": 1}
+        seen: set[str] = set()
+
+        with patch(
+            "app.services.scraper.recovery.extractor._fetch_html",
+            new=AsyncMock(return_value=(None, "pdf_direct")),
+        ), patch(
+            "app.services.scraper.recovery.extractor._extract_from_pdf",
+            new=AsyncMock(return_value=[]),
+        ) as mock_pdf:
+            from app.services.scraper.recovery.extractor import extract_from_url
+
+            # First direct PDF: fees — consumes fees budget (1→0)
+            _run(
+                extract_from_url(
+                    fees_pdf, {"fees"}, pdf_budget=budget, seen_pdf_urls=seen,
+                )
+            )
+            assert budget["fees"] == 0
+            assert budget["english"] == 1, "english budget must be unaffected"
+            assert mock_pdf.call_count == 1
+
+            # Second direct PDF: english — english budget still 1, should be fetched
+            _run(
+                extract_from_url(
+                    english_pdf, {"english"}, pdf_budget=budget, seen_pdf_urls=seen,
+                )
+            )
+            assert budget["english"] == 0
+            assert mock_pdf.call_count == 2, (
+                "english PDF must be fetched even though fees budget is exhausted"
+            )

@@ -1137,22 +1137,24 @@ class TestSingleCourseRecoveryBroadPdf:
             )
 
     def test_pdf_budget_passed_and_decremented(self):
-        """run_single_course_recovery must pass a pdf_budget list to
+        """run_single_course_recovery must pass a pdf_budget dict to
         extract_from_url.  A side_effect that simulates the real decrement
         confirms the budget is threaded correctly and is mutable (so the guard
-        in the extractor can enforce the per-university cap)."""
+        in the extractor can enforce the per-category cap)."""
         from app.services.scraper.recovery.run_recovery import run_single_course_recovery
 
         sc = self._mock_sc()
         db = self._mock_db(sc)
-        captured_budgets: list[list] = []
+        captured_budgets: list[dict] = []
 
         async def mock_extract(url, cats, country=None, metadata=None, pdf_budget=None):
             if pdf_budget is not None:
                 captured_budgets.append(pdf_budget)
-                # Simulate real extractor decrement for a direct PDF URL
-                if url.lower().endswith(".pdf") and pdf_budget[0] > 0:
-                    pdf_budget[0] -= 1
+                # Simulate real extractor decrement for a direct fees PDF
+                if url.lower().endswith(".pdf") and isinstance(pdf_budget, dict):
+                    for cat in (cats or set()):
+                        if pdf_budget.get(cat, 0) > 0:
+                            pdf_budget[cat] -= 1
             if metadata is not None:
                 metadata["source_type"] = "pdf_direct"
             return [dict(self._fee_result())] if url == self._GAP_PDF_URL else []
@@ -1182,26 +1184,34 @@ class TestSingleCourseRecoveryBroadPdf:
 
         assert captured_budgets, (
             "extract_from_url was not called with a pdf_budget argument; "
-            "run_single_course_recovery must pass its pdf_budget list to "
-            "extract_from_url so the per-university cap is enforced."
+            "run_single_course_recovery must pass its pdf_budget dict to "
+            "extract_from_url so the per-category cap is enforced."
         )
         budget = captured_budgets[0]
-        assert isinstance(budget, list), (
-            "pdf_budget must be a mutable list (not %r)" % type(budget)
+        assert isinstance(budget, dict), (
+            "pdf_budget must be a mutable dict[str, int] (not %r)" % type(budget)
         )
-        from app.services.scraper.recovery.extractor import _SINGLE_COURSE_PDF_BUDGET
-        assert budget[0] == _SINGLE_COURSE_PDF_BUDGET - 1, (
-            "pdf_budget must be decremented by 1 after processing a direct PDF URL; "
-            "expected %d, got %d" % (_SINGLE_COURSE_PDF_BUDGET - 1, budget[0])
+        from app.services.scraper.recovery.extractor import (
+            _SINGLE_COURSE_PDF_BUDGET_PER_CATEGORY,
+        )
+        assert "fees" in budget, (
+            "pdf_budget dict must contain a 'fees' key; got keys: %r" % list(budget.keys())
+        )
+        expected_fees = _SINGLE_COURSE_PDF_BUDGET_PER_CATEGORY["fees"] - 1
+        assert budget["fees"] == expected_fees, (
+            "pdf_budget['fees'] must be decremented by 1 after processing a fees PDF; "
+            "expected %d, got %d" % (expected_fees, budget["fees"])
         )
 
     def test_single_course_pdf_budget_lower_than_batch_cap(self):
-        """run_single_course_recovery must initialise its pdf_budget with
-        _SINGLE_COURSE_PDF_BUDGET, which must be strictly lower than
-        MAX_PDFS_PER_RECOVERY_RUN (the batch cap).  This prevents a
-        single-course trigger from consuming as many PDF fetches as a full
-        batch pass."""
+        """run_single_course_recovery must initialise its pdf_budget with per-category
+        caps from _SINGLE_COURSE_PDF_BUDGET_PER_CATEGORY, each of which must be
+        strictly lower than the corresponding cap in _BATCH_PDF_BUDGET_PER_CATEGORY.
+        This prevents a single-course trigger from consuming as many PDF fetches as
+        a full batch pass."""
         from app.services.scraper.recovery.extractor import (
+            _SINGLE_COURSE_PDF_BUDGET_PER_CATEGORY,
+            _BATCH_PDF_BUDGET_PER_CATEGORY,
             _SINGLE_COURSE_PDF_BUDGET,
             MAX_PDFS_PER_RECOVERY_RUN,
         )
@@ -1211,16 +1221,23 @@ class TestSingleCourseRecoveryBroadPdf:
             "triggers consume fewer PDF fetches than a full batch pass."
             % (_SINGLE_COURSE_PDF_BUDGET, MAX_PDFS_PER_RECOVERY_RUN)
         )
+        for cat, single_cap in _SINGLE_COURSE_PDF_BUDGET_PER_CATEGORY.items():
+            batch_cap = _BATCH_PDF_BUDGET_PER_CATEGORY.get(cat, 0)
+            assert single_cap <= batch_cap, (
+                "single-course cap for '%s' (%d) must be <= batch cap (%d)"
+                % (cat, single_cap, batch_cap)
+            )
 
         from app.services.scraper.recovery.run_recovery import run_single_course_recovery
 
         sc = self._mock_sc()
         db = self._mock_db(sc)
-        initial_budgets: list[int] = []
+        captured_initial: list[dict] = []
 
         async def mock_extract(url, cats, country=None, metadata=None, pdf_budget=None):
-            if pdf_budget is not None and not initial_budgets:
-                initial_budgets.append(pdf_budget[0])
+            if pdf_budget is not None and not captured_initial:
+                # Snapshot a copy of the initial budget dict on first call
+                captured_initial.append(dict(pdf_budget) if isinstance(pdf_budget, dict) else {"_legacy": pdf_budget[0]})
             if metadata is not None:
                 metadata["source_type"] = "html"
             return []
@@ -1248,19 +1265,25 @@ class TestSingleCourseRecoveryBroadPdf:
 
         self._run(_run())
 
-        assert initial_budgets, (
+        assert captured_initial, (
             "extract_from_url was never called with a pdf_budget; "
-            "run_single_course_recovery must pass its pdf_budget list to extract_from_url"
+            "run_single_course_recovery must pass its pdf_budget dict to extract_from_url"
         )
-        assert initial_budgets[0] == _SINGLE_COURSE_PDF_BUDGET, (
-            "run_single_course_recovery must initialise pdf_budget with "
-            "_SINGLE_COURSE_PDF_BUDGET (%d), got %d"
-            % (_SINGLE_COURSE_PDF_BUDGET, initial_budgets[0])
+        initial = captured_initial[0]
+        assert "_legacy" not in initial, (
+            "run_single_course_recovery must pass a dict[str, int] pdf_budget, not a list"
         )
-        assert initial_budgets[0] < MAX_PDFS_PER_RECOVERY_RUN, (
-            "Single-course pdf_budget initial value (%d) must be lower than "
-            "the batch cap MAX_PDFS_PER_RECOVERY_RUN (%d)"
-            % (initial_budgets[0], MAX_PDFS_PER_RECOVERY_RUN)
+        assert "fees" in initial and "english" in initial, (
+            "pdf_budget dict must contain 'fees' and 'english' keys; got: %r" % initial
+        )
+        assert initial["fees"] == _SINGLE_COURSE_PDF_BUDGET_PER_CATEGORY["fees"], (
+            "run_single_course_recovery must initialise pdf_budget['fees'] with "
+            "_SINGLE_COURSE_PDF_BUDGET_PER_CATEGORY['fees'] (%d), got %d"
+            % (_SINGLE_COURSE_PDF_BUDGET_PER_CATEGORY["fees"], initial["fees"])
+        )
+        assert initial["fees"] < _BATCH_PDF_BUDGET_PER_CATEGORY["fees"], (
+            "Single-course fees budget (%d) must be lower than batch cap (%d)"
+            % (initial["fees"], _BATCH_PDF_BUDGET_PER_CATEGORY["fees"])
         )
 
     def test_no_candidates_writes_trace_rows(self):

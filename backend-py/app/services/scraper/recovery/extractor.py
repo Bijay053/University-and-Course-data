@@ -292,43 +292,108 @@ _PDF_CATEGORY_KEYWORDS: dict[str, list[str]] = {
 _MAX_LINKED_PDFS = 5
 
 # Hard cap on total PDFs fetched across ALL candidate pages for a single
-# university in one recovery pass.  Prevents a fee-schedule-heavy university
-# (e.g. one PDF per faculty) from inflating recovery runtime unpredictably.
+# university in one recovery pass.  Preserved for backward-compat with callers
+# that still pass a legacy list[int] budget; new code uses the per-category
+# dicts below instead.
 MAX_PDFS_PER_RECOVERY_RUN = 10
 
-# Tighter cap used when recovery is triggered for a single course rather than
-# a full batch run.  A single-course trigger only needs a small number of PDFs
-# to fill its missing fields; using the full batch cap here would allow more
-# PDF fetches than necessary for one course.
+# Legacy single-course cap — preserved for backward-compat.
 _SINGLE_COURSE_PDF_BUDGET = 3
 
+# Per-category PDF budgets for a batch recovery pass.  Each category gets its
+# own independent counter so a university with many fees PDFs cannot crowd out
+# English-requirements PDF fetches (and vice-versa).
+_BATCH_PDF_BUDGET_PER_CATEGORY: dict[str, int] = {
+    "fees": 5,
+    "english": 5,
+    "intakes": 3,
+    "location": 3,
+    "requirements": 3,
+}
 
-def make_pdf_budget(*, single_course: bool = False) -> list[int]:
-    """Return a fresh mutable PDF-budget counter for one recovery pass.
+# Tighter per-category caps for a single-course recovery trigger.
+_SINGLE_COURSE_PDF_BUDGET_PER_CATEGORY: dict[str, int] = {
+    "fees": 2,
+    "english": 2,
+    "intakes": 1,
+    "location": 1,
+    "requirements": 1,
+}
 
-    Always use this helper instead of constructing ``[CONSTANT]`` inline.
+
+def make_pdf_budget(*, single_course: bool = False) -> dict[str, int]:
+    """Return a fresh mutable per-category PDF-budget dict for one recovery pass.
+
+    Always use this helper instead of constructing budget objects inline.
     It is the single authoritative place that maps *call-site intent* to the
-    right cap, so new entry points cannot accidentally use the wrong constant.
+    right caps, so new entry points cannot accidentally use the wrong constants.
+
+    Each category gets its own independent counter.  Exhausting the ``fees``
+    budget will not prevent ``english`` (or any other category) PDFs from
+    being fetched in the same pass.
 
     Parameters
     ----------
     single_course:
         ``True``  → single-course trigger (API "re-run recovery" button, or any
-                    future targeted repair path).  Uses ``_SINGLE_COURSE_PDF_BUDGET``
-                    (currently 3) — tight enough to fill one course's missing
-                    fields without over-fetching.
+                    future targeted repair path).  Uses the tighter
+                    ``_SINGLE_COURSE_PDF_BUDGET_PER_CATEGORY`` caps.
         ``False`` → batch recovery pass that processes all staged courses for
                     an entire university in one go.  Uses
-                    ``MAX_PDFS_PER_RECOVERY_RUN`` (currently 10).
+                    ``_BATCH_PDF_BUDGET_PER_CATEGORY`` caps.
 
     Returns
     -------
-    list[int]
-        A one-element mutable list ``[cap]`` ready to be passed as the
-        ``pdf_budget`` argument to :func:`extract_from_url`.
+    dict[str, int]
+        A mutable dict mapping each category name to its remaining PDF budget.
+        Pass as the ``pdf_budget`` argument to :func:`extract_from_url`.
+
+    Notes
+    -----
+    :func:`extract_from_url` also accepts the legacy ``list[int]`` format
+    (a one-element list ``[N]``) as a backward-compatible shim.  In that mode
+    the single counter is shared across all categories, reproducing the old
+    behaviour exactly.
     """
-    cap = _SINGLE_COURSE_PDF_BUDGET if single_course else MAX_PDFS_PER_RECOVERY_RUN
-    return [cap]
+    template = (
+        _SINGLE_COURSE_PDF_BUDGET_PER_CATEGORY
+        if single_course
+        else _BATCH_PDF_BUDGET_PER_CATEGORY
+    )
+    return dict(template)
+
+
+def _budget_remaining_categories(
+    pdf_budget: dict[str, int] | list[int],
+    categories: set[str],
+) -> set[str]:
+    """Return the subset of *categories* that still have PDF budget remaining.
+
+    Handles both the new ``dict[str, int]`` format and the legacy
+    ``list[int]`` (single shared counter) format.
+    """
+    if isinstance(pdf_budget, list):
+        return categories if pdf_budget[0] > 0 else set()
+    return {cat for cat in categories if pdf_budget.get(cat, 0) > 0}
+
+
+def _budget_decrement(
+    pdf_budget: dict[str, int] | list[int],
+    categories: set[str],
+) -> None:
+    """Decrement the PDF budget for each category in *categories*.
+
+    Handles both the new ``dict[str, int]`` format and the legacy
+    ``list[int]`` (single shared counter) format.  In the legacy format the
+    counter is decremented by 1 regardless of how many categories are supplied
+    (one PDF fetch = one budget unit, same as before).
+    """
+    if isinstance(pdf_budget, list):
+        pdf_budget[0] = max(0, pdf_budget[0] - 1)
+    else:
+        for cat in categories:
+            if cat in pdf_budget:
+                pdf_budget[cat] = max(0, pdf_budget[cat] - 1)
 
 
 def score_pdf_link(pdf_url: str, anchor_text: str, categories: set[str]) -> int:
@@ -466,7 +531,7 @@ async def extract_from_url(
     country: str | None = None,
     timeout: float = 12.0,
     metadata: dict | None = None,
-    pdf_budget: list[int] | None = None,
+    pdf_budget: dict[str, int] | list[int] | None = None,
     seen_pdf_urls: set[str] | None = None,
 ) -> list[dict[str, Any]]:
     """Fetch a URL once and run ALL specified category extractors on it.
@@ -488,12 +553,17 @@ async def extract_from_url(
     metadata:
         Optional dict that will be updated with ``source_type`` after fetching.
     pdf_budget:
-        Optional mutable one-element list ``[remaining]`` shared across all
+        Optional per-category budget dict (``dict[str, int]``) shared across all
         ``extract_from_url`` calls for a single university in one recovery pass.
-        Each PDF fetched decrements the counter; when it reaches 0 a WARNING is
-        logged and no further PDFs are fetched for this university.  If
-        ``None``, no cross-URL budget is enforced (``_MAX_LINKED_PDFS`` still
-        caps per-page PDF discovery).
+        Each category has its own independent counter; exhausting the ``fees``
+        budget does not prevent ``english`` (or other category) PDFs from being
+        fetched.  When a PDF is fetched, only the counters for the categories
+        it was run against are decremented.  If ``None``, no cross-URL budget is
+        enforced (``_MAX_LINKED_PDFS`` still caps per-page PDF discovery).
+
+        A legacy ``list[int]`` (one-element ``[remaining]``) is also accepted
+        as a backward-compatible shim; in that mode a single counter is shared
+        across all categories, reproducing the original behaviour.
     seen_pdf_urls:
         Optional mutable set shared across all ``extract_from_url`` calls for a
         single university in one recovery pass.  Any PDF URL (direct or linked)
@@ -524,51 +594,108 @@ async def extract_from_url(
         # Pass categories so only relevant PDFs are fetched.
         pdf_links = await _find_linked_pdfs(html, url, categories=categories)
         for pdf_url in pdf_links:
-            # Skip PDFs already processed in this recovery run.
-            if seen_pdf_urls is not None:
-                if pdf_url in seen_pdf_urls:
-                    log.debug(
-                        "[RECOVERY:extract] PDF %r already fetched in this run — skipping",
-                        pdf_url,
-                    )
-                    continue
-                seen_pdf_urls.add(pdf_url)
-            # Honour the per-university PDF budget when provided.
+            # Guard: skip PDFs already fetched in this recovery run.
+            # IMPORTANT: only CHECK here — do NOT add yet.  The URL is added to
+            # seen_pdf_urls only after the budget/category gating confirms we
+            # will actually fetch the PDF.  Adding eagerly (before the budget
+            # check) would permanently block a later extract_from_url call with
+            # a different category from fetching the same URL even though the
+            # current call's budget for that URL's relevant categories is zero.
+            if seen_pdf_urls is not None and pdf_url in seen_pdf_urls:
+                log.debug(
+                    "[RECOVERY:extract] PDF %r already fetched in this run — skipping",
+                    pdf_url,
+                )
+                continue
+
+            # Narrow to the categories this specific PDF is most relevant for
+            # (URL-based keyword scoring).  When more than one category is in
+            # play, this prevents a fees PDF from consuming english budget (and
+            # vice-versa).  Fall back to the full categories set when the PDF
+            # URL matches no category-specific keywords.
+            if len(categories) > 1:
+                pdf_cats: set[str] = {
+                    cat for cat in categories
+                    if score_pdf_link(pdf_url, "", {cat}) > 0
+                }
+                if not pdf_cats:
+                    pdf_cats = categories
+            else:
+                pdf_cats = categories
+
+            # Honour the per-category PDF budget when provided.
             if pdf_budget is not None:
-                if pdf_budget[0] <= 0:
+                active_cats = _budget_remaining_categories(pdf_budget, pdf_cats)
+                if not active_cats:
                     log.warning(
-                        "[RECOVERY:extract] PDF budget exhausted (MAX_PDFS_PER_RECOVERY_RUN=%d)"
-                        " — skipping remaining PDFs for this university (next skipped: %r)",
-                        MAX_PDFS_PER_RECOVERY_RUN,
+                        "[RECOVERY:extract] PDF budget exhausted for categories=%s"
+                        " — skipping linked PDF %r (not marked seen; other"
+                        " categories may still fetch it)",
+                        pdf_cats,
                         pdf_url,
                     )
-                    break
-                pdf_budget[0] -= 1
-            log.info("[RECOVERY:extract] following linked PDF %r — running extractors", pdf_url)
-            pdf_results = await _extract_from_pdf(pdf_url, categories)
+                    # Do NOT add to seen_pdf_urls: the URL was not fetched, so
+                    # a later call with a category that still has budget should
+                    # still be able to pick it up.
+                    # Don't break either: a later PDF may match a category with
+                    # remaining budget.  Continue to the next linked PDF.
+                    continue
+                # Commit: mark seen and decrement budget before fetching.
+                if seen_pdf_urls is not None:
+                    seen_pdf_urls.add(pdf_url)
+                _budget_decrement(pdf_budget, active_cats)
+                log.info(
+                    "[RECOVERY:extract] following linked PDF %r"
+                    " — running extractors for categories=%s (budgeted)",
+                    pdf_url, active_cats,
+                )
+                pdf_results = await _extract_from_pdf(pdf_url, active_cats)
+            else:
+                # No budget tracking: commit to seen before fetching.
+                if seen_pdf_urls is not None:
+                    seen_pdf_urls.add(pdf_url)
+                log.info(
+                    "[RECOVERY:extract] following linked PDF %r"
+                    " — running extractors for categories=%s",
+                    pdf_url, pdf_cats,
+                )
+                pdf_results = await _extract_from_pdf(pdf_url, pdf_cats)
             results.extend(pdf_results)
 
     elif source_type in ("pdf_direct", "pdf_content_type"):
-        # The URL itself is a PDF — check dedup set first.
-        if seen_pdf_urls is not None:
-            if url in seen_pdf_urls:
-                log.debug(
-                    "[RECOVERY:extract] PDF %r already fetched in this run — skipping", url
-                )
-                return results
-            seen_pdf_urls.add(url)
-        # Counts against the budget too.
+        # Guard: skip direct PDFs already fetched in this recovery run.
+        # As with the linked-PDF path, only CHECK here — do NOT add to
+        # seen_pdf_urls until after the budget gating confirms we will fetch.
+        if seen_pdf_urls is not None and url in seen_pdf_urls:
+            log.debug(
+                "[RECOVERY:extract] PDF %r already fetched in this run — skipping", url
+            )
+            return results
+
+        # Counts against the per-category budget.
         if pdf_budget is not None:
-            if pdf_budget[0] <= 0:
+            active_cats = _budget_remaining_categories(pdf_budget, categories)
+            if not active_cats:
                 log.warning(
-                    "[RECOVERY:extract] PDF budget exhausted (MAX_PDFS_PER_RECOVERY_RUN=%d)"
-                    " — skipping direct PDF %r",
-                    MAX_PDFS_PER_RECOVERY_RUN,
+                    "[RECOVERY:extract] PDF budget exhausted for all categories=%s"
+                    " — skipping direct PDF %r (not marked seen)",
+                    categories,
                     url,
                 )
+                # Do NOT add to seen_pdf_urls: the PDF was not fetched, so a
+                # later call with a category that still has budget can still
+                # fetch it.
                 return results
-            pdf_budget[0] -= 1
-        pdf_results = await _extract_from_pdf(url, categories)
+            # Commit: mark seen and decrement budget before fetching.
+            if seen_pdf_urls is not None:
+                seen_pdf_urls.add(url)
+            _budget_decrement(pdf_budget, active_cats)
+            pdf_results = await _extract_from_pdf(url, active_cats)
+        else:
+            # No budget tracking: commit to seen before fetching.
+            if seen_pdf_urls is not None:
+                seen_pdf_urls.add(url)
+            pdf_results = await _extract_from_pdf(url, categories)
         results.extend(pdf_results)
 
     if not results:

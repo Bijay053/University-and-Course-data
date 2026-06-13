@@ -390,10 +390,11 @@ async def run_recovery_pass(
         for cand in candidates:
             url_to_categories.setdefault(cand["url"], set()).add(cand["category"])
 
-        # One mutable budget counter shared across all candidate-URL fetches for
-        # this university.  Prevents universities with many PDF links from
-        # inflating recovery runtime unpredictably.
-        pdf_budget: list[int] = make_pdf_budget(single_course=False)
+        # Per-category PDF budget shared across all candidate-URL fetches for this
+        # university.  Each category (fees, english, …) has its own independent
+        # counter so a university with many fees PDFs cannot crowd out
+        # english-requirements PDF fetches in the same pass.
+        pdf_budget: dict[str, int] = make_pdf_budget(single_course=False)
 
         # Shared dedup set: a PDF URL that appears both as a direct candidate
         # and as a linked PDF on another HTML page must only be downloaded once.
@@ -629,7 +630,7 @@ async def run_single_course_recovery(
 
     # Per-course PDF budget — tighter than the batch cap because a single-course
     # trigger only needs a handful of PDFs to fill its missing fields.
-    pdf_budget: list[int] = make_pdf_budget(single_course=True)
+    pdf_budget: dict[str, int] = make_pdf_budget(single_course=True)
 
     for url, url_cats in url_to_categories.items():
         meta: dict[str, str] = {}
