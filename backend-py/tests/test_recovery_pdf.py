@@ -1358,3 +1358,156 @@ class TestSingleCourseRecoveryBroadPdf:
             "run_single_course_recovery must return the trace rows even when "
             "no candidates were found; got: %r" % result
         )
+
+
+# ---------------------------------------------------------------------------
+# make_pdf_budget — guard tests for the constant-selection helper
+# ---------------------------------------------------------------------------
+
+class TestMakePdfBudget:
+    """Unit tests that pin the behaviour of make_pdf_budget() so that any
+    future entry point that accidentally constructs a budget inline (rather
+    than calling make_pdf_budget) is caught immediately.
+
+    Four invariants are tested:
+    1. batch path  (single_course=False) → caps from _BATCH_PDF_BUDGET_PER_CATEGORY
+    2. single-course path (single_course=True) → caps from _SINGLE_COURSE_PDF_BUDGET_PER_CATEGORY
+    3. each call returns a *fresh* dict (mutations don't bleed across calls)
+    4. _SINGLE_COURSE_PDF_BUDGET < MAX_PDFS_PER_RECOVERY_RUN (the invariant
+       that makes the guard meaningful)
+    """
+
+    def _imports(self):
+        from app.services.scraper.recovery.extractor import (
+            make_pdf_budget,
+            _BATCH_PDF_BUDGET_PER_CATEGORY,
+            _SINGLE_COURSE_PDF_BUDGET_PER_CATEGORY,
+            _SINGLE_COURSE_PDF_BUDGET,
+            MAX_PDFS_PER_RECOVERY_RUN,
+        )
+        return (
+            make_pdf_budget,
+            _BATCH_PDF_BUDGET_PER_CATEGORY,
+            _SINGLE_COURSE_PDF_BUDGET_PER_CATEGORY,
+            _SINGLE_COURSE_PDF_BUDGET,
+            MAX_PDFS_PER_RECOVERY_RUN,
+        )
+
+    def test_batch_path_returns_batch_caps(self):
+        """make_pdf_budget(single_course=False) must return a dict whose values
+        exactly match _BATCH_PDF_BUDGET_PER_CATEGORY — not the legacy list
+        [MAX_PDFS_PER_RECOVERY_RUN] and not the tighter single-course caps."""
+        (
+            make_pdf_budget,
+            _BATCH_PDF_BUDGET_PER_CATEGORY,
+            _SINGLE_COURSE_PDF_BUDGET_PER_CATEGORY,
+            _SINGLE_COURSE_PDF_BUDGET,
+            MAX_PDFS_PER_RECOVERY_RUN,
+        ) = self._imports()
+
+        result = make_pdf_budget(single_course=False)
+
+        assert isinstance(result, dict), (
+            "make_pdf_budget(single_course=False) must return a dict[str, int], "
+            "not %r" % type(result)
+        )
+        assert result == _BATCH_PDF_BUDGET_PER_CATEGORY, (
+            "make_pdf_budget(single_course=False) returned wrong caps.\n"
+            "Expected: %r\n"
+            "Got:      %r\n"
+            "A new entry point that constructs [MAX_PDFS_PER_RECOVERY_RUN] inline "
+            "instead of calling make_pdf_budget() will fail here."
+            % (_BATCH_PDF_BUDGET_PER_CATEGORY, result)
+        )
+
+    def test_single_course_path_returns_single_course_caps(self):
+        """make_pdf_budget(single_course=True) must return a dict whose values
+        exactly match _SINGLE_COURSE_PDF_BUDGET_PER_CATEGORY — not the tighter
+        legacy scalar _SINGLE_COURSE_PDF_BUDGET and not the batch caps."""
+        (
+            make_pdf_budget,
+            _BATCH_PDF_BUDGET_PER_CATEGORY,
+            _SINGLE_COURSE_PDF_BUDGET_PER_CATEGORY,
+            _SINGLE_COURSE_PDF_BUDGET,
+            MAX_PDFS_PER_RECOVERY_RUN,
+        ) = self._imports()
+
+        result = make_pdf_budget(single_course=True)
+
+        assert isinstance(result, dict), (
+            "make_pdf_budget(single_course=True) must return a dict[str, int], "
+            "not %r" % type(result)
+        )
+        assert result == _SINGLE_COURSE_PDF_BUDGET_PER_CATEGORY, (
+            "make_pdf_budget(single_course=True) returned wrong caps.\n"
+            "Expected: %r\n"
+            "Got:      %r\n"
+            "A new entry point that constructs [_SINGLE_COURSE_PDF_BUDGET] inline "
+            "instead of calling make_pdf_budget(single_course=True) will fail here."
+            % (_SINGLE_COURSE_PDF_BUDGET_PER_CATEGORY, result)
+        )
+
+    def test_each_call_returns_a_fresh_dict(self):
+        """Mutating the dict returned by one make_pdf_budget() call must not
+        affect the dict returned by a subsequent call (i.e. the helper must
+        return a copy, not a reference to the module-level constant)."""
+        (
+            make_pdf_budget,
+            _BATCH_PDF_BUDGET_PER_CATEGORY,
+            _SINGLE_COURSE_PDF_BUDGET_PER_CATEGORY,
+            _SINGLE_COURSE_PDF_BUDGET,
+            MAX_PDFS_PER_RECOVERY_RUN,
+        ) = self._imports()
+
+        for single_course in (False, True):
+            first = make_pdf_budget(single_course=single_course)
+            second = make_pdf_budget(single_course=single_course)
+
+            assert first is not second, (
+                "make_pdf_budget(single_course=%r) returned the same object on "
+                "two consecutive calls — it must return a fresh copy each time "
+                "so that callers can mutate their own budget without bleeding "
+                "into other callers." % single_course
+            )
+
+            # Mutate the first dict and confirm the second is unaffected
+            for key in list(first.keys()):
+                first[key] = 0
+            second_after_mutation = make_pdf_budget(single_course=single_course)
+            expected = (
+                _SINGLE_COURSE_PDF_BUDGET_PER_CATEGORY
+                if single_course
+                else _BATCH_PDF_BUDGET_PER_CATEGORY
+            )
+            assert second_after_mutation == expected, (
+                "After mutating a budget dict returned by make_pdf_budget("
+                "single_course=%r), a subsequent call returned unexpected values.\n"
+                "Expected: %r\n"
+                "Got:      %r\n"
+                "make_pdf_budget must return a dict copy, not the module-level "
+                "constant itself." % (single_course, expected, second_after_mutation)
+            )
+
+    def test_single_course_budget_strictly_less_than_max_recovery_run(self):
+        """_SINGLE_COURSE_PDF_BUDGET < MAX_PDFS_PER_RECOVERY_RUN must hold.
+
+        This invariant is what makes the make_pdf_budget() guard meaningful:
+        single-course recovery triggers must always consume fewer PDF fetches
+        than a full batch pass.  If someone raises _SINGLE_COURSE_PDF_BUDGET
+        to equal or exceed MAX_PDFS_PER_RECOVERY_RUN the guard becomes a no-op.
+        """
+        (
+            make_pdf_budget,
+            _BATCH_PDF_BUDGET_PER_CATEGORY,
+            _SINGLE_COURSE_PDF_BUDGET_PER_CATEGORY,
+            _SINGLE_COURSE_PDF_BUDGET,
+            MAX_PDFS_PER_RECOVERY_RUN,
+        ) = self._imports()
+
+        assert _SINGLE_COURSE_PDF_BUDGET < MAX_PDFS_PER_RECOVERY_RUN, (
+            "_SINGLE_COURSE_PDF_BUDGET (%d) must be strictly less than "
+            "MAX_PDFS_PER_RECOVERY_RUN (%d).  If they become equal the "
+            "make_pdf_budget() guard is meaningless — a single-course trigger "
+            "would be allowed as many PDF fetches as a full batch pass."
+            % (_SINGLE_COURSE_PDF_BUDGET, MAX_PDFS_PER_RECOVERY_RUN)
+        )
