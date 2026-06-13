@@ -276,8 +276,11 @@ async def search_candidate_pages(
                             "matched_keyword": matched_kw,
                         }
 
-                # Add high-scoring links to BFS frontier for deeper traversal
-                if depth < 2:  # max BFS depth = 2 hops from seed
+                # Add high-scoring links to BFS frontier for deeper traversal.
+                # PDFs are skipped here — they cannot be crawled for more links and
+                # their binary content wastes a BFS page slot.  They are still added
+                # to `candidates` above and will be processed by _extract_from_pdf.
+                if depth < 2 and not full_url.lower().endswith(".pdf"):
                     total_score = sum(
                         _path_score(urlparse(full_url).path, cat)
                         + _text_score(anchor_text, cat)
@@ -286,6 +289,11 @@ async def search_candidate_pages(
                     if total_score > 0 and full_url not in visited:
                         visited.add(full_url)
                         frontier.append((full_url, depth + 1))
+                elif full_url.lower().endswith(".pdf") and scores:
+                    log.debug(
+                        "[RECOVERY:search] PDF candidate found: url=%r categories=%s score=%s",
+                        full_url, list(scores.keys()), scores,
+                    )
 
     log.info(
         "[RECOVERY:search] BFS complete — visited %d pages, found %d raw candidates",

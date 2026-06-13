@@ -281,49 +281,116 @@ async def _extract_requirements_text(html: str, url: str) -> list[dict[str, Any]
     return []
 
 
-async def _find_linked_pdfs(html: str, base_url: str) -> list[str]:
-    """Return PDF URLs linked from the page (up to 3)."""
+_PDF_CATEGORY_KEYWORDS: dict[str, list[str]] = {
+    "fees": ["fee", "fees", "tuition", "cost", "costs", "pricing", "international", "schedule"],
+    "english": ["ielts", "english", "language", "requirement", "toefl", "pte", "admission"],
+    "intakes": ["intake", "dates", "calendar", "semester", "trimester", "start"],
+    "location": ["campus", "location", "campuses", "study"],
+    "requirements": ["requirement", "entry", "admission", "prerequisite", "eligibility"],
+}
+
+_MAX_LINKED_PDFS = 5
+
+
+def _score_pdf_link(pdf_url: str, anchor_text: str, categories: set[str]) -> int:
+    """Return a relevance score for a PDF link against the needed categories."""
+    combined = (pdf_url.lower() + " " + anchor_text.lower())
+    score = 0
+    for cat in categories:
+        for kw in _PDF_CATEGORY_KEYWORDS.get(cat, []):
+            if kw in combined:
+                score += 1
+    return score
+
+
+async def _find_linked_pdfs(
+    html: str,
+    base_url: str,
+    categories: set[str] | None = None,
+) -> list[str]:
+    """Return PDF URLs linked from the page, ranked by relevance to needed categories.
+
+    Scores each PDF link against category keywords (URL path + anchor text).
+    Returns at most ``_MAX_LINKED_PDFS`` URLs, highest-scoring first.
+    Un-scored links (no category filter) are returned in discovery order.
+    """
     try:
         from bs4 import BeautifulSoup
         from urllib.parse import urljoin
         soup = BeautifulSoup(html, "html.parser")
-        pdfs: list[str] = []
+        scored: list[tuple[int, str]] = []
+        seen: set[str] = set()
         for a in soup.find_all("a", href=True):
             href = a["href"].strip()
-            if href.lower().endswith(".pdf"):
-                full = urljoin(base_url, href).split("#")[0]
-                if full not in pdfs:
-                    pdfs.append(full)
-                    if len(pdfs) >= 3:
-                        break
-        return pdfs
-    except Exception:
+            if not href.lower().endswith(".pdf"):
+                continue
+            full = urljoin(base_url, href).split("#")[0]
+            if full in seen:
+                continue
+            seen.add(full)
+            anchor_text = a.get_text(" ", strip=True)
+            score = _score_pdf_link(full, anchor_text, categories or set()) if categories else 0
+            scored.append((score, full))
+            log.debug(
+                "[RECOVERY:extract] PDF link found: url=%r anchor=%r score=%d",
+                full, anchor_text[:80], score,
+            )
+        if not scored:
+            return []
+        # Sort by score descending so most-relevant PDFs are fetched first
+        scored.sort(key=lambda t: t[0], reverse=True)
+        result = [url for _, url in scored[:_MAX_LINKED_PDFS]]
+        log.info(
+            "[RECOVERY:extract] %d PDF link(s) found at %r; keeping top %d: %s",
+            len(scored), base_url, len(result), result,
+        )
+        return result
+    except Exception as exc:
+        log.debug("[RECOVERY:extract] _find_linked_pdfs error at %r: %s", base_url, exc)
         return []
 
 
 async def _extract_from_pdf(pdf_url: str, categories: set[str]) -> list[dict[str, Any]]:
-    """Attempt extraction from a PDF URL for all given categories."""
+    """Fetch a PDF and run all given category extractors on its text.
+
+    Uses ``pdf_fetcher.download_pdf_text`` to download and parse the PDF,
+    wraps the plain text in a minimal HTML shell so the existing extractor
+    functions can process it, then tags every result with ``source_type='pdf'``.
+    """
     results: list[dict[str, Any]] = []
     try:
-        from app.services.scraper.pdf_fetcher import fetch_pdf_text
-        pdf_text = await fetch_pdf_text(pdf_url)
+        from app.services.scraper.pdf_fetcher import download_pdf_text
+        log.info("[RECOVERY:extract] fetching PDF %r for categories=%s", pdf_url, categories)
+        pdf_text = await download_pdf_text(pdf_url)
         if not pdf_text:
-            log.debug("[RECOVERY:extract] PDF %r returned no text", pdf_url)
+            log.debug("[RECOVERY:extract] PDF %r returned no text — skipping", pdf_url)
             return results
 
-        log.info("[RECOVERY:extract] scanning PDF %r for categories=%s", pdf_url, categories)
-        # PDF text is plain so wrap in minimal HTML
+        log.info(
+            "[RECOVERY:extract] PDF %r parsed — %d chars; running extractors for categories=%s",
+            pdf_url, len(pdf_text), categories,
+        )
+        # PDF text is plain, so wrap in minimal HTML so the extractors can parse it
         wrapped = f"<html><body><pre>{pdf_text}</pre></body></html>"
         for cat in categories:
             cat_results = await _run_extractor(wrapped, pdf_url, cat)
             for r in cat_results:
                 r["source_type"] = "pdf"
                 r["source_url"] = pdf_url
+                log.debug(
+                    "[RECOVERY:extract] PDF field extracted: pdf=%r field=%r value=%r confidence=%s",
+                    pdf_url, r.get("field"), r.get("value"), r.get("confidence"),
+                )
+            if cat_results:
+                log.info(
+                    "[RECOVERY:extract] PDF %r category=%r → %d field(s) extracted",
+                    pdf_url, cat, len(cat_results),
+                )
             results.extend(cat_results)
     except ImportError:
-        log.debug("[RECOVERY:extract] pdf_fetcher not available, skipping PDF %r", pdf_url)
+        log.debug("[RECOVERY:extract] pdf_fetcher not available — skipping PDF %r", pdf_url)
     except Exception as exc:
-        log.debug("[RECOVERY:extract] PDF extraction error %r: %s", pdf_url, exc)
+        log.warning("[RECOVERY:extract] PDF extraction error for %r: %s", pdf_url, exc)
     return results
 
 
@@ -370,10 +437,11 @@ async def extract_from_url(
             cat_results = await _run_extractor(html, url, cat, country=country)
             results.extend(cat_results)
 
-        # Check for linked PDFs and extract from those too
-        pdf_links = await _find_linked_pdfs(html, url)
+        # Check for linked PDFs and extract from those too.
+        # Pass categories so only relevant PDFs are fetched.
+        pdf_links = await _find_linked_pdfs(html, url, categories=categories)
         for pdf_url in pdf_links:
-            log.info("[RECOVERY:extract] found linked PDF %r — attempting extraction", pdf_url)
+            log.info("[RECOVERY:extract] following linked PDF %r — running extractors", pdf_url)
             pdf_results = await _extract_from_pdf(pdf_url, categories)
             results.extend(pdf_results)
 
