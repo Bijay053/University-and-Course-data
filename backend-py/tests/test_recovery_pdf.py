@@ -1511,3 +1511,289 @@ class TestMakePdfBudget:
             "would be allowed as many PDF fetches as a full batch pass."
             % (_SINGLE_COURSE_PDF_BUDGET, MAX_PDFS_PER_RECOVERY_RUN)
         )
+
+
+# ---------------------------------------------------------------------------
+# Call-site verification — every caller passes the correct single_course flag
+# ---------------------------------------------------------------------------
+
+class TestMakePdfBudgetCallSites:
+    """Integration-level tests that assert every call-site in run_recovery.py
+    passes the expected single_course flag to make_pdf_budget().
+
+    A batch entry point that accidentally passes single_course=True (or a
+    single-course trigger that omits the flag) will silently use the wrong
+    caps at runtime.  These tests catch that class of mistake.
+
+    Strategy: patch make_pdf_budget at its definition site
+    (app.services.scraper.recovery.extractor.make_pdf_budget) with a spy
+    that records the keyword arguments it is called with, then assert the
+    captured kwargs match the expected flag for each entry point.
+
+    The patch target is the definition site because both run_recovery_pass and
+    run_single_course_recovery import make_pdf_budget via a local
+    ``from app.services.scraper.recovery.extractor import make_pdf_budget``
+    statement that executes each time the function is called.  Patching the
+    definition object (not a pre-bound name in the caller's module) is the
+    correct and future-proof target.
+    """
+
+    _MAKE_PDF_BUDGET_PATH = (
+        "app.services.scraper.recovery.extractor.make_pdf_budget"
+    )
+
+    def _run(self, coro):
+        return asyncio.get_event_loop().run_until_complete(coro)
+
+    # ------------------------------------------------------------------ #
+    # Helpers shared by both call-site tests                              #
+    # ------------------------------------------------------------------ #
+
+    def _make_budget_spy(self, real_fn):
+        """Return (spy_fn, calls_list).
+
+        spy_fn is a drop-in replacement for make_pdf_budget that records
+        every (args, kwargs) it receives into calls_list, then delegates
+        to the real function so callers get a valid budget dict back.
+        """
+        calls: list[dict] = []
+
+        def spy(*args, **kwargs):
+            calls.append({"args": args, "kwargs": kwargs})
+            return real_fn(*args, **kwargs)
+
+        return spy, calls
+
+    def _mock_sc(self) -> MagicMock:
+        sc = MagicMock()
+        sc.id = 7
+        sc.scrape_job_id = "callsite-test-run-001"
+        sc.university_id = 88
+        sc.course_name = "Master of Data Science"
+        sc.degree_level = "master"
+        sc.international_fee = None
+        sc.ielts_overall = None
+        sc.intake_months = None
+        sc.course_location = None
+        sc.other_requirement = None
+        sc.course_website = "https://uni.edu.au/courses/mds"
+        return sc
+
+    def _mock_db_single(self, sc: MagicMock) -> AsyncMock:
+        """Minimal DB mock suitable for run_single_course_recovery."""
+        db = AsyncMock()
+        db.get = AsyncMock(return_value=sc)
+        execute_result = MagicMock()
+        execute_result.all = MagicMock(return_value=[])
+        db.execute = AsyncMock(return_value=execute_result)
+        db.commit = AsyncMock()
+        return db
+
+    def _mock_db_batch(self) -> AsyncMock:
+        """Minimal DB mock suitable for run_recovery_pass.
+
+        _get_courses_for_run uses db.execute(...).scalars().all() to return
+        ScrapedCourse ORM rows.  We return a single fake row so the function
+        proceeds past the early-exit guard.
+        """
+        db = AsyncMock()
+
+        fake_row = MagicMock()
+        fake_row.id = 7
+        fake_row.university_id = 88
+        fake_row.course_name = "Master of Data Science"
+        fake_row.degree_level = "master"
+        fake_row.international_fee = None
+        fake_row.ielts_overall = None
+        fake_row.intake_months = None
+        fake_row.course_location = None
+        fake_row.other_requirement = None
+        fake_row.course_website = "https://uni.edu.au/courses/mds"
+        fake_row.status = "pending"
+        fake_row.scrape_job_id = "callsite-test-run-001"
+
+        scalars_mock = MagicMock()
+        scalars_mock.all = MagicMock(return_value=[fake_row])
+        execute_result_courses = MagicMock()
+        execute_result_courses.scalars = MagicMock(return_value=scalars_mock)
+
+        execute_result_evidence = MagicMock()
+        execute_result_evidence.all = MagicMock(return_value=[])
+
+        db.execute = AsyncMock(
+            side_effect=[execute_result_courses, execute_result_evidence]
+        )
+        db.commit = AsyncMock()
+        return db
+
+    # ------------------------------------------------------------------ #
+    # Test 1: run_single_course_recovery → single_course=True            #
+    # ------------------------------------------------------------------ #
+
+    def test_run_single_course_recovery_passes_single_course_true(self):
+        """run_single_course_recovery must call make_pdf_budget with
+        single_course=True.  Passing single_course=False (or omitting it)
+        would give this path the full batch caps, allowing a single
+        operator-triggered re-run to consume as many PDF fetches as an
+        entire university's batch recovery pass."""
+        from app.services.scraper.recovery.run_recovery import (
+            run_single_course_recovery,
+        )
+        from app.services.scraper.recovery.extractor import (
+            make_pdf_budget as real_make_pdf_budget,
+        )
+
+        sc = self._mock_sc()
+        db = self._mock_db_single(sc)
+        spy, calls = self._make_budget_spy(real_make_pdf_budget)
+
+        _candidate = {
+            "url": "https://uni.edu.au/fees",
+            "category": "fees",
+            "score": 5,
+            "path_score": 2,
+            "matched_keyword": "fees",
+            "via_broad_scorer": False,
+        }
+
+        async def _run():
+            from contextlib import ExitStack
+            with ExitStack() as stack:
+                stack.enter_context(patch(
+                    "app.services.scraper.recovery.run_recovery._get_university_info",
+                    new=AsyncMock(return_value={
+                        "scrape_url": "https://uni.edu.au",
+                        "country": "AU",
+                        "scrape_config": {},
+                    }),
+                ))
+                stack.enter_context(patch(
+                    "app.services.scraper.recovery.detector.detect_missing_fields",
+                    return_value=["international_fee"],
+                ))
+                stack.enter_context(patch(
+                    "app.services.scraper.recovery.searcher.search_candidate_pages",
+                    new=AsyncMock(return_value=[_candidate]),
+                ))
+                stack.enter_context(patch(
+                    self._MAKE_PDF_BUDGET_PATH,
+                    side_effect=spy,
+                ))
+                stack.enter_context(patch(
+                    "app.services.scraper.recovery.extractor.extract_from_url",
+                    new=AsyncMock(return_value=[]),
+                ))
+                stack.enter_context(patch(
+                    "app.services.scraper.recovery.mapper.map_results_to_course",
+                    return_value=({}, {}),
+                ))
+                stack.enter_context(patch(
+                    "app.services.scraper.recovery.run_recovery._fetch_all_rows_for_course",
+                    new=AsyncMock(return_value=[]),
+                ))
+                return await run_single_course_recovery(sc.id, db)
+
+        self._run(_run())
+
+        assert calls, (
+            "make_pdf_budget was never called inside run_single_course_recovery. "
+            "Ensure the function calls make_pdf_budget() to initialise its "
+            "per-course PDF budget before calling extract_from_url."
+        )
+        for call in calls:
+            actual_flag = call["kwargs"].get("single_course", False)
+            assert actual_flag is True, (
+                "run_single_course_recovery must pass single_course=True to "
+                "make_pdf_budget(); got single_course=%r.\n"
+                "Passing single_course=False gives this per-course trigger the "
+                "same large caps as a full batch pass, defeating the guard."
+                % actual_flag
+            )
+
+    # ------------------------------------------------------------------ #
+    # Test 2: run_recovery_pass → single_course=False                    #
+    # ------------------------------------------------------------------ #
+
+    def test_run_recovery_pass_passes_single_course_false(self):
+        """run_recovery_pass must call make_pdf_budget with single_course=False
+        (or rely on the default, which is also False).  Passing single_course=True
+        would silently cap every per-university batch recovery to the tighter
+        single-course limits, causing the batch pass to under-fetch PDFs."""
+        from app.services.scraper.recovery.run_recovery import run_recovery_pass
+        from app.services.scraper.recovery.extractor import (
+            make_pdf_budget as real_make_pdf_budget,
+        )
+
+        db = self._mock_db_batch()
+        spy, calls = self._make_budget_spy(real_make_pdf_budget)
+
+        _candidate = {
+            "url": "https://uni.edu.au/fees",
+            "category": "fees",
+            "score": 5,
+            "path_score": 2,
+            "matched_keyword": "fees",
+            "via_broad_scorer": False,
+        }
+
+        async def _run():
+            from contextlib import ExitStack
+            with ExitStack() as stack:
+                stack.enter_context(patch(
+                    "app.services.scraper.recovery.run_recovery._get_university_info",
+                    new=AsyncMock(return_value={
+                        "scrape_url": "https://uni.edu.au",
+                        "country": "AU",
+                        "scrape_config": {},
+                    }),
+                ))
+                stack.enter_context(patch(
+                    "app.services.scraper.recovery.detector.detect_missing_fields",
+                    return_value=["international_fee"],
+                ))
+                stack.enter_context(patch(
+                    "app.services.scraper.recovery.searcher.search_candidate_pages",
+                    new=AsyncMock(return_value=[_candidate]),
+                ))
+                stack.enter_context(patch(
+                    "app.services.scraper.recovery.run_recovery._existing_recovery_fields",
+                    new=AsyncMock(return_value=set()),
+                ))
+                stack.enter_context(patch(
+                    self._MAKE_PDF_BUDGET_PATH,
+                    side_effect=spy,
+                ))
+                stack.enter_context(patch(
+                    "app.services.scraper.recovery.extractor.extract_from_url",
+                    new=AsyncMock(return_value=[]),
+                ))
+                stack.enter_context(patch(
+                    "app.services.scraper.recovery.mapper.map_results_to_course",
+                    return_value={},
+                ))
+                stack.enter_context(patch(
+                    "app.services.scraper.recovery.run_recovery._write_recovery_results",
+                    new=AsyncMock(return_value=0),
+                ))
+                stack.enter_context(patch(
+                    "app.services.scraper.config.context.get_uni_config",
+                    return_value=None,
+                ))
+                return await run_recovery_pass("callsite-test-run-001", db)
+
+        self._run(_run())
+
+        assert calls, (
+            "make_pdf_budget was never called inside run_recovery_pass. "
+            "Ensure the function calls make_pdf_budget() to initialise its "
+            "per-university PDF budget before calling extract_from_url."
+        )
+        for call in calls:
+            actual_flag = call["kwargs"].get("single_course", False)
+            assert actual_flag is False, (
+                "run_recovery_pass must pass single_course=False (or rely on the "
+                "default) to make_pdf_budget(); got single_course=%r.\n"
+                "Passing single_course=True would silently cap each university's "
+                "batch recovery to the tighter per-course limits."
+                % actual_flag
+            )
