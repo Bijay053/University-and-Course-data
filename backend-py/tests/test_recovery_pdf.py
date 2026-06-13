@@ -919,3 +919,351 @@ class TestRunRecoveryPassFallbackPdf:
         assert budget[0] == 0, (
             "pdf_budget must remain 0 when the PDF was skipped; got %d" % budget[0]
         )
+
+
+# ---------------------------------------------------------------------------
+# run_single_course_recovery: pdf_broad tagging, budget, trace rows
+# ---------------------------------------------------------------------------
+
+class TestSingleCourseRecoveryBroadPdf:
+    """run_single_course_recovery has its own url_is_broad tagging block and
+    its own pdf_budget allocation (mirroring run_recovery_pass).
+
+    Tests verify:
+    1. A via_broad_scorer=True PDF candidate that flows through the function
+       results in source_type='pdf_broad' (not 'pdf') by the time it is passed
+       to map_results_to_course.
+    2. The pdf_budget kwarg is passed to extract_from_url and is decremented
+       when the extractor processes a direct PDF URL.
+    3. When search_candidate_pages returns no candidates, _write_trace_row is
+       called once per needed field with status='no_source'.
+    4. The gap PDF URL reaches extract_from_url (candidate not silently dropped).
+    """
+
+    _GAP_PDF_URL = "https://uni.edu.au/download/2024-international-prospectus.pdf"
+    _SEED_URL = "https://uni.edu.au"
+    _SC_ID = 42
+    _SCRAPE_RUN_ID = "single-course-test-run-001"
+
+    def _run(self, coro):
+        return asyncio.get_event_loop().run_until_complete(coro)
+
+    def _mock_sc(self) -> MagicMock:
+        """Return a MagicMock that looks like a ScrapedCourse ORM row."""
+        sc = MagicMock()
+        sc.id = self._SC_ID
+        sc.scrape_job_id = self._SCRAPE_RUN_ID
+        sc.university_id = 99
+        sc.course_name = "Bachelor of Commerce"
+        sc.degree_level = "bachelor"
+        sc.international_fee = None
+        sc.ielts_overall = 6.5
+        sc.intake_months = "February,July"
+        sc.course_location = "Sydney"
+        sc.other_requirement = None
+        return sc
+
+    def _mock_db(self, sc: MagicMock) -> AsyncMock:
+        """Return a minimal AsyncSession mock with pre-wired get/execute/commit."""
+        db = AsyncMock()
+        db.get = AsyncMock(return_value=sc)
+        # evidence query (.all()) and DELETE statement both go through execute
+        execute_result = MagicMock()
+        execute_result.all = MagicMock(return_value=[])
+        db.execute = AsyncMock(return_value=execute_result)
+        db.commit = AsyncMock()
+        return db
+
+    def _broad_candidate(self) -> dict:
+        return {
+            "url": self._GAP_PDF_URL,
+            "category": "fees",
+            "score": 3,
+            "path_score": 1,
+            "matched_keyword": "international",
+            "via_broad_scorer": True,
+        }
+
+    def _fee_result(self) -> dict:
+        return {
+            "field": "international_fee",
+            "value": 28000.0,
+            "normalized": 28000.0,
+            "confidence": 0.85,
+            "snippet": "International tuition fee: AUD 28,000 per year",
+            "method": "table",
+            "source_url": self._GAP_PDF_URL,
+            "source_type": "pdf",
+        }
+
+    def _common_patches(self, sc: MagicMock):
+        """Return a list of patch context managers shared across tests."""
+        return [
+            patch(
+                "app.services.scraper.recovery.run_recovery._get_university_info",
+                new=AsyncMock(return_value={
+                    "scrape_url": self._SEED_URL,
+                    "country": "AU",
+                    "scrape_config": {},
+                }),
+            ),
+            patch(
+                "app.services.scraper.recovery.detector.detect_missing_fields",
+                return_value=["international_fee"],
+            ),
+            patch(
+                "app.services.scraper.recovery.run_recovery._write_recovery_results",
+                new=AsyncMock(return_value=1),
+            ),
+            patch(
+                "app.services.scraper.recovery.run_recovery._fetch_all_rows_for_course",
+                new=AsyncMock(return_value=[]),
+            ),
+        ]
+
+    # ------------------------------------------------------------------ #
+
+    def test_broad_pdf_candidate_reaches_extractor(self):
+        """extract_from_url must be called with the gap PDF URL when
+        search_candidate_pages returns a via_broad_scorer=True candidate.
+        The fallback-discovered PDF must not be silently dropped between
+        the searcher output and the extraction step."""
+        from app.services.scraper.recovery.run_recovery import run_single_course_recovery
+
+        sc = self._mock_sc()
+        db = self._mock_db(sc)
+        extract_calls: list[tuple] = []
+
+        async def mock_extract(url, cats, **kwargs):
+            extract_calls.append((url, frozenset(cats)))
+            return [dict(self._fee_result())] if url == self._GAP_PDF_URL else []
+
+        async def _run():
+            patches = self._common_patches(sc) + [
+                patch(
+                    "app.services.scraper.recovery.searcher.search_candidate_pages",
+                    new=AsyncMock(return_value=[self._broad_candidate()]),
+                ),
+                patch(
+                    "app.services.scraper.recovery.extractor.extract_from_url",
+                    side_effect=mock_extract,
+                ),
+                patch(
+                    "app.services.scraper.recovery.mapper.map_results_to_course",
+                    return_value=({"international_fee": dict(self._fee_result())}, {}),
+                ),
+            ]
+            ctx: Any = patches[0]
+            for p in patches[1:]:
+                ctx = ctx.__class__.__new__(ctx.__class__)
+                # Use contextlib.ExitStack instead
+            from contextlib import AsyncExitStack, ExitStack
+            with ExitStack() as stack:
+                for p in patches:
+                    stack.enter_context(p)
+                return await run_single_course_recovery(self._SC_ID, db)
+
+        self._run(_run())
+
+        pdf_calls = [url for url, _ in extract_calls if ".pdf" in url]
+        assert pdf_calls, (
+            "extract_from_url was never called with the gap PDF URL.\n"
+            "calls seen: %r\n"
+            "run_single_course_recovery must not drop via_broad_scorer=True "
+            "candidates before the extraction step." % extract_calls
+        )
+        assert any(self._GAP_PDF_URL in url for url in pdf_calls), (
+            "Expected extract_from_url to be called with %r; "
+            "got calls: %r" % (self._GAP_PDF_URL, extract_calls)
+        )
+
+    def test_broad_pdf_result_tagged_pdf_broad(self):
+        """PDF results from a via_broad_scorer=True URL must have
+        source_type='pdf_broad' (not 'pdf') by the time they reach
+        map_results_to_course."""
+        from app.services.scraper.recovery.run_recovery import run_single_course_recovery
+
+        sc = self._mock_sc()
+        db = self._mock_db(sc)
+        captured_map_inputs: list[list] = []
+
+        def mock_map(all_results, degree_level=None, course_name=None, return_rejects=False):
+            captured_map_inputs.append(list(all_results))
+            fee = next((r for r in all_results if r.get("field") == "international_fee"), None)
+            mapped = {"international_fee": fee} if fee else {}
+            return (mapped, {}) if return_rejects else mapped
+
+        async def _run():
+            from contextlib import ExitStack
+            patches = self._common_patches(sc) + [
+                patch(
+                    "app.services.scraper.recovery.searcher.search_candidate_pages",
+                    new=AsyncMock(return_value=[self._broad_candidate()]),
+                ),
+                patch(
+                    "app.services.scraper.recovery.extractor.extract_from_url",
+                    new=AsyncMock(return_value=[dict(self._fee_result())]),
+                ),
+                patch(
+                    "app.services.scraper.recovery.mapper.map_results_to_course",
+                    side_effect=mock_map,
+                ),
+            ]
+            with ExitStack() as stack:
+                for p in patches:
+                    stack.enter_context(p)
+                return await run_single_course_recovery(self._SC_ID, db)
+
+        self._run(_run())
+
+        assert captured_map_inputs, (
+            "map_results_to_course was never called — the extraction result "
+            "was dropped before reaching the mapping step"
+        )
+        all_seen = [r for batch in captured_map_inputs for r in batch]
+        fee_results = [r for r in all_seen if r.get("field") == "international_fee"]
+        assert fee_results, (
+            "No international_fee result reached map_results_to_course; "
+            "all results seen: %r" % all_seen
+        )
+        for r in fee_results:
+            assert r.get("source_type") == "pdf_broad", (
+                "Result from a via_broad_scorer PDF must have source_type='pdf_broad' "
+                "by the time it reaches map_results_to_course; "
+                "got source_type=%r for result=%r" % (r.get("source_type"), r)
+            )
+            assert r.get("source_url") == self._GAP_PDF_URL, (
+                "source_url must be the gap PDF URL; got %r" % r.get("source_url")
+            )
+
+    def test_pdf_budget_passed_and_decremented(self):
+        """run_single_course_recovery must pass a pdf_budget list to
+        extract_from_url.  A side_effect that simulates the real decrement
+        confirms the budget is threaded correctly and is mutable (so the guard
+        in the extractor can enforce the per-university cap)."""
+        from app.services.scraper.recovery.run_recovery import run_single_course_recovery
+
+        sc = self._mock_sc()
+        db = self._mock_db(sc)
+        captured_budgets: list[list] = []
+
+        async def mock_extract(url, cats, country=None, metadata=None, pdf_budget=None):
+            if pdf_budget is not None:
+                captured_budgets.append(pdf_budget)
+                # Simulate real extractor decrement for a direct PDF URL
+                if url.lower().endswith(".pdf") and pdf_budget[0] > 0:
+                    pdf_budget[0] -= 1
+            if metadata is not None:
+                metadata["source_type"] = "pdf_direct"
+            return [dict(self._fee_result())] if url == self._GAP_PDF_URL else []
+
+        async def _run():
+            from contextlib import ExitStack
+            patches = self._common_patches(sc) + [
+                patch(
+                    "app.services.scraper.recovery.searcher.search_candidate_pages",
+                    new=AsyncMock(return_value=[self._broad_candidate()]),
+                ),
+                patch(
+                    "app.services.scraper.recovery.extractor.extract_from_url",
+                    side_effect=mock_extract,
+                ),
+                patch(
+                    "app.services.scraper.recovery.mapper.map_results_to_course",
+                    return_value=({"international_fee": dict(self._fee_result())}, {}),
+                ),
+            ]
+            with ExitStack() as stack:
+                for p in patches:
+                    stack.enter_context(p)
+                return await run_single_course_recovery(self._SC_ID, db)
+
+        self._run(_run())
+
+        assert captured_budgets, (
+            "extract_from_url was not called with a pdf_budget argument; "
+            "run_single_course_recovery must pass its pdf_budget list to "
+            "extract_from_url so the per-university cap is enforced."
+        )
+        budget = captured_budgets[0]
+        assert isinstance(budget, list), (
+            "pdf_budget must be a mutable list (not %r)" % type(budget)
+        )
+        from app.services.scraper.recovery.extractor import MAX_PDFS_PER_RECOVERY_RUN
+        assert budget[0] == MAX_PDFS_PER_RECOVERY_RUN - 1, (
+            "pdf_budget must be decremented by 1 after processing a direct PDF URL; "
+            "expected %d, got %d" % (MAX_PDFS_PER_RECOVERY_RUN - 1, budget[0])
+        )
+
+    def test_no_candidates_writes_trace_rows(self):
+        """When search_candidate_pages returns an empty list,
+        run_single_course_recovery must write a 'no_source' trace row for
+        every needed field and return the resulting rows (no extraction is
+        attempted)."""
+        from app.services.scraper.recovery.run_recovery import run_single_course_recovery
+
+        sc = self._mock_sc()
+        db = self._mock_db(sc)
+        trace_calls: list[tuple] = []
+
+        async def mock_write_trace(db_, sc_id, run_id, field, status, reason, **kw):
+            trace_calls.append((sc_id, field, status))
+
+        async def _run():
+            from contextlib import ExitStack
+            patches = [
+                patch(
+                    "app.services.scraper.recovery.run_recovery._get_university_info",
+                    new=AsyncMock(return_value={
+                        "scrape_url": self._SEED_URL,
+                        "country": "AU",
+                        "scrape_config": {},
+                    }),
+                ),
+                patch(
+                    "app.services.scraper.recovery.detector.detect_missing_fields",
+                    return_value=["international_fee", "other_requirement"],
+                ),
+                patch(
+                    "app.services.scraper.recovery.searcher.search_candidate_pages",
+                    new=AsyncMock(return_value=[]),
+                ),
+                patch(
+                    "app.services.scraper.recovery.run_recovery._write_trace_row",
+                    side_effect=mock_write_trace,
+                ),
+                patch(
+                    "app.services.scraper.recovery.run_recovery._fetch_all_rows_for_course",
+                    new=AsyncMock(return_value=[{"field": "international_fee", "status": "no_source"}]),
+                ),
+            ]
+            with ExitStack() as stack:
+                for p in patches:
+                    stack.enter_context(p)
+                return await run_single_course_recovery(self._SC_ID, db)
+
+        result = self._run(_run())
+
+        assert trace_calls, (
+            "_write_trace_row was never called even though no candidates were found; "
+            "run_single_course_recovery must write trace rows when the BFS search "
+            "yields no candidate pages"
+        )
+        fields_traced = {field for _, field, _ in trace_calls}
+        assert "international_fee" in fields_traced, (
+            "Expected a trace row for 'international_fee'; "
+            "trace_calls=%r" % trace_calls
+        )
+        assert "other_requirement" in fields_traced, (
+            "Expected a trace row for 'other_requirement'; "
+            "trace_calls=%r" % trace_calls
+        )
+        statuses = {status for _, _, status in trace_calls}
+        assert statuses == {"no_source"}, (
+            "All trace rows must have status='no_source' when no candidates found; "
+            "got statuses=%r" % statuses
+        )
+        assert result, (
+            "run_single_course_recovery must return the trace rows even when "
+            "no candidates were found; got: %r" % result
+        )
