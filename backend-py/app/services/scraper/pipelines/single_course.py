@@ -5807,6 +5807,32 @@ async def extract_course(
             #   applying them to PG courses is wrong, hence the pg_skip flag.
             _course_dl = (payload.get("degree_level") or "").strip()
             _english_by_level: dict = central_data.get("english_by_level") or {}
+            # Re-infer degree_level from the AI-enriched course_name when the
+            # raw HTML extractor missed it.  JS-rendered sites (e.g. law.ac.uk)
+            # return a minimal shell on a plain HTTP fetch so the degree_level
+            # extractor fires on content-free HTML and returns no match.  The AI
+            # fallback then enriches course_name (e.g. "LLM Journalism and the
+            # Law") but does not back-fill degree_level, leaving _course_dl
+            # empty and causing Path 1 to fall back to the "undergraduate" bucket
+            # — applying UG IELTS 6.0 to every LLM / MBA / MSc course.
+            # Guard: only re-infer when a separate "postgraduate" bucket exists
+            # in english_by_level.  If the central page is level-uniform (single
+            # bucket only) the bucket choice doesn't affect the outcome anyway.
+            if not _course_dl and _english_by_level.get("postgraduate"):
+                _cn_for_dl = (payload.get("course_name") or "").strip()
+                if _cn_for_dl:
+                    try:
+                        from app.services.scraper.extractors.degree_level import (
+                            classify_degree_level as _classify_dl,
+                        )
+                        _inferred_dl, _, _ = _classify_dl(_cn_for_dl, "")
+                        if _inferred_dl:
+                            _course_dl = _inferred_dl
+                            # Also back-fill payload so staging sees the correct
+                            # degree_level without waiting for sanitize_degree_level.
+                            payload.setdefault("degree_level", _inferred_dl)
+                    except Exception:  # noqa: BLE001
+                        pass
             # Diploma/Advanced Diploma programs sit between pathway programs
             # and bachelor-level courses in the KBS column-keyed table.  They
             # have a separate "diploma" by_level key populated by the

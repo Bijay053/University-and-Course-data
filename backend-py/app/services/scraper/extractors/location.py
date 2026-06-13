@@ -574,12 +574,22 @@ def _sanitise_for_display(raw: str | None) -> str | None:
     def _strip_avail(part: str) -> str:
         return _CAMPUS_AVAILABILITY_SUFFIX_RE.sub("", part).strip()
 
-    parts = [
-        _strip_avail(p.strip()) for p in raw.split(",")
-        if _strip_avail(p.strip())
-        and not _REMOVE_VIRTUAL.search(p)
-        and _strip_avail(p.strip()).lower() not in _COUNTRY_NAME_PARTS_LC
-    ]
+    # Build the parts list by stripping virtual-delivery tokens from within
+    # each comma-separated segment rather than discarding the whole segment.
+    # Without this, a string like "Bristol, London Moorgate and Online" only
+    # yields "Bristol": the second comma-part ("London Moorgate and Online")
+    # matches _REMOVE_VIRTUAL and was previously dropped wholesale, losing
+    # the valid physical campus "London Moorgate".
+    parts = []
+    for _raw_part in raw.split(","):
+        _q = _REMOVE_VIRTUAL.sub("", _raw_part)
+        # Strip dangling conjunctions left after removing a virtual token at
+        # the end ("London Moorgate and ") or the start (" and London Moorgate").
+        _q = re.sub(r"\s*\b(?:and|or)\b\s*$", "", _q, flags=re.IGNORECASE)
+        _q = re.sub(r"^\s*\b(?:and|or)\b\s*", "", _q, flags=re.IGNORECASE)
+        _q = _strip_avail(_q.strip())
+        if _q and _q.lower() not in _COUNTRY_NAME_PARTS_LC:
+            parts.append(_q)
     if parts:
         # de-dup preserving order
         seen: set[str] = set()
