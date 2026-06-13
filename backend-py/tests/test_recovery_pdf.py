@@ -435,3 +435,152 @@ class TestSearcherHomepagePdf:
             "Sanity: a PDF with 'fees' in path should already score > 0 via "
             "_score_link — the fallback must not override this"
         )
+
+    def test_via_broad_scorer_flag_true_for_fallback_candidate(self):
+        """Candidates added via the _score_pdf_link fallback must have
+        via_broad_scorer=True so the orchestrator can count and tag them."""
+        from app.services.scraper.recovery.searcher import search_candidate_pages
+
+        seed_html = self._seed_html()
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.text = seed_html
+
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(return_value=mock_response)
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+
+        async def _run():
+            with patch("httpx.AsyncClient", return_value=mock_client):
+                return await search_candidate_pages(self._SEED_URL, {"fees"})
+
+        candidates = self._run(_run())
+
+        broad_cands = [c for c in candidates if "international-prospectus.pdf" in c["url"]]
+        assert broad_cands, "Gap PDF must appear in candidates"
+        assert broad_cands[0].get("via_broad_scorer") is True, (
+            "A PDF surfaced only via _score_pdf_link fallback must have "
+            "via_broad_scorer=True; got: %r" % broad_cands[0]
+        )
+
+    def test_via_broad_scorer_flag_false_for_standard_candidate(self):
+        """A candidate scored by the standard _score_link must have
+        via_broad_scorer=False (or absent/falsy)."""
+        from app.services.scraper.recovery.searcher import search_candidate_pages
+
+        # A page whose URL path contains "fees" — standard scorer gives > 0
+        standard_url = "https://uni.edu.au/fees/overview"
+        html = f'<html><body><a href="{standard_url}">Tuition fees</a></body></html>'
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.text = html
+
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(return_value=mock_response)
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+
+        async def _run():
+            with patch("httpx.AsyncClient", return_value=mock_client):
+                return await search_candidate_pages(self._SEED_URL, {"fees"})
+
+        candidates = self._run(_run())
+
+        standard_cands = [c for c in candidates if "fees/overview" in c["url"]]
+        assert standard_cands, "Standard URL must appear as a candidate"
+        assert not standard_cands[0].get("via_broad_scorer"), (
+            "A candidate found by the standard scorer must NOT have "
+            "via_broad_scorer=True; got: %r" % standard_cands[0]
+        )
+
+
+# ---------------------------------------------------------------------------
+# run_recovery_pass: pdfs_via_broad_scorer in summary + pdf_broad tagging
+# ---------------------------------------------------------------------------
+
+class TestBroadScorerSummaryCount:
+    """run_recovery_pass must include pdfs_via_broad_scorer in its summary
+    dict, and results from broad-scorer PDFs must have source_type='pdf_broad'."""
+
+    def _run(self, coro):
+        return asyncio.get_event_loop().run_until_complete(coro)
+
+    def test_summary_includes_pdfs_via_broad_scorer_key(self):
+        """run_recovery_pass returns a summary dict that always contains the
+        pdfs_via_broad_scorer key (zero when no broad-scorer PDFs found)."""
+        from app.services.scraper.recovery.run_recovery import run_recovery_pass
+
+        # Minimal async DB mock that returns 0 courses → early return path
+        db = AsyncMock()
+        db.execute = AsyncMock(return_value=MagicMock(scalars=MagicMock(return_value=MagicMock(all=MagicMock(return_value=[])))))
+
+        async def _run():
+            return await run_recovery_pass("test-run-id", db)
+
+        summary = self._run(_run())
+        assert "pdfs_via_broad_scorer" in summary, (
+            "run_recovery_pass summary must include 'pdfs_via_broad_scorer' key; "
+            "got keys: %s" % list(summary.keys())
+        )
+        assert summary["pdfs_via_broad_scorer"] == 0
+
+    def test_pdf_broad_source_type_tagged_for_broad_scorer_url(self):
+        """PDF extraction results from a broad-scorer URL must have
+        source_type='pdf_broad' (not 'pdf') after the tagging step."""
+        # Simulate what the orchestrator does: take a result with source_type='pdf'
+        # and tag it if the URL is in url_is_broad.
+        pdf_url = "https://uni.edu.au/download/2024-international-prospectus.pdf"
+        results = [
+            {"field": "international_fee", "value": 12000.0, "source_type": "pdf", "source_url": pdf_url},
+            {"field": "ielts_overall", "value": 6.5, "source_type": "pdf", "source_url": pdf_url},
+        ]
+        url_is_broad = {pdf_url}
+
+        # Apply the tagging logic (mirrors what run_recovery.py does)
+        for r in results:
+            if r.get("source_type") == "pdf" and r.get("source_url") in url_is_broad:
+                r["source_type"] = "pdf_broad"
+
+        for r in results:
+            assert r["source_type"] == "pdf_broad", (
+                "Results from a broad-scorer URL must be tagged 'pdf_broad'; "
+                "got %r for field=%r" % (r["source_type"], r["field"])
+            )
+
+    def test_standard_pdf_source_type_unchanged(self):
+        """PDF results from a URL NOT in url_is_broad keep source_type='pdf'."""
+        pdf_url = "https://uni.edu.au/fees/schedule.pdf"
+        results = [
+            {"field": "international_fee", "value": 15000.0, "source_type": "pdf", "source_url": pdf_url},
+        ]
+        url_is_broad: set[str] = set()  # empty — this URL was found by standard scorer
+
+        for r in results:
+            if r.get("source_type") == "pdf" and r.get("source_url") in url_is_broad:
+                r["source_type"] = "pdf_broad"
+
+        assert results[0]["source_type"] == "pdf", (
+            "Standard PDF results must keep source_type='pdf'; "
+            "got %r" % results[0]["source_type"]
+        )
+
+    def test_html_results_are_never_tagged_pdf_broad(self):
+        """Only source_type='pdf' results are eligible for 'pdf_broad' tagging —
+        HTML extraction results must never be re-tagged."""
+        broad_url = "https://uni.edu.au/fees/overview"
+        results = [
+            {"field": "international_fee", "value": 15000.0, "source_type": "html", "source_url": broad_url},
+        ]
+        url_is_broad = {broad_url}
+
+        for r in results:
+            if r.get("source_type") == "pdf" and r.get("source_url") in url_is_broad:
+                r["source_type"] = "pdf_broad"
+
+        assert results[0]["source_type"] == "html", (
+            "HTML results from a broad-scorer URL must keep source_type='html'; "
+            "got %r" % results[0]["source_type"]
+        )

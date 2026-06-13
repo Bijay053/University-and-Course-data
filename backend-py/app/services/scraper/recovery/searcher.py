@@ -275,11 +275,13 @@ async def search_candidate_pages(
                 # the HTML-page scoring dicts.  This ensures PDFs are surfaced
                 # from *any* BFS-visited page, not only from pages that are
                 # themselves high-scoring HTML candidates.
+                _via_broad = False
                 if full_url.lower().endswith(".pdf") and not scores and _pdf_link_scorer is not None:
                     for cat in needed_categories:
                         ps = _pdf_link_scorer(full_url, anchor_text, {cat})
                         if ps > 0:
                             scores[cat] = ps
+                            _via_broad = True
 
                 for cat, score in scores.items():
                     key = (full_url, cat)
@@ -299,6 +301,10 @@ async def search_candidate_pages(
                             "score": score,
                             "path_score": ps,
                             "matched_keyword": matched_kw,
+                            # True when surfaced only by the broader _score_pdf_link
+                            # fallback (standard _score_link gave 0).  Used by the
+                            # orchestrator to count and tag 'pdf_broad' results.
+                            "via_broad_scorer": _via_broad,
                         }
 
                 # Add high-scoring links to BFS frontier for deeper traversal.

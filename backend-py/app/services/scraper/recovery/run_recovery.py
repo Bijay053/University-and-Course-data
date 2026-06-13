@@ -294,7 +294,7 @@ async def run_recovery_pass(
     courses = await _get_courses_for_run(db, scrape_run_id)
     if not courses:
         log.info("[RECOVERY] no staged courses found for run %r", scrape_run_id)
-        return {"courses_examined": 0, "fields_recovered": 0, "results_written": 0}
+        return {"courses_examined": 0, "fields_recovered": 0, "results_written": 0, "pdfs_via_broad_scorer": 0}
 
     course_ids = [c["id"] for c in courses]
     evidence_map = await _get_evidence_for_courses(db, course_ids)
@@ -308,6 +308,7 @@ async def run_recovery_pass(
     total_examined = 0
     total_fields = 0
     total_written = 0
+    total_broad_scorer_pdfs = 0
 
     for uni_id, uni_courses in uni_groups.items():
         uni_info = await _get_university_info(db, uni_id)
@@ -360,6 +361,23 @@ async def run_recovery_pass(
             log.info("[RECOVERY] uni_id=%s — no candidates found", uni_id)
             continue
 
+        # Count and log PDFs surfaced only by the broad-keyword fallback scorer.
+        # via_broad_scorer=True means _score_link gave 0 and _score_pdf_link gave >0.
+        broad_pdfs_this_uni = sum(1 for c in candidates if c.get("via_broad_scorer"))
+        total_broad_scorer_pdfs += broad_pdfs_this_uni
+        if broad_pdfs_this_uni:
+            log.info(
+                "[RECOVERY] uni_id=%s — %d PDF candidate(s) surfaced via broad-keyword "
+                "fallback scorer (would have been missed by standard link scorer)",
+                uni_id, broad_pdfs_this_uni,
+            )
+
+        # URLs discovered via the broad-keyword fallback — their PDF results will
+        # be tagged source_type='pdf_broad' so the summary API can count them.
+        url_is_broad: set[str] = {
+            c["url"] for c in candidates if c.get("via_broad_scorer")
+        }
+
         # ------------------------------------------------------------------
         # Fix: group candidates by URL so each URL is fetched EXACTLY ONCE.
         # A URL may be a candidate for multiple categories (e.g. an admissions
@@ -382,6 +400,12 @@ async def run_recovery_pass(
                 page_results = await extract_from_url(
                     url, url_cats, country=country, pdf_budget=pdf_budget
                 )
+                # Tag PDF results from broad-scorer-discovered URLs as 'pdf_broad'
+                # so operators can distinguish them from standard PDF results.
+                if url in url_is_broad:
+                    for r in page_results:
+                        if r.get("source_type") == "pdf":
+                            r["source_type"] = "pdf_broad"
                 for res in page_results:
                     field = res.get("field", "")
                     res_cat = FIELD_TO_CATEGORY.get(field, "")
@@ -448,13 +472,24 @@ async def run_recovery_pass(
         "courses_examined": total_examined,
         "fields_recovered": total_fields,
         "results_written": total_written,
+        "pdfs_via_broad_scorer": total_broad_scorer_pdfs,
     }
     log.info("[RECOVERY] pass complete for run %r — %s", scrape_run_id, summary)
+    if total_broad_scorer_pdfs:
+        log.info(
+            "[RECOVERY] run %r — %d PDF(s) discovered via broad-keyword fallback scorer "
+            "(tagged source_type='pdf_broad' in recovery results)",
+            scrape_run_id, total_broad_scorer_pdfs,
+        )
     if emit:
+        broad_note = (
+            f", {total_broad_scorer_pdfs} via broad-keyword PDF scorer"
+            if total_broad_scorer_pdfs else ""
+        )
         await emit(
             "status",
             f"[RECOVERY] Agent Recovery complete — {total_examined} courses examined, "
-            f"{total_written} recovery results written",
+            f"{total_written} recovery results written{broad_note}",
             phase="recovery",
             **summary,
         )
@@ -568,6 +603,15 @@ async def run_single_course_recovery(
     for cand in candidates:
         url_to_categories.setdefault(cand["url"], set()).add(cand["category"])
 
+    # URLs discovered via the broad-keyword fallback scorer — their PDF results
+    # will be tagged source_type='pdf_broad' so the summary API can count them.
+    url_is_broad: set[str] = {c["url"] for c in candidates if c.get("via_broad_scorer")}
+    if url_is_broad:
+        log.info(
+            "[RECOVERY] trigger: course %s — %d URL(s) found via broad-keyword fallback scorer",
+            scraped_course_id, len(url_is_broad),
+        )
+
     # Track which categories had candidates at all
     categories_searched: set[str] = {cand["category"] for cand in candidates}
     # Track source_type per URL (html_empty = both HTTP and browser failed)
@@ -589,6 +633,11 @@ async def run_single_course_recovery(
                 url, url_cats, country=country, metadata=meta, pdf_budget=pdf_budget
             )
             url_source_types[url] = meta.get("source_type", "html")
+            # Tag PDF results from broad-scorer-discovered URLs as 'pdf_broad'
+            if url in url_is_broad:
+                for r in page_results:
+                    if r.get("source_type") == "pdf":
+                        r["source_type"] = "pdf_broad"
             for r in page_results:
                 if r.get("value") is not None:
                     cat = FIELD_TO_CATEGORY.get(r.get("field", ""), "")

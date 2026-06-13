@@ -55,12 +55,16 @@ async def get_recovery_summary(
     row = (await db.execute(
         text(f"""
             SELECT
-                COUNT(DISTINCT scraped_course_id)                         AS courses_with_recovery,
-                COUNT(*) FILTER (WHERE status = 'pending')                AS pending,
-                COUNT(*) FILTER (WHERE status = 'applied')                AS applied,
-                COUNT(*) FILTER (WHERE status = 'rejected')               AS rejected,
+                COUNT(DISTINCT scraped_course_id)                              AS courses_with_recovery,
+                COUNT(*) FILTER (WHERE status = 'pending')                     AS pending,
+                COUNT(*) FILTER (WHERE status = 'applied')                     AS applied,
+                COUNT(*) FILTER (WHERE status = 'rejected')                    AS rejected,
                 COUNT(*) FILTER (WHERE status = 'pending'
-                                   AND confidence >= 0.80)                AS high_confidence_pending
+                                   AND confidence >= 0.80)                     AS high_confidence_pending,
+                COUNT(DISTINCT source_url)
+                    FILTER (WHERE source_type IN ('pdf', 'pdf_broad'))          AS pdf_sources,
+                COUNT(DISTINCT source_url)
+                    FILTER (WHERE source_type = 'pdf_broad')                   AS pdf_broad_sources
             FROM agent_recovery_results
             WHERE scrape_run_id = :run_id
               AND status NOT IN ({trace_list})
@@ -74,6 +78,9 @@ async def get_recovery_summary(
         "applied": int(row.applied or 0) if row else 0,
         "rejected": int(row.rejected or 0) if row else 0,
         "highConfidencePending": int(row.high_confidence_pending or 0) if row else 0,
+        # PDF source counts: total PDFs used + how many needed the broad-keyword fallback
+        "pdfSources": int(row.pdf_sources or 0) if row else 0,
+        "pdfBroadSources": int(row.pdf_broad_sources or 0) if row else 0,
     }
 
 # ---------------------------------------------------------------------------

@@ -3949,7 +3949,7 @@ export default function Scraping() {
       </div>
 
       {/* ── Replay from Snapshot Dialog ────────────────────────────────────── */}
-      <Dialog open={replayDialogOpen} onOpenChange={(o) => { if (!replayLoading && !replayCommitting) setReplayDialogOpen(o); }}>
+      <Dialog open={replayDialogOpen} onOpenChange={(o) => { if (!replayCommitting) setReplayDialogOpen(o); }}>
         <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -4121,7 +4121,7 @@ export default function Scraping() {
             <Button
               variant="outline"
               onClick={() => setReplayDialogOpen(false)}
-              disabled={replayLoading || replayCommitting}
+              disabled={replayCommitting}
             >
               {replayResult?.commit ? "Done" : "Close"}
             </Button>
