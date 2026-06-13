@@ -617,6 +617,10 @@ function RecoveryPanel({ courseId, readOnly, onAction }: { courseId: number; rea
                         <Badge className="text-[10px] bg-amber-100 text-amber-800 border border-amber-300 py-0 hover:bg-amber-100">
                           PDF
                         </Badge>
+                      ) : res.sourceType === "pdf_broad" ? (
+                        <Badge className="text-[10px] bg-orange-100 text-orange-800 border border-orange-300 py-0 hover:bg-orange-100" title="Found via broad-keyword fallback scorer — PDF not directly linked from a fees/requirements page">
+                          PDF (broad)
+                        </Badge>
                       ) : (
                         <Badge variant="outline" className="text-[10px] text-slate-500 border-slate-200 py-0">
                           {res.sourceType ?? "html"}
@@ -688,9 +692,16 @@ function RecoveryPanel({ courseId, readOnly, onAction }: { courseId: number; rea
                             <ExternalLink className="w-2.5 h-2.5 flex-shrink-0" />
                             {res.sourceUrl}
                           </a>
-                          {res.sourceType === "pdf" && (
-                            <span className="inline-flex items-center text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-300 px-1.5 py-0.5 rounded flex-shrink-0">
-                              PDF
+                          {(res.sourceType === "pdf" || res.sourceType === "pdf_broad") && (
+                            <span
+                              className={`inline-flex items-center text-[10px] font-semibold border px-1.5 py-0.5 rounded flex-shrink-0 ${
+                                res.sourceType === "pdf_broad"
+                                  ? "bg-orange-100 text-orange-800 border-orange-300"
+                                  : "bg-amber-100 text-amber-800 border-amber-300"
+                              }`}
+                              title={res.sourceType === "pdf_broad" ? "Found via broad-keyword fallback scorer" : undefined}
+                            >
+                              {res.sourceType === "pdf_broad" ? "PDF (broad)" : "PDF"}
                             </span>
                           )}
                         </div>
