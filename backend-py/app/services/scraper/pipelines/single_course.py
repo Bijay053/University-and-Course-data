@@ -3543,19 +3543,21 @@ async def extract_course(
                     for _fee_fl_url in _fee_followed_urls:
                         if payload.get("international_fee") is not None:
                             break
-                        # PDF dedup: if this linked URL is a PDF already fetched
-                        # in this repair/scrape run, skip without re-downloading.
-                        if (
-                            seen_pdf_urls is not None
-                            and _fee_fl_url.lower().endswith(".pdf")
-                        ):
-                            if _fee_fl_url in seen_pdf_urls:
-                                log.debug(
-                                    "[FEE_FOLLOW] PDF %r already fetched this run"
-                                    " — skipping (seen_pdf_urls guard)",
-                                    _fee_fl_url,
-                                )
-                                continue
+                        # PDF dedup: skip any URL already seen this run — covers
+                        # both .pdf-extension URLs and non-.pdf redirects / query-
+                        # string download links (e.g. /download?file=fees) that
+                        # were registered after their first fetch revealed a PDF
+                        # content-type.
+                        if seen_pdf_urls is not None and _fee_fl_url in seen_pdf_urls:
+                            log.debug(
+                                "[FEE_FOLLOW] PDF %r already fetched this run"
+                                " — skipping (seen_pdf_urls guard)",
+                                _fee_fl_url,
+                            )
+                            continue
+                        # Pre-register .pdf-extension URLs before the fetch so a
+                        # concurrent sibling course skips rather than double-fetches.
+                        if seen_pdf_urls is not None and _fee_fl_url.lower().endswith(".pdf"):
                             seen_pdf_urls.add(_fee_fl_url)
                         _fee_fl_html = None
                         try:
@@ -3568,6 +3570,15 @@ async def extract_course(
                                 )
                             if _fee_fl_resp.status_code == 200:
                                 _fee_fl_html = _fee_fl_resp.text
+                                # Register non-.pdf URLs that served a PDF by
+                                # content-type so sibling courses skip the re-fetch.
+                                if (
+                                    seen_pdf_urls is not None
+                                    and "application/pdf" in _fee_fl_resp.headers.get(
+                                        "content-type", ""
+                                    ).lower()
+                                ):
+                                    seen_pdf_urls.add(_fee_fl_url)
                         except Exception:  # noqa: BLE001
                             pass
                         # Browser fallback — Cloudflare/WAF (e.g. JCU) blocks
@@ -3661,19 +3672,20 @@ async def extract_course(
                             if len(_followed_urls) >= 3:
                                 break
                     for _fl_url in _followed_urls:
-                        # PDF dedup: if this linked URL is a PDF already fetched
-                        # in this repair/scrape run, skip without re-downloading.
-                        if (
-                            seen_pdf_urls is not None
-                            and _fl_url.lower().endswith(".pdf")
-                        ):
-                            if _fl_url in seen_pdf_urls:
-                                log.debug(
-                                    "[FOLLOW_LINK] PDF %r already fetched this run"
-                                    " — skipping (seen_pdf_urls guard)",
-                                    _fl_url,
-                                )
-                                continue
+                        # PDF dedup: skip any URL already seen this run — covers
+                        # both .pdf-extension URLs and non-.pdf redirects / query-
+                        # string download links that were registered after their
+                        # first fetch revealed a PDF content-type.
+                        if seen_pdf_urls is not None and _fl_url in seen_pdf_urls:
+                            log.debug(
+                                "[FOLLOW_LINK] PDF %r already fetched this run"
+                                " — skipping (seen_pdf_urls guard)",
+                                _fl_url,
+                            )
+                            continue
+                        # Pre-register .pdf-extension URLs before the fetch so a
+                        # concurrent sibling course skips rather than double-fetches.
+                        if seen_pdf_urls is not None and _fl_url.lower().endswith(".pdf"):
                             seen_pdf_urls.add(_fl_url)
                         _fl_html = None
                         try:
@@ -3686,6 +3698,15 @@ async def extract_course(
                                 )
                             if _fl_resp.status_code == 200:
                                 _fl_html = _fl_resp.text
+                                # Register non-.pdf URLs that served a PDF by
+                                # content-type so sibling courses skip the re-fetch.
+                                if (
+                                    seen_pdf_urls is not None
+                                    and "application/pdf" in _fl_resp.headers.get(
+                                        "content-type", ""
+                                    ).lower()
+                                ):
+                                    seen_pdf_urls.add(_fl_url)
                         except Exception:  # noqa: BLE001
                             pass
                         # Browser fallback — same reason as fee follow_links:

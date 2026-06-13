@@ -772,3 +772,145 @@ async def test_repair_html_linked_pdf_fetched_once(
             text("DELETE FROM universities WHERE id = :i"), {"i": uni_id}
         )
         await db.commit()
+
+
+@pytest.mark.asyncio
+async def test_repair_non_pdf_extension_url_deduplicated(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A query-string download URL (no .pdf extension) that returns
+    application/pdf must be deduplicated across two repair targets.
+
+    The .pdf-extension guard in the original seen_pdf_urls logic never
+    triggered for URLs like ``/download?file=fees``, so such a URL could
+    be fetched once per course despite all courses in a repair run sharing
+    the same set.  After the fix, extract_course registers the URL in
+    seen_pdf_urls after receiving an application/pdf content-type response,
+    so the second course skips the re-fetch.
+
+    The fake extract_course simulates the fixed follow_links behaviour:
+    first call adds the non-.pdf URL to seen_pdf_urls after a mock PDF
+    fetch; second call finds it present and skips.
+    """
+    import uuid as _uuid
+
+    # A download URL with no .pdf extension — the old .endswith(".pdf") guard
+    # would have let both courses fetch this independently.
+    shared_pdf_dl = "https://example.test/shared/download?file=fee-schedule"
+    html_url_a = "https://example.test/course-a"
+    html_url_b = "https://example.test/course-b"
+
+    async with AsyncSessionLocal() as db:
+        uni_id = (
+            await db.execute(
+                text(
+                    "INSERT INTO universities (name, country, city) "
+                    "VALUES (:n, 'Australia', 'Sydney') RETURNING id"
+                ),
+                {"n": "Repair Non-PDF-Ext Dedup University"},
+            )
+        ).scalar_one()
+        ca = (
+            await db.execute(
+                text(
+                    "INSERT INTO courses "
+                    "(university_id, name, status, course_website) "
+                    "VALUES (:u, :n, 'active', :url) RETURNING id"
+                ),
+                {"u": uni_id, "n": "HTML Course Alpha", "url": html_url_a},
+            )
+        ).scalar_one()
+        cb = (
+            await db.execute(
+                text(
+                    "INSERT INTO courses "
+                    "(university_id, name, status, course_website) "
+                    "VALUES (:u, :n, 'active', :url) RETURNING id"
+                ),
+                {"u": uni_id, "n": "HTML Course Beta", "url": html_url_b},
+            )
+        ).scalar_one()
+        job_id = f"repair_{_uuid.uuid4().hex[:12]}"
+        await db.execute(
+            text(
+                "INSERT INTO scrape_runtime_jobs "
+                "(runtime_job_id, university_id, university_name, url, "
+                " job_type, status, request_payload) "
+                "VALUES (:j, :u, :n, :url, 'repair', 'queued', "
+                "        CAST(:pl AS jsonb))"
+            ),
+            {
+                "j": job_id,
+                "u": uni_id,
+                "n": "Repair Non-PDF-Ext Dedup University",
+                "url": "https://example.test/",
+                "pl": (
+                    '{"universityId": ' + str(uni_id) + ', '
+                    '"repair_targets": ['
+                    '{"course_id": ' + str(ca) + ', "url": "' + html_url_a + '"}, '
+                    '{"course_id": ' + str(cb) + ', "url": "' + html_url_b + '"}'
+                    ']}'
+                ),
+            },
+        )
+        await db.commit()
+
+    # Track how many times the shared download URL is "fetched".
+    # The fake simulates the fixed behaviour in single_course.py's follow_links:
+    # after a fetch whose response has content-type application/pdf, the URL is
+    # added to seen_pdf_urls so the next course's follow_links skips it.
+    pdf_fetch_count: list[int] = [0]
+
+    async def _fake_extract_course_non_pdf(
+        url: str,
+        *,
+        seen_pdf_urls: set | None = None,
+        **kwargs: object,
+    ) -> dict:
+        # Simulate: this HTML course page's follow_links pipeline fetches the
+        # shared download URL and discovers it is application/pdf, then
+        # registers it in seen_pdf_urls (the fixed behaviour).
+        if seen_pdf_urls is not None:
+            if shared_pdf_dl in seen_pdf_urls:
+                pass  # already fetched — skip (dedup working correctly)
+            else:
+                # First encounter: simulate the fetch + content-type detection.
+                pdf_fetch_count[0] += 1
+                # Register the non-.pdf URL just as the fixed code does after
+                # receiving content-type: application/pdf.
+                seen_pdf_urls.add(shared_pdf_dl)
+        else:
+            # seen_pdf_urls not threaded in — count unconditionally so the
+            # assertion below will expose the regression.
+            pdf_fetch_count[0] += 1
+        return {
+            "payload": {"course_name": "Test Course", "duration": 2},
+            "evidence": [],
+        }
+
+    from app.services.scraper import orchestrator as _orch_mod
+    from app.services.scraper import repair as repair_mod
+
+    monkeypatch.setattr(_orch_mod, "extract_course", _fake_extract_course_non_pdf)
+
+    async with AsyncSessionLocal() as db:
+        result = await repair_mod.run_repair(db, job_id)
+
+    # The non-.pdf download URL must have been "fetched" exactly once despite
+    # two HTML courses both linking to it internally.
+    assert pdf_fetch_count[0] == 1, (
+        f"Non-.pdf PDF URL fetched {pdf_fetch_count[0]} times; "
+        "expected exactly 1 — seen_pdf_urls guard must work for non-.pdf URLs"
+    )
+    assert result["staged"] == 2, result  # both courses still updated
+
+    # Cleanup.
+    async with AsyncSessionLocal() as db:
+        await db.execute(
+            text("DELETE FROM scrape_runtime_jobs WHERE runtime_job_id = :j"),
+            {"j": job_id},
+        )
+        await db.execute(
+            text("DELETE FROM universities WHERE id = :i"), {"i": uni_id}
+        )
+        await db.commit()
