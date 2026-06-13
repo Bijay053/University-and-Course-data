@@ -1085,12 +1085,6 @@ _BLOCK_URL_SUBSTRINGS: tuple[tuple[str, str], ...] = (
     # and ".pdf?" query strings; it cannot accidentally match a real course
     # slug since those never contain a dot-extension sequence.
     (".pdf",                    "asset_library_pdf"),
-    # UTAS undergraduate category listing pages.  The main /courses page
-    # has nav links to /study/undergraduate/* discipline hubs which are
-    # category listings, not individual CRICOS course detail pages.
-    # Match with AND without trailing slash to catch both /study/undergraduate
-    # and /study/undergraduate/ as seen in different browser nav exports.
-    ("/study/undergraduate",    "category_landing_page_url_block"),
     # UTAS /study/certificates — the certificate study-type category hub.
     # Not a CRICOS course page; real certificate courses appear under
     # /courses/<faculty>/courses/<slug>.  The trailing slash anchors
@@ -1107,10 +1101,11 @@ _BLOCK_URL_SUBSTRINGS: tuple[tuple[str, str], ...] = (
     ("/study/sustainability",   "category_landing_page_url_block"),
     ("/study/parents-and-carers", "category_landing_page_url_block"),
     ("/study/starting-at-the-university", "category_landing_page_url_block"),
-    # Trailing slash enforces path-boundary semantics: this blocks
-    # /study/postgraduate/ (Flinders category hub) and any sub-pages but
-    # NEVER matches /study/postgraduate-diploma-of-counselling (a real degree).
-    ("/study/postgraduate/",    "category_landing_page_url_block"),
+    # NOTE: /study/undergraduate (UTAS hub) and /study/postgraduate/ (Flinders
+    # hub) were previously here as global substring blocks but caused
+    # false-positive rejections on universities (ARU, ULaw) that publish real
+    # degree pages under those prefixes.  Moved to per-university YAML
+    # block_url_patterns in utas.yaml and flinders.yaml respectively.
 )
 
 # URL query-string substring matches.  Real course-detail pages do not
@@ -1357,32 +1352,13 @@ def _last_path_segment(path: str) -> str:
 # are globally blocked as category hubs for *other* universities.  Adding the
 # hostname here bypasses the named pattern(s) only for that host.
 #
-# Pattern → why it needs an exception
-# ─────────────────────────────────────────────────────────────────────────────
-# "/study/undergraduate"  — UTAS discipline hubs (correct global block).
-#                           ARU publishes individual degree pages at
-#                           /study/undergraduate/<slug> — real courses.
-# "/study/postgraduate/"  — Flinders category hub (correct global block).
-#                           ARU also uses /study/postgraduate/<slug> for real
-#                           degree pages that must not be suppressed.
-_BLOCK_URL_SUBSTRINGS_HOST_EXCEPTIONS: dict[str, frozenset[str]] = {
-    "www.aru.ac.uk": frozenset({
-        "/study/undergraduate",
-        "/study/postgraduate/",
-    }),
-    # University of Law: all degree pages are at /study/undergraduate/<subject>/<slug>/
-    # and /study/postgraduate/<subject>/<slug>/.  The UTAS (/study/undergraduate) and
-    # Flinders (/study/postgraduate/) global blocks incorrectly reject every ULaw
-    # course URL at both discovery and staging stages.
-    "www.law.ac.uk": frozenset({
-        "/study/undergraduate",
-        "/study/postgraduate/",
-    }),
-    # NOTE: Bath Spa was here but has been moved to bathspa.yaml
-    # allow_url_patterns.  The YAML-override mechanism in discovery.py now
-    # checks allow_url_patterns BEFORE is_blocked_page(), so per-university
-    # URL exceptions no longer require a developer change to this dict.
-}
+# NOTE: /study/undergraduate (UTAS hub) and /study/postgraduate/ (Flinders hub)
+# previously required exceptions here for ARU and ULaw.  Those two global
+# patterns have been removed entirely and moved into per-university YAML
+# block_url_patterns (utas.yaml, flinders.yaml) so no host exceptions are
+# needed for them.  Prefer the YAML approach for any future single-university
+# URL blocks rather than adding new global patterns with exception lists.
+_BLOCK_URL_SUBSTRINGS_HOST_EXCEPTIONS: dict[str, frozenset[str]] = {}
 
 
 def is_blocked_page(url: str | None, title: str | None = None) -> tuple[bool, str]:

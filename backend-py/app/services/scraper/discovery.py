@@ -216,10 +216,6 @@ _NON_COURSE_URL_PATTERNS: tuple[str, ...] = (
     # real course detail page.  Early rejection prevents the BFS from
     # enqueuing PDF links found on faculty listing pages.
     ".pdf",
-    # UTAS undergraduate discipline hub pages — category listings, not
-    # individual CRICOS course detail pages.  Match with and without
-    # trailing slash (/study/undergraduate and /study/undergraduate/).
-    "/study/undergraduate",
     # UTAS certificate study-type category hub.
     "/study/certificates",
     # UTAS study-info/lifestyle pages — never CRICOS course detail pages.
@@ -232,7 +228,10 @@ _NON_COURSE_URL_PATTERNS: tuple[str, ...] = (
     "/study/sustainability",
     "/study/parents-and-carers",
     "/study/starting-at-the-university",
-    "/study/postgraduate",
+    # NOTE: /study/undergraduate and /study/postgraduate were previously here
+    # but caused false-positive blocks on universities (e.g. ARU, ULaw) that
+    # publish real course pages under those prefixes.  They are now in the
+    # per-university YAML block_url_patterns for UTAS and Flinders respectively.
 )
 
 # Host-specific exceptions for _NON_COURSE_URL_PATTERNS.
@@ -240,19 +239,10 @@ _NON_COURSE_URL_PATTERNS: tuple[str, ...] = (
 # Use this when a pattern was added for one university's structure but
 # falsely blocks real course pages on another university with a similar
 # path convention.
-_NON_COURSE_URL_HOST_EXCEPTIONS: dict[str, frozenset[str]] = {
-    # ARU (Anglia Ruskin University) publishes real degree pages at
-    # /study/undergraduate/<slug> and /study/postgraduate/<slug>.
-    # The two patterns below were added for UTAS (/study/undergraduate
-    # = discipline hub) and Flinders (/study/postgraduate = hub), but
-    # they falsely block every ARU course URL at both the sitemap and
-    # BFS link-sweep stages.
-    "www.aru.ac.uk": frozenset({"/study/undergraduate", "/study/postgraduate"}),
-    # University of Law: all degree pages follow /study/undergraduate/<subject>/<slug>/
-    # and /study/postgraduate/<subject>/<slug>/ — the UTAS/Flinders substring patterns
-    # block every ULaw course URL in the sitemap parser and BFS stages.
-    "www.law.ac.uk": frozenset({"/study/undergraduate", "/study/postgraduate"}),
-}
+# NOTE: /study/undergraduate (UTAS) and /study/postgraduate (Flinders) exceptions
+# for ARU and ULaw were removed here because those two patterns were moved out of
+# the global list entirely into per-university YAML block_url_patterns.
+_NON_COURSE_URL_HOST_EXCEPTIONS: dict[str, frozenset[str]] = {}
 
 # Last-segment junk suffix regex (Node routes/scrape.ts:5540) — even
 # under a "course-y" parent path, segments ending in these words are

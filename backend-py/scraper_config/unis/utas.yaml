@@ -64,6 +64,13 @@ discovery:
   # merge) in addition to the BFS-phase discovery.py block.
   block_url_patterns:
     - "-domestic(?:/|$)"
+    # UTAS undergraduate discipline hub — category listing page, not a
+    # course detail page.  Previously a global block in discovery.py and
+    # guards.py; moved here so it only affects UTAS.
+    # (belt-and-suspenders: allow_url_patterns above already restricts
+    # UTAS to /courses/<faculty>/courses/<slug> paths, so this would only
+    # fire if allow_url_patterns were ever removed.)
+    - "/study/undergraduate"
   extra_course_urls:
     # Master of Teaching — under arts-soc which returns 403 for plain HTTP.
     # Belt-and-suspenders: injected unconditionally after all discovery tiers.

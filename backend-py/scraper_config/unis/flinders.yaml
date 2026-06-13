@@ -33,6 +33,14 @@ discovery:
   # course detail pages.  Supplementing BFS with sitemap ensures we capture
   # deep-faculty courses that BFS might miss after exhausting its page budget.
   always_sitemap_supplement: true
+  block_url_patterns:
+    # Flinders postgraduate category hub — /study/postgraduate/ lists all PG
+    # courses but is not an individual course detail page.  Trailing slash
+    # enforces path-boundary semantics: blocks /study/postgraduate/ and any
+    # sub-pages but NEVER matches /study/postgraduate-diploma-of-counselling.
+    # Previously a global block in discovery.py and guards.py; moved here so
+    # it only affects Flinders.
+    - "/study/postgraduate/"
 
 extraction:
   english:
