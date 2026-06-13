@@ -29,6 +29,53 @@ from app.dependencies import get_db
 log = logging.getLogger(__name__)
 router = APIRouter()
 
+
+# ---------------------------------------------------------------------------
+# GET /api/scrape/recovery/summary/{runtime_job_id}
+# ---------------------------------------------------------------------------
+
+@router.get("/recovery/summary/{runtime_job_id}")
+async def get_recovery_summary(
+    runtime_job_id: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> dict:
+    """Return aggregate recovery stats for a scrape job.
+
+    Only counts actionable rows (pending / applied / rejected).
+    Diagnostic trace rows (no_source, no_value, level_mismatch,
+    browser_failed, pdf_failed) are excluded so the counts reflect
+    real recovery attempts only.
+    """
+    _TRACE_STATUSES = (
+        "no_source", "no_value", "level_mismatch",
+        "browser_failed", "pdf_failed",
+    )
+    trace_list = ", ".join(f"'{s}'" for s in _TRACE_STATUSES)
+
+    row = (await db.execute(
+        text(f"""
+            SELECT
+                COUNT(DISTINCT scraped_course_id)                         AS courses_with_recovery,
+                COUNT(*) FILTER (WHERE status = 'pending')                AS pending,
+                COUNT(*) FILTER (WHERE status = 'applied')                AS applied,
+                COUNT(*) FILTER (WHERE status = 'rejected')               AS rejected,
+                COUNT(*) FILTER (WHERE status = 'pending'
+                                   AND confidence >= 0.80)                AS high_confidence_pending
+            FROM agent_recovery_results
+            WHERE scrape_run_id = :run_id
+              AND status NOT IN ({trace_list})
+        """),
+        {"run_id": runtime_job_id},
+    )).first()
+
+    return {
+        "coursesWithRecovery": int(row.courses_with_recovery or 0) if row else 0,
+        "pending": int(row.pending or 0) if row else 0,
+        "applied": int(row.applied or 0) if row else 0,
+        "rejected": int(row.rejected or 0) if row else 0,
+        "highConfidencePending": int(row.high_confidence_pending or 0) if row else 0,
+    }
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

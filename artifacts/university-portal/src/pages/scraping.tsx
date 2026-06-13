@@ -16,7 +16,7 @@ import {
   Globe, Zap, Loader2, X, ExternalLink, Bot, ArrowRight,
   Eye, Pencil, Trash2, Check, XCircle, CheckCheck, Save,
   Square, StopCircle, Play, ShieldCheck, Info, PlusCircle, ChevronDown, AlertTriangle, Sparkles,
-  Database, Download, RotateCcw,
+  Database, Download, RotateCcw, Activity,
 } from "lucide-react";
 import { Link } from "wouter";
 import { getFetchErrorMessage, readResponseJson } from "@/lib/readResponseJson";
@@ -674,6 +674,13 @@ export default function Scraping() {
   // (matches the live Review table). Keep it loose here — the component
   // owns the strict typing.
   type HistoryStagedCourse = ReviewStagedCourse & { evidence: ReviewEvidenceItem[] };
+  type RecoverySummary = {
+    coursesWithRecovery: number;
+    pending: number;
+    applied: number;
+    rejected: number;
+    highConfidencePending: number;
+  };
 
   // ── Compare / Restore types ───────────────────────────────────────────────
   type CompareJobMeta = {
@@ -714,6 +721,7 @@ export default function Scraping() {
   const [historyDetail, setHistoryDetail] = useState<{ logs: HistoryLogEntry[]; stagedCourses: HistoryStagedCourse[] } | null>(null);
   const [historyView, setHistoryView] = useState<"logs" | "courses">("logs");
   const [historyLogFilter, setHistoryLogFilter] = useState("");
+  const [recoverySummaries, setRecoverySummaries] = useState<Record<string, RecoverySummary>>({});
   // Compare / Restore state
   const [historySelected, setHistorySelected] = useState<Set<string>>(new Set());
   const [comparing, setComparing] = useState(false);
@@ -800,9 +808,20 @@ export default function Scraping() {
     setHistoryDetailLoading(true);
     setHistoryDetail(null);
     try {
-      const res = await fetch(`/api/scrape/history/${runtimeJobId}`);
-      const data = await readResponseJson<{ logs: HistoryLogEntry[]; stagedCourses: HistoryStagedCourse[] }>(res);
+      const [detailRes, summaryRes] = await Promise.all([
+        fetch(`/api/scrape/history/${runtimeJobId}`),
+        fetch(`/api/scrape/recovery/summary/${runtimeJobId}`),
+      ]);
+      const data = await readResponseJson<{ logs: HistoryLogEntry[]; stagedCourses: HistoryStagedCourse[] }>(detailRes);
       setHistoryDetail({ logs: data?.logs ?? [], stagedCourses: data?.stagedCourses ?? [] });
+      try {
+        const summary = await readResponseJson<RecoverySummary>(summaryRes);
+        if (summary) {
+          setRecoverySummaries(prev => ({ ...prev, [runtimeJobId]: summary }));
+        }
+      } catch {
+        // non-fatal — recovery summary is an enhancement
+      }
     } catch {
       setHistoryDetail({ logs: [], stagedCourses: [] });
     } finally {
@@ -3549,6 +3568,42 @@ export default function Scraping() {
 
                   {isExpanded && (
                     <div className="border-t bg-gray-50 p-3 sm:p-4">
+                      {/* ── Recovery Summary ─────────────────────────────────── */}
+                      {(() => {
+                        const rs = recoverySummaries[run.runtimeJobId];
+                        if (!rs || rs.coursesWithRecovery === 0) return null;
+                        const total = rs.pending + rs.applied + rs.rejected;
+                        return (
+                          <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Activity className="w-4 h-4 text-amber-600 shrink-0" />
+                              <span className="text-sm font-semibold text-amber-800">Recovery Summary</span>
+                              <span className="text-xs text-amber-600 ml-auto">
+                                {rs.coursesWithRecovery} course{rs.coursesWithRecovery !== 1 ? "s" : ""} with missing fields · {total} field decision{total !== 1 ? "s" : ""}
+                              </span>
+                            </div>
+                            <div className="flex flex-wrap gap-3 text-xs">
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 font-medium">
+                                <Clock className="w-3 h-3" />
+                                {rs.pending} pending
+                                {rs.highConfidencePending > 0 && (
+                                  <span className="ml-1 px-1.5 py-0.5 rounded bg-amber-200 text-amber-900 font-semibold">
+                                    {rs.highConfidencePending} ≥80% conf
+                                  </span>
+                                )}
+                              </span>
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-100 text-green-800 font-medium">
+                                <CheckCircle2 className="w-3 h-3" />
+                                {rs.applied} applied
+                              </span>
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-100 text-red-700 font-medium">
+                                <XCircle className="w-3 h-3" />
+                                {rs.rejected} rejected
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })()}
                       {historyDetailLoading ? (
                         <div className="text-center text-gray-400 py-6">Loading details…</div>
                       ) : historyView === "logs" ? (
