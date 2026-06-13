@@ -62,6 +62,7 @@ _DIFF_FIELDS = [
     "other_requirement",
     "description",
     "category",
+    "cricos_code",
 ]
 
 

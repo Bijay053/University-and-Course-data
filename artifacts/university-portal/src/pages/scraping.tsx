@@ -768,6 +768,12 @@ export default function Scraping() {
   const [replayError, setReplayError] = useState<string | null>(null);
   const [replayCommitting, setReplayCommitting] = useState(false);
 
+  // Source-dialog inline replay state (resets when dialog closes)
+  const [sdReplayLoading, setSdReplayLoading] = useState(false);
+  const [sdReplayResult, setSdReplayResult] = useState<ReplayResult | null>(null);
+  const [sdReplayError, setSdReplayError] = useState<string | null>(null);
+  const [sdReplayCommitting, setSdReplayCommitting] = useState(false);
+
   const fetchHistory = useCallback(async () => {
     setLoadingHistory(true);
     try {
@@ -2051,6 +2057,54 @@ export default function Scraping() {
       setReplayCommitting(false);
     }
   }, [replayTargetJobId, replayCourseUrl]);
+
+  // Source-dialog helpers
+  const closeSourceDialog = useCallback(() => {
+    setSourceDialogCourse(null);
+    setSdReplayLoading(false);
+    setSdReplayResult(null);
+    setSdReplayError(null);
+    setSdReplayCommitting(false);
+  }, []);
+
+  const runInlineReplay = useCallback(async (course: StagedCourse) => {
+    if (!course.courseWebsite || !course.scrapeJobId) return;
+    setSdReplayResult(null);
+    setSdReplayError(null);
+    setSdReplayLoading(true);
+    try {
+      const params = `?course_url=${encodeURIComponent(course.courseWebsite)}`;
+      const res = await fetch(`/api/scrape/replay/${course.scrapeJobId}${params}`, { method: "POST" });
+      if (!res.ok) {
+        const msg = await res.text().catch(() => String(res.status));
+        throw new Error(`Server returned ${res.status}: ${msg}`);
+      }
+      setSdReplayResult(await res.json() as ReplayResult);
+    } catch (e) {
+      setSdReplayError(e instanceof Error ? e.message : "Replay failed.");
+    } finally {
+      setSdReplayLoading(false);
+    }
+  }, []);
+
+  const commitInlineReplay = useCallback(async (course: StagedCourse) => {
+    if (!course.courseWebsite || !course.scrapeJobId) return;
+    setSdReplayCommitting(true);
+    setSdReplayError(null);
+    try {
+      const params = `?course_url=${encodeURIComponent(course.courseWebsite)}`;
+      const res = await fetch(`/api/scrape/replay/${course.scrapeJobId}/commit${params}`, { method: "POST" });
+      if (!res.ok) {
+        const msg = await res.text().catch(() => String(res.status));
+        throw new Error(`Server returned ${res.status}: ${msg}`);
+      }
+      setSdReplayResult(await res.json() as ReplayResult);
+    } catch (e) {
+      setSdReplayError(e instanceof Error ? e.message : "Commit failed.");
+    } finally {
+      setSdReplayCommitting(false);
+    }
+  }, []);
 
   return (
     <div className="space-y-8">
@@ -4021,7 +4075,7 @@ export default function Scraping() {
       </Dialog>
 
       {/* ── Raw Snapshot Source Dialog ─────────────────────────────────────── */}
-      <Dialog open={!!sourceDialogCourse} onOpenChange={(o) => { if (!o) setSourceDialogCourse(null); }}>
+      <Dialog open={!!sourceDialogCourse} onOpenChange={(o) => { if (!o) closeSourceDialog(); }}>
         <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -4158,13 +4212,170 @@ export default function Scraping() {
                 </div>
               );
             })}
+
+            {/* ── Inline Replay Panel ──────────────────────────────────────────── */}
+            {(sdReplayLoading || sdReplayResult !== null || sdReplayError !== null) && (
+              <div className="mt-2 pt-4 border-t border-dashed border-emerald-200">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-1.5">
+                  <RotateCcw className="w-3.5 h-3.5 text-emerald-600" />
+                  Re-extraction result
+                </p>
+
+                {sdReplayLoading && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground py-8 justify-center">
+                    <RotateCcw className="w-5 h-5 animate-spin text-emerald-600" />
+                    <span>Running extractors on stored snapshot…</span>
+                  </div>
+                )}
+
+                {sdReplayError && !sdReplayLoading && (
+                  <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg p-3 flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                    {sdReplayError}
+                  </div>
+                )}
+
+                {sdReplayResult && !sdReplayLoading && sdReplayResult.replayed === 0 && (
+                  <div className="text-sm text-muted-foreground bg-gray-50 border rounded-lg p-4 text-center">
+                    <p className="font-medium">No replayable snapshot found for this course</p>
+                    <p className="text-xs mt-1 text-gray-400">Only ai_prompt/pdf snapshots exist — those are not used for re-extraction.</p>
+                  </div>
+                )}
+
+                {sdReplayResult && !sdReplayLoading && sdReplayResult.replayed > 0 && sdReplayResult.changed === 0 && !sdReplayResult.commit && (
+                  <div className="text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg p-3 flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 shrink-0" />
+                    No changes — extractors produce the same result as the original scrape.
+                  </div>
+                )}
+
+                {sdReplayResult?.commit && (
+                  <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">
+                    <CheckCircle2 className="w-4 h-4 shrink-0" />
+                    Replay applied — staged_courses updated. Refresh the review table to see the new values.
+                  </div>
+                )}
+
+                {sdReplayResult && !sdReplayLoading && sdReplayResult.diffs.length > 0 && !sdReplayResult.commit && (() => {
+                  const diff = sdReplayResult.diffs[0];
+                  const FIELD_LABELS: Record<string, string> = {
+                    course_name: "Course Name", degree_level: "Degree Level",
+                    duration: "Duration", international_fee: "Intl. Fee",
+                    intake_months: "Intakes", course_location: "Location",
+                    ielts_overall: "IELTS Overall", pte_overall: "PTE Overall",
+                    cricos_code: "CRICOS", study_mode: "Study Mode",
+                    other_requirement: "Entry Req.", academic_level: "Academic Level",
+                    academic_score: "Academic Score",
+                    ielts_reading: "IELTS Reading", ielts_writing: "IELTS Writing",
+                    ielts_speaking: "IELTS Speaking", ielts_listening: "IELTS Listening",
+                    description: "Description", category: "Category",
+                  };
+                  const PRIORITY = [
+                    "course_name", "degree_level", "duration", "international_fee",
+                    "intake_months", "course_location", "ielts_overall", "pte_overall",
+                    "cricos_code", "study_mode", "other_requirement",
+                    "academic_level", "academic_score",
+                    "ielts_reading", "ielts_writing", "ielts_speaking", "ielts_listening",
+                    "description", "category",
+                  ];
+                  const sortedChanges = [...Object.entries(diff.changes)].sort(
+                    ([a], [b]) => {
+                      const ai = PRIORITY.indexOf(a); const bi = PRIORITY.indexOf(b);
+                      return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+                    }
+                  );
+                  const fmtVal = (v: unknown) => {
+                    if (v === null || v === undefined || String(v) === "") return null;
+                    return String(v);
+                  };
+                  return (
+                    <div className="border rounded-lg overflow-hidden">
+                      <div className="bg-amber-50 px-3 py-2 border-b">
+                        <p className="text-xs font-semibold text-amber-800">
+                          {sortedChanges.length} field{sortedChanges.length !== 1 ? "s" : ""} would change
+                        </p>
+                      </div>
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="bg-gray-50 border-b">
+                            <th className="text-left px-3 py-1.5 font-medium text-gray-500 w-28">Field</th>
+                            <th className="text-left px-3 py-1.5 font-medium text-red-600 w-1/2">Current value</th>
+                            <th className="text-left px-3 py-1.5 font-medium text-green-700">Replay value</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {sortedChanges.map(([field, change]) => (
+                            <tr key={field} className="border-b last:border-0">
+                              <td className="px-3 py-2 font-medium text-gray-600 whitespace-nowrap align-top">
+                                {FIELD_LABELS[field] ?? field}
+                              </td>
+                              <td className="px-3 py-2 text-red-700 bg-red-50/40 font-mono break-all align-top">
+                                {fmtVal(change.old) ?? <span className="text-gray-400 italic not-italic font-sans">empty</span>}
+                              </td>
+                              <td className="px-3 py-2 text-green-700 bg-green-50/40 font-mono break-all align-top">
+                                {fmtVal(change.new) ?? <span className="text-gray-400 italic not-italic font-sans">empty</span>}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
           </div>
 
-          <DialogFooter className="mt-3 pt-3 border-t">
-            <span className="text-xs text-muted-foreground mr-auto">
+          <DialogFooter className="mt-3 pt-3 border-t flex-wrap gap-2">
+            <span className="text-xs text-muted-foreground mr-auto self-center">
               {courseSnaps.length} snapshot{courseSnaps.length !== 1 ? "s" : ""} found
             </span>
-            <Button variant="outline" onClick={() => setSourceDialogCourse(null)}>Close</Button>
+
+            {/* Apply / Keep current — shown only when pre-commit diff exists */}
+            {sdReplayResult && !sdReplayResult.commit && sdReplayResult.changed > 0 && !sdReplayError && (
+              <>
+                <Button
+                  size="sm"
+                  onClick={() => sourceDialogCourse && void commitInlineReplay(sourceDialogCourse)}
+                  disabled={sdReplayCommitting}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                >
+                  {sdReplayCommitting
+                    ? <><Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />Applying…</>
+                    : <><Check className="w-3.5 h-3.5 mr-1" />Apply replay result</>}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => { setSdReplayResult(null); setSdReplayError(null); }}
+                  disabled={sdReplayCommitting}
+                >
+                  Keep current
+                </Button>
+              </>
+            )}
+
+            {/* Replay this course — shown when no replay has run yet */}
+            {!sdReplayResult && !sdReplayLoading && !sdReplayError && sourceDialogCourse?.courseWebsite && sourceDialogCourse?.scrapeJobId && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-emerald-700 border-emerald-300 hover:bg-emerald-50"
+                onClick={() => sourceDialogCourse && void runInlineReplay(sourceDialogCourse)}
+              >
+                <RotateCcw className="w-3.5 h-3.5 mr-1" />
+                Replay this course
+              </Button>
+            )}
+
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={closeSourceDialog}
+              disabled={sdReplayCommitting}
+            >
+              {sdReplayResult?.commit ? "Done" : "Close without changes"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
