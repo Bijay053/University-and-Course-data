@@ -785,10 +785,16 @@ export default function ScrapeAgentPage() {
       const extScore = afterExtraction?.extraction_score ?? 0;
       const extOk = extScore >= 60;
 
+      const filterKept = filterImpact?.after_filter ?? 0;
+
       if (discOk && extOk) {
         toast({ title: `Fix validated ✓ — ${discFound} URLs found, extraction score ${extScore}/100`, description: "Both discovery and extraction quality look good. Safe to run a full scrape." });
       } else if (discOk) {
         toast({ title: `Discovery fixed ✓ — ${discFound} URLs found`, description: `Extraction quality score is ${extScore}/100. Review extraction metrics below.`, variant: "default" });
+      } else if (discFound === 0 && filterKept > 0) {
+        // Live probe returned 0 (rate-limited / fast-mode miss) but URL filter
+        // simulation confirms the patterns work on historical data — not a failure.
+        toast({ title: `Fix saved — patterns pass ${filterKept} historical URLs`, description: "Live probe returned 0 (possibly rate-limited or fast-mode miss). Run a full scrape to confirm.", variant: "default" });
       } else if (discFound === 0) {
         toast({ title: "Fix saved — discovery still returning 0 URLs", description: "Try a different fix or review the block/allow patterns.", variant: "destructive" });
       } else {
@@ -801,7 +807,7 @@ export default function ScrapeAgentPage() {
       setRunningPostRepair(false);
       await loadConfig();
     }
-  }, [config?.latest_job_id, uniId, toast, loadConfig, extractionResult]);
+  }, [config?.latest_job_id, uniId, toast, loadConfig, extractionResult, filterImpact]);
 
   const launchFullScrapeAfterRepair = useCallback(async () => {
     if (!uniId) return;

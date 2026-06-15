@@ -24,3 +24,4 @@ discovery:
   allow_url_patterns:
   - /study(?:/|\?(?:.*)?$|$)
   - /study/[^?#]+(?:/[^?#]+){0,5}(?:/|$|\?)
+  use_browser: true

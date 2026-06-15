@@ -1,63 +1,34 @@
 discovery:
-  allow_url_patterns:
-  - /study/(?:undergraduate|postgraduate)/[^/]+/[^/]+/
-  block_url_patterns:
-  - /employability/
-  - /study/legal-training/
-  - /study/study-modes/
-  - /study/course-demands/
-  - /study/fee-status-classification/
-  - /study/psychology-faculty/
-  - /study/criminology-and-policing-faculty/
-  - /study/higher-rights-of-audience-assessment/
-  - /contact-form/
-  - /study/psychology/psychology-competition/
-  - /study/postgraduate/continue-your-studies/
   course_detail_url_patterns:
   - /study/undergraduate/[^/]+/[^/]+/
   - /study/postgraduate/[^/]+/[^/]+/
 extraction:
-  fees:
-    default_currency: GBP
   english:
-    # University of Law publishes IELTS / English-requirements on separate
-    # pages for undergraduate and postgraduate programmes.  Using separate
-    # URLs ensures UG courses never inherit PG IELTS values (which are
-    # typically higher) and vice-versa.
-    #
-    # The orchestrator fetches each page once before the course loop and
-    # routes results into the correct english_by_level bucket.  No YAML
-    # central_page needed when both _ug and _pg are provided.
-    central_page_ug: "https://www.law.ac.uk/study/undergraduate/entry-requirements/"
-    central_page_pg: "https://www.law.ac.uk/study/postgraduate/entry-requirements/"
+    central_page_ug: https://www.law.ac.uk/study/undergraduate/entry-requirements/
+    central_page_pg: https://www.law.ac.uk/study/postgraduate/entry-requirements/
   text_cleaning:
     location:
-      # Nav/section headings mistakenly picked up as campus names — clear them.
-      # Checked as case-insensitive substring match; applied BEFORE allowed_values.
       reject_values:
-        - Fees
-        - Course fees
-        - Tuition fees
-        - Funding
-        - Apply
-        - Entry requirements
-        - Study mode
-        - Duration
-        - Start dates
-        - Key facts
-        - How to apply
-        - Newcastle University
-      # University of Law campuses — only these are accepted as valid locations.
-      # Any extracted location not containing at least one of these strings is
-      # cleared so reviewers see blank rather than a garbage nav fragment.
+      - Fees
+      - Course fees
+      - Tuition fees
+      - Funding
+      - Apply
+      - Entry requirements
+      - Study mode
+      - Duration
+      - Start dates
+      - Key facts
+      - How to apply
+      - Newcastle University
       allowed_values:
-        - Birmingham
-        - Bristol
-        - Leeds
-        - London Bloomsbury
-        - London Moorgate
-        - Manchester
-        - Nottingham
-        - Newcastle
-        - Online
-        - Hong Kong
+      - Birmingham
+      - Bristol
+      - Leeds
+      - London Bloomsbury
+      - London Moorgate
+      - Manchester
+      - Nottingham
+      - Newcastle
+      - Online
+      - Hong Kong
