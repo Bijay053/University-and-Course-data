@@ -1854,7 +1854,9 @@ class TestNoPdfBudgetInlineConstruction:
             )
         results = []
         for path in sorted(pkg.rglob("*.py")):
-            if path.name in ("extractor.py", "__init__.py"):
+            if path.relative_to(pkg) == pathlib.Path("extractor.py"):
+                continue
+            if path.name == "__init__.py":
                 continue
             results.append((path.name, path.read_text(encoding="utf-8")))
         return results
@@ -1906,6 +1908,56 @@ class TestNoPdfBudgetInlineConstruction:
             )
             assert "__init__.py" not in found_names, (
                 "__init__.py must be excluded at every nesting level"
+            )
+
+    def test_nested_extractor_py_is_not_excluded(self):
+        """A nested sub-package extractor.py (e.g. recovery/bulk/extractor.py)
+        must NOT be excluded — only the top-level extractor.py is the budget
+        constants home.  Matching by full relative path (not bare filename)
+        ensures sub-package extractor modules are still scanned.
+        """
+        import pathlib
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = pathlib.Path(tmpdir)
+
+            # Top-level recovery files — top-level extractor.py is excluded
+            (root / "searcher.py").write_text("# top-level\n", encoding="utf-8")
+            (root / "extractor.py").write_text(
+                "# excluded — budget constants live here\n", encoding="utf-8"
+            )
+            (root / "__init__.py").write_text("", encoding="utf-8")
+
+            # Nested sub-package with its own extractor.py
+            sub = root / "bulk"
+            sub.mkdir()
+            (sub / "__init__.py").write_text("", encoding="utf-8")
+            (sub / "extractor.py").write_text(
+                "# nested extractor — does NOT define budget constants\n",
+                encoding="utf-8",
+            )
+
+            results = self._recovery_sources_except_extractor(_pkg_override=root)
+            found_names = [name for name, _ in results]
+
+            assert "extractor.py" in found_names, (
+                "Nested bulk/extractor.py must NOT be excluded; "
+                "only the top-level extractor.py is exempted. got: %r" % found_names
+            )
+            assert "searcher.py" in found_names, (
+                "Top-level non-extractor files must still appear; got: %r" % found_names
+            )
+            # The top-level extractor.py is still excluded (same name, depth 0)
+            # We confirm by checking the count: one extractor.py returned (the nested one)
+            extractor_entries = [(n, s) for n, s in results if n == "extractor.py"]
+            assert len(extractor_entries) == 1, (
+                "Exactly one extractor.py (the nested one) should appear; "
+                "got %d: %r" % (len(extractor_entries), extractor_entries)
+            )
+            assert "nested extractor" in extractor_entries[0][1], (
+                "The included extractor.py must be the nested one (bulk/), "
+                "not the top-level one"
             )
 
     # ------------------------------------------------------------------ #
