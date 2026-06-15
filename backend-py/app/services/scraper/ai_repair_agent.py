@@ -9,11 +9,13 @@ Loop per attempt:
   2. Call OpenAI              (json_object mode → diagnosis + patches)
   3. Strict patch validation  (whitelist, type, regex, range)
   4. Apply validated patches  (DB admin_config + YAML on disk)
-  5. URL filter simulation    (discovery patches only — no live re-scrape needed)
-  6. Predict extraction gains (DB queries: IELTS fills, junk-location clears, …)
-  7. Evaluate success criteria (6-dimensional: discovery, fee, IELTS, location, mode, degree)
-  8. Record attempt           (Redis, TTL 24 h)
-  9. Terminate if overall_ok OR no more patches OR MAX_ATTEMPTS
+  5. URL filter simulation    (discovery patches only — fast, no live re-scrape)
+  6. Real extraction scan     (re-fetch up to 5 staged course URLs with patched config;
+                               SQL fast-path for default_ielts / reject_values)
+  7. Real quality snapshot    (DB fill rates AFTER scan — not predicted, actual)
+  8. Evaluate success         (6-dimensional: discovery, fee, IELTS, location, mode, degree)
+  9. Record attempt           (Redis, TTL 24 h)
+ 10. Terminate if overall_ok OR no more patches OR MAX_ATTEMPTS
 
 Session key: ``ai_repair:{job_id}``
 """
@@ -403,49 +405,202 @@ async def _predict_quality(
     return pred, fills
 
 
+# ── Real post-patch extraction scan ───────────────────────────────────────────
+
+async def _run_extraction_scan(
+    ctx: dict,
+    config_patch: dict,
+    db,
+    max_courses: int = 5,
+) -> dict:
+    """Re-run extraction on a sample of staged courses using the patched config.
+
+    Two phases:
+    1. SQL fast path — directly apply config-derivable updates without any page
+       fetches: ``english.default_ielts`` fills NULL IELTS rows; location
+       ``reject_values`` clears junk locations.
+    2. Fetch + extract path — re-fetch up to ``max_courses`` course URLs and run
+       the full extraction pipeline (no AI/Gemini) with the new config to capture
+       fee, IELTS, or mode improvements from central pages / new patterns.
+
+    Updates ``scraped_courses`` rows in-place and commits.
+    Returns a fill-summary dict for the UI chips (actual counts, not estimates).
+    """
+    from sqlalchemy import text
+
+    uni_id     = ctx["university_id"]
+    job_id     = ctx["job_id"]
+    scrape_url = ctx["scrape_url"]
+    extr_patch = config_patch.get("extraction") or {}
+
+    fills: dict[str, Any] = {
+        "fee_fills":          0,
+        "ielts_fills":        0,
+        "location_clears":    0,
+        "mode_fills":         0,
+        "courses_rescanned":  0,
+    }
+    _base_where  = (
+        "university_id = :uid AND scrape_job_id = :jid "
+        "AND status IN ('pending','review','approved')"
+    )
+    _base_params: dict[str, Any] = {"uid": uni_id, "jid": job_id}
+
+    # ── Phase 1: SQL fast path ────────────────────────────────────────────────
+
+    # 1a. default_ielts → fill NULL ielts_overall rows immediately
+    default_ielts = (extr_patch.get("english") or {}).get("default_ielts")
+    if default_ielts is not None:
+        res = await db.execute(
+            text(
+                f"UPDATE scraped_courses SET ielts_overall = :iv "
+                f"WHERE {_base_where} AND ielts_overall IS NULL"
+            ),
+            {**_base_params, "iv": float(default_ielts)},
+        )
+        fills["ielts_fills"] = res.rowcount or 0
+
+    # 1b. reject_values → clear junk course_location values
+    reject_vals = (
+        (extr_patch.get("text_cleaning") or {}).get("location") or {}
+    ).get("reject_values") or []
+    for val in reject_vals:
+        res = await db.execute(
+            text(
+                f"UPDATE scraped_courses SET course_location = NULL "
+                f"WHERE {_base_where} AND course_location IS NOT NULL "
+                f"AND LOWER(course_location) LIKE LOWER(:rv)"
+            ),
+            {**_base_params, "rv": f"%{val}%"},
+        )
+        fills["location_clears"] += res.rowcount or 0
+
+    await db.commit()
+
+    # ── Phase 2: Fetch + extract sample courses ───────────────────────────────
+    # Skip if patch doesn't touch anything that benefits from a live fetch
+    needs_fetch = bool(extr_patch.get("fees") or extr_patch.get("english") or extr_patch.get("filters"))
+    if not needs_fetch:
+        log.info("extraction_scan: no live-fetch-sensitive patches; skipping fetch phase")
+        return fills
+
+    # Load the freshly-patched config so extract_course() picks up the changes
+    try:
+        from urllib.parse import urlparse as _urlparse
+        from app.services.scraper.config.loader import load_uni_config
+        from app.services.scraper.config.context import set_uni_config
+        from app.services.scraper.pipelines.single_course import extract_course
+
+        _host = _urlparse(scrape_url).netloc
+        _slug = _host.removeprefix("www.").split(".")[0] if _host else "unknown"
+
+        _sc_row = (await db.execute(
+            text("SELECT scrape_config FROM universities WHERE id = :uid"),
+            {"uid": uni_id},
+        )).first()
+        _db_sc = _sc_row[0] if (_sc_row and _sc_row[0]) else {}
+
+        uni_cfg = load_uni_config(
+            slug=_slug,
+            name=ctx["uni_name"],
+            scrape_url=scrape_url,
+            university_id=uni_id,
+            db_scrape_config=_db_sc,
+        )
+        set_uni_config(uni_cfg)
+    except Exception as exc:
+        log.warning("extraction_scan: config load failed — skipping fetch phase: %s", exc)
+        return fills
+
+    # Pick courses with worst quality first (NULL fee OR NULL IELTS)
+    sample_rows = (await db.execute(text("""
+        SELECT id, course_url, international_fee, ielts_overall, study_mode
+        FROM   scraped_courses
+        WHERE  university_id = :uid
+          AND  scrape_job_id = :jid
+          AND  status IN ('pending','review','approved')
+          AND  course_url IS NOT NULL
+          AND  (international_fee IS NULL OR ielts_overall IS NULL)
+        ORDER BY id
+        LIMIT  :n
+    """), {**_base_params, "n": max_courses})).mappings().all()
+
+    fills["courses_rescanned"] = len(sample_rows)
+
+    for row in sample_rows:
+        url = row["course_url"]
+        if not url:
+            continue
+        try:
+            result = await extract_course(url=url, use_ai_fallback=False)
+            update: dict[str, Any] = {}
+            if row["international_fee"] is None and result.get("international_fee") is not None:
+                update["international_fee"] = result["international_fee"]
+                fills["fee_fills"] += 1
+            if row["ielts_overall"] is None and result.get("ielts_overall") is not None:
+                update["ielts_overall"] = result["ielts_overall"]
+                fills["ielts_fills"] += 1
+            if row["study_mode"] is None and result.get("study_mode") is not None:
+                update["study_mode"] = result["study_mode"]
+                fills["mode_fills"] += 1
+            if update:
+                clauses = ", ".join(f"{k}=:{k}" for k in update)
+                await db.execute(
+                    text(f"UPDATE scraped_courses SET {clauses} WHERE id=:rid"),
+                    {"rid": row["id"], **update},
+                )
+        except Exception as exc:
+            log.warning("extraction_scan: url=%s error=%s", url, exc)
+
+    await db.commit()
+    return fills
+
+
 # ── Success criteria ──────────────────────────────────────────────────────────
 
-def _evaluate_success(ctx: dict, quality_pred: dict, sim: dict, fills: dict) -> dict:
-    """Evaluate 6 quality criteria. Returns criteria dict + overall_ok flag."""
-    q_before = ctx["quality"]
+def _evaluate_success(
+    quality_after: dict,
+    sim: dict,
+    predicted_fills: dict,
+    ctx: dict,
+) -> dict:
+    """Evaluate 6 quality criteria against the REAL post-scan quality_after snapshot.
 
+    ``quality_after`` comes from ``_quality_snapshot()`` called after
+    ``_run_extraction_scan()`` has committed DB updates — these are real numbers,
+    not estimates.  ``predicted_fills`` is kept as a helper for qualitative flags
+    that only take effect on the next full scrape (e.g. fees_central_page_set).
+    """
     disc_ok = (
-        quality_pred.get("drop_rate", 100) < _DISC_DROP_RATE_OK
+        quality_after.get("drop_rate", 100) < _DISC_DROP_RATE_OK
         or (sim.get("total", 0) > 0 and sim.get("after", 0) >= sim["total"] * _DISC_RESCUE_OK)
-        or ctx["drop_rate"] < _DISC_DROP_RATE_OK  # already OK before patch
+        or ctx["drop_rate"] < _DISC_DROP_RATE_OK
     )
     fee_ok = (
-        q_before.get("fee_pct", 0) >= _FEE_PCT_OK
-        or fills.get("fees_central_page_set", False)
+        quality_after.get("fee_pct", 0) >= _FEE_PCT_OK
+        or predicted_fills.get("fees_central_page_set", False)
     )
-    ielts_ok = (
-        quality_pred.get("ielts_pct", 0) >= _IELTS_PCT_OK
+    ielts_ok  = quality_after.get("ielts_pct",        0) >= _IELTS_PCT_OK
+    loc_ok    = quality_after.get("location_pct",     0) >= _LOCATION_PCT_OK
+    mode_ok   = (
+        quality_after.get("mode_pct", 0) >= _MODE_PCT_OK
+        or predicted_fills.get("online_only_disabled", False)
     )
-    location_ok = (
-        q_before.get("location_pct", 0) >= _LOCATION_PCT_OK
-        or fills.get("location_junk_removed", 0) > 0
-    )
-    mode_ok = (
-        q_before.get("mode_pct", 0) >= _MODE_PCT_OK
-        or fills.get("online_only_disabled", False)
-    )
-    degree_ok = (
-        q_before.get("degree_level_pct", 0) >= _DEGREE_PCT_OK
-    )
+    degree_ok = quality_after.get("degree_level_pct", 0) >= _DEGREE_PCT_OK
 
-    all_flags   = [disc_ok, fee_ok, ielts_ok, location_ok, mode_ok, degree_ok]
-    pass_count  = sum(1 for f in all_flags if f)
-    overall_ok  = pass_count >= _CRITERIA_PASS_MIN
+    all_flags  = [disc_ok, fee_ok, ielts_ok, loc_ok, mode_ok, degree_ok]
+    pass_count = sum(1 for f in all_flags if f)
+    overall_ok = pass_count >= _CRITERIA_PASS_MIN
 
     return {
-        "discovery_ok":   disc_ok,
-        "fee_ok":         fee_ok,
-        "ielts_ok":       ielts_ok,
-        "location_ok":    location_ok,
-        "mode_ok":        mode_ok,
+        "discovery_ok":    disc_ok,
+        "fee_ok":          fee_ok,
+        "ielts_ok":        ielts_ok,
+        "location_ok":     loc_ok,
+        "mode_ok":         mode_ok,
         "degree_level_ok": degree_ok,
-        "criteria_pass":  pass_count,
-        "overall_ok":     overall_ok,
+        "criteria_pass":   pass_count,
+        "overall_ok":      overall_ok,
     }
 
 
@@ -834,14 +989,45 @@ async def run_ai_repair_loop(job_id: str, db) -> dict:
                     log.warning("ai_repair: apply error: %s", exc)
                     patch_error = str(exc)
 
-            # ⑥ Predict quality after patches + fills
-            quality_predicted, predicted_fills = await _predict_quality(
-                ctx, config_patch, sim, db
-            )
+            # ⑥ Real extraction scan:
+            #    Phase 1 — SQL fast-path (default_ielts fills, reject_values clears)
+            #    Phase 2 — re-fetch up to 5 staged course URLs with patched config
+            scan_fills = await _run_extraction_scan(ctx, config_patch, db)
 
-            # ⑦ Evaluate success criteria
-            success_criteria = _evaluate_success(ctx, quality_predicted, sim, predicted_fills)
-            quality_delta    = _compute_delta(quality_before, quality_predicted)
+            # ⑦ Real quality snapshot AFTER the extraction scan
+            quality_after = await _quality_snapshot(job_id, ctx["university_id"], db)
+            # Drop-rate: use URL simulation for discovery patches; carry forward otherwise
+            # (we cannot re-run full discovery inline — the simulation is the best proxy)
+            if sim.get("total", 0) > 0:
+                _raw   = ctx["raw_discovered"]
+                _after = ctx["after_filter"] + sim.get("after", 0)
+                quality_after["drop_rate"] = (
+                    max(0, round(100 * (1 - _after / _raw))) if _raw > 0
+                    else quality_before.get("drop_rate", 0)
+                )
+            else:
+                quality_after["drop_rate"] = quality_before.get("drop_rate", 0)
+
+            # predicted_fills: qualitative flags for UI chips that take effect on the
+            # next full scrape (e.g. fees_central_page_set, online_only_disabled).
+            # Merge real scan counts on top so the UI shows actual fill numbers.
+            _, predicted_fills = await _predict_quality(ctx, config_patch, sim, db)
+            predicted_fills.update({
+                k: v for k, v in scan_fills.items()
+                if v and k not in predicted_fills
+            })
+            # Real fill counts always win over estimates
+            for _real_key, _ui_key in [
+                ("ielts_fills",     "ielts_fills"),
+                ("fee_fills",       "fee_fills"),
+                ("location_clears", "location_junk_removed"),
+            ]:
+                if scan_fills.get(_real_key):
+                    predicted_fills[_ui_key] = scan_fills[_real_key]
+
+            # ⑧ Evaluate success using REAL quality_after (not predicted)
+            success_criteria = _evaluate_success(quality_after, sim, predicted_fills, ctx)
+            quality_delta    = _compute_delta(quality_before, quality_after)
 
             attempt_record: dict = {
                 "attempt_number":    attempt_num,
@@ -863,12 +1049,13 @@ async def run_ai_repair_loop(job_id: str, db) -> dict:
                 # Patch save status
                 "patch_applied_ok":  patch_applied_ok,
                 "patch_error":       patch_error if patch_error else None,
-                # Quality tracking
+                # Quality tracking — quality_after is REAL (from DB after scan)
                 "quality_before":    quality_before,
-                "quality_predicted": quality_predicted,
+                "quality_after":     quality_after,
                 "quality_delta":     quality_delta,
                 "predicted_fills":   predicted_fills,
                 "success_criteria":  success_criteria,
+                "courses_rescanned": scan_fills.get("courses_rescanned", 0),
             }
             session["attempts"].append(attempt_record)
             _write_session(job_id, session)
@@ -876,15 +1063,15 @@ async def run_ai_repair_loop(job_id: str, db) -> dict:
             crit_pass = success_criteria["criteria_pass"]
             overall   = success_criteria["overall_ok"]
 
-            # ⑧ Termination
+            # ⑨ Termination
             if not patches_raw:
                 session.update(
                     status="completed",
                     final_verdict=(
                         f"OpenAI could not identify a further automatic fix "
-                        f"({crit_pass}/6 quality criteria already met). "
+                        f"({crit_pass}/6 quality criteria passing on real post-scan data). "
                         f"Diagnosis: {ai_data.get('diagnosis', 'N/A')}. "
-                        "Re-run the scrape to validate applied patches."
+                        "Re-run the scrape to apply any config changes to the full course set."
                     ),
                 )
                 break
@@ -893,8 +1080,9 @@ async def run_ai_repair_loop(job_id: str, db) -> dict:
                 session.update(
                     status="completed",
                     final_verdict=(
-                        f"All quality targets met ({crit_pass}/6 criteria pass). "
-                        "Re-run the scrape to apply config changes to live data."
+                        f"All quality targets met — {crit_pass}/6 criteria pass on real "
+                        f"post-scan data ({scan_fills.get('courses_rescanned', 0)} courses re-extracted). "
+                        "Re-run the full scrape to propagate improvements across all courses."
                     ),
                 )
                 break
@@ -904,14 +1092,14 @@ async def run_ai_repair_loop(job_id: str, db) -> dict:
                     status="completed",
                     final_verdict=(
                         f"Reached maximum {MAX_ATTEMPTS} attempts. "
-                        f"{crit_pass}/6 quality criteria passing. "
+                        f"{crit_pass}/6 quality criteria passing (real post-scan). "
                         f"Outstanding: {_failing_criteria_str(success_criteria)}. "
-                        "Re-run the scrape with patches applied."
+                        "Re-run the scrape with patches applied to process all courses."
                     ),
                 )
 
-            # Update ctx quality for next attempt's context message
-            ctx["quality"] = quality_predicted
+            # Update ctx quality for next attempt's context message (use real values)
+            ctx["quality"] = quality_after
 
     except Exception as exc:
         log.exception("ai_repair: unexpected error job=%s: %s", job_id, exc)

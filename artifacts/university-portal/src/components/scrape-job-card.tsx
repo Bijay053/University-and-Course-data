@@ -124,11 +124,12 @@ type AIRepairAttempt = {
   ai_cost_usd:       number;
   patch_applied_ok:  boolean;
   patch_error?:      string | null;
-  quality_before?:   QualityMetrics;
-  quality_predicted?: QualityMetrics;
-  quality_delta?:    Partial<Record<keyof QualityMetrics, number>>;
-  predicted_fills?:  PredictedFills;
-  success_criteria?: SuccessCriteria;
+  quality_before?:      QualityMetrics;
+  quality_after?:       QualityMetrics;
+  quality_delta?:       Partial<Record<keyof QualityMetrics, number>>;
+  predicted_fills?:     PredictedFills;
+  success_criteria?:    SuccessCriteria;
+  courses_rescanned?:   number;
 };
 type AIRepairSession = {
   session_id:      string;
@@ -2952,11 +2953,12 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
                                 {/* Attempt cards */}
                                 {aiRepairSession.attempts.map((att, i) => {
                                   const sc       = att.success_criteria;
-                                  const fills    = att.predicted_fills    ?? {};
-                                  const qb       = att.quality_before     ?? {} as QualityMetrics;
-                                  const qp       = att.quality_predicted  ?? {} as QualityMetrics;
+                                  const fills    = att.predicted_fills ?? {};
+                                  const qb       = att.quality_before  ?? {} as QualityMetrics;
+                                  const qp       = att.quality_after   ?? {} as QualityMetrics;
                                   const overall  = sc?.overall_ok ?? false;
                                   const passN    = sc?.criteria_pass ?? 0;
+                                  const rescanned = att.courses_rescanned ?? 0;
 
                                   type MetricRow = { label: string; before: number; after: number; unit?: string; lowerIsBetter?: boolean };
                                   const metrics: MetricRow[] = [
@@ -2968,7 +2970,7 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
                                     { label: "Degree level",    before: qb.degree_level_pct ?? 0, after: qp.degree_level_pct ?? 0, unit: "%" },
                                     { label: "Study mode",      before: qb.mode_pct       ?? 0, after: qp.mode_pct       ?? 0, unit: "%" },
                                   ];
-                                  const hasQuality = att.quality_before != null;
+                                  const hasQuality = att.quality_before != null && att.quality_after != null;
 
                                   const criteriaItems: { key: keyof SuccessCriteria; label: string }[] = [
                                     { key: "discovery_ok",   label: "Discovery" },
@@ -3048,14 +3050,23 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
                                         {/* ── Quality before → after table ── */}
                                         {hasQuality && (
                                           <div className="mt-1.5">
-                                            <span className="text-[9px] font-semibold text-gray-500 uppercase tracking-wide">Quality scan — before → predicted after</span>
+                                            <div className="flex items-center justify-between">
+                                              <span className="text-[9px] font-semibold text-gray-500 uppercase tracking-wide">
+                                                Quality scan — before → after (real re-extraction)
+                                              </span>
+                                              {rescanned > 0 && (
+                                                <span className="text-[8px] text-violet-600 font-medium">
+                                                  {rescanned} course{rescanned > 1 ? "s" : ""} re-extracted
+                                                </span>
+                                              )}
+                                            </div>
                                             <div className="mt-1 rounded border border-gray-100 overflow-hidden">
                                               <table className="w-full text-[9px]">
                                                 <thead>
                                                   <tr className="bg-gray-50 text-gray-500 font-semibold">
                                                     <th className="text-left px-1.5 py-0.5">Metric</th>
                                                     <th className="text-right px-1.5 py-0.5">Before</th>
-                                                    <th className="text-right px-1.5 py-0.5">Predicted</th>
+                                                    <th className="text-right px-1.5 py-0.5">After</th>
                                                     <th className="text-right px-1.5 py-0.5">Δ</th>
                                                   </tr>
                                                 </thead>
