@@ -22,6 +22,5 @@ discovery:
   - /globalassets/
   - \.(?:jpg|jpeg|png|gif|webp|svg|pdf)(?:\?|$)
   allow_url_patterns:
-  - /study/(?:$|\?(?:.*)?$)
-  - /study/(?:undergraduate|postgraduate-taught-courses|postgraduate-research-courses)(?:/|$)
-  - /study/(?:undergraduate|postgraduate-taught-courses|postgraduate-research-courses)/[^?#]+(?:/[^?#]+){0,3}(?:/|$)
+  - /study(?:/|\?(?:.*)?$|$)
+  - /study/[^?#]+(?:/[^?#]+){0,5}(?:/|$|\?)
