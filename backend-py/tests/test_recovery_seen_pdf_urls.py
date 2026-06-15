@@ -1163,6 +1163,91 @@ class TestSeenPdfUrlsMixedCategory:
                 "because it was already seen"
             )
 
+    def test_make_pdf_budget_dict_only_first_category_decremented(self):
+        """Using the dict returned by make_pdf_budget():
+        - After the first call (categories={"fees"}), only budget["fees"] decrements.
+        - After the deduped second call (categories={"requirements"}), neither
+          budget["fees"] nor budget["requirements"] changes.
+        This closes the gap where existing tests used hand-crafted dicts instead of
+        the helper so a signature change to make_pdf_budget() would go undetected.
+        """
+        from app.services.scraper.recovery.extractor import (
+            extract_from_url,
+            make_pdf_budget,
+        )
+
+        seen: set[str] = set()
+        budget = make_pdf_budget(single_course=False)
+
+        # Record initial values so the test does not depend on magic numbers.
+        initial_fees = budget["fees"]
+        initial_requirements = budget["requirements"]
+        assert initial_fees > 0, "make_pdf_budget must provide a non-zero fees budget"
+        assert initial_requirements > 0, (
+            "make_pdf_budget must provide a non-zero requirements budget"
+        )
+
+        with (
+            patch(
+                "app.services.scraper.recovery.extractor._fetch_html",
+                new=AsyncMock(return_value=(_HTML_LINKING_MIXED_PDF, "html")),
+            ),
+            patch(
+                "app.services.scraper.recovery.extractor._run_extractor",
+                new=AsyncMock(return_value=[]),
+            ),
+            patch(
+                "app.services.scraper.recovery.extractor._find_linked_pdfs",
+                new=AsyncMock(return_value=[_MIXED_PDF_URL]),
+            ),
+            patch(
+                "app.services.scraper.recovery.extractor._extract_from_pdf",
+                new=AsyncMock(return_value=[]),
+            ) as mock_pdf,
+        ):
+            # Call 1: fees page — PDF fetched, only fees counter decremented.
+            _run(
+                extract_from_url(
+                    "https://uni.edu/fees-page",
+                    {"fees"},
+                    pdf_budget=budget,
+                    seen_pdf_urls=seen,
+                )
+            )
+            assert mock_pdf.call_count == 1, (
+                "First call (fees) must fetch the mixed PDF"
+            )
+            assert budget["fees"] == initial_fees - 1, (
+                "budget['fees'] must be decremented by exactly 1 on the first fetch"
+            )
+            assert budget["requirements"] == initial_requirements, (
+                "budget['requirements'] must be unaffected by the fees-category call"
+            )
+            assert _MIXED_PDF_URL in seen, (
+                "Mixed PDF URL must be added to seen_pdf_urls after the first fetch"
+            )
+
+            # Call 2: requirements page — PDF is already in seen, neither counter changes.
+            _run(
+                extract_from_url(
+                    "https://uni.edu/requirements-page",
+                    {"requirements"},
+                    pdf_budget=budget,
+                    seen_pdf_urls=seen,
+                )
+            )
+            assert mock_pdf.call_count == 1, (
+                "Second call (requirements) must skip the PDF because it is already "
+                "in seen_pdf_urls — _extract_from_pdf must not be called again"
+            )
+            assert budget["fees"] == initial_fees - 1, (
+                "budget['fees'] must not change after the deduped requirements call"
+            )
+            assert budget["requirements"] == initial_requirements, (
+                "budget['requirements'] must not be decremented when the PDF is "
+                "skipped via the seen_pdf_urls guard"
+            )
+
     def test_without_seen_set_mixed_pdf_fetched_twice(self):
         """When seen_pdf_urls is None the same PDF URL is NOT deduplicated
         across separate calls — each call fetches it independently.
