@@ -1,8 +1,8 @@
-"""AI-powered scrape repair agent — OpenAI edition (full quality loop).
+"""AI-powered scrape repair agent - OpenAI edition (full quality loop).
 
-Uses the Replit AI Integrations OpenAI proxy (gpt-5.4) to iteratively
-diagnose failing scrape jobs and apply config patches — both discovery and
-extraction — until ALL quality criteria are met or MAX_ATTEMPTS is reached.
+Uses the Replit AI Integrations OpenAI proxy to iteratively diagnose failing
+scrape jobs and apply config patches until BOTH discovery quality AND extraction
+quality improve, or MAX_ATTEMPTS is reached.
 
 Loop per attempt:
   1. Snapshot quality BEFORE  (discovery stats + extraction fill rates)
@@ -31,12 +31,12 @@ from typing import Any
 
 log = logging.getLogger(__name__)
 
-MAX_ATTEMPTS = 5
+MAX_ATTEMPTS = 6
 _REDIS_KEY_PREFIX = "ai_repair:"
 _REDIS_TTL_SEC    = 86_400  # 24 h
 
 # Success thresholds
-_DISC_DROP_RATE_OK   = 30   # % — acceptable URL drop-rate after filter
+_DISC_DROP_RATE_OK   = 30   # % - acceptable URL drop-rate after filter
 _DISC_RESCUE_OK      = 0.50 # fraction of dropped URLs rescued
 _FEE_PCT_OK          = 50   # %
 _IELTS_PCT_OK        = 50   # %
@@ -44,6 +44,10 @@ _LOCATION_PCT_OK     = 70   # %
 _MODE_PCT_OK         = 60   # %
 _DEGREE_PCT_OK       = 70   # %
 _CRITERIA_PASS_MIN   = 4    # out of 6 criteria must pass for overall_ok
+
+# Extraction quality thresholds
+_EXTRACTION_AVG_THRESHOLD = 60   # avg key-field fill rate to be considered "ok"
+_EXTRACTION_MIN_FIELD    = 35    # any single key field below this is "poor"
 
 
 # ── Redis helpers ─────────────────────────────────────────────────────────────
@@ -100,13 +104,13 @@ def _set_dotpath(dotpath: str, value: Any) -> dict:
 
 # ── Strict patch validation ───────────────────────────────────────────────────
 
-_ALLOWED_DISCOVERY_FIELDS: dict[str, type] = {
-    "allow_url_patterns": list,
-    "block_url_patterns": list,
-    "must_contain":       list,
-    "bfs_page_budget":    int,
-    "use_browser":        bool,
-    "sitemap_url":        str,
+_ALLOWED_DISCOVERY_FIELDS: dict[str, type | tuple] = {
+    "allow_url_patterns":   list,
+    "block_url_patterns":   list,
+    "must_contain":         list,
+    "bfs_page_budget":      int,
+    "use_browser":          bool,
+    "sitemap_url":          str,
 }
 
 _ALLOWED_EXTRACTION_FIELDS: dict[str, str] = {
@@ -136,6 +140,17 @@ _KNOWN_STAGING_FIELDS = {
 }
 
 _ISO_CURRENCY_RE = re.compile(r"^[A-Z]{3}$")
+
+_ALLOWED_RECIPE_FIELDS: dict[str, type | tuple] = {
+    "fee_source_urls":            list,
+    "fee_term":                   str,
+    "location_reject_values":     list,
+    "location_allowed_values":    list,
+    "study_mode_online_keywords": list,
+    "course_name_remove_after":   list,
+}
+
+_ALLOWED_SECTIONS = {"discovery", "recipe"}
 
 
 class PatchValidationError(ValueError):
@@ -230,71 +245,153 @@ def _validate_extraction_patch(field: str, value: Any) -> None:
                 )
 
 
-def _validate_and_build_config_patch(patches: list[dict]) -> tuple[dict, list[str]]:
-    config_patch: dict = {}
+def _validate_patch(patch: dict) -> dict:
+    """Validate and sanitise one AI patch dict.
+
+    Returns the sanitised patch on success.
+    Raises PatchValidationError with a human-readable reason on failure.
+    """
+    section = patch.get("section")
+    field   = patch.get("field")
+    value   = patch.get("value")
+
+    if section not in _ALLOWED_SECTIONS:
+        raise PatchValidationError(
+            f"Section '{section}' is not in the allowed set {_ALLOWED_SECTIONS}. "
+            "Only 'discovery' and 'recipe' patches may be applied automatically."
+        )
+
+    if section == "discovery":
+        if field not in _ALLOWED_DISCOVERY_FIELDS:
+            raise PatchValidationError(
+                f"Field '{field}' is not an allowed discovery field. "
+                f"Allowed: {sorted(_ALLOWED_DISCOVERY_FIELDS)}"
+            )
+        expected_type = _ALLOWED_DISCOVERY_FIELDS[field]
+        if not isinstance(value, expected_type):
+            raise PatchValidationError(
+                f"Discovery field '{field}' must be {expected_type.__name__}, "
+                f"got {type(value).__name__}."
+            )
+        if field in ("allow_url_patterns", "block_url_patterns", "must_contain"):
+            if not value:
+                raise PatchValidationError(f"'{field}' must not be an empty list.")
+            for i, pat in enumerate(value):
+                if not isinstance(pat, str):
+                    raise PatchValidationError(f"'{field}[{i}]' must be a string.")
+                if len(pat) > 500:
+                    raise PatchValidationError(
+                        f"'{field}[{i}]' pattern is suspiciously long (>500 chars)."
+                    )
+                try:
+                    re.compile(pat)
+                except re.error as exc:
+                    raise PatchValidationError(
+                        f"'{field}[{i}]' is not a valid regex: {exc}  (pattern: {pat!r})"
+                    ) from exc
+        if field == "bfs_page_budget":
+            if not (5 <= value <= 300):
+                raise PatchValidationError(
+                    f"'bfs_page_budget' must be between 5 and 300, got {value}."
+                )
+        if field == "sitemap_url":
+            if not value.startswith(("http://", "https://")):
+                raise PatchValidationError(
+                    f"'sitemap_url' must start with http:// or https://, got {value!r}."
+                )
+
+    elif section == "recipe":
+        if field not in _ALLOWED_RECIPE_FIELDS:
+            raise PatchValidationError(
+                f"Field '{field}' is not an allowed recipe field. "
+                f"Allowed: {sorted(_ALLOWED_RECIPE_FIELDS)}"
+            )
+        expected_type = _ALLOWED_RECIPE_FIELDS[field]
+        if not isinstance(value, expected_type):
+            raise PatchValidationError(
+                f"Recipe field '{field}' must be {expected_type.__name__}, "
+                f"got {type(value).__name__}."
+            )
+        if isinstance(value, list):
+            if not value:
+                raise PatchValidationError(f"Recipe field '{field}' must not be an empty list.")
+            for i, item in enumerate(value):
+                if not isinstance(item, str):
+                    raise PatchValidationError(
+                        f"Recipe field '{field}[{i}]' must be a string, got {type(item).__name__}."
+                    )
+        if field == "fee_term" and value not in ("Annual", "Per Unit", "Full Course", ""):
+            raise PatchValidationError(
+                f"'fee_term' must be one of Annual | Per Unit | Full Course, got {value!r}."
+            )
+    return patch
+
+    return discovery_patch, recipe_patch, errors
+
+
+def _validate_and_build_config_patch(patches: list[dict]) -> tuple[dict, dict, list[str]]:
+    """Validate all patches and build separate discovery and recipe patch dicts.
+
+    Returns (discovery_patch, recipe_patch, errors).
+    Patches that fail validation are skipped (not applied) and their
+    error message is recorded.
+    """
+    discovery_patch: dict = {}
+    recipe_patch: dict = {}
     errors: list[str] = []
     for p in patches:
         section = p.get("section", "")
         field   = p.get("field",   "")
         value   = p.get("value")
         try:
+            validated = _validate_patch(p)
+            section = validated["section"]
+            field   = validated["field"]
+            value   = validated["value"]
             if section == "discovery":
-                _validate_discovery_patch(field, value)
-                config_patch.setdefault("discovery", {})[field] = value
-            elif section == "extraction":
-                _validate_extraction_patch(field, value)
-                nested = _set_dotpath(field, value)
-                config_patch["extraction"] = _deep_merge(config_patch.get("extraction", {}), nested)
+                discovery_patch[field] = value
             else:
-                raise PatchValidationError(
-                    f"Section '{section}' not allowed. Must be 'discovery' or 'extraction'."
-                )
+                recipe_patch[field] = value
         except PatchValidationError as exc:
             errors.append(f"{section}.{field}: {exc}")
             log.warning("ai_repair: patch rejected: %s", exc)
-    return config_patch, errors
+
+    return discovery_patch, recipe_patch, errors
 
 
-# ── Quality snapshot ──────────────────────────────────────────────────────────
+# ── Extraction quality helpers ────────────────────────────────────────────────
 
-async def _quality_snapshot(job_id: str, uni_id: int, db) -> dict:
-    """Query staged-course fill rates for this job. Returns quality dict."""
-    from sqlalchemy import text
+def _extraction_quality_ok(quality: dict) -> bool:
+    """True when average key-field fill rate is acceptable."""
+    if not quality or quality.get("total_staged", 0) == 0:
+        return True  # No staged courses yet - don't block on extraction
+    key_pcts = [
+        quality.get("fee_pct", 0),
+        quality.get("ielts_pct", 0),
+        quality.get("intakes_pct", 0),
+        quality.get("location_pct", 0),
+        quality.get("degree_level_pct", 0),
+        quality.get("mode_pct", 0),
+        quality.get("duration_pct", 0),
+    ]
+    avg = sum(key_pcts) / len(key_pcts)
+    min_field = min(key_pcts)
+    return avg >= _EXTRACTION_AVG_THRESHOLD and min_field >= _EXTRACTION_MIN_FIELD
 
-    q = (await db.execute(
-        text("""
-            SELECT COUNT(*)                                      AS total,
-                   COUNT(international_fee)                      AS has_fee,
-                   COUNT(ielts_overall)                          AS has_ielts,
-                   COUNT(intake_months)                          AS has_intakes,
-                   COUNT(course_location)                        AS has_location,
-                   COUNT(degree_level)                           AS has_degree_level,
-                   COUNT(study_mode)                             AS has_mode,
-                   COUNT(duration)                               AS has_duration,
-                   COUNT(academic_level)                         AS has_academic_level,
-                   array_agg(DISTINCT course_location)
-                     FILTER (WHERE course_location IS NOT NULL)  AS sample_locations,
-                   array_agg(DISTINCT degree_level)
-                     FILTER (WHERE degree_level IS NOT NULL)     AS sample_degrees,
-                   array_agg(DISTINCT study_mode)
-                     FILTER (WHERE study_mode IS NOT NULL)       AS sample_modes
-            FROM   scraped_courses
-            WHERE  university_id = :uid
-              AND  scrape_job_id = :jid
-              AND  status IN ('pending','review','approved')
-        """),
-        {"uid": uni_id, "jid": job_id},
-    )).mappings().first()
 
-    total = (q["total"] or 0) if q else 0
-    if total == 0:
-        return {
-            "total_staged": 0, "fee_pct": 0, "ielts_pct": 0, "intakes_pct": 0,
-            "location_pct": 0, "degree_level_pct": 0, "mode_pct": 0,
-            "duration_pct": 0, "academic_level_pct": 0,
-            "sample_locations": [], "sample_degrees": [], "sample_modes": [],
-        }
-
+def _quality_summary(quality: dict) -> str:
+    if not quality:
+        return "no courses staged yet"
+    return (
+        f"staged={quality.get('total_staged', 0)}"
+        f" fee={quality.get('fee_pct', 0)}%"
+        f" ielts={quality.get('ielts_pct', 0)}%"
+        f" intakes={quality.get('intakes_pct', 0)}%"
+        f" location={quality.get('location_pct', 0)}%"
+        f" degree_level={quality.get('degree_level_pct', 0)}%"
+        f" mode={quality.get('mode_pct', 0)}%"
+        f" duration={quality.get('duration_pct', 0)}%"
+    )
     pct = lambda n: round(100 * (n or 0) / total)
     return {
         "total_staged":       total,
@@ -323,7 +420,7 @@ async def _predict_quality(
     """Compute predicted quality metrics and predicted fills after applying patches.
 
     Returns (quality_predicted, predicted_fills).
-    Does NOT run a live scrape — uses DB row counts to estimate improvements.
+    Does NOT run a live scrape - uses DB row counts to estimate improvements.
     """
     from sqlalchemy import text
 
@@ -650,26 +747,102 @@ async def _gather_context(job_id: str, db) -> dict:
         except Exception:
             pass
 
-    quality = await _quality_snapshot(job_id, uni_id, db)
-    drop_rate = round(100 * (1 - after_filter / raw_discovered)) if raw_discovered > 0 else 0
+    q = (await db.execute(
+        text("""
+            SELECT COUNT(*)                                          AS total,
+                   COUNT(international_fee)                          AS has_fee,
+                   COUNT(ielts_overall)                              AS has_ielts,
+                   COUNT(intake_months)                              AS has_intakes,
+                   COUNT(course_location)                            AS has_location,
+                   COUNT(degree_level)                               AS has_degree_level,
+                   COUNT(study_mode)                                 AS has_mode,
+                   COUNT(duration)                                   AS has_duration,
+                   COUNT(academic_level)                             AS has_academic_level,
+                   array_agg(DISTINCT course_location)
+                     FILTER (WHERE course_location IS NOT NULL)      AS sample_locations,
+                   array_agg(DISTINCT degree_level)
+                     FILTER (WHERE degree_level IS NOT NULL)         AS sample_degree_levels,
+                   array_agg(DISTINCT study_mode)
+                     FILTER (WHERE study_mode IS NOT NULL)           AS sample_modes
+            FROM   scraped_courses
+            WHERE  university_id = :uid
+              AND  scrape_job_id = :jid
+    q = (await db.execute(
+        text("""
+            SELECT COUNT(*)                                          AS total,
+                   COUNT(international_fee)                          AS has_fee,
+                   COUNT(ielts_overall)                              AS has_ielts,
+                   COUNT(intake_months)                              AS has_intakes,
+                   COUNT(course_location)                            AS has_location,
+                   COUNT(degree_level)                               AS has_degree_level,
+                   COUNT(study_mode)                                 AS has_mode,
+                   COUNT(duration)                                   AS has_duration,
+                   COUNT(academic_level)                             AS has_academic_level,
+                   array_agg(DISTINCT course_location)
+                     FILTER (WHERE course_location IS NOT NULL)      AS sample_locations,
+                   array_agg(DISTINCT degree_level)
+                     FILTER (WHERE degree_level IS NOT NULL)         AS sample_degree_levels,
+                   array_agg(DISTINCT study_mode)
+                     FILTER (WHERE study_mode IS NOT NULL)           AS sample_modes
+            FROM   scraped_courses
+            WHERE  university_id = :uid
+              AND  scrape_job_id = :jid
+              AND  status IN ('pending', 'review', 'approved')
+        """),
+        {"uid": uni_id, "jid": job_id},
+    )).mappings().first()
+
+    quality: dict = {}
+    total = (q["total"] or 0) if q else 0
+    if total > 0:
+        quality = {
+            "total_staged":       total,
+            "fee_pct":            round(100 * (q["has_fee"]           or 0) / total),
+            "ielts_pct":          round(100 * (q["has_ielts"]         or 0) / total),
+            "intakes_pct":        round(100 * (q["has_intakes"]       or 0) / total),
+            "location_pct":       round(100 * (q["has_location"]      or 0) / total),
+            "degree_level_pct":   round(100 * (q["has_degree_level"]  or 0) / total),
+            "mode_pct":           round(100 * (q["has_mode"]          or 0) / total),
+            "duration_pct":       round(100 * (q["has_duration"]      or 0) / total),
+            "academic_level_pct": round(100 * (q["has_academic_level"] or 0) / total),
+            "sample_locations":   list((q["sample_locations"]    or [])[:8]),
+            "sample_degrees":     list((q["sample_degree_levels"] or [])[:8]),
+            "sample_modes":       list((q["sample_modes"]         or [])[:8]),
+        }
+    """Re-read per-field fill rates from the staging table for before/after comparison."""
+    from sqlalchemy import text
+
+    q = (await db.execute(
+        text("""
+            SELECT COUNT(*)                              AS total,
+                   COUNT(international_fee)             AS has_fee,
+                   COUNT(ielts_overall)                 AS has_ielts,
+                   COUNT(intake_months)                 AS has_intakes,
+                   COUNT(course_location)               AS has_location,
+                   COUNT(degree_level)                  AS has_degree_level,
+                   COUNT(study_mode)                    AS has_mode,
+                   COUNT(duration)                      AS has_duration
+            FROM   scraped_courses
+            WHERE  university_id = :uid
+              AND  scrape_job_id = :jid
+              AND  status IN ('pending', 'review', 'approved')
+        """),
+        {"uid": uni_id, "jid": job_id},
+    )).mappings().first()
+
+    total = (q["total"] or 0) if q else 0
+    if total == 0:
+        return {}
 
     return {
-        "job_id":          job_id,
-        "university_id":   uni_id,
-        "uni_name":        row["uni_name"] or "Unknown",
-        "scrape_url":      row["scrape_url"] or "",
-        "raw_discovered":  raw_discovered,
-        "after_filter":    after_filter,
-        "imported":        row["imported"] or 0,
-        "total_errors":    row["total_errors"] or 0,
-        "drop_rate":       drop_rate,
-        "dropped_sample":  dropped_sample,
-        "passed_sample":   passed_sample,
-        "admin_config":    admin_config,
-        "yaml_content":    yaml_content[:4000],
-        "quality":         quality,
-        "unis_dir":        unis_dir,
-        "yaml_file":       yaml_files[0] if yaml_files else None,
+        "total_staged":     total,
+        "fee_pct":          round(100 * (q["has_fee"]          or 0) / total),
+        "ielts_pct":        round(100 * (q["has_ielts"]        or 0) / total),
+        "intakes_pct":      round(100 * (q["has_intakes"]      or 0) / total),
+        "location_pct":     round(100 * (q["has_location"]     or 0) / total),
+        "degree_level_pct": round(100 * (q["has_degree_level"] or 0) / total),
+        "mode_pct":         round(100 * (q["has_mode"]         or 0) / total),
+        "duration_pct":     round(100 * (q["has_duration"]     or 0) / total),
     }
 
 
@@ -679,83 +852,62 @@ _SYSTEM_PROMPT = """\
 You are an expert web scraping engineer specialising in university course scrapers.
 Analyse a failing or low-quality scrape job and return the most impactful fix.
 
-Return ONLY a valid JSON object — no markdown, no text outside the JSON.
+Return ONLY a valid JSON object - no markdown, no text outside the JSON.
 
 Schema:
 {
-  "diagnosis": "one sentence describing the root problem",
-  "root_cause": "one of: allow_url_patterns | block_url_patterns | bfs_page_budget | use_browser | fees | english | location | study_mode | filters | duration | unknown",
-  "confidence": <integer 0-100>,
-  "explanation": "2-3 sentences explaining why this fix will work",
+  "diagnosis": "string - one sentence describing the root problem",
+  "root_cause": "string - one of: allow_url_patterns | block_url_patterns | bfs_page_budget | use_browser | fee_extraction | location_extraction | ielts_extraction | intake_extraction | mode_extraction | unknown",
+  "confidence": number - integer 0-100,
+  "explanation": "string - 2-3 sentences explaining why this fix will work",
   "patches": [
-    { "section": "discovery" | "extraction", "field": "<dotpath>", "action": "replace", "value": <value> }
+    {
+      "section": "string - 'discovery' for URL/crawl fixes | 'recipe' for extraction data-cleaning fixes",
+      "field": "string - see allowed fields below",
+      "action": "string - 'replace'",
+      "value": <appropriate type for the field>
+    }
   ]
 }
+    quality_str = _quality_summary(ctx.get("quality"))
 
-DISCOVERY PATCHES (section="discovery"):
-  allow_url_patterns   list[regex]  — rescue filtered-out course URLs
-  block_url_patterns   list[regex]  — block non-course URLs leaking through
-  must_contain         list[str]    — only keep URLs containing these strings
-  bfs_page_budget      int 5-300    — raise when too few pages crawled
-  use_browser          bool         — enable for JS-rendered SPAs
-  sitemap_url          str (URL)    — override sitemap URL
-
-EXTRACTION PATCHES (section="extraction"):
-  fees.central_page                  str (URL) or null   — fee schedule page
-  fees.fees_pdf_url                  str (URL) or null   — fee schedule PDF
-  fees.default_currency              str (ISO-3)         — e.g. AUD, GBP, USD
-  fees.credit_points_per_unit        int 1-200 or null
-  english.central_page               str (URL) or null   — IELTS/English req page
-  english.requirements_pdf_url       str (URL) or null
-  english.trust_vision_ocr           bool                — false = disable OCR
-  english.default_ielts              float 4.0-9.0 or null
-  english.default_pte                int 30-90 or null
-  english.default_toefl              int 30-120 or null
-  filters.domestic_only.enabled      bool
-  filters.online_only.enabled        bool
-  text_cleaning.location.strip_patterns  list[regex]   — strip noise from locations
-  text_cleaning.location.reject_values   list[str]     — clear location if it contains these (e.g. ["Fees", "Campus Map"])
-  text_cleaning.location.allowed_values  list[str]     — allowlist of valid campuses
-  text_cleaning.duration.split_on_slash  bool
-  staging.reject_if_missing              list[known_fields]
-
-RULES:
-- All regex patterns must be valid Python re.search() patterns (no ^ anchors)
-- field must use exact dot-notation paths from the tables above
-- Do NOT repeat a fix from any previous attempt listed in context
-- Return up to 3 patches per attempt; prioritise highest-impact fix first
-- Return empty patches if no safe automatic fix is possible
-
-DIAGNOSIS PRIORITY:
-1. drop_rate > 50% + dropped_sample non-empty → fix allow/block_url_patterns
-2. raw_discovered = 0 → raise bfs_page_budget or enable use_browser
-3. fee_pct < 40% + staged > 0 → set fees.central_page or fees.default_currency
-4. ielts_pct < 40% + staged > 0 → set english.central_page or english.default_ielts
-5. location_pct < 40% or junk in sample_locations → text_cleaning.location.reject_values
-6. mode_pct < 40% → check filters.online_only.enabled (set false if appropriate)
-7. Otherwise → return empty patches with clear explanation\
-"""
-
-
-def _build_user_message(ctx: dict, previous_attempts: list[dict]) -> str:
-    prev_block = ""
-    if previous_attempts:
-        lines = [
-            f"  #{a['attempt_number']}: root_cause={a['root_cause']} "
-            f"patched={[p.get('field') for p in a.get('patches_applied', [])]} "
-            f"success_criteria={a.get('success_criteria', {}).get('criteria_pass', '?')}/6"
-            for a in previous_attempts
-        ]
-        prev_block = "\nPREVIOUS ATTEMPTS (do NOT repeat these fixes):\n" + "\n".join(lines)
-
-    q = ctx["quality"]
-    total = q.get("total_staged", 0)
-    quality_str = (
-        f"total_staged={total}  fee={q.get('fee_pct',0)}%  ielts={q.get('ielts_pct',0)}%  "
-        f"intakes={q.get('intakes_pct',0)}%  location={q.get('location_pct',0)}%  "
-        f"degree_level={q.get('degree_level_pct',0)}%  study_mode={q.get('mode_pct',0)}%  "
-        f"duration={q.get('duration_pct',0)}%"
-    ) if total else "no courses staged yet"
+    if phase == "extraction":
+        focus_block = (
+            "CURRENT FOCUS: Discovery is working - concentrate on EXTRACTION QUALITY.\n"
+            "The drop_rate is acceptable. The problem is that staged courses are missing key fields.\n"
+            "Suggest recipe patches (section='recipe') to fix fee extraction, location noise,\n"
+            "IELTS/English data, intake months, study mode, or course name contamination.\n"
+            "You may also include a discovery patch if relevant, but extraction is the priority."
+        )
+        diag_priority = (
+            "DIAGNOSIS PRIORITY (extraction phase):\n"
+            "1. fee_pct < 40%  → suggest fee_source_urls pointing to the university fee schedule page\n"
+            "2. location_pct < 40% OR location values look like nav-text → suggest location_reject_values\n"
+            "3. mode_pct < 40% → suggest study_mode_online_keywords if online courses exist\n"
+            "4. degree_level_pct < 40% → suggest course_name_remove_after to strip suffixes\n"
+            "5. ielts_pct < 40% → note in explanation (IELTS is usually scraped from course pages, not recipe-fixable)\n"
+            "6. intakes_pct < 40% → note in explanation (intake months are usually scraped from course pages)\n"
+            "7. duration_pct < 40% → note in explanation (duration is usually scraped from course pages)\n"
+            "8. If nothing is recipe-fixable, return empty patches with a clear explanation"
+        )
+    else:
+        focus_block = (
+            "CURRENT FOCUS: Fix URL DISCOVERY - the scraper is not finding enough course pages.\n"
+            "Check the drop_rate and dropped URL sample. Fix allow_url_patterns or block_url_patterns first."
+        )
+        diag_priority = (
+            "DIAGNOSIS PRIORITY (discovery phase):\n"
+            "1. drop_rate > 50% AND dropped sample non-empty → fix allow_url_patterns or block_url_patterns\n"
+            "2. raw_discovered == 0 OR raw_discovered < 5 → increase bfs_page_budget or enable use_browser\n"
+            "3. staged > 0 but fee_pct < 40% → also suggest a fee_source_urls recipe patch\n"
+            "4. Otherwise → return empty patches with a clear diagnosis\n"
+            "\nHOW TO DERIVE allow_url_patterns:\n"
+            "- Look at the dropped URL paths above\n"
+            "- Find the common path prefix or pattern\n"
+            "- Write a regex that matches those paths with re.search()\n"
+            "- Example: dropped paths like \"/courses/undergraduate/computing-bsc-hons\" → pattern \"/courses/[^/]+/[^/]+\"\n"
+            "- Make the pattern broad enough to catch all similar URLs but not so broad it catches non-course pages"
+        )
 
     admin_disc = ctx["admin_config"].get("discovery", {})
     admin_extr = ctx["admin_config"].get("extraction", {})
@@ -763,153 +915,35 @@ def _build_user_message(ctx: dict, previous_attempts: list[dict]) -> str:
     return f"""UNIVERSITY: {ctx['uni_name']}
 SCRAPE URL: {ctx['scrape_url']}
 
+{focus_block}
+
 DISCOVERY STATS:
   raw_discovered={ctx['raw_discovered']}  after_filter={ctx['after_filter']}  staged={ctx['imported']}  drop_rate={ctx['drop_rate']}%  errors={ctx['total_errors']}
 
-DROPPED URLs (filtered out — may be real course pages):
+DROPPED URLs (incorrectly blocked - look like real course pages):
 {json.dumps(ctx['dropped_sample'], indent=2)}
 
 PASSED URLs (currently making it through the filter):
 {json.dumps(ctx['passed_sample'], indent=2)}
 
-EXTRACTION QUALITY (staged courses):
+EXTRACTION QUALITY (fill rates for staged courses):
 {quality_str}
   sample_locations:     {json.dumps(q.get('sample_locations', []))}
   sample_degree_levels: {json.dumps(q.get('sample_degrees', []))}
   sample_study_modes:   {json.dumps(q.get('sample_modes', []))}
 
-ADMIN_CONFIG discovery overrides (DB, highest priority):
-{json.dumps(admin_disc, indent=2) if admin_disc else "(none)"}
+    """Run the OpenAI-powered repair loop. Writes progress to Redis after every attempt.
 
-ADMIN_CONFIG extraction overrides (DB):
-{json.dumps(admin_extr, indent=2) if admin_extr else "(none)"}
+ADMIN_CONFIG (database overrides):
+{json.dumps(ctx['admin_config'], indent=2)}
 
-YAML CONFIG ON DISK:
-{ctx['yaml_content'] or "(no YAML file found)"}
+YAML CONFIG (file on disk):
+{ctx['yaml_content'] or "(empty — no YAML file found)"}
 {prev_block}
 
-Analyse and return the highest-impact fix as JSON.\
-"""
+{diag_priority}
 
-
-# ── URL filter simulation ─────────────────────────────────────────────────────
-
-_MEDIA_EXT  = re.compile(r"\.(jpe?g|png|gif|webp|svg|ico|bmp|pdf|css|js|woff2?|ttf|eot|mp[34]|zip|docx?)$", re.I)
-_ASSET_PATH = re.compile(r"/(images?|assets?|globalassets|static|media|uploads?|fonts?|icons?|scripts?)/", re.I)
-
-
-def _is_course_url(u: str) -> bool:
-    return not _MEDIA_EXT.search(u) and not _ASSET_PATH.search(u)
-
-
-def _simulate_filter(dropped: list[str], allow_pats: list[str], block_pats: list[str]) -> dict:
-    course_urls = [u for u in dropped if _is_course_url(u)]
-    if not course_urls:
-        return {"before": 0, "after": 0, "total": 0, "rescued": []}
-
-    def _c(pats: list[str]) -> list:
-        out = []
-        for p in pats:
-            try:
-                out.append(re.compile(p, re.IGNORECASE))
-            except re.error:
-                pass
-        return out
-
-    allow_c = _c(allow_pats)
-    block_c = _c(block_pats)
-    passing = []
-    for u in course_urls:
-        ok = True
-        if allow_c and not any(c.search(u) for c in allow_c):
-            ok = False
-        if ok and block_c and any(c.search(u) for c in block_c):
-            ok = False
-        if ok:
-            passing.append(u)
-
-    return {"before": 0, "after": len(passing), "total": len(course_urls), "rescued": passing[:6]}
-
-
-# ── Patch application ─────────────────────────────────────────────────────────
-
-async def _apply_to_db(uni_id: int, config_patch: dict, db) -> None:
-    from sqlalchemy import text
-    import json as _json
-
-    row = (await db.execute(
-        text("SELECT scrape_config FROM universities WHERE id = :id"),
-        {"id": uni_id},
-    )).mappings().first()
-
-    sc       = dict((row.get("scrape_config") or {}) if row else {})
-    existing = sc.get("admin_config") or {}
-    sc["_prev_admin_config"] = existing
-    sc["admin_config"]       = _deep_merge(existing, config_patch)
-
-    await db.execute(
-        text("UPDATE universities SET scrape_config = CAST(:cfg AS jsonb) WHERE id = :id"),
-        {"cfg": _json.dumps(sc), "id": uni_id},
-    )
-    await db.commit()
-
-
-def _apply_to_yaml(yaml_file: Any, unis_dir: Path, uni_id: int, scrape_url: str, config_patch: dict) -> None:
-    import yaml as _yaml
-
-    if not yaml_file:
-        candidates = list(unis_dir.glob(f"*_{uni_id}.yaml"))
-        if not candidates:
-            bare = re.sub(r"^www\.", "", re.sub(r"^https?://", "", scrape_url).split("/")[0].lower())
-            if bare:
-                for f in unis_dir.glob("*.yaml"):
-                    try:
-                        if bare in f.read_text(encoding="utf-8")[:600]:
-                            candidates = [f]; break
-                    except Exception:
-                        continue
-        if not candidates:
-            log.warning("ai_repair: no YAML for uni_id=%s", uni_id); return
-        yaml_file = candidates[0]
-
-    try:
-        existing_text = yaml_file.read_text(encoding="utf-8")
-        comment_lines = [ln for ln in existing_text.splitlines() if ln.strip().startswith("#")]
-        header  = ("\n".join(comment_lines) + "\n") if comment_lines else ""
-        merged  = _deep_merge(_yaml.safe_load(existing_text) or {}, config_patch)
-        new_txt = header + _yaml.dump(merged, default_flow_style=False, allow_unicode=True, sort_keys=False)
-        yaml_file.write_text(new_txt, encoding="utf-8")
-        log.info("ai_repair: wrote config patch to %s", yaml_file.name)
-    except Exception as exc:
-        log.warning("ai_repair: YAML write failed: %s", exc)
-
-
-# ── Quality delta computation ─────────────────────────────────────────────────
-
-def _compute_delta(before: dict, predicted: dict) -> dict:
-    keys = ["fee_pct", "ielts_pct", "intakes_pct", "location_pct",
-            "degree_level_pct", "mode_pct", "duration_pct", "drop_rate"]
-    delta: dict = {}
-    for k in keys:
-        b = before.get(k, 0)
-        p = predicted.get(k, 0)
-        if b != p:
-            delta[k] = p - b
-    return delta
-
-
-# ── Main loop ─────────────────────────────────────────────────────────────────
-
-async def run_ai_repair_loop(job_id: str, db) -> dict:
-    """Run the OpenAI-powered full quality repair loop.
-
-    After each patch: simulates discovery improvement AND predicts extraction
-    gains from the DB, evaluates 6-dimensional success criteria, and continues
-    until overall_ok or MAX_ATTEMPTS.
-    """
-    from app.services.ai.openai_client import chat_json
-
-    session: dict = {
+Return ONLY the JSON object described above. No markdown, no explanation outside the JSON."""
         "session_id":      str(uuid.uuid4())[:8],
         "job_id":          job_id,
         "status":          "running",
@@ -920,6 +954,7 @@ async def run_ai_repair_loop(job_id: str, db) -> dict:
         "started_at":      datetime.now(timezone.utc).isoformat(),
         "completed_at":    None,
         "error":           None,
+        "quality_before":  None,
     }
     _write_session(job_id, session)
 
@@ -930,37 +965,24 @@ async def run_ai_repair_loop(job_id: str, db) -> dict:
             return session
 
         session["uni_name"] = ctx["uni_name"]
+        quality_baseline = ctx.get("quality") or {}
+        session["quality_before"] = quality_baseline
         _write_session(job_id, session)
+
+        # Carry forward the "before" quality for each attempt
+        quality_before_attempt = quality_baseline
 
         for attempt_num in range(1, MAX_ATTEMPTS + 1):
             session["current_attempt"] = attempt_num
             _write_session(job_id, session)
             log.info("ai_repair: job=%s attempt=%d/%d", job_id, attempt_num, MAX_ATTEMPTS)
 
-            # ① Snapshot quality BEFORE this attempt
-            quality_before = await _quality_snapshot(job_id, ctx["university_id"], db)
-            quality_before["drop_rate"] = ctx["drop_rate"]
+            # Determine current repair phase
+            discovery_needs_fix = (
+                ctx["drop_rate"] > 20
+            disc_patch, recipe_patch, validation_errors = _validate_and_build_config_patch(patches_raw)
 
-            # ② Call OpenAI
-            user_msg = _build_user_message(ctx, session["attempts"])
-            ai_data  = await chat_json(system=_SYSTEM_PROMPT, user=user_msg, max_tokens=2048)
-
-            if ai_data is None:
-                session.update(
-                    status="completed",
-                    final_verdict=(
-                        "OpenAI service unavailable. Check AI_INTEGRATIONS_OPENAI_BASE_URL "
-                        "and AI_INTEGRATIONS_OPENAI_API_KEY."
-                    ),
-                )
-                break
-
-            # ③ Validate patches
-            patches_raw: list[dict] = ai_data.get("patches") or []
-            config_patch, validation_errors = _validate_and_build_config_patch(patches_raw)
-            disc_patch = config_patch.get("discovery", {})
-
-            # ④ URL filter simulation
+            # Simulate URL filter change (only for allow/block pattern changes)
             sim: dict = {"before": 0, "after": 0, "total": 0, "rescued": []}
             if "allow_url_patterns" in disc_patch or "block_url_patterns" in disc_patch:
                 from sqlalchemy import text as _text
@@ -986,8 +1008,10 @@ async def run_ai_repair_loop(job_id: str, db) -> dict:
                                    ctx["university_id"], ctx["scrape_url"], config_patch)
                     patch_applied_ok = True
                 except Exception as exc:
-                    log.warning("ai_repair: apply error: %s", exc)
-                    patch_error = str(exc)
+            # Determine current repair phase
+            discovery_needs_fix = (
+                ctx["drop_rate"] > 20
+            phase = "discovery" if discovery_needs_fix else "extraction"
 
             # ⑥ Real extraction scan:
             #    Phase 1 — SQL fast-path (default_ielts fills, reject_values clears)
@@ -1030,15 +1054,20 @@ async def run_ai_repair_loop(job_id: str, db) -> dict:
             quality_delta    = _compute_delta(quality_before, quality_after)
 
             attempt_record: dict = {
-                "attempt_number":    attempt_num,
-                "diagnosis":         ai_data.get("diagnosis", "Unknown"),
-                "root_cause":        ai_data.get("root_cause", "unknown"),
-                "confidence":        ai_data.get("confidence", 0),
-                "explanation":       ai_data.get("explanation", ""),
-                "patches_applied":   [
+                "attempt_number":     attempt_num,
+                "phase":              phase,
+                "diagnosis":          ai_data.get("diagnosis", "Unknown issue"),
+                "root_cause":         ai_data.get("root_cause", "unknown"),
+                "confidence":         ai_data.get("confidence", 0),
+                "explanation":        ai_data.get("explanation", ""),
+                "patches_applied":    [
                     {"section": p.get("section"), "field": p.get("field"), "new_value": p.get("value")}
                     for p in patches_raw
-                    if p.get("section") in {"discovery", "extraction"} and p.get("field")
+                    if p.get("section") in _ALLOWED_SECTIONS
+                    and (
+                        p.get("field") in _ALLOWED_DISCOVERY_FIELDS
+                        or p.get("field") in _ALLOWED_RECIPE_FIELDS
+                    )
                 ],
                 "validation_errors": validation_errors,
                 # URL simulation (discovery)
@@ -1058,49 +1087,153 @@ async def run_ai_repair_loop(job_id: str, db) -> dict:
                 "courses_rescanned": scan_fills.get("courses_rescanned", 0),
             }
             session["attempts"].append(attempt_record)
+
+            # Apply discovery patch
+            if disc_patch:
+                try:
+                    await _apply_discovery_to_db(ctx["university_id"], disc_patch, db)
+                    _apply_to_yaml(
+                        ctx.get("yaml_file"),
+                        ctx["unis_dir"],
+                        ctx["university_id"],
+                        ctx["scrape_url"],
+                        disc_patch,
+                    )
+                    attempt_record["patch_applied_ok"] = True
+                    log.info("ai_repair: discovery patch applied: %s", list(disc_patch.keys()))
+                except Exception as exc:
+                    log.warning("ai_repair: discovery patch apply error: %s", exc)
+                    attempt_record["patch_error"] = str(exc)
+
+            # Apply recipe patch
+            if recipe_patch:
+                try:
+                    await _apply_recipe_to_db(ctx["university_id"], recipe_patch, db)
+                    attempt_record["patch_applied_ok"] = True
+                    attempt_record["recipe_patch_applied"] = list(recipe_patch.keys())
+                    log.info("ai_repair: recipe patch applied: %s", list(recipe_patch.keys()))
+                except Exception as exc:
+                    log.warning("ai_repair: recipe patch apply error: %s", exc)
+                    attempt_record["recipe_patch_error"] = str(exc)
+
+            # Re-query extraction quality for before/after comparison
+            quality_after = await _requery_quality(ctx["university_id"], job_id, db)
+            attempt_record["quality_after"] = quality_after
             _write_session(job_id, session)
 
-            crit_pass = success_criteria["criteria_pass"]
-            overall   = success_criteria["overall_ok"]
+            # ── Termination checks ────────────────────────────────────────────
 
-            # ⑨ Termination
-            if not patches_raw:
+            has_url_patch = bool("allow_url_patterns" in disc_patch or "block_url_patterns" in disc_patch)
+            urls_rescued_enough = (
+                has_url_patch
+                and sim["total"] > 0
+                and sim["after"] >= sim["total"] * 0.5
+            )
+            discovery_now_ok = urls_rescued_enough or (
+                not has_url_patch and ctx["drop_rate"] < 20
+            )
+            extraction_ok = _extraction_quality_ok(quality_after)
+            no_patches = not patches_raw
+
+            if no_patches:
+                if discovery_now_ok and extraction_ok:
+                    session.update(
+                        status="completed",
+                        final_verdict="No issues detected - discovery and extraction quality are both acceptable.",
+                    )
+                elif discovery_now_ok and not extraction_ok:
+                    session.update(
+                        status="completed",
+                        final_verdict=(
+                            f"OpenAI could not identify an extraction fix after {attempt_num} attempt(s). "
+                            f"Discovery is working. Extraction quality ({_quality_summary(quality_after)}) "
+                            "may require manual recipe configuration. "
+                            f"Diagnosis: {ai_data.get('diagnosis', 'N/A')}"
+                        ),
+                    )
+                else:
+                    session.update(
+                        status="completed",
+                        final_verdict=(
+                            f"OpenAI could not identify an automatic fix after {attempt_num} attempt(s). "
+                            f"Diagnosis: {ai_data.get('diagnosis', 'N/A')}. Manual config review recommended."
+                        ),
+                    )
+                break
+
+            if recipe_patch and not disc_patch:
+                # Pure recipe patch - recipe changes need a re-scrape to verify quality improvement
+                recipe_fields = ", ".join(recipe_patch.keys())
+                extraction_note = (
+                    "Extraction quality is acceptable."
+                    if extraction_ok
+                    else (
+                        f"Extraction quality was poor ({_quality_summary(quality_after)}). "
+                        "The recipe patch targets this - re-run the scrape to measure improvement."
+                    )
+                )
                 session.update(
                     status="completed",
                     final_verdict=(
-                        f"OpenAI could not identify a further automatic fix "
-                        f"({crit_pass}/6 quality criteria passing on real post-scan data). "
-                        f"Diagnosis: {ai_data.get('diagnosis', 'N/A')}. "
-                        "Re-run the scrape to apply any config changes to the full course set."
+                        f"Recipe patch applied ({recipe_fields}). "
+                        f"{extraction_note} "
+                        "Re-run a full scrape to confirm extraction improvements."
                     ),
                 )
                 break
 
-            if overall:
-                session.update(
-                    status="completed",
-                    final_verdict=(
-                        f"All quality targets met — {crit_pass}/6 criteria pass on real "
-                        f"post-scan data ({scan_fills.get('courses_rescanned', 0)} courses re-extracted). "
-                        "Re-run the full scrape to propagate improvements across all courses."
-                    ),
-                )
+            if urls_rescued_enough:
+                if extraction_ok:
+                    session.update(
+                        status="completed",
+                        final_verdict=(
+                            f"Discovery fix applied - {sim['after']}/{sim['total']} previously-dropped URLs "
+                            f"now pass the new filter. Extraction quality is also acceptable ({_quality_summary(quality_after)}). "
+                            "Re-run a full scrape to confirm."
+                        ),
+                    )
+                    break
+                else:
+                    # Discovery fixed but extraction is still poor → continue to extraction phase
+                    log.info(
+                        "ai_repair: discovery fixed but extraction quality poor (%s) - continuing to extraction phase",
+                        _quality_summary(quality_after),
+                    )
+                    # Update context quality for next attempt so the AI sees current state
+                    ctx["quality"] = quality_after
+                    ctx["drop_rate"] = 0  # Signal that discovery is no longer the problem
+                    quality_before_attempt = quality_after
+                    if attempt_num == MAX_ATTEMPTS:
+                        session.update(
+                            status="completed",
+                            final_verdict=(
+                                f"Discovery fix applied ({sim['after']}/{sim['total']} URLs rescued). "
+                                f"Extraction quality remains poor: {_quality_summary(quality_after)}. "
+                                "Re-run a full scrape and check the Recipe Editor for extraction improvements."
+                            ),
+                        )
+                    continue
+
+            if not has_url_patch and ctx["drop_rate"] < 20:
+                # No URL problem, non-recipe patch applied
+                if extraction_ok:
+                    session.update(
+                        status="completed",
+                        final_verdict=(
+                            "Config patch applied. Discovery and extraction quality are both acceptable. "
+                            "Re-run a scrape to verify the changes."
+                        ),
+                    )
+                else:
+                    session.update(
+                        status="completed",
+                        final_verdict=(
+                            "Config patch applied. "
+                            f"Extraction quality: {_quality_summary(quality_after)}. "
+                            "Re-run a scrape to verify - or use the Recipe Editor to tune extraction rules."
+                        ),
+                    )
                 break
-
-            if attempt_num == MAX_ATTEMPTS:
-                session.update(
-                    status="completed",
-                    final_verdict=(
-                        f"Reached maximum {MAX_ATTEMPTS} attempts. "
-                        f"{crit_pass}/6 quality criteria passing (real post-scan). "
-                        f"Outstanding: {_failing_criteria_str(success_criteria)}. "
-                        "Re-run the scrape with patches applied to process all courses."
-                    ),
-                )
-
-            # Update ctx quality for next attempt's context message (use real values)
-            ctx["quality"] = quality_after
-
     except Exception as exc:
         log.exception("ai_repair: unexpected error job=%s: %s", job_id, exc)
         session.update(status="failed", error=str(exc))

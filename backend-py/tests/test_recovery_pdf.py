@@ -2154,7 +2154,23 @@ class TestNoPdfBudgetInlineConstruction:
             ``try``/``except``, ``for``/``while``, and ``with`` branches.
             A name is treated as 'possibly literal' if *any* branch assigns
             it a literal.  Nested function/class definitions are NOT
-            descended into (handled by the outer visitor's generic_visit)."""
+            descended into (handled by the outer visitor's generic_visit).
+
+            Known gaps (out of scope — not present in the codebase today):
+            - **Augmented assignments** (``ast.AugAssign``, e.g.
+              ``budget |= {"fees": 5}``): the collector only handles plain
+              ``Assign`` and ``AnnAssign``; an augmented assignment to a
+              name that was previously set to a safe value will NOT be
+              detected as introducing a literal.  If this pattern is ever
+              used, the collector must be extended with an ``ast.AugAssign``
+              branch that appends ``stmt.value`` for ``stmt.target`` names.
+            - **Tuple-unpack assignments** (e.g. ``a, budget = foo()``):
+              when the ``Assign`` target is an ``ast.Tuple`` rather than a
+              plain ``ast.Name``, the per-element names are silently skipped.
+              If tuple unpacking of a literal-containing RHS is ever used,
+              the collector must recurse into ``ast.Tuple`` / ``ast.List``
+              target elements.
+            """
             assigns: dict[str, list[ast.expr]] = {}
 
             def _collect(stmt_list) -> None:
@@ -2163,9 +2179,13 @@ class TestNoPdfBudgetInlineConstruction:
                         for target in stmt.targets:
                             if isinstance(target, ast.Name):
                                 assigns.setdefault(target.id, []).append(stmt.value)
+                            # NOTE: ast.Tuple / ast.List targets (tuple-unpack)
+                            # are intentionally not handled — see known gaps above.
                     elif isinstance(stmt, ast.AnnAssign):
                         if isinstance(stmt.target, ast.Name) and stmt.value is not None:
                             assigns.setdefault(stmt.target.id, []).append(stmt.value)
+                    # NOTE: ast.AugAssign (e.g. |=, +=) is intentionally not
+                    # handled — see known gaps above.
                     elif isinstance(stmt, ast.If):
                         _collect(stmt.body)
                         _collect(stmt.orelse)
@@ -2326,7 +2346,17 @@ class TestNoPdfBudgetInlineConstruction:
             """Multi-branch collector — records ALL possible assignments to each
             name, including those inside if/else, try/except, for/while, and
             with branches.  A name is 'possibly literal' if any branch assigns
-            it a literal.  Nested function/class defs are skipped (new scope)."""
+            it a literal.  Nested function/class defs are skipped (new scope).
+
+            Known gaps (out of scope — not present in the codebase today):
+            - **Augmented assignments** (ast.AugAssign, e.g. ``budget |= {"fees": 5}``):
+              only plain Assign/AnnAssign are handled; an augmented assignment will NOT
+              be detected as introducing a literal.  Extend with an AugAssign branch if
+              this pattern is ever used.
+            - **Tuple-unpack assignments** (e.g. ``a, budget = foo()``): when the Assign
+              target is an ast.Tuple the per-element names are silently skipped.  Recurse
+              into Tuple/List target elements if this pattern is ever used.
+            """
             assigns: dict[str, list[ast.expr]] = {}
 
             def _collect(stmt_list) -> None:
@@ -2335,9 +2365,11 @@ class TestNoPdfBudgetInlineConstruction:
                         for target in stmt.targets:
                             if isinstance(target, ast.Name):
                                 assigns.setdefault(target.id, []).append(stmt.value)
+                            # NOTE: ast.Tuple / ast.List targets (tuple-unpack) not handled.
                     elif isinstance(stmt, ast.AnnAssign):
                         if isinstance(stmt.target, ast.Name) and stmt.value is not None:
                             assigns.setdefault(stmt.target.id, []).append(stmt.value)
+                    # NOTE: ast.AugAssign (e.g. |=, +=) intentionally not handled.
                     elif isinstance(stmt, ast.If):
                         _collect(stmt.body)
                         _collect(stmt.orelse)
@@ -2517,6 +2549,13 @@ async def run(url, cats):
             return ""
 
         def _collect_assignments(stmts) -> dict[str, list[ast.expr]]:
+            # Known gaps (out of scope — not present in the codebase today):
+            # - AugAssign (e.g. `budget |= {"fees": 5}`): only plain Assign/AnnAssign
+            #   are handled; augmented assignments are silently skipped.  Extend with
+            #   an ast.AugAssign branch that records stmt.value if this pattern arises.
+            # - Tuple-unpack (e.g. `a, budget = foo()`): ast.Tuple / ast.List targets
+            #   in an Assign are silently skipped.  Recurse into target elements if
+            #   this pattern arises.
             assigns: dict[str, list[ast.expr]] = {}
 
             def _collect(stmt_list) -> None:
@@ -2525,9 +2564,11 @@ async def run(url, cats):
                         for target in stmt.targets:
                             if isinstance(target, ast.Name):
                                 assigns.setdefault(target.id, []).append(stmt.value)
+                            # NOTE: ast.Tuple / ast.List targets not handled — see gap above.
                     elif isinstance(stmt, ast.AnnAssign):
                         if isinstance(stmt.target, ast.Name) and stmt.value is not None:
                             assigns.setdefault(stmt.target.id, []).append(stmt.value)
+                    # NOTE: ast.AugAssign (|=, +=, etc.) not handled — see gap above.
                     elif isinstance(stmt, ast.If):
                         _collect(stmt.body)
                         _collect(stmt.orelse)
@@ -2660,6 +2701,33 @@ async def run(url, cats, condition):
             "Expected a violation when budget is a dict literal in the else-branch, "
             "but none was reported.\n\nSource:\n"
             + _ELSE_BRANCH_SOURCE
+        )
+
+        # Sub-case 5: augmented assignment (|=) — explicit out-of-scope gap
+        #
+        # ``budget |= {"fees": 5}`` is an ast.AugAssign node, which
+        # _collect_assignments does NOT handle.  The variable was first set to
+        # a safe make_pdf_budget() return value, so the collector sees only
+        # that safe assignment; the |= that merges a literal dict on top is
+        # invisible to the checker.
+        #
+        # This sub-case documents the gap rather than asserting the violation
+        # is caught — it verifies that the checker does NOT fire, confirming
+        # the known blind-spot.  If _collect_assignments is ever extended to
+        # handle AugAssign, flip the assertion to `assert _run(...)`.
+        _AUGASSIGN_SOURCE = '''\
+async def run(url, cats):
+    budget = make_pdf_budget(single_course=False)
+    budget |= {"fees": 5}
+    results = await extract_from_url(url, cats, pdf_budget=budget)
+    return results
+'''
+        assert not _run(_AUGASSIGN_SOURCE), (
+            "Augmented assignment (|=) is a known gap in _collect_assignments: "
+            "AugAssign nodes are not tracked, so this pattern escapes detection.  "
+            "If _collect_assignments now handles AugAssign, update this sub-case "
+            "to assert _run(...) instead.\n\nSource:\n"
+            + _AUGASSIGN_SOURCE
         )
 
     # ------------------------------------------------------------------ #

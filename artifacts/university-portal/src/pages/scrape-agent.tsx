@@ -552,6 +552,9 @@ export default function ScrapeAgentPage() {
   const [postRepairCandidate, setPostRepairCandidate] = useState<RepairCandidate | null>(null);
   const [postRepairDiscovery, setPostRepairDiscovery] = useState<DiscoveryTest | null>(null);
   const [runningPostRepair, setRunningPostRepair] = useState(false);
+  const [postRepairPhase, setPostRepairPhase] = useState<"discovery" | "extraction" | "done">("discovery");
+  const [preRepairExtraction, setPreRepairExtraction] = useState<ExtractionQualityResult | null>(null);
+  const [postRepairExtraction, setPostRepairExtraction] = useState<ExtractionQualityResult | null>(null);
   const [launchingFullScrape, setLaunchingFullScrape] = useState(false);
 
   const loadConfig = useCallback(async () => {
@@ -718,7 +721,21 @@ export default function ScrapeAgentPage() {
     setApplyingCandidateId(candidate.id);
     setPostRepairCandidate(null);
     setPostRepairDiscovery(null);
+    setPreRepairExtraction(null);
+    setPostRepairExtraction(null);
+    setPostRepairPhase("discovery");
+
     try {
+      // Step 0: Snapshot extraction quality BEFORE the patch for before/after comparison
+      let capturedBefore: ExtractionQualityResult | null = extractionResult;
+      if (!capturedBefore) {
+        try {
+          const preRes = await fetch(`${BASE}/api/scrape/jobs/${jobId}/extraction-quality`, { method: "POST" });
+          if (preRes.ok) capturedBefore = await preRes.json();
+        } catch { /* best-effort */ }
+      }
+      setPreRepairExtraction(capturedBefore);
+
       // Step 1: Apply the config patch — do NOT trigger a full scrape yet
       const res = await fetch(`${BASE}/api/scrape/jobs/${jobId}/auto-repair-filter`, {
         method: "POST",
@@ -734,31 +751,48 @@ export default function ScrapeAgentPage() {
       setRepairCandidates(null);
       setPostRepairCandidate(candidate);
 
-      // Step 2: Auto-run fast Test Discovery to validate the fix immediately
+      // Step 2: Run fast Test Discovery
       setRunningPostRepair(true);
+      setPostRepairPhase("discovery");
+      let discData: DiscoveryTest | null = null;
       const discRes = await fetch(
         `${BASE}/api/universities/${uniId}/test-discovery?fast_only=true`,
         { method: "POST" },
       );
       if (discRes.ok) {
-        const discData: DiscoveryTest = await discRes.json();
+        discData = await discRes.json() as DiscoveryTest;
         setPostRepairDiscovery(discData);
         setDiscoveryTest(discData);
-        const found = discData.total_found ?? 0;
-        if (found > 0) {
-          toast({
-            title: `Fix validated ✓ — ${found} URL${found === 1 ? "" : "s"} found`,
-            description: "The config change is working. Run a full scrape when ready.",
-          });
-        } else {
-          toast({
-            title: "Fix saved — not yet validated",
-            description: "Test discovery still returned 0 URLs. Try a different fix or review the block/allow patterns.",
-            variant: "destructive",
-          });
+      }
+
+      // Step 3: Run Extraction Quality Scan for after comparison
+      setPostRepairPhase("extraction");
+      let afterExtraction: ExtractionQualityResult | null = null;
+      try {
+        const extRes = await fetch(`${BASE}/api/scrape/jobs/${jobId}/extraction-quality`, { method: "POST" });
+        if (extRes.ok) {
+          afterExtraction = await extRes.json() as ExtractionQualityResult;
+          setPostRepairExtraction(afterExtraction);
+          setExtractionResult(afterExtraction);
         }
+      } catch { /* best-effort */ }
+
+      setPostRepairPhase("done");
+
+      // Toast summary
+      const discFound = discData?.total_found ?? 0;
+      const discOk = discData && discData.safety_level === "safe" && discData.total_raw > 0;
+      const extScore = afterExtraction?.extraction_score ?? 0;
+      const extOk = extScore >= 60;
+
+      if (discOk && extOk) {
+        toast({ title: `Fix validated ✓ — ${discFound} URLs found, extraction score ${extScore}/100`, description: "Both discovery and extraction quality look good. Safe to run a full scrape." });
+      } else if (discOk) {
+        toast({ title: `Discovery fixed ✓ — ${discFound} URLs found`, description: `Extraction quality score is ${extScore}/100. Review extraction metrics below.`, variant: "default" });
+      } else if (discFound === 0) {
+        toast({ title: "Fix saved — discovery still returning 0 URLs", description: "Try a different fix or review the block/allow patterns.", variant: "destructive" });
       } else {
-        toast({ title: "Fix saved", description: "Config applied — validation discovery failed. Re-run scrape to confirm." });
+        toast({ title: "Fix saved", description: "Config applied. Check the validation results below.", variant: "default" });
       }
     } catch (err) {
       toast({ title: "Apply failed", description: String(err), variant: "destructive" });
@@ -767,7 +801,7 @@ export default function ScrapeAgentPage() {
       setRunningPostRepair(false);
       await loadConfig();
     }
-  }, [config?.latest_job_id, uniId, toast, loadConfig]);
+  }, [config?.latest_job_id, uniId, toast, loadConfig, extractionResult]);
 
   const launchFullScrapeAfterRepair = useCallback(async () => {
     if (!uniId) return;
@@ -2136,7 +2170,25 @@ export default function ScrapeAgentPage() {
                 const disc = postRepairDiscovery;
                 const isSafe = disc && disc.safety_level === "safe" && disc.total_raw > 0;
                 const isWarning = disc && disc.safety_level === "warning";
-                const isDangerous = disc && (!isSafe && !isWarning);
+                const discOk = isSafe;
+                const extScore = postRepairExtraction?.extraction_score ?? null;
+                const extOk = extScore !== null && extScore >= 60;
+                const bothOk = discOk && extOk;
+                const done = postRepairPhase === "done";
+
+                // Before/after comparison rows for key extraction fields
+                const EXT_FIELDS: { key: string; label: string }[] = [
+                  { key: "international_fee", label: "Fee" },
+                  { key: "english_test",      label: "IELTS/English" },
+                  { key: "intake_months",      label: "Intakes" },
+                  { key: "course_location",    label: "Location" },
+                  { key: "degree_level",       label: "Degree Level" },
+                  { key: "study_mode",         label: "Study Mode" },
+                  { key: "duration",           label: "Duration" },
+                ];
+                const beforeRates = preRepairExtraction?.field_fill_rates ?? {};
+                const afterRates  = postRepairExtraction?.field_fill_rates ?? {};
+                const hasComparison = preRepairExtraction !== null && postRepairExtraction !== null;
 
                 return (
                   <div className="border border-violet-300 rounded-xl p-3 bg-violet-50 space-y-3">
@@ -2149,55 +2201,143 @@ export default function ScrapeAgentPage() {
                           <p className="text-[10px] text-violet-600 truncate">{postRepairCandidate.label}</p>
                         )}
                       </div>
-                      {disc && (
+                      {done && (
                         <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold border ${
-                          isSafe ? "bg-green-50 border-green-300 text-green-800"
-                          : isWarning ? "bg-amber-50 border-amber-300 text-amber-800"
-                          : "bg-red-50 border-red-300 text-red-800"
+                          bothOk
+                            ? "bg-green-50 border-green-300 text-green-800"
+                            : discOk
+                              ? "bg-amber-50 border-amber-300 text-amber-800"
+                              : "bg-red-50 border-red-300 text-red-800"
                         }`}>
-                          {isSafe ? <CheckCheck className="w-3 h-3" />
-                          : isWarning ? <AlertTriangle className="w-3 h-3" />
-                          : <ShieldAlert className="w-3 h-3" />}
-                          {isSafe ? "Safe to scrape" : isWarning ? "Warning" : "Fix didn't work"}
+                          {bothOk
+                            ? <><CheckCheck className="w-3 h-3" /> Safe to scrape</>
+                            : discOk
+                              ? <><AlertTriangle className="w-3 h-3" /> Discovery OK — check extraction</>
+                              : <><ShieldAlert className="w-3 h-3" /> Fix didn't work</>}
                         </div>
                       )}
                     </div>
 
-                    {/* Discovery running */}
+                    {/* Progress indicators while running */}
                     {runningPostRepair && (
-                      <div className="flex items-center gap-2 text-violet-600 text-xs py-1">
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        Running fast Test Discovery to validate the fix…
+                      <div className="space-y-1.5">
+                        <div className={`flex items-center gap-2 text-xs ${postRepairPhase === "discovery" ? "text-violet-600" : "text-gray-400"}`}>
+                          {postRepairPhase === "discovery"
+                            ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            : <CheckCheck className="w-3.5 h-3.5 text-green-500" />}
+                          <span>Running Test Discovery…</span>
+                        </div>
+                        <div className={`flex items-center gap-2 text-xs ${postRepairPhase === "extraction" ? "text-violet-600" : "text-gray-400"}`}>
+                          {postRepairPhase === "extraction"
+                            ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            : <span className="w-3.5 h-3.5" />}
+                          <span>Running Extraction Quality Scan…</span>
+                        </div>
                       </div>
                     )}
 
-                    {/* Discovery result */}
-                    {disc && !runningPostRepair && (
-                      <div className="grid grid-cols-3 gap-1.5 text-center text-[10px]">
-                        <div className="bg-white rounded border border-gray-200 p-2">
-                          <div className="font-bold text-gray-800 text-sm">{disc.total_raw}</div>
-                          <div className="text-gray-400">Links found</div>
-                        </div>
-                        <div className="bg-white rounded border border-gray-200 p-2">
-                          <div className="font-bold text-emerald-700 text-sm">{disc.total_passing}</div>
-                          <div className="text-gray-400">Pass filter</div>
-                        </div>
-                        <div className="bg-white rounded border border-gray-200 p-2">
-                          <div className={`font-bold text-sm ${isSafe ? "text-green-600" : isWarning ? "text-amber-600" : "text-red-600"}`}>
-                            {disc.safety_score}/100
+                    {/* Discovery result grid */}
+                    {disc && done && (
+                      <div>
+                        <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5 flex items-center gap-1">
+                          <Search className="w-3 h-3" /> Discovery
+                        </p>
+                        <div className="grid grid-cols-3 gap-1.5 text-center text-[10px]">
+                          <div className="bg-white rounded border border-gray-200 p-2">
+                            <div className="font-bold text-gray-800 text-sm">{disc.total_raw}</div>
+                            <div className="text-gray-400">Links found</div>
                           </div>
-                          <div className="text-gray-400">Safety score</div>
+                          <div className="bg-white rounded border border-gray-200 p-2">
+                            <div className="font-bold text-emerald-700 text-sm">{disc.total_passing}</div>
+                            <div className="text-gray-400">Pass filter</div>
+                          </div>
+                          <div className="bg-white rounded border border-gray-200 p-2">
+                            <div className={`font-bold text-sm ${isSafe ? "text-green-600" : isWarning ? "text-amber-600" : "text-red-600"}`}>
+                              {disc.safety_score}/100
+                            </div>
+                            <div className="text-gray-400">Safety score</div>
+                          </div>
                         </div>
+                      </div>
+                    )}
+
+                    {/* Extraction quality before/after comparison */}
+                    {done && hasComparison && (
+                      <div>
+                        <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5 flex items-center gap-1.5">
+                          <FlaskConical className="w-3 h-3" /> Extraction Quality
+                          <span className={`ml-auto text-[9px] px-1.5 py-0.5 rounded-full font-medium border ${
+                            extOk
+                              ? "bg-green-50 border-green-200 text-green-700"
+                              : "bg-amber-50 border-amber-200 text-amber-700"
+                          }`}>
+                            Score {extScore ?? "—"}/100 {extOk ? "✓" : "⚠"}
+                          </span>
+                        </p>
+                        {/* Header row */}
+                        <div className="grid grid-cols-[5rem_3.5rem_1fr_3.5rem] gap-x-1.5 text-[9px] text-gray-400 font-medium mb-1 px-0.5">
+                          <span>Field</span>
+                          <span className="text-right">Before</span>
+                          <span className="text-center">Change</span>
+                          <span className="text-right">After</span>
+                        </div>
+                        <div className="space-y-1">
+                          {EXT_FIELDS.map(({ key, label }) => {
+                            const before = Math.round(beforeRates[key] ?? 0);
+                            const after  = Math.round(afterRates[key]  ?? 0);
+                            const delta  = after - before;
+                            const barMax = 100;
+                            return (
+                              <div key={key} className="grid grid-cols-[5rem_3.5rem_1fr_3.5rem] gap-x-1.5 items-center">
+                                <span className={`text-[10px] truncate ${after < 40 ? "text-amber-700 font-medium" : "text-gray-600"}`}>{label}</span>
+                                <span className="text-[10px] text-gray-400 text-right">{before}%</span>
+                                <div className="relative h-2.5 bg-gray-100 rounded-full overflow-hidden">
+                                  {/* before bar */}
+                                  <div className="absolute inset-y-0 left-0 bg-gray-300 rounded-full" style={{ width: `${before}%` }} />
+                                  {/* improvement overlay */}
+                                  {delta > 0 && (
+                                    <div className="absolute inset-y-0 rounded-full bg-emerald-400" style={{ left: `${before}%`, width: `${delta}%` }} />
+                                  )}
+                                  {/* regression overlay */}
+                                  {delta < 0 && (
+                                    <div className="absolute inset-y-0 rounded-full bg-red-400" style={{ left: `${after}%`, width: `${-delta}%` }} />
+                                  )}
+                                </div>
+                                <span className={`text-[10px] font-semibold text-right ${
+                                  delta > 0 ? "text-emerald-700" : delta < 0 ? "text-red-600" : "text-gray-600"
+                                }`}>
+                                  {after}%{delta !== 0 && <span className="text-[8px] ml-0.5">{delta > 0 ? `+${delta}` : delta}</span>}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                        {/* Overall completeness */}
+                        {preRepairExtraction && postRepairExtraction && (
+                          <div className="mt-2 flex items-center gap-2 text-[10px] border-t border-violet-200 pt-2">
+                            <span className="text-gray-500 font-medium w-20">Overall avg</span>
+                            <span className="text-gray-400">{Math.round(preRepairExtraction.avg_completeness_pct)}%</span>
+                            <span className="flex-1 text-center text-gray-400">→</span>
+                            <span className={`font-bold ${postRepairExtraction.avg_completeness_pct >= 70 ? "text-green-700" : "text-amber-700"}`}>
+                              {Math.round(postRepairExtraction.avg_completeness_pct)}%
+                            </span>
+                          </div>
+                        )}
+                        {!extOk && (
+                          <p className="text-[10px] text-amber-700 mt-1.5 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+                            ⚠ Extraction quality is still below threshold (score {extScore}/100). Discovery patches don't affect already-staged data — re-scrape to see improvement, or try another repair.
+                          </p>
+                        )}
                       </div>
                     )}
 
                     {/* Action buttons */}
-                    {disc && !runningPostRepair && (
+                    {done && (
                       <div className="space-y-2">
-                        {isSafe && (
+                        {bothOk && (
                           <>
                             <p className="text-[10px] text-green-700 font-medium">
-                              ✓ Test Discovery confirmed {disc.total_passing} course URLs are reachable. Safe to run full scrape.
+                              ✓ Discovery confirmed {disc?.total_passing} URLs. Extraction score {extScore}/100. Safe to run a full scrape.
                             </p>
                             <Button
                               size="sm"
@@ -2211,12 +2351,41 @@ export default function ScrapeAgentPage() {
                             </Button>
                           </>
                         )}
-                        {!isSafe && (
+                        {discOk && !extOk && (
                           <>
                             <p className="text-[10px] text-amber-700 font-medium">
-                              {disc.total_raw === 0
+                              ✓ Discovery is working ({disc?.total_passing} URLs). Extraction needs improvement — try another fix or re-scrape to apply recipe changes.
+                            </p>
+                            <div className="grid grid-cols-2 gap-2">
+                              <Button
+                                size="sm"
+                                onClick={generateRepairCandidates}
+                                disabled={loadingCandidates}
+                                variant="outline"
+                                className="h-7 text-xs gap-1 border-violet-300 text-violet-700 hover:bg-violet-50"
+                              >
+                                {loadingCandidates ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                                Try Another Fix
+                              </Button>
+                              <Button
+                                size="sm"
+                                onClick={launchFullScrapeAfterRepair}
+                                disabled={launchingFullScrape}
+                                className="h-7 text-xs gap-1 bg-green-600 hover:bg-green-700 text-white"
+                              >
+                                {launchingFullScrape
+                                  ? <><Loader2 className="w-3 h-3 animate-spin" /> Starting…</>
+                                  : <><Play className="w-3 h-3" /> Run Full Scrape</>}
+                              </Button>
+                            </div>
+                          </>
+                        )}
+                        {!discOk && disc && (
+                          <>
+                            <p className="text-[10px] text-amber-700 font-medium">
+                              {(disc?.total_raw ?? 0) === 0
                                 ? "⚠ Test Discovery still found 0 links. This fix didn't help — try the next candidate."
-                                : `⚠ Only ${disc.total_passing} URLs pass the filter (score ${disc.safety_score}/100). Consider trying the next fix or adjusting the config manually.`}
+                                : `⚠ Only ${disc?.total_passing} URLs pass the filter (score ${disc?.safety_score}/100). Try a different fix or adjust config manually.`}
                             </p>
                             <Button
                               size="sm"
@@ -2232,7 +2401,13 @@ export default function ScrapeAgentPage() {
                         )}
                         <button
                           type="button"
-                          onClick={() => { setPostRepairCandidate(null); setPostRepairDiscovery(null); }}
+                          onClick={() => {
+                            setPostRepairCandidate(null);
+                            setPostRepairDiscovery(null);
+                            setPreRepairExtraction(null);
+                            setPostRepairExtraction(null);
+                            setPostRepairPhase("discovery");
+                          }}
                           className="text-[10px] text-gray-400 hover:text-gray-600 w-full text-center"
                         >
                           Dismiss

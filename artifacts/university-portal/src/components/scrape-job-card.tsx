@@ -89,6 +89,16 @@ type QualityMetrics = {
   mode_pct:           number;
   duration_pct:       number;
 };
+type QualitySnapshot = {
+  total_staged:     number;
+  fee_pct:          number;
+  ielts_pct:        number;
+  intakes_pct:      number;
+  location_pct:     number;
+  degree_level_pct: number;
+  mode_pct:         number;
+  duration_pct:     number;
+};
 type PredictedFills = {
   discovery_rescued?:        number;
   ielts_fills?:              number;
@@ -110,26 +120,29 @@ type SuccessCriteria = {
   overall_ok:      boolean;
 };
 type AIRepairAttempt = {
-  attempt_number:    number;
-  diagnosis:         string;
-  root_cause:        string;
-  confidence:        number;
-  explanation:       string;
-  patches_applied:   AIRepairPatch[];
-  validation_errors: string[];
-  before_pass_count: number;
-  after_pass_count:  number;
-  total_test_urls:   number;
-  rescued_sample:    string[];
-  ai_cost_usd:       number;
-  patch_applied_ok:  boolean;
-  patch_error?:      string | null;
-  quality_before?:      QualityMetrics;
-  quality_after?:       QualityMetrics;
-  quality_delta?:       Partial<Record<keyof QualityMetrics, number>>;
-  predicted_fills?:     PredictedFills;
-  success_criteria?:    SuccessCriteria;
-  courses_rescanned?:   number;
+  attempt_number:        number;
+  phase:                 string;
+  diagnosis:             string;
+  root_cause:            string;
+  confidence:            number;
+  explanation:           string;
+  patches_applied:       AIRepairPatch[];
+  validation_errors:     string[];
+  before_pass_count:     number;
+  after_pass_count:      number;
+  total_test_urls:       number;
+  rescued_sample:        string[];
+  ai_cost_usd:           number;
+  patch_applied_ok:      boolean;
+  patch_error?:          string | null;
+  recipe_patch_applied?: string[];
+  quality_before?:       QualityMetrics;
+  quality_predicted?:    QualityMetrics;
+  quality_after?:        QualityMetrics;
+  quality_delta?:        Partial<Record<keyof QualityMetrics, number>>;
+  predicted_fills?:      PredictedFills;
+  success_criteria?:     SuccessCriteria;
+  courses_rescanned?:    number;
 };
 type AIRepairSession = {
   session_id:      string;
@@ -2918,7 +2931,7 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
                                     <span className="text-[9px] bg-violet-100 text-violet-700 px-1.5 py-0.5 rounded-full">Running</span>
                                   )}
                                 </div>
-                                <span className="text-[9px] text-violet-500">{aiRepairSession.attempts.length}/{5} attempts</span>
+                                <span className="text-[9px] text-violet-500">{aiRepairSession.attempts.length}/{6} attempts</span>
                               </button>
 
                               <div className="p-2.5 space-y-2">
@@ -2932,7 +2945,7 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
                                 {aiRepairSession.status === "running" && (
                                   <div className="flex items-center gap-1.5 text-[10px] text-violet-600">
                                     <Loader2 className="w-3 h-3 animate-spin" />
-                                    Running attempt {aiRepairSession.current_attempt} of {5}…
+                                    Running attempt {aiRepairSession.current_attempt} of {6}…
                                   </div>
                                 )}
                                 {aiRepairSession.final_verdict && (
@@ -2953,11 +2966,13 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
                                 {/* Attempt cards */}
                                 {aiRepairSession.attempts.map((att, i) => {
                                   const sc       = att.success_criteria;
-                                  const fills    = att.predicted_fills ?? {};
-                                  const qb       = att.quality_before  ?? {} as QualityMetrics;
-                                  const qp       = att.quality_after   ?? {} as QualityMetrics;
-                                  const overall  = sc?.overall_ok ?? false;
-                                  const passN    = sc?.criteria_pass ?? 0;
+                                  const fills     = att.predicted_fills    ?? {};
+                                  const qb        = att.quality_before     ?? {} as QualityMetrics;
+                                  const qp        = att.quality_predicted  ?? {} as QualityMetrics;
+                                  const qa        = att.quality_after;
+                                  const overall   = sc?.overall_ok ?? false;
+                                  const passN     = sc?.criteria_pass ?? 0;
+                                  const phase     = att.phase ?? "discovery";
                                   const rescanned = att.courses_rescanned ?? 0;
 
                                   type MetricRow = { label: string; before: number; after: number; unit?: string; lowerIsBetter?: boolean };
@@ -2971,7 +2986,15 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
                                     { label: "Study mode",      before: qb.mode_pct       ?? 0, after: qp.mode_pct       ?? 0, unit: "%" },
                                   ];
                                   const hasQuality = att.quality_before != null && att.quality_after != null;
-
+                                  const qualityFields: { key: keyof QualitySnapshot; label: string }[] = [
+                                    { key: "fee_pct",          label: "Fee" },
+                                    { key: "ielts_pct",        label: "IELTS" },
+                                    { key: "intakes_pct",      label: "Intakes" },
+                                    { key: "location_pct",     label: "Location" },
+                                    { key: "degree_level_pct", label: "Degree" },
+                                    { key: "mode_pct",         label: "Mode" },
+                                    { key: "duration_pct",     label: "Duration" },
+                                  ];
                                   const criteriaItems: { key: keyof SuccessCriteria; label: string }[] = [
                                     { key: "discovery_ok",   label: "Discovery" },
                                     { key: "fee_ok",         label: "Fees" },
@@ -2980,7 +3003,6 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
                                     { key: "mode_ok",        label: "Study Mode" },
                                     { key: "degree_level_ok", label: "Degree Level" },
                                   ];
-
                                   return (
                                     <div key={i} className={`rounded border text-[10px] overflow-hidden ${
                                       overall ? "border-green-200" : "border-gray-200"
@@ -2989,7 +3011,16 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
                                       <div className={`flex items-center justify-between px-2 py-1 font-semibold ${
                                         overall ? "bg-green-50 text-green-800" : "bg-gray-50 text-gray-700"
                                       }`}>
-                                        <span>Repair #{att.attempt_number} — {att.root_cause}</span>
+                                        <span className="flex items-center gap-1.5">
+                                          Repair #{att.attempt_number} — {att.root_cause}
+                                          <span className={`text-[8px] font-medium px-1.5 py-0.5 rounded-full border ${
+                                            phase === "extraction"
+                                              ? "bg-teal-50 border-teal-200 text-teal-700"
+                                              : "bg-blue-50 border-blue-200 text-blue-700"
+                                          }`}>
+                                            {phase}
+                                          </span>
+                                        </span>
                                         <div className="flex items-center gap-1.5">
                                           {sc && (
                                             <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full ${
@@ -3017,15 +3048,20 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
                                           <div className="mt-1">
                                             <span className="text-[9px] font-semibold text-gray-500 uppercase tracking-wide">Patches applied</span>
                                             {att.patches_applied.map((p, j) => {
-                                              const isDisc = p.section === "discovery";
+                                              const isDiscovery = p.section === "discovery";
+                                              const isRecipe    = p.section === "recipe";
                                               return (
                                                 <div key={j} className={`mt-0.5 font-mono text-[9px] rounded px-1.5 py-1 border ${
-                                                  isDisc ? "bg-violet-50 border-violet-100" : "bg-amber-50 border-amber-100"
+                                                  isDiscovery ? "bg-violet-50 border-violet-100"
+                                                    : isRecipe ? "bg-teal-50 border-teal-100"
+                                                    : "bg-amber-50 border-amber-100"
                                                 }`}>
                                                   <span className={`font-semibold text-[8px] uppercase tracking-wide mr-1 px-1 py-0.5 rounded ${
-                                                    isDisc ? "bg-violet-100 text-violet-700" : "bg-amber-100 text-amber-700"
+                                                    isDiscovery ? "bg-violet-100 text-violet-700"
+                                                      : isRecipe ? "bg-teal-100 text-teal-700"
+                                                      : "bg-amber-100 text-amber-700"
                                                   }`}>{p.section}</span>
-                                                  <span className={isDisc ? "text-violet-700" : "text-amber-700"}>{p.field}</span>
+                                                  <span className={isDiscovery ? "text-violet-700" : isRecipe ? "text-teal-700" : "text-amber-700"}>{p.field}</span>
                                                   {" → "}
                                                   <span className="text-gray-700 break-all">{JSON.stringify(p.new_value)}</span>
                                                 </div>
@@ -3171,7 +3207,11 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
                                             : att.patch_applied_ok
                                               ? <><CheckCheck className="w-2.5 h-2.5 text-green-500" /> Config saved to DB + YAML</>
                                               : <><AlertTriangle className="w-2.5 h-2.5 text-amber-500" /> Config save failed{att.patch_error ? `: ${att.patch_error}` : ""}</>
+
                                           }
+                                          {att.recipe_patch_applied && att.recipe_patch_applied.length > 0 && (
+                                            <span className="ml-1 text-teal-600">· Recipe: {att.recipe_patch_applied.join(", ")}</span>
+                                          )}
                                         </div>
                                       </div>
                                     </div>
