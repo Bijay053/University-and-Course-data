@@ -1797,3 +1797,330 @@ class TestMakePdfBudgetCallSites:
                 "batch recovery to the tighter per-course limits."
                 % actual_flag
             )
+
+
+# ---------------------------------------------------------------------------
+# Static-analysis guard: no recovery entry-point may bypass make_pdf_budget()
+# ---------------------------------------------------------------------------
+
+class TestNoPdfBudgetInlineConstruction:
+    """Static-analysis guard: recovery entry-point modules must never construct
+    a pdf_budget object inline.
+
+    Why this exists
+    ---------------
+    ``make_pdf_budget()`` is the single source of truth for PDF caps.  If a
+    new entry point (bulk re-trigger endpoint, repair path, etc.) constructs
+    its own ``{"fees": N, ...}`` dict or ``[MAX_PDFS_PER_RECOVERY_RUN]`` list
+    instead of calling the helper, it will use wrong caps silently — no
+    existing dynamic test would catch it.
+
+    These two tests scan the source of every recovery module **except**
+    ``extractor.py`` (where the constants and ``make_pdf_budget`` live):
+
+    1. ``test_no_budget_constants_referenced_outside_extractor`` — verifies
+       that the internal constant names are not imported or referenced.
+    2. ``test_no_inline_pdf_budget_dict_or_list`` — uses AST to verify that
+       no variable whose name contains ``pdf_budget`` or ``pdf_cap`` is
+       assigned a dict or list *literal* (rather than being the return value
+       of a function call).
+
+    If either test fails, the fix is always to call ``make_pdf_budget()``.
+    """
+
+    # ------------------------------------------------------------------ #
+    # Helpers                                                             #
+    # ------------------------------------------------------------------ #
+
+    @staticmethod
+    def _recovery_sources_except_extractor() -> list[tuple[str, str]]:
+        """Return [(filename, source_text)] for all recovery .py files
+        except extractor.py.  These are the files a future entry point
+        would be added to (or a new file in the same package)."""
+        import pathlib
+        pkg = pathlib.Path(__file__).parent.parent / "app" / "services" / "scraper" / "recovery"
+        results = []
+        for path in sorted(pkg.glob("*.py")):
+            if path.name in ("extractor.py", "__init__.py"):
+                continue
+            results.append((path.name, path.read_text(encoding="utf-8")))
+        return results
+
+    # ------------------------------------------------------------------ #
+    # Test 1: budget-constant names must not appear outside extractor.py  #
+    # ------------------------------------------------------------------ #
+
+    _FORBIDDEN_CONSTANT_NAMES = (
+        "MAX_PDFS_PER_RECOVERY_RUN",
+        "_BATCH_PDF_BUDGET_PER_CATEGORY",
+        "_SINGLE_COURSE_PDF_BUDGET_PER_CATEGORY",
+        "_SINGLE_COURSE_PDF_BUDGET",
+    )
+
+    def test_no_budget_constants_referenced_outside_extractor(self):
+        """No recovery module outside extractor.py should reference the
+        internal budget constants directly.  All budget construction must
+        go through make_pdf_budget().
+
+        Uses AST ``Name`` node inspection so that docstrings and comments
+        that mention the constants for documentation purposes do not trigger
+        false positives — only actual code references are caught.
+        """
+        import ast
+
+        _forbidden = frozenset(self._FORBIDDEN_CONSTANT_NAMES)
+
+        class ConstantNameVisitor(ast.NodeVisitor):
+            def __init__(self):
+                self.violations: list[str] = []
+
+            def visit_Name(self, node: ast.Name) -> None:
+                if node.id in _forbidden:
+                    self.violations.append(
+                        f"{self._filename}:{node.lineno}: "
+                        f"references {node.id!r} — use make_pdf_budget() instead"
+                    )
+                self.generic_visit(node)
+
+            def visit_Attribute(self, node: ast.Attribute) -> None:
+                if node.attr in _forbidden:
+                    self.violations.append(
+                        f"{self._filename}:{node.lineno}: "
+                        f"references {node.attr!r} — use make_pdf_budget() instead"
+                    )
+                self.generic_visit(node)
+
+        all_violations: list[str] = []
+        for filename, source in self._recovery_sources_except_extractor():
+            try:
+                tree = ast.parse(source, filename=filename)
+            except SyntaxError:
+                continue
+            visitor = ConstantNameVisitor()
+            visitor._filename = filename
+            visitor.visit(tree)
+            all_violations.extend(visitor.violations)
+
+        assert not all_violations, (
+            "Recovery modules outside extractor.py must not reference "
+            "internal PDF budget constants directly.  Always call "
+            "make_pdf_budget() instead.\n\nViolations found:\n"
+            + "\n".join(f"  - {v}" for v in all_violations)
+        )
+
+    # ------------------------------------------------------------------ #
+    # Test 2: pdf_budget must only be assigned via make_pdf_budget()       #
+    # ------------------------------------------------------------------ #
+
+    def test_no_inline_pdf_budget_dict_or_list(self):
+        """Any variable whose name contains 'pdf_budget' or 'pdf_cap' must
+        be assigned the *return value* of a function call (i.e. make_pdf_budget()),
+        not a dict/list literal.
+
+        This is checked via AST so it catches both simple assignments::
+
+            pdf_budget = {"fees": 5}          # FORBIDDEN
+            pdf_budget = [10]                 # FORBIDDEN
+
+        and augmented / annotated variants::
+
+            pdf_budget: dict = {"fees": 5}    # FORBIDDEN
+
+        The check intentionally ignores extractor.py (where the template
+        dicts are legitimately defined) and __init__.py.
+        """
+        import ast
+
+        _BUDGET_VAR_RE = __import__("re").compile(
+            r"pdf_budget|pdf_cap", __import__("re").IGNORECASE
+        )
+
+        class InlineBudgetVisitor(ast.NodeVisitor):
+            def __init__(self):
+                self.violations: list[str] = []
+
+            def _is_literal_container(self, node: ast.expr) -> bool:
+                return isinstance(node, (ast.Dict, ast.List))
+
+            def _check_target_and_value(
+                self, target_name: str, value_node: ast.expr, lineno: int, filename: str
+            ) -> None:
+                if _BUDGET_VAR_RE.search(target_name) and self._is_literal_container(value_node):
+                    kind = "dict" if isinstance(value_node, ast.Dict) else "list"
+                    self.violations.append(
+                        f"{filename}:{lineno}: {target_name!r} assigned a "
+                        f"{kind} literal — use make_pdf_budget() instead"
+                    )
+
+            def visit_Assign(self, node: ast.Assign) -> None:
+                for target in node.targets:
+                    if isinstance(target, ast.Name):
+                        self._check_target_and_value(
+                            target.id, node.value, node.lineno, self._filename
+                        )
+                self.generic_visit(node)
+
+            def visit_AnnAssign(self, node: ast.AnnAssign) -> None:
+                if node.value is not None and isinstance(node.target, ast.Name):
+                    self._check_target_and_value(
+                        node.target.id, node.value, node.lineno, self._filename
+                    )
+                self.generic_visit(node)
+
+        all_violations: list[str] = []
+        for filename, source in self._recovery_sources_except_extractor():
+            try:
+                tree = ast.parse(source, filename=filename)
+            except SyntaxError:
+                continue
+            visitor = InlineBudgetVisitor()
+            visitor._filename = filename
+            visitor.visit(tree)
+            all_violations.extend(visitor.violations)
+
+        assert not all_violations, (
+            "Recovery entry-point modules must not construct pdf_budget "
+            "objects inline.  Call make_pdf_budget(single_course=...) "
+            "instead of writing a literal dict or list.\n\n"
+            "Violations found:\n"
+            + "\n".join(f"  - {v}" for v in all_violations)
+        )
+
+    # ------------------------------------------------------------------ #
+    # Test 3: extract_from_url call-site guard (strongest check)          #
+    # ------------------------------------------------------------------ #
+
+    def test_extract_from_url_pdf_budget_kwarg_never_a_literal(self):
+        """Every call to extract_from_url() in non-extractor recovery modules
+        must pass a ``pdf_budget`` kwarg whose value is NOT a dict or list
+        literal — either directly inline or via a locally-assigned variable.
+
+        This catches two bypass patterns that Test 2 misses because they
+        use a variable name that doesn't match ``pdf_budget|pdf_cap``::
+
+            # Pattern A — direct inline kwarg (any variable name)
+            extract_from_url(url, cats, pdf_budget={"fees": 5})   # FORBIDDEN
+            extract_from_url(url, cats, pdf_budget=[10])           # FORBIDDEN
+
+            # Pattern B — variable-mediated (name not matching the regex)
+            budget = {"fees": 5}                                   # FORBIDDEN
+            extract_from_url(url, cats, pdf_budget=budget)
+
+        The test performs per-function intra-procedural assignment tracking:
+        for each function body it maps ``name → assigned AST value`` for
+        simple ``Assign`` and ``AnnAssign`` statements, then resolves any
+        ``Name`` reference in the ``pdf_budget`` kwarg against that map.
+
+        A ``pdf_budget`` kwarg value that resolves to a ``Dict`` or ``List``
+        node is always a violation.  A value that resolves to a ``Call``
+        node whose function is ``make_pdf_budget`` is always OK.  A value
+        that resolves to something else (e.g. another Name that can't be
+        resolved in the same function scope) is left unchecked — the other
+        tests and the existing call-site tests cover that case.
+        """
+        import ast
+
+        _LITERAL_TYPES = (ast.Dict, ast.List)
+
+        def _fn_name(call_node: ast.Call) -> str:
+            """Return the bare function name from a Call node (best-effort)."""
+            func = call_node.func
+            if isinstance(func, ast.Name):
+                return func.id
+            if isinstance(func, ast.Attribute):
+                return func.attr
+            return ""
+
+        def _is_make_pdf_budget_call(node: ast.expr) -> bool:
+            return isinstance(node, ast.Call) and _fn_name(node) == "make_pdf_budget"
+
+        def _collect_assignments(stmts) -> dict[str, ast.expr]:
+            """Shallow single-pass over a list of statements; records the
+            *last* simple assignment to each name.  Nested scopes are not
+            descended into (handled by the outer visitor's generic_visit)."""
+            assigns: dict[str, ast.expr] = {}
+            for stmt in stmts:
+                if isinstance(stmt, ast.Assign):
+                    for target in stmt.targets:
+                        if isinstance(target, ast.Name):
+                            assigns[target.id] = stmt.value
+                elif isinstance(stmt, ast.AnnAssign):
+                    if isinstance(stmt.target, ast.Name) and stmt.value is not None:
+                        assigns[stmt.target.id] = stmt.value
+            return assigns
+
+        class CallSiteVisitor(ast.NodeVisitor):
+            """Walk function bodies; for each extract_from_url() call check
+            the pdf_budget kwarg against the function's local assignment map."""
+
+            def __init__(self, filename: str):
+                self._filename = filename
+                self.violations: list[str] = []
+
+            def _check_function(self, node) -> None:
+                local_assigns = _collect_assignments(node.body)
+                self._check_calls_in_stmts(node.body, local_assigns)
+
+            def _check_calls_in_stmts(self, stmts, local_assigns: dict[str, ast.expr]) -> None:
+                """Walk all statements and nested nodes looking for Call nodes
+                whose function name is extract_from_url."""
+                for stmt in ast.walk(ast.Module(body=stmts, type_ignores=[])):
+                    if not isinstance(stmt, ast.Call):
+                        continue
+                    if _fn_name(stmt) != "extract_from_url":
+                        continue
+                    # Found an extract_from_url call — inspect the pdf_budget kwarg.
+                    for kw in stmt.keywords:
+                        if kw.arg != "pdf_budget":
+                            continue
+                        self._check_kwarg_value(kw.value, stmt.lineno, local_assigns)
+
+            def _check_kwarg_value(
+                self,
+                value: ast.expr,
+                lineno: int,
+                local_assigns: dict[str, ast.expr],
+            ) -> None:
+                """Resolve the kwarg value to a concrete node and flag literals."""
+                # Resolve Name references one level deep using the function's
+                # local assignment map.
+                resolved = value
+                if isinstance(value, ast.Name) and value.id in local_assigns:
+                    resolved = local_assigns[value.id]
+
+                if isinstance(resolved, _LITERAL_TYPES):
+                    kind = "dict" if isinstance(resolved, ast.Dict) else "list"
+                    self.violations.append(
+                        f"{self._filename}:{lineno}: extract_from_url() called "
+                        f"with pdf_budget= set to a {kind} literal "
+                        f"— use make_pdf_budget() instead"
+                    )
+                # If resolved is a Call to make_pdf_budget → OK.
+                # If resolved is something else we cannot prove → not flagged
+                # (rely on existing call-site dynamic tests for that path).
+
+            def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+                self._check_function(node)
+                self.generic_visit(node)
+
+            def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
+                self._check_function(node)
+                self.generic_visit(node)
+
+        all_violations: list[str] = []
+        for filename, source in self._recovery_sources_except_extractor():
+            try:
+                tree = ast.parse(source, filename=filename)
+            except SyntaxError:
+                continue
+            visitor = CallSiteVisitor(filename)
+            visitor.visit(tree)
+            all_violations.extend(visitor.violations)
+
+        assert not all_violations, (
+            "extract_from_url() call sites in recovery entry-point modules "
+            "must not pass a dict/list literal as pdf_budget= (directly or "
+            "via a locally-assigned variable).  Always use make_pdf_budget().\n\n"
+            "Violations found:\n"
+            + "\n".join(f"  - {v}" for v in all_violations)
+        )

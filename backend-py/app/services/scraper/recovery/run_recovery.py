@@ -16,6 +16,23 @@ Algorithm
 
 A failure in the recovery pass must never fail the main scrape job.  The
 caller (orchestrator.run_scrape) wraps the call in try/except.
+
+PDF Budget Rule — NEVER BYPASS
+-------------------------------
+Any code that calls :func:`~app.services.scraper.recovery.extractor.extract_from_url`
+**must** obtain its ``pdf_budget`` argument by calling
+:func:`~app.services.scraper.recovery.extractor.make_pdf_budget`.
+
+Do NOT construct a budget dict or list inline (e.g. ``{"fees": 5}`` or
+``[10]``), and do NOT reference the internal constants
+``MAX_PDFS_PER_RECOVERY_RUN``, ``_BATCH_PDF_BUDGET_PER_CATEGORY``, or
+``_SINGLE_COURSE_PDF_BUDGET_PER_CATEGORY`` outside of ``extractor.py``.
+
+``make_pdf_budget(single_course=False)``  →  batch pass (per-university)
+``make_pdf_budget(single_course=True)``   →  single-course trigger / repair
+
+A static-analysis test in ``tests/test_recovery_pdf.py``
+(``TestNoPdfBudgetInlineConstruction``) enforces this rule automatically.
 """
 from __future__ import annotations
 
