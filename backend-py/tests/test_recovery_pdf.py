@@ -1833,18 +1833,80 @@ class TestNoPdfBudgetInlineConstruction:
     # ------------------------------------------------------------------ #
 
     @staticmethod
-    def _recovery_sources_except_extractor() -> list[tuple[str, str]]:
+    def _recovery_sources_except_extractor(
+        _pkg_override=None,
+    ) -> list[tuple[str, str]]:
         """Return [(filename, source_text)] for all recovery .py files
-        except extractor.py.  These are the files a future entry point
-        would be added to (or a new file in the same package)."""
+        except extractor.py.  Uses rglob so that files in sub-packages
+        (e.g. recovery/bulk/, recovery/repair/) are included as well.
+
+        Args:
+            _pkg_override: Optional pathlib.Path to substitute for the real
+                recovery package directory.  Used only in tests.
+        """
         import pathlib
-        pkg = pathlib.Path(__file__).parent.parent / "app" / "services" / "scraper" / "recovery"
+        if _pkg_override is not None:
+            pkg = pathlib.Path(_pkg_override)
+        else:
+            pkg = (
+                pathlib.Path(__file__).parent.parent
+                / "app" / "services" / "scraper" / "recovery"
+            )
         results = []
-        for path in sorted(pkg.glob("*.py")):
+        for path in sorted(pkg.rglob("*.py")):
             if path.name in ("extractor.py", "__init__.py"):
                 continue
             results.append((path.name, path.read_text(encoding="utf-8")))
         return results
+
+    # ------------------------------------------------------------------ #
+    # Test 0: rglob covers nested sub-packages                           #
+    # ------------------------------------------------------------------ #
+
+    def test_recovery_sources_includes_nested_subpackage_files(self):
+        """_recovery_sources_except_extractor must find .py files inside
+        sub-directories of the recovery package, not just top-level files.
+
+        Builds a temporary directory tree that mirrors a recovery package with
+        a nested sub-package, then calls the helper directly via its
+        ``_pkg_override`` parameter so the assertion validates the actual
+        helper implementation (not a parallel rglob reimplementation).
+        """
+        import pathlib
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = pathlib.Path(tmpdir)
+
+            # Top-level recovery files
+            (root / "searcher.py").write_text("# top-level\n", encoding="utf-8")
+            (root / "extractor.py").write_text("# excluded — budget constants live here\n", encoding="utf-8")
+            (root / "__init__.py").write_text("", encoding="utf-8")
+
+            # Nested sub-package (simulates a future recovery/bulk/ split)
+            sub = root / "bulk"
+            sub.mkdir()
+            (sub / "__init__.py").write_text("", encoding="utf-8")
+            (sub / "bulk_runner.py").write_text(
+                "# nested module — must be found by rglob\n", encoding="utf-8"
+            )
+
+            # Call the real helper, pointed at the temp directory
+            results = self._recovery_sources_except_extractor(_pkg_override=root)
+            found_names = [name for name, _ in results]
+
+            assert "searcher.py" in found_names, (
+                "Top-level files must appear; got: %r" % found_names
+            )
+            assert "bulk_runner.py" in found_names, (
+                "Nested sub-package files must be found by rglob; got: %r" % found_names
+            )
+            assert "extractor.py" not in found_names, (
+                "extractor.py must be excluded (budget constants live there)"
+            )
+            assert "__init__.py" not in found_names, (
+                "__init__.py must be excluded at every nesting level"
+            )
 
     # ------------------------------------------------------------------ #
     # Test 1: budget-constant names must not appear outside extractor.py  #
