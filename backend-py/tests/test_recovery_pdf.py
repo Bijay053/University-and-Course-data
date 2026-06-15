@@ -2170,6 +2170,17 @@ class TestNoPdfBudgetInlineConstruction:
             def __init__(self, filename: str):
                 self._filename = filename
                 self.violations: list[str] = []
+                # Canonical name plus any aliases found via ImportFrom nodes.
+                self._target_names: set[str] = {"extract_from_url"}
+
+            def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
+                """Detect ``from X import extract_from_url as alias`` and
+                register the alias so call-site checks cover it too."""
+                for alias in node.names:
+                    if alias.name == "extract_from_url":
+                        effective_name = alias.asname if alias.asname else alias.name
+                        self._target_names.add(effective_name)
+                self.generic_visit(node)
 
             def _check_function(self, node) -> None:
                 local_assigns = _collect_assignments(node.body)
@@ -2177,11 +2188,11 @@ class TestNoPdfBudgetInlineConstruction:
 
             def _check_calls_in_stmts(self, stmts, local_assigns: dict[str, ast.expr]) -> None:
                 """Walk all statements and nested nodes looking for Call nodes
-                whose function name is extract_from_url."""
+                whose function name is extract_from_url or any registered alias."""
                 for stmt in ast.walk(ast.Module(body=stmts, type_ignores=[])):
                     if not isinstance(stmt, ast.Call):
                         continue
-                    if _fn_name(stmt) != "extract_from_url":
+                    if _fn_name(stmt) not in self._target_names:
                         continue
                     # Found an extract_from_url call — inspect the pdf_budget kwarg.
                     for kw in stmt.keywords:
@@ -2237,6 +2248,170 @@ class TestNoPdfBudgetInlineConstruction:
             "via a locally-assigned variable).  Always use make_pdf_budget().\n\n"
             "Violations found:\n"
             + "\n".join(f"  - {v}" for v in all_violations)
+        )
+
+    # ------------------------------------------------------------------ #
+    # Test 3b: alias+literal-dict path is caught by Test 3               #
+    # ------------------------------------------------------------------ #
+
+    def test_alias_import_with_literal_dict_is_caught_by_call_site_visitor(self):
+        """Synthetic fixture: a module that imports extract_from_url under an
+        alias and passes a literal dict as pdf_budget= must be flagged by
+        CallSiteVisitor (the AST visitor inside
+        test_extract_from_url_pdf_budget_kwarg_never_a_literal).
+
+        This confirms that the import-alias tracking in CallSiteVisitor closes
+        the bypass gap::
+
+            # recovery/some_new_entry.py
+            from .extractor import extract_from_url as _extract
+
+            async def run(url, cats):
+                budget = {"fees": 5}
+                results = await _extract(url, cats, pdf_budget=budget)  # FORBIDDEN
+
+        Three sub-cases are verified:
+
+        1. **Forbidden — alias + literal dict via local variable**: must produce
+           at least one violation.
+        2. **Forbidden — alias + inline dict literal**: must produce at least
+           one violation.
+        3. **Allowed — alias + make_pdf_budget() call**: must produce no
+           violations.
+        """
+        import ast
+
+        _LITERAL_TYPES = (ast.Dict, ast.List)
+
+        def _fn_name(call_node: ast.Call) -> str:
+            func = call_node.func
+            if isinstance(func, ast.Name):
+                return func.id
+            if isinstance(func, ast.Attribute):
+                return func.attr
+            return ""
+
+        def _collect_assignments(stmts) -> dict[str, ast.expr]:
+            assigns: dict[str, ast.expr] = {}
+            for stmt in stmts:
+                if isinstance(stmt, ast.Assign):
+                    for target in stmt.targets:
+                        if isinstance(target, ast.Name):
+                            assigns[target.id] = stmt.value
+                elif isinstance(stmt, ast.AnnAssign):
+                    if isinstance(stmt.target, ast.Name) and stmt.value is not None:
+                        assigns[stmt.target.id] = stmt.value
+            return assigns
+
+        class _CallSiteVisitor(ast.NodeVisitor):
+            """Standalone reimplementation of CallSiteVisitor — self-contained
+            so this test does not depend on the inner class defined inside
+            test_extract_from_url_pdf_budget_kwarg_never_a_literal."""
+
+            def __init__(self, filename: str):
+                self._filename = filename
+                self.violations: list[str] = []
+                self._target_names: set[str] = {"extract_from_url"}
+
+            def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
+                for alias in node.names:
+                    if alias.name == "extract_from_url":
+                        effective_name = alias.asname if alias.asname else alias.name
+                        self._target_names.add(effective_name)
+                self.generic_visit(node)
+
+            def _check_function(self, node) -> None:
+                local_assigns = _collect_assignments(node.body)
+                self._check_calls_in_stmts(node.body, local_assigns)
+
+            def _check_calls_in_stmts(self, stmts, local_assigns: dict[str, ast.expr]) -> None:
+                for stmt in ast.walk(ast.Module(body=stmts, type_ignores=[])):
+                    if not isinstance(stmt, ast.Call):
+                        continue
+                    if _fn_name(stmt) not in self._target_names:
+                        continue
+                    for kw in stmt.keywords:
+                        if kw.arg != "pdf_budget":
+                            continue
+                        self._check_kwarg_value(kw.value, stmt.lineno, local_assigns)
+
+            def _check_kwarg_value(
+                self,
+                value: ast.expr,
+                lineno: int,
+                local_assigns: dict[str, ast.expr],
+            ) -> None:
+                resolved = value
+                if isinstance(value, ast.Name) and value.id in local_assigns:
+                    resolved = local_assigns[value.id]
+                if isinstance(resolved, _LITERAL_TYPES):
+                    kind = "dict" if isinstance(resolved, ast.Dict) else "list"
+                    self.violations.append(
+                        f"{self._filename}:{lineno}: extract_from_url() called "
+                        f"with pdf_budget= set to a {kind} literal "
+                        f"— use make_pdf_budget() instead"
+                    )
+
+            def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+                self._check_function(node)
+                self.generic_visit(node)
+
+            def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
+                self._check_function(node)
+                self.generic_visit(node)
+
+        def _run_visitor(source: str, filename: str) -> list[str]:
+            tree = ast.parse(source, filename=filename)
+            v = _CallSiteVisitor(filename)
+            v.visit(tree)
+            return v.violations
+
+        # Sub-case 1: alias + literal dict via local variable — must be caught
+        _FORBIDDEN_VAR_SOURCE = '''\
+from app.services.scraper.recovery.extractor import extract_from_url as _extract
+
+async def run(url, cats):
+    budget = {"fees": 5}
+    results = await _extract(url, cats, pdf_budget=budget)
+    return results
+'''
+        var_violations = _run_visitor(_FORBIDDEN_VAR_SOURCE, "some_entry_var.py")
+        assert var_violations, (
+            "Expected at least one violation for an aliased extract_from_url "
+            "call where pdf_budget= is a locally-assigned dict literal, "
+            "but CallSiteVisitor reported none.\n\nSource:\n" + _FORBIDDEN_VAR_SOURCE
+        )
+
+        # Sub-case 2: alias + inline dict literal — must be caught
+        _FORBIDDEN_INLINE_SOURCE = '''\
+from app.services.scraper.recovery.extractor import extract_from_url as _extract
+
+async def run(url, cats):
+    results = await _extract(url, cats, pdf_budget={"fees": 5})
+    return results
+'''
+        inline_violations = _run_visitor(_FORBIDDEN_INLINE_SOURCE, "some_entry_inline.py")
+        assert inline_violations, (
+            "Expected at least one violation for an aliased extract_from_url "
+            "call where pdf_budget= is an inline dict literal, "
+            "but CallSiteVisitor reported none.\n\nSource:\n" + _FORBIDDEN_INLINE_SOURCE
+        )
+
+        # Sub-case 3: alias + make_pdf_budget() — must produce no violations
+        _ALLOWED_SOURCE = '''\
+from app.services.scraper.recovery.extractor import extract_from_url as _extract
+from app.services.scraper.recovery.extractor import make_pdf_budget
+
+async def run(url, cats):
+    budget = make_pdf_budget(single_course=False)
+    results = await _extract(url, cats, pdf_budget=budget)
+    return results
+'''
+        allowed_violations = _run_visitor(_ALLOWED_SOURCE, "some_entry_ok.py")
+        assert not allowed_violations, (
+            "Expected no violations for an aliased extract_from_url call that "
+            "correctly passes pdf_budget=make_pdf_budget(...), but got:\n"
+            + "\n".join(f"  - {v}" for v in allowed_violations)
         )
 
     # ------------------------------------------------------------------ #
