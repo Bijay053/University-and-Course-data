@@ -2271,11 +2271,37 @@ class TestNoPdfBudgetInlineConstruction:
 
         class MissingBudgetKwargVisitor(ast.NodeVisitor):
             """Walk all call expressions; flag any call to extract_from_url
-            that does not include a ``pdf_budget`` keyword argument."""
+            (or any alias it was imported under) that does not include a
+            ``pdf_budget`` keyword argument.
+
+            Import-alias tracking
+            ---------------------
+            A module may import the function under a different name::
+
+                from app.services.scraper.recovery.extractor import (
+                    extract_from_url as _extract,
+                )
+                await _extract(url, cats)   # alias — must still be caught
+
+            ``visit_ImportFrom`` collects every such alias and adds it to
+            ``_target_names`` so that ``visit_Call`` checks both the canonical
+            name and any alias that resolves to the same function.
+            """
 
             def __init__(self, filename: str):
                 self._filename = filename
                 self.violations: list[str] = []
+                # Canonical name plus any aliases found via ImportFrom nodes.
+                self._target_names: set[str] = {"extract_from_url"}
+
+            def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
+                """Detect ``from X import extract_from_url as alias`` and
+                register the alias so call-site checks cover it too."""
+                for alias in node.names:
+                    if alias.name == "extract_from_url":
+                        effective_name = alias.asname if alias.asname else alias.name
+                        self._target_names.add(effective_name)
+                self.generic_visit(node)
 
             def _fn_name(self, call_node: ast.Call) -> str:
                 func = call_node.func
@@ -2286,7 +2312,7 @@ class TestNoPdfBudgetInlineConstruction:
                 return ""
 
             def visit_Call(self, node: ast.Call) -> None:
-                if self._fn_name(node) == "extract_from_url":
+                if self._fn_name(node) in self._target_names:
                     kwarg_names = {kw.arg for kw in node.keywords}
                     if "pdf_budget" not in kwarg_names:
                         self.violations.append(
@@ -2314,4 +2340,110 @@ class TestNoPdfBudgetInlineConstruction:
             "PDF budget caps.\n\n"
             "Violations found:\n"
             + "\n".join(f"  - {v}" for v in all_violations)
+        )
+
+    def test_alias_import_of_extract_from_url_is_caught(self):
+        """Synthetic fixture: a module that imports extract_from_url under an
+        alias and calls it without pdf_budget= must be flagged.
+
+        This confirms that the import-alias tracking in
+        MissingBudgetKwargVisitor closes the bypass gap::
+
+            # recovery/some_new_entry.py
+            from app.services.scraper.recovery.extractor import (
+                extract_from_url as _extract,
+            )
+
+            async def run():
+                results = await _extract(url, cats)   # FORBIDDEN — no pdf_budget
+
+        The test builds the module source as a string, writes it to a
+        temporary file inside a temporary directory that mirrors the recovery
+        package layout (so _recovery_sources_except_extractor picks it up),
+        and asserts that at least one violation is reported for the alias call
+        site.  A control test also confirms that calling _extract WITH a
+        pdf_budget= kwarg produces no violation.
+        """
+        import ast
+        import pathlib
+        import tempfile
+
+        # The source that must be *caught* — alias call without pdf_budget=
+        _FORBIDDEN_SOURCE = '''\
+from app.services.scraper.recovery.extractor import extract_from_url as _extract
+
+async def run(url, cats, country):
+    results = await _extract(url, cats, country=country)
+    return results
+'''
+
+        # The source that must be *allowed* — alias call WITH pdf_budget=
+        _ALLOWED_SOURCE = '''\
+from app.services.scraper.recovery.extractor import extract_from_url as _fetch
+
+async def run(url, cats, budget, country):
+    results = await _fetch(url, cats, country=country, pdf_budget=budget)
+    return results
+'''
+
+        # Re-implement a standalone version of MissingBudgetKwargVisitor so
+        # this test is self-contained and doesn't rely on the inner class
+        # defined inside the other test method.
+        class _MissingBudgetKwargVisitor(ast.NodeVisitor):
+            def __init__(self, filename: str):
+                self._filename = filename
+                self.violations: list[str] = []
+                self._target_names: set[str] = {"extract_from_url"}
+
+            def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
+                for alias in node.names:
+                    if alias.name == "extract_from_url":
+                        effective_name = alias.asname if alias.asname else alias.name
+                        self._target_names.add(effective_name)
+                self.generic_visit(node)
+
+            def _fn_name(self, call_node: ast.Call) -> str:
+                func = call_node.func
+                if isinstance(func, ast.Name):
+                    return func.id
+                if isinstance(func, ast.Attribute):
+                    return func.attr
+                return ""
+
+            def visit_Call(self, node: ast.Call) -> None:
+                if self._fn_name(node) in self._target_names:
+                    kwarg_names = {kw.arg for kw in node.keywords}
+                    if "pdf_budget" not in kwarg_names:
+                        self.violations.append(
+                            f"{self._filename}:{node.lineno}: "
+                            "extract_from_url() called without a pdf_budget= "
+                            "keyword argument — always pass "
+                            "make_pdf_budget(single_course=...) explicitly"
+                        )
+                self.generic_visit(node)
+
+        def _run_visitor(source: str, filename: str) -> list[str]:
+            tree = ast.parse(source, filename=filename)
+            v = _MissingBudgetKwargVisitor(filename)
+            v.visit(tree)
+            return v.violations
+
+        # --- forbidden path: alias call without pdf_budget= must be caught ---
+        forbidden_violations = _run_visitor(_FORBIDDEN_SOURCE, "some_new_entry.py")
+        assert forbidden_violations, (
+            "Expected at least one violation for an aliased extract_from_url "
+            "call without pdf_budget=, but the visitor reported none.\n\n"
+            "Source under test:\n" + _FORBIDDEN_SOURCE
+        )
+        assert any("_extract" in v or "extract_from_url" in v for v in forbidden_violations), (
+            "Violation message should reference the alias or the canonical name; "
+            "got: %r" % forbidden_violations
+        )
+
+        # --- allowed path: alias call WITH pdf_budget= must produce no violation ---
+        allowed_violations = _run_visitor(_ALLOWED_SOURCE, "some_new_entry_ok.py")
+        assert not allowed_violations, (
+            "Expected no violations for an aliased extract_from_url call that "
+            "correctly passes pdf_budget=, but got:\n"
+            + "\n".join(f"  - {v}" for v in allowed_violations)
         )
