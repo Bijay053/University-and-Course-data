@@ -5824,17 +5824,6 @@ async def extract_course(
                     from app.services.scraper.extractors.degree_level import (
                         classify_degree_level as _classify_dl,
                     )
-                    # Pass course_name AND url so either signal can win.
-                    # Passing url is critical for JS-rendered sites (e.g.
-                    # law.ac.uk) where course_name may be empty at this
-                    # stage of the pipeline (AI enrichment runs later) but
-                    # the URL path already encodes the tier:
-                    #   /study/postgraduate/law/llm-... → "Master's"
-                    #   /study/undergraduate/law/llb-... → "Bachelor's"
-                    # The old call passed "" as the url arg, so when
-                    # _cn_for_dl was also empty both inputs were blank
-                    # and the classifier returned None — leaving _course_dl
-                    # empty and forcing the "undergraduate" bucket.
                     _inferred_dl, _, _ = _classify_dl(_cn_for_dl, url)
                     if _inferred_dl:
                         _course_dl = _inferred_dl
@@ -5844,6 +5833,24 @@ async def extract_course(
                             payload["degree_level"] = _inferred_dl
                 except Exception:  # noqa: BLE001
                     pass
+                # URL-path fallback: classify_degree_level scans for structured
+                # label patterns ("degree level: …", "award: …") in page_text,
+                # so passing a bare URL as page_text returns None when the URL
+                # contains only a path segment like "/postgraduate/".  This is
+                # the common failure mode for JS-rendered sites (e.g. law.ac.uk)
+                # where course_name is not yet populated at this pipeline stage
+                # (AI enrichment runs later) but the URL already encodes the
+                # study tier:
+                #   /study/postgraduate/law/llm-… → "Master's" bucket
+                #   /study/undergraduate/law/llb-… → "Bachelor's" (default)
+                # Without this fallback every PG course inherits the UG central
+                # IELTS (e.g. 6.0 instead of 7.5) when course_name is empty.
+                if not _course_dl:
+                    _url_lower = url.lower()
+                    if "/postgraduate/" in _url_lower or "/postgrad/" in _url_lower:
+                        _course_dl = "Master's"
+                        if not payload.get("degree_level"):
+                            payload["degree_level"] = "Master's"
             # Diploma/Advanced Diploma programs sit between pathway programs
             # and bachelor-level courses in the KBS column-keyed table.  They
             # have a separate "diploma" by_level key populated by the
