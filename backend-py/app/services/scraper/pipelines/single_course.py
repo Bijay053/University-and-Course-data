@@ -5820,19 +5820,30 @@ async def extract_course(
             # bucket only) the bucket choice doesn't affect the outcome anyway.
             if not _course_dl and _english_by_level.get("postgraduate"):
                 _cn_for_dl = (payload.get("course_name") or "").strip()
-                if _cn_for_dl:
-                    try:
-                        from app.services.scraper.extractors.degree_level import (
-                            classify_degree_level as _classify_dl,
-                        )
-                        _inferred_dl, _, _ = _classify_dl(_cn_for_dl, "")
-                        if _inferred_dl:
-                            _course_dl = _inferred_dl
-                            # Also back-fill payload so staging sees the correct
-                            # degree_level without waiting for sanitize_degree_level.
-                            payload.setdefault("degree_level", _inferred_dl)
-                    except Exception:  # noqa: BLE001
-                        pass
+                try:
+                    from app.services.scraper.extractors.degree_level import (
+                        classify_degree_level as _classify_dl,
+                    )
+                    # Pass course_name AND url so either signal can win.
+                    # Passing url is critical for JS-rendered sites (e.g.
+                    # law.ac.uk) where course_name may be empty at this
+                    # stage of the pipeline (AI enrichment runs later) but
+                    # the URL path already encodes the tier:
+                    #   /study/postgraduate/law/llm-... → "Master's"
+                    #   /study/undergraduate/law/llb-... → "Bachelor's"
+                    # The old call passed "" as the url arg, so when
+                    # _cn_for_dl was also empty both inputs were blank
+                    # and the classifier returned None — leaving _course_dl
+                    # empty and forcing the "undergraduate" bucket.
+                    _inferred_dl, _, _ = _classify_dl(_cn_for_dl, url)
+                    if _inferred_dl:
+                        _course_dl = _inferred_dl
+                        # Also back-fill payload so staging sees the correct
+                        # degree_level without waiting for sanitize_degree_level.
+                        if not payload.get("degree_level"):
+                            payload["degree_level"] = _inferred_dl
+                except Exception:  # noqa: BLE001
+                    pass
             # Diploma/Advanced Diploma programs sit between pathway programs
             # and bachelor-level courses in the KBS column-keyed table.  They
             # have a separate "diploma" by_level key populated by the

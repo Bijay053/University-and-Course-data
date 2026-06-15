@@ -1,0 +1,15 @@
+# Roehampton University
+# Hostname: www.roehampton.ac.uk
+# Country: United Kingdom  |  Currency: GBP
+# Slug: roehampton
+# Auto-generated: 2026-06-15
+#
+# This stub was created automatically on the first scrape of this university.
+# Review and expand it to improve discovery and extraction quality.
+# See scraper_config/defaults.yaml for all available options.
+
+discovery: {}
+
+extraction:
+  fees:
+    default_currency: GBP
