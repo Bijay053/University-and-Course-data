@@ -28,6 +28,10 @@ args = "backend-py: Celery worker"
 task = "workflow.run"
 args = "Redis"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "recovery-pdf-budget-static-check"
+
 [[workflows.workflow]]
 name = "backend-py: FastAPI"
 author = "agent"
@@ -61,6 +65,17 @@ args = "redis-server --bind 127.0.0.1 --port 6379 --save \"\" --appendonly no --
 
 [workflows.workflow.metadata]
 outputType = "console"
+
+[[workflows.workflow]]
+name = "recovery-pdf-budget-static-check"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd backend-py && python -m pytest tests/test_recovery_pdf.py::TestNoPdfBudgetInlineConstruction -v"
+
+[workflows.workflow.metadata]
+isValidation = true
 
 [agent]
 stack = "PNPM_WORKSPACE"
