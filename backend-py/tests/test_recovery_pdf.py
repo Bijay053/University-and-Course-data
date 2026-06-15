@@ -2186,3 +2186,80 @@ class TestNoPdfBudgetInlineConstruction:
             "Violations found:\n"
             + "\n".join(f"  - {v}" for v in all_violations)
         )
+
+    # ------------------------------------------------------------------ #
+    # Test 4: every extract_from_url call must include pdf_budget kwarg   #
+    # ------------------------------------------------------------------ #
+
+    def test_extract_from_url_always_passes_pdf_budget_kwarg(self):
+        """Every call to extract_from_url() in non-extractor recovery modules
+        must include a ``pdf_budget=`` keyword argument.
+
+        This guards against new entry points that call extract_from_url()
+        without any ``pdf_budget`` argument at all — relying on the default
+        value — which silently bypasses the per-run budget caps enforced by
+        make_pdf_budget().
+
+        Example of the forbidden pattern::
+
+            # Missing pdf_budget entirely — relies on extractor default
+            page_results = await extract_from_url(url, cats, country=country)
+
+        The correct pattern is always::
+
+            pdf_budget = make_pdf_budget(single_course=False)
+            page_results = await extract_from_url(
+                url, cats, country=country, pdf_budget=pdf_budget,
+            )
+
+        Existing call sites in run_recovery.py (run_recovery_pass and
+        run_single_course_recovery) both pass this check.
+        """
+        import ast
+
+        class MissingBudgetKwargVisitor(ast.NodeVisitor):
+            """Walk all call expressions; flag any call to extract_from_url
+            that does not include a ``pdf_budget`` keyword argument."""
+
+            def __init__(self, filename: str):
+                self._filename = filename
+                self.violations: list[str] = []
+
+            def _fn_name(self, call_node: ast.Call) -> str:
+                func = call_node.func
+                if isinstance(func, ast.Name):
+                    return func.id
+                if isinstance(func, ast.Attribute):
+                    return func.attr
+                return ""
+
+            def visit_Call(self, node: ast.Call) -> None:
+                if self._fn_name(node) == "extract_from_url":
+                    kwarg_names = {kw.arg for kw in node.keywords}
+                    if "pdf_budget" not in kwarg_names:
+                        self.violations.append(
+                            f"{self._filename}:{node.lineno}: "
+                            "extract_from_url() called without a pdf_budget= "
+                            "keyword argument — always pass "
+                            "make_pdf_budget(single_course=...) explicitly"
+                        )
+                self.generic_visit(node)
+
+        all_violations: list[str] = []
+        for filename, source in self._recovery_sources_except_extractor():
+            try:
+                tree = ast.parse(source, filename=filename)
+            except SyntaxError:
+                continue
+            visitor = MissingBudgetKwargVisitor(filename)
+            visitor.visit(tree)
+            all_violations.extend(visitor.violations)
+
+        assert not all_violations, (
+            "Every extract_from_url() call in recovery entry-point modules "
+            "must pass an explicit pdf_budget= keyword argument sourced from "
+            "make_pdf_budget().  Omitting it silently bypasses the per-run "
+            "PDF budget caps.\n\n"
+            "Violations found:\n"
+            + "\n".join(f"  - {v}" for v in all_violations)
+        )
