@@ -392,6 +392,48 @@ def _quality_summary(quality: dict) -> str:
         f" mode={quality.get('mode_pct', 0)}%"
         f" duration={quality.get('duration_pct', 0)}%"
     )
+
+
+# ── Quality snapshot ───────────────────────────────────────────────────────────
+
+async def _quality_snapshot(job_id: str, uni_id: int, db) -> dict:
+    """Query staged-course fill rates for this job. Returns quality dict."""
+    from sqlalchemy import text
+
+    q = (await db.execute(
+        text("""
+            SELECT COUNT(*)                                      AS total,
+                   COUNT(international_fee)                      AS has_fee,
+                   COUNT(ielts_overall)                          AS has_ielts,
+                   COUNT(intake_months)                          AS has_intakes,
+                   COUNT(course_location)                        AS has_location,
+                   COUNT(degree_level)                           AS has_degree_level,
+                   COUNT(study_mode)                             AS has_mode,
+                   COUNT(duration)                               AS has_duration,
+                   COUNT(academic_level)                         AS has_academic_level,
+                   array_agg(DISTINCT course_location)
+                     FILTER (WHERE course_location IS NOT NULL)  AS sample_locations,
+                   array_agg(DISTINCT degree_level)
+                     FILTER (WHERE degree_level IS NOT NULL)     AS sample_degrees,
+                   array_agg(DISTINCT study_mode)
+                     FILTER (WHERE study_mode IS NOT NULL)       AS sample_modes
+            FROM   scraped_courses
+            WHERE  university_id = :uid
+              AND  scrape_job_id = :jid
+              AND  status IN ('pending','review','approved')
+        """),
+        {"uid": uni_id, "jid": job_id},
+    )).mappings().first()
+
+    total = (q["total"] or 0) if q else 0
+    if total == 0:
+        return {
+            "total_staged": 0, "fee_pct": 0, "ielts_pct": 0, "intakes_pct": 0,
+            "location_pct": 0, "degree_level_pct": 0, "mode_pct": 0,
+            "duration_pct": 0, "academic_level_pct": 0,
+            "sample_locations": [], "sample_degrees": [], "sample_modes": [],
+        }
+
     pct = lambda n: round(100 * (n or 0) / total)
     return {
         "total_staged":       total,
@@ -767,26 +809,6 @@ async def _gather_context(job_id: str, db) -> dict:
             FROM   scraped_courses
             WHERE  university_id = :uid
               AND  scrape_job_id = :jid
-    q = (await db.execute(
-        text("""
-            SELECT COUNT(*)                                          AS total,
-                   COUNT(international_fee)                          AS has_fee,
-                   COUNT(ielts_overall)                              AS has_ielts,
-                   COUNT(intake_months)                              AS has_intakes,
-                   COUNT(course_location)                            AS has_location,
-                   COUNT(degree_level)                               AS has_degree_level,
-                   COUNT(study_mode)                                 AS has_mode,
-                   COUNT(duration)                                   AS has_duration,
-                   COUNT(academic_level)                             AS has_academic_level,
-                   array_agg(DISTINCT course_location)
-                     FILTER (WHERE course_location IS NOT NULL)      AS sample_locations,
-                   array_agg(DISTINCT degree_level)
-                     FILTER (WHERE degree_level IS NOT NULL)         AS sample_degree_levels,
-                   array_agg(DISTINCT study_mode)
-                     FILTER (WHERE study_mode IS NOT NULL)           AS sample_modes
-            FROM   scraped_courses
-            WHERE  university_id = :uid
-              AND  scrape_job_id = :jid
               AND  status IN ('pending', 'review', 'approved')
         """),
         {"uid": uni_id, "jid": job_id},
@@ -809,6 +831,30 @@ async def _gather_context(job_id: str, db) -> dict:
             "sample_degrees":     list((q["sample_degree_levels"] or [])[:8]),
             "sample_modes":       list((q["sample_modes"]         or [])[:8]),
         }
+
+    drop_rate = round(100 * (1 - after_filter / raw_discovered)) if raw_discovered > 0 else 0
+
+    return {
+        "job_id":          job_id,
+        "university_id":   uni_id,
+        "uni_name":        row["uni_name"] or "Unknown",
+        "scrape_url":      row["scrape_url"] or "",
+        "raw_discovered":  raw_discovered,
+        "after_filter":    after_filter,
+        "imported":        row["imported"] or 0,
+        "total_errors":    row["total_errors"] or 0,
+        "drop_rate":       drop_rate,
+        "dropped_sample":  dropped_sample,
+        "passed_sample":   passed_sample,
+        "admin_config":    admin_config,
+        "yaml_content":    yaml_content[:4000],
+        "quality":         quality,
+        "unis_dir":        unis_dir,
+        "yaml_file":       yaml_files[0] if yaml_files else None,
+    }
+
+
+async def _requery_quality(uni_id: int, job_id: str, db) -> dict:
     """Re-read per-field fill rates from the staging table for before/after comparison."""
     from sqlalchemy import text
 
@@ -852,28 +898,191 @@ _SYSTEM_PROMPT = """\
 You are an expert web scraping engineer specialising in university course scrapers.
 Analyse a failing or low-quality scrape job and return the most impactful fix.
 
-Return ONLY a valid JSON object - no markdown, no text outside the JSON.
+Return ONLY a valid JSON object — no markdown, no text outside the JSON.
 
 Schema:
 {
-  "diagnosis": "string - one sentence describing the root problem",
-  "root_cause": "string - one of: allow_url_patterns | block_url_patterns | bfs_page_budget | use_browser | fee_extraction | location_extraction | ielts_extraction | intake_extraction | mode_extraction | unknown",
-  "confidence": number - integer 0-100,
-  "explanation": "string - 2-3 sentences explaining why this fix will work",
+  "diagnosis": "one sentence describing the root problem",
+  "root_cause": "one of: allow_url_patterns | block_url_patterns | bfs_page_budget | use_browser | fees | english | location | study_mode | filters | duration | unknown",
+  "confidence": <integer 0-100>,
+  "explanation": "2-3 sentences explaining why this fix will work",
   "patches": [
-    {
-      "section": "string - 'discovery' for URL/crawl fixes | 'recipe' for extraction data-cleaning fixes",
-      "field": "string - see allowed fields below",
-      "action": "string - 'replace'",
-      "value": <appropriate type for the field>
-    }
+    { "section": "discovery" | "recipe", "field": "<dotpath>", "action": "replace", "value": <value> }
   ]
 }
-    quality_str = _quality_summary(ctx.get("quality"))
+
+DISCOVERY PATCHES (section="discovery"):
+  allow_url_patterns   list[regex]  — rescue filtered-out course URLs
+  block_url_patterns   list[regex]  — block non-course URLs leaking through
+  must_contain         list[str]    — only keep URLs containing these strings
+  bfs_page_budget      int 5-300    — raise when too few pages crawled
+  use_browser          bool         — enable for JS-rendered SPAs
+  sitemap_url          str (URL)    — override sitemap URL
+
+RECIPE PATCHES (section="recipe"):
+  fees.central_page                  str (URL) or null   — fee schedule page
+  fees.fees_pdf_url                  str (URL) or null   — fee schedule PDF
+  fees.default_currency              str (ISO-3)         — e.g. AUD, GBP, USD
+  fees.credit_points_per_unit        int 1-200 or null
+  english.central_page               str (URL) or null   — IELTS/English req page
+  english.requirements_pdf_url       str (URL) or null
+  english.trust_vision_ocr           bool                — false = disable OCR
+  english.default_ielts              float 4.0-9.0 or null
+  english.default_pte                int 30-90 or null
+  english.default_toefl              int 30-120 or null
+  filters.domestic_only.enabled      bool
+  filters.online_only.enabled        bool
+  text_cleaning.location.strip_patterns  list[regex]
+  text_cleaning.location.reject_values   list[str]
+  text_cleaning.location.allowed_values  list[str]
+  text_cleaning.duration.split_on_slash  bool
+  staging.reject_if_missing              list[known_fields]
+
+RULES:
+- All regex patterns must be valid Python re.search() patterns (no ^ anchors)
+- field must use exact dot-notation paths from the tables above
+- Do NOT repeat a fix from any previous attempt listed in context
+- Return up to 3 patches per attempt; prioritise highest-impact fix first
+- Return empty patches if no safe automatic fix is possible\
+"""
+
+
+# ── URL filter simulation ─────────────────────────────────────────────────────
+
+_MEDIA_EXT  = re.compile(r"\.(jpe?g|png|gif|webp|svg|ico|bmp|pdf|css|js|woff2?|ttf|eot|mp[34]|zip|docx?)$", re.I)
+_ASSET_PATH = re.compile(r"/(images?|assets?|globalassets|static|media|uploads?|fonts?|icons?|scripts?)/", re.I)
+
+
+def _is_course_url(u: str) -> bool:
+    return not _MEDIA_EXT.search(u) and not _ASSET_PATH.search(u)
+
+
+def _simulate_filter(dropped: list[str], allow_pats: list[str], block_pats: list[str]) -> dict:
+    course_urls = [u for u in dropped if _is_course_url(u)]
+    if not course_urls:
+        return {"before": 0, "after": 0, "total": 0, "rescued": []}
+
+    def _c(pats: list[str]) -> list:
+        out = []
+        for p in pats:
+            try:
+                out.append(re.compile(p, re.IGNORECASE))
+            except re.error:
+                pass
+        return out
+
+    allow_c = _c(allow_pats)
+    block_c = _c(block_pats)
+    passing = []
+    for u in course_urls:
+        ok = True
+        if allow_c and not any(c.search(u) for c in allow_c):
+            ok = False
+        if ok and block_c and any(c.search(u) for c in block_c):
+            ok = False
+        if ok:
+            passing.append(u)
+
+    return {"before": 0, "after": len(passing), "total": len(course_urls), "rescued": passing[:6]}
+
+
+# ── Patch application ─────────────────────────────────────────────────────────
+
+async def _apply_to_db(uni_id: int, config_patch: dict, db) -> None:
+    """Merge config_patch into universities.scrape_config.admin_config and commit."""
+    from sqlalchemy import text
+    import json as _json
+
+    row = (await db.execute(
+        text("SELECT scrape_config FROM universities WHERE id = :id"),
+        {"id": uni_id},
+    )).mappings().first()
+
+    sc       = dict((row.get("scrape_config") or {}) if row else {})
+    existing = sc.get("admin_config") or {}
+    sc["_prev_admin_config"] = existing
+    sc["admin_config"]       = _deep_merge(existing, config_patch)
+
+    await db.execute(
+        text("UPDATE universities SET scrape_config = CAST(:cfg AS jsonb) WHERE id = :id"),
+        {"cfg": _json.dumps(sc), "id": uni_id},
+    )
+    await db.commit()
+
+
+async def _apply_discovery_to_db(uni_id: int, disc_patch: dict, db) -> None:
+    """Write discovery-section patch into admin_config.discovery."""
+    await _apply_to_db(uni_id, {"discovery": disc_patch}, db)
+
+
+async def _apply_recipe_to_db(uni_id: int, recipe_patch: dict, db) -> None:
+    """Write recipe-section patch into admin_config.extraction."""
+    await _apply_to_db(uni_id, {"extraction": recipe_patch}, db)
+
+
+def _apply_to_yaml(yaml_file: Any, unis_dir: Path, uni_id: int, scrape_url: str, config_patch: dict) -> None:
+    import yaml as _yaml
+
+    if not yaml_file:
+        candidates = list(unis_dir.glob(f"*_{uni_id}.yaml"))
+        if not candidates:
+            bare = re.sub(r"^www\.", "", re.sub(r"^https?://", "", scrape_url).split("/")[0].lower())
+            if bare:
+                for f in unis_dir.glob("*.yaml"):
+                    try:
+                        if bare in f.read_text(encoding="utf-8")[:600]:
+                            candidates = [f]; break
+                    except Exception:
+                        continue
+        if not candidates:
+            log.warning("ai_repair: no YAML for uni_id=%s", uni_id); return
+        yaml_file = candidates[0]
+
+    try:
+        existing_text = yaml_file.read_text(encoding="utf-8")
+        comment_lines = [ln for ln in existing_text.splitlines() if ln.strip().startswith("#")]
+        header  = ("\n".join(comment_lines) + "\n") if comment_lines else ""
+        merged  = _deep_merge(_yaml.safe_load(existing_text) or {}, config_patch)
+        new_txt = header + _yaml.dump(merged, default_flow_style=False, allow_unicode=True, sort_keys=False)
+        yaml_file.write_text(new_txt, encoding="utf-8")
+        log.info("ai_repair: wrote config patch to %s", yaml_file.name)
+    except Exception as exc:
+        log.warning("ai_repair: YAML write failed: %s", exc)
+
+
+# ── Quality delta computation ─────────────────────────────────────────────────
+
+def _compute_delta(before: dict, after: dict) -> dict:
+    keys = ["fee_pct", "ielts_pct", "intakes_pct", "location_pct",
+            "degree_level_pct", "mode_pct", "duration_pct", "drop_rate"]
+    delta: dict = {}
+    for k in keys:
+        b = before.get(k, 0)
+        p = after.get(k, 0)
+        if b != p:
+            delta[k] = p - b
+    return delta
+
+
+# ── User message builder ──────────────────────────────────────────────────────
+
+def _build_user_message(ctx: dict, previous_attempts: list[dict], phase: str = "discovery") -> str:
+    prev_block = ""
+    if previous_attempts:
+        lines = [
+            f"  #{a['attempt_number']}: root_cause={a['root_cause']} "
+            f"patched={[p.get('field') for p in a.get('patches_applied', [])]} "
+            f"success_criteria={a.get('success_criteria', {}).get('criteria_pass', '?')}/6"
+            for a in previous_attempts
+        ]
+        prev_block = "\nPREVIOUS ATTEMPTS (do NOT repeat these fixes):\n" + "\n".join(lines)
+
+    q = ctx.get("quality") or {}
+    quality_str = _quality_summary(q)
 
     if phase == "extraction":
         focus_block = (
-            "CURRENT FOCUS: Discovery is working - concentrate on EXTRACTION QUALITY.\n"
+            "CURRENT FOCUS: Discovery is working — concentrate on EXTRACTION QUALITY.\n"
             "The drop_rate is acceptable. The problem is that staged courses are missing key fields.\n"
             "Suggest recipe patches (section='recipe') to fix fee extraction, location noise,\n"
             "IELTS/English data, intake months, study mode, or course name contamination.\n"
@@ -881,31 +1090,31 @@ Schema:
         )
         diag_priority = (
             "DIAGNOSIS PRIORITY (extraction phase):\n"
-            "1. fee_pct < 40%  → suggest fee_source_urls pointing to the university fee schedule page\n"
-            "2. location_pct < 40% OR location values look like nav-text → suggest location_reject_values\n"
-            "3. mode_pct < 40% → suggest study_mode_online_keywords if online courses exist\n"
-            "4. degree_level_pct < 40% → suggest course_name_remove_after to strip suffixes\n"
-            "5. ielts_pct < 40% → note in explanation (IELTS is usually scraped from course pages, not recipe-fixable)\n"
-            "6. intakes_pct < 40% → note in explanation (intake months are usually scraped from course pages)\n"
-            "7. duration_pct < 40% → note in explanation (duration is usually scraped from course pages)\n"
+            "1. fee_pct < 40%  → suggest fees.central_page pointing to the university fee schedule\n"
+            "2. location_pct < 40% OR location values look like nav-text → suggest text_cleaning.location.reject_values\n"
+            "3. mode_pct < 40% → suggest filters.online_only.enabled=false if online courses exist\n"
+            "4. degree_level_pct < 40% → note in explanation (degree level is scraped from page structure)\n"
+            "5. ielts_pct < 40% → suggest english.central_page or english.default_ielts\n"
+            "6. intakes_pct < 40% → note in explanation (intake months are scraped from course pages)\n"
+            "7. duration_pct < 40% → note in explanation (duration is scraped from course pages)\n"
             "8. If nothing is recipe-fixable, return empty patches with a clear explanation"
         )
     else:
         focus_block = (
-            "CURRENT FOCUS: Fix URL DISCOVERY - the scraper is not finding enough course pages.\n"
+            "CURRENT FOCUS: Fix URL DISCOVERY — the scraper is not finding enough course pages.\n"
             "Check the drop_rate and dropped URL sample. Fix allow_url_patterns or block_url_patterns first."
         )
         diag_priority = (
             "DIAGNOSIS PRIORITY (discovery phase):\n"
             "1. drop_rate > 50% AND dropped sample non-empty → fix allow_url_patterns or block_url_patterns\n"
             "2. raw_discovered == 0 OR raw_discovered < 5 → increase bfs_page_budget or enable use_browser\n"
-            "3. staged > 0 but fee_pct < 40% → also suggest a fee_source_urls recipe patch\n"
+            "3. staged > 0 but fee_pct < 40% → also suggest a fees.central_page recipe patch\n"
             "4. Otherwise → return empty patches with a clear diagnosis\n"
             "\nHOW TO DERIVE allow_url_patterns:\n"
             "- Look at the dropped URL paths above\n"
             "- Find the common path prefix or pattern\n"
             "- Write a regex that matches those paths with re.search()\n"
-            "- Example: dropped paths like \"/courses/undergraduate/computing-bsc-hons\" → pattern \"/courses/[^/]+/[^/]+\"\n"
+            "- Example: paths like \"/courses/undergraduate/computing-bsc-hons\" → pattern \"/courses/[^/]+/[^/]+\"\n"
             "- Make the pattern broad enough to catch all similar URLs but not so broad it catches non-course pages"
         )
 
@@ -920,7 +1129,7 @@ SCRAPE URL: {ctx['scrape_url']}
 DISCOVERY STATS:
   raw_discovered={ctx['raw_discovered']}  after_filter={ctx['after_filter']}  staged={ctx['imported']}  drop_rate={ctx['drop_rate']}%  errors={ctx['total_errors']}
 
-DROPPED URLs (incorrectly blocked - look like real course pages):
+DROPPED URLs (incorrectly blocked — look like real course pages):
 {json.dumps(ctx['dropped_sample'], indent=2)}
 
 PASSED URLs (currently making it through the filter):
@@ -932,18 +1141,33 @@ EXTRACTION QUALITY (fill rates for staged courses):
   sample_degree_levels: {json.dumps(q.get('sample_degrees', []))}
   sample_study_modes:   {json.dumps(q.get('sample_modes', []))}
 
-    """Run the OpenAI-powered repair loop. Writes progress to Redis after every attempt.
+ADMIN_CONFIG discovery overrides (DB, highest priority):
+{json.dumps(admin_disc, indent=2) if admin_disc else "(none)"}
 
-ADMIN_CONFIG (database overrides):
-{json.dumps(ctx['admin_config'], indent=2)}
+ADMIN_CONFIG extraction overrides (DB):
+{json.dumps(admin_extr, indent=2) if admin_extr else "(none)"}
 
-YAML CONFIG (file on disk):
-{ctx['yaml_content'] or "(empty — no YAML file found)"}
+YAML CONFIG ON DISK:
+{ctx['yaml_content'] or "(no YAML file found)"}
 {prev_block}
 
 {diag_priority}
 
 Return ONLY the JSON object described above. No markdown, no explanation outside the JSON."""
+
+
+# ── Main loop ─────────────────────────────────────────────────────────────────
+
+async def run_ai_repair_loop(job_id: str, db) -> dict:
+    """Run the OpenAI-powered full quality repair loop.
+
+    After each patch: simulates discovery improvement AND runs a real extraction
+    scan, evaluates 6-dimensional success criteria, and continues until overall_ok
+    or MAX_ATTEMPTS.
+    """
+    from app.services.ai.openai_client import chat_json
+
+    session: dict = {
         "session_id":      str(uuid.uuid4())[:8],
         "job_id":          job_id,
         "status":          "running",
@@ -964,25 +1188,43 @@ Return ONLY the JSON object described above. No markdown, no explanation outside
             session.update(status="failed", error="Job not found in database.")
             return session
 
-        session["uni_name"] = ctx["uni_name"]
-        quality_baseline = ctx.get("quality") or {}
+        session["uni_name"]       = ctx["uni_name"]
+        quality_baseline          = ctx.get("quality") or {}
         session["quality_before"] = quality_baseline
         _write_session(job_id, session)
-
-        # Carry forward the "before" quality for each attempt
-        quality_before_attempt = quality_baseline
 
         for attempt_num in range(1, MAX_ATTEMPTS + 1):
             session["current_attempt"] = attempt_num
             _write_session(job_id, session)
             log.info("ai_repair: job=%s attempt=%d/%d", job_id, attempt_num, MAX_ATTEMPTS)
 
-            # Determine current repair phase
-            discovery_needs_fix = (
-                ctx["drop_rate"] > 20
+            # ① Snapshot quality BEFORE this attempt
+            quality_before = await _quality_snapshot(job_id, ctx["university_id"], db)
+            quality_before["drop_rate"] = ctx["drop_rate"]
+
+            # ② Determine current repair phase
+            discovery_needs_fix = ctx["drop_rate"] > 20
+            phase = "discovery" if discovery_needs_fix else "extraction"
+
+            # ③ Call OpenAI
+            user_msg = _build_user_message(ctx, session["attempts"], phase=phase)
+            ai_data  = await chat_json(system=_SYSTEM_PROMPT, user=user_msg, max_tokens=2048)
+
+            if ai_data is None:
+                session.update(
+                    status="completed",
+                    final_verdict=(
+                        "OpenAI service unavailable. Check AI_INTEGRATIONS_OPENAI_BASE_URL "
+                        "and AI_INTEGRATIONS_OPENAI_API_KEY."
+                    ),
+                )
+                break
+
+            # ④ Validate patches → 3-tuple (disc_patch, recipe_patch, errors)
+            patches_raw: list[dict] = ai_data.get("patches") or []
             disc_patch, recipe_patch, validation_errors = _validate_and_build_config_patch(patches_raw)
 
-            # Simulate URL filter change (only for allow/block pattern changes)
+            # ⑤ URL filter simulation (discovery patches only — no live re-scrape needed)
             sim: dict = {"before": 0, "after": 0, "total": 0, "rescued": []}
             if "allow_url_patterns" in disc_patch or "block_url_patterns" in disc_patch:
                 from sqlalchemy import text as _text
@@ -998,30 +1240,46 @@ Return ONLY the JSON object described above. No markdown, no explanation outside
                     disc_patch.get("block_url_patterns", []),
                 )
 
-            # ⑤ Apply patches
+            # ⑥ Apply discovery patch
             patch_applied_ok  = False
             patch_error: str  = ""
-            if config_patch:
+            recipe_patch_applied: list = []
+            if disc_patch:
                 try:
-                    await _apply_to_db(ctx["university_id"], config_patch, db)
+                    await _apply_discovery_to_db(ctx["university_id"], disc_patch, db)
                     _apply_to_yaml(ctx.get("yaml_file"), ctx["unis_dir"],
-                                   ctx["university_id"], ctx["scrape_url"], config_patch)
+                                   ctx["university_id"], ctx["scrape_url"],
+                                   {"discovery": disc_patch})
                     patch_applied_ok = True
+                    log.info("ai_repair: discovery patch applied: %s", list(disc_patch.keys()))
                 except Exception as exc:
-            # Determine current repair phase
-            discovery_needs_fix = (
-                ctx["drop_rate"] > 20
-            phase = "discovery" if discovery_needs_fix else "extraction"
+                    log.warning("ai_repair: discovery patch apply error: %s", exc)
+                    patch_error = str(exc)
 
-            # ⑥ Real extraction scan:
+            # ⑦ Apply recipe patch
+            if recipe_patch:
+                try:
+                    await _apply_recipe_to_db(ctx["university_id"], recipe_patch, db)
+                    recipe_patch_applied = list(recipe_patch.keys())
+                    patch_applied_ok = True
+                    log.info("ai_repair: recipe patch applied: %s", recipe_patch_applied)
+                except Exception as exc:
+                    log.warning("ai_repair: recipe patch apply error: %s", exc)
+                    if not patch_error:
+                        patch_error = str(exc)
+
+            # ⑧ Real extraction scan:
             #    Phase 1 — SQL fast-path (default_ielts fills, reject_values clears)
             #    Phase 2 — re-fetch up to 5 staged course URLs with patched config
-            scan_fills = await _run_extraction_scan(ctx, config_patch, db)
+            config_patch_combined: dict = {}
+            if disc_patch:
+                config_patch_combined["discovery"] = disc_patch
+            if recipe_patch:
+                config_patch_combined["extraction"] = recipe_patch
+            scan_fills = await _run_extraction_scan(ctx, config_patch_combined, db)
 
-            # ⑦ Real quality snapshot AFTER the extraction scan
+            # ⑨ Real quality snapshot AFTER the extraction scan
             quality_after = await _quality_snapshot(job_id, ctx["university_id"], db)
-            # Drop-rate: use URL simulation for discovery patches; carry forward otherwise
-            # (we cannot re-run full discovery inline — the simulation is the best proxy)
             if sim.get("total", 0) > 0:
                 _raw   = ctx["raw_discovered"]
                 _after = ctx["after_filter"] + sim.get("after", 0)
@@ -1032,15 +1290,9 @@ Return ONLY the JSON object described above. No markdown, no explanation outside
             else:
                 quality_after["drop_rate"] = quality_before.get("drop_rate", 0)
 
-            # predicted_fills: qualitative flags for UI chips that take effect on the
-            # next full scrape (e.g. fees_central_page_set, online_only_disabled).
-            # Merge real scan counts on top so the UI shows actual fill numbers.
-            _, predicted_fills = await _predict_quality(ctx, config_patch, sim, db)
-            predicted_fills.update({
-                k: v for k, v in scan_fills.items()
-                if v and k not in predicted_fills
-            })
-            # Real fill counts always win over estimates
+            # predicted_fills: qualitative flags for UI chips (e.g. fees_central_page_set)
+            _, predicted_fills = await _predict_quality(ctx, config_patch_combined, sim, db)
+            predicted_fills.update({k: v for k, v in scan_fills.items() if v and k not in predicted_fills})
             for _real_key, _ui_key in [
                 ("ielts_fills",     "ielts_fills"),
                 ("fee_fills",       "fee_fills"),
@@ -1049,18 +1301,20 @@ Return ONLY the JSON object described above. No markdown, no explanation outside
                 if scan_fills.get(_real_key):
                     predicted_fills[_ui_key] = scan_fills[_real_key]
 
-            # ⑧ Evaluate success using REAL quality_after (not predicted)
+            # ⑩ Evaluate success using REAL quality_after (not predicted)
             success_criteria = _evaluate_success(quality_after, sim, predicted_fills, ctx)
             quality_delta    = _compute_delta(quality_before, quality_after)
+            crit_pass        = success_criteria["criteria_pass"]
+            overall          = success_criteria["overall_ok"]
 
             attempt_record: dict = {
-                "attempt_number":     attempt_num,
-                "phase":              phase,
-                "diagnosis":          ai_data.get("diagnosis", "Unknown issue"),
-                "root_cause":         ai_data.get("root_cause", "unknown"),
-                "confidence":         ai_data.get("confidence", 0),
-                "explanation":        ai_data.get("explanation", ""),
-                "patches_applied":    [
+                "attempt_number":      attempt_num,
+                "phase":               phase,
+                "diagnosis":           ai_data.get("diagnosis", "Unknown"),
+                "root_cause":          ai_data.get("root_cause", "unknown"),
+                "confidence":          ai_data.get("confidence", 0),
+                "explanation":         ai_data.get("explanation", ""),
+                "patches_applied":     [
                     {"section": p.get("section"), "field": p.get("field"), "new_value": p.get("value")}
                     for p in patches_raw
                     if p.get("section") in _ALLOWED_SECTIONS
@@ -1069,171 +1323,108 @@ Return ONLY the JSON object described above. No markdown, no explanation outside
                         or p.get("field") in _ALLOWED_RECIPE_FIELDS
                     )
                 ],
-                "validation_errors": validation_errors,
-                # URL simulation (discovery)
-                "before_pass_count": sim["before"],
-                "after_pass_count":  sim["after"],
-                "total_test_urls":   sim["total"],
-                "rescued_sample":    sim["rescued"],
-                # Patch save status
-                "patch_applied_ok":  patch_applied_ok,
-                "patch_error":       patch_error if patch_error else None,
-                # Quality tracking — quality_after is REAL (from DB after scan)
-                "quality_before":    quality_before,
-                "quality_after":     quality_after,
-                "quality_delta":     quality_delta,
-                "predicted_fills":   predicted_fills,
-                "success_criteria":  success_criteria,
-                "courses_rescanned": scan_fills.get("courses_rescanned", 0),
+                "validation_errors":   validation_errors,
+                "before_pass_count":   sim["before"],
+                "after_pass_count":    sim["after"],
+                "total_test_urls":     sim["total"],
+                "rescued_sample":      sim["rescued"],
+                "patch_applied_ok":    patch_applied_ok,
+                "patch_error":         patch_error if patch_error else None,
+                "recipe_patch_applied": recipe_patch_applied,
+                "quality_before":      quality_before,
+                "quality_after":       quality_after,
+                "quality_delta":       quality_delta,
+                "predicted_fills":     predicted_fills,
+                "success_criteria":    success_criteria,
+                "courses_rescanned":   scan_fills.get("courses_rescanned", 0),
             }
             session["attempts"].append(attempt_record)
-
-            # Apply discovery patch
-            if disc_patch:
-                try:
-                    await _apply_discovery_to_db(ctx["university_id"], disc_patch, db)
-                    _apply_to_yaml(
-                        ctx.get("yaml_file"),
-                        ctx["unis_dir"],
-                        ctx["university_id"],
-                        ctx["scrape_url"],
-                        disc_patch,
-                    )
-                    attempt_record["patch_applied_ok"] = True
-                    log.info("ai_repair: discovery patch applied: %s", list(disc_patch.keys()))
-                except Exception as exc:
-                    log.warning("ai_repair: discovery patch apply error: %s", exc)
-                    attempt_record["patch_error"] = str(exc)
-
-            # Apply recipe patch
-            if recipe_patch:
-                try:
-                    await _apply_recipe_to_db(ctx["university_id"], recipe_patch, db)
-                    attempt_record["patch_applied_ok"] = True
-                    attempt_record["recipe_patch_applied"] = list(recipe_patch.keys())
-                    log.info("ai_repair: recipe patch applied: %s", list(recipe_patch.keys()))
-                except Exception as exc:
-                    log.warning("ai_repair: recipe patch apply error: %s", exc)
-                    attempt_record["recipe_patch_error"] = str(exc)
-
-            # Re-query extraction quality for before/after comparison
-            quality_after = await _requery_quality(ctx["university_id"], job_id, db)
-            attempt_record["quality_after"] = quality_after
             _write_session(job_id, session)
 
-            # ── Termination checks ────────────────────────────────────────────
+            urls_rescued_enough = sim["total"] > 0 and sim["after"] >= sim["total"] * 0.5
+            has_url_patch       = bool("allow_url_patterns" in disc_patch or "block_url_patterns" in disc_patch)
+            discovery_now_ok    = urls_rescued_enough or (not has_url_patch and ctx["drop_rate"] < 20)
+            extraction_ok       = _extraction_quality_ok(quality_after)
 
-            has_url_patch = bool("allow_url_patterns" in disc_patch or "block_url_patterns" in disc_patch)
-            urls_rescued_enough = (
-                has_url_patch
-                and sim["total"] > 0
-                and sim["after"] >= sim["total"] * 0.5
-            )
-            discovery_now_ok = urls_rescued_enough or (
-                not has_url_patch and ctx["drop_rate"] < 20
-            )
-            extraction_ok = _extraction_quality_ok(quality_after)
-            no_patches = not patches_raw
-
-            if no_patches:
+            # ⑪ Termination checks
+            if not patches_raw:
                 if discovery_now_ok and extraction_ok:
-                    session.update(
-                        status="completed",
-                        final_verdict="No issues detected - discovery and extraction quality are both acceptable.",
-                    )
-                elif discovery_now_ok and not extraction_ok:
-                    session.update(
-                        status="completed",
-                        final_verdict=(
-                            f"OpenAI could not identify an extraction fix after {attempt_num} attempt(s). "
-                            f"Discovery is working. Extraction quality ({_quality_summary(quality_after)}) "
-                            "may require manual recipe configuration. "
-                            f"Diagnosis: {ai_data.get('diagnosis', 'N/A')}"
-                        ),
+                    verdict = "No issues detected — discovery and extraction quality are both acceptable."
+                elif discovery_now_ok:
+                    verdict = (
+                        f"OpenAI could not identify an extraction fix after {attempt_num} attempt(s). "
+                        f"Discovery is working. Extraction quality ({_quality_summary(quality_after)}) "
+                        f"may require manual recipe configuration. Diagnosis: {ai_data.get('diagnosis', 'N/A')}"
                     )
                 else:
-                    session.update(
-                        status="completed",
-                        final_verdict=(
-                            f"OpenAI could not identify an automatic fix after {attempt_num} attempt(s). "
-                            f"Diagnosis: {ai_data.get('diagnosis', 'N/A')}. Manual config review recommended."
-                        ),
+                    verdict = (
+                        f"OpenAI could not identify an automatic fix after {attempt_num} attempt(s). "
+                        f"Diagnosis: {ai_data.get('diagnosis', 'N/A')}. Manual config review recommended."
                     )
+                session.update(status="completed", final_verdict=verdict)
                 break
 
             if recipe_patch and not disc_patch:
-                # Pure recipe patch - recipe changes need a re-scrape to verify quality improvement
-                recipe_fields = ", ".join(recipe_patch.keys())
                 extraction_note = (
                     "Extraction quality is acceptable."
                     if extraction_ok
                     else (
                         f"Extraction quality was poor ({_quality_summary(quality_after)}). "
-                        "The recipe patch targets this - re-run the scrape to measure improvement."
+                        "The recipe patch targets this — re-run the scrape to measure improvement."
                     )
                 )
                 session.update(
                     status="completed",
                     final_verdict=(
-                        f"Recipe patch applied ({recipe_fields}). "
+                        f"Recipe patch applied ({', '.join(recipe_patch.keys())}). "
                         f"{extraction_note} "
                         "Re-run a full scrape to confirm extraction improvements."
                     ),
                 )
                 break
 
-            if urls_rescued_enough:
-                if extraction_ok:
-                    session.update(
-                        status="completed",
-                        final_verdict=(
-                            f"Discovery fix applied - {sim['after']}/{sim['total']} previously-dropped URLs "
-                            f"now pass the new filter. Extraction quality is also acceptable ({_quality_summary(quality_after)}). "
-                            "Re-run a full scrape to confirm."
-                        ),
-                    )
-                    break
-                else:
-                    # Discovery fixed but extraction is still poor → continue to extraction phase
-                    log.info(
-                        "ai_repair: discovery fixed but extraction quality poor (%s) - continuing to extraction phase",
-                        _quality_summary(quality_after),
-                    )
-                    # Update context quality for next attempt so the AI sees current state
-                    ctx["quality"] = quality_after
-                    ctx["drop_rate"] = 0  # Signal that discovery is no longer the problem
-                    quality_before_attempt = quality_after
-                    if attempt_num == MAX_ATTEMPTS:
-                        session.update(
-                            status="completed",
-                            final_verdict=(
-                                f"Discovery fix applied ({sim['after']}/{sim['total']} URLs rescued). "
-                                f"Extraction quality remains poor: {_quality_summary(quality_after)}. "
-                                "Re-run a full scrape and check the Recipe Editor for extraction improvements."
-                            ),
-                        )
-                    continue
-
-            if not has_url_patch and ctx["drop_rate"] < 20:
-                # No URL problem, non-recipe patch applied
-                if extraction_ok:
-                    session.update(
-                        status="completed",
-                        final_verdict=(
-                            "Config patch applied. Discovery and extraction quality are both acceptable. "
-                            "Re-run a scrape to verify the changes."
-                        ),
-                    )
-                else:
-                    session.update(
-                        status="completed",
-                        final_verdict=(
-                            "Config patch applied. "
-                            f"Extraction quality: {_quality_summary(quality_after)}. "
-                            "Re-run a scrape to verify - or use the Recipe Editor to tune extraction rules."
-                        ),
-                    )
+            if overall:
+                session.update(
+                    status="completed",
+                    final_verdict=(
+                        f"All quality targets met — {crit_pass}/6 criteria pass on real "
+                        f"post-scan data ({scan_fills.get('courses_rescanned', 0)} courses re-extracted). "
+                        "Re-run the full scrape to propagate improvements across all courses."
+                    ),
+                )
                 break
+
+            if urls_rescued_enough and not extraction_ok:
+                log.info(
+                    "ai_repair: discovery fixed but extraction quality poor (%s) — continuing to extraction phase",
+                    _quality_summary(quality_after),
+                )
+                ctx["quality"]   = quality_after
+                ctx["drop_rate"] = 0
+                if attempt_num == MAX_ATTEMPTS:
+                    session.update(
+                        status="completed",
+                        final_verdict=(
+                            f"Discovery fix applied ({sim['after']}/{sim['total']} URLs rescued). "
+                            f"Extraction quality remains poor: {_quality_summary(quality_after)}. "
+                            "Re-run a full scrape and check the Recipe Editor for extraction improvements."
+                        ),
+                    )
+                continue
+
+            if attempt_num == MAX_ATTEMPTS:
+                session.update(
+                    status="completed",
+                    final_verdict=(
+                        f"Reached maximum {MAX_ATTEMPTS} attempts. "
+                        f"{crit_pass}/6 quality criteria passing (real post-scan). "
+                        f"Outstanding: {_failing_criteria_str(success_criteria)}. "
+                        "Re-run the scrape with patches applied to process all courses."
+                    ),
+                )
+
+            ctx["quality"] = quality_after
+
     except Exception as exc:
         log.exception("ai_repair: unexpected error job=%s: %s", job_id, exc)
         session.update(status="failed", error=str(exc))
