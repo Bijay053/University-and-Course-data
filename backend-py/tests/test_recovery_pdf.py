@@ -2148,19 +2148,41 @@ class TestNoPdfBudgetInlineConstruction:
         def _is_make_pdf_budget_call(node: ast.expr) -> bool:
             return isinstance(node, ast.Call) and _fn_name(node) == "make_pdf_budget"
 
-        def _collect_assignments(stmts) -> dict[str, ast.expr]:
-            """Shallow single-pass over a list of statements; records the
-            *last* simple assignment to each name.  Nested scopes are not
+        def _collect_assignments(stmts) -> dict[str, list[ast.expr]]:
+            """Multi-branch collector that records ALL possible assignments to
+            each name, including those inside ``if``/``else``,
+            ``try``/``except``, ``for``/``while``, and ``with`` branches.
+            A name is treated as 'possibly literal' if *any* branch assigns
+            it a literal.  Nested function/class definitions are NOT
             descended into (handled by the outer visitor's generic_visit)."""
-            assigns: dict[str, ast.expr] = {}
-            for stmt in stmts:
-                if isinstance(stmt, ast.Assign):
-                    for target in stmt.targets:
-                        if isinstance(target, ast.Name):
-                            assigns[target.id] = stmt.value
-                elif isinstance(stmt, ast.AnnAssign):
-                    if isinstance(stmt.target, ast.Name) and stmt.value is not None:
-                        assigns[stmt.target.id] = stmt.value
+            assigns: dict[str, list[ast.expr]] = {}
+
+            def _collect(stmt_list) -> None:
+                for stmt in stmt_list:
+                    if isinstance(stmt, ast.Assign):
+                        for target in stmt.targets:
+                            if isinstance(target, ast.Name):
+                                assigns.setdefault(target.id, []).append(stmt.value)
+                    elif isinstance(stmt, ast.AnnAssign):
+                        if isinstance(stmt.target, ast.Name) and stmt.value is not None:
+                            assigns.setdefault(stmt.target.id, []).append(stmt.value)
+                    elif isinstance(stmt, ast.If):
+                        _collect(stmt.body)
+                        _collect(stmt.orelse)
+                    elif isinstance(stmt, (ast.For, ast.While)):
+                        _collect(stmt.body)
+                        _collect(stmt.orelse)
+                    elif isinstance(stmt, ast.Try):
+                        _collect(stmt.body)
+                        for handler in stmt.handlers:
+                            _collect(handler.body)
+                        _collect(stmt.orelse)
+                        _collect(stmt.finalbody)
+                    elif isinstance(stmt, ast.With):
+                        _collect(stmt.body)
+                    # FunctionDef / AsyncFunctionDef / ClassDef: new scope — skip
+
+            _collect(stmts)
             return assigns
 
         class CallSiteVisitor(ast.NodeVisitor):
@@ -2204,25 +2226,34 @@ class TestNoPdfBudgetInlineConstruction:
                 self,
                 value: ast.expr,
                 lineno: int,
-                local_assigns: dict[str, ast.expr],
+                local_assigns: dict[str, list[ast.expr]],
             ) -> None:
-                """Resolve the kwarg value to a concrete node and flag literals."""
-                # Resolve Name references one level deep using the function's
-                # local assignment map.
-                resolved = value
-                if isinstance(value, ast.Name) and value.id in local_assigns:
-                    resolved = local_assigns[value.id]
+                """Resolve the kwarg value and flag literals.
 
-                if isinstance(resolved, _LITERAL_TYPES):
-                    kind = "dict" if isinstance(resolved, ast.Dict) else "list"
+                For a ``Name`` reference all possible assigned values (from
+                every branch) are checked conservatively: if *any* branch
+                could produce a literal the call site is flagged.
+                """
+                if isinstance(value, ast.Name) and value.id in local_assigns:
+                    for resolved in local_assigns[value.id]:
+                        if isinstance(resolved, _LITERAL_TYPES):
+                            kind = "dict" if isinstance(resolved, ast.Dict) else "list"
+                            self.violations.append(
+                                f"{self._filename}:{lineno}: extract_from_url() called "
+                                f"with pdf_budget= set to a {kind} literal "
+                                f"— use make_pdf_budget() instead"
+                            )
+                            return
+                    return  # no literal found among any branch — OK
+
+                # Direct (non-Name) literal in the call expression.
+                if isinstance(value, _LITERAL_TYPES):
+                    kind = "dict" if isinstance(value, ast.Dict) else "list"
                     self.violations.append(
                         f"{self._filename}:{lineno}: extract_from_url() called "
                         f"with pdf_budget= set to a {kind} literal "
                         f"— use make_pdf_budget() instead"
                     )
-                # If resolved is a Call to make_pdf_budget → OK.
-                # If resolved is something else we cannot prove → not flagged
-                # (rely on existing call-site dynamic tests for that path).
 
             def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
                 self._check_function(node)
@@ -2291,16 +2322,39 @@ class TestNoPdfBudgetInlineConstruction:
                 return func.attr
             return ""
 
-        def _collect_assignments(stmts) -> dict[str, ast.expr]:
-            assigns: dict[str, ast.expr] = {}
-            for stmt in stmts:
-                if isinstance(stmt, ast.Assign):
-                    for target in stmt.targets:
-                        if isinstance(target, ast.Name):
-                            assigns[target.id] = stmt.value
-                elif isinstance(stmt, ast.AnnAssign):
-                    if isinstance(stmt.target, ast.Name) and stmt.value is not None:
-                        assigns[stmt.target.id] = stmt.value
+        def _collect_assignments(stmts) -> dict[str, list[ast.expr]]:
+            """Multi-branch collector — records ALL possible assignments to each
+            name, including those inside if/else, try/except, for/while, and
+            with branches.  A name is 'possibly literal' if any branch assigns
+            it a literal.  Nested function/class defs are skipped (new scope)."""
+            assigns: dict[str, list[ast.expr]] = {}
+
+            def _collect(stmt_list) -> None:
+                for stmt in stmt_list:
+                    if isinstance(stmt, ast.Assign):
+                        for target in stmt.targets:
+                            if isinstance(target, ast.Name):
+                                assigns.setdefault(target.id, []).append(stmt.value)
+                    elif isinstance(stmt, ast.AnnAssign):
+                        if isinstance(stmt.target, ast.Name) and stmt.value is not None:
+                            assigns.setdefault(stmt.target.id, []).append(stmt.value)
+                    elif isinstance(stmt, ast.If):
+                        _collect(stmt.body)
+                        _collect(stmt.orelse)
+                    elif isinstance(stmt, (ast.For, ast.While)):
+                        _collect(stmt.body)
+                        _collect(stmt.orelse)
+                    elif isinstance(stmt, ast.Try):
+                        _collect(stmt.body)
+                        for handler in stmt.handlers:
+                            _collect(handler.body)
+                        _collect(stmt.orelse)
+                        _collect(stmt.finalbody)
+                    elif isinstance(stmt, ast.With):
+                        _collect(stmt.body)
+                    # FunctionDef / AsyncFunctionDef / ClassDef: new scope — skip
+
+            _collect(stmts)
             return assigns
 
         class _CallSiteVisitor(ast.NodeVisitor):
@@ -2339,13 +2393,22 @@ class TestNoPdfBudgetInlineConstruction:
                 self,
                 value: ast.expr,
                 lineno: int,
-                local_assigns: dict[str, ast.expr],
+                local_assigns: dict[str, list[ast.expr]],
             ) -> None:
-                resolved = value
                 if isinstance(value, ast.Name) and value.id in local_assigns:
-                    resolved = local_assigns[value.id]
-                if isinstance(resolved, _LITERAL_TYPES):
-                    kind = "dict" if isinstance(resolved, ast.Dict) else "list"
+                    for resolved in local_assigns[value.id]:
+                        if isinstance(resolved, _LITERAL_TYPES):
+                            kind = "dict" if isinstance(resolved, ast.Dict) else "list"
+                            self.violations.append(
+                                f"{self._filename}:{lineno}: extract_from_url() called "
+                                f"with pdf_budget= set to a {kind} literal "
+                                f"— use make_pdf_budget() instead"
+                            )
+                            return
+                    return  # no literal found among any branch — OK
+
+                if isinstance(value, _LITERAL_TYPES):
+                    kind = "dict" if isinstance(value, ast.Dict) else "list"
                     self.violations.append(
                         f"{self._filename}:{lineno}: extract_from_url() called "
                         f"with pdf_budget= set to a {kind} literal "
@@ -2412,6 +2475,191 @@ async def run(url, cats):
             "Expected no violations for an aliased extract_from_url call that "
             "correctly passes pdf_budget=make_pdf_budget(...), but got:\n"
             + "\n".join(f"  - {v}" for v in allowed_violations)
+        )
+
+    # ------------------------------------------------------------------ #
+    # Test 3c: conditional re-assignment is caught by Test 3             #
+    # ------------------------------------------------------------------ #
+
+    def test_conditional_reassignment_is_caught_by_call_site_visitor(self):
+        """Synthetic fixture: a variable that is first assigned a safe
+        ``make_pdf_budget()`` call but then re-assigned a literal dict inside
+        an ``if``/``else`` or ``try``/``except`` branch must be flagged.
+
+        This verifies the multi-branch extension to ``_collect_assignments``
+        that was added to fix the false-negative described in the task::
+
+            budget = make_pdf_budget(single_course=False)
+            if condition:
+                budget = {"fees": 5}   # FORBIDDEN — any branch with a literal
+            await extract_from_url(url, cats, pdf_budget=budget)
+
+        Four sub-cases:
+
+        1. **if/else re-assignment** — literal in the ``if`` branch must be caught.
+        2. **try/except re-assignment** — literal in the ``except`` handler must
+           be caught.
+        3. **both branches safe** — two ``make_pdf_budget()`` calls produce no
+           violation.
+        4. **only-else literal** — literal exclusively in the ``else`` branch
+           must be caught.
+        """
+        import ast
+
+        _LITERAL_TYPES = (ast.Dict, ast.List)
+
+        def _fn_name(call_node: ast.Call) -> str:
+            func = call_node.func
+            if isinstance(func, ast.Name):
+                return func.id
+            if isinstance(func, ast.Attribute):
+                return func.attr
+            return ""
+
+        def _collect_assignments(stmts) -> dict[str, list[ast.expr]]:
+            assigns: dict[str, list[ast.expr]] = {}
+
+            def _collect(stmt_list) -> None:
+                for stmt in stmt_list:
+                    if isinstance(stmt, ast.Assign):
+                        for target in stmt.targets:
+                            if isinstance(target, ast.Name):
+                                assigns.setdefault(target.id, []).append(stmt.value)
+                    elif isinstance(stmt, ast.AnnAssign):
+                        if isinstance(stmt.target, ast.Name) and stmt.value is not None:
+                            assigns.setdefault(stmt.target.id, []).append(stmt.value)
+                    elif isinstance(stmt, ast.If):
+                        _collect(stmt.body)
+                        _collect(stmt.orelse)
+                    elif isinstance(stmt, (ast.For, ast.While)):
+                        _collect(stmt.body)
+                        _collect(stmt.orelse)
+                    elif isinstance(stmt, ast.Try):
+                        _collect(stmt.body)
+                        for handler in stmt.handlers:
+                            _collect(handler.body)
+                        _collect(stmt.orelse)
+                        _collect(stmt.finalbody)
+                    elif isinstance(stmt, ast.With):
+                        _collect(stmt.body)
+
+            _collect(stmts)
+            return assigns
+
+        class _V(ast.NodeVisitor):
+            def __init__(self, filename: str):
+                self._filename = filename
+                self.violations: list[str] = []
+                self._target_names: set[str] = {"extract_from_url"}
+
+            def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
+                for alias in node.names:
+                    if alias.name == "extract_from_url":
+                        effective = alias.asname if alias.asname else alias.name
+                        self._target_names.add(effective)
+                self.generic_visit(node)
+
+            def _check_function(self, node) -> None:
+                local_assigns = _collect_assignments(node.body)
+                for stmt in ast.walk(ast.Module(body=node.body, type_ignores=[])):
+                    if not isinstance(stmt, ast.Call):
+                        continue
+                    if _fn_name(stmt) not in self._target_names:
+                        continue
+                    for kw in stmt.keywords:
+                        if kw.arg != "pdf_budget":
+                            continue
+                        value = kw.value
+                        if isinstance(value, ast.Name) and value.id in local_assigns:
+                            for resolved in local_assigns[value.id]:
+                                if isinstance(resolved, _LITERAL_TYPES):
+                                    kind = "dict" if isinstance(resolved, ast.Dict) else "list"
+                                    self.violations.append(
+                                        f"{self._filename}:{stmt.lineno}: "
+                                        f"pdf_budget= is a {kind} literal in some branch"
+                                    )
+                                    break
+                        elif isinstance(value, _LITERAL_TYPES):
+                            kind = "dict" if isinstance(value, ast.Dict) else "list"
+                            self.violations.append(
+                                f"{self._filename}:{stmt.lineno}: "
+                                f"pdf_budget= is an inline {kind} literal"
+                            )
+
+            def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+                self._check_function(node)
+                self.generic_visit(node)
+
+            def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
+                self._check_function(node)
+                self.generic_visit(node)
+
+        def _run(source: str) -> list[str]:
+            tree = ast.parse(source, filename="fixture.py")
+            v = _V("fixture.py")
+            v.visit(tree)
+            return v.violations
+
+        # Sub-case 1: literal in the if-branch — must be caught
+        _IF_BRANCH_SOURCE = '''\
+async def run(url, cats):
+    budget = make_pdf_budget(single_course=False)
+    if condition:
+        budget = {"fees": 5}
+    results = await extract_from_url(url, cats, pdf_budget=budget)
+    return results
+'''
+        assert _run(_IF_BRANCH_SOURCE), (
+            "Expected a violation when budget is re-assigned a dict literal "
+            "inside an if-branch, but none was reported.\n\nSource:\n"
+            + _IF_BRANCH_SOURCE
+        )
+
+        # Sub-case 2: literal in the except-handler — must be caught
+        _TRY_BRANCH_SOURCE = '''\
+async def run(url, cats):
+    try:
+        budget = make_pdf_budget(single_course=False)
+    except Exception:
+        budget = {"fees": 5}
+    results = await extract_from_url(url, cats, pdf_budget=budget)
+    return results
+'''
+        assert _run(_TRY_BRANCH_SOURCE), (
+            "Expected a violation when budget is re-assigned a dict literal "
+            "inside an except-handler, but none was reported.\n\nSource:\n"
+            + _TRY_BRANCH_SOURCE
+        )
+
+        # Sub-case 3: both branches call make_pdf_budget — no violation
+        _SAFE_SOURCE = '''\
+async def run(url, cats, condition):
+    if condition:
+        budget = make_pdf_budget(single_course=True)
+    else:
+        budget = make_pdf_budget(single_course=False)
+    results = await extract_from_url(url, cats, pdf_budget=budget)
+    return results
+'''
+        assert not _run(_SAFE_SOURCE), (
+            "Expected no violations when both branches assign make_pdf_budget(), "
+            "but got violations."
+        )
+
+        # Sub-case 4: literal in the else-branch only — must be caught
+        _ELSE_BRANCH_SOURCE = '''\
+async def run(url, cats, condition):
+    if condition:
+        budget = make_pdf_budget(single_course=True)
+    else:
+        budget = {"fees": 5}
+    results = await extract_from_url(url, cats, pdf_budget=budget)
+    return results
+'''
+        assert _run(_ELSE_BRANCH_SOURCE), (
+            "Expected a violation when budget is a dict literal in the else-branch, "
+            "but none was reported.\n\nSource:\n"
+            + _ELSE_BRANCH_SOURCE
         )
 
     # ------------------------------------------------------------------ #
