@@ -2,4 +2,22 @@ extraction:
   fees:
     default_currency: GBP
 discovery:
-  block_url_patterns: []
+  block_url_patterns:
+  - /apply
+  - /contact
+  - /news
+  - /events
+  - /blog
+  - /about
+  - /research
+  - /alumni
+  - /outreach
+  - /parents
+  - /jobs
+  - /careers
+  - /accommodation
+  - /life-on-campus
+  - /fees-and-funding$
+  - /international/living
+  allow_url_patterns:
+  - /study/[^/]+/[^/]+/[^/]+/[^/]+/?$

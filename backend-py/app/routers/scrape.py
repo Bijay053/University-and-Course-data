@@ -5986,6 +5986,80 @@ async def apply_scrape_fix(
     }
 
 
+@router.post("/jobs/{job_id}/ai-repair")
+async def start_ai_repair(
+    job_id: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[dict, Depends(get_current_user)],
+) -> dict:
+    """Trigger the AI-powered iterative repair loop for a completed scrape job.
+
+    Enqueues a Celery task (``ai_repair.run_loop``) that calls Gemini to
+    diagnose the job's failures, generates config patches, applies them,
+    simulates the URL filter improvement, and repeats up to 5 times.
+
+    Progress is written to Redis after every attempt; poll
+    ``GET /jobs/{job_id}/ai-repair-status`` to follow along.
+
+    Returns immediately with ``{"session_id": ..., "status": "queued"}``.
+    """
+    from sqlalchemy import text as _text
+    from app.services.scraper.ai_repair_agent import _write_session
+    import uuid
+
+    # Verify the job exists
+    row = (await db.execute(
+        _text("SELECT runtime_job_id FROM scrape_runtime_jobs WHERE runtime_job_id = :j"),
+        {"j": job_id},
+    )).first()
+    if not row:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail=f"Job {job_id!r} not found")
+
+    session_id = str(uuid.uuid4())[:8]
+
+    # Write initial queued state so the poller sees something immediately
+    _write_session(job_id, {
+        "session_id":      session_id,
+        "job_id":          job_id,
+        "status":          "queued",
+        "current_attempt": 0,
+        "attempts":        [],
+        "final_verdict":   None,
+        "uni_name":        None,
+        "started_at":      None,
+        "completed_at":    None,
+        "error":           None,
+    })
+
+    # Enqueue Celery task
+    try:
+        from app.tasks.auto_repair_task import run_ai_scrape_repair
+        run_ai_scrape_repair.apply_async(args=[job_id], queue="scrape")
+    except Exception as exc:
+        log.warning("start_ai_repair: Celery enqueue failed for job=%s: %s", job_id, exc)
+
+    return {"session_id": session_id, "status": "queued", "job_id": job_id}
+
+
+@router.get("/jobs/{job_id}/ai-repair-status")
+async def get_ai_repair_status(
+    job_id: str,
+    _: Annotated[dict, Depends(get_current_user)],
+) -> dict:
+    """Poll the AI repair session state for a job.
+
+    Reads from Redis key ``ai_repair:{job_id}``.  Returns an empty
+    ``{"status": "not_started"}`` if no session has been initiated.
+    """
+    from app.services.scraper.ai_repair_agent import read_session
+
+    session = read_session(job_id)
+    if not session:
+        return {"job_id": job_id, "status": "not_started", "attempts": []}
+    return session
+
+
 @router.post("/jobs/{job_id}/auto-repair-filter")
 async def auto_repair_filter(
     job_id: str,

@@ -76,6 +76,36 @@ const ACTION_LABELS: Record<string, string> = {
   api_promotion: "API Promotion",
 };
 
+// ── AI Repair Agent types ─────────────────────────────────────────────────────
+type AIRepairPatch = { section: string | null; field: string | null; new_value: unknown };
+type AIRepairAttempt = {
+  attempt_number:    number;
+  diagnosis:         string;
+  root_cause:        string;
+  confidence:        number;
+  explanation:       string;
+  patches_applied:   AIRepairPatch[];
+  before_pass_count: number;
+  after_pass_count:  number;
+  total_test_urls:   number;
+  rescued_sample:    string[];
+  ai_cost_usd:       number;
+  patch_applied_ok:  boolean;
+  patch_error?:      string;
+};
+type AIRepairSession = {
+  session_id:      string;
+  job_id:          string;
+  status:          "queued" | "running" | "completed" | "failed" | "not_started";
+  current_attempt: number;
+  attempts:        AIRepairAttempt[];
+  final_verdict:   string | null;
+  uni_name:        string | null;
+  started_at:      string | null;
+  completed_at:    string | null;
+  error:           string | null;
+};
+
 // ── AI Diagnostic types ───────────────────────────────────────────────────────
 type DiagnoseRootCause = { issue: string; explanation: string; severity: "high" | "medium" | "low" };
 type DiagnoseAction    = { action: string; detail: string; auto_fixable: boolean; fix_type?: "config" | "platform_bug" };
@@ -390,6 +420,12 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
   const [validateLoading, setValidateLoading] = useState(false);
   const [applyingRepairFix, setApplyingRepairFix] = useState(false);
   const [repairFixApplied, setRepairFixApplied] = useState(false);
+
+  // AI Repair Agent state
+  const [aiRepairSession, setAiRepairSession] = useState<AIRepairSession | null>(null);
+  const [aiRepairLoading, setAiRepairLoading] = useState(false);
+  const [aiRepairPolling, setAiRepairPolling] = useState(false);
+  const [showAiRepairLog, setShowAiRepairLog] = useState(false);
 
   const pollRef = useRef<number | null>(null);
   const logIndexRef = useRef(0);
@@ -709,6 +745,31 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
     }
   }, [phase, urlFilterWarning, completedJobId]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Poll AI repair session status every 2.5 s while the loop is running
+  useEffect(() => {
+    if (!aiRepairPolling || !completedJobId) return;
+    const poll = async () => {
+      try {
+        const res = await fetch(`/api/scrape/jobs/${completedJobId}/ai-repair-status`, {
+          credentials: "include",
+          cache: "no-store",
+        });
+        if (res.ok) {
+          const data = await readResponseJson<AIRepairSession>(res);
+          if (data) {
+            setAiRepairSession(data);
+            if (data.status === "completed" || data.status === "failed") {
+              setAiRepairPolling(false);
+            }
+          }
+        }
+      } catch { /* ignore transient errors */ }
+    };
+    poll(); // immediate first fetch
+    const id = setInterval(poll, 2500);
+    return () => clearInterval(id);
+  }, [aiRepairPolling, completedJobId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleValidateRepairFix = useCallback(async (candidate: RepairCandidateData) => {
     if (!completedJobId) return;
     setValidateLoading(true);
@@ -809,6 +870,48 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
       setDiagnoseLoading(false);
     }
   }, []);
+
+  const handleAiRepair = useCallback(async () => {
+    if (!completedJobId) return;
+    setAiRepairLoading(true);
+    setShowAiRepairLog(true);
+    setAiRepairSession(prev =>
+      prev ? { ...prev, status: "queued", attempts: [], final_verdict: null, error: null } : null
+    );
+    try {
+      const res = await fetch(`/api/scrape/jobs/${completedJobId}/ai-repair`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        cache: "no-store",
+      });
+      if (!res.ok) {
+        const msg = await getFetchErrorMessage(res);
+        toast({ title: "AI Repair failed to start", description: msg || `Error ${res.status}`, variant: "destructive" });
+        return;
+      }
+      const data = await readResponseJson<{ session_id: string; status: string; job_id: string }>(res);
+      if (data) {
+        setAiRepairSession({
+          session_id:      data.session_id,
+          job_id:          completedJobId,
+          status:          "queued",
+          current_attempt: 0,
+          attempts:        [],
+          final_verdict:   null,
+          uni_name:        null,
+          started_at:      null,
+          completed_at:    null,
+          error:           null,
+        });
+        setAiRepairPolling(true);
+      }
+    } catch (e) {
+      toast({ title: "AI Repair error", description: String(e), variant: "destructive" });
+    } finally {
+      setAiRepairLoading(false);
+    }
+  }, [completedJobId, toast]);
 
   const applyFix = useCallback(async (jobId: string, patch: Record<string, unknown>) => {
     setApplyingFix(true);
@@ -2723,7 +2826,7 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
                             );
                           })()}
 
-                          {/* Re-run diagnosis + Open Scrape Agent */}
+                          {/* Re-run diagnosis + Auto Repair + Open Scrape Agent */}
                           <div className="flex items-center gap-2 pt-1 border-t border-gray-100 flex-wrap">
                             <button
                               type="button"
@@ -2732,6 +2835,18 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
                               className="text-[10px] text-blue-500 hover:text-blue-700 disabled:opacity-50 flex items-center gap-1"
                             >
                               <Bot className="w-3 h-3" /> Re-run diagnosis
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleAiRepair}
+                              disabled={aiRepairLoading || aiRepairPolling}
+                              className="text-[10px] bg-violet-600 hover:bg-violet-700 text-white px-2 py-1 rounded flex items-center gap-1 disabled:opacity-50 font-semibold"
+                            >
+                              {(aiRepairLoading || aiRepairPolling)
+                                ? <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                                : <Zap className="w-2.5 h-2.5" />
+                              }
+                              {aiRepairPolling ? `Repairing… (attempt ${aiRepairSession?.current_attempt ?? 0}/5)` : "Auto Repair with AI"}
                             </button>
                             {(diagnoseResult?.university_id || (selectedUni && selectedUni !== ALL)) && (
                               <a
@@ -2742,6 +2857,137 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
                               </a>
                             )}
                           </div>
+
+                          {/* ── AI Repair Log ─────────────────────────────── */}
+                          {aiRepairSession && aiRepairSession.status !== "not_started" && showAiRepairLog && (
+                            <div className="mt-2 rounded border border-violet-200 overflow-hidden">
+                              <button
+                                type="button"
+                                className="w-full flex items-center justify-between px-2.5 py-1.5 bg-violet-50 hover:bg-violet-100 transition-colors"
+                                onClick={() => setShowAiRepairLog(v => !v)}
+                              >
+                                <div className="flex items-center gap-1.5">
+                                  <Zap className="w-3 h-3 text-violet-600" />
+                                  <span className="text-[10px] font-semibold text-violet-800">AI Repair Agent Log</span>
+                                  {aiRepairPolling && <Loader2 className="w-2.5 h-2.5 animate-spin text-violet-400" />}
+                                  {aiRepairSession.status === "completed" && (
+                                    <span className="text-[9px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">Done</span>
+                                  )}
+                                  {aiRepairSession.status === "failed" && (
+                                    <span className="text-[9px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full">Failed</span>
+                                  )}
+                                  {(aiRepairSession.status === "queued" || aiRepairSession.status === "running") && (
+                                    <span className="text-[9px] bg-violet-100 text-violet-700 px-1.5 py-0.5 rounded-full">Running</span>
+                                  )}
+                                </div>
+                                <span className="text-[9px] text-violet-500">{aiRepairSession.attempts.length}/{5} attempts</span>
+                              </button>
+
+                              <div className="p-2.5 space-y-2">
+                                {/* Status + verdict */}
+                                {(aiRepairSession.status === "queued") && (
+                                  <div className="flex items-center gap-1.5 text-[10px] text-violet-600">
+                                    <Loader2 className="w-3 h-3 animate-spin" />
+                                    AI repair agent is queued — waiting for a Celery worker…
+                                  </div>
+                                )}
+                                {aiRepairSession.status === "running" && (
+                                  <div className="flex items-center gap-1.5 text-[10px] text-violet-600">
+                                    <Loader2 className="w-3 h-3 animate-spin" />
+                                    Running attempt {aiRepairSession.current_attempt} of {5}…
+                                  </div>
+                                )}
+                                {aiRepairSession.final_verdict && (
+                                  <div className={`text-[10px] rounded px-2 py-1.5 leading-relaxed ${
+                                    aiRepairSession.status === "completed"
+                                      ? "bg-green-50 border border-green-200 text-green-800"
+                                      : "bg-red-50 border border-red-200 text-red-800"
+                                  }`}>
+                                    <strong>Verdict:</strong> {aiRepairSession.final_verdict}
+                                  </div>
+                                )}
+                                {aiRepairSession.error && (
+                                  <div className="text-[10px] bg-red-50 border border-red-200 text-red-700 rounded px-2 py-1.5">
+                                    <strong>Error:</strong> {aiRepairSession.error}
+                                  </div>
+                                )}
+
+                                {/* Attempt cards */}
+                                {aiRepairSession.attempts.map((att, i) => {
+                                  const improved = att.after_pass_count > 0 && att.total_test_urls > 0;
+                                  return (
+                                    <div key={i} className={`rounded border text-[10px] overflow-hidden ${
+                                      improved ? "border-green-200" : "border-gray-200"
+                                    }`}>
+                                      {/* Attempt header */}
+                                      <div className={`flex items-center justify-between px-2 py-1 font-semibold ${
+                                        improved ? "bg-green-50 text-green-800" : "bg-gray-50 text-gray-700"
+                                      }`}>
+                                        <span>Repair #{att.attempt_number} — {att.root_cause}</span>
+                                        <span className="text-[9px] font-normal opacity-70">
+                                          {att.confidence}% confidence
+                                        </span>
+                                      </div>
+                                      <div className="px-2 py-1.5 space-y-1 bg-white">
+                                        {/* Diagnosis */}
+                                        <p className="text-gray-800 font-medium">{att.diagnosis}</p>
+                                        <p className="text-gray-500 leading-relaxed">{att.explanation}</p>
+
+                                        {/* Patches */}
+                                        {att.patches_applied.length > 0 && (
+                                          <div className="mt-1">
+                                            <span className="text-[9px] font-semibold text-gray-500 uppercase tracking-wide">Patches applied</span>
+                                            {att.patches_applied.map((p, j) => (
+                                              <div key={j} className="mt-0.5 font-mono text-[9px] bg-gray-50 border border-gray-100 rounded px-1.5 py-1">
+                                                <span className="text-violet-600">{p.section}.{p.field}</span>
+                                                {" → "}
+                                                <span className="text-gray-700 break-all">{JSON.stringify(p.new_value)}</span>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        )}
+
+                                        {/* Simulation result */}
+                                        {att.total_test_urls > 0 && (
+                                          <div className={`mt-1 rounded px-1.5 py-1 text-[9px] font-medium flex items-center gap-1 ${
+                                            improved ? "bg-green-50 text-green-700" : "bg-amber-50 text-amber-700"
+                                          }`}>
+                                            {improved
+                                              ? <CheckCheck className="w-2.5 h-2.5" />
+                                              : <AlertTriangle className="w-2.5 h-2.5" />
+                                            }
+                                            Filter simulation: {att.before_pass_count} → {att.after_pass_count} URLs pass
+                                            <span className="opacity-70">({att.total_test_urls} tested)</span>
+                                          </div>
+                                        )}
+                                        {att.rescued_sample.length > 0 && (
+                                          <div className="text-[9px] text-green-600 space-y-0.5">
+                                            {att.rescued_sample.map((u, k) => (
+                                              <div key={k} className="font-mono truncate">✓ {u}</div>
+                                            ))}
+                                          </div>
+                                        )}
+
+                                        {/* Patch applied status */}
+                                        <div className="text-[9px] text-gray-400 flex items-center gap-1">
+                                          {att.patch_applied_ok
+                                            ? <><CheckCheck className="w-2.5 h-2.5 text-green-500" /> Config saved to DB + YAML</>
+                                            : <><AlertTriangle className="w-2.5 h-2.5 text-amber-500" /> Config save failed{att.patch_error ? `: ${att.patch_error}` : ""}</>
+                                          }
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+
+                                {aiRepairSession.status === "completed" && aiRepairSession.attempts.length > 0 && (
+                                  <p className="text-[9px] text-gray-500 italic">
+                                    Config patches have been saved. Click <strong>Re-run scrape</strong> (from the main controls) to verify with a live discovery run.
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          )}
                         </>
                       );
                     })()}
