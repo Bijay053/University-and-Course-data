@@ -326,37 +326,55 @@ def _validate_patch(patch: dict) -> dict:
             )
     return patch
 
-    return discovery_patch, recipe_patch, errors
-
 
 def _validate_and_build_config_patch(patches: list[dict]) -> tuple[dict, dict, list[str]]:
-    """Validate all patches and build separate discovery and recipe patch dicts.
+    """Validate all patches and build separate discovery and extraction patch dicts.
 
-    Returns (discovery_patch, recipe_patch, errors).
-    Patches that fail validation are skipped (not applied) and their
-    error message is recorded.
+    Returns (discovery_patch, extraction_patch, errors).
+    - discovery_patch: flat dict of validated discovery fields
+    - extraction_patch: NESTED dict ready to deep-merge into admin_config.extraction.
+      Dotpath fields (e.g. "fees.central_page") are expanded to nested dicts so the
+      config loader receives properly-structured data.
+    - errors: human-readable rejection reasons for skipped patches
     """
     discovery_patch: dict = {}
-    recipe_patch: dict = {}
+    extraction_patch: dict = {}
     errors: list[str] = []
     for p in patches:
         section = p.get("section", "")
         field   = p.get("field",   "")
         value   = p.get("value")
         try:
-            validated = _validate_patch(p)
-            section = validated["section"]
-            field   = validated["field"]
-            value   = validated["value"]
             if section == "discovery":
+                _validate_discovery_patch(field, value)
                 discovery_patch[field] = value
+            elif section == "recipe":
+                if field in _ALLOWED_EXTRACTION_FIELDS:
+                    # Dotpath extraction field (e.g. "fees.central_page"):
+                    # validate with the extraction validator then expand to nested dict
+                    _validate_extraction_patch(field, value)
+                    frag = _set_dotpath(field, value)
+                    extraction_patch = _deep_merge(extraction_patch, frag)
+                elif field in _ALLOWED_RECIPE_FIELDS:
+                    # Legacy flat recipe field — validate then store at top level
+                    validated = _validate_patch(p)
+                    extraction_patch[validated["field"]] = validated["value"]
+                else:
+                    raise PatchValidationError(
+                        f"Field '{field}' is not in allowed discovery or extraction fields. "
+                        f"Discovery allowed: {sorted(_ALLOWED_DISCOVERY_FIELDS)}. "
+                        f"Extraction allowed: {sorted(_ALLOWED_EXTRACTION_FIELDS)}."
+                    )
             else:
-                recipe_patch[field] = value
+                raise PatchValidationError(
+                    f"Section '{section}' is not in the allowed set {_ALLOWED_SECTIONS}. "
+                    "Only 'discovery' and 'recipe' patches may be applied automatically."
+                )
         except PatchValidationError as exc:
             errors.append(f"{section}.{field}: {exc}")
             log.warning("ai_repair: patch rejected: %s", exc)
 
-    return discovery_patch, recipe_patch, errors
+    return discovery_patch, extraction_patch, errors
 
 
 # ── Extraction quality helpers ────────────────────────────────────────────────
@@ -617,10 +635,22 @@ async def _run_extraction_scan(
     await db.commit()
 
     # ── Phase 2: Fetch + extract sample courses ───────────────────────────────
-    # Skip if patch doesn't touch anything that benefits from a live fetch
-    needs_fetch = bool(extr_patch.get("fees") or extr_patch.get("english") or extr_patch.get("filters"))
-    if not needs_fetch:
-        log.info("extraction_scan: no live-fetch-sensitive patches; skipping fetch phase")
+    # Run on ALL attempts — not just extraction-patch attempts.  Even a discovery
+    # patch may rescue new URLs that should be tested, and even without patches the
+    # live scan tells OpenAI whether the current config can fill critical fields.
+
+    # Count staged courses before deciding whether fetch phase is worth running
+    staged_count = (await db.execute(
+        text(
+            "SELECT COUNT(*) FROM scraped_courses "
+            "WHERE university_id=:uid AND scrape_job_id=:jid "
+            "  AND status IN ('pending','review','approved')"
+        ),
+        _base_params,
+    )).scalar() or 0
+
+    if staged_count == 0:
+        log.info("extraction_scan: no staged courses yet; skipping fetch phase")
         return fills
 
     # Load the freshly-patched config so extract_course() picks up the changes
@@ -651,22 +681,54 @@ async def _run_extraction_scan(
         log.warning("extraction_scan: config load failed — skipping fetch phase: %s", exc)
         return fills
 
-    # Pick courses with worst quality first (NULL fee OR NULL IELTS)
+    # Pick courses with any missing key field (fee, IELTS, mode, location, degree_level).
+    # Prefer courses missing the most fields so each fetch has the highest chance of
+    # improving quality metrics.  course_url must be a detail page (not a hub):
+    # filter to URLs with at least 3 path segments to exclude /study/ category pages.
     sample_rows = (await db.execute(text("""
-        SELECT id, course_url, international_fee, ielts_overall, study_mode
+        SELECT id, course_url, international_fee, ielts_overall, study_mode,
+               course_location, degree_level
         FROM   scraped_courses
         WHERE  university_id = :uid
           AND  scrape_job_id = :jid
           AND  status IN ('pending','review','approved')
           AND  course_url IS NOT NULL
-          AND  (international_fee IS NULL OR ielts_overall IS NULL)
-        ORDER BY id
+          AND  (
+               international_fee IS NULL
+            OR ielts_overall     IS NULL
+            OR study_mode        IS NULL
+            OR course_location   IS NULL
+            OR degree_level      IS NULL
+          )
+        ORDER BY (
+            CASE WHEN international_fee IS NULL THEN 1 ELSE 0 END +
+            CASE WHEN ielts_overall     IS NULL THEN 1 ELSE 0 END +
+            CASE WHEN study_mode        IS NULL THEN 1 ELSE 0 END +
+            CASE WHEN course_location   IS NULL THEN 1 ELSE 0 END +
+            CASE WHEN degree_level      IS NULL THEN 1 ELSE 0 END
+        ) DESC,
+        id
         LIMIT  :n
     """), {**_base_params, "n": max_courses})).mappings().all()
 
-    fills["courses_rescanned"] = len(sample_rows)
+    # Prefer real detail-page URLs: score by path-segment depth (more segments = more specific)
+    def _detail_score(url: str) -> int:
+        try:
+            from urllib.parse import urlparse as _up
+            path = _up(url).path.rstrip("/")
+            segments = [s for s in path.split("/") if s]
+            # Penalise generic hub-page segments
+            _hub_segs = {"study", "courses", "undergraduate", "postgraduate", "programs",
+                         "programmes", "find-a-course", "search", "browse"}
+            hub_penalty = sum(1 for s in segments if s.lower() in _hub_segs)
+            return len(segments) - hub_penalty
+        except Exception:
+            return 0
 
-    for row in sample_rows:
+    sorted_rows = sorted(sample_rows, key=lambda r: _detail_score(r["course_url"] or ""), reverse=True)
+    fills["courses_rescanned"] = len(sorted_rows)
+
+    for row in sorted_rows:
         url = row["course_url"]
         if not url:
             continue
@@ -1069,53 +1131,92 @@ def _compute_delta(before: dict, after: dict) -> dict:
 def _build_user_message(ctx: dict, previous_attempts: list[dict], phase: str = "discovery") -> str:
     prev_block = ""
     if previous_attempts:
-        lines = [
-            f"  #{a['attempt_number']}: root_cause={a['root_cause']} "
-            f"patched={[p.get('field') for p in a.get('patches_applied', [])]} "
-            f"success_criteria={a.get('success_criteria', {}).get('criteria_pass', '?')}/6"
-            for a in previous_attempts
-        ]
-        prev_block = "\nPREVIOUS ATTEMPTS (do NOT repeat these fixes):\n" + "\n".join(lines)
+        lines = []
+        for a in previous_attempts:
+            patches_detail = "; ".join(
+                f"{p.get('section')}.{p.get('field')}={json.dumps(p.get('new_value'))[:80]}"
+                for p in a.get("patches_applied", [])
+            ) or "(no patches applied)"
+            q_after = a.get("quality_after") or {}
+            lines.append(
+                f"  Attempt #{a['attempt_number']} [{a.get('phase','?')} phase]: "
+                f"root_cause={a['root_cause']} | "
+                f"patches={patches_detail} | "
+                f"result={a.get('success_criteria',{}).get('criteria_pass','?')}/6 criteria | "
+                f"fee={q_after.get('fee_pct',0)}% ielts={q_after.get('ielts_pct',0)}% "
+                f"loc={q_after.get('location_pct',0)}% mode={q_after.get('mode_pct',0)}% "
+                f"degree={q_after.get('degree_level_pct',0)}%"
+            )
+        prev_block = (
+            "\nPREVIOUS ATTEMPTS — CRITICAL: do NOT repeat any patch already listed below.\n"
+            "Each patch has already been applied. Repeating the same field with the same\n"
+            "or similar values will not improve quality. Choose a different fix strategy.\n"
+            + "\n".join(lines)
+        )
 
     q = ctx.get("quality") or {}
     quality_str = _quality_summary(q)
 
+    # Build failing-field hints for extraction phase
+    _failing_hints: list[str] = []
+    fee_pct  = q.get("fee_pct",          0)
+    ielts_pct= q.get("ielts_pct",        0)
+    loc_pct  = q.get("location_pct",     0)
+    mode_pct = q.get("mode_pct",         0)
+    deg_pct  = q.get("degree_level_pct", 0)
+    int_pct  = q.get("intakes_pct",      0)
+    if fee_pct   < _FEE_PCT_OK:    _failing_hints.append(f"fees ({fee_pct}% < {_FEE_PCT_OK}% target)")
+    if ielts_pct < _IELTS_PCT_OK:  _failing_hints.append(f"IELTS ({ielts_pct}% < {_IELTS_PCT_OK}% target)")
+    if loc_pct   < _LOCATION_PCT_OK: _failing_hints.append(f"location ({loc_pct}% < {_LOCATION_PCT_OK}% target)")
+    if mode_pct  < _MODE_PCT_OK:   _failing_hints.append(f"study_mode ({mode_pct}% < {_MODE_PCT_OK}% target)")
+    if deg_pct   < _DEGREE_PCT_OK: _failing_hints.append(f"degree_level ({deg_pct}% < {_DEGREE_PCT_OK}% target)")
+    if int_pct   < 40:             _failing_hints.append(f"intakes ({int_pct}% fill rate)")
+    failing_str = ", ".join(_failing_hints) if _failing_hints else "all fields meeting targets"
+
     if phase == "extraction":
         focus_block = (
-            "CURRENT FOCUS: Discovery is working — concentrate on EXTRACTION QUALITY.\n"
-            "The drop_rate is acceptable. The problem is that staged courses are missing key fields.\n"
-            "Suggest recipe patches (section='recipe') to fix fee extraction, location noise,\n"
-            "IELTS/English data, intake months, study mode, or course name contamination.\n"
-            "You may also include a discovery patch if relevant, but extraction is the priority."
+            "CURRENT FOCUS: EXTRACTION QUALITY — discovery is working (drop_rate acceptable).\n"
+            "★★★ DO NOT suggest ANY section='discovery' patches. ★★★\n"
+            "The problem is that staged courses are missing key fields.\n"
+            f"FAILING FIELDS: {failing_str}\n"
+            "Suggest ONLY section='recipe' patches targeting the failing fields above.\n"
+            "Valid recipe fields: fees.central_page, fees.fees_pdf_url, fees.default_currency,\n"
+            "  english.central_page, english.default_ielts, english.default_pte,\n"
+            "  filters.domestic_only.enabled, filters.online_only.enabled,\n"
+            "  text_cleaning.location.reject_values, text_cleaning.location.strip_patterns,\n"
+            "  text_cleaning.duration.split_on_slash, staging.reject_if_missing"
         )
         diag_priority = (
-            "DIAGNOSIS PRIORITY (extraction phase):\n"
-            "1. fee_pct < 40%  → suggest fees.central_page pointing to the university fee schedule\n"
-            "2. location_pct < 40% OR location values look like nav-text → suggest text_cleaning.location.reject_values\n"
-            "3. mode_pct < 40% → suggest filters.online_only.enabled=false if online courses exist\n"
-            "4. degree_level_pct < 40% → note in explanation (degree level is scraped from page structure)\n"
-            "5. ielts_pct < 40% → suggest english.central_page or english.default_ielts\n"
-            "6. intakes_pct < 40% → note in explanation (intake months are scraped from course pages)\n"
-            "7. duration_pct < 40% → note in explanation (duration is scraped from course pages)\n"
-            "8. If nothing is recipe-fixable, return empty patches with a clear explanation"
+            "DIAGNOSIS PRIORITY (extraction phase — pick the lowest-fill field first):\n"
+            f"  Failing: {failing_str}\n"
+            "1. fee_pct low     → section='recipe', field='fees.central_page', value='<URL to fee schedule page>'\n"
+            "2. ielts_pct low   → section='recipe', field='english.central_page', value='<URL>' OR\n"
+            "                     section='recipe', field='english.default_ielts', value=6.0\n"
+            "3. location noise  → section='recipe', field='text_cleaning.location.reject_values', value=[<nav labels>]\n"
+            "4. mode_pct low    → section='recipe', field='filters.online_only.enabled', value=false\n"
+            "5. degree_level low→ note in explanation only (degree level is scraped from page H-tags)\n"
+            "6. intakes low     → note in explanation only (intakes are scraped from individual course pages)\n"
+            "7. Nothing fixable → return empty patches with a clear explanation"
         )
     else:
         focus_block = (
             "CURRENT FOCUS: Fix URL DISCOVERY — the scraper is not finding enough course pages.\n"
-            "Check the drop_rate and dropped URL sample. Fix allow_url_patterns or block_url_patterns first."
+            "Check the drop_rate and dropped URL sample. Fix allow_url_patterns or block_url_patterns.\n"
+            "If raw_discovered is very low (< 10), raise bfs_page_budget or enable use_browser.\n"
+            "Once discovery is fixed (drop_rate < 20%), the next attempt will switch to extraction."
         )
         diag_priority = (
             "DIAGNOSIS PRIORITY (discovery phase):\n"
-            "1. drop_rate > 50% AND dropped sample non-empty → fix allow_url_patterns or block_url_patterns\n"
-            "2. raw_discovered == 0 OR raw_discovered < 5 → increase bfs_page_budget or enable use_browser\n"
-            "3. staged > 0 but fee_pct < 40% → also suggest a fees.central_page recipe patch\n"
+            "1. drop_rate > 50% AND dropped_sample non-empty → fix allow_url_patterns or block_url_patterns\n"
+            "2. raw_discovered == 0 OR raw_discovered < 5   → increase bfs_page_budget or enable use_browser\n"
+            "3. staged > 0 but fee_pct < 40%               → also add a fees.central_page recipe patch\n"
             "4. Otherwise → return empty patches with a clear diagnosis\n"
             "\nHOW TO DERIVE allow_url_patterns:\n"
-            "- Look at the dropped URL paths above\n"
-            "- Find the common path prefix or pattern\n"
+            "- Look at the dropped URL paths in DROPPED URLs below\n"
+            "- Find the common path prefix or pattern across those URLs\n"
             "- Write a regex that matches those paths with re.search()\n"
-            "- Example: paths like \"/courses/undergraduate/computing-bsc-hons\" → pattern \"/courses/[^/]+/[^/]+\"\n"
-            "- Make the pattern broad enough to catch all similar URLs but not so broad it catches non-course pages"
+            "- Example: paths like '/courses/undergraduate/computing-bsc-hons' → '/courses/[^/]+/[^/]+'\n"
+            "- Make it broad enough to catch all similar URLs, narrow enough to exclude navigation"
         )
 
     admin_disc = ctx["admin_config"].get("discovery", {})
@@ -1158,12 +1259,27 @@ Return ONLY the JSON object described above. No markdown, no explanation outside
 
 # ── Main loop ─────────────────────────────────────────────────────────────────
 
+def _patch_fingerprint(p: dict) -> str:
+    """Return a stable string key for a validated patch dict (section, field, value)."""
+    return f"{p.get('section')}:{p.get('field')}:{json.dumps(p.get('value'), sort_keys=True)[:120]}"
+
+
 async def run_ai_repair_loop(job_id: str, db) -> dict:
     """Run the OpenAI-powered full quality repair loop.
 
     After each patch: simulates discovery improvement AND runs a real extraction
     scan, evaluates 6-dimensional success criteria, and continues until overall_ok
     or MAX_ATTEMPTS.
+
+    Stage-aware strategy:
+    - Phase 1 (discovery): runs while drop_rate > 20%.  Once the simulation or
+      initial context shows discovery is OK, _discovery_phase_done is set to True
+      and the loop locks into extraction phase for all remaining attempts.
+    - Phase 2 (extraction): OpenAI is explicitly told NOT to suggest discovery
+      patches; only recipe/extraction patches are accepted.
+    - Duplicate detection: a fingerprint of each applied patch is tracked; patches
+      with the same (section, field, value) are silently skipped to prevent the
+      loop from repeating identical fixes.
     """
     from app.services.ai.openai_client import chat_json
 
@@ -1193,17 +1309,24 @@ async def run_ai_repair_loop(job_id: str, db) -> dict:
         session["quality_before"] = quality_baseline
         _write_session(job_id, session)
 
+        # ── Session-level state ────────────────────────────────────────────────
+        # Tracks (section:field:value) fingerprints so duplicates are skipped
+        _applied_fingerprints: set[str] = set()
+        # True once discovery quality is confirmed acceptable
+        _discovery_phase_done: bool = ctx["drop_rate"] <= 20
+
         for attempt_num in range(1, MAX_ATTEMPTS + 1):
             session["current_attempt"] = attempt_num
             _write_session(job_id, session)
-            log.info("ai_repair: job=%s attempt=%d/%d", job_id, attempt_num, MAX_ATTEMPTS)
+            log.info("ai_repair: job=%s attempt=%d/%d phase_done=%s drop_rate=%s%%",
+                     job_id, attempt_num, MAX_ATTEMPTS, _discovery_phase_done, ctx["drop_rate"])
 
             # ① Snapshot quality BEFORE this attempt
             quality_before = await _quality_snapshot(job_id, ctx["university_id"], db)
             quality_before["drop_rate"] = ctx["drop_rate"]
 
-            # ② Determine current repair phase
-            discovery_needs_fix = ctx["drop_rate"] > 20
+            # ② Determine current repair phase (locked once discovery is done)
+            discovery_needs_fix = ctx["drop_rate"] > 20 and not _discovery_phase_done
             phase = "discovery" if discovery_needs_fix else "extraction"
 
             # ③ Call OpenAI
@@ -1220,9 +1343,48 @@ async def run_ai_repair_loop(job_id: str, db) -> dict:
                 )
                 break
 
-            # ④ Validate patches → 3-tuple (disc_patch, recipe_patch, errors)
+            # ④ Validate patches → (disc_patch, extr_patch, errors)
+            #    extr_patch is already a NESTED dict (dotpath fields expanded)
             patches_raw: list[dict] = ai_data.get("patches") or []
-            disc_patch, recipe_patch, validation_errors = _validate_and_build_config_patch(patches_raw)
+
+            # ── Duplicate-patch filter ────────────────────────────────────────
+            # Skip patches whose (section, field, value) fingerprint was already
+            # applied in a previous attempt to prevent the loop from repeating
+            # identical or near-identical fixes.
+            dup_skipped: list[str] = []
+            deduped_patches: list[dict] = []
+            for p in patches_raw:
+                fp = _patch_fingerprint(p)
+                if fp in _applied_fingerprints:
+                    dup_skipped.append(f"{p.get('section')}.{p.get('field')}")
+                    log.info("ai_repair: skipping duplicate patch %s.%s", p.get("section"), p.get("field"))
+                else:
+                    deduped_patches.append(p)
+            patches_raw = deduped_patches
+
+            # ── Extraction-phase guard ────────────────────────────────────────
+            # When discovery is confirmed done, strip any pure-discovery patches
+            # OpenAI may still suggest; only extraction fixes are meaningful now.
+            disc_only_blocked: list[str] = []
+            if phase == "extraction":
+                allowed, blocked = [], []
+                for p in patches_raw:
+                    if p.get("section") == "discovery":
+                        blocked.append(f"discovery.{p.get('field')}")
+                    else:
+                        allowed.append(p)
+                patches_raw = allowed
+                disc_only_blocked = blocked
+                if blocked:
+                    log.info("ai_repair: blocked discovery patches in extraction phase: %s", blocked)
+
+            disc_patch, extr_patch, validation_errors = _validate_and_build_config_patch(patches_raw)
+            if dup_skipped:
+                validation_errors.append(f"Duplicate patches skipped: {', '.join(dup_skipped)}")
+            if disc_only_blocked:
+                validation_errors.append(
+                    f"Discovery patches blocked (extraction phase active): {', '.join(disc_only_blocked)}"
+                )
 
             # ⑤ URL filter simulation (discovery patches only — no live re-scrape needed)
             sim: dict = {"before": 0, "after": 0, "total": 0, "rescued": []}
@@ -1239,11 +1401,22 @@ async def run_ai_repair_loop(job_id: str, db) -> dict:
                     disc_patch.get("allow_url_patterns", []),
                     disc_patch.get("block_url_patterns", []),
                 )
+                # Update ctx drop_rate immediately so next iteration uses the improved value
+                if sim.get("after", 0) > 0:
+                    _raw      = ctx["raw_discovered"]
+                    _new_after = ctx["after_filter"] + sim["after"]
+                    ctx["drop_rate"] = max(0, round(100 * (1 - _new_after / _raw))) if _raw > 0 else 0
+                    if ctx["drop_rate"] <= 20:
+                        _discovery_phase_done = True
+                        log.info(
+                            "ai_repair: discovery phase complete — drop_rate now %s%% after simulation",
+                            ctx["drop_rate"],
+                        )
 
             # ⑥ Apply discovery patch
             patch_applied_ok  = False
             patch_error: str  = ""
-            recipe_patch_applied: list = []
+            extr_patch_applied_keys: list = []
             if disc_patch:
                 try:
                     await _apply_discovery_to_db(ctx["university_id"], disc_patch, db)
@@ -1251,32 +1424,40 @@ async def run_ai_repair_loop(job_id: str, db) -> dict:
                                    ctx["university_id"], ctx["scrape_url"],
                                    {"discovery": disc_patch})
                     patch_applied_ok = True
+                    # Register fingerprints so this exact patch is not repeated
+                    for p in patches_raw:
+                        if p.get("section") == "discovery":
+                            _applied_fingerprints.add(_patch_fingerprint(p))
                     log.info("ai_repair: discovery patch applied: %s", list(disc_patch.keys()))
                 except Exception as exc:
                     log.warning("ai_repair: discovery patch apply error: %s", exc)
                     patch_error = str(exc)
 
-            # ⑦ Apply recipe patch
-            if recipe_patch:
+            # ⑦ Apply extraction patch (dotpath fields already expanded to nested dict)
+            if extr_patch:
                 try:
-                    await _apply_recipe_to_db(ctx["university_id"], recipe_patch, db)
-                    recipe_patch_applied = list(recipe_patch.keys())
+                    await _apply_recipe_to_db(ctx["university_id"], extr_patch, db)
+                    extr_patch_applied_keys = _flatten_dotpaths(extr_patch)
                     patch_applied_ok = True
-                    log.info("ai_repair: recipe patch applied: %s", recipe_patch_applied)
+                    # Register fingerprints
+                    for p in patches_raw:
+                        if p.get("section") == "recipe":
+                            _applied_fingerprints.add(_patch_fingerprint(p))
+                    log.info("ai_repair: extraction patch applied: %s", extr_patch_applied_keys)
                 except Exception as exc:
-                    log.warning("ai_repair: recipe patch apply error: %s", exc)
+                    log.warning("ai_repair: extraction patch apply error: %s", exc)
                     if not patch_error:
                         patch_error = str(exc)
 
             # ⑧ Real extraction scan:
             #    Phase 1 — SQL fast-path (default_ielts fills, reject_values clears)
-            #    Phase 2 — re-fetch up to 5 staged course URLs with patched config
+            #    Phase 2 — re-fetch up to 8 staged course detail URLs with patched config
             config_patch_combined: dict = {}
             if disc_patch:
                 config_patch_combined["discovery"] = disc_patch
-            if recipe_patch:
-                config_patch_combined["extraction"] = recipe_patch
-            scan_fills = await _run_extraction_scan(ctx, config_patch_combined, db)
+            if extr_patch:
+                config_patch_combined["extraction"] = extr_patch
+            scan_fills = await _run_extraction_scan(ctx, config_patch_combined, db, max_courses=8)
 
             # ⑨ Real quality snapshot AFTER the extraction scan
             quality_after = await _quality_snapshot(job_id, ctx["university_id"], db)
@@ -1308,53 +1489,65 @@ async def run_ai_repair_loop(job_id: str, db) -> dict:
             overall          = success_criteria["overall_ok"]
 
             attempt_record: dict = {
-                "attempt_number":      attempt_num,
-                "phase":               phase,
-                "diagnosis":           ai_data.get("diagnosis", "Unknown"),
-                "root_cause":          ai_data.get("root_cause", "unknown"),
-                "confidence":          ai_data.get("confidence", 0),
-                "explanation":         ai_data.get("explanation", ""),
-                "patches_applied":     [
+                "attempt_number":       attempt_num,
+                "phase":                phase,
+                "diagnosis":            ai_data.get("diagnosis", "Unknown"),
+                "root_cause":           ai_data.get("root_cause", "unknown"),
+                "confidence":           ai_data.get("confidence", 0),
+                "explanation":          ai_data.get("explanation", ""),
+                "patches_applied":      [
                     {"section": p.get("section"), "field": p.get("field"), "new_value": p.get("value")}
                     for p in patches_raw
                     if p.get("section") in _ALLOWED_SECTIONS
                     and (
                         p.get("field") in _ALLOWED_DISCOVERY_FIELDS
                         or p.get("field") in _ALLOWED_RECIPE_FIELDS
+                        or p.get("field") in _ALLOWED_EXTRACTION_FIELDS
                     )
                 ],
-                "validation_errors":   validation_errors,
-                "before_pass_count":   sim["before"],
-                "after_pass_count":    sim["after"],
-                "total_test_urls":     sim["total"],
-                "rescued_sample":      sim["rescued"],
-                "patch_applied_ok":    patch_applied_ok,
-                "patch_error":         patch_error if patch_error else None,
-                "recipe_patch_applied": recipe_patch_applied,
-                "quality_before":      quality_before,
-                "quality_after":       quality_after,
-                "quality_delta":       quality_delta,
-                "predicted_fills":     predicted_fills,
-                "success_criteria":    success_criteria,
-                "courses_rescanned":   scan_fills.get("courses_rescanned", 0),
+                "validation_errors":    validation_errors,
+                "before_pass_count":    sim["before"],
+                "after_pass_count":     sim["after"],
+                "total_test_urls":      sim["total"],
+                "rescued_sample":       sim["rescued"],
+                "patch_applied_ok":     patch_applied_ok,
+                "patch_error":          patch_error if patch_error else None,
+                "recipe_patch_applied": extr_patch_applied_keys,
+                "quality_before":       quality_before,
+                "quality_after":        quality_after,
+                "quality_delta":        quality_delta,
+                "predicted_fills":      predicted_fills,
+                "success_criteria":     success_criteria,
+                "courses_rescanned":    scan_fills.get("courses_rescanned", 0),
             }
             session["attempts"].append(attempt_record)
             _write_session(job_id, session)
 
             urls_rescued_enough = sim["total"] > 0 and sim["after"] >= sim["total"] * 0.5
             has_url_patch       = bool("allow_url_patterns" in disc_patch or "block_url_patterns" in disc_patch)
-            discovery_now_ok    = urls_rescued_enough or (not has_url_patch and ctx["drop_rate"] < 20)
-            extraction_ok       = _extraction_quality_ok(quality_after)
+            discovery_now_ok    = (
+                _discovery_phase_done
+                or urls_rescued_enough
+                or (not has_url_patch and ctx["drop_rate"] < 20)
+            )
+            extraction_ok = _extraction_quality_ok(quality_after)
+
+            # Lock into extraction phase if discovery has been confirmed OK
+            if discovery_now_ok and not _discovery_phase_done:
+                _discovery_phase_done = True
+                ctx["drop_rate"] = 0
+                log.info("ai_repair: discovery confirmed OK — locking into extraction phase")
 
             # ⑪ Termination checks
-            if not patches_raw:
+            if not patches_raw and not dup_skipped and not disc_only_blocked:
                 if discovery_now_ok and extraction_ok:
                     verdict = "No issues detected — discovery and extraction quality are both acceptable."
                 elif discovery_now_ok:
                     verdict = (
                         f"OpenAI could not identify an extraction fix after {attempt_num} attempt(s). "
                         f"Discovery is working. Extraction quality ({_quality_summary(quality_after)}) "
-                        f"may require manual recipe configuration. Diagnosis: {ai_data.get('diagnosis', 'N/A')}"
+                        f"may require manual recipe configuration. "
+                        f"Diagnosis: {ai_data.get('diagnosis', 'N/A')}"
                     )
                 else:
                     verdict = (
@@ -1364,19 +1557,19 @@ async def run_ai_repair_loop(job_id: str, db) -> dict:
                 session.update(status="completed", final_verdict=verdict)
                 break
 
-            if recipe_patch and not disc_patch:
+            if extr_patch and not disc_patch:
                 extraction_note = (
                     "Extraction quality is acceptable."
                     if extraction_ok
                     else (
                         f"Extraction quality was poor ({_quality_summary(quality_after)}). "
-                        "The recipe patch targets this — re-run the scrape to measure improvement."
+                        "The extraction patch targets this — re-run the scrape to measure improvement."
                     )
                 )
                 session.update(
                     status="completed",
                     final_verdict=(
-                        f"Recipe patch applied ({', '.join(recipe_patch.keys())}). "
+                        f"Extraction patch applied ({', '.join(extr_patch_applied_keys or ['(nested)'])}). "
                         f"{extraction_note} "
                         "Re-run a full scrape to confirm extraction improvements."
                     ),
@@ -1399,27 +1592,46 @@ async def run_ai_repair_loop(job_id: str, db) -> dict:
                     "ai_repair: discovery fixed but extraction quality poor (%s) — continuing to extraction phase",
                     _quality_summary(quality_after),
                 )
-                ctx["quality"]   = quality_after
-                ctx["drop_rate"] = 0
+                ctx["quality"]          = quality_after
+                ctx["drop_rate"]        = 0
+                _discovery_phase_done   = True
                 if attempt_num == MAX_ATTEMPTS:
                     session.update(
                         status="completed",
                         final_verdict=(
-                            f"Discovery fix applied ({sim['after']}/{sim['total']} URLs rescued). "
-                            f"Extraction quality remains poor: {_quality_summary(quality_after)}. "
-                            "Re-run a full scrape and check the Recipe Editor for extraction improvements."
+                            f"DISCOVERY FILTER FIXED ({sim['after']}/{sim['total']} URLs rescued). "
+                            f"EXTRACTION RULES PROBLEM: key fields still not filling. "
+                            f"{_quality_summary(quality_after)}. "
+                            "Re-run a full scrape and use the Recipe Editor to fix fee/IELTS/location extraction."
                         ),
                     )
                 continue
 
             if attempt_num == MAX_ATTEMPTS:
+                # Build a specific verdict that names the root problem
+                if not _discovery_phase_done and ctx["raw_discovered"] < 10:
+                    problem_type = (
+                        f"DISCOVERY DEPTH PROBLEM: only {ctx['raw_discovered']} pages were crawled. "
+                        "Raise bfs_page_budget (try 80–150) or enable use_browser for JS-rendered sites."
+                    )
+                elif not _discovery_phase_done:
+                    problem_type = (
+                        f"DISCOVERY FILTER PROBLEM: drop_rate={ctx['drop_rate']}% after {attempt_num} attempts. "
+                        "The allow_url_patterns regex is not matching the course URL structure. "
+                        "Manually inspect a few course URLs and update the YAML allow_url_patterns."
+                    )
+                else:
+                    problem_type = (
+                        f"EXTRACTION RULES PROBLEM: discovery OK but key fields are not filling. "
+                        f"Failing: {_failing_criteria_str(success_criteria)}. "
+                        "Check the Recipe Editor for fee/IELTS/location extraction config."
+                    )
                 session.update(
                     status="completed",
                     final_verdict=(
                         f"Reached maximum {MAX_ATTEMPTS} attempts. "
-                        f"{crit_pass}/6 quality criteria passing (real post-scan). "
-                        f"Outstanding: {_failing_criteria_str(success_criteria)}. "
-                        "Re-run the scrape with patches applied to process all courses."
+                        f"{crit_pass}/6 quality criteria passing. "
+                        f"{problem_type}"
                     ),
                 )
 
@@ -1433,6 +1645,18 @@ async def run_ai_repair_loop(job_id: str, db) -> dict:
         _write_session(job_id, session)
 
     return session
+
+
+def _flatten_dotpaths(nested: dict, prefix: str = "") -> list[str]:
+    """Flatten a nested dict back to dotpath keys for display purposes."""
+    result: list[str] = []
+    for k, v in nested.items():
+        full = f"{prefix}.{k}" if prefix else k
+        if isinstance(v, dict):
+            result.extend(_flatten_dotpaths(v, full))
+        else:
+            result.append(full)
+    return result
 
 
 def _failing_criteria_str(sc: dict) -> str:
