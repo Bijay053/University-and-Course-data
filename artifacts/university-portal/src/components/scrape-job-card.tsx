@@ -78,6 +78,37 @@ const ACTION_LABELS: Record<string, string> = {
 
 // ── AI Repair Agent types ─────────────────────────────────────────────────────
 type AIRepairPatch = { section: string | null; field: string | null; new_value: unknown };
+type QualityMetrics = {
+  total_staged:       number;
+  drop_rate:          number;
+  fee_pct:            number;
+  ielts_pct:          number;
+  intakes_pct:        number;
+  location_pct:       number;
+  degree_level_pct:   number;
+  mode_pct:           number;
+  duration_pct:       number;
+};
+type PredictedFills = {
+  discovery_rescued?:        number;
+  ielts_fills?:              number;
+  location_junk_removed?:    number;
+  location_strip_count?:     number;
+  english_central_page_set?: boolean;
+  fees_central_page_set?:    boolean;
+  online_only_disabled?:     boolean;
+  domestic_only_disabled?:   boolean;
+};
+type SuccessCriteria = {
+  discovery_ok:    boolean;
+  fee_ok:          boolean;
+  ielts_ok:        boolean;
+  location_ok:     boolean;
+  mode_ok:         boolean;
+  degree_level_ok: boolean;
+  criteria_pass:   number;
+  overall_ok:      boolean;
+};
 type AIRepairAttempt = {
   attempt_number:    number;
   diagnosis:         string;
@@ -92,7 +123,12 @@ type AIRepairAttempt = {
   rescued_sample:    string[];
   ai_cost_usd:       number;
   patch_applied_ok:  boolean;
-  patch_error?:      string;
+  patch_error?:      string | null;
+  quality_before?:   QualityMetrics;
+  quality_predicted?: QualityMetrics;
+  quality_delta?:    Partial<Record<keyof QualityMetrics, number>>;
+  predicted_fills?:  PredictedFills;
+  success_criteria?: SuccessCriteria;
 };
 type AIRepairSession = {
   session_id:      string;
@@ -2915,43 +2951,79 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
 
                                 {/* Attempt cards */}
                                 {aiRepairSession.attempts.map((att, i) => {
-                                  const improved = att.after_pass_count > 0 && att.total_test_urls > 0;
+                                  const sc       = att.success_criteria;
+                                  const fills    = att.predicted_fills    ?? {};
+                                  const qb       = att.quality_before     ?? {} as QualityMetrics;
+                                  const qp       = att.quality_predicted  ?? {} as QualityMetrics;
+                                  const overall  = sc?.overall_ok ?? false;
+                                  const passN    = sc?.criteria_pass ?? 0;
+
+                                  type MetricRow = { label: string; before: number; after: number; unit?: string; lowerIsBetter?: boolean };
+                                  const metrics: MetricRow[] = [
+                                    { label: "Discovery drop",  before: qb.drop_rate      ?? 0, after: qp.drop_rate      ?? 0, unit: "%",  lowerIsBetter: true  },
+                                    { label: "Fee fill",        before: qb.fee_pct        ?? 0, after: qp.fee_pct        ?? 0, unit: "%" },
+                                    { label: "IELTS fill",      before: qb.ielts_pct      ?? 0, after: qp.ielts_pct      ?? 0, unit: "%" },
+                                    { label: "Intakes fill",    before: qb.intakes_pct    ?? 0, after: qp.intakes_pct    ?? 0, unit: "%" },
+                                    { label: "Location fill",   before: qb.location_pct   ?? 0, after: qp.location_pct   ?? 0, unit: "%" },
+                                    { label: "Degree level",    before: qb.degree_level_pct ?? 0, after: qp.degree_level_pct ?? 0, unit: "%" },
+                                    { label: "Study mode",      before: qb.mode_pct       ?? 0, after: qp.mode_pct       ?? 0, unit: "%" },
+                                  ];
+                                  const hasQuality = att.quality_before != null;
+
+                                  const criteriaItems: { key: keyof SuccessCriteria; label: string }[] = [
+                                    { key: "discovery_ok",   label: "Discovery" },
+                                    { key: "fee_ok",         label: "Fees" },
+                                    { key: "ielts_ok",       label: "IELTS" },
+                                    { key: "location_ok",    label: "Location" },
+                                    { key: "mode_ok",        label: "Study Mode" },
+                                    { key: "degree_level_ok", label: "Degree Level" },
+                                  ];
+
                                   return (
                                     <div key={i} className={`rounded border text-[10px] overflow-hidden ${
-                                      improved ? "border-green-200" : "border-gray-200"
+                                      overall ? "border-green-200" : "border-gray-200"
                                     }`}>
-                                      {/* Attempt header */}
+                                      {/* ── Header ── */}
                                       <div className={`flex items-center justify-between px-2 py-1 font-semibold ${
-                                        improved ? "bg-green-50 text-green-800" : "bg-gray-50 text-gray-700"
+                                        overall ? "bg-green-50 text-green-800" : "bg-gray-50 text-gray-700"
                                       }`}>
                                         <span>Repair #{att.attempt_number} — {att.root_cause}</span>
-                                        <span className="text-[9px] font-normal opacity-70">
-                                          {att.confidence}% confidence
-                                        </span>
+                                        <div className="flex items-center gap-1.5">
+                                          {sc && (
+                                            <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full ${
+                                              overall
+                                                ? "bg-green-200 text-green-800"
+                                                : passN >= 3 ? "bg-amber-100 text-amber-800"
+                                                : "bg-gray-200 text-gray-600"
+                                            }`}>
+                                              {passN}/6 criteria
+                                            </span>
+                                          )}
+                                          <span className="text-[9px] font-normal opacity-60">
+                                            {att.confidence}% conf
+                                          </span>
+                                        </div>
                                       </div>
-                                      <div className="px-2 py-1.5 space-y-1 bg-white">
-                                        {/* Diagnosis */}
+
+                                      <div className="px-2 py-1.5 space-y-1.5 bg-white">
+                                        {/* ── Diagnosis ── */}
                                         <p className="text-gray-800 font-medium">{att.diagnosis}</p>
                                         <p className="text-gray-500 leading-relaxed">{att.explanation}</p>
 
-                                        {/* Patches */}
+                                        {/* ── Patches applied ── */}
                                         {att.patches_applied.length > 0 && (
                                           <div className="mt-1">
                                             <span className="text-[9px] font-semibold text-gray-500 uppercase tracking-wide">Patches applied</span>
                                             {att.patches_applied.map((p, j) => {
-                                              const isDiscovery = p.section === "discovery";
+                                              const isDisc = p.section === "discovery";
                                               return (
                                                 <div key={j} className={`mt-0.5 font-mono text-[9px] rounded px-1.5 py-1 border ${
-                                                  isDiscovery
-                                                    ? "bg-violet-50 border-violet-100"
-                                                    : "bg-amber-50 border-amber-100"
+                                                  isDisc ? "bg-violet-50 border-violet-100" : "bg-amber-50 border-amber-100"
                                                 }`}>
                                                   <span className={`font-semibold text-[8px] uppercase tracking-wide mr-1 px-1 py-0.5 rounded ${
-                                                    isDiscovery ? "bg-violet-100 text-violet-700" : "bg-amber-100 text-amber-700"
-                                                  }`}>
-                                                    {p.section}
-                                                  </span>
-                                                  <span className={isDiscovery ? "text-violet-700" : "text-amber-700"}>{p.field}</span>
+                                                    isDisc ? "bg-violet-100 text-violet-700" : "bg-amber-100 text-amber-700"
+                                                  }`}>{p.section}</span>
+                                                  <span className={isDisc ? "text-violet-700" : "text-amber-700"}>{p.field}</span>
                                                   {" → "}
                                                   <span className="text-gray-700 break-all">{JSON.stringify(p.new_value)}</span>
                                                 </div>
@@ -2960,7 +3032,7 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
                                           </div>
                                         )}
 
-                                        {/* Validation errors — patches rejected by strict validator */}
+                                        {/* ── Rejected patches ── */}
                                         {att.validation_errors?.length > 0 && (
                                           <div className="mt-1 rounded px-1.5 py-1 bg-red-50 border border-red-100">
                                             <div className="text-[9px] font-semibold text-red-700 mb-0.5 flex items-center gap-1">
@@ -2968,39 +3040,126 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
                                               {att.validation_errors.length} patch{att.validation_errors.length > 1 ? "es" : ""} rejected by safety validator
                                             </div>
                                             {att.validation_errors.map((err, k) => (
-                                              <div key={k} className="font-mono text-[8.5px] text-red-600 break-all mt-0.5">
-                                                • {err}
-                                              </div>
+                                              <div key={k} className="font-mono text-[8.5px] text-red-600 break-all mt-0.5">• {err}</div>
                                             ))}
                                           </div>
                                         )}
 
-                                        {/* Simulation result */}
-                                        {att.total_test_urls > 0 && (
-                                          <div className={`mt-1 rounded px-1.5 py-1 text-[9px] font-medium flex items-center gap-1 ${
-                                            improved ? "bg-green-50 text-green-700" : "bg-amber-50 text-amber-700"
-                                          }`}>
-                                            {improved
-                                              ? <CheckCheck className="w-2.5 h-2.5" />
-                                              : <AlertTriangle className="w-2.5 h-2.5" />
-                                            }
-                                            Filter simulation: {att.before_pass_count} → {att.after_pass_count} URLs pass
-                                            <span className="opacity-70">({att.total_test_urls} tested)</span>
+                                        {/* ── Quality before → after table ── */}
+                                        {hasQuality && (
+                                          <div className="mt-1.5">
+                                            <span className="text-[9px] font-semibold text-gray-500 uppercase tracking-wide">Quality scan — before → predicted after</span>
+                                            <div className="mt-1 rounded border border-gray-100 overflow-hidden">
+                                              <table className="w-full text-[9px]">
+                                                <thead>
+                                                  <tr className="bg-gray-50 text-gray-500 font-semibold">
+                                                    <th className="text-left px-1.5 py-0.5">Metric</th>
+                                                    <th className="text-right px-1.5 py-0.5">Before</th>
+                                                    <th className="text-right px-1.5 py-0.5">Predicted</th>
+                                                    <th className="text-right px-1.5 py-0.5">Δ</th>
+                                                  </tr>
+                                                </thead>
+                                                <tbody>
+                                                  {metrics.map((m, mi) => {
+                                                    const delta = m.lowerIsBetter ? m.before - m.after : m.after - m.before;
+                                                    const changed = Math.abs(delta) >= 1;
+                                                    const good   = delta > 0;
+                                                    return (
+                                                      <tr key={mi} className={mi % 2 === 0 ? "bg-white" : "bg-gray-50/50"}>
+                                                        <td className="px-1.5 py-0.5 text-gray-600">{m.label}</td>
+                                                        <td className="px-1.5 py-0.5 text-right text-gray-500">{m.before}{m.unit}</td>
+                                                        <td className={`px-1.5 py-0.5 text-right font-medium ${
+                                                          changed ? (good ? "text-green-700" : "text-red-600") : "text-gray-400"
+                                                        }`}>{m.after}{m.unit}</td>
+                                                        <td className={`px-1.5 py-0.5 text-right font-bold ${
+                                                          !changed ? "text-gray-300"
+                                                          : good ? "text-green-600" : "text-red-500"
+                                                        }`}>
+                                                          {!changed ? "—" : `${good ? "+" : ""}${m.lowerIsBetter ? -delta : delta}pp`}
+                                                        </td>
+                                                      </tr>
+                                                    );
+                                                  })}
+                                                </tbody>
+                                              </table>
+                                            </div>
+
+                                            {/* Predicted fills detail */}
+                                            {Object.keys(fills).length > 0 && (
+                                              <div className="mt-1 flex flex-wrap gap-1">
+                                                {fills.discovery_rescued != null && (
+                                                  <span className="text-[8px] bg-violet-50 text-violet-700 border border-violet-100 rounded px-1 py-0.5">
+                                                    +{fills.discovery_rescued} URLs rescued
+                                                  </span>
+                                                )}
+                                                {fills.ielts_fills != null && fills.ielts_fills > 0 && (
+                                                  <span className="text-[8px] bg-blue-50 text-blue-700 border border-blue-100 rounded px-1 py-0.5">
+                                                    +{fills.ielts_fills} IELTS fills
+                                                  </span>
+                                                )}
+                                                {fills.location_junk_removed != null && fills.location_junk_removed > 0 && (
+                                                  <span className="text-[8px] bg-orange-50 text-orange-700 border border-orange-100 rounded px-1 py-0.5">
+                                                    {fills.location_junk_removed} junk locations cleared
+                                                  </span>
+                                                )}
+                                                {fills.fees_central_page_set && (
+                                                  <span className="text-[8px] bg-green-50 text-green-700 border border-green-100 rounded px-1 py-0.5">
+                                                    Fee page set — re-run to fill
+                                                  </span>
+                                                )}
+                                                {fills.english_central_page_set && (
+                                                  <span className="text-[8px] bg-green-50 text-green-700 border border-green-100 rounded px-1 py-0.5">
+                                                    IELTS page set — re-run to fill
+                                                  </span>
+                                                )}
+                                                {fills.online_only_disabled && (
+                                                  <span className="text-[8px] bg-amber-50 text-amber-700 border border-amber-100 rounded px-1 py-0.5">
+                                                    Online-only filter disabled
+                                                  </span>
+                                                )}
+                                              </div>
+                                            )}
                                           </div>
                                         )}
+
+                                        {/* ── URL simulation — rescued sample ── */}
                                         {att.rescued_sample.length > 0 && (
-                                          <div className="text-[9px] text-green-600 space-y-0.5">
+                                          <div className="text-[9px] text-green-600 space-y-0.5 mt-0.5">
+                                            <span className="text-gray-400 font-semibold uppercase tracking-wide text-[8px]">Rescued URLs</span>
                                             {att.rescued_sample.map((u, k) => (
                                               <div key={k} className="font-mono truncate">✓ {u}</div>
                                             ))}
                                           </div>
                                         )}
 
-                                        {/* Patch applied status */}
-                                        <div className="text-[9px] text-gray-400 flex items-center gap-1">
-                                          {att.patch_applied_ok
-                                            ? <><CheckCheck className="w-2.5 h-2.5 text-green-500" /> Config saved to DB + YAML</>
-                                            : <><AlertTriangle className="w-2.5 h-2.5 text-amber-500" /> Config save failed{att.patch_error ? `: ${att.patch_error}` : ""}</>
+                                        {/* ── Success criteria badges ── */}
+                                        {sc && (
+                                          <div className="mt-1.5">
+                                            <span className="text-[9px] font-semibold text-gray-500 uppercase tracking-wide">Quality criteria</span>
+                                            <div className="mt-1 flex flex-wrap gap-1">
+                                              {criteriaItems.map(({ key, label }) => {
+                                                const pass = sc[key] as boolean;
+                                                return (
+                                                  <span key={key} className={`text-[8px] font-medium px-1.5 py-0.5 rounded-full border flex items-center gap-0.5 ${
+                                                    pass
+                                                      ? "bg-green-50 text-green-700 border-green-200"
+                                                      : "bg-gray-50 text-gray-400 border-gray-200"
+                                                  }`}>
+                                                    {pass ? "✓" : "✗"} {label}
+                                                  </span>
+                                                );
+                                              })}
+                                            </div>
+                                          </div>
+                                        )}
+
+                                        {/* ── Patch save status ── */}
+                                        <div className="text-[9px] text-gray-400 flex items-center gap-1 pt-0.5 border-t border-gray-50">
+                                          {att.patches_applied.length === 0
+                                            ? <><span className="opacity-60">No patches to save</span></>
+                                            : att.patch_applied_ok
+                                              ? <><CheckCheck className="w-2.5 h-2.5 text-green-500" /> Config saved to DB + YAML</>
+                                              : <><AlertTriangle className="w-2.5 h-2.5 text-amber-500" /> Config save failed{att.patch_error ? `: ${att.patch_error}` : ""}</>
                                           }
                                         </div>
                                       </div>
