@@ -19,6 +19,9 @@ discovery:
   - /life-on-campus
   - /fees-and-funding$
   - /international/living
+  - /globalassets/
+  - \.(?:jpg|jpeg|png|gif|webp|svg|pdf)(?:\?|$)
   allow_url_patterns:
-  - /study(?:/|$)
-  - /study/(?:undergraduate|postgraduate(?:-taught-courses|-research-courses)?)(?:/|$)
+  - /study/(?:$|\?(?:.*)?$)
+  - /study/(?:undergraduate|postgraduate-taught-courses|postgraduate-research-courses)(?:/|$)
+  - /study/(?:undergraduate|postgraduate-taught-courses|postgraduate-research-courses)/[^?#]+(?:/[^?#]+){0,3}(?:/|$)

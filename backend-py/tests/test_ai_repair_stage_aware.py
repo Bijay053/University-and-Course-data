@@ -283,6 +283,17 @@ class TestBuildUserMessagePhase:
 
 # ── Discovery phase initialisation ────────────────────────────────────────────
 
+class TestExtractionScanColumnName:
+    """Regression test: extraction scan must use course_website, not course_url."""
+
+    def test_extraction_scan_sql_uses_course_website(self):
+        import inspect
+        from app.services.scraper import ai_repair_agent
+        src = inspect.getsource(ai_repair_agent._run_extraction_scan)
+        assert "course_website" in src, "SQL must reference course_website column"
+        assert "course_url" not in src, "course_url does not exist in scraped_courses — use course_website"
+
+
 class TestDiscoveryPhaseDoneInit:
 
     def test_discovery_phase_done_when_drop_rate_zero(self):

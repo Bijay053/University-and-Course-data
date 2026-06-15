@@ -683,16 +683,16 @@ async def _run_extraction_scan(
 
     # Pick courses with any missing key field (fee, IELTS, mode, location, degree_level).
     # Prefer courses missing the most fields so each fetch has the highest chance of
-    # improving quality metrics.  course_url must be a detail page (not a hub):
+    # improving quality metrics.  course_website must be a detail page (not a hub):
     # filter to URLs with at least 3 path segments to exclude /study/ category pages.
     sample_rows = (await db.execute(text("""
-        SELECT id, course_url, international_fee, ielts_overall, study_mode,
+        SELECT id, course_website, international_fee, ielts_overall, study_mode,
                course_location, degree_level
         FROM   scraped_courses
         WHERE  university_id = :uid
           AND  scrape_job_id = :jid
           AND  status IN ('pending','review','approved')
-          AND  course_url IS NOT NULL
+          AND  course_website IS NOT NULL
           AND  (
                international_fee IS NULL
             OR ielts_overall     IS NULL
@@ -725,11 +725,11 @@ async def _run_extraction_scan(
         except Exception:
             return 0
 
-    sorted_rows = sorted(sample_rows, key=lambda r: _detail_score(r["course_url"] or ""), reverse=True)
+    sorted_rows = sorted(sample_rows, key=lambda r: _detail_score(r["course_website"] or ""), reverse=True)
     fills["courses_rescanned"] = len(sorted_rows)
 
     for row in sorted_rows:
-        url = row["course_url"]
+        url = row["course_website"]
         if not url:
             continue
         try:
