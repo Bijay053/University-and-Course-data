@@ -753,7 +753,7 @@ async def _gather_context(job_id: str, db) -> dict:
             SELECT srj.university_id,
                    srj.total_found,
                    srj.imported,
-                   srj.total_errors,
+                   srj.errors          AS total_errors,
                    srj.discovered_config,
                    u.name          AS uni_name,
                    u.scrape_url    AS scrape_url,

@@ -20,4 +20,4 @@ discovery:
   - /fees-and-funding$
   - /international/living
   allow_url_patterns:
-  - /study/[^/]+/[^/]+/[^/]+/[^/]+/?$
+  - /study(?:/|$)
