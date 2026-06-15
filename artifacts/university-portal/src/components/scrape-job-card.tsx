@@ -214,6 +214,29 @@ const POLL_MAX = 10000;
 const ALL = "__new__";
 
 // ── Small helpers ─────────────────────────────────────────────────────────────
+
+/** Extract a short human-readable reason from a raw Python exception string. */
+function shortRepairError(err: string | null | undefined): string {
+  if (!err) return "";
+  // asyncpg / SQLAlchemy column errors  →  e.g. column "course_url" does not exist
+  const colMatch = err.match(/column "([^"]+)" does not exist/i);
+  if (colMatch) return `DB column "${colMatch[1]}" not found`;
+  // relation / table not found
+  const relMatch = err.match(/relation "([^"]+)" does not exist/i);
+  if (relMatch) return `DB table "${relMatch[1]}" not found`;
+  // permission denied
+  if (/permission denied/i.test(err)) return "DB permission denied";
+  // connection refused / timeout
+  if (/connection refused|could not connect/i.test(err)) return "DB connection refused";
+  if (/timeout/i.test(err)) return "DB timeout";
+  // asyncpg inner message after ">:"
+  const asyncpgMatch = err.match(/>:\s*(.+?)(?:\n|HINT|$)/);
+  if (asyncpgMatch) return asyncpgMatch[1].trim().slice(0, 120);
+  // strip leading exception type wrapper and return first meaningful line
+  const firstLine = err.replace(/^\([\w.]+\)\s*/m, "").split(/\n/)[0].trim();
+  return firstLine.slice(0, 120);
+}
+
 function fmt(ms: number) {
   const s = Math.max(0, Math.round(ms / 1000));
   const m = Math.floor(s / 60);
@@ -2924,9 +2947,15 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
                                   {aiRepairSession.status === "completed" && (
                                     <span className="text-[9px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">Done</span>
                                   )}
-                                  {aiRepairSession.status === "failed" && (
-                                    <span className="text-[9px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full">Failed</span>
-                                  )}
+                                  {aiRepairSession.status === "failed" && (() => {
+                                    const short = shortRepairError(aiRepairSession.error);
+                                    return (
+                                      <span className="flex items-center gap-1">
+                                        <span className="text-[9px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full">Failed</span>
+                                        {short && <span className="text-[9px] text-red-600 truncate max-w-[220px]" title={short}>{short}</span>}
+                                      </span>
+                                    );
+                                  })()}
                                   {(aiRepairSession.status === "queued" || aiRepairSession.status === "running") && (
                                     <span className="text-[9px] bg-violet-100 text-violet-700 px-1.5 py-0.5 rounded-full">Running</span>
                                   )}
@@ -2957,11 +2986,25 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
                                     <strong>Verdict:</strong> {aiRepairSession.final_verdict}
                                   </div>
                                 )}
-                                {aiRepairSession.error && (
-                                  <div className="text-[10px] bg-red-50 border border-red-200 text-red-700 rounded px-2 py-1.5">
-                                    <strong>Error:</strong> {aiRepairSession.error}
-                                  </div>
-                                )}
+                                {aiRepairSession.error && (() => {
+                                  const short = shortRepairError(aiRepairSession.error);
+                                  const isTruncated = aiRepairSession.error.length > short.length + 5;
+                                  return (
+                                    <div className="text-[10px] bg-red-50 border border-red-200 text-red-700 rounded px-2 py-1.5 space-y-1">
+                                      <div><strong>Reason:</strong> {short || aiRepairSession.error}</div>
+                                      {isTruncated && (
+                                        <details className="mt-0.5">
+                                          <summary className="cursor-pointer text-red-400 hover:text-red-600 select-none">
+                                            Show full error
+                                          </summary>
+                                          <pre className="mt-1 text-[9px] whitespace-pre-wrap break-all text-red-600 leading-relaxed">
+                                            {aiRepairSession.error}
+                                          </pre>
+                                        </details>
+                                      )}
+                                    </div>
+                                  );
+                                })()}
 
                                 {/* Attempt cards */}
                                 {aiRepairSession.attempts.map((att, i) => {
