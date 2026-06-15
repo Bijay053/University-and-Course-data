@@ -20,6 +20,29 @@ from urllib.parse import urlparse
 
 log = logging.getLogger(__name__)
 
+# ─── Media / asset URL filter ─────────────────────────────────────────────────
+# URLs matching these patterns are static assets, not course pages, and must
+# never drive allow_url_patterns derivation or appear in "rescued" URL lists.
+
+_MEDIA_EXT_RE = re.compile(
+    r"\.(jpe?g|png|gif|webp|svg|ico|bmp|tiff?|pdf|css|js|woff2?|ttf|eot|mp[34]|zip|docx?|xlsx?|pptx?)$",
+    re.IGNORECASE,
+)
+_ASSET_PATH_RE = re.compile(
+    r"/(images?|assets?|globalassets|static|media|uploads?|files?|fonts?|icons?|styles?|scripts?)/",
+    re.IGNORECASE,
+)
+
+
+def _is_course_url(url: str) -> bool:
+    """Return False for URLs that are clearly media, asset, or static-file paths."""
+    path = urlparse(url).path
+    if _MEDIA_EXT_RE.search(path):
+        return False
+    if _ASSET_PATH_RE.search(path):
+        return False
+    return True
+
 
 # ─── URL pattern derivation helpers ──────────────────────────────────────────
 
@@ -657,11 +680,18 @@ class AutoRepairEngine:
         if len(self.dropped_sample) < 3:
             return []
 
-        new_pats = _derive_allow_patterns_from_urls(self.dropped_sample)
+        # Strip media/asset URLs — they must never drive allow_url_patterns
+        # derivation (e.g. .jpg images from /globalassets/ should not produce
+        # a pattern that matches the entire site).
+        course_urls = [u for u in self.dropped_sample if _is_course_url(u)]
+        if len(course_urls) < 3:
+            return []
+
+        new_pats = _derive_allow_patterns_from_urls(course_urls)
         if not new_pats:
             return []
 
-        seed_urls = _derive_seed_urls(self.dropped_sample, self.scrape_url)
+        seed_urls = _derive_seed_urls(course_urls, self.scrape_url)
 
         # Smart block patterns: use the standard set minus any that would
         # accidentally block the paths we just allowed.
@@ -677,7 +707,7 @@ class AutoRepairEngine:
         # dropped_sample itself should now pass — use that as the before/after.
         if not self.historical_urls:
             compiled = [re.compile(p, re.IGNORECASE) for p in new_pats if p]
-            rescued = [u for u in self.dropped_sample if compiled and any(c.search(u) for c in compiled)]
+            rescued = [u for u in course_urls if compiled and any(c.search(u) for c in compiled)]
             sim = SimulationResult(
                 method="dropped_sample_filter",
                 before_count=0,
@@ -700,8 +730,8 @@ class AutoRepairEngine:
             rank=0,
             label="Replace allow_url_patterns with patterns derived from dropped URLs",
             description=(
-                f"Derived {len(new_pats)} pattern(s) from {len(self.dropped_sample)} "
-                f"dropped URL sample(s). Replaces the broken filter with one that "
+                f"Derived {len(new_pats)} pattern(s) from {len(course_urls)} "
+                f"course URL sample(s). Replaces the broken filter with one that "
                 f"matches actual course pages."
             ),
             category="url_filter",
@@ -715,7 +745,7 @@ class AutoRepairEngine:
                 "block_url_patterns": block_pats,
             }},
             simulation=sim,
-            confidence=80 if len(self.dropped_sample) >= 6 else 60,
+            confidence=80 if len(course_urls) >= 6 else 60,
             safety_gate_passed=gate,
             expected_gain=max(0, sim.after_count - sim.before_count),
             proposed_yaml=proposed_yaml,

@@ -5919,6 +5919,62 @@ async def apply_scrape_fix(
     )
     await db.commit()
 
+    # ── Also write the patch into the YAML file on disk ───────────────────────
+    # This ensures the Scraper Configs YAML editor reflects the change
+    # immediately (the editor reads from the file, not admin_config in the DB).
+    try:
+        import yaml as _yaml
+        from pathlib import Path as _Path
+
+        _unis_dir = _Path(__file__).parent.parent.parent / "scraper_config" / "unis"
+
+        # Strategy 1 — fast: glob for files whose name ends with the uni ID
+        _yaml_files = list(_unis_dir.glob(f"*_{uni_id}.yaml"))
+
+        # Strategy 2 — hostname scan: match the university's scrape URL to a YAML
+        if not _yaml_files:
+            _uni_url = (await db.execute(
+                _text("SELECT COALESCE(scrape_url, website, '') AS url FROM universities WHERE id = :id"),
+                {"id": uni_id},
+            )).scalar() or ""
+            import re as _re_yaml
+            _bare_host = _re_yaml.sub(
+                r"^www\.", "",
+                _re_yaml.sub(r"^https?://", "", _uni_url).split("/")[0].lower(),
+            )
+            if _bare_host:
+                for _f in _unis_dir.glob("*.yaml"):
+                    # Hostname almost always appears in the first comment block
+                    if _bare_host in _f.read_text(encoding="utf-8")[:600]:
+                        _yaml_files = [_f]
+                        break
+
+        if _yaml_files:
+            _yaml_path = _yaml_files[0]
+            _existing_text = _yaml_path.read_text(encoding="utf-8")
+
+            # Preserve leading comment lines (hostname / title header)
+            _comment_lines = []
+            for _ln in _existing_text.splitlines():
+                if _ln.strip().startswith("#"):
+                    _comment_lines.append(_ln)
+                else:
+                    break
+            _header = ("\n".join(_comment_lines) + "\n") if _comment_lines else ""
+
+            _existing_data = _yaml.safe_load(_existing_text) or {}
+            _merged_yaml_data = _deep_merge_local(_existing_data, config_patch)
+            _new_yaml_text = _header + _yaml.dump(
+                _merged_yaml_data,
+                default_flow_style=False,
+                allow_unicode=True,
+                sort_keys=False,
+            )
+            _yaml_path.write_text(_new_yaml_text, encoding="utf-8")
+            log.info("apply-fix: wrote merged config_patch to %s", _yaml_path.name)
+    except Exception as _yaml_err:
+        log.warning("apply-fix: could not update YAML file for uni_id=%s: %s", uni_id, _yaml_err)
+
     return {
         "ok": True,
         "job_id": job_id,
@@ -6296,6 +6352,18 @@ async def simulate_fix(
         )).first()
         dc = (row[0] or {}) if row else {}
         urls = dc.get("pipeline_stats", {}).get("dropped_sample") or []
+
+    # Strip media / asset URLs — they should never appear in "rescued" course
+    # URL lists (e.g. .jpg images from /globalassets/ are not course pages).
+    _MEDIA_EXT_SIM = _re.compile(
+        r"\.(jpe?g|png|gif|webp|svg|ico|bmp|tiff?|pdf|css|js|woff2?|ttf|eot|mp[34]|zip|docx?|xlsx?|pptx?)$",
+        _re.IGNORECASE,
+    )
+    _ASSET_PATH_SIM = _re.compile(
+        r"/(images?|assets?|globalassets|static|media|uploads?|files?|fonts?|icons?|styles?|scripts?)/",
+        _re.IGNORECASE,
+    )
+    urls = [u for u in urls if not _MEDIA_EXT_SIM.search(u) and not _ASSET_PATH_SIM.search(u)]
 
     if not urls:
         return {"ok": True, "before": 0, "after": 0, "total": 0, "sample_rescued": []}

@@ -1,3 +1,5 @@
 extraction:
   fees:
     default_currency: GBP
+discovery:
+  block_url_patterns: []
