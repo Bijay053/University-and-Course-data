@@ -1,18 +1,21 @@
-"""AI-powered scrape repair agent.
+"""AI-powered scrape repair agent — OpenAI edition.
 
-Uses Gemini to iteratively diagnose failing scrape jobs and apply
-config patches until discovery improves or MAX_ATTEMPTS is reached.
+Uses the Replit AI Integrations OpenAI proxy (gpt-5.4) to iteratively
+diagnose failing scrape jobs and apply config patches until discovery
+improves or MAX_ATTEMPTS is reached.
 
 Loop (per attempt):
-  1. Gather context  — job stats, dropped URLs, current YAML, staging quality
-  2. Call Gemini     — returns structured JSON diagnosis + patches
-  3. Apply patches   — writes to admin_config (DB) + YAML file on disk
-  4. Simulate filter — tests the new allow/block patterns against dropped URLs
-  5. Record attempt  — stored in Redis (key ``ai_repair:{job_id}``)
-  6. Terminate if improvement >= 50 % of dropped URLs rescued, or MAX_ATTEMPTS hit
+  1. Gather context  — job stats, dropped URLs, current YAML + admin_config,
+                       staging quality (fee %, IELTS %, etc.)
+  2. Call OpenAI     — structured JSON diagnosis + patches via json_object mode
+  3. Validate patch  — strict whitelist of allowed sections/fields/types/regexes
+  4. Apply patches   — writes to admin_config (DB) + YAML file on disk
+  5. Simulate filter — tests new allow/block patterns against dropped URLs
+  6. Record attempt  — stored in Redis (key ``ai_repair:{job_id}``, TTL 24 h)
+  7. Terminate if improvement >= 50 % of dropped URLs rescued, or MAX_ATTEMPTS hit
 
-Session state stored in Redis as JSON under key ``ai_repair:{job_id}`` with
-24-hour TTL so the frontend can poll for live progress.
+Session state is stored in Redis as JSON under key ``ai_repair:{job_id}``
+so the frontend can poll for live progress.
 """
 from __future__ import annotations
 
@@ -22,6 +25,7 @@ import re
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 log = logging.getLogger(__name__)
 
@@ -43,7 +47,7 @@ def _redis_client():
 
 
 def read_session(job_id: str) -> dict:
-    """Return the current session state for a job (empty dict if missing)."""
+    """Return the current session state (empty dict if missing)."""
     try:
         raw = _redis_client().get(_redis_key(job_id))
         return json.loads(raw) if raw else {}
@@ -71,10 +75,109 @@ def _deep_merge(base: dict, override: dict) -> dict:
     return result
 
 
+# ── Strict patch validation ───────────────────────────────────────────────────
+
+_ALLOWED_DISCOVERY_FIELDS: dict[str, type | tuple] = {
+    "allow_url_patterns": list,
+    "block_url_patterns": list,
+    "must_contain":       list,
+    "bfs_page_budget":    int,
+    "use_browser":        bool,
+    "sitemap_url":        str,
+}
+_ALLOWED_SECTIONS = {"discovery"}   # extraction patches are read-only hints only
+
+
+class PatchValidationError(ValueError):
+    """Raised when an AI patch fails strict validation."""
+
+
+def _validate_patch(patch: dict) -> dict:
+    """Validate and sanitise one AI patch dict.
+
+    Returns the sanitised patch on success.
+    Raises PatchValidationError with a human-readable reason on failure.
+    """
+    section = patch.get("section")
+    field   = patch.get("field")
+    value   = patch.get("value")
+
+    if section not in _ALLOWED_SECTIONS:
+        raise PatchValidationError(
+            f"Section '{section}' is not in the allowed set {_ALLOWED_SECTIONS}. "
+            "Only 'discovery' patches may be applied automatically."
+        )
+
+    if field not in _ALLOWED_DISCOVERY_FIELDS:
+        raise PatchValidationError(
+            f"Field '{field}' is not an allowed discovery field. "
+            f"Allowed: {sorted(_ALLOWED_DISCOVERY_FIELDS)}"
+        )
+
+    expected_type = _ALLOWED_DISCOVERY_FIELDS[field]
+    if not isinstance(value, expected_type):
+        raise PatchValidationError(
+            f"Field '{field}' must be {expected_type.__name__}, got {type(value).__name__}."
+        )
+
+    # Per-field semantic checks
+    if field in ("allow_url_patterns", "block_url_patterns", "must_contain"):
+        if not value:
+            raise PatchValidationError(f"'{field}' must not be an empty list.")
+        for i, pat in enumerate(value):
+            if not isinstance(pat, str):
+                raise PatchValidationError(f"'{field}[{i}]' must be a string.")
+            if len(pat) > 500:
+                raise PatchValidationError(f"'{field}[{i}]' pattern is suspiciously long (>500 chars).")
+            try:
+                re.compile(pat)
+            except re.error as exc:
+                raise PatchValidationError(
+                    f"'{field}[{i}]' is not a valid regex: {exc}  (pattern: {pat!r})"
+                ) from exc
+
+    if field == "bfs_page_budget":
+        if not (5 <= value <= 300):
+            raise PatchValidationError(
+                f"'bfs_page_budget' must be between 5 and 300, got {value}."
+            )
+
+    if field == "sitemap_url":
+        if not value.startswith(("http://", "https://")):
+            raise PatchValidationError(
+                f"'sitemap_url' must start with http:// or https://, got {value!r}."
+            )
+
+    return patch
+
+
+def _validate_and_build_config_patch(patches: list[dict]) -> tuple[dict, list[str]]:
+    """Validate all patches and build a config_patch dict.
+
+    Returns (config_patch, errors) — errors is empty on full success.
+    Patches that fail validation are skipped (not applied) and their
+    error message is recorded.
+    """
+    config_patch: dict = {}
+    errors: list[str] = []
+
+    for p in patches:
+        try:
+            validated = _validate_patch(p)
+            section = validated["section"]
+            field   = validated["field"]
+            value   = validated["value"]
+            config_patch.setdefault(section, {})[field] = value
+        except PatchValidationError as exc:
+            errors.append(str(exc))
+            log.warning("ai_repair: patch rejected by validator: %s", exc)
+
+    return config_patch, errors
+
+
 # ── Context gathering ─────────────────────────────────────────────────────────
 
 async def _gather_context(job_id: str, db) -> dict:
-    """Collect job stats, config, and staging quality for the AI prompt."""
     from sqlalchemy import text
 
     row = (await db.execute(
@@ -102,14 +205,13 @@ async def _gather_context(job_id: str, db) -> dict:
     pipeline: dict = disc_cfg.get("pipeline_stats", {})
 
     raw_discovered: int = pipeline.get("raw_discovered", row["total_found"] or 0)
-    after_filter: int   = pipeline.get("after_filter", row["imported"] or 0)
-    dropped_sample: list[str] = pipeline.get("dropped_sample", [])[:12]
-    passed_sample:  list[str] = pipeline.get("passed_sample", [])[:5]
+    after_filter:   int = pipeline.get("after_filter",   row["imported"]   or 0)
+    dropped_sample: list[str] = pipeline.get("dropped_sample", [])[:15]
+    passed_sample:  list[str] = pipeline.get("passed_sample",  [])[:5]
 
-    sc: dict = row["scrape_config_raw"] or {}
+    sc: dict           = row["scrape_config_raw"] or {}
     admin_config: dict = sc.get("admin_config") or {}
 
-    # YAML file on disk
     unis_dir = Path(__file__).parent.parent.parent.parent / "scraper_config" / "unis"
     yaml_files = list(unis_dir.glob(f"*_{uni_id}.yaml"))
     yaml_content = ""
@@ -119,7 +221,6 @@ async def _gather_context(job_id: str, db) -> dict:
         except Exception:
             pass
 
-    # Extraction quality from staged courses for this job
     q = (await db.execute(
         text("""
             SELECT COUNT(*)                      AS total,
@@ -141,13 +242,13 @@ async def _gather_context(job_id: str, db) -> dict:
     total = (q["total"] or 0) if q else 0
     if total > 0:
         quality = {
-            "total_staged":    total,
-            "fee_pct":         round(100 * (q["has_fee"]         or 0) / total),
-            "ielts_pct":       round(100 * (q["has_ielts"]       or 0) / total),
-            "intakes_pct":     round(100 * (q["has_intakes"]     or 0) / total),
-            "location_pct":    round(100 * (q["has_location"]    or 0) / total),
-            "degree_level_pct":round(100 * (q["has_degree_level"]or 0) / total),
-            "mode_pct":        round(100 * (q["has_mode"]        or 0) / total),
+            "total_staged":     total,
+            "fee_pct":          round(100 * (q["has_fee"]          or 0) / total),
+            "ielts_pct":        round(100 * (q["has_ielts"]        or 0) / total),
+            "intakes_pct":      round(100 * (q["has_intakes"]      or 0) / total),
+            "location_pct":     round(100 * (q["has_location"]     or 0) / total),
+            "degree_level_pct": round(100 * (q["has_degree_level"] or 0) / total),
+            "mode_pct":         round(100 * (q["has_mode"]         or 0) / total),
         }
 
     drop_rate = round(100 * (1 - after_filter / raw_discovered)) if raw_discovered > 0 else 0
@@ -165,171 +266,122 @@ async def _gather_context(job_id: str, db) -> dict:
         "dropped_sample":  dropped_sample,
         "passed_sample":   passed_sample,
         "admin_config":    admin_config,
-        "yaml_content":    yaml_content[:2500],
+        "yaml_content":    yaml_content[:3000],
         "quality":         quality,
         "unis_dir":        unis_dir,
         "yaml_file":       yaml_files[0] if yaml_files else None,
     }
 
 
-# ── AI prompt ─────────────────────────────────────────────────────────────────
+# ── OpenAI prompt ─────────────────────────────────────────────────────────────
 
-def _build_prompt(ctx: dict, previous_attempts: list[dict]) -> str:
+_SYSTEM_PROMPT = """\
+You are an expert web scraping engineer specialising in university course scrapers.
+Your job is to analyse a failing scrape job and return the single most impactful fix.
+
+You MUST return a valid JSON object — no markdown, no text outside the JSON.
+
+The JSON must follow this exact schema:
+{
+  "diagnosis": "string — one sentence describing the root problem",
+  "root_cause": "string — one of: allow_url_patterns | block_url_patterns | bfs_page_budget | use_browser | extraction | unknown",
+  "confidence": number — integer 0-100,
+  "explanation": "string — 2-3 sentences explaining why this fix will work",
+  "patches": [
+    {
+      "section": "string — must be 'discovery'",
+      "field": "string — one of: allow_url_patterns | block_url_patterns | bfs_page_budget | use_browser | must_contain | sitemap_url",
+      "action": "string — 'replace'",
+      "value": <list of strings for pattern fields | integer for bfs_page_budget | boolean for use_browser | string for sitemap_url>
+    }
+  ]
+}
+
+Rules you MUST follow:
+- patches[].section must always be "discovery" — extraction patches are not supported
+- allow_url_patterns and block_url_patterns values must be valid Python regex strings
+- Patterns are matched with re.search() against the URL path, NOT the full URL
+- Do NOT use ^ anchors — paths are matched mid-string
+- Each pattern must not exceed 200 characters
+- bfs_page_budget must be an integer between 5 and 300
+- use_browser must be true or false (boolean)
+- If you cannot identify a concrete fix, return an empty patches list with a clear diagnosis
+- Do NOT suggest the same fix as any previous repair attempt listed in the context\
+"""
+
+
+def _build_user_message(ctx: dict, previous_attempts: list[dict]) -> str:
     prev_block = ""
     if previous_attempts:
-        lines = []
-        for a in previous_attempts:
-            lines.append(
-                f"  Attempt {a['attempt_number']}: {a['diagnosis']}"
-                f" | Before: {a['before_pass_count']} After: {a['after_pass_count']}"
-                f" | Patch: {json.dumps(a.get('patches_applied', []))}"
-            )
-        prev_block = "PREVIOUS REPAIR ATTEMPTS (do NOT repeat these):\n" + "\n".join(lines)
+        lines = [f"  #{a['attempt_number']}: {a['diagnosis']} | patches={json.dumps([p.get('field') for p in a.get('patches_applied', [])])}" for a in previous_attempts]
+        prev_block = "\nPREVIOUS REPAIR ATTEMPTS (do NOT repeat these):\n" + "\n".join(lines)
 
     q = ctx.get("quality") or {}
     quality_str = (
-        f"  Staged: {q.get('total_staged', 0)}"
-        f" | Fee: {q.get('fee_pct', 0)}%"
-        f" | IELTS: {q.get('ielts_pct', 0)}%"
-        f" | Intakes: {q.get('intakes_pct', 0)}%"
-        f" | Location: {q.get('location_pct', 0)}%"
-        f" | DegreeLevel: {q.get('degree_level_pct', 0)}%"
-    ) if q else "  No courses staged yet"
+        f"staged={q.get('total_staged', 0)}"
+        f" fee={q.get('fee_pct', 0)}%"
+        f" ielts={q.get('ielts_pct', 0)}%"
+        f" intakes={q.get('intakes_pct', 0)}%"
+        f" location={q.get('location_pct', 0)}%"
+        f" degree_level={q.get('degree_level_pct', 0)}%"
+    ) if q else "no courses staged yet"
 
-    return f"""You are an expert web scraping engineer specialising in university course scrapers.
-Analyse this failed/poor scrape job and return the single most impactful fix.
-
-UNIVERSITY: {ctx['uni_name']}
+    return f"""UNIVERSITY: {ctx['uni_name']}
 SCRAPE URL: {ctx['scrape_url']}
 
 DISCOVERY STATS:
-  Raw URLs found by crawler: {ctx['raw_discovered']}
-  URLs that passed filters:  {ctx['after_filter']}
-  Courses staged:            {ctx['imported']}
-  URL drop rate:             {ctx['drop_rate']}%
+  raw_urls_found={ctx['raw_discovered']}  after_filter={ctx['after_filter']}  staged={ctx['imported']}  drop_rate={ctx['drop_rate']}%
 
-SAMPLE DROPPED URLs (blocked by the current filter — these SHOULD be course pages):
+DROPPED URLs (these are being incorrectly blocked — they look like real course pages):
 {json.dumps(ctx['dropped_sample'], indent=2)}
 
-SAMPLE PASSED URLs (currently allowed through):
+PASSED URLs (these currently make it through the filter):
 {json.dumps(ctx['passed_sample'], indent=2)}
 
-CURRENT ADMIN_CONFIG OVERRIDE (stored in DB, highest priority):
+ADMIN_CONFIG (DB override, highest priority):
 {json.dumps(ctx['admin_config'], indent=2)}
 
-CURRENT YAML CONFIG (file on disk):
-{ctx['yaml_content'] or "(empty)"}
+YAML CONFIG (file on disk):
+{ctx['yaml_content'] or "(empty — no YAML file found)"}
 
 EXTRACTION QUALITY:
 {quality_str}
-
 {prev_block}
 
-DIAGNOSIS PRIORITY (address in this order):
-1. drop_rate > 50 % with dropped samples available → fix allow_url_patterns or block_url_patterns
-2. raw_discovered == 0 → increase bfs_page_budget (up to 200) or enable use_browser: true
-3. staged > 0 but fee_pct < 40 % → suggest a note in explanation (cannot auto-fix extraction)
-4. staged > 0 but ielts_pct < 30 % → suggest a note in explanation
+DIAGNOSIS PRIORITY (work through in order):
+1. drop_rate > 50% AND dropped sample is non-empty → fix allow_url_patterns or block_url_patterns
+2. raw_discovered == 0 OR raw_discovered < 5 → increase bfs_page_budget (up to 200) or enable use_browser
+3. staged > 0 but fee_pct < 40% → note in explanation only (no patch — extraction cannot be auto-fixed)
+4. Otherwise → return empty patches with a clear diagnosis explaining why no auto-fix is possible
 
-RULES FOR allow_url_patterns:
-- Must be a list of regex strings anchored to the URL PATH (not full URL)
-- Derive them from the actual dropped URL paths above, not guesses
-- Keep patterns broad enough to catch all course URL variants
-- Example: dropped URL "/courses/undergraduate/computing-bsc" → pattern "/courses/[^/]+/[^/]+"
-- Do NOT use ^ anchors; paths are matched with re.search(), not re.match()
+HOW TO DERIVE allow_url_patterns:
+- Look at the dropped URL paths above
+- Find the common path prefix or pattern
+- Write a regex that matches those paths with re.search()
+- Example: dropped paths like "/courses/undergraduate/computing-bsc-hons" → pattern "/courses/[^/]+/[^/]+"
+- Make the pattern broad enough to catch all similar URLs but not so broad it catches non-course pages
 
-RULES FOR block_url_patterns:
-- List of regex strings for paths to EXCLUDE
-- Only suggest if a specific non-course path is leaking through
-
-RULES FOR bfs_page_budget:
-- Integer 20-200; only suggest if raw_discovered is very low (< 5)
-
-RULES FOR use_browser:
-- Boolean; only suggest if site is known SPA / heavy JavaScript
-
-Return ONLY a single valid JSON object. No markdown, no explanation outside JSON.
-
-{{
-  "diagnosis": "one sentence describing the root problem",
-  "root_cause": "allow_url_patterns|block_url_patterns|bfs_page_budget|use_browser|extraction|unknown",
-  "confidence": 85,
-  "explanation": "2-3 sentences explaining why this fix will work",
-  "patches": [
-    {{
-      "section": "discovery",
-      "field": "allow_url_patterns",
-      "action": "replace",
-      "value": ["/courses/[^/]+/[^/]+"]
-    }}
-  ]
-}}"""
+Return ONLY the JSON object described above. No markdown, no explanation outside the JSON."""
 
 
-# ── Response parsing ──────────────────────────────────────────────────────────
+# ── URL filter simulation ─────────────────────────────────────────────────────
 
-def _parse_ai_response(text: str) -> dict | None:
-    text = text.strip()
-    # Strip markdown fences
-    if text.startswith("```"):
-        text = re.sub(r"^```(?:json)?\n?", "", text)
-        text = re.sub(r"\n?```$", text.strip(), "")
-        text = re.sub(r"^```(?:json)?\n?", "", text)
-        text = re.sub(r"\n?```\s*$", "", text).strip()
-
-    # Try direct parse
-    try:
-        data = json.loads(text)
-        if isinstance(data, dict) and data.get("patches"):
-            return data
-    except json.JSONDecodeError:
-        pass
-
-    # Try to extract JSON object from mixed content
-    m = re.search(r'\{[^{}]*"patches"\s*:\s*\[.*?\]\s*\}', text, re.DOTALL)
-    if m:
-        try:
-            data = json.loads(m.group(0))
-            if isinstance(data, dict) and data.get("patches"):
-                return data
-        except json.JSONDecodeError:
-            pass
-
-    return None
+_MEDIA_EXT = re.compile(
+    r"\.(jpe?g|png|gif|webp|svg|ico|bmp|pdf|css|js|woff2?|ttf|eot|mp[34]|zip|docx?)$",
+    re.IGNORECASE,
+)
+_ASSET_PATH = re.compile(
+    r"/(images?|assets?|globalassets|static|media|uploads?|fonts?|icons?|scripts?)/",
+    re.IGNORECASE,
+)
 
 
-def _build_config_patch(patches: list[dict]) -> dict:
-    """Convert AI patch list → admin_config patch dict."""
-    config_patch: dict = {}
-    for p in patches:
-        section = p.get("section", "discovery")
-        field   = p.get("field")
-        value   = p.get("value")
-        if not field or value is None:
-            continue
-        config_patch.setdefault(section, {})[field] = value
-    return config_patch
+def _is_course_url(u: str) -> bool:
+    return not _MEDIA_EXT.search(u) and not _ASSET_PATH.search(u)
 
-
-# ── Simulation ────────────────────────────────────────────────────────────────
 
 def _simulate_filter(dropped_urls: list[str], allow_pats: list[str], block_pats: list[str]) -> dict:
-    """Test how many dropped course URLs would now pass the new patterns."""
-    import re as _re
-
-    # Exclude media / asset URLs (same filter as simulate-fix endpoint)
-    _MEDIA_EXT = _re.compile(
-        r"\.(jpe?g|png|gif|webp|svg|ico|bmp|pdf|css|js|woff2?|ttf|eot|mp[34]|zip|docx?)$",
-        _re.IGNORECASE,
-    )
-    _ASSET_PATH = _re.compile(
-        r"/(images?|assets?|globalassets|static|media|uploads?|fonts?|icons?|scripts?)/",
-        _re.IGNORECASE,
-    )
-    course_urls = [
-        u for u in dropped_urls
-        if not _MEDIA_EXT.search(u) and not _ASSET_PATH.search(u)
-    ]
+    course_urls = [u for u in dropped_urls if _is_course_url(u)]
     if not course_urls:
         return {"before": 0, "after": 0, "total": 0, "rescued": []}
 
@@ -337,8 +389,8 @@ def _simulate_filter(dropped_urls: list[str], allow_pats: list[str], block_pats:
         out = []
         for p in pats:
             try:
-                out.append(_re.compile(p, _re.IGNORECASE))
-            except _re.error:
+                out.append(re.compile(p, re.IGNORECASE))
+            except re.error:
                 pass
         return out
 
@@ -381,19 +433,21 @@ async def _apply_to_db(uni_id: int, config_patch: dict, db) -> None:
     await db.commit()
 
 
-def _apply_to_yaml(yaml_file, unis_dir: Path, uni_id: int, scrape_url: str, config_patch: dict) -> None:
+def _apply_to_yaml(yaml_file: Any, unis_dir: Path, uni_id: int, scrape_url: str, config_patch: dict) -> None:
     import yaml as _yaml
-    import re as _re2
 
     if not yaml_file:
         candidates = list(unis_dir.glob(f"*_{uni_id}.yaml"))
         if not candidates:
-            bare = _re2.sub(r"^www\.", "", _re2.sub(r"^https?://", "", scrape_url).split("/")[0].lower())
+            bare = re.sub(r"^www\.", "", re.sub(r"^https?://", "", scrape_url).split("/")[0].lower())
             if bare:
                 for f in unis_dir.glob("*.yaml"):
-                    if bare in f.read_text(encoding="utf-8")[:600]:
-                        candidates = [f]
-                        break
+                    try:
+                        if bare in f.read_text(encoding="utf-8")[:600]:
+                            candidates = [f]
+                            break
+                    except Exception:
+                        continue
         if not candidates:
             log.warning("ai_repair: no YAML file found for uni_id=%s", uni_id)
             return
@@ -411,7 +465,7 @@ def _apply_to_yaml(yaml_file, unis_dir: Path, uni_id: int, scrape_url: str, conf
         merged = _deep_merge(_yaml.safe_load(existing_text) or {}, config_patch)
         new_text = header + _yaml.dump(merged, default_flow_style=False, allow_unicode=True, sort_keys=False)
         yaml_file.write_text(new_text, encoding="utf-8")
-        log.info("ai_repair: wrote config to %s", yaml_file.name)
+        log.info("ai_repair: wrote config patch to %s", yaml_file.name)
     except Exception as exc:
         log.warning("ai_repair: YAML write failed: %s", exc)
 
@@ -419,20 +473,20 @@ def _apply_to_yaml(yaml_file, unis_dir: Path, uni_id: int, scrape_url: str, conf
 # ── Main loop ─────────────────────────────────────────────────────────────────
 
 async def run_ai_repair_loop(job_id: str, db) -> dict:
-    """Run the AI repair loop. Writes progress to Redis after every attempt."""
-    from app.services.ai import gemini_client
+    """Run the OpenAI-powered repair loop. Writes progress to Redis after every attempt."""
+    from app.services.ai.openai_client import chat_json
 
     session: dict = {
-        "session_id":     str(uuid.uuid4())[:8],
-        "job_id":         job_id,
-        "status":         "running",
+        "session_id":      str(uuid.uuid4())[:8],
+        "job_id":          job_id,
+        "status":          "running",
         "current_attempt": 0,
-        "attempts":       [],
-        "final_verdict":  None,
-        "uni_name":       None,
-        "started_at":     datetime.now(timezone.utc).isoformat(),
-        "completed_at":   None,
-        "error":          None,
+        "attempts":        [],
+        "final_verdict":   None,
+        "uni_name":        None,
+        "started_at":      datetime.now(timezone.utc).isoformat(),
+        "completed_at":    None,
+        "error":           None,
     }
     _write_session(job_id, session)
 
@@ -448,37 +502,33 @@ async def run_ai_repair_loop(job_id: str, db) -> dict:
         for attempt_num in range(1, MAX_ATTEMPTS + 1):
             session["current_attempt"] = attempt_num
             _write_session(job_id, session)
-            log.info("ai_repair: job=%s attempt=%d", job_id, attempt_num)
+            log.info("ai_repair: job=%s attempt=%d/%d", job_id, attempt_num, MAX_ATTEMPTS)
 
-            prompt = _build_prompt(ctx, session["attempts"])
+            user_msg = _build_user_message(ctx, session["attempts"])
 
-            resp = await gemini_client.generate(
-                prompt,
-                max_output_tokens=2048,
-                call_type="ai_repair",
+            ai_data = await chat_json(
+                system=_SYSTEM_PROMPT,
+                user=user_msg,
+                max_tokens=2048,
             )
 
-            if resp.skipped or not resp.text:
-                session.update(
-                    status="completed",
-                    final_verdict="AI service unavailable — manual config review required.",
-                )
-                break
-
-            ai_data = _parse_ai_response(resp.text)
-            if not ai_data:
+            if ai_data is None:
                 session.update(
                     status="completed",
                     final_verdict=(
-                        f"AI returned an unparseable response after {attempt_num} attempt(s). "
-                        "Raw preview: " + resp.text[:300]
+                        "OpenAI service unavailable or returned an invalid response. "
+                        "Check that AI_INTEGRATIONS_OPENAI_BASE_URL and "
+                        "AI_INTEGRATIONS_OPENAI_API_KEY are set correctly."
                     ),
                 )
                 break
 
-            patches       = ai_data.get("patches", [])
-            config_patch  = _build_config_patch(patches)
-            disc_patch    = config_patch.get("discovery", {})
+            # Extract fields with safe defaults
+            patches_raw: list[dict] = ai_data.get("patches") or []
+
+            # Strict validation — reject bad patches, record errors
+            config_patch, validation_errors = _validate_and_build_config_patch(patches_raw)
+            disc_patch = config_patch.get("discovery", {})
 
             # Simulate URL filter change (if relevant)
             sim: dict = {"before": 0, "after": 0, "total": 0, "rescued": []}
@@ -497,25 +547,27 @@ async def run_ai_repair_loop(job_id: str, db) -> dict:
                 )
 
             attempt_record: dict = {
-                "attempt_number":   attempt_num,
-                "diagnosis":        ai_data.get("diagnosis", "Unknown issue"),
-                "root_cause":       ai_data.get("root_cause", "unknown"),
-                "confidence":       ai_data.get("confidence", 0),
-                "explanation":      ai_data.get("explanation", ""),
-                "patches_applied":  [
+                "attempt_number":     attempt_num,
+                "diagnosis":          ai_data.get("diagnosis", "Unknown issue"),
+                "root_cause":         ai_data.get("root_cause", "unknown"),
+                "confidence":         ai_data.get("confidence", 0),
+                "explanation":        ai_data.get("explanation", ""),
+                "patches_applied":    [
                     {"section": p.get("section"), "field": p.get("field"), "new_value": p.get("value")}
-                    for p in patches
+                    for p in patches_raw
+                    if p.get("section") in _ALLOWED_SECTIONS
+                    and p.get("field") in _ALLOWED_DISCOVERY_FIELDS
                 ],
-                "before_pass_count": sim["before"],
-                "after_pass_count":  sim["after"],
-                "total_test_urls":   sim["total"],
-                "rescued_sample":    sim["rescued"],
-                "ai_cost_usd":       round(resp.cost_usd, 6),
-                "patch_applied_ok":  False,
+                "validation_errors":  validation_errors,
+                "before_pass_count":  sim["before"],
+                "after_pass_count":   sim["after"],
+                "total_test_urls":    sim["total"],
+                "rescued_sample":     sim["rescued"],
+                "patch_applied_ok":   False,
             }
             session["attempts"].append(attempt_record)
 
-            # Apply patch
+            # Apply patch (only if there are valid patches)
             if config_patch:
                 try:
                     await _apply_to_db(ctx["university_id"], config_patch, db)
@@ -530,35 +582,51 @@ async def run_ai_repair_loop(job_id: str, db) -> dict:
                 except Exception as exc:
                     log.warning("ai_repair: patch apply error: %s", exc)
                     attempt_record["patch_error"] = str(exc)
+            elif validation_errors:
+                attempt_record["patch_applied_ok"] = False
 
             _write_session(job_id, session)
 
-            # Termination check
-            is_url_fix     = "allow_url_patterns" in disc_patch or "block_url_patterns" in disc_patch
-            good_enough    = is_url_fix and sim["total"] > 0 and sim["after"] >= sim["total"] * 0.5
-            no_url_problem = not is_url_fix and ctx["drop_rate"] < 20
+            # Termination checks
+            is_url_fix  = "allow_url_patterns" in disc_patch or "block_url_patterns" in disc_patch
+            good_enough = is_url_fix and sim["total"] > 0 and sim["after"] >= sim["total"] * 0.5
+            no_url_prob = not is_url_fix and ctx["drop_rate"] < 20
+            no_patches  = not patches_raw
 
             if good_enough:
                 session.update(
                     status="completed",
                     final_verdict=(
-                        f"Fix applied — {sim['after']}/{sim['total']} previously-dropped URLs now "
-                        f"pass the new filter. Re-run discovery to confirm the improvement."
+                        f"Fix applied — {sim['after']}/{sim['total']} previously-dropped URLs "
+                        f"now pass the new filter. Re-run discovery to confirm the improvement."
                     ),
                 )
                 break
-            if no_url_problem:
+
+            if no_url_prob:
                 session.update(
                     status="completed",
                     final_verdict="Config patch applied. Re-run discovery to verify the changes.",
                 )
                 break
+
+            if no_patches:
+                session.update(
+                    status="completed",
+                    final_verdict=(
+                        f"OpenAI could not identify an automatic fix after {attempt_num} attempt(s). "
+                        f"Diagnosis: {ai_data.get('diagnosis', 'N/A')}. Manual config review recommended."
+                    ),
+                )
+                break
+
             if attempt_num == MAX_ATTEMPTS:
                 session.update(
                     status="completed",
                     final_verdict=(
-                        f"Reached {MAX_ATTEMPTS} attempts. Best result: "
-                        f"{sim['after']}/{sim['total']} URLs rescued. Manual review may be needed."
+                        f"Reached maximum {MAX_ATTEMPTS} attempts. "
+                        f"Best result: {sim['after']}/{sim['total']} URLs rescued. "
+                        "Manual review may be needed for remaining issues."
                     ),
                 )
 

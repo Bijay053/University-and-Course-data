@@ -85,6 +85,7 @@ type AIRepairAttempt = {
   confidence:        number;
   explanation:       string;
   patches_applied:   AIRepairPatch[];
+  validation_errors: string[];
   before_pass_count: number;
   after_pass_count:  number;
   total_test_urls:   number;
@@ -2942,6 +2943,21 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
                                                 <span className="text-violet-600">{p.section}.{p.field}</span>
                                                 {" → "}
                                                 <span className="text-gray-700 break-all">{JSON.stringify(p.new_value)}</span>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        )}
+
+                                        {/* Validation errors — patches rejected by strict validator */}
+                                        {att.validation_errors?.length > 0 && (
+                                          <div className="mt-1 rounded px-1.5 py-1 bg-red-50 border border-red-100">
+                                            <div className="text-[9px] font-semibold text-red-700 mb-0.5 flex items-center gap-1">
+                                              <AlertTriangle className="w-2.5 h-2.5" />
+                                              {att.validation_errors.length} patch{att.validation_errors.length > 1 ? "es" : ""} rejected by safety validator
+                                            </div>
+                                            {att.validation_errors.map((err, k) => (
+                                              <div key={k} className="font-mono text-[8.5px] text-red-600 break-all mt-0.5">
+                                                • {err}
                                               </div>
                                             ))}
                                           </div>
