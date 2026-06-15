@@ -2938,13 +2938,25 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
                                         {att.patches_applied.length > 0 && (
                                           <div className="mt-1">
                                             <span className="text-[9px] font-semibold text-gray-500 uppercase tracking-wide">Patches applied</span>
-                                            {att.patches_applied.map((p, j) => (
-                                              <div key={j} className="mt-0.5 font-mono text-[9px] bg-gray-50 border border-gray-100 rounded px-1.5 py-1">
-                                                <span className="text-violet-600">{p.section}.{p.field}</span>
-                                                {" → "}
-                                                <span className="text-gray-700 break-all">{JSON.stringify(p.new_value)}</span>
-                                              </div>
-                                            ))}
+                                            {att.patches_applied.map((p, j) => {
+                                              const isDiscovery = p.section === "discovery";
+                                              return (
+                                                <div key={j} className={`mt-0.5 font-mono text-[9px] rounded px-1.5 py-1 border ${
+                                                  isDiscovery
+                                                    ? "bg-violet-50 border-violet-100"
+                                                    : "bg-amber-50 border-amber-100"
+                                                }`}>
+                                                  <span className={`font-semibold text-[8px] uppercase tracking-wide mr-1 px-1 py-0.5 rounded ${
+                                                    isDiscovery ? "bg-violet-100 text-violet-700" : "bg-amber-100 text-amber-700"
+                                                  }`}>
+                                                    {p.section}
+                                                  </span>
+                                                  <span className={isDiscovery ? "text-violet-700" : "text-amber-700"}>{p.field}</span>
+                                                  {" → "}
+                                                  <span className="text-gray-700 break-all">{JSON.stringify(p.new_value)}</span>
+                                                </div>
+                                              );
+                                            })}
                                           </div>
                                         )}
 
