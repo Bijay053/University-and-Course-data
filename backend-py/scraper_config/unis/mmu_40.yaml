@@ -1,168 +1,18 @@
-# Manchester Metropolitan University  (uni_id=40)
-# Hostname: www.mmu.ac.uk
+# Manchester Metropolitan University
+# Hostname: www.mmu.ac.uk  |  Country: UK  |  Currency: GBP
+# uni_id: 40 (dev)  /  2167 (prod)
 #
-# Site profile: Cloudflare-protected, JS-rendered.  Static HTTP fails on all
-# A-Z listing pages.  Stealth browser is required for discovery.
-#
-# Course URL structure (confirmed from live site):
-#   listing : https://www.mmu.ac.uk/study/courses/<letter>
-#   detail  : https://www.mmu.ac.uk/study/courses/<course-slug>
-#   e.g.    : https://www.mmu.ac.uk/study/courses/accounting-and-finance-bsc
-#
-# Key fixes vs initial config:
-#   1. allow_url_patterns: was '/study/[^/]+/course/' (singular) — never matched
-#      the real URLs which use '/study/courses/<slug>' (plural).
-#   2. course_link XPath: was contains(@href, '/course/') — updated to match
-#      the plural /study/courses/ path.
-#   3. Removed '/international' from block_url_patterns — it was suppressing
-#      the international fees / entry-requirements pages.
+# Discovery strategy (2026-06-16):
+#   MMU uses Swiftype for course search. The public engine key is embedded in
+#   the course-search page JS. We query Swiftype directly — no Cloudflare
+#   exposure, no browser, no BFS. 393 courses with structured metadata +
+#   full body text (fees, IELTS, entry requirements).
 
 discovery:
-
-  use_stealth_browser: true
-  always_sitemap_supplement: true
-  bfs_page_budget: 0
-  max_candidates: 1500
-  expected_min_courses: 443
-
-  seed_urls:
-    - https://www.mmu.ac.uk/study/courses/a
-    - https://www.mmu.ac.uk/study/courses/b
-    - https://www.mmu.ac.uk/study/courses/c
-    - https://www.mmu.ac.uk/study/courses/d
-    - https://www.mmu.ac.uk/study/courses/e
-    - https://www.mmu.ac.uk/study/courses/f
-    - https://www.mmu.ac.uk/study/courses/g
-    - https://www.mmu.ac.uk/study/courses/h
-    - https://www.mmu.ac.uk/study/courses/i
-    - https://www.mmu.ac.uk/study/courses/j
-    - https://www.mmu.ac.uk/study/courses/k
-    - https://www.mmu.ac.uk/study/courses/l
-    - https://www.mmu.ac.uk/study/courses/m
-    - https://www.mmu.ac.uk/study/courses/n
-    - https://www.mmu.ac.uk/study/courses/o
-    - https://www.mmu.ac.uk/study/courses/p
-    - https://www.mmu.ac.uk/study/courses/q
-    - https://www.mmu.ac.uk/study/courses/r
-    - https://www.mmu.ac.uk/study/courses/s
-    - https://www.mmu.ac.uk/study/courses/t
-    - https://www.mmu.ac.uk/study/courses/u
-    - https://www.mmu.ac.uk/study/courses/v
-    - https://www.mmu.ac.uk/study/courses/w
-    - https://www.mmu.ac.uk/study/courses/x
-    - https://www.mmu.ac.uk/study/courses/y
-    - https://www.mmu.ac.uk/study/courses/z
-
-  allow_url_patterns:
-    # FIX: was '/study/[^/]+/course/' (singular) — matched nothing on MMU.
-    # Real course detail URLs are /study/courses/<slug> (plural).
-    - '/study/courses/[^/?#=]+/?$'
-    # A-Z listing seed pages — bypass global block so browser can crawl them.
-    - '/courses/[a-z]/?$'
-
-  block_url_patterns:
-    - '/news'
-    - '/events'
-    - '/staff/'
-    - '/about'
-    - '/contact'
-    - '/accommodation'
-    # NOTE: '/international' intentionally omitted — it covers MMU's international
-    # fees and entry-requirements pages which we need for extraction.
-    - '/apprenticeships'
-
-  custom_settings:
-    USER_AGENT: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
-
-extraction:
-  max_parallel_fetch: 2
-  browser_wait_strategy: "networkidle"
-  browser_dcl_settle_ms: 2000
-
-  filters:
-    domestic_only:
-      enabled: false
-    online_only:
-      enabled: false
-
-  fees:
-    default_currency: "GBP"
-    prefer_international: true
-    prefer_annual_over_total: true
+  swiftype:
+    engine_key: "yxx_JtAeyygPkQNS-jYj"
+    type_filter: course
+    per_page: 100
+    city: Manchester
+    currency: GBP
     fee_year: "2025"
-    fee_term: "year"
-    reject_keywords:
-      - "Home student"
-      - "Home fee"
-      - "UK student"
-      - "UK fee"
-      - "Domestic"
-
-  english:
-    default_ielts: 6.0
-    source: course_page
-    source_xpath: "//div[contains(@id, 'entry-requirements')] | //section[contains(@id, 'entry-requirements')]"
-
-    ielts:
-      raw_xpath: ".//p[contains(., 'IELTS')] | .//li[contains(., 'IELTS')]"
-      remove_tags: true
-      patterns:
-        overall:
-          - 'score\sof\s.?(\d\.?\d)'
-          - '(\d\.?\d*)\s*overall'
-        each:
-          - 'minimum\sof\s(\d\.?\d*)'
-          - '(\d\.?\d*)\sin\seach'
-          - 'no\selement\sless\sthan\s(\d\.?\d*)'
-      apply_each_to:
-        - ielts_reading
-        - ielts_writing
-        - ielts_listening
-        - ielts_speaking
-
-  selectors:
-    course_list:
-      xpath: "//div[contains(@class, 'course-card')] | //div[contains(@class, 'card course')]"
-
-    course_name:
-      xpath: ".//h4//text() | .//h3//text()"
-
-    degree_type:
-      xpath: ".//span[contains(@class, 'study-level')]/text()"
-
-    # FIX: was contains(@href, '/course/') — updated to match /study/courses/.
-    course_link:
-      xpath: ".//a[contains(@href, '/study/courses/')]/@href"
-
-    intake_month:
-      xpath: "//select[contains(@id, 'startDateSelect')]//option/text() | //div[contains(@id, 'intake')]//text()"
-
-    city:
-      value: "Manchester"
-
-    duration:
-      xpath: "//span[contains(., 'length')]//p/text() | //div[contains(@class, 'course-meta')]//span[contains(., 'Duration')]/following-sibling::span/text()"
-      also_use_as_study_load: true
-
-    fee_international:
-      primary:
-        xpath: "//div[contains(@id, 'fee')]//h3[contains(., 'nternational')]/following-sibling::p[1]/text()"
-      fallback:
-        xpath: "//p[contains(., 'International fees') or contains(., 'Overseas fees')]/text()"
-
-    course_description:
-      xpath: "//section[contains(@id, 'course-information')] | //div[contains(@id, 'overview')]"
-
-    career:
-      xpath: "//div[contains(@id, 'career')] | //section[contains(@id, 'careers')]"
-
-    course_structure:
-      xpath: "//div[contains(@data-component, 'study-criteria')] | //section[contains(@id, 'course-structure')]"
-
-    other_requirements:
-      xpath: "//div[contains(@id, 'entry-requirements')] | //section[contains(@id, 'entry-requirements')]"
-
-  staging:
-    reject_if_missing:
-      - course_name
-    skip_degree_qualifier_check: true

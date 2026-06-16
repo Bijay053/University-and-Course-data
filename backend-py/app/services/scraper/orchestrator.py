@@ -894,6 +894,36 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     log.warning("[RECIPE] json_api returned 0 links — falling through to BFS discovery")
 
         # ── SearchStax Solr provider (e.g. University of Huddersfield) ────────
+        # ── Swiftype API provider ─────────────────────────────────────────────
+        # When discovery.swiftype is set, fetch all courses from the Swiftype
+        # public search API — no HTML crawling, no browser, no Cloudflare.
+        # Each record carries structured metadata + full body text; fees and
+        # IELTS are extracted by regex in swiftype_mmu.py. The prebuilt result
+        # is returned verbatim by _extract_only (same short-circuit as SearchStax).
+        _swiftype_cfg = getattr(_uni_cfg.discovery, "swiftype", None)
+        if _swiftype_cfg is not None and getattr(_swiftype_cfg, "enabled", True):
+            from app.services.scraper.swiftype_mmu import fetch_swiftype_links
+            log.info("[SWIFTYPE] swiftype discovery configured — querying API ...")
+            _sw_error: str | None = None
+            try:
+                links = await fetch_swiftype_links(_swiftype_cfg, emit=emit)
+            except Exception as _sw_exc:  # noqa: BLE001
+                log.error("[SWIFTYPE] provider failed: %s", _sw_exc, exc_info=True)
+                links = []
+                _sw_error = str(_sw_exc)
+            _always_browser = False  # never fall through to browser/BFS
+            if not links:
+                _failure_msg = (
+                    f"Swiftype provider returned 0 links — aborting. "
+                    f"Check that engine_key is correct and the API is reachable. "
+                    f"Provider error: {_sw_error or 'none'}."
+                )
+                log.error(_failure_msg)
+                job.status = "failed"
+                job.error_message = _failure_msg
+                await db.commit()
+                return
+
         # When a uni's YAML declares a discovery.searchstax block, the course
         # catalogue is fetched straight from its SearchStax Solr core. Each doc
         # already carries structured fields + full page text, so we build
@@ -2384,11 +2414,14 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # filtered — applying them on top of Solr's own filter wrongly drops
         # real courses (e.g. Durham /business/courses/ via a stale admin_config
         # allow_url_patterns the YAML cannot override).  Skip both filters here.
-        _skip_url_filters_searchstax = _searchstax_cfg is not None
+        _skip_url_filters_searchstax = (
+            _searchstax_cfg is not None
+            or (getattr(_uni_cfg.discovery, "swiftype", None) is not None)
+        )
         if _skip_url_filters_searchstax and links:
             log.info(
-                "[EXTRACT] searchstax active — skipping allow/block_url_patterns "
-                "filters (Solr already filtered to course docs; %d links)",
+                "[EXTRACT] api-provider active — skipping allow/block_url_patterns "
+                "filters (API already filtered to course docs; %d links)",
                 len(links),
             )
 

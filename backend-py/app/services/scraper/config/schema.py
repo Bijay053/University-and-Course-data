@@ -731,6 +731,62 @@ class SsrPropDiscoveryConfig(BaseModel):
     )
 
 
+class SwiftypeConfig(BaseModel):
+    """Swiftype public search API provider.
+
+    Use when a university serves its course catalogue through a Swiftype
+    engine (e.g. Manchester Metropolitan University).  The engine key is
+    embedded in the course-search page JavaScript and is fully public.
+
+    Example YAML::
+
+        discovery:
+          swiftype:
+            engine_key: "yxx_JtAeyygPkQNS-jYj"
+            city: Manchester
+            currency: GBP
+            fee_year: "2025"
+    """
+
+    enabled: bool = Field(
+        default=True,
+        description="Set false to disable without removing the config block.",
+    )
+    engine_key: str = Field(
+        description=(
+            "Public Swiftype engine key embedded in the search page JS. "
+            "E.g. 'yxx_JtAeyygPkQNS-jYj' for MMU."
+        ),
+    )
+    search_url: str = Field(
+        default="https://search-api.swiftype.com/api/v1/public/engines/search.json",
+        description="Swiftype search API endpoint. Rarely needs changing.",
+    )
+    type_filter: str = Field(
+        default="course",
+        description=(
+            "Value to filter by ``filters.page.type``. "
+            "Use 'course' for MMU (returns exactly the taught-programme records)."
+        ),
+    )
+    per_page: int = Field(
+        default=100,
+        description="Records per API page (max 100 for Swiftype public API).",
+    )
+    city: str = Field(
+        default="Manchester",
+        description="Hardcoded course_location value for all records from this engine.",
+    )
+    currency: str = Field(
+        default="GBP",
+        description="ISO 4217 currency code for international_fee values.",
+    )
+    fee_year: str = Field(
+        default="2025",
+        description="Academic year label for fee values (e.g. '2025' = 2025-26).",
+    )
+
+
 class DiscoveryConfig(BaseModel):
     """Safe to replay against unknown universities (Tier-3 playbook matching)."""
 
@@ -739,6 +795,17 @@ class DiscoveryConfig(BaseModel):
         description=(
             "When present, route discovery + extraction through the SearchStax "
             "Solr provider instead of HTML crawling. See SearchStaxConfig."
+        ),
+    )
+    swiftype: Optional[SwiftypeConfig] = Field(
+        default=None,
+        description=(
+            "When present, route discovery + extraction through the Swiftype "
+            "public search API instead of HTML crawling.  The API key is the "
+            "public engine_key embedded in the university's search page JS. "
+            "Each Swiftype record carries structured metadata + full body text; "
+            "fees and IELTS are extracted via regex — no per-course HTTP fetch. "
+            "See SwiftypeConfig for full field docs."
         ),
     )
     ssr_prop_discovery: Optional[SsrPropDiscoveryConfig] = Field(
