@@ -21,7 +21,7 @@ discovery:
 
   use_stealth_browser: true
   always_sitemap_supplement: true
-  bfs_page_budget: 150
+  bfs_page_budget: 0
   max_candidates: 1500
   expected_min_courses: 443
 
