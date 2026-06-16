@@ -1,27 +1,108 @@
+# University of Roehampton
+# Hostname: www.roehampton.ac.uk
+# Country: United Kingdom  |  Currency: GBP
+
+discovery:
+  seed_urls:
+    - https://www.roehampton.ac.uk/study/undergraduate-courses/
+    - https://www.roehampton.ac.uk/study/postgraduate-taught-courses/
+    - https://www.roehampton.ac.uk/study/postgraduate-research-courses/
+    - https://www.roehampton.ac.uk/study/academic-areas/continuing-education/international-pathways/
+
+  bfs_page_budget: 100
+  max_candidates: 1500
+  expected_min_courses: 150
+
+  listing_only_patterns:
+    - '/study/[^/]+/$'
+    - '/study/[^/]+/[^/]+/$'
+    - '/study/clearing'
+    - '/study/open-days'
+    - '/study/higher-technicals'
+    - '/study/apprenticeships/$'
+    - '/study/short-courses'
+    - '/study/study-abroad'
+    - '/study/foundation-studies'
+    - '/study/unibuddy'
+    - '/study/our-rankings'
+    - '/study/our-subject-areas'
+    - '/study/academic-areas/$'
+    - '/study/academic-areas/[^/]+/$'
+
+  # Course pages sit at 2+ path-segments under /study/
+  # e.g. /study/undergraduate-courses/early-childhood-studies/
+  # e.g. /study/apprenticeships/nursing-associate-apprenticeship/
+  # e.g. /study/academic-areas/continuing-education/international-pathways/international-year-one-in-business/
+  allow_url_patterns:
+    - '/study/undergraduate-courses/[^/?#]+/?$'
+    - '/study/postgraduate-taught-courses/[^/?#]+/?$'
+    - '/study/postgraduate-research-courses/[^/?#]+/?$'
+    - '/study/apprenticeships/[^/?#]+/?$'
+    - '/study/academic-areas/[^/]+/[^/]+/[^/?#]+/?$'
+    - '/study/academic-areas/continuing-education/[^/]+/[^/]+/[^/?#]+/?$'
+
+  course_detail_url_patterns:
+    - '/study/undergraduate-courses/[^/?#]+/?$'
+    - '/study/postgraduate-taught-courses/[^/?#]+/?$'
+    - '/study/postgraduate-research-courses/[^/?#]+/?$'
+    - '/study/apprenticeships/[^/?#]+/?$'
+    - '/study/academic-areas/[^/]+/[^/]+/[^/?#]+/?$'
+
+  block_url_patterns:
+    - '/apply'
+    - '/contact'
+    - '/news'
+    - '/events'
+    - '/blog'
+    - '/about'
+    - '/research'
+    - '/alumni'
+    - '/outreach'
+    - '/parents'
+    - '/jobs'
+    - '/careers'
+    - '/accommodation'
+    - '/life-on-campus'
+    - '/fees-and-funding'
+    - '/international/living'
+    - '/globalassets/'
+    - '/study/clearing'
+    - '/study/open-days'
+    - '/study/higher-technicals'
+    - '/study/short-courses'
+    - '/study/study-abroad'
+    - '/study/foundation-studies'
+    - '/study/unibuddy'
+    - '/study/our-rankings'
+    - '/study/our-subject-areas'
+    - '\.(?:jpg|jpeg|png|gif|webp|svg|pdf)(?:\?|$)'
+
+  use_browser: true
+
 extraction:
   fees:
     default_currency: GBP
-discovery:
-  block_url_patterns:
-  - /apply
-  - /contact
-  - /news
-  - /events
-  - /blog
-  - /about
-  - /research
-  - /alumni
-  - /outreach
-  - /parents
-  - /jobs
-  - /careers
-  - /accommodation
-  - /life-on-campus
-  - /fees-and-funding$
-  - /international/living
-  - /globalassets/
-  - \.(?:jpg|jpeg|png|gif|webp|svg|pdf)(?:\?|$)
-  allow_url_patterns:
-  - /study(?:/|\?(?:.*)?$|$)
-  - /study/[^?#]+(?:/[^?#]+){0,5}(?:/|$|\?)
-  use_browser: true
+    prefer_international: true
+    prefer_annual_over_total: true
+    fee_year: "2025"
+    fee_term: "year"
+    reject_keywords:
+      - "Home"
+      - "UK student"
+      - "Domestic"
+
+  english:
+    central_page: https://www.roehampton.ac.uk/international/entry-requirements/english-language-requirements/
+    source: course_page
+
+  filters:
+    domestic_only:
+      enabled: false
+    online_only:
+      enabled: false
+
+  staging:
+    skip_degree_qualifier_check: true
+    reject_if_missing:
+      - course_name
+    require_international_fee: false
