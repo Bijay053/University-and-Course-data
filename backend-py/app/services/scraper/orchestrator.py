@@ -269,11 +269,12 @@ async def _extract_only(
     ``repair.py``, extending dedup to PDFs that are linked *from* HTML
     course pages rather than being the direct repair-target URL.
     """
-    # Custom-provider short-circuit: a provider (e.g. searchstax_hud) may
-    # embed a fully-formed result under ``searchstax_result``. Return it
-    # verbatim — no network fetch, no extraction. Shape matches this
-    # function's normal output: {name, url, payload, evidence}.
-    _pre = link.get("searchstax_result")
+    # Custom-provider short-circuit: a provider (e.g. searchstax_hud or
+    # swiftype_mmu) may embed a fully-formed result under ``searchstax_result``
+    # or ``swiftype_result``. Return it verbatim — no network fetch, no
+    # extraction. Shape matches this function's normal output:
+    # {name, url, payload, evidence}.
+    _pre = link.get("searchstax_result") or link.get("swiftype_result")
     if _pre is not None:
         # Save the JSON payload as a snapshot so replay can re-apply guards
         # independently of the HTML path.
