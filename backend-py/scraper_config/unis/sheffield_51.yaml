@@ -1,0 +1,11 @@
+# The University of Sheffield
+# Hostname: sheffield.ac.uk
+# Country: United Kingdom  |  Currency: GBP
+# Slug: sheffield
+# Auto-generated: 2026-06-15
+
+discovery: {}
+
+extraction:
+  fees:
+    default_currency: GBP

@@ -1,0 +1,131 @@
+# Manchester Metropolitan University
+# Hostname: www.mmu.ac.uk
+
+discovery:
+
+  seed_urls:
+    - https://www.mmu.ac.uk/study/courses/a
+    - https://www.mmu.ac.uk/study/courses/b
+    - https://www.mmu.ac.uk/study/courses/c
+    - https://www.mmu.ac.uk/study/courses/d
+    - https://www.mmu.ac.uk/study/courses/e
+    - https://www.mmu.ac.uk/study/courses/f
+    - https://www.mmu.ac.uk/study/courses/g
+    - https://www.mmu.ac.uk/study/courses/h
+    - https://www.mmu.ac.uk/study/courses/i
+    - https://www.mmu.ac.uk/study/courses/j
+    - https://www.mmu.ac.uk/study/courses/k
+    - https://www.mmu.ac.uk/study/courses/l
+    - https://www.mmu.ac.uk/study/courses/m
+    - https://www.mmu.ac.uk/study/courses/n
+    - https://www.mmu.ac.uk/study/courses/o
+    - https://www.mmu.ac.uk/study/courses/p
+    - https://www.mmu.ac.uk/study/courses/q
+    - https://www.mmu.ac.uk/study/courses/r
+    - https://www.mmu.ac.uk/study/courses/s
+    - https://www.mmu.ac.uk/study/courses/t
+    - https://www.mmu.ac.uk/study/courses/u
+    - https://www.mmu.ac.uk/study/courses/v
+    - https://www.mmu.ac.uk/study/courses/w
+    - https://www.mmu.ac.uk/study/courses/x
+    - https://www.mmu.ac.uk/study/courses/y
+    - https://www.mmu.ac.uk/study/courses/z
+
+  bfs_page_budget: 150
+  max_candidates: 1500
+  expected_min_courses: 400
+  crawler_concurrency: 1
+  downloader_delay: 2.0
+
+  allow_url_patterns:
+    - '.*/study/[^/]+/course/.+'
+    - '.*/courses/[a-z]$'
+
+  block_url_patterns:
+    - "/news"
+    - "/events"
+    - "/staff/"
+    - "/about"
+    - "/contact"
+    - "/linkassets/"
+
+  custom_settings:
+    USER_AGENT: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+
+extraction:
+  max_parallel_fetch: 8
+
+  force_detail_pages:
+    - '.*/study/[^/]+/course/.+'
+
+  filters:
+    domestic_only:
+      enabled: false
+    online_only:
+      enabled: false
+
+  fees:
+    default_currency: "GBP"
+    prefer_international: true
+    prefer_annual_over_total: true
+    fee_year: "2025"
+    fee_term: "year"
+    reject_keywords:
+      - "Domestic"
+      - "Home student"
+      - "UK student"
+
+  english:
+    source: course_page
+    source_xpath: "//div[contains(@id, 'entry-requirements')] | //section[contains(@id, 'entry-requirements')]"
+
+    ielts:
+      raw_xpath: ".//p[contains(., 'IELTS')] | .//li[contains(., 'IELTS')]"
+      remove_tags: true
+      patterns:
+        overall:
+          - 'score\s*of\s*.*?(\d\.?\d*)'
+          - '(\d\.?\d*)\s*overall'
+        each:
+          - 'minimum\s*of\s*(\d\.?\d*)'
+          - '(\d\.?\d*)\s*in\s*each'
+          - 'no\s*element\s*less\s*than\s*(\d\.?\d*)'
+      apply_each_to:
+        - ielts_reading
+        - ielts_writing
+        - ielts_listening
+        - ielts_speaking
+
+  selectors:
+    course_list:
+      xpath: "//div[contains(@class, 'course-card')] | //div[contains(@class, 'card course')]"
+    course_name:
+      xpath: ".//h4//text() | .//h3//text()"
+    degree_type:
+      xpath: ".//span[contains(@class, 'study-level')]/text()"
+    course_link:
+      xpath: ".//a[contains(@href, '/course/')]/@href"
+    intake_month:
+      xpath: "//select[contains(@id, 'startDateSelect')]//option/text() | //div[contains(@id, 'intake')]//text()"
+    city:
+      value: "Manchester"
+    duration:
+      xpath: "//span[contains(., 'length')]//p/text() | //div[contains(@class, 'course-meta')]//span[contains(., 'Duration')]/following-sibling::span/text()"
+      also_use_as_study_load: true
+    fee_international:
+      primary:
+        xpath: "//div[contains(@id, 'fee')]//h3[contains(., 'nternational')]/following-sibling::p[1]/text()"
+      fallback:
+        xpath: "//p[contains(., 'International fees') or contains(., 'Overseas fees')]/text()"
+    course_description:
+      xpath: "//section[contains(@id, 'course-information')] | //div[contains(@id, 'overview')]"
+    career:
+      xpath: "//div[contains(@id, 'career')] | //section[contains(@id, 'careers')]"
+    course_structure:
+      xpath: "//div[contains(@data-component, 'study-criteria')] | //section[contains(@id, 'course-structure')]"
+    other_requirements:
+      xpath: "//div[contains(@id, 'entry-requirements')] | //section[contains(@id, 'entry-requirements')]"
+
+  staging:
+    reject_if_missing:
+      - course_name

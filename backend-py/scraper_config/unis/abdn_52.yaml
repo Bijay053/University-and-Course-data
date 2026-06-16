@@ -1,0 +1,177 @@
+# University of Aberdeen
+# Hostname: www.abdn.ac.uk
+# Country: United Kingdom  |  Currency: GBP
+
+discovery:
+  seed_urls:
+    - https://www.abdn.ac.uk/study/undergraduate/degree-programmes/?limit=All
+    - https://www.abdn.ac.uk/study/postgraduate-taught/degree-programmes/?limit=All
+    - https://www.abdn.ac.uk/study/postgraduate-research/research-areas/?limit=All
+
+  force_index_pages:
+    - '(?i)/degree-programmes/\?limit=All'
+    - '(?i)/research-areas/\?limit=All'
+
+  listing_only_patterns:
+    - '(?i)/degree-programmes/'
+    - '(?i)/research-areas/'
+
+  allow_url_patterns:
+    - '(?i)/study/(undergraduate|postgraduate-taught)/degree-programmes/.+'
+    - '(?i)/study/postgraduate-research/research-areas/.+'
+    - '(?i)/research/postgraduate-research/profiles/.+'
+
+  course_detail_url_patterns:
+    - '(?i)/study/(undergraduate|postgraduate-taught)/degree-programmes/.+'
+    - '(?i)/research/postgraduate-research/profiles/.+'
+
+  block_url_patterns:
+    - "/news"
+    - "/events"
+    - "/staff/"
+    - "/about"
+    - "/contact"
+    - "/linkassets/"
+
+  bfs_page_budget: 100
+  max_candidates: 2500
+  expected_min_courses: 600
+  always_browser_discover: false
+  skip_browser_discovery: true
+
+extraction:
+  max_parallel_fetch: 4
+  skip_browser_rescue: false
+  skip_per_course_browser: false
+  browser_wait_strategy: domcontentloaded
+
+  force_detail_pages:
+    - '(?i)/study/(undergraduate|postgraduate-taught)/degree-programmes/.+'
+    - '(?i)/research/postgraduate-research/profiles/.+'
+
+  filters:
+    domestic_only:
+      enabled: false
+    online_only:
+      enabled: false
+
+  fees:
+    default_currency: GBP
+    prefer_international: true
+    prefer_annual_over_total: true
+    fee_year: "2026"
+    fee_term: "year"
+    reject_keywords:
+      - "Home"
+      - "RUK"
+      - "Scotland"
+      - "EU"
+
+  english:
+    source: course_page
+    source_xpath: "//section[contains(@id, 'language_requirements')] | //div[contains(@id, 'entry')]//h4[contains(text(), 'language test')]/following-sibling::*"
+
+    ielts:
+      raw_xpath: ".//p[contains(., 'IELTS')]/following-sibling::p[1] | //div[contains(@id, 'entry')]//h4[contains(., 'IELTS')]/following-sibling::ul"
+      remove_tags: true
+      patterns:
+        overall:
+          - 'overall\s*-?\s*(\d\.?\d*)'
+        listening:
+          - 'listening\s*-?\s*(\d\.?\d*)'
+        reading:
+          - 'reading\s*-?\s*(\d\.?\d*)'
+        writing:
+          - 'writing\s*-?\s*(\d\.?\d*)'
+        speaking:
+          - 'speaking\s*-?\s*(\d\.?\d*)'
+
+    pte:
+      raw_xpath: ".//p[contains(., 'PTE')]/following-sibling::p[1] | //div[contains(@id, 'entry')]//h4[contains(., 'PTE')]/following-sibling::ul"
+      remove_tags: true
+      patterns:
+        overall:
+          - 'overall\s*-?\s*(\d\.?\d*)'
+        listening:
+          - 'listening\s*-?\s*(\d\.?\d*)'
+        reading:
+          - 'reading\s*-?\s*(\d\.?\d*)'
+        writing:
+          - 'writing\s*-?\s*(\d\.?\d*)'
+        speaking:
+          - 'speaking\s*-?\s*(\d\.?\d*)'
+
+    toefl:
+      raw_xpath: ".//p[contains(., 'TOEFL iBT')]/following-sibling::p[1] | //div[contains(@id, 'entry')]//h4[contains(., 'TOEFL')]/following-sibling::ul"
+      remove_tags: true
+      patterns:
+        overall:
+          - 'toefl ibt:?\s*(\d\.?\d*)'
+        listening:
+          - 'listening\s*-?\s*(\d\.?\d*)'
+        reading:
+          - 'reading\s*-?\s*(\d\.?\d*)'
+        writing:
+          - 'writing\s*-?\s*(\d\.?\d*)'
+        speaking:
+          - 'speaking\s*-?\s*(\d\.?\d*)'
+
+  selectors:
+    course_list:
+      xpath: "//table[contains(@class, 'degree-results')]//tr[td] | //ul[contains(@class, 'degree-list')]/li | //div[contains(@class, 'degree-row')]"
+
+    course_name:
+      xpath: "//h1"
+
+    course_link:
+      xpath: ".//a/@href | ./a/@href"
+
+    city:
+      value: "Aberdeen"
+
+    degree:
+      xpath: "//dl[contains(@class, 'degree_info')]//dt[contains(., 'Degree Qualification')]/following-sibling::dd[1] | //dt[contains(text(), 'tudy level')]/following-sibling::dd/text()"
+
+    study_mode:
+      xpath: "//dl[contains(@class, 'degree_info')]//dt[contains(., 'Learning Mode')]/following-sibling::dd[1] | //dt[contains(text(), 'mode')]/following-sibling::dd/text()"
+
+    study_load:
+      xpath: "//dl[contains(@class, 'degree_info')]//dt[contains(., 'Study Mode')]/following-sibling::dd[1]"
+
+    intake_month:
+      xpath: "//dl[contains(@class, 'degree_info')]//dt[contains(., 'Start Month')]/following-sibling::dd[1] | //dt[contains(text(), 'mode')]/following-sibling::dd/text()"
+
+    duration:
+      xpath: "//dl[contains(@class, 'degree_info')]//dt[contains(., 'Duration')]/following-sibling::dd[1] | //dt[contains(text(), 'duration')]/following-sibling::dd/text()"
+
+    course_description:
+      xpath: "//div[contains(@class, 'overview_container')]/following-sibling::div[1] | //section[contains(@id, 'overview')] | //div[contains(@id, 'overview')]//div[contains(@class, 'block-text')]"
+
+    course_structure:
+      xpath: "//section[contains(@id, 'what')] | //div[contains(@id, 'what')]"
+
+    career:
+      xpath: "//section[contains(@id, 'career')] | //div[contains(@id, 'career')]"
+
+    other_requirements:
+      xpath: "//section[contains(@id, 'entry')] | //div[contains(@id, 'entry')]"
+
+    fee_international:
+      primary:
+        xpath: "//td[contains(@class, 'fee_category') and contains(., 'nternational')]/following-sibling::td//text()"
+      fallback:
+        xpath: "//*[contains(text(), 'International') or contains(text(), 'Overseas')]/following-sibling::*[contains(text(), '£')]/text()"
+
+  text_cleaning:
+    global_substring_blocklist:
+      - Apply now
+      - Find out more
+      - Book an open day
+      - Request a prospectus
+      - Chat with a student
+
+  staging:
+    reject_if_missing:
+      - course_name
+    skip_degree_qualifier_check: true
+    require_international_fee: false
