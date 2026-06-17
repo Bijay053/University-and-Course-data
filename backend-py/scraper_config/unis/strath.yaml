@@ -39,6 +39,12 @@ discovery:
   skip_browser_discovery: true
 
 extraction:
+  study_mode:
+    # Strath pages contain "apply online"/"online student services" boilerplate
+    # on every course, triggering the bare \bonline\b fallback at conf=0.50.
+    # Suppress it so Gemini or the location-derived logic sets the correct mode.
+    online_only_requires_strong_evidence: true
+
   max_parallel_fetch: 8
 
   force_detail_pages:
