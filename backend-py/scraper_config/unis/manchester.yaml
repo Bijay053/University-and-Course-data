@@ -1,11 +1,182 @@
-# University of Manchester
+# The University of Manchester
 # Hostname: www.manchester.ac.uk
 # Country: United Kingdom  |  Currency: GBP
-# Slug: manchester
-# Auto-generated: 2026-06-15
 
-discovery: {}
+discovery:
+  # Pulls directly from your spider's fast structured XML repository entry paths
+  seed_urls:
+    - https://www.manchester.ac.uk/study/postgraduate-research/programmes/list/xml/
+    - https://www.manchester.ac.uk/study/masters/courses/list/xml/
+    - https://www.manchester.ac.uk/study/undergraduate/courses/2026/xml/
+
+  # Shield landing endpoints from being processed as final details sheets
+  force_index_pages:
+    - '(?i)/list/xml/?$'
+    - '(?i)/courses/2026/xml/?$'
+
+  listing_only_patterns:
+    - '(?i)/xml/?$'
+
+  # FIX 1: Explicitly include /xml/ inside patterns to validate and keep the raw XML path keys intact
+  allow_url_patterns:
+    - '(?i)/study/undergraduate/courses/2026/xml/\d+/[^/]+/?$'
+    - '(?i)/study/masters/courses/list/xml/\d+/[^/]+/?$'
+    - '(?i)/study/postgraduate-research/programmes/list/xml/\d+/[^/]+/?$'
+
+  # Ensures matching criteria maps final leaf entries precisely
+  course_detail_url_patterns:
+    - '(?i)/study/undergraduate/courses/2026/xml/\d+/[^/]+/?$'
+    - '(?i)/study/masters/courses/list/xml/\d+/[^/]+/?$'
+    - '(?i)/study/postgraduate-research/programmes/list/xml/\d+/[^/]+/?$'
+
+  block_url_patterns:
+    - "/news"
+    - "/events"
+    - "/staff/"
+    - "/about"
+    - "/contact"
+    - "/linkassets/"
+
+  bfs_page_budget: 80
+  max_candidates: 3500
+  expected_min_courses: 800
+  always_browser_discover: false
+  skip_browser_discovery: true
 
 extraction:
+  # Maintain a single-worker threshold to glide smoothly beneath active security firewalls
+  max_parallel_fetch: 1
+  skip_browser_rescue: false
+  skip_per_course_browser: false
+  browser_wait_strategy: domcontentloaded
+
+  # FIX 2: Synchronized detail page overrides to prevent framework misclassification drops
+  force_detail_pages:
+    - '(?i)/study/undergraduate/courses/2026/xml/\d+/[^/]+/?$'
+    - '(?i)/study/masters/courses/list/xml/\d+/[^/]+/?$'
+    - '(?i)/study/postgraduate-research/programmes/list/xml/\d+/[^/]+/?$'
+
+  filters:
+    domestic_only:
+      enabled: false
+    online_only:
+      enabled: false
+
   fees:
     default_currency: GBP
+    prefer_international: true
+    prefer_annual_over_total: true
+    fee_year: "2026"
+    fee_term: "year"
+    reject_keywords:
+      - "Home"
+      - "UK student"
+      - "Domestic"
+
+  english:
+    source: course_page
+    source_xpath: "//div[contains(@id, 'entry-requirements')] | //section[contains(@id, 'entry-requirements')] | //div[contains(@class, 'course-profile-content')] | //main"
+
+    ielts:
+      raw_xpath: ".//*[contains(text(), 'IELTS')] | .//li[contains(., 'IELTS')]"
+      remove_tags: true
+      patterns:
+        overall:
+          - 'ielts:?\s*(\d\.?\d*)'
+          - 'overall\s*score\s*of\s*(\d\.?\d*)'
+          - '(\d\.?\d*)\s*overall'
+        each:
+          - 'minimum\s*of\s*(\d\.?\d*)'
+          - 'than\s*(\d\.?\d*)'
+          - 'below\s*(\d\.?\d*)'
+      apply_each_to:
+        - ielts_reading
+        - ielts_writing
+        - ielts_listening
+        - ielts_speaking
+
+    pte:
+      raw_xpath: ".//li[contains(., 'Pearson')]"
+      remove_tags: true
+      patterns:
+        overall:
+          - ':?\s*(\d\.?\d*)'
+        each:
+          - 'than\s*(\d\.?\d*)'
+          - 'below\s*(\d\.?\d*)'
+      apply_each_to:
+        - pte_reading
+        - pte_writing
+        - pte_listening
+        - pte_speaking
+
+    toefl:
+      raw_xpath: ".//li[contains(., 'TOEFL iBT')]"
+      remove_tags: true
+      patterns:
+        overall:
+          - 'toefl ibt:?\s*(\d\.?\d*)'
+        each:
+          - 'than\s*(\d\.?\d*)'
+          - 'below\s*(\d\.?\d*)'
+      apply_each_to:
+        - toefl_reading
+        - toefl_writing
+        - toefl_listening
+        - toefl_speaking
+
+  selectors:
+    # Direct mapping onto your XML list node target elements
+    course_list:
+      xpath: "//li[.//a]"
+
+    # Replicates your compound concatenation text string logic mapping perfectly
+    course_name:
+      xpath: "concat(.//div[contains(@class, 'degree')]/text(), ' ', .//a/text()) | //h1[contains(@class, 'course-title')]/text() | //h1/text() | //main//h1"
+
+    # Handles baseline conditional mapping logic inside the internal URL string values
+    degree:
+      xpath: "CASE WHEN contains(self::url(), 'undergraduate') THEN 'undergraduate' WHEN contains(self::url(), 'masters') THEN 'masters' ELSE 'postgraduate-research' END"
+
+    course_link:
+      xpath: ".//a/@href | ./@href"
+
+    study_load:
+      xpath: ".//div[contains(@class, 'duration')]/text() | //*[contains(@class, 'duration') or contains(@class, 'mode')]/text() | //li[contains(., 'Full-time') or contains(., 'Part-time')]/text()"
+
+    duration:
+      xpath: ".//div[contains(@class, 'duration')]/text() | //dt[contains(., 'Duration')]/following-sibling::dd[1]/text()"
+      also_use_as_study_load: false
+
+    course_description:
+      xpath: "//div[contains(@class, 'course-profile-content')] | //div[contains(@id, 'overview')] | //section[contains(@id, 'course-profile')]"
+
+    course_structure:
+      xpath: "//div[contains(@id, 'course-details')] | //section[contains(@id, 'structure')] | //div[contains(@class, 'course-profile-content')]"
+
+    career:
+      xpath: "//div[contains(@id, 'careers')] | //section[contains(@id, 'opportunities')]"
+
+    other_requirements:
+      xpath: "//div[contains(@id, 'entry-requirements')] | //section[contains(@id, 'requirements')]"
+
+    fee_international:
+      primary:
+        xpath: "//*[contains(text(), 'International') or contains(text(), 'Overseas')]/following-sibling::*[contains(text(), '£')]/text()"
+      fallback:
+        xpath: "//table[contains(@class, 'fees')]//tr[contains(., 'International') or contains(., 'Overseas')]/td[contains(., '£')]/text() | //p[contains(., 'International') and contains(., '£')]/text()"
+
+  text_cleaning:
+    global_substring_blocklist:
+      - Apply now
+      - Find out more
+      - Book an open day
+      - Request a prospectus
+      - Chat with a student
+      - Our use of cookies
+
+  staging:
+    reject_if_missing:
+      - course_name
+    skip_degree_qualifier_check: true
+    require_international_fee: false

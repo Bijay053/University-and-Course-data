@@ -93,6 +93,12 @@ discovery:
   use_browser: true
 
 extraction:
+  course_name:
+    prefer_title_over_h1: true
+    strip_title_suffixes:
+      - " | University of Roehampton, London"
+      - " | University of Roehampton"
+
   fees:
     default_currency: GBP
     prefer_international: true

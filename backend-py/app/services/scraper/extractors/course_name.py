@@ -33,6 +33,12 @@ _ACRONYMS = {
     "XIII", "XIV", "XV",
     # "V", "I", "X" are skipped — too likely to be the letter, not a numeral.
 }
+# Lookup map: uppercase key → canonical form.
+# _smart_case does w.upper() before the set check, so mixed-case acronyms
+# like "MSc" / "BSc" / "PhD" would never match their all-caps key "MSC" /
+# "BSC" / "PHD" and were wrongly title-cased as "Msc" / "Bsc" / "Phd".
+# This dict solves that: look up by uppercase, return the canonical form.
+_ACRONYM_CANON: dict[str, str] = {a.upper(): a for a in _ACRONYMS}
 # Institution suffix tail: matches "Charles Sturt University" / "RMIT" /
 # "Federation Uni" / "ACU Online Courses" etc.  Used by both the
 # pipe/dash/colon branch and the comma branch of _TITLE_SUFFIX below.
@@ -178,8 +184,9 @@ def _smart_case(text: str) -> str:
             continue
         upper = w.upper().strip(",.;:()")
         bare = w.strip(",.;:()")
-        if upper in _ACRONYMS:
-            out.append(w.replace(bare, upper))
+        canon = _ACRONYM_CANON.get(upper)
+        if canon is not None:
+            out.append(w.replace(bare, canon))
             continue
         lower = bare.lower()
         if i > 0 and lower in _PREPOSITIONS:
