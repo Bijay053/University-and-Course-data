@@ -5,8 +5,12 @@
 # Discovery notes (2026-06-17):
 #   Seed /courses/ not /courses/undergraduate/ — the latter is immediately
 #   blocked by the global category_landing_page_url_block rule.  BFS navigates
-#   from /courses/ → the three listing pages → all ~537 subject pages.
-#   budget=800 absorbs ~15 wasted pages on /studywithus/ sub-sections.
+#   from /courses/ → the three listing pages → all ~537+53 course/subject pages.
+#   Research degrees live at /courses/research/ (NOT /courses/postgraduateresearch/).
+#   budget=900 absorbs ~15 wasted pages on /studywithus/ + 53 research pages.
+#
+# IMPORTANT: block "/research/" would also block /courses/research/ — use the
+#            hostname-scoped form "strath.ac.uk/research/" instead.
 
 discovery:
   seed_urls:
@@ -15,13 +19,15 @@ discovery:
   allow_url_patterns:
     - '/courses/undergraduate/[^/]+/?$'
     - '/courses/postgraduatetaught/[^/]+/?$'
-    - '/courses/postgraduateresearch/[^/]+/?$'
+    - '/courses/research/[^/]+/?$'
+    # dead pattern kept for safety — Strath does NOT use this path:
+    # - '/courses/postgraduateresearch/[^/]+/?$'
 
   block_url_patterns:
     - "/studywithus/"
     - "/whystrathclyde/"
     - "/workwithus/"
-    - "/research/"
+    - "strath.ac.uk/research/"     # blocks top-level /research/ but NOT /courses/research/
     - "/staff/"
     - "/news/"
     - "/events/"
@@ -32,7 +38,7 @@ discovery:
     - "/strathclydesport/"
     - "cookie"
 
-  bfs_page_budget: 800       # ~537 subject pages + overhead for non-course sections
+  bfs_page_budget: 900       # ~537 UG+PGT subject pages + 53 research pages + overhead
   max_candidates: 1500
 
   always_browser_discover: false
@@ -50,7 +56,7 @@ extraction:
   force_detail_pages:
     - '(?i)/courses/undergraduate/[^/]+/?$'
     - '(?i)/courses/postgraduatetaught/[^/]+/?$'
-    - '(?i)/courses/postgraduateresearch/[^/]+/?$'
+    - '(?i)/courses/research/[^/]+/?$'
 
   filters:
     domestic_only:
@@ -90,13 +96,16 @@ extraction:
       xpath: "//article[contains(@class, 'searchitem')]"
 
     course_name:
-      xpath: "//h1/text() | //main//h1/text()"
+      # All page types (UG/PGT/research) wrap the title in span.course-title inside H1.
+      # "//h1/text()" hits nav H1s; "//h1/span[@class='course-title']" is precise.
+      xpath: "//h1/span[@class='course-title']/text() | //main//h1/span[@class='course-title']/text()"
 
     course_link:
       xpath: ".//a/@href"
 
     degree:
-      xpath: ".//div[contains(./i/@class, 'graduation')]"
+      # UG/PGT pages: graduation icon div.  Research pages: superscript span in H1.
+      xpath: ".//div[contains(./i/@class, 'graduation')] | //h1/span[@class='superscript']/text()"
 
     city:
       value: "Glasgow"

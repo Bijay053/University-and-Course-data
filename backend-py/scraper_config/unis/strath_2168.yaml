@@ -1,24 +1,28 @@
 # University of Strathclyde
 # Hostname: www.strath.ac.uk
 # Country: United Kingdom  |  Currency: GBP
+#
+# Research degrees live at /courses/research/ (NOT /courses/postgraduateresearch/).
+# The generic block "/research/" also kills /courses/research/ — use the
+# hostname-scoped form "strath.ac.uk/research/" instead.
 
 discovery:
   # Seed /courses/ not the listing pages — /courses/undergraduate/ is blocked
   # immediately by the global category_landing_page_url_block rule.
-  # BFS navigates: /courses/ → listing pages → all ~537 subject pages.
+  # BFS navigates: /courses/ → listing pages → all ~537+53 course/subject pages.
   seed_urls:
     - https://www.strath.ac.uk/courses/
 
   allow_url_patterns:
     - '/courses/undergraduate/[^/]+/?$'
     - '/courses/postgraduatetaught/[^/]+/?$'
-    - '/courses/postgraduateresearch/[^/]+/?$'
+    - '/courses/research/[^/]+/?$'
 
   block_url_patterns:
     - "/studywithus/"
     - "/whystrathclyde/"
     - "/workwithus/"
-    - "/research/"
+    - "strath.ac.uk/research/"     # blocks top-level /research/ but NOT /courses/research/
     - "/staff/"
     - "/news/"
     - "/events/"
@@ -29,8 +33,8 @@ discovery:
     - "/strathclydesport/"
     - "cookie"
 
-  bfs_page_budget: 600       # enough to visit all ~537 subject pages if listing paginates
-  max_candidates: 1500       # generous cap above 537 expected courses
+  bfs_page_budget: 900       # ~537 UG+PGT subject pages + 53 research pages + overhead
+  max_candidates: 1500       # generous cap above expected course count
 
   always_browser_discover: false
   skip_browser_discovery: true      # static HTML renders all courses; no JS needed
@@ -47,7 +51,7 @@ extraction:
   force_detail_pages:
     - '(?i)/courses/undergraduate/[^/]+/?$'
     - '(?i)/courses/postgraduatetaught/[^/]+/?$'
-    - '(?i)/courses/postgraduateresearch/[^/]+/?$'
+    - '(?i)/courses/research/[^/]+/?$'
 
   filters:
     domestic_only:
@@ -93,15 +97,16 @@ extraction:
       xpath: "//article[contains(@class, 'searchitem')]"
 
     course_name:
-      # Spider: course.xpath(".//h2/text()")
-      xpath: "//h1/text() | //main//h1/text()"
+      # All page types (UG/PGT/research) wrap the title in span.course-title inside H1.
+      # "//h1/text()" hits nav H1s (wrong); this span selector is precise for all types.
+      xpath: "//h1/span[@class='course-title']/text() | //main//h1/span[@class='course-title']/text()"
 
     course_link:
       xpath: ".//a/@href"
 
     degree:
-      # Spider: remove_tags(course.xpath(".//div[contains(./i/@class, 'graduation')]"))
-      xpath: ".//div[contains(./i/@class, 'graduation')]"
+      # UG/PGT: graduation icon div.  Research: superscript span in H1 (e.g. "MPhil, PhD").
+      xpath: ".//div[contains(./i/@class, 'graduation')] | //h1/span[@class='superscript']/text()"
 
     city:
       value: "Glasgow"              # spider hardcodes "Glassgow" (typo) — corrected here
