@@ -53,6 +53,24 @@ _INTL_FEE_RE = re.compile(
     re.IGNORECASE,
 )
 
+# ── Sibling-fee matching (art.mmu.ac.uk / theatre.mmu.ac.uk courses) ─────────
+# Some courses appear twice in the Swiftype index: once on www.mmu.ac.uk (with
+# a "Typical annual fees … Overseas £X" block in the body) and once on a school
+# subdomain like art.mmu.ac.uk (with no fee section at all).  After mapping all
+# records we build a bare-name → fee lookup from the fee-bearing entries and
+# apply it to any fee-less sibling distinguished only by a school suffix.
+_ART_SUFFIX_RE = re.compile(
+    r"\s*[–—-]\s*Manchester\s+(?:School\s+of\s+(?:Art|Theatre|Design|Architecture)"
+    r"|Metropolitan\s+University\b)[^–—]*$",
+    re.IGNORECASE,
+)
+
+
+def _bare_name(name: str) -> str:
+    """Return a normalised, suffix-stripped name for fee-matching."""
+    return " ".join(_ART_SUFFIX_RE.sub("", name).lower().split())
+
+
 # ── Duration derivation from award type ──────────────────────────────────────
 # MMU body text doesn't expose duration in a parseable position; derive from
 # the degree type which is highly consistent for taught programmes.
@@ -483,4 +501,52 @@ async def fetch_swiftype_links(
         "[SWIFTYPE] total=%s mapped=%s skipped=%s",
         total, len(links), skipped,
     )
+
+    # ── Sibling-fee fallback ─────────────────────────────────────────────────
+    # Build a bare-name → fee dict from all entries that already have a fee
+    # (these come from www.mmu.ac.uk courses where body text carries
+    # "Typical annual fees … Overseas £X").
+    _fee_lookup: dict[str, dict] = {}
+    for _lnk in links:
+        _pl = _lnk.get("searchstax_result", {}).get("payload", {})
+        if "international_fee" in _pl:
+            _key = _bare_name(_lnk.get("name", ""))
+            if _key and _key not in _fee_lookup:
+                _fee_lookup[_key] = {
+                    "international_fee": _pl["international_fee"],
+                    "fee_term":          _pl.get("fee_term", "Year"),
+                    "fee_year":          _pl.get("fee_year"),
+                    "currency":          _pl.get("currency", "GBP"),
+                }
+
+    # Apply matched fee to fee-less courses (e.g. art.mmu.ac.uk entries)
+    _fee_applied = 0
+    for _lnk in links:
+        _res = _lnk.get("searchstax_result", {})
+        _pl  = _res.get("payload", {})
+        if "international_fee" not in _pl:
+            _key      = _bare_name(_lnk.get("name", ""))
+            _fee_data = _fee_lookup.get(_key)
+            if _fee_data:
+                _pl.update(_fee_data)
+                _res.get("evidence", []).append(_ev(
+                    "international_fee",
+                    int(_fee_data["international_fee"]),
+                    "swiftype:sibling_fee",
+                    _lnk["url"],
+                    "course",
+                    (
+                        f"Fee £{int(_fee_data['international_fee']):,} matched from "
+                        f"sibling www.mmu.ac.uk Swiftype entry by normalised course name."
+                    ),
+                    0.80,
+                ))
+                _fee_applied += 1
+
+    if _fee_applied:
+        log.info(
+            "[SWIFTYPE] Sibling-fee fallback applied to %d course(s) with no body fee.",
+            _fee_applied,
+        )
+
     return links
