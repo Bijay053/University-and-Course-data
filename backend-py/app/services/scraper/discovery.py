@@ -849,6 +849,25 @@ async def discover_course_links(
                         "[DISCOVER] invalid %s regex %r — skipped", _lp_field, _raw
                     )
 
+    # force_candidate_url_patterns: category-landing-shaped URLs that the
+    # operator has explicitly declared are real course detail pages.  When
+    # a URL matches one of these patterns it is added directly to `found`
+    # (the candidate set) rather than being pushed to the BFS drill-in
+    # queue, even when _is_category_landing() returns True.  This is
+    # intentionally separate from allow_url_patterns (which only governs
+    # whether BFS may *visit* a URL) so that sites like Canterbury — where
+    # allow_url_patterns covers intermediate navigation pages — are not
+    # accidentally promoted to candidates.
+    _force_candidate_compiled: list[tuple[str, re.Pattern]] = []
+    if discovery_config is not None:
+        for _raw in list(getattr(discovery_config, "force_candidate_url_patterns", None) or []):
+            try:
+                _force_candidate_compiled.append((_raw, re.compile(_raw)))
+            except re.error:
+                log.warning(
+                    "[DISCOVER] invalid force_candidate_url_patterns regex %r — skipped", _raw
+                )
+
     while queue and len(visited) < max_pages and len(found) < max_courses:
         url, depth = queue.pop(0)
         # Dedup on normalized URL so ?studentType=international and the bare
@@ -1050,7 +1069,22 @@ async def discover_course_links(
             # candidate set. Without this check these pages end up in `found`
             # and are later STAGE-rejected as category_landing_page — the BFS
             # never drills into them to harvest the real course URLs inside.
+            #
+            # Exception: the YAML operator can use force_candidate_url_patterns
+            # to declare that URLs matching certain patterns are real course
+            # detail pages even when their URL-shape looks like a category hub.
+            # The canonical example is Strath where /courses/undergraduate/<slug>/
+            # triggers _is_category_landing() but IS an individual degree page.
             if _is_category_landing(u):
+                _u_path_only = urlparse(u).path
+                if _force_candidate_compiled and any(
+                    cp.search(_u_path_only) or cp.search(u)
+                    for _, cp in _force_candidate_compiled
+                ):
+                    found[u] = n
+                    if len(found) >= max_courses:
+                        break
+                    continue
                 if depth < 2 and u not in visited:
                     queue.append((u, depth + 1))
                 continue
@@ -1126,12 +1160,35 @@ async def discover_course_links(
                 # allows the BFS to walk: catalogue root → category →
                 # course-detail-list, which is how Torrens hides 152
                 # courses behind 11 single-word category pages.
+                #
+                # Exception: YAML force_candidate_url_patterns can promote
+                # a category-landing-shaped URL directly to `found` when
+                # the operator has explicitly declared these URLs are
+                # course detail pages.  The canonical example is Strath
+                # where /courses/undergraduate/<slug>/ looks like a
+                # discipline hub to _is_category_landing() (3-part path,
+                # no degree qualifier in the slug) but IS an individual
+                # degree page.  The link text from the listing exceeds
+                # _MAX_COURSE_NAME_LEN (full article blurb), so
+                # _looks_like_course() returns False and we land here.
+                # Without force_candidate_url_patterns these 500+ course
+                # pages end up in the BFS drill-in queue instead of the
+                # candidate set.
                 elif (
                     depth < 2
                     and full not in visited
                     and (_is_nav(full) or _is_category_landing(full))
                 ):
-                    queue.append((full, depth + 1))
+                    if _is_category_landing(full) and _force_candidate_compiled and any(
+                        cp.search(urlparse(full).path) or cp.search(full)
+                        for _, cp in _force_candidate_compiled
+                    ):
+                        # Operator-declared course page: add to found directly.
+                        found[full] = text or full.rsplit("/", 1)[-1]
+                        if len(found) >= max_courses:
+                            break
+                    else:
+                        queue.append((full, depth + 1))
 
         added = len(found) - before
         if emit:

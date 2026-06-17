@@ -1,17 +1,32 @@
-# University of Strathclyde
+# University of Strathclyde  (prod uni_id=2168)
 # Hostname: www.strath.ac.uk
 # Country: United Kingdom  |  Currency: GBP
 #
-# Research degrees live at /courses/research/ (NOT /courses/postgraduateresearch/).
-# The generic block "/research/" also kills /courses/research/ — use the
-# hostname-scoped form "strath.ac.uk/research/" instead.
+# Discovery notes (2026-06-17):
+#   The /courses/ listing page contains ~562 <article class="searchitem"> elements
+#   in its STATIC HTML.  All courses are server-rendered; no JS needed.
+#   Each article links to an individual degree page such as
+#   /courses/undergraduate/accounting/ (= "Accounting BA Hons").
+#
+#   Problem: _is_category_landing() flagged all ~556 article links as category
+#   hubs (3-segment path, no degree qualifier) → they were pushed to the BFS
+#   drill-in queue, not the candidate set → only 6 candidates per /courses/ visit.
+#
+#   Fix: force_candidate_url_patterns promotes them directly to the candidate set,
+#   bypassing _is_category_landing().  bfs_page_budget=30 is enough: /courses/
+#   is the only seed page + a small buffer.
+#
+# IMPORTANT: block "/research/" also kills /courses/research/ — use the
+#            hostname-scoped form "strath.ac.uk/research/" instead.
 
 discovery:
-  # Seed /courses/ not the listing pages — /courses/undergraduate/ is blocked
-  # immediately by the global category_landing_page_url_block rule.
-  # BFS navigates: /courses/ → listing pages → all ~537+53 course/subject pages.
   seed_urls:
     - https://www.strath.ac.uk/courses/
+
+  force_candidate_url_patterns:
+    - '/courses/undergraduate/[^/]+/?$'
+    - '/courses/postgraduatetaught/[^/]+/?$'
+    - '/courses/research/[^/]+/?$'
 
   allow_url_patterns:
     - '/courses/undergraduate/[^/]+/?$'
@@ -33,11 +48,11 @@ discovery:
     - "/strathclydesport/"
     - "cookie"
 
-  bfs_page_budget: 900       # ~537 UG+PGT subject pages + 53 research pages + overhead
-  max_candidates: 1500       # generous cap above expected course count
+  bfs_page_budget: 30        # /courses/ single seed + small buffer; no drill-in needed
+  max_candidates: 700
 
   always_browser_discover: false
-  skip_browser_discovery: true      # static HTML renders all courses; no JS needed
+  skip_browser_discovery: true
 
 extraction:
   study_mode:

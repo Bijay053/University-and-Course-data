@@ -3,11 +3,22 @@
 # Country: United Kingdom  |  Currency: GBP
 #
 # Discovery notes (2026-06-17):
-#   Seed /courses/ not /courses/undergraduate/ — the latter is immediately
-#   blocked by the global category_landing_page_url_block rule.  BFS navigates
-#   from /courses/ → the three listing pages → all ~537+53 course/subject pages.
-#   Research degrees live at /courses/research/ (NOT /courses/postgraduateresearch/).
-#   budget=900 absorbs ~15 wasted pages on /studywithus/ + 53 research pages.
+#   The /courses/ listing page contains ~562 <article class="searchitem"> elements
+#   in its STATIC HTML — all courses are server-rendered, no JS fetch needed.
+#   Each article links to an individual degree page such as
+#   /courses/undergraduate/accounting/ (= "Accounting BA Hons") or
+#   /courses/research/chemistry/ (= "Chemistry MPhil, PhD").
+#
+#   Problem: _is_category_landing() returns True for 3-segment paths with no
+#   degree qualifier in the slug, so ALL ~556 article links were being pushed to
+#   the BFS drill-in queue (not the candidate set), causing only 6 candidates
+#   to come from /courses/ and BFS spending 900 pages visiting subject groups.
+#
+#   Fix: force_candidate_url_patterns (discovery-level) promotes these URLs
+#   directly to the candidate set, bypassing the _is_category_landing() redirect.
+#   allow_url_patterns is kept so BFS can still VISIT them if queued elsewhere.
+#   bfs_page_budget lowered to 30: /courses/ is the one seed page + a small
+#   buffer for any /studywithus/ nav pages that slip through before blocking.
 #
 # IMPORTANT: block "/research/" would also block /courses/research/ — use the
 #            hostname-scoped form "strath.ac.uk/research/" instead.
@@ -16,12 +27,22 @@ discovery:
   seed_urls:
     - https://www.strath.ac.uk/courses/
 
+  # force_candidate_url_patterns: these 3-segment paths look like category hubs
+  # to _is_category_landing() but ARE individual degree detail pages on Strath.
+  # This promotes all ~562 /courses/ listing articles directly to the candidate
+  # set in a single BFS page visit (matching the original Scrapy spider behaviour).
+  force_candidate_url_patterns:
+    - '/courses/undergraduate/[^/]+/?$'
+    - '/courses/postgraduatetaught/[^/]+/?$'
+    - '/courses/research/[^/]+/?$'
+
+  # allow_url_patterns: allow BFS to also VISIT these pages if they get queued
+  # (e.g. from a sibling-course nav link on a detail page).  Kept separate from
+  # force_candidate_url_patterns — they serve different roles.
   allow_url_patterns:
     - '/courses/undergraduate/[^/]+/?$'
     - '/courses/postgraduatetaught/[^/]+/?$'
     - '/courses/research/[^/]+/?$'
-    # dead pattern kept for safety — Strath does NOT use this path:
-    # - '/courses/postgraduateresearch/[^/]+/?$'
 
   block_url_patterns:
     - "/studywithus/"
@@ -38,8 +59,8 @@ discovery:
     - "/strathclydesport/"
     - "cookie"
 
-  bfs_page_budget: 900       # ~537 UG+PGT subject pages + 53 research pages + overhead
-  max_candidates: 1500
+  bfs_page_budget: 30        # /courses/ single seed page + small buffer; no drill-in needed
+  max_candidates: 700
 
   always_browser_discover: false
   skip_browser_discovery: true

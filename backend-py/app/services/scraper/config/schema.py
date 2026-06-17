@@ -998,6 +998,21 @@ class DiscoveryConfig(BaseModel):
             "one pattern are kept.  Empty list = allow everything."
         ),
     )
+    force_candidate_url_patterns: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Regex patterns.  Any URL matching one of these is added directly to the "
+            "candidate set (found) even when _is_category_landing() returns True — "
+            "i.e. its URL shape looks like a discipline hub rather than an individual "
+            "degree page.  Use when the university's course detail pages have 2- or "
+            "3-segment paths with no degree qualifier in the slug (e.g. Strath's "
+            "/courses/undergraduate/accounting/ IS the 'Accounting BA Hons' page). "
+            "Intentionally separate from allow_url_patterns, which only governs "
+            "whether BFS may *visit* a URL — to avoid accidentally promoting "
+            "intermediate navigation pages (e.g. Canterbury's subject-listing pages) "
+            "to course candidates."
+        ),
+    )
     allow_blocked_listing_patterns: list[str] = Field(
         default_factory=list,
         description=(
