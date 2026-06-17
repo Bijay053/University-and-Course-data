@@ -1,15 +1,24 @@
 # University of Roehampton
 # Hostname: www.roehampton.ac.uk
 # Country: United Kingdom  |  Currency: GBP
+#
+# Discovery: listing pages are JS-rendered (static HTML only shows nav links).
+# Sitemap at /sitemap.xml has 200+ course URLs — always_sitemap_supplement is
+# the primary discovery mechanism; BFS is a supplemental fallback.
 
 discovery:
+  always_sitemap_supplement: true
+  sitemap_url: https://www.roehampton.ac.uk/sitemap.xml
+
   seed_urls:
     - https://www.roehampton.ac.uk/study/undergraduate-courses/
     - https://www.roehampton.ac.uk/study/postgraduate-taught-courses/
     - https://www.roehampton.ac.uk/study/postgraduate-research-courses/
     - https://www.roehampton.ac.uk/study/academic-areas/continuing-education/international-pathways/
+    - https://www.roehampton.ac.uk/study/higher-technicals/
+    - https://www.roehampton.ac.uk/study/apprenticeships/
 
-  bfs_page_budget: 100
+  bfs_page_budget: 50
   max_candidates: 1500
   expected_min_courses: 150
 
@@ -18,8 +27,6 @@ discovery:
     - '/study/[^/]+/[^/]+/$'
     - '/study/clearing'
     - '/study/open-days'
-    - '/study/higher-technicals'
-    - '/study/apprenticeships/$'
     - '/study/short-courses'
     - '/study/study-abroad'
     - '/study/foundation-studies'
@@ -29,15 +36,15 @@ discovery:
     - '/study/academic-areas/$'
     - '/study/academic-areas/[^/]+/$'
 
-  # Course pages sit at 2+ path-segments under /study/
-  # e.g. /study/undergraduate-courses/early-childhood-studies/
-  # e.g. /study/apprenticeships/nursing-associate-apprenticeship/
-  # e.g. /study/academic-areas/continuing-education/international-pathways/international-year-one-in-business/
+  # Course pages: /study/{level}-courses/{slug}/, /study/apprenticeships/{slug}/,
+  # /study/higher-technicals/{slug}/,
+  # /study/academic-areas/{area}/{sub}/{slug}/ (deep pathway courses)
   allow_url_patterns:
     - '/study/undergraduate-courses/[^/?#]+/?$'
     - '/study/postgraduate-taught-courses/[^/?#]+/?$'
     - '/study/postgraduate-research-courses/[^/?#]+/?$'
     - '/study/apprenticeships/[^/?#]+/?$'
+    - '/study/higher-technicals/[^/?#]+/?$'
     - '/study/academic-areas/[^/]+/[^/]+/[^/?#]+/?$'
     - '/study/academic-areas/continuing-education/[^/]+/[^/]+/[^/?#]+/?$'
 
@@ -46,7 +53,8 @@ discovery:
     - '/study/postgraduate-taught-courses/[^/?#]+/?$'
     - '/study/postgraduate-research-courses/[^/?#]+/?$'
     - '/study/apprenticeships/[^/?#]+/?$'
-    - '/study/academic-areas/[^/]+/[^/]+/[^/?#]+/?$'
+    - '/study/higher-technicals/[^/?#]+/?$'
+    - '/study/academic-areas/[^/]+/[^/]+/[^/]+/[^/?#]+/?$'
 
   block_url_patterns:
     - '/apply'
@@ -68,13 +76,18 @@ discovery:
     - '/globalassets/'
     - '/study/clearing'
     - '/study/open-days'
-    - '/study/higher-technicals'
     - '/study/short-courses'
     - '/study/study-abroad'
     - '/study/foundation-studies'
     - '/study/unibuddy'
     - '/study/our-rankings'
     - '/study/our-subject-areas'
+    - '/staff'
+    - '/facilities'
+    - '/earth-day'
+    - '/pgce-offer-holder-page'
+    - '/law-clinic'
+    - '/volunteering'
     - '\.(?:jpg|jpeg|png|gif|webp|svg|pdf)(?:\?|$)'
 
   use_browser: true
