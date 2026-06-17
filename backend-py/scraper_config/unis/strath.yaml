@@ -1,44 +1,33 @@
-# University of Strathclyde
+# University of Strathclyde  (prod uni_id=2168)
 # Hostname: www.strath.ac.uk
 # Country: United Kingdom  |  Currency: GBP
 #
 # Discovery notes (2026-06-17):
 #   The /courses/ listing page contains ~562 <article class="searchitem"> elements
-#   in its STATIC HTML — all courses are server-rendered, no JS fetch needed.
+#   in its STATIC HTML.  All courses are server-rendered; no JS needed.
 #   Each article links to an individual degree page such as
-#   /courses/undergraduate/accounting/ (= "Accounting BA Hons") or
-#   /courses/research/chemistry/ (= "Chemistry MPhil, PhD").
+#   /courses/undergraduate/accounting/ (= "Accounting BA Hons").
 #
-#   Problem: _is_category_landing() returns True for 3-segment paths with no
-#   degree qualifier in the slug, so ALL ~556 article links were being pushed to
-#   the BFS drill-in queue (not the candidate set), causing only 6 candidates
-#   to come from /courses/ and BFS spending 900 pages visiting subject groups.
+#   Problem: _is_category_landing() flagged all ~556 article links as category
+#   hubs (3-segment path, no degree qualifier) → they were pushed to the BFS
+#   drill-in queue, not the candidate set → only 6 candidates per /courses/ visit.
 #
-#   Fix: force_candidate_url_patterns (discovery-level) promotes these URLs
-#   directly to the candidate set, bypassing the _is_category_landing() redirect.
-#   allow_url_patterns is kept so BFS can still VISIT them if queued elsewhere.
-#   bfs_page_budget lowered to 30: /courses/ is the one seed page + a small
-#   buffer for any /studywithus/ nav pages that slip through before blocking.
+#   Fix: force_candidate_url_patterns promotes them directly to the candidate set,
+#   bypassing _is_category_landing().  bfs_page_budget=30 is enough: /courses/
+#   is the only seed page + a small buffer.
 #
-# IMPORTANT: block "/research/" would also block /courses/research/ — use the
+# IMPORTANT: block "/research/" also kills /courses/research/ — use the
 #            hostname-scoped form "strath.ac.uk/research/" instead.
 
 discovery:
   seed_urls:
     - https://www.strath.ac.uk/courses/
 
-  # force_candidate_url_patterns: these 3-segment paths look like category hubs
-  # to _is_category_landing() but ARE individual degree detail pages on Strath.
-  # This promotes all ~562 /courses/ listing articles directly to the candidate
-  # set in a single BFS page visit (matching the original Scrapy spider behaviour).
   force_candidate_url_patterns:
     - '/courses/undergraduate/[^/]+/?$'
     - '/courses/postgraduatetaught/[^/]+/?$'
     - '/courses/research/[^/]+/?$'
 
-  # allow_url_patterns: allow BFS to also VISIT these pages if they get queued
-  # (e.g. from a sibling-course nav link on a detail page).  Kept separate from
-  # force_candidate_url_patterns — they serve different roles.
   allow_url_patterns:
     - '/courses/undergraduate/[^/]+/?$'
     - '/courses/postgraduatetaught/[^/]+/?$'
@@ -59,7 +48,7 @@ discovery:
     - "/strathclydesport/"
     - "cookie"
 
-  bfs_page_budget: 30        # /courses/ single seed page + small buffer; no drill-in needed
+  bfs_page_budget: 30        # /courses/ single seed + small buffer; no drill-in needed
   max_candidates: 700
 
   always_browser_discover: false
@@ -99,6 +88,9 @@ extraction:
       - "Isle of Man"
 
   english:
+    # Spider hardcodes IELTS by URL/degree logic rather than scraping — replicate that here.
+    # Science or engineering undergrad = 6.0 overall, all others = 6.5 overall.
+    # All sub-scores fixed at 5.5 regardless.
     source: static
     ielts_overall_default: "6.5"
     ielts_overall_science_engineering_ug: "6.0"
@@ -106,6 +98,8 @@ extraction:
     ielts_listening: "5.5"
     ielts_reading: "5.5"
     ielts_writing: "5.5"
+
+    # Rule: use 6.0 if URL contains 'science' OR (URL contains 'engineer' AND degree is undergraduate)
     ielts_override_rules:
       - condition: "url_contains=science"
         ielts_overall: "6.0"
@@ -114,49 +108,59 @@ extraction:
 
   selectors:
     course_list:
+      # Matches the spider: //article[contains(@class, 'searchitem')]
       xpath: "//article[contains(@class, 'searchitem')]"
 
     course_name:
       # All page types (UG/PGT/research) wrap the title in span.course-title inside H1.
-      # "//h1/text()" hits nav H1s; "//h1/span[@class='course-title']" is precise.
+      # "//h1/text()" hits nav H1s (wrong); this span selector is precise for all types.
       xpath: "//h1/span[@class='course-title']/text() | //main//h1/span[@class='course-title']/text()"
 
     course_link:
       xpath: ".//a/@href"
 
     degree:
-      # UG/PGT pages: graduation icon div.  Research pages: superscript span in H1.
+      # UG/PGT: graduation icon div.  Research: superscript span in H1 (e.g. "MPhil, PhD").
       xpath: ".//div[contains(./i/@class, 'graduation')] | //h1/span[@class='superscript']/text()"
 
     city:
-      value: "Glasgow"
+      value: "Glasgow"              # spider hardcodes "Glassgow" (typo) — corrected here
 
     study_load:
+      # Spider: //div[contains(@class, 'mode-of-attendance-container')]//div[contains(@class, 'mode-of-attendance-container')]
       xpath: "//div[contains(@class, 'mode-of-attendance-container')]//div[contains(@class, 'mode-of-attendance-container')]"
 
     duration:
+      # Spider: //div[contains(@class, 'key-facts-body')]//div[contains(., 'duration')]
       xpath: "//div[contains(@class, 'key-facts-body')]//div[contains(., 'duration')]"
 
     intake_month:
+      # Spider: //div[contains(@class, 'start-date-container')]/span[contains(@class, 'start-date')]/text()
       xpath: "//div[contains(@class, 'start-date-container')]/span[contains(@class, 'start-date')]/text()"
 
     fee_year_label:
+      # Spider: //div[contains(@id, 'feesfunding')]//ul[contains(@id, 'tabmaster_fees_tabs')]//a[contains(@id, 'tab')]/text()
       xpath: "//div[contains(@id, 'feesfunding')]//ul[contains(@id, 'tabmaster_fees_tabs')]//a[contains(@id, 'tab')]/text()"
 
     fee_international:
       primary:
+        # Spider: //div[contains(@id, 'feesfunding')]//tr/th[contains(., 'nternational')]/following-sibling::td//text()[contains(., '£')]
         xpath: "//div[contains(@id, 'feesfunding')]//tr/th[contains(., 'nternational')]/following-sibling::td//text()[contains(., '£')]"
 
     course_description:
+      # Spider: //div[contains(./h2/text(), 'Why this course')]
       xpath: "//div[contains(./h2/text(), 'Why this course')]"
 
     course_structure:
+      # Spider: //div[contains(@id, 'coursecontent')]
       xpath: "//div[contains(@id, 'coursecontent')]"
 
     other_requirements:
+      # Spider: //div[contains(@id, 'entryrequirement')]
       xpath: "//div[contains(@id, 'entryrequirement')]"
 
     career:
+      # Spider: //div[contains(@id, 'careers')]
       xpath: "//div[contains(@id, 'careers')]"
 
   staging:
