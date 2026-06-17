@@ -1,0 +1,102 @@
+# University of Central Lancashire
+# Hostname: [www.lancashire.ac.uk](https://www.lancashire.ac.uk)
+# Country: United Kingdom  |  Currency: GBP
+# Slug: lancashire
+# Auto-generated: 2026-06-17
+#
+# University of Central Lancashire (UCLan)
+# Hostname: [www.uclan.ac.uk](https://www.uclan.ac.uk)
+# Country: United Kingdom  |  Currency: GBP
+discovery:
+  seed_urls:
+    - https://www.lancashire.ac.uk/courses/a-z/undergraduate
+    - https://www.lancashire.ac.uk/courses/a-z/postgraduate-taught
+    - https://www.lancashire.ac.uk/courses/a-z/degree-apprenticeships
+    - https://www.lancashire.ac.uk/courses/a-z/postgraduate-research
+  # /courses/a-z/undergraduate ends with the bare segment "undergraduate" which
+  # guards.py blocks globally as a category-landing slug.  This override lets
+  # the BFS visit it to crawl its course links without adding the listing page
+  # itself to the candidate set.
+  allow_blocked_listing_patterns:
+    - '/courses/a-z/undergraduate'
+extraction:
+  max_parallel_fetch: 8
+  filters:
+    domestic_only:
+      enabled: false
+    online_only:
+      enabled: false
+  fees:
+    default_currency: GBP
+    prefer_international: true
+    prefer_annual_over_total: true
+    fee_year: "2025"
+    fee_term: "year"
+    reject_keywords:
+      - "Home"
+      - "UK"
+      - "Scottish"
+      - "Channel Islands"
+      - "Isle of Man"
+  english:
+    source: course_page
+    source_xpath: "//div[contains(@class, 'narrowColumn') and contains(.//h2/text(), 'Entry requirement')]"
+    ielts:
+      # Spider: //div[contains(@class, 'narrowColumn') and contains(.//h2/text(), 'Entry requirement')]//li[contains(text(), 'IELTS')]
+      raw_xpath: ".//li[contains(text(), 'IELTS')]"
+      remove_tags: true
+      patterns:
+        overall:
+          - 'ielts:?\s*(\d\.?\d*)'
+        each:
+          - 'no\s*component\s*lower\s*than\s*(\d\.?\d*)'
+      apply_each_to:
+        - ielts_reading
+        - ielts_writing
+        - ielts_listening
+        - ielts_speaking
+  selectors:
+    course_name:
+      xpath: "//h1/text() | //main//h1/text()"
+    city:
+      # Pulled from API response field computedData.campuses (set via api.city_field above)
+      # Fallback to Preston if not in API response
+      value: "Preston"
+    study_load:
+      # Spider: //select[contains(@id, 'attendance')]/option/text()
+      xpath: "//select[contains(@id, 'attendance')]/option/text()"
+    intake_month:
+      # Spider: //select[contains(@id, 'start')]/option/text()
+      xpath: "//select[contains(@id, 'start')]/option/text()"
+    duration:
+      # Spider: //div[contains(@class, 'ciLabel') and contains(text(), 'Duration')]/following-sibling::div[1]//text()
+      xpath: "//div[contains(@class, 'ciLabel') and contains(text(), 'Duration')]/following-sibling::div[1]//text()"
+    study_mode:
+      # Spider: //div[contains(@class, 'ciLabel') and contains(text(), 'Delivery')]/following-sibling::div[1]//text()
+      xpath: "//div[contains(@class, 'ciLabel') and contains(text(), 'Delivery')]/following-sibling::div[1]//text()"
+    fee_international:
+      primary:
+        # Spider: yearTitle div containing '2025' → sibling with 'International' → span with '£' and 'per year'
+        xpath: "//div[contains(@class, 'yearTitle') and contains(text(), '2025')]/following-sibling::div[contains(.//text(), 'International')]//span[contains(text(), '£') and contains(text(), 'per year')]//text()"
+    course_description:
+      # Spider: //div[contains(@class, 'ciInner')]
+      xpath: "//div[contains(@class, 'ciInner')]"
+    course_structure:
+      # Spider: //div[contains(@class, 'modules__tabs')]
+      xpath: "//div[contains(@class, 'modules__tabs')]"
+    other_requirements:
+      # Spider: entry requirement narrowColumn, excluding the calculator CTA div
+      xpath: "//div[contains(@class, 'narrowColumn') and contains(.//h2/text(), 'Entry requirement')]/*[not(self::div[contains(@class, 'erCalcCta')])]"
+    career:
+      # Spider tries 3 fallbacks in order
+      primary:
+        xpath: "//div[contains(@class, 'narrowColumn') and (contains(.//h2/text(), 'career') or contains(.//h2/text(), 'What can I do'))]"
+      fallback_1:
+        xpath: "//div[contains(@id, 'career')]"
+      fallback_2:
+        xpath: "//div[contains(@id, 'ndustry-links-content')]"
+  staging:
+    reject_if_missing:
+      - course_name
+    skip_degree_qualifier_check: false
+    require_international_fee: false
