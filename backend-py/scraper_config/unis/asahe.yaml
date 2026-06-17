@@ -1,0 +1,15 @@
+# asa
+# Hostname: asahe.edu.au
+# Country: Australia  |  Currency: AUD
+# Slug: asahe
+# Auto-generated: 2026-06-08
+#
+# This stub was created automatically on the first scrape of this university.
+# Review and expand it to improve discovery and extraction quality.
+# See scraper_config/defaults.yaml for all available options.
+
+discovery: {}
+
+extraction:
+  fees:
+    default_currency: AUD

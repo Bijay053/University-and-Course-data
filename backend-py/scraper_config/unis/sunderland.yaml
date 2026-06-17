@@ -1,0 +1,261 @@
+# University of Sunderland
+# Hostname: www.sunderland.ac.uk
+# Country: United Kingdom  |  Currency: GBP
+# uni_id: 1763
+#
+# Discovery strategy:
+#   The site is a Contensis CMS React SPA — static HTML has no course links.
+#   The sitemap (141 URLs) is outdated; 32 newer courses only appear in the
+#   /find-a-course page's window.REDUX_DATA navigation tree (187 total).
+#   Strategy: seed ALL 187 nav-tree course URLs directly so every URL that
+#   matches allow_url_patterns is immediately added as a course candidate
+#   without relying on BFS traversal of the SPA shell.
+#   The sitemap supplement runs in parallel and deduplicates.
+
+discovery:
+  sitemap_url: "https://www.sunderland.ac.uk/sitemap.xml"
+  always_sitemap_supplement: true
+
+  # Only depth-2 /postgraduate/<slug> and /undergraduate/<slug> paths are
+  # real course pages.  Known nav/info pages are excluded via the negative
+  # lookahead. The trailing [a-z0-9][a-z0-9-]*$ anchors against depth-3+
+  # sub-paths (e.g. schools-colleges-outreach/post-16).
+  allow_url_patterns:
+    - "sunderland\\.ac\\.uk/(postgraduate|undergraduate)/(?!(conversion-courses|difference-between-ma-msc-degree|llm-criminal-law-procedure|postgraduate-application-form|why-study-postgraduate-degree|how-to-write-personal-statement|freshers-week-guide|schools-colleges-outreach|scitt))[a-z0-9][a-z0-9-]*$"
+    - "sunderland\\.ac\\.uk/course/\\d+"
+
+  # All 187 course URLs extracted from window.REDUX_DATA on /find-a-course
+  # (Contensis CMS navigation tree, captured 2026-06-07).
+  # Seeding these directly bypasses BFS traversal of the JS SPA shell.
+  # The scraper adds each URL to the candidate set as soon as it matches
+  # allow_url_patterns above, without fetching the listing page.
+  seed_urls:
+    - "https://www.sunderland.ac.uk/postgraduate/llm-commercial-law-international-trade"
+    - "https://www.sunderland.ac.uk/postgraduate/llm-criminal-law-procedure"
+    - "https://www.sunderland.ac.uk/postgraduate/llm-international-human-rights"
+    - "https://www.sunderland.ac.uk/postgraduate/llm-law"
+    - "https://www.sunderland.ac.uk/postgraduate/llm-legal-practice"
+    - "https://www.sunderland.ac.uk/postgraduate/llm-terrorism-cyber-warfare"
+    - "https://www.sunderland.ac.uk/postgraduate/ma-advancing-counselling-practice"
+    - "https://www.sunderland.ac.uk/postgraduate/ma-childhood-youth-studies"
+    - "https://www.sunderland.ac.uk/postgraduate/ma-design"
+    - "https://www.sunderland.ac.uk/postgraduate/ma-education"
+    - "https://www.sunderland.ac.uk/postgraduate/ma-integrative-counselling"
+    - "https://www.sunderland.ac.uk/postgraduate/ma-international-education-dl"
+    - "https://www.sunderland.ac.uk/postgraduate/ma-investigative-management"
+    - "https://www.sunderland.ac.uk/postgraduate/ma-journalism-sport-journalism"
+    - "https://www.sunderland.ac.uk/postgraduate/ma-marketing"
+    - "https://www.sunderland.ac.uk/postgraduate/ma-media-production-film-tv"
+    - "https://www.sunderland.ac.uk/postgraduate/ma-modern-music-industries"
+    - "https://www.sunderland.ac.uk/postgraduate/ma-msc-extended-award"
+    - "https://www.sunderland.ac.uk/postgraduate/ma-send"
+    - "https://www.sunderland.ac.uk/postgraduate/ma-social-work"
+    - "https://www.sunderland.ac.uk/postgraduate/ma-visual-practice"
+    - "https://www.sunderland.ac.uk/postgraduate/master-of-medical-education"
+    - "https://www.sunderland.ac.uk/postgraduate/mba-chinese"
+    - "https://www.sunderland.ac.uk/postgraduate/mba-finance"
+    - "https://www.sunderland.ac.uk/postgraduate/mba-hr-management"
+    - "https://www.sunderland.ac.uk/postgraduate/mba-marketing"
+    - "https://www.sunderland.ac.uk/postgraduate/mba-master-of-business-administration"
+    - "https://www.sunderland.ac.uk/postgraduate/mba-professional-practice"
+    - "https://www.sunderland.ac.uk/postgraduate/mba-sports-management"
+    - "https://www.sunderland.ac.uk/postgraduate/mba-supply-chain-management"
+    - "https://www.sunderland.ac.uk/postgraduate/mba-sustainability"
+    - "https://www.sunderland.ac.uk/postgraduate/mba-top-up"
+    - "https://www.sunderland.ac.uk/postgraduate/mba-with-pgcert"
+    - "https://www.sunderland.ac.uk/postgraduate/med-health-professions"
+    - "https://www.sunderland.ac.uk/postgraduate/med-higher-education"
+    - "https://www.sunderland.ac.uk/postgraduate/mentoring-coaching-dl"
+    - "https://www.sunderland.ac.uk/postgraduate/mnurse-adult"
+    - "https://www.sunderland.ac.uk/postgraduate/msc-advanced-engineering-design"
+    - "https://www.sunderland.ac.uk/postgraduate/msc-computing"
+    - "https://www.sunderland.ac.uk/postgraduate/msc-cosmetic-science"
+    - "https://www.sunderland.ac.uk/postgraduate/msc-cybersecurity"
+    - "https://www.sunderland.ac.uk/postgraduate/msc-data-science"
+    - "https://www.sunderland.ac.uk/postgraduate/msc-digital-marketing-analytics"
+    - "https://www.sunderland.ac.uk/postgraduate/msc-drug-discovery-development"
+    - "https://www.sunderland.ac.uk/postgraduate/msc-engineering-management"
+    - "https://www.sunderland.ac.uk/postgraduate/msc-finance-management"
+    - "https://www.sunderland.ac.uk/postgraduate/msc-hr-management-cipd-accredited"
+    - "https://www.sunderland.ac.uk/postgraduate/msc-inequality-society"
+    - "https://www.sunderland.ac.uk/postgraduate/msc-international-business-management"
+    - "https://www.sunderland.ac.uk/postgraduate/msc-leadership-criminal-justice-policing"
+    - "https://www.sunderland.ac.uk/postgraduate/msc-nursing"
+    - "https://www.sunderland.ac.uk/postgraduate/msc-pharmaceutical-biopharmaceutical-formulations"
+    - "https://www.sunderland.ac.uk/postgraduate/msc-project-management"
+    - "https://www.sunderland.ac.uk/postgraduate/msc-psychology-conversion"
+    - "https://www.sunderland.ac.uk/postgraduate/msc-public-health"
+    - "https://www.sunderland.ac.uk/postgraduate/msc-sport-exercise-sciences"
+    - "https://www.sunderland.ac.uk/postgraduate/msc-sustainable-design-manufacture"
+    - "https://www.sunderland.ac.uk/postgraduate/msc-sustainable-tourism"
+    - "https://www.sunderland.ac.uk/postgraduate/msc-tourism-aviation"
+    - "https://www.sunderland.ac.uk/postgraduate/msc-tourism-events"
+    - "https://www.sunderland.ac.uk/postgraduate/msc-tourism-hospitality"
+    - "https://www.sunderland.ac.uk/postgraduate/msc-tourism-scheme-top-up-dl"
+    - "https://www.sunderland.ac.uk/postgraduate/pgce-early-years-teaching-dl"
+    - "https://www.sunderland.ac.uk/postgraduate/pgce-education-dl"
+    - "https://www.sunderland.ac.uk/postgraduate/pgce-further-education-skills"
+    - "https://www.sunderland.ac.uk/postgraduate/pgce-health-professions"
+    - "https://www.sunderland.ac.uk/postgraduate/pgce-higher-education"
+    - "https://www.sunderland.ac.uk/postgraduate/pgce-iqts-dl"
+    - "https://www.sunderland.ac.uk/postgraduate/pgce-primary-education-qts"
+    - "https://www.sunderland.ac.uk/postgraduate/pgce-primary-education-qts-school-based"
+    - "https://www.sunderland.ac.uk/postgraduate/pgce-secondary-education-computer-science"
+    - "https://www.sunderland.ac.uk/postgraduate/pgce-secondary-education-english"
+    - "https://www.sunderland.ac.uk/postgraduate/pgce-secondary-education-history"
+    - "https://www.sunderland.ac.uk/postgraduate/pgce-secondary-education-mathematics"
+    - "https://www.sunderland.ac.uk/postgraduate/pgce-secondary-education-qts-school-based"
+    - "https://www.sunderland.ac.uk/postgraduate/pgce-secondary-education-science-biology"
+    - "https://www.sunderland.ac.uk/postgraduate/pgcert-leadership-change"
+    - "https://www.sunderland.ac.uk/postgraduate/pgcert-medical-education"
+    - "https://www.sunderland.ac.uk/postgraduate/pgcert-send-leading-provision-practice-dl"
+    - "https://www.sunderland.ac.uk/postgraduate/pgdip-medical-education"
+    - "https://www.sunderland.ac.uk/postgraduate/pgdip-msc-clinical-pharmacy"
+    - "https://www.sunderland.ac.uk/postgraduate/pharmaceutical-sciences-overseas-ospap"
+    - "https://www.sunderland.ac.uk/postgraduate/trainee-pharmacist-foundation-programme"
+    - "https://www.sunderland.ac.uk/undergraduate/ba-hons-accounting-finance-professional-exemptions"
+    - "https://www.sunderland.ac.uk/undergraduate/ba-hons-accounting-financial-management-top-up"
+    - "https://www.sunderland.ac.uk/undergraduate/ba-hons-advertising-design"
+    - "https://www.sunderland.ac.uk/undergraduate/ba-hons-animation-games-art"
+    - "https://www.sunderland.ac.uk/undergraduate/ba-hons-applied-investigation"
+    - "https://www.sunderland.ac.uk/undergraduate/ba-hons-banking-finance-top-up"
+    - "https://www.sunderland.ac.uk/undergraduate/ba-hons-business-financial-management"
+    - "https://www.sunderland.ac.uk/undergraduate/ba-hons-business-human-resource-management"
+    - "https://www.sunderland.ac.uk/undergraduate/ba-hons-business-management"
+    - "https://www.sunderland.ac.uk/undergraduate/ba-hons-business-management-stage-3"
+    - "https://www.sunderland.ac.uk/undergraduate/ba-hons-business-marketing-management"
+    - "https://www.sunderland.ac.uk/undergraduate/ba-hons-business-marketing-management-stage-3"
+    - "https://www.sunderland.ac.uk/undergraduate/ba-hons-childhood-society-studies-top-up"
+    - "https://www.sunderland.ac.uk/undergraduate/ba-hons-childhood-studies"
+    - "https://www.sunderland.ac.uk/undergraduate/ba-hons-community-youth-work"
+    - "https://www.sunderland.ac.uk/undergraduate/ba-hons-counselling-top-up"
+    - "https://www.sunderland.ac.uk/undergraduate/ba-hons-education-studies"
+    - "https://www.sunderland.ac.uk/undergraduate/ba-hons-education-studies-in-service"
+    - "https://www.sunderland.ac.uk/undergraduate/ba-hons-english-creative-professional-writing"
+    - "https://www.sunderland.ac.uk/undergraduate/ba-hons-events-management"
+    - "https://www.sunderland.ac.uk/undergraduate/ba-hons-fashion-design-promotion"
+    - "https://www.sunderland.ac.uk/undergraduate/ba-hons-fashion-journalism"
+    - "https://www.sunderland.ac.uk/undergraduate/ba-hons-fashion-product-and-promotion"
+    - "https://www.sunderland.ac.uk/undergraduate/ba-hons-film-media"
+    - "https://www.sunderland.ac.uk/undergraduate/ba-hons-film-production"
+    - "https://www.sunderland.ac.uk/undergraduate/ba-hons-fine-art"
+    - "https://www.sunderland.ac.uk/undergraduate/ba-hons-graphic-design"
+    - "https://www.sunderland.ac.uk/undergraduate/ba-hons-graphic-design-top-up"
+    - "https://www.sunderland.ac.uk/undergraduate/ba-hons-illustration-design"
+    - "https://www.sunderland.ac.uk/undergraduate/ba-hons-journalism"
+    - "https://www.sunderland.ac.uk/undergraduate/ba-hons-mass-communications-top-up"
+    - "https://www.sunderland.ac.uk/undergraduate/ba-hons-media-culture-communication"
+    - "https://www.sunderland.ac.uk/undergraduate/ba-hons-media-production"
+    - "https://www.sunderland.ac.uk/undergraduate/ba-hons-modern-music-industries"
+    - "https://www.sunderland.ac.uk/undergraduate/ba-hons-music-top-up"
+    - "https://www.sunderland.ac.uk/undergraduate/ba-hons-performing-arts"
+    - "https://www.sunderland.ac.uk/undergraduate/ba-hons-photography-video-digital-imaging"
+    - "https://www.sunderland.ac.uk/undergraduate/ba-hons-primary-education-qts"
+    - "https://www.sunderland.ac.uk/undergraduate/ba-hons-primary-send-education-qts"
+    - "https://www.sunderland.ac.uk/undergraduate/ba-hons-screen-performance"
+    - "https://www.sunderland.ac.uk/undergraduate/ba-hons-social-media-management"
+    - "https://www.sunderland.ac.uk/undergraduate/ba-hons-social-work"
+    - "https://www.sunderland.ac.uk/undergraduate/ba-hons-sports-journalism"
+    - "https://www.sunderland.ac.uk/undergraduate/beng-hons-automotive-engineering"
+    - "https://www.sunderland.ac.uk/undergraduate/beng-hons-automotive-engineering-top-up"
+    - "https://www.sunderland.ac.uk/undergraduate/beng-hons-electronic-electrical-engineering"
+    - "https://www.sunderland.ac.uk/undergraduate/beng-hons-electronic-electrical-engineering-top-up"
+    - "https://www.sunderland.ac.uk/undergraduate/beng-hons-mechanical-engineering"
+    - "https://www.sunderland.ac.uk/undergraduate/beng-hons-mechanical-engineering-top-up"
+    - "https://www.sunderland.ac.uk/undergraduate/beng-hons-sustainable-design-engineering"
+    - "https://www.sunderland.ac.uk/undergraduate/beng-hons-sustainable-design-engineering-top-up"
+    - "https://www.sunderland.ac.uk/undergraduate/bsc-hons-adult-nursing-practice"
+    - "https://www.sunderland.ac.uk/undergraduate/bsc-hons-animal-management"
+    - "https://www.sunderland.ac.uk/undergraduate/bsc-hons-applied-business-computing-top-up"
+    - "https://www.sunderland.ac.uk/undergraduate/bsc-hons-audiology"
+    - "https://www.sunderland.ac.uk/undergraduate/bsc-hons-biochemistry"
+    - "https://www.sunderland.ac.uk/undergraduate/bsc-hons-biomedical-science"
+    - "https://www.sunderland.ac.uk/undergraduate/bsc-hons-business-intelligence-data-analytics-top-up"
+    - "https://www.sunderland.ac.uk/undergraduate/bsc-hons-cardiac-physiology"
+    - "https://www.sunderland.ac.uk/undergraduate/bsc-hons-childrens-young-peoples-nursing-practice"
+    - "https://www.sunderland.ac.uk/undergraduate/bsc-hons-clinical-psychology"
+    - "https://www.sunderland.ac.uk/undergraduate/bsc-hons-computer-science"
+    - "https://www.sunderland.ac.uk/undergraduate/bsc-hons-computer-systems-engineering"
+    - "https://www.sunderland.ac.uk/undergraduate/bsc-hons-computer-systems-engineering-top-up"
+    - "https://www.sunderland.ac.uk/undergraduate/bsc-hons-cosmetic-science"
+    - "https://www.sunderland.ac.uk/undergraduate/bsc-hons-criminology"
+    - "https://www.sunderland.ac.uk/undergraduate/bsc-hons-cybersecurity-digital-forensics"
+    - "https://www.sunderland.ac.uk/undergraduate/bsc-hons-esports-event-management"
+    - "https://www.sunderland.ac.uk/undergraduate/bsc-hons-forensic-psychology"
+    - "https://www.sunderland.ac.uk/undergraduate/bsc-hons-game-development"
+    - "https://www.sunderland.ac.uk/undergraduate/bsc-hons-health-social-care"
+    - "https://www.sunderland.ac.uk/undergraduate/bsc-hons-information-and-communication-technology-top-up"
+    - "https://www.sunderland.ac.uk/undergraduate/bsc-hons-international-tourism-aviation-management"
+    - "https://www.sunderland.ac.uk/undergraduate/bsc-hons-international-tourism-hospitality-management"
+    - "https://www.sunderland.ac.uk/undergraduate/bsc-hons-international-tourism-hospitality-management-top-up"
+    - "https://www.sunderland.ac.uk/undergraduate/bsc-hons-mathematics-education-qts"
+    - "https://www.sunderland.ac.uk/undergraduate/bsc-hons-mental-health-nursing-practice"
+    - "https://www.sunderland.ac.uk/undergraduate/bsc-hons-midwifery-practice"
+    - "https://www.sunderland.ac.uk/undergraduate/bsc-hons-mobile-and-web-technologies-top-up"
+    - "https://www.sunderland.ac.uk/undergraduate/bsc-hons-network-systems-engineering-top-up"
+    - "https://www.sunderland.ac.uk/undergraduate/bsc-hons-nursing-top-up"
+    - "https://www.sunderland.ac.uk/undergraduate/bsc-hons-occupational-therapy-accelerated"
+    - "https://www.sunderland.ac.uk/undergraduate/bsc-hons-paramedic-science-out-of-hospital-care"
+    - "https://www.sunderland.ac.uk/undergraduate/bsc-hons-pharmaceutical-science"
+    - "https://www.sunderland.ac.uk/undergraduate/bsc-hons-physical-education-qts"
+    - "https://www.sunderland.ac.uk/undergraduate/bsc-hons-physiotherapy"
+    - "https://www.sunderland.ac.uk/undergraduate/bsc-hons-policing-studies-top-up"
+    - "https://www.sunderland.ac.uk/undergraduate/bsc-hons-professional-policing"
+    - "https://www.sunderland.ac.uk/undergraduate/bsc-hons-psychology"
+    - "https://www.sunderland.ac.uk/undergraduate/bsc-hons-psychology-counselling"
+    - "https://www.sunderland.ac.uk/undergraduate/bsc-hons-sport-exercise-sciences"
+    - "https://www.sunderland.ac.uk/undergraduate/bsc-hons-sport-rehabilitation-therapy"
+    - "https://www.sunderland.ac.uk/undergraduate/bsc-hons-sports-coaching-physical-education"
+    - "https://www.sunderland.ac.uk/undergraduate/certificate-he-sport"
+    - "https://www.sunderland.ac.uk/undergraduate/fda-counselling"
+    - "https://www.sunderland.ac.uk/undergraduate/fdsc-animal-management"
+    - "https://www.sunderland.ac.uk/undergraduate/fdsc-health-social-care"
+    - "https://www.sunderland.ac.uk/undergraduate/fdsc-registered-nursing-associate"
+    - "https://www.sunderland.ac.uk/undergraduate/fdsc-sports-coaching"
+    - "https://www.sunderland.ac.uk/undergraduate/integrated-foundation-year"
+    - "https://www.sunderland.ac.uk/undergraduate/llb-hons-law"
+    - "https://www.sunderland.ac.uk/undergraduate/llb-hons-law-canadian-route"
+    - "https://www.sunderland.ac.uk/undergraduate/mbchb-medicine"
+    - "https://www.sunderland.ac.uk/undergraduate/mpharm-pharmacy"
+
+extraction:
+  fees:
+    default_currency: GBP
+    # NOTE: https://www.sunderland.ac.uk/international/fees returns 404 (React SPA
+    # routing — static HTML gives no fee data).  Remove central_page until a
+    # scrapeable fee URL is found; use degree_level_defaults below instead.
+    # Source: University of Sunderland official fees page / CollegeDunia 2025/26.
+    # UG: £14,500, PGT: £16,500 (range £14,500–21,000; using floor as conservative default).
+    degree_level_defaults:
+      undergraduate: 14500
+      postgraduate: 16500
+      doctorate: 16500
+
+  english:
+    central_page: "https://www.sunderland.ac.uk/english-language-requirements"
+    # IELTS: 6.0 overall, min 5.5 each component (UG and PGT standard).
+    # Source: sunderland.ac.uk/study/international/entry-language-requirements 2025.
+    degree_level_defaults:
+      undergraduate:
+        ielts: 6.0
+      postgraduate:
+        ielts: 6.0
+      doctorate:
+        ielts: 6.0
+
+  # Sunderland is a React SPA — httpx gets 200 SPA shell with no visible
+  # content.  scrape_do_render: true triggers Scrape.do headless Chrome
+  # rendering to get real page content for field extraction.
+  scrape_do_render: true
+
+  study_mode:
+    # Sunderland pages contain "apply online" / "register online" nav copy that
+    # fires the bare \bonline\b fallback → 'Online' at conf=0.70 on every
+    # on-campus course.  Suppress the rule pass so Gemini reads the actual
+    # course content ("On campus", "Full-time") and classifies correctly.
+    suppress_nav_rule: true
+    # "On Campus" is the physical delivery location for Sunderland, already
+    # captured in course_location.  The Mode column should show Full-time /
+    # Part-time (attendance mode), not a duplicate location label.
+    # This clears any "On Campus" study_mode set by any extractor (rule or Gemini).
+    suppress_on_campus: true
