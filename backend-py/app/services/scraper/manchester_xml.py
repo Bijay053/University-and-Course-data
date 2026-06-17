@@ -101,7 +101,10 @@ def _parse_entry(li_body: str, base_url: str, level_label: str, academic_level: 
     if not href_m:
         return None
     href = href_m.group(1).strip()
-    full_url = base_url.rstrip("/") + "/" + href.lstrip("/")
+    # The XML feed URL ends in …/xml/ but per-course pages drop that segment.
+    # e.g. feed base: …/courses/2026/xml/  →  course base: …/courses/2026/
+    course_base = re.sub(r"/xml/?$", "/", base_url.rstrip("/") + "/")
+    full_url = course_base.rstrip("/") + "/" + href.lstrip("/")
 
     # Extract title: content of <a>, strip <span class="screenreader"> and tags
     title_m = _TITLE_RE.search(li_body)

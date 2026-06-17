@@ -31,19 +31,19 @@ extraction:
   browser_wait_strategy: domcontentloaded
 
   allow_url_patterns:
-    - '(?i)/study/undergraduate/courses/\d{4}/xml/\d+/[^/]+/?$'
-    - '(?i)/study/masters/courses/list/xml/\d+/[^/]+/?$'
-    - '(?i)/study/postgraduate-research/programmes/list/xml/\d+/[^/]+/?$'
+    - '(?i)/study/undergraduate/courses/\d{4}/\d+/[^/]+/?$'
+    - '(?i)/study/masters/courses/list/\d+/[^/]+/?$'
+    - '(?i)/study/postgraduate-research/programmes/list/\d+/[^/]+/?$'
 
   course_detail_url_patterns:
-    - '(?i)/study/undergraduate/courses/\d{4}/xml/\d+/[^/]+/?$'
-    - '(?i)/study/masters/courses/list/xml/\d+/[^/]+/?$'
-    - '(?i)/study/postgraduate-research/programmes/list/xml/\d+/[^/]+/?$'
+    - '(?i)/study/undergraduate/courses/\d{4}/\d+/[^/]+/?$'
+    - '(?i)/study/masters/courses/list/\d+/[^/]+/?$'
+    - '(?i)/study/postgraduate-research/programmes/list/\d+/[^/]+/?$'
 
   force_detail_pages:
-    - '(?i)/study/undergraduate/courses/\d{4}/xml/\d+/[^/]+/?$'
-    - '(?i)/study/masters/courses/list/xml/\d+/[^/]+/?$'
-    - '(?i)/study/postgraduate-research/programmes/list/xml/\d+/[^/]+/?$'
+    - '(?i)/study/undergraduate/courses/\d{4}/\d+/[^/]+/?$'
+    - '(?i)/study/masters/courses/list/\d+/[^/]+/?$'
+    - '(?i)/study/postgraduate-research/programmes/list/\d+/[^/]+/?$'
 
   filters:
     domestic_only:
