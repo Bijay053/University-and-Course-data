@@ -15,7 +15,7 @@ discovery:
     per_page: 100
     city: Manchester
     currency: GBP
-    fee_year: 2025
+    fee_year: "2025"
 extraction:
   fees:
     default_currency: GBP
