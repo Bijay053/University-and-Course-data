@@ -1,58 +1,47 @@
 # The University of Manchester
 # Hostname: www.manchester.ac.uk
 # Country: United Kingdom  |  Currency: GBP
+#
+# Discovery strategy (2026-06-17):
+#   Manchester publishes three public XML course feeds that enumerate every
+#   taught programme and research degree (~934 courses total):
+#
+#     UG  (~366): https://www.manchester.ac.uk/study/undergraduate/courses/{year}/xml/
+#     PGT (~321): https://www.manchester.ac.uk/study/masters/courses/list/xml/
+#     PGR (~247): https://www.manchester.ac.uk/study/postgraduate-research/programmes/list/xml/
+#
+#   Each <li id="idNNNNN"> entry carries: course name, degree type, duration
+#   (and UCAS code for UG). Full course URL = xml_base + href.
+#
+#   The XML feeds are public and NOT Cloudflare-protected (fetched directly
+#   via manchester_xml.py provider). Per-course detail pages ARE protected;
+#   scrape.do is used for per-course extraction.
 
 discovery:
-  # Pulls directly from your spider's fast structured XML repository entry paths
-  seed_urls:
-    - https://www.manchester.ac.uk/study/postgraduate-research/programmes/list/xml/
-    - https://www.manchester.ac.uk/study/masters/courses/list/xml/
-    - https://www.manchester.ac.uk/study/undergraduate/courses/2026/xml/
-
-  # Shield landing endpoints from being processed as final details sheets
-  force_index_pages:
-    - '(?i)/list/xml/?$'
-    - '(?i)/courses/2026/xml/?$'
-
-  listing_only_patterns:
-    - '(?i)/xml/?$'
-
-  # FIX 1: Explicitly include /xml/ inside patterns to validate and keep the raw XML path keys intact
-  allow_url_patterns:
-    - '(?i)/study/undergraduate/courses/2026/xml/\d+/[^/]+/?$'
-    - '(?i)/study/masters/courses/list/xml/\d+/[^/]+/?$'
-    - '(?i)/study/postgraduate-research/programmes/list/xml/\d+/[^/]+/?$'
-
-  # Ensures matching criteria maps final leaf entries precisely
-  course_detail_url_patterns:
-    - '(?i)/study/undergraduate/courses/2026/xml/\d+/[^/]+/?$'
-    - '(?i)/study/masters/courses/list/xml/\d+/[^/]+/?$'
-    - '(?i)/study/postgraduate-research/programmes/list/xml/\d+/[^/]+/?$'
-
-  block_url_patterns:
-    - "/news"
-    - "/events"
-    - "/staff/"
-    - "/about"
-    - "/contact"
-    - "/linkassets/"
-
-  bfs_page_budget: 80
-  max_candidates: 3500
-  expected_min_courses: 800
-  always_browser_discover: false
-  skip_browser_discovery: true
+  manchester_xml:
+    ug_year: "2026"        # UG feed rotates annually — update each admissions cycle
+    include_ug:  true      # ~366 undergraduate courses
+    include_pgt: true      # ~321 postgraduate taught (Masters) courses
+    include_pgr: true      # ~247 postgraduate research (PhD/MPhil) courses
 
 extraction:
-  # Maintain a single-worker threshold to glide smoothly beneath active security firewalls
-  max_parallel_fetch: 1
+  max_parallel_fetch: 2
   skip_browser_rescue: false
   skip_per_course_browser: false
   browser_wait_strategy: domcontentloaded
 
-  # FIX 2: Synchronized detail page overrides to prevent framework misclassification drops
+  allow_url_patterns:
+    - '(?i)/study/undergraduate/courses/\d{4}/xml/\d+/[^/]+/?$'
+    - '(?i)/study/masters/courses/list/xml/\d+/[^/]+/?$'
+    - '(?i)/study/postgraduate-research/programmes/list/xml/\d+/[^/]+/?$'
+
+  course_detail_url_patterns:
+    - '(?i)/study/undergraduate/courses/\d{4}/xml/\d+/[^/]+/?$'
+    - '(?i)/study/masters/courses/list/xml/\d+/[^/]+/?$'
+    - '(?i)/study/postgraduate-research/programmes/list/xml/\d+/[^/]+/?$'
+
   force_detail_pages:
-    - '(?i)/study/undergraduate/courses/2026/xml/\d+/[^/]+/?$'
+    - '(?i)/study/undergraduate/courses/\d{4}/xml/\d+/[^/]+/?$'
     - '(?i)/study/masters/courses/list/xml/\d+/[^/]+/?$'
     - '(?i)/study/postgraduate-research/programmes/list/xml/\d+/[^/]+/?$'
 
@@ -124,47 +113,6 @@ extraction:
         - toefl_writing
         - toefl_listening
         - toefl_speaking
-
-  selectors:
-    # Direct mapping onto your XML list node target elements
-    course_list:
-      xpath: "//li[.//a]"
-
-    # Replicates your compound concatenation text string logic mapping perfectly
-    course_name:
-      xpath: "concat(.//div[contains(@class, 'degree')]/text(), ' ', .//a/text()) | //h1[contains(@class, 'course-title')]/text() | //h1/text() | //main//h1"
-
-    # Handles baseline conditional mapping logic inside the internal URL string values
-    degree:
-      xpath: "CASE WHEN contains(self::url(), 'undergraduate') THEN 'undergraduate' WHEN contains(self::url(), 'masters') THEN 'masters' ELSE 'postgraduate-research' END"
-
-    course_link:
-      xpath: ".//a/@href | ./@href"
-
-    study_load:
-      xpath: ".//div[contains(@class, 'duration')]/text() | //*[contains(@class, 'duration') or contains(@class, 'mode')]/text() | //li[contains(., 'Full-time') or contains(., 'Part-time')]/text()"
-
-    duration:
-      xpath: ".//div[contains(@class, 'duration')]/text() | //dt[contains(., 'Duration')]/following-sibling::dd[1]/text()"
-      also_use_as_study_load: false
-
-    course_description:
-      xpath: "//div[contains(@class, 'course-profile-content')] | //div[contains(@id, 'overview')] | //section[contains(@id, 'course-profile')]"
-
-    course_structure:
-      xpath: "//div[contains(@id, 'course-details')] | //section[contains(@id, 'structure')] | //div[contains(@class, 'course-profile-content')]"
-
-    career:
-      xpath: "//div[contains(@id, 'careers')] | //section[contains(@id, 'opportunities')]"
-
-    other_requirements:
-      xpath: "//div[contains(@id, 'entry-requirements')] | //section[contains(@id, 'requirements')]"
-
-    fee_international:
-      primary:
-        xpath: "//*[contains(text(), 'International') or contains(text(), 'Overseas')]/following-sibling::*[contains(text(), '£')]/text()"
-      fallback:
-        xpath: "//table[contains(@class, 'fees')]//tr[contains(., 'International') or contains(., 'Overseas')]/td[contains(., '£')]/text() | //p[contains(., 'International') and contains(., '£')]/text()"
 
   text_cleaning:
     global_substring_blocklist:

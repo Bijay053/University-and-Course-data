@@ -894,6 +894,36 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 else:
                     log.warning("[RECIPE] json_api returned 0 links — falling through to BFS discovery")
 
+        # ── Manchester XML catalogue provider ─────────────────────────────────
+        # When discovery.manchester_xml is set, fetch all courses from the
+        # three public XML feeds (UG/PGT/PGR) — no BFS, no browser needed for
+        # discovery.  Per-course HTML extraction still runs normally (links-only
+        # provider).  Per-course pages are Cloudflare-protected; the extractor
+        # must route via scrape.do (extraction.use_scrape_do: true in YAML).
+        _manchester_xml_cfg = getattr(_uni_cfg.discovery, "manchester_xml", None)
+        if _manchester_xml_cfg is not None and getattr(_manchester_xml_cfg, "enabled", True):
+            from app.services.scraper.manchester_xml import fetch_manchester_xml_links
+            log.info("[MANCHESTER-XML] XML discovery configured — fetching feeds …")
+            _mx_error: str | None = None
+            try:
+                links = await fetch_manchester_xml_links(_manchester_xml_cfg, emit=emit)
+            except Exception as _mx_exc:  # noqa: BLE001
+                log.error("[MANCHESTER-XML] provider failed: %s", _mx_exc, exc_info=True)
+                links = []
+                _mx_error = str(_mx_exc)
+            _always_browser = False  # XML feeds don't need browser discovery
+            if not links:
+                _failure_msg = (
+                    "Manchester XML provider returned 0 links — aborting. "
+                    "Check that the XML feed URLs are reachable and ug_year is correct. "
+                    f"Provider error: {_mx_error or 'none'}."
+                )
+                log.error(_failure_msg)
+                job.status = "failed"
+                job.error_message = _failure_msg
+                await db.commit()
+                return
+
         # ── SearchStax Solr provider (e.g. University of Huddersfield) ────────
         # ── Swiftype API provider ─────────────────────────────────────────────
         # When discovery.swiftype is set, fetch all courses from the Swiftype

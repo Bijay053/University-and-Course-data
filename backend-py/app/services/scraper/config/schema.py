@@ -731,6 +731,51 @@ class SsrPropDiscoveryConfig(BaseModel):
     )
 
 
+class ManchesterXmlConfig(BaseModel):
+    """University of Manchester XML catalogue discovery provider.
+
+    Manchester publishes three machine-readable XML course lists that enumerate
+    every taught programme and research degree (~934 courses total).  This
+    provider fetches all three feeds and returns discovery links for normal
+    per-course HTML extraction (links-only — no result short-circuit).
+
+    Per-course pages are Cloudflare-protected; set
+    ``extraction.use_scrape_do: true`` so the extractor routes through
+    scrape.do rather than direct HTTP.
+
+    Example YAML::
+
+        discovery:
+          manchester_xml:
+            ug_year: "2026"
+    """
+
+    enabled: bool = Field(
+        default=True,
+        description="Set false to disable without removing the config block.",
+    )
+    ug_year: str = Field(
+        default="2026",
+        description=(
+            "Academic year for the UG XML feed URL.  Manchester rotates this "
+            "annually — check the course-search page source if 0 UG courses "
+            "are returned.  E.g. '2026' for the 2026/27 entry cohort."
+        ),
+    )
+    include_ug: bool = Field(
+        default=True,
+        description="Include the Undergraduate XML feed (~366 courses).",
+    )
+    include_pgt: bool = Field(
+        default=True,
+        description="Include the Postgraduate Taught (Masters) XML feed (~321 courses).",
+    )
+    include_pgr: bool = Field(
+        default=True,
+        description="Include the Postgraduate Research (PhD/MPhil) XML feed (~247 courses).",
+    )
+
+
 class SwiftypeConfig(BaseModel):
     """Swiftype public search API provider.
 
@@ -790,6 +835,15 @@ class SwiftypeConfig(BaseModel):
 class DiscoveryConfig(BaseModel):
     """Safe to replay against unknown universities (Tier-3 playbook matching)."""
 
+    manchester_xml: Optional[ManchesterXmlConfig] = Field(
+        default=None,
+        description=(
+            "When present, discover courses from the University of Manchester's "
+            "three public XML feeds (UG, PGT, PGR) instead of BFS crawling. "
+            "Returns discovery links only — per-course HTML extraction runs "
+            "normally via scrape.do.  See ManchesterXmlConfig."
+        ),
+    )
     searchstax: Optional[SearchStaxConfig] = Field(
         default=None,
         description=(
