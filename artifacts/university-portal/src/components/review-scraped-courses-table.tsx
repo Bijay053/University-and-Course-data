@@ -1040,7 +1040,10 @@ export function ReviewScrapedCoursesTable({ courses, readOnly, showEvidence, uni
                     </td>
                     <td className="p-2 text-xs text-gray-600 align-top">
                       {course.intakeMonths?.length ? (
-                        course.intakeMonths.map(m => m.slice(0, 3)).join(", ")
+                        (Array.isArray(course.intakeMonths)
+                          ? course.intakeMonths
+                          : String(course.intakeMonths).split(",").map(s => s.trim()).filter(Boolean)
+                        ).map(m => String(m).slice(0, 3)).join(", ")
                       ) : <MissingBadge title="Missing intake months" />}
                     </td>
                     <td className="p-2 text-xs text-gray-600 align-top">
