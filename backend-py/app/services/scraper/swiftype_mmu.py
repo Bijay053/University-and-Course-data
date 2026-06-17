@@ -274,7 +274,7 @@ def _map_record(rec: dict, cfg: Any) -> Optional[dict]:
 
     city = getattr(cfg, "city", "Manchester")
     currency = getattr(cfg, "currency", "GBP")
-    fee_year = getattr(cfg, "fee_year", "2025")
+    fee_year = int(getattr(cfg, "fee_year", 2025))
 
     # ── Build payload ─────────────────────────────────────────────────────────
     payload: dict[str, Any] = {
