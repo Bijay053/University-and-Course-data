@@ -2448,6 +2448,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         _skip_url_filters_searchstax = (
             _searchstax_cfg is not None
             or (getattr(_uni_cfg.discovery, "swiftype", None) is not None)
+            or (getattr(_uni_cfg.discovery, "manchester_xml", None) is not None)
         )
         if _skip_url_filters_searchstax and links:
             log.info(
