@@ -1,0 +1,145 @@
+# University of Strathclyde
+# Hostname: www.strath.ac.uk
+# Country: United Kingdom  |  Currency: GBP
+
+discovery:
+  # Seed the three main A-Z listing pages directly so BFS collects all subject
+  # links in 3 pages without wasting budget crawling /studywithus/ etc.
+  seed_urls:
+    - https://www.strath.ac.uk/courses/undergraduate/
+    - https://www.strath.ac.uk/courses/postgraduatetaught/
+    - https://www.strath.ac.uk/courses/postgraduateresearch/
+
+  allow_url_patterns:
+    - '/courses/undergraduate/[^/]+/?$'
+    - '/courses/postgraduatetaught/[^/]+/?$'
+    - '/courses/postgraduateresearch/[^/]+/?$'
+
+  block_url_patterns:
+    - "/studywithus/"
+    - "/whystrathclyde/"
+    - "/workwithus/"
+    - "/research/"
+    - "/staff/"
+    - "/news/"
+    - "/events/"
+    - "/about/"
+    - "/contact/"
+    - "/media/"
+    - "/professionalservices/"
+    - "/strathclydesport/"
+    - "cookie"
+
+  bfs_page_budget: 600       # enough to visit all ~537 subject pages if listing paginates
+  max_candidates: 1500       # generous cap above 537 expected courses
+
+  always_browser_discover: false
+  skip_browser_discovery: true      # static HTML renders all courses; no JS needed
+
+extraction:
+  max_parallel_fetch: 8
+
+  force_detail_pages:
+    - '(?i)/courses/undergraduate/[^/]+/?$'
+    - '(?i)/courses/postgraduatetaught/[^/]+/?$'
+    - '(?i)/courses/postgraduateresearch/[^/]+/?$'
+
+  filters:
+    domestic_only:
+      enabled: false
+    online_only:
+      enabled: false
+
+  fees:
+    default_currency: GBP
+    prefer_international: true
+    prefer_annual_over_total: true
+    fee_year: "2025"
+    fee_term: "year"
+    reject_keywords:
+      - "Home"
+      - "UK"
+      - "Scottish"
+      - "Channel Islands"
+      - "Isle of Man"
+
+  english:
+    # Spider hardcodes IELTS by URL/degree logic rather than scraping — replicate that here.
+    # Science or engineering undergrad = 6.0 overall, all others = 6.5 overall.
+    # All sub-scores fixed at 5.5 regardless.
+    source: static
+    ielts_overall_default: "6.5"
+    ielts_overall_science_engineering_ug: "6.0"
+    ielts_speaking: "5.5"
+    ielts_listening: "5.5"
+    ielts_reading: "5.5"
+    ielts_writing: "5.5"
+
+    # Rule: use 6.0 if URL contains 'science' OR (URL contains 'engineer' AND degree is undergraduate)
+    ielts_override_rules:
+      - condition: "url_contains=science"
+        ielts_overall: "6.0"
+      - condition: "url_contains=engineer AND degree_level=undergraduate"
+        ielts_overall: "6.0"
+
+  selectors:
+    course_list:
+      # Matches the spider: //article[contains(@class, 'searchitem')]
+      xpath: "//article[contains(@class, 'searchitem')]"
+
+    course_name:
+      # Spider: course.xpath(".//h2/text()")
+      xpath: "//h1/text() | //main//h1/text()"
+
+    course_link:
+      xpath: ".//a/@href"
+
+    degree:
+      # Spider: remove_tags(course.xpath(".//div[contains(./i/@class, 'graduation')]"))
+      xpath: ".//div[contains(./i/@class, 'graduation')]"
+
+    city:
+      value: "Glasgow"              # spider hardcodes "Glassgow" (typo) — corrected here
+
+    study_load:
+      # Spider: //div[contains(@class, 'mode-of-attendance-container')]//div[contains(@class, 'mode-of-attendance-container')]
+      xpath: "//div[contains(@class, 'mode-of-attendance-container')]//div[contains(@class, 'mode-of-attendance-container')]"
+
+    duration:
+      # Spider: //div[contains(@class, 'key-facts-body')]//div[contains(., 'duration')]
+      xpath: "//div[contains(@class, 'key-facts-body')]//div[contains(., 'duration')]"
+
+    intake_month:
+      # Spider: //div[contains(@class, 'start-date-container')]/span[contains(@class, 'start-date')]/text()
+      xpath: "//div[contains(@class, 'start-date-container')]/span[contains(@class, 'start-date')]/text()"
+
+    fee_year_label:
+      # Spider: //div[contains(@id, 'feesfunding')]//ul[contains(@id, 'tabmaster_fees_tabs')]//a[contains(@id, 'tab')]/text()
+      xpath: "//div[contains(@id, 'feesfunding')]//ul[contains(@id, 'tabmaster_fees_tabs')]//a[contains(@id, 'tab')]/text()"
+
+    fee_international:
+      primary:
+        # Spider: //div[contains(@id, 'feesfunding')]//tr/th[contains(., 'nternational')]/following-sibling::td//text()[contains(., '£')]
+        xpath: "//div[contains(@id, 'feesfunding')]//tr/th[contains(., 'nternational')]/following-sibling::td//text()[contains(., '£')]"
+
+    course_description:
+      # Spider: //div[contains(./h2/text(), 'Why this course')]
+      xpath: "//div[contains(./h2/text(), 'Why this course')]"
+
+    course_structure:
+      # Spider: //div[contains(@id, 'coursecontent')]
+      xpath: "//div[contains(@id, 'coursecontent')]"
+
+    other_requirements:
+      # Spider: //div[contains(@id, 'entryrequirement')]
+      xpath: "//div[contains(@id, 'entryrequirement')]"
+
+    career:
+      # Spider: //div[contains(@id, 'careers')]
+      xpath: "//div[contains(@id, 'careers')]"
+
+  staging:
+    reject_if_missing:
+      - course_name
+    skip_degree_qualifier_check: false
+    require_international_fee: false
