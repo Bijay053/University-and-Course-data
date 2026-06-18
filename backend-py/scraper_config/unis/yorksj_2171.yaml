@@ -1,15 +1,50 @@
-# York St. Joint University
+# York St John University (York St. Joint University)
 # Hostname: www.yorksj.ac.uk
 # Country: United Kingdom  |  Currency: GBP
-# Slug: yorksj
-# Auto-generated: 2026-06-18
-#
-# This stub was created automatically on the first scrape of this university.
-# Review and expand it to improve discovery and extraction quality.
-# See scraper_config/defaults.yaml for all available options.
+# Discovery: Standard server-rendered HTML extraction via /courses/ listing
+# Notes: Based on legacy Scrapy spider. Spider explicitly skipped "Professional / CPD" degrees.
 
-discovery: {}
+discovery:
+  always_sitemap_supplement: true
+  allow_url_patterns:
+    - '/courses/'
+  block_url_patterns:
+    - '/news'
+    - '/events'
+    - '/about'
+    - '/staff'
+    - '/research'
 
 extraction:
   fees:
-    default_currency: GBP
+    default_currency: 'GBP'
+    prefer_international: true
+    prefer_annual_over_total: true
+    reject_keywords:
+      - 'Home student'
+      - 'Home fee'
+      - 'UK student'
+      - 'UK fee'
+      - 'Domestic'
+
+  english:
+    trust_vision_ocr: false
+    course_english_priority: true
+
+  intake:
+    start_dates_only: true
+
+  course_name:
+    strip_title_suffixes:
+      - ' | York St John University'
+      - ' - York St John University'
+
+  filters:
+    online_only:
+      enabled: false  
+
+  staging:
+    reject_if_missing:
+      - course_name
+    skip_degree_qualifier_check: true
+    require_international_fee: false
