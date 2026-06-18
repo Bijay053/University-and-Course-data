@@ -194,6 +194,31 @@ def classify_degree_level(course_name: str, page_text: str = "") -> tuple[str | 
     if hit:
         return hit, "page_lead", page_lead.strip()[:150]
 
+    # Strategy 5: body-qualification scan — search full page text for a
+    # pattern "[DegreeQualifier] [course_name]".  Handles CMS / JS frameworks
+    # (e.g. Roehampton) that dynamically strip the degree prefix from <title>
+    # so the title becomes "AI and Digital Media" instead of
+    # "MA AI and Digital Media", but the qualifier still appears in the page
+    # body (e.g. "MA AI and Digital Media is a studio-based …").
+    if name:
+        _escaped = re.escape(name)
+        _body_qual_re = re.compile(
+            r"\b(MA|MSc|MBA|MArch|MRes|MPhil|MEng|MEd|MLaw|LLM|MFA|MDes"
+            r"|MComp|MChem|MPhys|MMath|MSocSc"
+            r"|BSc|BA|BEng|BEd|BArts|BNurs|BBus|BBA|BSW|BArch"
+            r"|PGCert|PGDip|PGCE|Graduate\s+Certificate|Graduate\s+Diploma"
+            r"|PhD|DPhil|DBA|EdD)\b"
+            r"(?:\s+\([Hh]ons?\))?\s+"
+            + _escaped,
+            re.IGNORECASE,
+        )
+        _body_m = _body_qual_re.search(plain)
+        if _body_m:
+            _qual = _body_m.group(1)
+            _hit = _classify_text(_qual, _NAME_PATTERNS)
+            if _hit:
+                return _hit, "body_qual", _body_m.group(0)[:120]
+
     return None, "unknown", None
 
 

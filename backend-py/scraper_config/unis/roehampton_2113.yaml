@@ -110,6 +110,15 @@ extraction:
       - "UK student"
       - "Domestic"
 
+  study_mode:
+    # The Roehampton mega-nav has an "Online Postgraduate Degrees" link on
+    # EVERY page (pointing to onlinestudy.roehampton.ac.uk).  The bare
+    # \bonline\b fallback fires on this nav text and wrongly classifies all
+    # on-campus courses as Online.  Suppress the rule-based pass entirely —
+    # Gemini reads the actual course content and classifies correctly.
+    suppress_nav_rule: true
+    online_only_requires_strong_evidence: true
+
   english:
     central_page: https://www.roehampton.ac.uk/international/entry-requirements/english-language-requirements/
     source: course_page

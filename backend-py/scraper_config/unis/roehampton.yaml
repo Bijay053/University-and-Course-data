@@ -110,6 +110,10 @@ extraction:
       - "UK student"
       - "Domestic"
 
+  study_mode:
+    suppress_nav_rule: true
+    online_only_requires_strong_evidence: true
+
   english:
     central_page: https://www.roehampton.ac.uk/international/entry-requirements/english-language-requirements/
     source: course_page

@@ -955,6 +955,82 @@ def _from_uwl_nationality_select(
     return amount, ctx
 
 
+def _from_roehampton_int_tab(
+    html: str, url: str
+) -> "tuple[int, str] | None":
+    """Roehampton-specific fee pre-pass: reads the International students fee
+    from the 'Fees and funding' tabset.
+
+    Roehampton course pages render two tab panels in the Fees section:
+        class="tab-panel col-12 active"  → UK students  (£9,535 – £11,250)
+        class="tab-panel col-12"         → International (£18,980 – £25,250)
+
+    The generic cascade flattens all tab text and either picks the UK fee
+    (it appears first in the DOM) or a spurious small amount whose context
+    window accidentally captures an "International" nav link, bypassing the
+    GBP floor guard.  This pre-pass reads ONLY the non-active International
+    tab panel and returns the first plausible GBP amount (≥ £10,000).
+
+    Returns (amount_int, ctx_string) or None when not applicable / section
+    absent.
+    """
+    from urllib.parse import urlparse as _urlparse
+
+    host = (_urlparse(url or "").hostname or "").lower()
+    if "roehampton.ac.uk" not in host:
+        return None
+
+    try:
+        from bs4 import BeautifulSoup
+    except ImportError:  # pragma: no cover
+        return None
+
+    try:
+        soup = BeautifulSoup(html, "html.parser")
+    except Exception:  # pragma: no cover
+        return None
+
+    # Locate the "Fees and funding" tabset by its feature-heading h2.
+    fees_tabset = None
+    for tabset in soup.find_all("div", class_="tabset"):
+        h2 = tabset.find(
+            "h2",
+            string=re.compile(r"Fees\s+and\s+funding", re.I),
+        )
+        if h2:
+            fees_tabset = tabset
+            break
+    if fees_tabset is None:
+        return None
+
+    # Within the fee tabset find the non-active tab panel (International).
+    for panel in fees_tabset.find_all("div", class_=True):
+        cls: list[str] = panel.get("class") or []
+        if "tab-panel" not in cls or "active" in cls:
+            continue
+        # Confirm International students panel.
+        heading_text = " ".join(
+            el.get_text(strip=True)
+            for el in panel.find_all(["h2", "h3", "h4"])
+        )
+        if not re.search(r"\binternational\b", heading_text, re.I):
+            continue
+        # Extract first fee amount ≥ £10,000 from table cells.
+        for td in panel.find_all("td"):
+            raw = td.get_text(strip=True)
+            m = _AMOUNT_RE.search(raw)
+            if not m:
+                continue
+            raw_num = m.group(2) or m.group(3) or ""
+            amount = _parse_amount(raw_num)
+            if amount is None or amount < _GBP_INTL_MIN:
+                continue
+            ctx = f"Roehampton intl-tab: {raw[:80]}"
+            return amount, ctx
+
+    return None
+
+
 def _from_bcu_int_fee_panel(
     html: str, url: str
 ) -> "tuple[int, str] | None":
@@ -1083,6 +1159,31 @@ async def extract(
                 confidence=0.97,
                 snippet=_uwl_ctx[:120],
                 method="fee.uwl_nationality_select",
+            )
+        ]
+
+    # ── Pre-pass Roehampton: International students tab panel ────────────────
+    # Roehampton renders UK (active) and International (hidden) tab panels in
+    # the "Fees and funding" tabset on every course page.  The generic cascade
+    # picks the UK fee (appears first) or a small spurious amount whose context
+    # window captured an "International" nav link (bypassing the GBP floor).
+    # This pre-pass reads only the non-active International panel directly.
+    _roehampt_fee = _from_roehampton_int_tab(html, url)
+    if _roehampt_fee is not None:
+        _rh_amount, _rh_ctx = _roehampt_fee
+        return [
+            ExtractionResult(
+                field_key="international_fee",
+                value=_rh_amount,
+                normalized={
+                    "international_fee": _rh_amount,
+                    "currency": "GBP",
+                    "fee_term": "Annual",
+                    "fee_year": _extract_year(_rh_ctx),
+                },
+                confidence=0.96,
+                snippet=_rh_ctx[:120],
+                method="fee.roehampton_intl_tab",
             )
         ]
 
