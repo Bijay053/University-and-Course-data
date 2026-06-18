@@ -232,28 +232,33 @@ async def _replay_job_inner(
     diffs: list[dict] = []
     replayed = changed = unchanged = errors = 0
 
-    sem = asyncio.Semaphore(4)  # modest concurrency — replay is CPU-bound
+    # Concurrency cap: S3 download + extraction share one semaphore.
+    # IMPORTANT: keep the download *inside* the semaphore.  If downloads run
+    # outside, asyncio.gather launches all N tasks simultaneously and every
+    # task opens a fresh aioboto3 HTTP session before the semaphore gate —
+    # producing N (potentially 500+) concurrent S3 connections which floods
+    # the asyncio event loop and freezes the server.
+    sem = asyncio.Semaphore(6)  # 6 concurrent download+extract slots
 
     async def _replay_one(snap: PageSnapshot, snap_idx: int) -> None:
         nonlocal replayed, changed, unchanged, errors
-        # Early emit so the console shows activity immediately, before the S3
-        # download and extraction complete.  All tasks fire this as soon as
-        # asyncio.gather launches them, giving the user instant visual feedback.
-        if emit:
-            await emit(
-                "status",
-                f"↪ [{snap_idx}/{len(snapshots)}] {snap.course_url[:85]}",
-            )
         try:
-            raw_bytes = await download_snapshot(snap.storage_path)
-            if not raw_bytes:
-                log.warning("[REPLAY] S3 download failed for %s", snap.storage_path)
-                errors += 1
-                if emit:
-                    await emit("warn", f"S3 download failed: {snap.course_url[:80]}")
-                return
-
             async with sem:
+                # Emit early inside the semaphore so the user sees which
+                # courses are actively being processed.
+                if emit:
+                    await emit(
+                        "status",
+                        f"↪ [{snap_idx}/{len(snapshots)}] {snap.course_url[:85]}",
+                    )
+                raw_bytes = await download_snapshot(snap.storage_path)
+                if not raw_bytes:
+                    log.warning("[REPLAY] S3 download failed for %s", snap.storage_path)
+                    errors += 1
+                    if emit:
+                        await emit("warn", f"S3 download failed: {snap.course_url[:80]}")
+                    return
+
                 with replay_mode_scope():
                     if snap.snapshot_type == "json":
                         # API JSON snapshot — deserialise and re-apply guards

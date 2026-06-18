@@ -2062,7 +2062,9 @@ export default function Scraping() {
       const params = new URLSearchParams();
       if (courseUrl) params.set("course_url", courseUrl);
       const qs = params.size > 0 ? `?${params}` : "";
-      const res = await fetch(`/api/scrape/replay/${jobId}/stream${qs}`);
+      const res = await fetch(`/api/scrape/replay/${jobId}/stream${qs}`, {
+        credentials: "include",
+      });
       if (!res.ok) {
         const msg = await res.text().catch(() => String(res.status));
         throw new Error(`Server returned ${res.status}: ${msg}`);
