@@ -1,7 +1,7 @@
-# Middlesex University
-# Hostname: www.mdx.ac.uk
+# York St. Joint University
+# Hostname: www.yorksj.ac.uk
 # Country: United Kingdom  |  Currency: GBP
-# Slug: mdx
+# Slug: yorksj
 # Auto-generated: 2026-06-18
 #
 # This stub was created automatically on the first scrape of this university.
@@ -13,9 +13,3 @@ discovery: {}
 extraction:
   fees:
     default_currency: GBP
-
-  staging:
-    reject_if_missing:
-      - course_name
-    skip_degree_qualifier_check: true
-    require_international_fee: false
