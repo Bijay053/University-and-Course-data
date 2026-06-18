@@ -109,6 +109,11 @@ _NAME_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"\bassociate\s+degree\b", re.IGNORECASE), "Associate Degree"),
     (re.compile(r"\badvanced\s+diploma\b", re.IGNORECASE), "Advanced Diploma"),
     (re.compile(r"\bdiploma\b", re.IGNORECASE), "Diploma"),
+    # "Cert" — standalone abbreviation for Certificate used by UCLan/Lancashire
+    # and other UK universities (e.g. hero-banner badge "Cert", JSON-LD name
+    # "Astronomy, Cert").  Must come AFTER \bPGCert\b (line ~70) so that
+    # Postgraduate Certificates are classified correctly first.
+    (re.compile(r"\bCert\b"), "Certificate"),
     (re.compile(r"\bcertificate\b", re.IGNORECASE), "Certificate"),
 )
 

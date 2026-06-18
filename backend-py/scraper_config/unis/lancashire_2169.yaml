@@ -13,6 +13,17 @@ discovery:
     - https://www.lancashire.ac.uk/courses/a-z/postgraduate-taught
     - https://www.lancashire.ac.uk/courses/a-z/degree-apprenticeships
     - https://www.lancashire.ac.uk/courses/a-z/postgraduate-research
+    # CPD (Continuing Professional Development) short courses — different URL
+    # structure (/cpd/courses/{slug}) and different page template from the
+    # main /courses/ catalogue.  Add as a separate seed so the BFS discovers
+    # individual course pages under this path.
+    - https://www.lancashire.ac.uk/cpd/courses/
+  listing_only_patterns:
+    # CPD index / category listing pages — visit to crawl links but do NOT
+    # stage them as course candidates themselves.
+    - '/cpd/?$'
+    - '/cpd/courses/?$'
+    - '/cpd/courses/\?'
   # /courses/a-z/undergraduate ends with the bare segment "undergraduate" which
   # guards.py blocks globally as a category-landing slug.  This override lets
   # the BFS visit it to crawl its course links without adding the listing page
@@ -69,11 +80,13 @@ extraction:
       # Spider: //select[contains(@id, 'start')]/option/text()
       xpath: "//select[contains(@id, 'start')]/option/text()"
     duration:
-      # Spider: //div[contains(@class, 'ciLabel') and contains(text(), 'Duration')]/following-sibling::div[1]//text()
-      xpath: "//div[contains(@class, 'ciLabel') and contains(text(), 'Duration')]/following-sibling::div[1]//text()"
+      # Regular course pages: ciLabel "Duration" + sibling div.
+      # CPD course pages: variant-details__item > dt "DURATION" > dd (e.g. "1 year").
+      xpath: "//div[contains(@class, 'ciLabel') and contains(text(), 'Duration')]/following-sibling::div[1]//text() | //div[contains(@class, 'variant-details__item') and .//dt[contains(text(), 'DURATION')]]//dd/text()"
     study_mode:
-      # Spider: //div[contains(@class, 'ciLabel') and contains(text(), 'Delivery')]/following-sibling::div[1]//text()
-      xpath: "//div[contains(@class, 'ciLabel') and contains(text(), 'Delivery')]/following-sibling::div[1]//text()"
+      # Regular course pages: ciLabel "Delivery" + sibling div.
+      # CPD course pages: variant-details__item > dt "DELIVERY" > dd (e.g. "Online learning").
+      xpath: "//div[contains(@class, 'ciLabel') and contains(text(), 'Delivery')]/following-sibling::div[1]//text() | //div[contains(@class, 'variant-details__item') and .//dt[contains(text(), 'DELIVERY')]]//dd/text()"
     fee_international:
       primary:
         # Spider: yearTitle div containing '2025' → sibling with 'International' → span with '£' and 'per year'
