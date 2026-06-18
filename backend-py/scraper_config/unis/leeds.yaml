@@ -15,6 +15,7 @@
 
 discovery:
   bfs_page_budget: 80
+  max_candidates: 700
   always_sitemap_supplement: true
 
   seed_urls:
