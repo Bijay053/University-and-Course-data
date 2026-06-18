@@ -1,0 +1,45 @@
+# University of Leeds
+# Hostname: www.leeds.ac.uk
+# Country: United Kingdom  |  Currency: GBP
+# Discovery: Standard HTML extraction via course-search pagination
+# Notes: Extracted from legacy Scrapy spider. Includes specific query parameters for undergraduate and postgraduate search terms.
+
+discovery:
+  always_sitemap_supplement: true
+  seed_urls:
+    - 'https://courses.leeds.ac.uk/course-search/undergraduate-courses?type=UG&term=202526'
+    - 'https://courses.leeds.ac.uk/course-search/masters-courses?type=PGT&term=202526'
+  block_url_patterns:
+    - '/news'
+    - '/events'
+    - '/about'
+    - '/research'
+    - '/staff'
+
+extraction:
+  fees:
+    default_currency: 'GBP'
+    prefer_international: true
+    prefer_annual_over_total: true
+    reject_keywords:
+      - 'Home student'
+      - 'Home fee'
+      - 'UK student'
+      - 'UK fee'
+      - 'Domestic'
+
+  english:
+    trust_vision_ocr: false
+    course_english_priority: true
+
+  intake:
+    start_dates_only: true
+
+  course_name:
+    strip_title_suffixes:
+      - ' | University of Leeds'
+      - ' - University of Leeds'
+
+  filters:
+    online_only:
+      enabled: false
