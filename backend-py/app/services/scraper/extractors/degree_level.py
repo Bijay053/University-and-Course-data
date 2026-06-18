@@ -208,7 +208,9 @@ def classify_degree_level(course_name: str, page_text: str = "") -> tuple[str | 
             r"|BSc|BA|BEng|BEd|BArts|BNurs|BBus|BBA|BSW|BArch"
             r"|PGCert|PGDip|PGCE|Graduate\s+Certificate|Graduate\s+Diploma"
             r"|PhD|DPhil|DBA|EdD)\b"
-            r"(?:\s+\([Hh]ons?\))?\s+"
+            r"(?:\s+\([Hh]ons?\))?"
+            # Allow optional preposition: "MA in AI…", "BSc of Computing…"
+            r"\s+(?:(?:in|of|for|by|with|on)\s+)?"
             + _escaped,
             re.IGNORECASE,
         )
