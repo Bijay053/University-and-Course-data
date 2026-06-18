@@ -7,8 +7,8 @@
 discovery:
   always_sitemap_supplement: true
   seed_urls:
-    - 'https://courses.leeds.ac.uk/course-search/undergraduate-courses?type=UG&term=202526'
-    - 'https://courses.leeds.ac.uk/course-search/masters-courses?type=PGT&term=202526'
+    - 'https://courses.leeds.ac.uk/course-search/undergraduate-courses?type=UG&term=202627'
+    - 'https://courses.leeds.ac.uk/course-search/masters-courses?type=PGT&term=202627'
   block_url_patterns:
     - '/news'
     - '/events'
