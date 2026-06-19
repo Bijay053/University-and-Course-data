@@ -121,6 +121,15 @@ _HOST_CDX_URL_PREFIX: dict[str, str] = {
     # sub-tree is missed, but render_listing_pages covers it separately.
     "www.londonmet.ac.uk": "www.londonmet.ac.uk/courses/*",
     "londonmet.ac.uk": "www.londonmet.ac.uk/courses/*",
+    # Leeds: real course pages live on courses.leeds.ac.uk (a separate subdomain
+    # from the main www.leeds.ac.uk site).  CDX for www.leeds.ac.uk/* returns
+    # 10 000 archived URLs — mostly 1990s /acom/leedsetc/course/*.htm garbage
+    # that match Wayback's "looks like course" heuristic but stage 0 real data.
+    # Targeting courses.leeds.ac.uk/* fetches archived course-catalogue pages
+    # in the courses.leeds.ac.uk/NNNNNN/<code>/<slug> format that our
+    # allow_url_patterns accepts.
+    "www.leeds.ac.uk": "courses.leeds.ac.uk/*",
+    "courses.leeds.ac.uk": "courses.leeds.ac.uk/*",
 }
 
 
