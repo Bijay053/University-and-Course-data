@@ -99,10 +99,16 @@ extraction:
     # max_annual_fee: 100000
 
     # Keywords that identify domestic / HECS / CSP fees — discard these.
+    #
+    # NOTE: "Domestic", "New Zealand citizen", "NZ citizen" removed.
+    # Auckland fee pages show both rates in the same block:
+    #   International students: $48,133/yr
+    #   Domestic students: $8,000/yr
+    # "Domestic" appears in the evidence window of the international fee, so
+    # these broad keywords caused FEE_REJECT on the correct value, triggering a
+    # full Gemini enrichment call for every course. prefer_international: true
+    # already handles the domestic vs international selection.
     reject_keywords:
-      - "Domestic"
-      - "New Zealand citizen"
-      - "NZ citizen"
       - "CSP"
       - "HECS"
       - "Government-funded"
