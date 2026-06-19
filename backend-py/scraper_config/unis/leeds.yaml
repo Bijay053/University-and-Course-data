@@ -5,68 +5,23 @@
 #
 # Bug history / rationale:
 #   - Default BFS budget (25) exhausts before all listing pages are visited.
-#     Leeds has ~21 UG pages (~316 courses) + ~19 PGT pages (~280 courses) = 40 listing
-#     pages, far exceeding the default cap.
-#   - BFS also follows term=202728 next-year variants, wasting budget on duplicates;
-#     blocked below.
-#   - Fix: raise bfs_page_budget to 80 and pre-seed all paginated listing URLs so
-#     the BFS queue contains every page from the start, not just what it can discover
-#     by link-following within a tight budget.
+#     Leeds has ~21 UG pages (~316 courses) + ~19 PGT pages (~280 courses).
+#   - Default candidate cap (500) cut discovery at 499 courses.
+#   - Tried pre-seeding all 42 paginated URLs — caused rate-limit/IP-block when
+#     all 42 fired simultaneously; also wasteful because the two base seed URLs
+#     already embed all pagination links in their static HTML, so the BFS discovers
+#     them naturally without pre-seeding.
+#   - Fix: two simple seed URLs + raised budget/candidate cap.  On a clean IP the
+#     BFS follows all pagination links and reaches 545+ candidates within budget.
 
 discovery:
   bfs_page_budget: 80
   max_candidates: 700
-  always_sitemap_supplement: true
+  always_sitemap_supplement: false   # sitemap returns 0 for courses.leeds.ac.uk
 
   seed_urls:
-    # ── Undergraduate (UG) — 2026/27 cohort ──────────────────────────────────
-    # ~316 UG courses at 15 per page = 22 pages (last page may be partial).
-    # Pages pre-seeded so the BFS visits all without needing link discovery.
-    - 'https://courses.leeds.ac.uk/course-search/undergraduate-courses?page=1&start_rank=1&type=UG&term=202627'
-    - 'https://courses.leeds.ac.uk/course-search/undergraduate-courses?page=2&start_rank=16&type=UG&term=202627'
-    - 'https://courses.leeds.ac.uk/course-search/undergraduate-courses?page=3&start_rank=31&type=UG&term=202627'
-    - 'https://courses.leeds.ac.uk/course-search/undergraduate-courses?page=4&start_rank=46&type=UG&term=202627'
-    - 'https://courses.leeds.ac.uk/course-search/undergraduate-courses?page=5&start_rank=61&type=UG&term=202627'
-    - 'https://courses.leeds.ac.uk/course-search/undergraduate-courses?page=6&start_rank=76&type=UG&term=202627'
-    - 'https://courses.leeds.ac.uk/course-search/undergraduate-courses?page=7&start_rank=91&type=UG&term=202627'
-    - 'https://courses.leeds.ac.uk/course-search/undergraduate-courses?page=8&start_rank=106&type=UG&term=202627'
-    - 'https://courses.leeds.ac.uk/course-search/undergraduate-courses?page=9&start_rank=121&type=UG&term=202627'
-    - 'https://courses.leeds.ac.uk/course-search/undergraduate-courses?page=10&start_rank=136&type=UG&term=202627'
-    - 'https://courses.leeds.ac.uk/course-search/undergraduate-courses?page=11&start_rank=151&type=UG&term=202627'
-    - 'https://courses.leeds.ac.uk/course-search/undergraduate-courses?page=12&start_rank=166&type=UG&term=202627'
-    - 'https://courses.leeds.ac.uk/course-search/undergraduate-courses?page=13&start_rank=181&type=UG&term=202627'
-    - 'https://courses.leeds.ac.uk/course-search/undergraduate-courses?page=14&start_rank=196&type=UG&term=202627'
-    - 'https://courses.leeds.ac.uk/course-search/undergraduate-courses?page=15&start_rank=211&type=UG&term=202627'
-    - 'https://courses.leeds.ac.uk/course-search/undergraduate-courses?page=16&start_rank=226&type=UG&term=202627'
-    - 'https://courses.leeds.ac.uk/course-search/undergraduate-courses?page=17&start_rank=241&type=UG&term=202627'
-    - 'https://courses.leeds.ac.uk/course-search/undergraduate-courses?page=18&start_rank=256&type=UG&term=202627'
-    - 'https://courses.leeds.ac.uk/course-search/undergraduate-courses?page=19&start_rank=271&type=UG&term=202627'
-    - 'https://courses.leeds.ac.uk/course-search/undergraduate-courses?page=20&start_rank=286&type=UG&term=202627'
-    - 'https://courses.leeds.ac.uk/course-search/undergraduate-courses?page=21&start_rank=301&type=UG&term=202627'
-    - 'https://courses.leeds.ac.uk/course-search/undergraduate-courses?page=22&start_rank=316&type=UG&term=202627'
-
-    # ── Postgraduate Taught (PGT) — 2026/27 cohort ───────────────────────────
-    # ~280 PGT courses at 15 per page = 19 pages; 20th page added as safety.
-    - 'https://courses.leeds.ac.uk/course-search/masters-courses?page=1&start_rank=1&type=PGT&term=202627'
-    - 'https://courses.leeds.ac.uk/course-search/masters-courses?page=2&start_rank=16&type=PGT&term=202627'
-    - 'https://courses.leeds.ac.uk/course-search/masters-courses?page=3&start_rank=31&type=PGT&term=202627'
-    - 'https://courses.leeds.ac.uk/course-search/masters-courses?page=4&start_rank=46&type=PGT&term=202627'
-    - 'https://courses.leeds.ac.uk/course-search/masters-courses?page=5&start_rank=61&type=PGT&term=202627'
-    - 'https://courses.leeds.ac.uk/course-search/masters-courses?page=6&start_rank=76&type=PGT&term=202627'
-    - 'https://courses.leeds.ac.uk/course-search/masters-courses?page=7&start_rank=91&type=PGT&term=202627'
-    - 'https://courses.leeds.ac.uk/course-search/masters-courses?page=8&start_rank=106&type=PGT&term=202627'
-    - 'https://courses.leeds.ac.uk/course-search/masters-courses?page=9&start_rank=121&type=PGT&term=202627'
-    - 'https://courses.leeds.ac.uk/course-search/masters-courses?page=10&start_rank=136&type=PGT&term=202627'
-    - 'https://courses.leeds.ac.uk/course-search/masters-courses?page=11&start_rank=151&type=PGT&term=202627'
-    - 'https://courses.leeds.ac.uk/course-search/masters-courses?page=12&start_rank=166&type=PGT&term=202627'
-    - 'https://courses.leeds.ac.uk/course-search/masters-courses?page=13&start_rank=181&type=PGT&term=202627'
-    - 'https://courses.leeds.ac.uk/course-search/masters-courses?page=14&start_rank=196&type=PGT&term=202627'
-    - 'https://courses.leeds.ac.uk/course-search/masters-courses?page=15&start_rank=211&type=PGT&term=202627'
-    - 'https://courses.leeds.ac.uk/course-search/masters-courses?page=16&start_rank=226&type=PGT&term=202627'
-    - 'https://courses.leeds.ac.uk/course-search/masters-courses?page=17&start_rank=241&type=PGT&term=202627'
-    - 'https://courses.leeds.ac.uk/course-search/masters-courses?page=18&start_rank=256&type=PGT&term=202627'
-    - 'https://courses.leeds.ac.uk/course-search/masters-courses?page=19&start_rank=271&type=PGT&term=202627'
-    - 'https://courses.leeds.ac.uk/course-search/masters-courses?page=20&start_rank=286&type=PGT&term=202627'
+    - 'https://courses.leeds.ac.uk/course-search/undergraduate-courses?type=UG&term=202627'
+    - 'https://courses.leeds.ac.uk/course-search/masters-courses?type=PGT&term=202627'
 
   block_url_patterns:
     - '/news'
@@ -74,7 +29,7 @@ discovery:
     - '/about'
     - '/research'
     - '/staff'
-    # Block next-year term so the BFS doesn't waste budget visiting 202728 duplicates
+    # Block next-year duplicates so the BFS doesn't waste budget on them
     - 'term=202728'
     - 'term=202829'
 
