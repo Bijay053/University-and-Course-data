@@ -7,15 +7,22 @@
 #   - Default BFS budget (25) exhausts before all listing pages are visited.
 #     Leeds has ~21 UG pages (~316 courses) + ~19 PGT pages (~280 courses).
 #   - Default candidate cap (500) cut discovery at 499 courses.
-#   - Pre-seeding 42 paginated URLs caused simultaneous burst → IP rate-limit.
-#   - After run 2 (80 pages fetched), Cloudflare/rate-limit blocks all direct
-#     HTTP fetches from our server IP. BFS returns 0, falls back to Wayback (159).
-#   - Fix: use render_listing_pages (Scrape.do residential proxy) so each
-#     listing page is fetched from a clean residential IP that bypasses the block.
-#     render_listing_pages_static: true uses static mode (~$0.0005/page, not $0.006)
-#     since the course results ARE present in the raw SSR HTML without JS execution
-#     (confirmed by runs 1 & 2 where static fetch returned 16 course links per page).
-#   - Total cost: 42 pages × $0.0005 = ~$0.02 per scrape run.
+#   - After run 2 (80 pages fetched), Cloudflare/rate-limit blocked our server
+#     IP permanently.  BFS returns 0, Wayback fallback activates.
+#   - Wayback CDX for www.leeds.ac.uk/* returns 10,000 URLs — includes 1990s
+#     archived pages (/acom/leedsetc/course/, /aed/courses/credit/) that look
+#     like course paths but are ancient HTML files with no usable data.  All
+#     173 of them staged 0 courses.  Blocked by allow_url_patterns now.
+#   - render_listing_pages_static: true (tried) — Funnelback search uses JS to
+#     render the correct page for each ?page=N&start_rank=N URL.  Static mode
+#     ignores the params and returns the default page-1 results for every URL,
+#     so 42 pages × Scrape.do static = 16 unique links (all dupes of page 1).
+#   - Fix: remove render_listing_pages_static so headless Chrome (JS enabled)
+#     executes the Funnelback JS and renders each paginated page correctly.
+#     Each Scrape.do render call costs ~$0.006; 42 pages ≈ $0.25 per run.
+#   - allow_url_patterns restricts candidates to courses.leeds.ac.uk/NNNNN/
+#     paths — the format all real current Leeds courses use — which blocks both
+#     the Wayback garbage and any www.leeds.ac.uk/* non-course noise.
 
 discovery:
   bfs_page_budget: 80
@@ -26,6 +33,14 @@ discovery:
     - 'https://courses.leeds.ac.uk/course-search/undergraduate-courses?type=UG&term=202627'
     - 'https://courses.leeds.ac.uk/course-search/masters-courses?type=PGT&term=202627'
 
+  # Only accept real Leeds course URLs — format is courses.leeds.ac.uk/<term>/<code>/<slug>
+  # or courses.leeds.ac.uk/<legacy-id>/<Name>.  This blocks:
+  #   - www.leeds.ac.uk/acom/leedsetc/course/*.htm  (1990s Wayback archive)
+  #   - www.leeds.ac.uk/aed/courses/*               (archived adult-education pages)
+  #   - any other www.leeds.ac.uk/* noise the Wayback CDX surfaces
+  allow_url_patterns:
+    - 'courses\.leeds\.ac\.uk/\d+'
+
   block_url_patterns:
     - '/news'
     - '/events'
@@ -35,11 +50,11 @@ discovery:
     - 'term=202728'
     - 'term=202829'
 
-  # Fetch all paginated listing pages via Scrape.do residential proxy.
-  # These bypass the IP block that direct HTTP from our server hits after
-  # a heavy crawl.  Static mode (no headless Chrome) is sufficient because
-  # Funnelback renders course cards server-side in the initial HTML response.
-  render_listing_pages_static: true
+  # Fetch all paginated listing pages via Scrape.do headless Chrome.
+  # render_listing_pages_static is NOT set (defaults to false) — Funnelback
+  # renders the correct page only after JS executes; static mode ignores URL
+  # params and returns page-1 results for every URL.
+  # Cost: 42 pages × ~$0.006 = ~$0.25 per run.
   render_listing_pages:
     # ── Undergraduate (UG) — 2026/27 cohort (~316 courses, 22 pages) ─────────
     - 'https://courses.leeds.ac.uk/course-search/undergraduate-courses?page=1&start_rank=1&type=UG&term=202627'
