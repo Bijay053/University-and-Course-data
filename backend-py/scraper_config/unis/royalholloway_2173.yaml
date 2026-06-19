@@ -2,21 +2,26 @@
 # Hostname: www.royalholloway.ac.uk
 # Country: United Kingdom  |  Currency: GBP
 # Slug: royalholloway
-# Auto-generated: 2026-06-19
 #
-# Course URL pattern: /studying-here/(undergraduate|postgraduate)/<dept>/<course-slug>
-# Non-course pages that BFS finds (/ug-prospectus, /pg-prospectus, /fees-and-funding,
-# /applying, /prospectuses-and-brochures) are filtered out by allow_url_patterns.
+# Course URL pattern: /studying-here/(undergraduate|postgraduate|central-london-campus)/<dept>/<course-slug>
+# Research degrees are under /studying-here/postgraduate/ (e.g. /postgraduate/mathematics/mathematics-phd)
 
 discovery:
-  # Only accept actual course pages — 4-segment paths under undergraduate/postgraduate.
-  # This blocks /ug-prospectus, /pg-prospectus, /studying-here/fees-and-funding, etc.
+  # Only accept 4-segment course paths under studying-here.
+  # Blocks /ug-prospectus, /pg-prospectus, /fees-and-funding/*, etc.
+  # central-london-campus added for the London campus courses (1 course was missing without it).
   allow_url_patterns:
-    - 'royalholloway\.ac\.uk/studying-here/(undergraduate|postgraduate)/[^/]+/[^/]+'
+    - 'royalholloway\.ac\.uk/studying-here/(undergraduate|postgraduate|central-london-campus)/[^/]+/[^/]+'
 
 extraction:
   fees:
     default_currency: GBP
+  filters:
+    # Disabled: study_mode extractor picks up "Online" from page text at conf=0.50
+    # on courses that are actually On Campus — this caused 12/44 courses to be
+    # rejected as online_only. Royal Holloway courses are campus-based.
+    online_only:
+      enabled: false
   staging:
     reject_if_missing:
       - course_name
