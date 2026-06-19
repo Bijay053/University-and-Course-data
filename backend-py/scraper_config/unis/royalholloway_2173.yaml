@@ -5,11 +5,17 @@
 #
 # Course URL pattern: /studying-here/(undergraduate|postgraduate|central-london-campus)/<dept>/<course-slug>
 # Research degrees are under /studying-here/postgraduate/ (e.g. /postgraduate/mathematics/mathematics-phd)
+#
+# Discovery notes:
+#   - /studying-here/ root page finds ~46 course links directly, but 2 PG courses are
+#     only reachable via department sub-pages (e.g. /postgraduate/classics/ancient-history).
+#     BFS budget raised to 50 so it can visit more dept sub-pages before hitting the cap.
 
 discovery:
+  bfs_page_budget: 50
+
   # Only accept 4-segment course paths under studying-here.
   # Blocks /ug-prospectus, /pg-prospectus, /fees-and-funding/*, etc.
-  # central-london-campus added for the London campus courses (1 course was missing without it).
   allow_url_patterns:
     - 'royalholloway\.ac\.uk/studying-here/(undergraduate|postgraduate|central-london-campus)/[^/]+/[^/]+'
 
@@ -17,9 +23,8 @@ extraction:
   fees:
     default_currency: GBP
   filters:
-    # Disabled: study_mode extractor picks up "Online" from page text at conf=0.50
-    # on courses that are actually On Campus — this caused 12/44 courses to be
-    # rejected as online_only. Royal Holloway courses are campus-based.
+    # Disabled: study_mode extractor reads "Online" from page text at conf=0.50
+    # on courses that are actually On Campus — causes false online_only rejections.
     online_only:
       enabled: false
   staging:
