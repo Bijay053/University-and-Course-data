@@ -113,6 +113,14 @@ _HOST_CDX_URL_PREFIX: dict[str, str] = {
     # targeted path prefix (/study/courses/*, /courses/*) returns real course
     # pages from the CDX index.  The default www.jcu.edu.au/* query is used
     # as a harmless final fallback; browser discovery is the primary path.
+    # London Met: CDX for www.londonmet.ac.uk/* returns 10 000 URLs sorted in
+    # SURT order — /applying/* sorts before /courses/* alphabetically and
+    # exhausts the 10 000-row cap before real course URLs appear.  Targeting
+    # /courses/* returns only the course subtree: UG, PG, research, extended-
+    # degrees, top-up, routes-into-teaching, etc.  The /research/courses/*
+    # sub-tree is missed, but render_listing_pages covers it separately.
+    "www.londonmet.ac.uk": "www.londonmet.ac.uk/courses/*",
+    "londonmet.ac.uk": "www.londonmet.ac.uk/courses/*",
 }
 
 

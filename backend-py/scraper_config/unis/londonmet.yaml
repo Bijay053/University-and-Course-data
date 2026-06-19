@@ -99,9 +99,15 @@ extraction:
 
   filters:
     domestic_only:
-      # londonmet_chrome_scrub.apply_overrides() detects has_international_options()
-      # via <select> dropdown and returns is_domestic_only=True for UK-only courses.
-      enabled: true
+      # Disabled (2026-06-19): londonmet_chrome_scrub.has_international_options()
+      # checks for data-fee-type="International" options in the <select> dropdown.
+      # The <select id="course-entry-point-selector"> IS server-rendered in static
+      # HTML, but its <option> children are JS-populated — so the static HTML has
+      # an empty <select> → has_international_options() returns False for every
+      # course → is_domestic_only=True → 31/34 courses silently rejected.
+      # With enabled: false, the chrome_scrub domestic_only flag is never set;
+      # staging relies on _DOMESTIC_ONLY_RE regex on page text and operator review.
+      enabled: false
 
   fees:
     default_currency: "GBP"
