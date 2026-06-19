@@ -1,0 +1,20 @@
+# The University of Portsmouth
+# Hostname: www.port.ac.uk
+# Country: United Kingdom  |  Currency: GBP
+# Slug: port
+# Auto-generated: 2026-06-19
+#
+# This stub was created automatically on the first scrape of this university.
+# Review and expand it to improve discovery and extraction quality.
+# See scraper_config/defaults.yaml for all available options.
+
+discovery: 
+  seed_urls:
+    - https://www.port.ac.uk/study/courses?type=Connected_Degrees+Degree_Apprenticeship+Dual_degree+Foundation_year+Learning_at_Work+London_campus+New_course+Pathway+Placement_degree+Professional_and_Flexible_Learning+Teacher_training+Top-up_degree
+    - https://www.port.ac.uk/study/courses?page=2&type=Connected_Degrees+Degree_Apprenticeship+Dual_degree+Foundation_year+Learning_at_Work+London_campus+New_course+Pathway+Placement_degree+Professional_and_Flexible_Learning+Teacher_training+Top-up_degree
+    - https://www.port.ac.uk/study/courses?page=3&type=Connected_Degrees+Degree_Apprenticeship+Dual_degree+Foundation_year+Learning_at_Work+London_campus+New_course+Pathway+Placement_degree+Professional_and_Flexible_Learning+Teacher_training+Top-up_degree
+    - https://www.port.ac.uk/study/courses?page=14&type=Connected_Degrees+Degree_Apprenticeship+Dual_degree+Foundation_year+Learning_at_Work+London_campus+New_course+Pathway+Placement_degree+Professional_and_Flexible_Learning+Teacher_training+Top-up_degree
+
+extraction:
+  fees:
+    default_currency: GBP
