@@ -40,6 +40,25 @@ discovery:
   # full 482-URL course catalogue and must always be merged in.
   always_sitemap_supplement: true
 
+  # Seed the three known JS-rendered listing pages so the BFS queues them.
+  # Static fetch returns an empty shell (~54 KB, 0 course links) — courses
+  # are loaded via AJAX after page load.  The render_listing_pages block
+  # below re-fetches them via Scrape.do headless Chrome to extract the
+  # JS-rendered course links as an additional discovery source.
+  seed_urls:
+    - 'https://www.londonmet.ac.uk/courses/undergraduate/'
+    - 'https://www.londonmet.ac.uk/courses/postgraduate/'
+    - 'https://www.londonmet.ac.uk/research/courses/'
+
+  # Fetch the three listing pages with Scrape.do headless Chrome (JS enabled).
+  # render_listing_pages_static is NOT set (defaults to false) because the
+  # course cards are rendered entirely by JavaScript — static mode returns 0
+  # links.  Each render costs ~$0.006 via Scrape.do.
+  render_listing_pages:
+    - 'https://www.londonmet.ac.uk/courses/undergraduate/'
+    - 'https://www.londonmet.ac.uk/courses/postgraduate/'
+    - 'https://www.londonmet.ac.uk/research/courses/'
+
   # Pre-filter the 7,920-URL sitemap down to actual course pages BEFORE
   # they consume candidate-cap slots.  Keys on the `---<degree>` infix
   # that every real LondonMet course URL contains (e.g.
