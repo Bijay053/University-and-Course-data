@@ -1,0 +1,44 @@
+# Ulster University
+# Hostname: www.ulster.ac.uk
+# Country: United Kingdom  |  Currency: GBP
+#
+# Discovery notes (2026-06-19):
+#   - Course listing at /courses uses Funnelback JS search — static HTML returns
+#     only 4 navigation links. BFS found 34 candidates, all non-course pages,
+#     staged only 1 course.
+#   - Funnelback pagination: start_rank increments by 40 (40 results per page).
+#   - Individual course pages are at /courses/<slug>.
+#   - Fix: render_listing_pages (Scrape.do headless Chrome) for each Funnelback
+#     page + allow_url_patterns restricted to /courses/<slug> so BFS cannot
+#     wander into /study/*, /doctoralcollege/*, /departments, etc.
+#   - 10 pages × 40 = 400 capacity, covers Ulster's full catalogue.
+
+discovery:
+  # Only accept individual course pages at /courses/<slug>.
+  # Blocks /study, /doctoralcollege, /departments, /faculties and all info pages.
+  allow_url_patterns:
+    - 'ulster\.ac\.uk/courses/[^/?]+'
+
+  # Render all Funnelback paginated listing pages via Scrape.do headless Chrome.
+  # Static fetch returns 4 navigation links; rendered fetch shows real course cards.
+  render_listing_pages:
+    - 'https://www.ulster.ac.uk/courses'
+    - 'https://www.ulster.ac.uk/courses?&start_rank=41'
+    - 'https://www.ulster.ac.uk/courses?&start_rank=81'
+    - 'https://www.ulster.ac.uk/courses?&start_rank=121'
+    - 'https://www.ulster.ac.uk/courses?&start_rank=161'
+    - 'https://www.ulster.ac.uk/courses?&start_rank=201'
+    - 'https://www.ulster.ac.uk/courses?&start_rank=241'
+    - 'https://www.ulster.ac.uk/courses?&start_rank=281'
+    - 'https://www.ulster.ac.uk/courses?&start_rank=321'
+    - 'https://www.ulster.ac.uk/courses?&start_rank=361'
+
+extraction:
+  fees:
+    default_currency: GBP
+  filters:
+    online_only:
+      enabled: false
+  staging:
+    skip_degree_qualifier_check: true
+    require_international_fee: false
