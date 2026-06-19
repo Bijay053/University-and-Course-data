@@ -44,7 +44,11 @@ discovery:
   # adds all same-host links; the extraction gate then drops non-course pages.
 
   # Block obvious non-course paths early to save BFS budget.
+  # Also blocks Wayback CDX junk: the CDX for londonmet.ac.uk returns thousands
+  # of /applying/academic-term-dates/ and /applying/postgraduate/ URLs that the
+  # extraction gate drops anyway — blocking them here avoids wasted gate cycles.
   block_url_patterns:
+    - "/applying/"
     - "/courses/short/"
     - "/courses/short-courses/"
     - "/courses/english-language-courses/"
@@ -102,3 +106,12 @@ extraction:
   fees:
     default_currency: "GBP"
     central_page: "https://www.londonmet.ac.uk/international/costs-and-fees/"
+    # London Met does not publish per-course fees on individual course pages.
+    # londonmet_chrome_scrub.py nulls the bogus £10,000 postgraduate-loan banner
+    # that appears on every PG page, leaving fee=null.  The central fee page
+    # parses to 0 program records.  Without this flag, ALL courses fail the
+    # no_international_fee staging gate and are dropped (3/34 staged in testing).
+    # With force_central_fee_stage: true, courses without an extracted fee still
+    # stage in "review" status — the operator can inspect and correct fees there.
+    # Remove this flag once a proper per-course fee fetcher is implemented.
+    force_central_fee_stage: true
