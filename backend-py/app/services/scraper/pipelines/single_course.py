@@ -3732,7 +3732,8 @@ async def extract_course(
                                 pass
                         if not _fl_html:
                             continue
-                        _fl_text = html_to_text(_fl_html)
+                        from app.services.scraper.extractors._text import html_to_text as _h2t_fl  # noqa: PLC0415
+                        _fl_text = _h2t_fl(_fl_html)
                         _fl_result = _et2.extract(_fl_text, url=_fl_url)
                         _fl_fields = getattr(_fl_result, "fields", {}) or {}
                         _fl_filled: list[str] = []
@@ -3815,7 +3816,8 @@ async def extract_course(
                     for e in _field_ev
                 )
 
-            _bm_text = html_to_text(html)
+            from app.services.scraper.extractors._text import html_to_text as _h2t_bm  # noqa: PLC0415
+            _bm_text = _h2t_bm(html)
             _matched_band: str | None = None
             _matched_spec: dict | None = None
             for _bname, _bspec in _band_map.items():
@@ -6952,8 +6954,8 @@ async def extract_course(
             )
         ):
             from app.services.scraper.extractors.english_test import _PER_BAND_FLOOR_RE
-            from app.services.scraper.extractors._text import html_to_text
-            _band_text = html_to_text(rendered_html or html or "")
+            from app.services.scraper.extractors._text import html_to_text as _h2t_band  # noqa: PLC0415
+            _band_text = _h2t_band(rendered_html or html or "")
             _band_match = _PER_BAND_FLOOR_RE.search(_band_text)
             if _band_match:
                 _floor = float(_band_match.group(1))
