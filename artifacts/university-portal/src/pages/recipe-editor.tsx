@@ -160,6 +160,7 @@ interface Recipe {
   fallback_strategy: string;
   api?: ApiConfig;
   must_contain: string[];
+  allow_url_patterns: string[];
   course_detail_url_patterns: string[];
   block_url_patterns: string[];
   fetch_detail_page: boolean;
@@ -237,6 +238,7 @@ const EMPTY_RECIPE: Recipe = {
   bfs_page_budget: null,
   fallback_strategy: "bfs",
   must_contain: [],
+  allow_url_patterns: [],
   course_detail_url_patterns: [],
   block_url_patterns: [],
   fetch_detail_page: true,
@@ -900,7 +902,7 @@ export default function RecipeEditorPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           urls,
-          allow_url_patterns: filterSimAllowPats,
+          allow_url_patterns: recipe.allow_url_patterns.length > 0 ? recipe.allow_url_patterns : filterSimAllowPats,
           must_contain: recipe.must_contain,
           block_url_patterns: recipe.block_url_patterns,
         }),
@@ -913,7 +915,7 @@ export default function RecipeEditorPage() {
     } finally {
       setFilterSimLoading(false);
     }
-  }, [filterSimUrls, filterSimAllowPats, recipe.must_contain, recipe.block_url_patterns]);
+  }, [filterSimUrls, filterSimAllowPats, recipe.allow_url_patterns, recipe.must_contain, recipe.block_url_patterns]);
 
   // ── Listing-page link fetcher handler ──
   const fetchListingLinks = useCallback(async () => {
@@ -3411,6 +3413,23 @@ export default function RecipeEditorPage() {
                 helpText="Regex patterns — any URL matching one of these is dropped. E.g. /news, /events, /cpd."
               />
               <Separator />
+              <StringListEditor
+                label="Allow URL Patterns (regex inclusion filter)"
+                values={recipe.allow_url_patterns}
+                onChange={v => patchRecipe({ allow_url_patterns: v })}
+                placeholder="e.g. /courses/[^/?]+"
+                helpText={
+                  <span>
+                    Regex patterns — a URL is only accepted if it matches <strong>at least one</strong> of these patterns.
+                    Applied before block_url_patterns and must_contain. Leave empty to allow all discovered URLs through.{" "}
+                    <strong>Common trap:</strong> use <code className="text-xs">[^/?]+</code> (no slash or query-string) rather than <code className="text-xs">[^?]+</code> (allows any path depth) to avoid matching listing pages.
+                    Pair with <em>Render Listing Pages</em> (Discovery tab) for JS-rendered listings — e.g.{" "}
+                    <code className="text-xs">/courses/find-a-course/[^/]+/[^/?]+</code> ensures BFS only follows leaf course pages, not category hubs.
+                    Serialized as <code className="text-xs">discovery.allow_url_patterns</code> in the YAML.
+                  </span>
+                }
+              />
+              <Separator />
 
               {/* ── Filter Simulator ─────────────────────────────────────── */}
               <div className="space-y-3">
@@ -3423,13 +3442,18 @@ export default function RecipeEditorPage() {
                   </div>
                 </div>
 
-                {filterSimAllowPats.length > 0 && (
+                {(recipe.allow_url_patterns.length > 0 || filterSimAllowPats.length > 0) && (
                   <div className="rounded-md border border-blue-200 bg-blue-50 p-2.5 space-y-1">
-                    <p className="text-xs font-semibold text-blue-700">Allow URL Patterns (from YAML config — applied first)</p>
-                    {filterSimAllowPats.map((p, i) => (
+                    <p className="text-xs font-semibold text-blue-700">
+                      Allow URL Patterns — applied first
+                      {recipe.allow_url_patterns.length === 0 && filterSimAllowPats.length > 0 && (
+                        <span className="font-normal text-blue-500 ml-1">(from saved config — add patterns above to override)</span>
+                      )}
+                    </p>
+                    {(recipe.allow_url_patterns.length > 0 ? recipe.allow_url_patterns : filterSimAllowPats).map((p, i) => (
                       <code key={i} className="block font-mono text-xs bg-blue-100 px-1.5 py-0.5 rounded text-blue-900">{p}</code>
                     ))}
-                    <p className="text-[11px] text-blue-600">URLs must match at least one of these patterns, then your block/must_contain rules below are applied.</p>
+                    <p className="text-[11px] text-blue-600">URLs must match at least one of these patterns, then block_url_patterns and must_contain are applied.</p>
                   </div>
                 )}
 
@@ -4624,8 +4648,12 @@ function buildYamlPreview(recipe: Recipe): string {
     discLines.push("  block_url_patterns:");
     recipe.block_url_patterns.forEach(p => discLines.push(`    - ${_yq(p)}`));
   }
-  if (recipe.must_contain.length > 0) {
+  if (recipe.allow_url_patterns.length > 0) {
     discLines.push("  allow_url_patterns:");
+    recipe.allow_url_patterns.forEach(p => discLines.push(`    - ${_yq(p)}`));
+  }
+  if (recipe.must_contain.length > 0) {
+    discLines.push("  must_contain:");
     recipe.must_contain.forEach(p => discLines.push(`    - ${_yq(p)}`));
   }
   if (discLines.length > 0) {
