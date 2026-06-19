@@ -16,13 +16,17 @@
 #     pages enter the candidate pool.
 
 discovery:
-  # Only accept individual course pages at /study/courses/<slug>.
-  # This blocks /study/study-skills, /study/undergraduate/applying, and all the
-  # marketing/info pages BFS finds via connected-degrees / foundation-year pages.
+  # Only accept pages under /study/courses/.
+  # Portsmouth course URLs use two-segment paths:
+  #   /study/courses/<slug>                (connected degrees, foundation, etc.)
+  #   /study/courses/undergraduate/<slug>  (UG courses)
+  #   /study/courses/postgraduate/<slug>   (PG courses)
+  # Using [^?]+ (allows slashes) instead of [^/?]+ (stops at first slash).
+  # This blocks all /study/study-skills, /study/undergraduate/applying, etc.
   # Category pages like /study/courses/postgraduate-taught may still match but
   # are gate-dropped as category_landing_page_url_block.
   allow_url_patterns:
-    - 'port\.ac\.uk/study/courses/[^/?]+'
+    - 'port\.ac\.uk/study/courses/[^?]+'
 
   # Fetch all 14 paginated course listing pages via Scrape.do headless Chrome.
   # Static fetch returns 3 links; headless Chrome executes the JS search engine
