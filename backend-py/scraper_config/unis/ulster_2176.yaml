@@ -16,8 +16,12 @@
 discovery:
   # Only accept individual course pages at /courses/<slug>.
   # Blocks /study, /doctoralcollege, /departments, /faculties and all info pages.
+  #
+  # IMPORTANT: use path-only patterns (no hostname). The render_listing_pages
+  # filter checks patterns against the URL path only, so hostname-prefixed
+  # patterns silently drop every course link render_listing_pages finds.
   allow_url_patterns:
-    - 'ulster\.ac\.uk/courses/[^/?]+'
+    - '/courses/[^/?]+'
 
   # Render all Funnelback paginated listing pages via Scrape.do headless Chrome.
   # Static fetch returns 4 navigation links; rendered fetch shows real course cards.

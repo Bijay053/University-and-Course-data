@@ -1764,8 +1764,12 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                         if _p.netloc != _rlp_host:
                             continue
                         _path = _p.path
-                        # apply allow_url_patterns (must match at least one)
-                        if _rlp_allow and not any(p.search(_path) for p in _rlp_allow):
+                        # apply allow_url_patterns (must match at least one).
+                        # Check against the FULL URL so both path-only patterns
+                        # (/courses/[^/?]+) and hostname-prefixed patterns
+                        # (ulster\.ac\.uk/courses/[^/?]+) work consistently.
+                        # The main URL filter (Phase A.5b) also searches full URL.
+                        if _rlp_allow and not any(p.search(_abs) for p in _rlp_allow):
                             continue
                         # apply block_url_patterns
                         if _rlp_block and any(p.search(_path) for p in _rlp_block):
