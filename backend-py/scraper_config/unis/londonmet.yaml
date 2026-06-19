@@ -1,123 +1,55 @@
-# London Metropolitan University (UK)
+# London Metropolitan University
 # Hostname: www.londonmet.ac.uk
-# University ID: dev=6 (prod: lookup by name).
-#
-# Bug history / rationale (2026-05-13):
-#   - Live data showed only 2 staged courses.  BFS found only 19 candidates,
-#     all category landing pages.  The sitemap (482 URLs) was suppressed because
-#     19 > _SITEMAP_FALLBACK_THRESHOLD(5) so the conditional sitemap fallback
-#     never fired.  Fix: always_sitemap_supplement: true.
-#
-# Bug history (2026-06-19 — sitemap dead, render_listing_pages broken):
-#   - All LondonMet sitemap URLs now return HTML 404:
-#       /new-sitemap-en.xml, /sitemap.xml, /sitemap_index.xml, /sitemap-en.xml
-#     Our server IP appears blocked from robots.txt too (curl times out).
-#     always_sitemap_supplement: true → 0 unique candidates wasted.
-#   - render_listing_pages was added (3 JS-rendered listing URLs) but returned
-#     0 new course links.  Root cause: allow_url_patterns was also applied inside
-#     render_listing_pages (orchestrator line 1768).  The rendered page links
-#     either use a slightly different URL format or the rendered page's course
-#     hrefs don't match the strict "---[a-z0-9-]+" infix pattern, so every link
-#     is rejected before entering the candidate pool.
-#   - Wayback never triggered because BFS found 18 candidates (> 0 threshold).
-#     use_wayback: true forces Wayback to always supplement regardless.
-#   - Fix: remove allow_url_patterns (was blocking render_listing_pages);
-#     disable always_sitemap_supplement (sitemap is dead); add use_wayback: true.
-#   - LondonMet is a UK university — fees are quoted in GBP (£).
+# Country: United Kingdom  |  Currency: GBP
+# Discovery: Seeded search lists
 
 discovery:
-  # Sitemap is completely dead — all sitemap URLs (including the formerly-working
-  # /new-sitemap-en.xml) now return HTML 404.  Disable to avoid wasted probing.
-  always_sitemap_supplement: false
-
-  # Seed the three JS-rendered listing pages.  BFS will block them via
-  # category_landing_page_url_block (expected), but render_listing_pages below
-  # fetches them via Scrape.do headless Chrome independently.
+  always_sitemap_supplement: true
   seed_urls:
-    - 'https://www.londonmet.ac.uk/courses/undergraduate/'
-    - 'https://www.londonmet.ac.uk/courses/postgraduate/'
-    - 'https://www.londonmet.ac.uk/research/courses/'
-
-  # allow_url_patterns intentionally removed.  When set, this filter is also
-  # applied inside render_listing_pages (orchestrator.py:1768) and rejects every
-  # course link the rendered pages produce.  Without it, render_listing_pages
-  # adds all same-host links; the extraction gate then drops non-course pages.
-
-  # Block obvious non-course paths early to save BFS budget.
-  # Also blocks Wayback CDX junk: the CDX for londonmet.ac.uk returns thousands
-  # of /applying/academic-term-dates/ and /applying/postgraduate/ URLs that the
-  # extraction gate drops anyway — blocking them here avoids wasted gate cycles.
+    - 'https://www.londonmet.ac.uk/myprospectus/courses/all/all/Undergraduate/Undergraduate%20degree%20courses/all/list?resultsurl=%2Fcourses%2F'
+    - 'https://www.londonmet.ac.uk/myprospectus/courses/all/all/Postgraduate/Postgraduate%20courses/all/list?resultsurl=%2Fcourses%2F'
+    - 'https://www.londonmet.ac.uk/myprospectus/courses/all/all/Research%20degree/Our%20MPhil,%20PhD%20and%20Professional%20Doctorate%20courses/all/list'
+  allow_url_patterns:
+    - '/courses/'
   block_url_patterns:
-    - "/applying/"
-    - "/courses/short/"
-    - "/courses/short-courses/"
-    - "/courses/english-language-courses/"
-    - "/courses/open-language-programme/"
-    - "/courses/professional-courses/"
-    - "/courses/apprenticeships/"
-    - "/courses/international-pathway-programmes/"
-    - "/courses/global-partnerships/"
-    - "/courses/our-collaborative-partnerships/"
-    - "/courses/routes-into-law/"
-    - "/international/study-abroad/"
-    - "/news"
-    - "/events"
-    - "/about"
-    - "/staff"
-    - "/library"
-    - "/students"
-
-  # Raise the candidate cap — with no allow filter, more pages will be found.
-  max_candidates: 600
-
-  # Force Wayback Machine to always supplement BFS results (not just as a
-  # fallback when BFS returns 0).  LondonMet has solid Wayback CDX coverage
-  # of course URLs with the ---<degree> infix pattern.
-  use_wayback: true
-
-  # Fetch the three JS-rendered listing pages via Scrape.do headless Chrome.
-  # allow_url_patterns is NOT set so extracted links are NOT pre-filtered here.
-  render_listing_pages:
-    - 'https://www.londonmet.ac.uk/courses/undergraduate/'
-    - 'https://www.londonmet.ac.uk/courses/postgraduate/'
-    - 'https://www.londonmet.ac.uk/research/courses/'
+    - '/news'
+    - '/events'
+    - '/about'
+    - '/staff'
+    - '/research'
 
 extraction:
-  # Skip the sparse-static rescue browser refetch.
-  # londonmet_chrome_scrub.py recovers fees directly from data-* attributes
-  # embedded in each course page's <select id="course-entry-point-selector">.
-  skip_browser_rescue: true
+  fees:
+    default_currency: 'GBP'
+    prefer_international: true
+    prefer_annual_over_total: true
+    reject_keywords:
+      - 'Home student'
+      - 'Home fee'
+      - 'UK student'
+      - 'UK fee'
+      - 'Domestic'
 
   english:
-    # London Met does NOT publish per-course IELTS/PTE/TOEFL scores.
-    # Every course links to a shared entry-requirements page.
-    # Standard minimums (verified 2026-06-04):
-    #   IELTS 6.0 overall, PTE Academic 59, TOEFL iBT 72
+    trust_vision_ocr: false
     default_ielts: 6.0
-    default_pte: 59
-    default_toefl: 72
+    default_pte: 60
+    default_toefl: 80
+
+  intake:
+    start_dates_only: true
+
+  course_name:
+    strip_title_suffixes:
+      - ' | London Metropolitan University'
+      - ' - London Metropolitan University'
 
   filters:
-    domestic_only:
-      # Disabled (2026-06-19): londonmet_chrome_scrub.has_international_options()
-      # checks for data-fee-type="International" options in the <select> dropdown.
-      # The <select id="course-entry-point-selector"> IS server-rendered in static
-      # HTML, but its <option> children are JS-populated — so the static HTML has
-      # an empty <select> → has_international_options() returns False for every
-      # course → is_domestic_only=True → 31/34 courses silently rejected.
-      # With enabled: false, the chrome_scrub domestic_only flag is never set;
-      # staging relies on _DOMESTIC_ONLY_RE regex on page text and operator review.
+    online_only:
       enabled: false
 
-  fees:
-    default_currency: "GBP"
-    central_page: "https://www.londonmet.ac.uk/international/costs-and-fees/"
-    # London Met does not publish per-course fees on individual course pages.
-    # londonmet_chrome_scrub.py nulls the bogus £10,000 postgraduate-loan banner
-    # that appears on every PG page, leaving fee=null.  The central fee page
-    # parses to 0 program records.  Without this flag, ALL courses fail the
-    # no_international_fee staging gate and are dropped (3/34 staged in testing).
-    # With force_central_fee_stage: true, courses without an extracted fee still
-    # stage in "review" status — the operator can inspect and correct fees there.
-    # Remove this flag once a proper per-course fee fetcher is implemented.
-    force_central_fee_stage: true
+  staging:
+    reject_if_missing:
+      - course_name
+    skip_degree_qualifier_check: true
+    require_international_fee: false
