@@ -1,14 +1,18 @@
-# Royal Halloway University
+# Royal Holloway University
 # Hostname: www.royalholloway.ac.uk
 # Country: United Kingdom  |  Currency: GBP
 # Slug: royalholloway
 # Auto-generated: 2026-06-19
 #
-# This stub was created automatically on the first scrape of this university.
-# Review and expand it to improve discovery and extraction quality.
-# See scraper_config/defaults.yaml for all available options.
+# Course URL pattern: /studying-here/(undergraduate|postgraduate)/<dept>/<course-slug>
+# Non-course pages that BFS finds (/ug-prospectus, /pg-prospectus, /fees-and-funding,
+# /applying, /prospectuses-and-brochures) are filtered out by allow_url_patterns.
 
-discovery: {}
+discovery:
+  # Only accept actual course pages — 4-segment paths under undergraduate/postgraduate.
+  # This blocks /ug-prospectus, /pg-prospectus, /studying-here/fees-and-funding, etc.
+  allow_url_patterns:
+    - 'royalholloway\.ac\.uk/studying-here/(undergraduate|postgraduate)/[^/]+/[^/]+'
 
 extraction:
   fees:
