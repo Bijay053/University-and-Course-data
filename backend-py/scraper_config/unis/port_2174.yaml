@@ -1,20 +1,54 @@
 # The University of Portsmouth
 # Hostname: www.port.ac.uk
 # Country: United Kingdom  |  Currency: GBP
-# Slug: port
-# Auto-generated: 2026-06-19
 #
-# This stub was created automatically on the first scrape of this university.
-# Review and expand it to improve discovery and extraction quality.
-# See scraper_config/defaults.yaml for all available options.
+# Discovery notes (2026-06-19):
+#   - Course listing at /study/courses is a JS-rendered search interface.
+#     Static HTTP fetch returns only 3 navigation links per page — no course data.
+#   - The "show more results" button loads additional results via AJAX on the same
+#     page. Scrape.do headless Chrome captures the initial rendered batch per page.
+#   - Without allow_url_patterns, BFS follows links from /study/connected-degrees
+#     and /study/our-icp-foundation-year-courses into marketing/info pages
+#     ("Study skills", "Managing stress", "Living away from home", etc.) — 110
+#     extractable links with almost no real courses.
+#   - Fix: render_listing_pages (headless Chrome) for all 14 paginated search pages
+#     + allow_url_patterns restricted to /study/courses/<slug> so only actual course
+#     pages enter the candidate pool.
 
-discovery: 
-  seed_urls:
-    - https://www.port.ac.uk/study/courses?type=Connected_Degrees+Degree_Apprenticeship+Dual_degree+Foundation_year+Learning_at_Work+London_campus+New_course+Pathway+Placement_degree+Professional_and_Flexible_Learning+Teacher_training+Top-up_degree
-    - https://www.port.ac.uk/study/courses?page=2&type=Connected_Degrees+Degree_Apprenticeship+Dual_degree+Foundation_year+Learning_at_Work+London_campus+New_course+Pathway+Placement_degree+Professional_and_Flexible_Learning+Teacher_training+Top-up_degree
-    - https://www.port.ac.uk/study/courses?page=3&type=Connected_Degrees+Degree_Apprenticeship+Dual_degree+Foundation_year+Learning_at_Work+London_campus+New_course+Pathway+Placement_degree+Professional_and_Flexible_Learning+Teacher_training+Top-up_degree
-    - https://www.port.ac.uk/study/courses?page=14&type=Connected_Degrees+Degree_Apprenticeship+Dual_degree+Foundation_year+Learning_at_Work+London_campus+New_course+Pathway+Placement_degree+Professional_and_Flexible_Learning+Teacher_training+Top-up_degree
+discovery:
+  # Only accept individual course pages at /study/courses/<slug>.
+  # This blocks /study/study-skills, /study/undergraduate/applying, and all the
+  # marketing/info pages BFS finds via connected-degrees / foundation-year pages.
+  # Category pages like /study/courses/postgraduate-taught may still match but
+  # are gate-dropped as category_landing_page_url_block.
+  allow_url_patterns:
+    - 'port\.ac\.uk/study/courses/[^/?]+'
+
+  # Fetch all 14 paginated course listing pages via Scrape.do headless Chrome.
+  # Static fetch returns 3 links; headless Chrome executes the JS search engine
+  # and renders the initial course cards for that page.
+  render_listing_pages:
+    - 'https://www.port.ac.uk/study/courses'
+    - 'https://www.port.ac.uk/study/courses?page=2'
+    - 'https://www.port.ac.uk/study/courses?page=3'
+    - 'https://www.port.ac.uk/study/courses?page=4'
+    - 'https://www.port.ac.uk/study/courses?page=5'
+    - 'https://www.port.ac.uk/study/courses?page=6'
+    - 'https://www.port.ac.uk/study/courses?page=7'
+    - 'https://www.port.ac.uk/study/courses?page=8'
+    - 'https://www.port.ac.uk/study/courses?page=9'
+    - 'https://www.port.ac.uk/study/courses?page=10'
+    - 'https://www.port.ac.uk/study/courses?page=11'
+    - 'https://www.port.ac.uk/study/courses?page=12'
+    - 'https://www.port.ac.uk/study/courses?page=13'
+    - 'https://www.port.ac.uk/study/courses?page=14'
 
 extraction:
   fees:
     default_currency: GBP
+  filters:
+    online_only:
+      enabled: false
+  staging:
+    skip_degree_qualifier_check: true
+    require_international_fee: false
