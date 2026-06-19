@@ -1,62 +1,12 @@
-# University of Leeds
-# Hostname: www.leeds.ac.uk  (course catalogue: courses.leeds.ac.uk)
-# Country: United Kingdom  |  Currency: GBP
-# Discovery: Funnelback / course-search pagination (15 courses per page)
-#
-# Bug history / rationale:
-#   - Default BFS budget (25) exhausts before all listing pages are visited.
-#     Leeds has ~21 UG pages (~316 courses) + ~19 PGT pages (~280 courses).
-#   - Default candidate cap (500) cut discovery at 499 courses.
-#   - After run 2 (80 pages fetched), Cloudflare/rate-limit blocked our server
-#     IP permanently.  BFS returns 0, Wayback fallback activates.
-#   - Wayback CDX for www.leeds.ac.uk/* returns 10,000 URLs — includes 1990s
-#     archived pages (/acom/leedsetc/course/, /aed/courses/credit/) that look
-#     like course paths but are ancient HTML files with no usable data.  All
-#     173 of them staged 0 courses.  Blocked by allow_url_patterns now.
-#   - render_listing_pages_static: true (tried) — Funnelback search uses JS to
-#     render the correct page for each ?page=N&start_rank=N URL.  Static mode
-#     ignores the params and returns the default page-1 results for every URL,
-#     so 42 pages × Scrape.do static = 16 unique links (all dupes of page 1).
-#   - Fix: remove render_listing_pages_static so headless Chrome (JS enabled)
-#     executes the Funnelback JS and renders each paginated page correctly.
-#     Each Scrape.do render call costs ~$0.006; 42 pages ≈ $0.25 per run.
-#   - allow_url_patterns restricts candidates to courses.leeds.ac.uk/NNNNN/
-#     paths — the format all real current Leeds courses use — which blocks both
-#     the Wayback garbage and any www.leeds.ac.uk/* non-course noise.
-
 discovery:
   bfs_page_budget: 80
   max_candidates: 700
-  always_sitemap_supplement: false   # sitemap returns 0 for courses.leeds.ac.uk
+  always_sitemap_supplement: true
 
   seed_urls:
-    - 'https://courses.leeds.ac.uk/course-search/undergraduate-courses?type=UG&term=202627'
-    - 'https://courses.leeds.ac.uk/course-search/masters-courses?type=PGT&term=202627'
-
-  # Only accept real Leeds course URLs — format is courses.leeds.ac.uk/<term>/<code>/<slug>
-  # or courses.leeds.ac.uk/<legacy-id>/<Name>.  This blocks:
-  #   - www.leeds.ac.uk/acom/leedsetc/course/*.htm  (1990s Wayback archive)
-  #   - www.leeds.ac.uk/aed/courses/*               (archived adult-education pages)
-  #   - any other www.leeds.ac.uk/* noise the Wayback CDX surfaces
-  allow_url_patterns:
-    - 'courses\.leeds\.ac\.uk/\d+'
-
-  block_url_patterns:
-    - '/news'
-    - '/events'
-    - '/about'
-    - '/research'
-    - '/staff'
-    - 'term=202728'
-    - 'term=202829'
-
-  # Fetch all paginated listing pages via Scrape.do headless Chrome.
-  # render_listing_pages_static is NOT set (defaults to false) — Funnelback
-  # renders the correct page only after JS executes; static mode ignores URL
-  # params and returns page-1 results for every URL.
-  # Cost: 42 pages × ~$0.006 = ~$0.25 per run.
-  render_listing_pages:
-    # ── Undergraduate (UG) — 2026/27 cohort (~316 courses, 22 pages) ─────────
+    # ── Undergraduate (UG) — 2026/27 cohort ──────────────────────────────────
+    # ~316 UG courses at 15 per page = 22 pages (last page may be partial).
+    # Pages pre-seeded so the BFS visits all without needing link discovery.
     - 'https://courses.leeds.ac.uk/course-search/undergraduate-courses?page=1&start_rank=1&type=UG&term=202627'
     - 'https://courses.leeds.ac.uk/course-search/undergraduate-courses?page=2&start_rank=16&type=UG&term=202627'
     - 'https://courses.leeds.ac.uk/course-search/undergraduate-courses?page=3&start_rank=31&type=UG&term=202627'
@@ -79,7 +29,9 @@ discovery:
     - 'https://courses.leeds.ac.uk/course-search/undergraduate-courses?page=20&start_rank=286&type=UG&term=202627'
     - 'https://courses.leeds.ac.uk/course-search/undergraduate-courses?page=21&start_rank=301&type=UG&term=202627'
     - 'https://courses.leeds.ac.uk/course-search/undergraduate-courses?page=22&start_rank=316&type=UG&term=202627'
-    # ── Postgraduate Taught (PGT) — 2026/27 cohort (~280 courses, 20 pages) ──
+
+    # ── Postgraduate Taught (PGT) — 2026/27 cohort ───────────────────────────
+    # ~280 PGT courses at 15 per page = 19 pages; 20th page added as safety.
     - 'https://courses.leeds.ac.uk/course-search/masters-courses?page=1&start_rank=1&type=PGT&term=202627'
     - 'https://courses.leeds.ac.uk/course-search/masters-courses?page=2&start_rank=16&type=PGT&term=202627'
     - 'https://courses.leeds.ac.uk/course-search/masters-courses?page=3&start_rank=31&type=PGT&term=202627'
@@ -100,6 +52,16 @@ discovery:
     - 'https://courses.leeds.ac.uk/course-search/masters-courses?page=18&start_rank=256&type=PGT&term=202627'
     - 'https://courses.leeds.ac.uk/course-search/masters-courses?page=19&start_rank=271&type=PGT&term=202627'
     - 'https://courses.leeds.ac.uk/course-search/masters-courses?page=20&start_rank=286&type=PGT&term=202627'
+
+  block_url_patterns:
+    - '/news'
+    - '/events'
+    - '/about'
+    - '/research'
+    - '/staff'
+    # Block next-year term so the BFS doesn't waste budget visiting 202728 duplicates
+    - 'term=202728'
+    - 'term=202829'
 
 extraction:
   fees:
@@ -128,3 +90,8 @@ extraction:
   filters:
     online_only:
       enabled: false
+  staging:
+    reject_if_missing:
+      - course_name
+    skip_degree_qualifier_check: true
+    require_international_fee: false
