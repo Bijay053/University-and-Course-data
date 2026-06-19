@@ -149,6 +149,7 @@ interface BrowserAction {
 interface Recipe {
   discovery_strategy: string;
   seed_urls: string[];
+  render_listing_pages: string[];
   extra_course_urls: string[];
   expected_min_courses: number | null;
   expected_max_courses: number | null;
@@ -226,6 +227,7 @@ interface Recipe {
 const EMPTY_RECIPE: Recipe = {
   discovery_strategy: "auto",
   seed_urls: [],
+  render_listing_pages: [],
   extra_course_urls: [],
   expected_min_courses: null,
   expected_max_courses: null,
@@ -2134,6 +2136,14 @@ export default function RecipeEditorPage() {
                 onChange={v => patchRecipe({ seed_urls: v })}
                 placeholder="https://example.com/study/undergraduate/courses"
                 helpText="Course-listing pages visited first during discovery (BFS and browser mode). These are queued at highest priority so the crawler goes there before anywhere else. Use for JS-heavy sites like SCU — add the undergraduate/postgraduate listing pages, not just the homepage."
+              />
+
+              <StringListEditor
+                label="JS-Rendered Listing Pages"
+                values={recipe.render_listing_pages}
+                onChange={v => patchRecipe({ render_listing_pages: v })}
+                placeholder="https://example.ac.uk/study/courses?page=2"
+                helpText="Use when the course listing is JS-rendered — static fetch returns a near-empty shell (e.g. 'Search results update instantly…'). Each URL is fetched via Scrape.do headless Chrome so JavaScript executes and course card links appear. Add one URL per pagination page. Funnelback sites use ?&start_rank=41 increments; React/Vue search pages use ?page=N. Pair with allow_url_patterns (URL Filter tab) to prevent BFS from following non-course links discovered from these pages."
               />
 
               <StringListEditor
@@ -4601,6 +4611,10 @@ function buildYamlPreview(recipe: Recipe): string {
   if (recipe.seed_urls.length > 0) {
     discLines.push("  seed_urls:");
     recipe.seed_urls.forEach(u => discLines.push(`    - ${_yq(u)}`));
+  }
+  if (recipe.render_listing_pages.length > 0) {
+    discLines.push("  render_listing_pages:");
+    recipe.render_listing_pages.forEach(u => discLines.push(`    - ${_yq(u)}`));
   }
   if (recipe.course_detail_url_patterns.length > 0) {
     discLines.push("  course_detail_url_patterns:");

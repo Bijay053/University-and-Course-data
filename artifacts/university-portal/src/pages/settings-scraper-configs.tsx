@@ -336,6 +336,49 @@ discovery:
   # Raise BFS page budget for sites with many listing pages (default 25 full):
   # bfs_page_budget: 80
 
+  # ── JS-rendered listing pages (Funnelback / React search / infinite scroll) ─
+  #
+  # Use when: the course listing is built by JavaScript — static HTTP fetch returns
+  # a near-empty shell (e.g. "Search results update instantly…"), so BFS cannot
+  # extract course links from it.  Real-world triggers:
+  #   • Funnelback search results (Ulster: /courses?&start_rank=41)
+  #   • "Show more results" infinite-scroll pages (Portsmouth: /study/courses?page=N)
+  #   • React / Vue SPA search pages where links appear only after JS executes
+  #
+  # HOW IT WORKS:
+  #   Each URL in render_listing_pages is fetched via Scrape.do headless Chrome
+  #   (full JS execution, no clicking required).  The rendered HTML is then scanned
+  #   for course links exactly like a normal BFS listing page.  These pages are
+  #   processed BEFORE BFS so their links seed the candidate pool.
+  #
+  # WHEN TO USE vs seed_urls:
+  #   seed_urls  — static HTML pages; BFS visits them and follows links.
+  #   render_listing_pages — JS-rendered pages; headless Chrome fetches them once
+  #                          to extract the initial set of course card links.
+  #
+  # HOW TO FIND THE RIGHT URLs:
+  #   1. Open the course listing page in your browser.
+  #   2. Check what URL changes as you paginate (look for ?page=N or ?start_rank=N).
+  #   3. Add each page URL — coverage = pages × courses-per-initial-render.
+  #   4. Pair with allow_url_patterns to filter BFS to only accept course URLs.
+  #
+  # PAGINATION FORMATS:
+  #   Page-number (Portsmouth):  ?page=2, ?page=3, … ?page=14
+  #   start_rank (Funnelback):   ?&start_rank=41, ?&start_rank=81, … (steps of 40)
+  #
+  # render_listing_pages:
+  #   - https://www.example.ac.uk/study/courses          # page 1 (no param needed)
+  #   - https://www.example.ac.uk/study/courses?page=2
+  #   - https://www.example.ac.uk/study/courses?page=3
+  #   # … repeat for all pages …
+  #   - https://www.example.ac.uk/study/courses?page=14
+  #
+  # TIP: Combine with allow_url_patterns to prevent BFS from wandering into
+  # marketing/info pages after discovering course links from the rendered pages:
+  #   allow_url_patterns:
+  #     - 'example\.ac\.uk/study/courses/[^?]+'   # matches /courses/<slug> and
+  #                                                # /courses/undergraduate/<slug>
+
   # Enable Playwright browser discovery in addition to BFS (for Cloudflare sites):
   # always_browser_discover: true
 
@@ -502,6 +545,7 @@ extraction:
 # ── QUICK REFERENCE — symptom → YAML field ────────────────────────────────────
 # Symptom                                        Fix
 # ─────────────────────────────────────────────────────────────────────────────
+# BFS finds 0–9 courses (JS-rendered listing)    render_listing_pages (+ allow_url_patterns)
 # BFS finds 0–9 courses (JS SPA, hidden API)     auto_api_discovery: true
 # You already know the API endpoint URL           generic_search_api (Option B above)
 # Site uses SearchStax Solr directly             searchstax (Option C above)
@@ -510,7 +554,8 @@ extraction:
 # Mode shows Part-time for intl-only courses     searchstax.exclude_part_time: true
 # Solr doc has all fields (no HTML fetch needed) searchstax.field_map_as_payload: true + links_only: false
 # Solr field names differ from HUD defaults      searchstax.field_map (6 overrideable fields)
-# Discovery finds nav/news pages, not courses    must_contain / block_url_patterns
+# JS listing page shows only navigation links    render_listing_pages
+# Discovery finds nav/news pages, not courses    must_contain / block_url_patterns / allow_url_patterns
 # Sitemap not auto-discovered                    sitemap_url
 # BFS finds < 5 courses (different subdomain)    fallback_subdomains
 # Cloudflare blocks plain-HTTP BFS               always_browser_discover: true
