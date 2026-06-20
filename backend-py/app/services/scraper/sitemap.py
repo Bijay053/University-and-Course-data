@@ -209,6 +209,7 @@ async def discover_from_sitemap(
     *,
     emit=None,
     sitemap_url: str | None = None,
+    offset: int = 0,
 ) -> list[dict]:
     """Probe sitemap.xml + robots.txt at ``origin`` and return course candidates.
 
@@ -353,13 +354,20 @@ async def discover_from_sitemap(
         if found:
             break
 
+    all_results = [{"url": u, "name": n} for u, n in found.items()]
+    if offset > 0:
+        all_results = all_results[offset:]
+
     if emit:
         await emit(
             "status",
-            f"[DISCOVER] sitemap: done — {len(found)} unique candidates",
+            f"[DISCOVER] sitemap: done — {len(found)} unique candidates"
+            + (f" (offset={offset}, returning {len(all_results)})" if offset else ""),
             phase="discover",
             kind="sitemap_done",
             total=len(found),
+            offset=offset,
+            returned=len(all_results),
         )
 
-    return [{"url": u, "name": n} for u, n in found.items()]
+    return all_results

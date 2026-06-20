@@ -1059,6 +1059,18 @@ class DiscoveryConfig(BaseModel):
         default=None,
         description="Explicit sitemap URL.  Overrides the auto-detected sitemap.",
     )
+    sitemap_offset: Optional[int] = Field(
+        default=None,
+        description=(
+            "Skip the first N URLs returned by the sitemap before applying "
+            "max_candidates.  Use to partition a large sitemap across two "
+            "jobs when the full catalogue exceeds _MAX_COURSES_PER_JOB: "
+            "job-1 uses offset=0 (default), job-2 sets offset=500 (or "
+            "whatever max_candidates was for job-1).  Because sitemaps are "
+            "static XML files the order is deterministic, so offset-based "
+            "partitioning reliably covers non-overlapping URL ranges."
+        ),
+    )
     use_wayback: Optional[bool] = Field(
         default=None,
         description=(

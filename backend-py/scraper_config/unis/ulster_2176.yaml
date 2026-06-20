@@ -37,8 +37,17 @@ discovery:
 
   # Cap at 500 — matches _MAX_COURSES_PER_JOB so the asyncio.gather() batch
   # stays within memory limits (961-course gather caused OOM on first attempt).
-  # Run two jobs to cover the full catalogue of ~987 courses if needed.
+  #
+  # To scrape the SECOND half of the catalogue (~487 remaining URLs), temporarily
+  # set sitemap_offset: 500 in this file, trigger a new scrape job, then restore
+  # sitemap_offset to 0 (or remove it) before the next regular scrape.
+  # See backend-py/docs/task206_confirmed_counts.md for the full partitioning protocol.
   max_candidates: 500
+
+  # sitemap_offset skips the first N URLs from the sitemap before applying
+  # max_candidates.  Default (0/unset) = start from the beginning of the sitemap.
+  # Set to 500 for Batch 2 to cover the second half of the catalogue.
+  sitemap_offset: 0
 
   # Deduplicate if multiple intake-year variants appear in the sitemap.
   year_dedup_mode: keep_latest
