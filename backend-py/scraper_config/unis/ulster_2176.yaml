@@ -35,8 +35,10 @@ discovery:
   allow_url_patterns:
     - 'ulster\.ac\.uk/courses/\d{6}/'
 
-  # Raise candidate cap — sitemap has 987 course URLs; default cap is 200.
-  max_candidates: 1000
+  # Cap at 500 — matches _MAX_COURSES_PER_JOB so the asyncio.gather() batch
+  # stays within memory limits (961-course gather caused OOM on first attempt).
+  # Run two jobs to cover the full catalogue of ~987 courses if needed.
+  max_candidates: 500
 
   # Deduplicate if multiple intake-year variants appear in the sitemap.
   year_dedup_mode: keep_latest
