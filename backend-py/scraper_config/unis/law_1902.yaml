@@ -3,6 +3,34 @@ discovery:
   - /study/undergraduate/[^/]+/[^/]+/
   - /study/postgraduate/[^/]+/[^/]+/
 
+  # Seed both listing pages directly so the browser doesn't have to
+  # crawl from the homepage.  Without this, the browser spent the full
+  # 90s on postgraduate pages (nav score=120) and never reached
+  # /study/undergraduate/, resulting in 0 bachelor courses discovered.
+  # Each listing page links to sub-category hubs (/study/undergraduate/law/
+  # etc.) which in turn link to individual course pages — the browser BFS
+  # will follow those within the time budget.
+  seed_urls:
+    - https://www.law.ac.uk/study/undergraduate/
+    - https://www.law.ac.uk/study/postgraduate/
+    - https://www.law.ac.uk/study/undergraduate/law/
+    - https://www.law.ac.uk/study/undergraduate/business/
+    - https://www.law.ac.uk/study/undergraduate/criminology/
+    - https://www.law.ac.uk/study/postgraduate/law/
+    - https://www.law.ac.uk/study/postgraduate/sqe/
+    - https://www.law.ac.uk/study/postgraduate/criminology/
+    - https://www.law.ac.uk/study/psychology/
+
+  # Increase from default 90s — the site has ~120+ courses across two
+  # study levels and multiple sub-category hubs (~12s per nav page).
+  # 240s covers ~18-20 nav visits, enough for both UG and PG subtrees.
+  browser_time_budget_s: 240
+
+  # Raise early-stop threshold to match the larger catalogue.
+  # Default 100 would stop before all UG courses are found if PG fills
+  # the quota first.
+  browser_early_stop_courses: 200
+
 extraction:
   english:
     central_page_ug: https://www.law.ac.uk/study/undergraduate/entry-requirements/
