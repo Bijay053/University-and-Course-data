@@ -906,7 +906,19 @@ export default function RecipeEditorPage() {
         return;
       }
       setFilterSimUrls(urls.join("\n"));
-      setFilterSimAllowPats(data.filter_config?.allow_url_patterns || []);
+      const configPats: string[] = data.filter_config?.allow_url_patterns || [];
+      setFilterSimAllowPats(configPats);
+      // Auto-sync into the recipe editor when the recipe field is empty but the
+      // saved config has patterns — so the editor reflects the active config.
+      // Use the functional updater form so we can read the latest recipe state
+      // without adding `recipe` to the useCallback dep array.
+      if (configPats.length > 0) {
+        setRecipe(prev =>
+          prev.allow_url_patterns.length === 0
+            ? { ...prev, allow_url_patterns: configPats }
+            : prev
+        );
+      }
     } catch (e: any) {
       setFilterSimError(String(e));
     } finally {
