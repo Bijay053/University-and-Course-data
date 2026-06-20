@@ -72,6 +72,139 @@ def _strip_provider_name_from_title(
     return cleaned
 
 
+async def _apply_render_listing_pages(
+    *,
+    links: list[dict],
+    scrape_url: str,
+    render_pages: list[str],
+    allow_patterns: list[str],
+    block_patterns: list[str],
+    render_static: bool = False,
+    emit=None,
+    _fetch_fn=None,
+    _sleep_fn=None,
+) -> int:
+    """Fetch rendered listing pages via Scrape.do and harvest course links.
+
+    Extracted from :func:`run_scrape` so the filter logic is independently
+    testable without mocking the entire orchestrator pipeline.
+
+    *links* is mutated in-place; returns the number of **new** links added.
+
+    The *_fetch_fn* keyword argument is injectable for integration tests so
+    the real Scrape.do HTTP call is never made during the test suite::
+
+        added = await _apply_render_listing_pages(
+            ...,
+            _fetch_fn=fake_fetch,
+        )
+
+    When *_fetch_fn* is ``None`` (the default, production path) the real
+    ``fetch_html_scrape_do`` is imported lazily to avoid a module-level
+    circular dependency.
+
+    Key invariant: both ``allow_url_patterns`` and ``block_url_patterns`` are
+    matched against the **full** URL (scheme + host + path), not path-only.
+    This mirrors the Phase A.5b post-filter in :func:`run_scrape` and is the
+    fix for the bug where hostname-prefixed patterns silently dropped every
+    link harvested from rendered pages.
+    """
+    from urllib.parse import urlparse as _urlparse_rlp
+
+    if _fetch_fn is None:
+        from app.services.scraper.http_fetcher import fetch_html_scrape_do
+        _fetch_fn = fetch_html_scrape_do
+
+    # _sleep_fn defaults to asyncio.sleep (real production path).
+    # Tests pass an instant no-op to avoid 12/24/36 s retry waits.
+    _sleep = _sleep_fn if _sleep_fn is not None else asyncio.sleep
+
+    if emit is None:
+        async def emit(event: str, message: str, **kwargs: Any) -> None:  # noqa: E306
+            pass
+
+    _rlp_allow = [re.compile(p) for p in allow_patterns]
+    _rlp_block = [re.compile(p) for p in block_patterns]
+    _existing_urls: set[str] = {item["url"] for item in links}
+    _rlp_parsed_base = _urlparse_rlp(scrape_url)
+    _rlp_base = f"{_rlp_parsed_base.scheme}://{_rlp_parsed_base.netloc}"
+    _rlp_host = _rlp_parsed_base.netloc
+    _rlp_render = not render_static
+
+    log.info(
+        "[RENDER_PAGES] fetching %d listing page(s) via Scrape.do (render=%s)",
+        len(render_pages), _rlp_render,
+    )
+    await emit(
+        "status",
+        f"[DISCOVER] Scanning {len(render_pages)} catalogue page(s) for course links "
+        f"(each page lists many courses — this is not the final course count)...",
+        phase="discover",
+    )
+
+    _rlp_total_added = 0
+    for _rlp_url in render_pages:
+        try:
+            _rlp_html = None
+            for _rlp_attempt in range(3):
+                _rlp_html = await _fetch_fn(_rlp_url, render=_rlp_render)
+                if _rlp_html:
+                    break
+                _rlp_wait = (_rlp_attempt + 1) * 12
+                log.warning(
+                    "[RENDER_PAGES] render=%s failed for %s — retry %d/3 in %ds",
+                    _rlp_render, _rlp_url, _rlp_attempt + 1, _rlp_wait,
+                )
+                await _sleep(_rlp_wait)
+            if not _rlp_html:
+                log.warning("[RENDER_PAGES] no response from %s after 3 attempts", _rlp_url)
+                continue
+            _rlp_hrefs = re.findall(r'href=["\']([^"\'<> ]+)["\']', _rlp_html)
+            _added_this = 0
+            for _h in _rlp_hrefs:
+                if _h.startswith("http"):
+                    _abs = _h
+                elif _h.startswith("/"):
+                    _abs = _rlp_base + _h
+                else:
+                    continue
+                _p = _urlparse_rlp(_abs)
+                if _p.netloc != _rlp_host:
+                    continue
+                _path = _p.path
+                # Match against the FULL URL (scheme+host+path) so patterns that
+                # include the hostname (e.g. 'port\.ac\.uk/study/courses/') match
+                # correctly.  Path-only patterns (e.g. '/courses/[^/?]+') also
+                # work because the full URL contains the path as a suffix.
+                _full_url_for_filter = _abs
+                if _rlp_allow and not any(p.search(_full_url_for_filter) for p in _rlp_allow):
+                    continue
+                if _rlp_block and any(p.search(_full_url_for_filter) for p in _rlp_block):
+                    continue
+                _abs_clean = f"{_rlp_base}{_path}"
+                if _abs_clean not in _existing_urls:
+                    links.append({"url": _abs_clean, "name": ""})
+                    _existing_urls.add(_abs_clean)
+                    _added_this += 1
+                    _rlp_total_added += 1
+            log.info("[RENDER_PAGES] %s → +%d new link(s)", _rlp_url[:90], _added_this)
+        except Exception as _rlp_exc:
+            log.warning("[RENDER_PAGES] failed %s: %s", _rlp_url, _rlp_exc)
+
+    if _rlp_total_added:
+        log.info(
+            "[RENDER_PAGES] +%d total new course link(s) from rendered listing pages",
+            _rlp_total_added,
+        )
+        await emit(
+            "status",
+            f"[DISCOVER] Rendered listing pages: +{_rlp_total_added} new course link(s)",
+            phase="discover",
+        )
+
+    return _rlp_total_added
+
+
 # Bug E: ordered (prefix-or-keyword, level) pairs the UI uses to colour
 # log lines. We tag every emit with one of these so the front-end can
 # style errors red, warnings amber, [SAMPLE✓] green, etc., without
@@ -1709,87 +1842,18 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # Runs AFTER all other tiers so it supplements rather than replaces BFS.
         _render_pages = list(getattr(_uni_cfg.discovery, "render_listing_pages", None) or [])
         if _render_pages:
-            from app.services.scraper.http_fetcher import fetch_html_scrape_do
-            import re as _re_rlp
-            from urllib.parse import urlparse as _urlparse_rlp
-            _rlp_allow = [_re_rlp.compile(p) for p in (_uni_cfg.discovery.allow_url_patterns or [])]
-            _rlp_block = [_re_rlp.compile(p) for p in (_uni_cfg.discovery.block_url_patterns or [])]
-            _existing_urls = {item["url"] for item in links}
-            _rlp_total_added = 0
-            _rlp_parsed_base = _urlparse_rlp(scrape_url)
-            _rlp_base = f"{_rlp_parsed_base.scheme}://{_rlp_parsed_base.netloc}"
-            _rlp_host = _rlp_parsed_base.netloc
             # When render_listing_pages_static is set, the listing pages are
             # server-side rendered and the course links are present in the raw
             # HTML without JS — use the cheaper render=False call (~1 credit vs ~5).
-            _rlp_render = not bool(getattr(_uni_cfg.discovery, "render_listing_pages_static", False))
-            log.info(
-                "[RENDER_PAGES] fetching %d listing page(s) via Scrape.do (render=%s)",
-                len(_render_pages), _rlp_render,
+            await _apply_render_listing_pages(
+                links=links,
+                scrape_url=scrape_url,
+                render_pages=_render_pages,
+                allow_patterns=list(_uni_cfg.discovery.allow_url_patterns or []),
+                block_patterns=list(_uni_cfg.discovery.block_url_patterns or []),
+                render_static=bool(getattr(_uni_cfg.discovery, "render_listing_pages_static", False)),
+                emit=emit,
             )
-            await emit(
-                "status",
-                f"[DISCOVER] Scanning {len(_render_pages)} catalogue page(s) for course links "
-                f"(each page lists many courses — this is not the final course count)...",
-                phase="discover",
-            )
-            for _rlp_url in _render_pages:
-                try:
-                    _rlp_html = None
-                    for _rlp_attempt in range(3):
-                        _rlp_html = await fetch_html_scrape_do(_rlp_url, render=_rlp_render)
-                        if _rlp_html:
-                            break
-                        _rlp_wait = (_rlp_attempt + 1) * 12
-                        log.warning(
-                            "[RENDER_PAGES] render=%s failed for %s — retry %d/3 in %ds",
-                            _rlp_render, _rlp_url, _rlp_attempt + 1, _rlp_wait,
-                        )
-                        await asyncio.sleep(_rlp_wait)
-                    if not _rlp_html:
-                        log.warning("[RENDER_PAGES] no response from %s after 3 attempts", _rlp_url)
-                        continue
-                    _rlp_hrefs = _re_rlp.findall(r'href=["\']([^"\'<> ]+)["\']', _rlp_html)
-                    _added_this = 0
-                    for _h in _rlp_hrefs:
-                        # Normalise to absolute URL
-                        if _h.startswith("http"):
-                            _abs = _h
-                        elif _h.startswith("/"):
-                            _abs = _rlp_base + _h
-                        else:
-                            continue
-                        _p = _urlparse_rlp(_abs)
-                        # Same host only
-                        if _p.netloc != _rlp_host:
-                            continue
-                        _path = _p.path
-                        # apply allow_url_patterns against the full URL (scheme+host+path)
-                        # so that patterns that include the hostname (e.g. 'port\.ac\.uk/study/courses/')
-                        # match correctly.  This mirrors the Phase A.5b post-filter which also
-                        # searches against the full URL string.
-                        _full_url_for_filter = _abs
-                        if _rlp_allow and not any(p.search(_full_url_for_filter) for p in _rlp_allow):
-                            continue
-                        # apply block_url_patterns against full URL for the same reason
-                        if _rlp_block and any(p.search(_full_url_for_filter) for p in _rlp_block):
-                            continue
-                        _abs_clean = f"{_rlp_base}{_path}"
-                        if _abs_clean not in _existing_urls:
-                            links.append({"url": _abs_clean, "name": ""})
-                            _existing_urls.add(_abs_clean)
-                            _added_this += 1
-                            _rlp_total_added += 1
-                    log.info("[RENDER_PAGES] %s → +%d new link(s)", _rlp_url[:90], _added_this)
-                except Exception as _rlp_exc:
-                    log.warning("[RENDER_PAGES] failed %s: %s", _rlp_url, _rlp_exc)
-            if _rlp_total_added:
-                log.info("[RENDER_PAGES] +%d total new course link(s) from rendered listing pages", _rlp_total_added)
-                await emit(
-                    "status",
-                    f"[DISCOVER] Rendered listing pages: +{_rlp_total_added} new course link(s)",
-                    phase="discover",
-                )
 
         # ── Raw discovery count (before any post-filter like must_contain) ───────
         # summary["discovered"] will be updated again after must_contain filtering
