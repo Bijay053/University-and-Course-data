@@ -3,39 +3,43 @@
 # Country: United Kingdom  |  Currency: GBP
 #
 # Discovery notes (2026-06-19):
-#   - Course listing at /courses uses Funnelback JS search — static HTML returns
-#     only 4 navigation links. BFS found 34 candidates, all non-course pages,
-#     staged only 1 course.
-#   - Funnelback pagination: start_rank increments by 40 (40 results per page).
-#   - Individual course pages are at /courses/<slug>.
-#   - Fix: render_listing_pages (Scrape.do headless Chrome) for each Funnelback
-#     page + allow_url_patterns restricted to /courses/<slug> so BFS cannot
-#     wander into /study/*, /doctoralcollege/*, /departments, etc.
-#   - 10 pages × 40 = 400 capacity, covers Ulster's full catalogue.
+#   - Course listing at /courses uses Funnelback JS search.  Scrape.do headless
+#     Chrome renders the UI but individual course hrefs are never emitted into
+#     the DOM (virtual list rendering).  render_listing_pages returned 0 new links.
+#   - Site is fully Cloudflare-protected; direct HTTP returns 403 on every path.
+#   - SOLUTION: dedicated courses sitemap at /site-maps/sitemap-courses.xml
+#     has 987 course URLs at /courses/202627/<slug>-<id>.  Accessible via the
+#     Scrape.do fallback in http_fetcher.fetch_html.
+#   - The sitemap fallback fires automatically: BFS finds 0 course candidates
+#     (all BFS links are navigation/info pages filtered by allow_url_patterns),
+#     which is below _SITEMAP_FALLBACK_THRESHOLD so discover_from_sitemap is
+#     called with the explicit sitemap_url below.
+#   - year_dedup_mode: keep_latest dedups if future sitemaps include both
+#     202627 and 202728 variants of the same course.
 
 discovery:
-  # Only accept individual course pages at /courses/<slug>.
-  # Blocks /study, /doctoralcollege, /departments, /faculties and all info pages.
-  #
-  # IMPORTANT: use path-only patterns (no hostname). The render_listing_pages
-  # filter checks patterns against the URL path only, so hostname-prefixed
-  # patterns silently drop every course link render_listing_pages finds.
-  allow_url_patterns:
-    - '/courses/[^/?]+'
+  # Explicit sitemap URL — fetched via Scrape.do since direct HTTP returns 403.
+  # 987 course URLs at pattern /courses/202627/<slug>-<id>.
+  sitemap_url: 'https://www.ulster.ac.uk/site-maps/sitemap-courses.xml'
 
-  # Render all Funnelback paginated listing pages via Scrape.do headless Chrome.
-  # Static fetch returns 4 navigation links; rendered fetch shows real course cards.
-  render_listing_pages:
-    - 'https://www.ulster.ac.uk/courses'
-    - 'https://www.ulster.ac.uk/courses?&start_rank=41'
-    - 'https://www.ulster.ac.uk/courses?&start_rank=81'
-    - 'https://www.ulster.ac.uk/courses?&start_rank=121'
-    - 'https://www.ulster.ac.uk/courses?&start_rank=161'
-    - 'https://www.ulster.ac.uk/courses?&start_rank=201'
-    - 'https://www.ulster.ac.uk/courses?&start_rank=241'
-    - 'https://www.ulster.ac.uk/courses?&start_rank=281'
-    - 'https://www.ulster.ac.uk/courses?&start_rank=321'
-    - 'https://www.ulster.ac.uk/courses?&start_rank=361'
+  # REQUIRED: BFS finds ~38 /study/* links which pass _looks_like_course_url()
+  # (because /study/ is in _COURSE_URL_HINTS), so BFS count ≥ threshold(5) and
+  # the automatic sitemap fallback never fires.  always_sitemap_supplement forces
+  # the sitemap to run unconditionally and merge its results with BFS.
+  always_sitemap_supplement: true
+
+  # Accept /courses/<6-digit-year>/<slug> URLs only.
+  # re.search finds 'ulster.ac.uk/courses/202627/' anywhere in the full URL.
+  # Blocks /study/*, /doctoralcollege/*, /departments, all info pages, and
+  # bare /courses/ index (no 6-digit year segment → no match).
+  allow_url_patterns:
+    - 'ulster\.ac\.uk/courses/\d{6}/'
+
+  # Raise candidate cap — sitemap has 987 course URLs; default cap is 200.
+  max_candidates: 1000
+
+  # Deduplicate if multiple intake-year variants appear in the sitemap.
+  year_dedup_mode: keep_latest
 
 extraction:
   fees:

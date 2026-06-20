@@ -3,49 +3,39 @@
 # Country: United Kingdom  |  Currency: GBP
 #
 # Discovery notes (2026-06-19):
-#   - Course listing at /study/courses is a JS-rendered search interface.
-#     Static HTTP fetch returns only 3 navigation links per page — no course data.
-#   - The "show more results" button loads additional results via AJAX on the same
-#     page. Scrape.do headless Chrome captures the initial rendered batch per page.
-#   - Without allow_url_patterns, BFS follows links from /study/connected-degrees
-#     and /study/our-icp-foundation-year-courses into marketing/info pages
-#     ("Study skills", "Managing stress", "Living away from home", etc.) — 110
-#     extractable links with almost no real courses.
-#   - Fix: render_listing_pages (headless Chrome) for all 14 paginated search pages
-#     + allow_url_patterns restricted to /study/courses/<slug> so only actual course
-#     pages enter the candidate pool.
+#   - Course listing at /study/courses is a JS-rendered Algolia search interface.
+#     Headless Chrome (render_listing_pages) returns 0 course hrefs — Algolia
+#     renders course cards in the DOM but <a href> links use JS navigation,
+#     not plain anchors. render_listing_pages produced 0 new candidates.
+#   - BFS via subject area pages (/study/subject-area/*) found 113 courses but
+#     there are more subject areas than fit in the BFS page budget.
+#   - Fix: sitemap page 2 (https://www.port.ac.uk/sitemap.xml?page=2) contains
+#     419 top-level course pages (233 UG + 186 PG taught). Use
+#     always_sitemap_supplement to run sitemap unconditionally (BFS finds ~113
+#     course-like links via /study/subject-area/*, which is >= the 5-link
+#     threshold, so the automatic sitemap fallback never fires alone).
+#   - allow_url_patterns tightened to depth-4 URLs only (exactly 2 segments
+#     after /study/courses/), blocking sub-pages like
+#     /study/courses/postgraduate-taught/<slug>/applying-for-...
 
 discovery:
-  # Only accept pages under /study/courses/.
-  # Portsmouth course URLs use two-segment paths:
-  #   /study/courses/<slug>                (connected degrees, foundation, etc.)
-  #   /study/courses/undergraduate/<slug>  (UG courses)
-  #   /study/courses/postgraduate/<slug>   (PG courses)
-  # Using [^?]+ (allows slashes) instead of [^/?]+ (stops at first slash).
-  # This blocks all /study/study-skills, /study/undergraduate/applying, etc.
-  # Category pages like /study/courses/postgraduate-taught may still match but
-  # are gate-dropped as category_landing_page_url_block.
-  allow_url_patterns:
-    - 'port\.ac\.uk/study/courses/[^?]+'
+  # Explicit sitemap URL — page 2 has 419 top-level course pages.
+  sitemap_url: 'https://www.port.ac.uk/sitemap.xml?page=2'
 
-  # Fetch all 14 paginated course listing pages via Scrape.do headless Chrome.
-  # Static fetch returns 3 links; headless Chrome executes the JS search engine
-  # and renders the initial course cards for that page.
-  render_listing_pages:
-    - 'https://www.port.ac.uk/study/courses'
-    - 'https://www.port.ac.uk/study/courses?page=2'
-    - 'https://www.port.ac.uk/study/courses?page=3'
-    - 'https://www.port.ac.uk/study/courses?page=4'
-    - 'https://www.port.ac.uk/study/courses?page=5'
-    - 'https://www.port.ac.uk/study/courses?page=6'
-    - 'https://www.port.ac.uk/study/courses?page=7'
-    - 'https://www.port.ac.uk/study/courses?page=8'
-    - 'https://www.port.ac.uk/study/courses?page=9'
-    - 'https://www.port.ac.uk/study/courses?page=10'
-    - 'https://www.port.ac.uk/study/courses?page=11'
-    - 'https://www.port.ac.uk/study/courses?page=12'
-    - 'https://www.port.ac.uk/study/courses?page=13'
-    - 'https://www.port.ac.uk/study/courses?page=14'
+  # REQUIRED: BFS finds ~113 /study/subject-area/* course links which are
+  # >= the 5-link sitemap-fallback threshold, so automatic sitemap fallback
+  # never fires.  always_sitemap_supplement forces the sitemap to run
+  # unconditionally and its 419 URLs merge with BFS results.
+  always_sitemap_supplement: true
+
+  # Raise candidate cap to hold sitemap URLs + BFS candidates combined.
+  max_candidates: 500
+
+  # Accept only depth-4 course pages: /study/courses/<type>/<slug>
+  # Pattern: exactly 2 path segments after /study/courses/ with optional
+  # trailing slash → blocks sub-pages (depth 5+) and category pages (depth 3).
+  allow_url_patterns:
+    - 'port\.ac\.uk/study/courses/[^/]+/[^/]+/?$'
 
 extraction:
   fees:
