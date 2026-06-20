@@ -16,7 +16,7 @@ import {
   Code2, DollarSign, BookOpen, MapPin, ShieldCheck, Zap, RefreshCw,
   FlaskConical, CheckCircle2, XCircle, AlertTriangle, ChevronDown, ChevronUp, Info,
   MousePointerClick, GripVertical, Link, Stethoscope, Loader2, Wand2, WifiOff,
-  TrendingUp, ExternalLink, Play, Type, Calendar, GitMerge, ClipboardList,
+  TrendingUp, ExternalLink, Play, Type, Calendar, GitMerge, ClipboardList, AlertCircle,
 } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -306,24 +306,43 @@ const API_FIELDS = [
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 function StringListEditor({
-  label, values, onChange, placeholder, helpText,
+  label, values, onChange, placeholder, helpText, validateRegex,
 }: {
   label: string;
   values: string[];
   onChange: (v: string[]) => void;
   placeholder?: string;
   helpText?: React.ReactNode;
+  validateRegex?: boolean;
 }) {
   const [draft, setDraft] = useState("");
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkText, setBulkText] = useState("");
+  const [regexError, setRegexError] = useState<string | null>(null);
+
+  const checkRegex = (v: string): string | null => {
+    if (!validateRegex || !v.trim()) return null;
+    try {
+      new RegExp(v.trim());
+      return null;
+    } catch (e) {
+      return e instanceof Error ? e.message : "Invalid regex";
+    }
+  };
+
+  const handleDraftChange = (v: string) => {
+    setDraft(v);
+    setRegexError(checkRegex(v));
+  };
 
   const add = () => {
     const v = draft.trim();
-    if (v && !values.includes(v)) {
-      onChange([...values, v]);
-      setDraft("");
-    }
+    if (!v || values.includes(v)) return;
+    const err = checkRegex(v);
+    if (err) { setRegexError(err); return; }
+    onChange([...values, v]);
+    setDraft("");
+    setRegexError(null);
   };
 
   const addBulk = () => {
@@ -344,13 +363,13 @@ function StringListEditor({
       <div className="flex gap-2">
         <Input
           value={draft}
-          onChange={e => setDraft(e.target.value)}
+          onChange={e => handleDraftChange(e.target.value)}
           placeholder={placeholder}
           onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); add(); }}}
-          className="text-sm"
+          className={`text-sm${regexError ? " border-destructive focus-visible:ring-destructive" : ""}`}
         />
-        <Button type="button" variant="outline" size="sm" onClick={add} title="Add single URL">
-          <Plus className="h-3 w-3" />
+        <Button type="button" variant="outline" size="sm" onClick={add} title={regexError ? regexError : "Add"} disabled={!!regexError}>
+          {regexError ? <AlertCircle className="h-3 w-3 text-destructive" /> : <Plus className="h-3 w-3" />}
         </Button>
         <Button
           type="button"
@@ -363,6 +382,12 @@ function StringListEditor({
           <ClipboardList className="h-3 w-3" />
         </Button>
       </div>
+      {regexError && (
+        <p className="flex items-center gap-1 text-xs text-destructive">
+          <AlertCircle className="h-3 w-3 shrink-0" />
+          {regexError}
+        </p>
+      )}
       {bulkOpen && (
         <div className="space-y-2 rounded-md border border-dashed p-3 bg-muted/30">
           <p className="text-xs text-muted-foreground font-medium">Paste multiple URLs — one per line</p>
@@ -3411,6 +3436,7 @@ export default function RecipeEditorPage() {
                 onChange={v => patchRecipe({ block_url_patterns: v })}
                 placeholder="e.g. /apprenticeship"
                 helpText="Regex patterns — any URL matching one of these is dropped. E.g. /news, /events, /cpd."
+                validateRegex
               />
               <Separator />
               <StringListEditor
@@ -3418,6 +3444,7 @@ export default function RecipeEditorPage() {
                 values={recipe.allow_url_patterns}
                 onChange={v => patchRecipe({ allow_url_patterns: v })}
                 placeholder="e.g. /courses/[^/?]+"
+                validateRegex
                 helpText={
                   <span>
                     Regex patterns — a URL is only accepted if it matches <strong>at least one</strong> of these patterns.
