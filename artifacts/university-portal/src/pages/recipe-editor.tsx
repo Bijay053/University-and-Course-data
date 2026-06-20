@@ -422,6 +422,53 @@ function StringListEditor({
   );
 }
 
+// Inline regex-validated pattern row used by the API provider URL pattern lists.
+// Unlike StringListEditor (draft+add model), these rows edit values in-place.
+function RegexPatternRow({
+  value,
+  onChange,
+  onRemove,
+  placeholder,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  onRemove: () => void;
+  placeholder?: string;
+}) {
+  const [regexError, setRegexError] = useState<string | null>(null);
+
+  const check = (v: string): string | null => {
+    if (!v.trim()) return null;
+    try { new RegExp(v.trim()); return null; }
+    catch (e) { return e instanceof Error ? e.message : "Invalid regex"; }
+  };
+
+  const handleChange = (v: string) => {
+    setRegexError(check(v));
+    onChange(v);
+  };
+
+  return (
+    <div className="space-y-0.5">
+      <div className="flex gap-2 mt-1">
+        <Input
+          value={value}
+          onChange={e => handleChange(e.target.value)}
+          placeholder={placeholder}
+          className={`text-sm font-mono flex-1${regexError ? " border-destructive focus-visible:ring-destructive" : ""}`}
+        />
+        <Button type="button" variant="ghost" size="sm" onClick={onRemove}>✕</Button>
+      </div>
+      {regexError && (
+        <p className="flex items-center gap-1 text-xs text-destructive pl-0.5">
+          <AlertCircle className="h-3 w-3 shrink-0" />
+          {regexError}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function FeeRulesEditor({
   label, rules, onChange
 }: {
@@ -3207,22 +3254,20 @@ export default function RecipeEditorPage() {
                     Regex whitelist applied to URLs extracted from API results — only matching URLs are kept. Leave blank to keep all.
                   </p>
                   {(recipe.api?.api_allow_url_patterns || [""]).map((pat, i) => (
-                    <div key={i} className="flex gap-2 mt-1">
-                      <Input
-                        value={pat}
-                        onChange={e => {
-                          const arr = [...(recipe.api?.api_allow_url_patterns || [""])];
-                          arr[i] = e.target.value;
-                          patchApi({ api_allow_url_patterns: arr.filter(Boolean) });
-                        }}
-                        placeholder="/study/qualifications/"
-                        className="text-sm font-mono flex-1"
-                      />
-                      <Button type="button" variant="ghost" size="sm" onClick={() => {
+                    <RegexPatternRow
+                      key={i}
+                      value={pat}
+                      placeholder="/study/qualifications/"
+                      onChange={v => {
+                        const arr = [...(recipe.api?.api_allow_url_patterns || [""])];
+                        arr[i] = v;
+                        patchApi({ api_allow_url_patterns: arr.filter(Boolean) });
+                      }}
+                      onRemove={() => {
                         const arr = (recipe.api?.api_allow_url_patterns || []).filter((_, j) => j !== i);
                         patchApi({ api_allow_url_patterns: arr });
-                      }}>✕</Button>
-                    </div>
+                      }}
+                    />
                   ))}
                   <Button type="button" variant="outline" size="sm" className="mt-2"
                     onClick={() => patchApi({ api_allow_url_patterns: [...(recipe.api?.api_allow_url_patterns || []), ""] })}>
@@ -3235,22 +3280,20 @@ export default function RecipeEditorPage() {
                     Regex blocklist applied to URLs extracted from API results — matching URLs are dropped.
                   </p>
                   {(recipe.api?.api_block_url_patterns || [""]).map((pat, i) => (
-                    <div key={i} className="flex gap-2 mt-1">
-                      <Input
-                        value={pat}
-                        onChange={e => {
-                          const arr = [...(recipe.api?.api_block_url_patterns || [""])];
-                          arr[i] = e.target.value;
-                          patchApi({ api_block_url_patterns: arr.filter(Boolean) });
-                        }}
-                        placeholder="^\\.pdf$"
-                        className="text-sm font-mono flex-1"
-                      />
-                      <Button type="button" variant="ghost" size="sm" onClick={() => {
+                    <RegexPatternRow
+                      key={i}
+                      value={pat}
+                      placeholder="^\\.pdf$"
+                      onChange={v => {
+                        const arr = [...(recipe.api?.api_block_url_patterns || [""])];
+                        arr[i] = v;
+                        patchApi({ api_block_url_patterns: arr.filter(Boolean) });
+                      }}
+                      onRemove={() => {
                         const arr = (recipe.api?.api_block_url_patterns || []).filter((_, j) => j !== i);
                         patchApi({ api_block_url_patterns: arr });
-                      }}>✕</Button>
-                    </div>
+                      }}
+                    />
                   ))}
                   <Button type="button" variant="outline" size="sm" className="mt-2"
                     onClick={() => patchApi({ api_block_url_patterns: [...(recipe.api?.api_block_url_patterns || []), ""] })}>
