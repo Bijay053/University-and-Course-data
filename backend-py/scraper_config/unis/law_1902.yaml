@@ -5,6 +5,8 @@
 # Notes: Adapted from the provided Scrapy spider. Courses are pulled directly from the /api/coursesearch/find endpoint.
 
 discovery:
+  seed_urls:
+    - https://law.ac.uk/api/coursesearch/find?page=1&size=200
   always_sitemap_supplement: true
   generic_search_api:
     enabled: true
