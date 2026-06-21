@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -457,25 +457,22 @@ function RegexPatternRow({
   onRemove: () => void;
   placeholder?: string;
 }) {
-  const [regexError, setRegexError] = useState<string | null>(null);
-
-  const check = (v: string): string | null => {
+  const checkRegex = (v: string): string | null => {
     if (!v.trim()) return null;
     try { new RegExp(v.trim()); return null; }
     catch (e) { return e instanceof Error ? e.message : "Invalid regex"; }
   };
 
-  const handleChange = (v: string) => {
-    setRegexError(check(v));
-    onChange(v);
-  };
+  // Derived from `value` prop — immediately reflects errors in pre-existing patterns
+  // (loaded from saved recipes) without waiting for user interaction.
+  const regexError = useMemo(() => checkRegex(value), [value]);
 
   return (
     <div className="space-y-0.5">
       <div className="flex gap-2 mt-1">
         <Input
           value={value}
-          onChange={e => handleChange(e.target.value)}
+          onChange={e => onChange(e.target.value)}
           placeholder={placeholder}
           className={`text-sm font-mono flex-1${regexError ? " border-destructive focus-visible:ring-destructive" : ""}`}
         />
@@ -3277,7 +3274,7 @@ export default function RecipeEditorPage() {
                   </p>
                   {(recipe.api?.api_allow_url_patterns || [""]).map((pat, i) => (
                     <RegexPatternRow
-                      key={i}
+                      key={`${i}:${pat}`}
                       value={pat}
                       placeholder="/study/qualifications/"
                       onChange={v => {
@@ -3303,7 +3300,7 @@ export default function RecipeEditorPage() {
                   </p>
                   {(recipe.api?.api_block_url_patterns || [""]).map((pat, i) => (
                     <RegexPatternRow
-                      key={i}
+                      key={`${i}:${pat}`}
                       value={pat}
                       placeholder="^\\.pdf$"
                       onChange={v => {
