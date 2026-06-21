@@ -68,6 +68,30 @@ class TestMissingFields:
         assert "missing_international_fee_central_page" in codes
         assert "missing_international_fee" not in codes
 
+    def test_missing_fee_is_warning_when_require_fee_false(self):
+        """When require_international_fee=False, missing fee is WARNING not CRITICAL.
+
+        Universities like Ulster University have require_international_fee=false
+        in their YAML because Cloudflare blocks fee-page fetches.  The operator
+        has acknowledged the gap; courses should land in the review queue
+        (warning) not data_quality_failure (critical).
+        """
+        payload = _good_payload(international_fee=None, has_central_fee_page=False)
+        issues = _check_course(payload, "https://ulster.ac.uk/courses/foo",
+                               require_international_fee=False)
+        fee_issues = [i for i in issues if i.code == "missing_international_fee"]
+        assert fee_issues, "missing_international_fee issue should still be raised"
+        assert all(i.severity == "warning" for i in fee_issues), (
+            f"expected warning, got: {[i.severity for i in fee_issues]}"
+        )
+
+    def test_missing_fee_default_still_critical(self):
+        """Default (require_international_fee=True) behaviour is unchanged."""
+        payload = _good_payload(international_fee=None, has_central_fee_page=False)
+        issues = _check_course(payload, "https://example.edu/course")
+        fee_issues = [i for i in issues if i.code == "missing_international_fee"]
+        assert any(i.severity == "critical" for i in fee_issues)
+
     def test_missing_ielts_is_warning(self):
         payload = _good_payload(ielts_overall=None)
         issues = _run_check(payload)

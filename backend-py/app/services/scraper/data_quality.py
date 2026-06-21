@@ -323,6 +323,7 @@ def _check_course(
     url: str,
     campus_allowlist: list[str] | None = None,
     default_currency: str = "AUD",
+    require_international_fee: bool = True,
 ) -> list[QualityIssue]:
     """Return a list of quality issues for one staged course payload.
 
@@ -336,6 +337,12 @@ def _check_course(
         When non-empty, the course_location must contain at least one of these
         strings (case-insensitive).  Sourced from ExtractionConfig.campus_allowlist
         in the per-uni YAML.  An empty list disables the check.
+    require_international_fee:
+        When False (sourced from staging.require_international_fee in the uni's
+        YAML), the ``missing_international_fee`` issue is downgraded from CRITICAL
+        to WARNING.  This prevents courses from landing in ``data_quality_failure``
+        purely because the fee is behind a JS tab or a Cloudflare-protected page —
+        the operator has already acknowledged the gap by setting the flag.
     """
     issues: list[QualityIssue] = []
     name = payload.get("course_name") or payload.get("name") or "?"
@@ -426,8 +433,19 @@ def _check_course(
                 pass
         if intl_fee is None and domestic_fee is None:
             if not has_central_fee:
-                add("critical", "missing_international_fee",
-                    "No international fee found and no central fee page flag set.")
+                # When the university YAML sets require_international_fee=false,
+                # the operator has acknowledged that the fee may be behind a JS
+                # tab or a Cloudflare-protected endpoint.  Downgrade from CRITICAL
+                # to WARNING so the course lands in the review queue (not
+                # data_quality_failure) and can still be approved by a human.
+                if require_international_fee:
+                    add("critical", "missing_international_fee",
+                        "No international fee found and no central fee page flag set.")
+                else:
+                    add("warning", "missing_international_fee",
+                        "No international fee found (require_international_fee=false — "
+                        "fee may be behind a JS tab or Cloudflare-protected page; "
+                        "stage for human review).")
             else:
                 add("warning", "missing_international_fee_central_page",
                     "International fee absent — marked for central fee page review.")
@@ -880,6 +898,7 @@ async def run_quality_checks(
     # Extract campus allowlist and default fee currency from uni_config if provided.
     campus_allowlist: list[str] = []
     _default_currency: str = "AUD"
+    _require_intl_fee: bool = True  # default: missing fee is CRITICAL
     if uni_config is not None:
         try:
             campus_allowlist = uni_config.extraction.campus_allowlist or []
@@ -889,6 +908,15 @@ async def run_quality_checks(
             _cfg_currency = uni_config.extraction.fees.default_currency
             if _cfg_currency:
                 _default_currency = _cfg_currency.strip().upper()
+        except AttributeError:
+            pass
+        try:
+            # When staging.require_international_fee=false the operator has
+            # acknowledged that fees may not be extractable (e.g. Cloudflare-
+            # protected JS tabs).  Downgrade missing_international_fee from
+            # CRITICAL to WARNING so those courses land in the review queue
+            # instead of data_quality_failure.
+            _require_intl_fee = uni_config.extraction.staging.require_international_fee
         except AttributeError:
             pass
 
@@ -909,6 +937,7 @@ async def run_quality_checks(
             payload, url,
             campus_allowlist=campus_allowlist or None,
             default_currency=_default_currency,
+            require_international_fee=_require_intl_fee,
         )
         all_issues.extend(course_issues)
 

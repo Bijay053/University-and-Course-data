@@ -63,6 +63,30 @@ extraction:
   filters:
     online_only:
       enabled: false
+
+  # Cloudflare bypass — Ulster is fully Cloudflare Bot Management protected.
+  # httpx returns 403, curl_cffi also blocked (Enterprise Bot Management).
+  # Wayback Machine snapshots exist but the 2025-12 archives typically lack
+  # international fee tables and IELTS scores — resulting in 86% of staged
+  # courses getting data_quality_failure due to missing IELTS / fee data.
+  #
+  # Scrape.do headless Chrome (render=true) bypasses Cloudflare by executing
+  # JavaScript in a real Chrome instance.  Ulster's fee tables and English
+  # requirement sections are rendered server-side but gated behind Cloudflare;
+  # Scrape.do's residential Chrome renders the full page so extractors see
+  # fee rows and IELTS scores.
+  #
+  # scrape_do_skip_fallbacks=true: skips the wasted httpx+curl_cffi round-trips
+  # (both always fail for Ulster) and goes straight to Scrape.do render.
+  # Saves ~2-3s per course × ~500 courses = several minutes per batch.
+  #
+  # auto_interact_all=true: expands any collapsed accordions / <details> panels
+  # after page load so fee tables or IELTS sections inside "show more" blocks
+  # are visible to the extractors before html = page.content() is called.
+  scrape_do_render: true
+  scrape_do_skip_fallbacks: true
+  auto_interact_all: true
+
   staging:
     skip_degree_qualifier_check: true
     require_international_fee: false
