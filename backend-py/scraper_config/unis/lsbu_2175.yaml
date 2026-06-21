@@ -1,15 +1,61 @@
 # London South Bank University
 # Hostname: www.lsbu.ac.uk
 # Country: United Kingdom  |  Currency: GBP
-# Slug: lsbu
-# Auto-generated: 2026-06-19
-#
-# This stub was created automatically on the first scrape of this university.
-# Review and expand it to improve discovery and extraction quality.
-# See scraper_config/defaults.yaml for all available options.
+# Discovery: Seeded search results to BFS discovery
+# Notes: Heavily blocked marketing/stories to prevent scraping alumni profiles.
 
-discovery: {}
+discovery:
+  always_sitemap_supplement: true
+  seed_urls:
+    - 'https://www.lsbu.ac.uk/study/course-finder?f.Method+of+Study%7CcoursesMode=full-time&profile=_default&query=%21nullsearch&collection=lsbu%7Esp-courses-meta&f.Level%7CcourseLevel=undergraduate'
+    - 'https://www.lsbu.ac.uk/study/course-finder?f.Method+of+Study%7CcoursesMode=full-time&profile=_default&query=%21nullsearch&collection=lsbu%7Esp-courses-meta&f.Level%7CcourseLevel=postgraduate'
+    - 'https://www.lsbu.ac.uk/study/course-finder?f.Method+of+Study%7CcoursesMode=full-time&profile=_default&query=%21nullsearch&collection=lsbu%7Esp-courses-meta&f.Level%7CcourseLevel=foundation'
+  
+  allow_url_patterns:
+    - '/study/course-finder/[a-z0-9-]+$'  # Forces strict matching of course pages only
+  
+  block_url_patterns:
+    - '/stories-finder/'
+    - '/our-schools/'
+    - '/order-a-prospectus/'
+    - 'entry-requirements'
+    - 'fees-and-funding'
+    - '/news'
+    - '/events'
+    - '/about'
+    - '/staff'
+    - '/research'
 
 extraction:
   fees:
-    default_currency: GBP
+    default_currency: 'GBP'
+    prefer_international: true
+    prefer_annual_over_total: true
+    reject_keywords:
+      - 'Home student'
+      - 'Home fee'
+      - 'UK student'
+      - 'UK fee'
+      - 'Domestic'
+      - 'per module'
+      - 'part-time'
+
+  english:
+    trust_vision_ocr: false
+    default_ielts: 6.0
+    default_pte: 60
+    default_toefl: 80
+
+  intake:
+    start_dates_only: true
+
+  course_name:
+    strip_title_suffixes:
+      - ' | London South Bank University'
+      - ' - London South Bank University'
+      - ' | LSBU'
+      - ' - LSBU'
+
+  filters:
+    online_only:
+      enabled: false
