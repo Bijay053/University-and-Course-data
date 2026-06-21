@@ -1,77 +1,49 @@
+# University of Law
+# Hostname: www.law.ac.uk
+# Country: United Kingdom  |  Currency: GBP
+# Discovery: JSON/REST API course catalogue extraction
+# Notes: Adapted from the provided Scrapy spider. Courses are pulled directly from the /api/coursesearch/find endpoint.
+
 discovery:
-  course_detail_url_patterns:
-  - /study/undergraduate/[^/]+/[^/]+/
-  - /study/postgraduate/[^/]+/[^/]+/
-
-  # Seed both listing pages directly so the browser doesn't have to
-  # crawl from the homepage.  Without this, the browser spent the full
-  # 90s on postgraduate pages (nav score=120) and never reached
-  # /study/undergraduate/, resulting in 0 bachelor courses discovered.
-  # Each listing page links to sub-category hubs (/study/undergraduate/law/
-  # etc.) which in turn link to individual course pages — the browser BFS
-  # will follow those within the time budget.
-  seed_urls:
-    - https://www.law.ac.uk/study/undergraduate/
-    - https://www.law.ac.uk/study/postgraduate/
-    - https://www.law.ac.uk/study/undergraduate/law/
-    - https://www.law.ac.uk/study/undergraduate/business/
-    - https://www.law.ac.uk/study/undergraduate/criminology/
-    - https://www.law.ac.uk/study/postgraduate/law/
-    - https://www.law.ac.uk/study/postgraduate/sqe/
-    - https://www.law.ac.uk/study/postgraduate/criminology/
-    - https://www.law.ac.uk/study/psychology/
-
-  # Increase from default 90s — the site has ~120+ courses across two
-  # study levels and multiple sub-category hubs (~12s per nav page).
-  # 240s covers ~18-20 nav visits, enough for both UG and PG subtrees.
-  browser_time_budget_s: 240
-
-  # Raise early-stop threshold to match the larger catalogue.
-  # Default 100 would stop before all UG courses are found if PG fills
-  # the quota first.
-  browser_early_stop_courses: 200
+  always_sitemap_supplement: true
+  generic_search_api:
+    enabled: true
+    method: GET
+    url: 'https://law.ac.uk/api/coursesearch/find'
+    root_path: 'Courses'
+    url_fields: [Url]
+    title_fields: [Name, Award]
+    normalize_relative_urls: true
+    base_url: 'https://www.law.ac.uk'
+    page_size: 100
+    max_pages: 20
 
 extraction:
+  fees:
+    default_currency: 'GBP'
+    prefer_international: true
+    prefer_annual_over_total: true
+    reject_keywords:
+      - 'Home student'
+      - 'Home fee'
+      - 'UK student'
+      - 'UK fee'
+      - 'Domestic'
+
   english:
-    central_page_ug: https://www.law.ac.uk/study/undergraduate/entry-requirements/
-    # central_page_pg removed: the single PG entry-requirements page covers ALL
-    # programmes including BPC/SQE (IELTS 7.5) and LLM/MA/MSc (IELTS 6.5).
-    # Fetching it stamps every LLM with 7.5, which is wrong.
-    # Instead, use per-degree-level defaults so LLM/MA/MSc get 6.5.
-    degree_level_defaults:
-      postgraduate:
-        ielts: 6.5
+    trust_vision_ocr: false
+    default_ielts: 6.0
+    default_pte: 60
+    default_toefl: 80
+
+  intake:
+    start_dates_only: true
+
+  course_name:
+    strip_title_suffixes:
+      - ' | University of Law'
+      - ' - University of Law'
 
   filters:
     online_only:
-      enabled: false  # UoL markets online LLMs to international students
-
-  staging:
-    skip_degree_qualifier_check: true  # SQE/LPC/BPC courses use vocational names
-
-  text_cleaning:
-    location:
-      reject_values:
-      - Fees
-      - Course fees
-      - Tuition fees
-      - Funding
-      - Apply
-      - Entry requirements
-      - Study mode
-      - Duration
-      - Start dates
-      - Key facts
-      - How to apply
-      - Newcastle University
-      allowed_values:
-      - Birmingham
-      - Bristol
-      - Leeds
-      - London Bloomsbury
-      - London Moorgate
-      - Manchester
-      - Nottingham
-      - Newcastle
-      - Online
-      - Hong Kong
+      enabled: false
