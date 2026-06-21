@@ -276,6 +276,11 @@ async def _emit(db, runtime_job_id: str, sequence: int, event: str, message: str
 
 _MAX_COURSES_PER_JOB = 500
 _MAX_PARALLEL_FETCH = 4
+# Courses extracted and staged per batch before the next batch starts.
+# Lower values reduce peak memory at the cost of slightly more staging
+# overhead.  50 is a good default for large universities (>200 courses)
+# without harming smaller ones (a single batch covers them entirely).
+_EXTRACTION_BATCH_SIZE = 50
 # How long a pending/rejected scraped_courses row may sit before the next
 # scrape is allowed to wipe it. Anything older than this is considered
 # left-over from a failed prior run and is safe to clear so dedup does not
@@ -3264,125 +3269,37 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     continue
                 return result
 
-        results = await asyncio.gather(
-            *[_bounded(lk) for lk in links], return_exceptions=True
-        )
-
-        # Honor stop request observed during the gather phase before we
-        # spend any time on staging. Anything already extracted is dropped
-        # — no half-staged batch lands in scraped_courses.
-        if stop_flag[0]:
-            return await _finalize_stopped()
-
-        # ── SHADOW MODE ──────────────────────────────────────────────────────
-        # When SHADOW_MODE_UNI_IDS includes this uni, run all course links
-        # through the new extraction code path and diff the results.
-        # Only the old-path results (``results``) proceed to staging — shadow
-        # mode is verification only. Cutover (new path becomes authoritative)
-        # is a separate explicit step via SHADOW_CUTOVER_UNI_IDS.
-        #
-        # Both paths share the same vision_image_cache (asyncio Future dict).
-        # Old path runs first (its gather completes before this block); every
-        # image URL it processes is stored as a settled Future. When the new
-        # path gather runs, those URLs are already cached → it awaits the same
-        # Future and gets identical OCR values without a new Gemini call.
-        # This makes the within-run diff immune to vision-OCR non-determinism
-        # (Gemini returning different values for the same image on different days
-        # cannot affect a single shadow run — both paths see the same cache hit).
-        # Cross-run non-determinism (different values across the 5-run streak)
-        # is expected and acceptable: each run's old↔new diff will still be
-        # clean as long as the new code path is equivalent to the old one.
-        from app.services.scraper.shadow.mode import is_shadow_enabled as _shadow_on
-        if _shadow_on(uni_id):
-            from app.services.scraper.shadow.diff import diff_staged_runs as _diff_runs
-            from app.services.scraper.shadow.new_path import extract_new_path as _new_path
-            from app.services.scraper.shadow.report import write_shadow_report as _write_report
-
-            try:
-                old_dicts = [r for r in results if isinstance(r, dict)]
-                log.info(
-                    "shadow[%s/%d] applying new-path transformation to %d extracted results",
-                    _uni_cfg.slug, uni_id, len(old_dicts),
-                )
-                # New path transforms the already-extracted old results — no re-fetch,
-                # no second Playwright session, no second Gemini call. This is "Option A"
-                # correctly implemented: one network fetch, both code paths run on the
-                # same already-fetched content. Initially a no-op (deep copy), diverging
-                # only when per-uni config transformations are added in new_path.py.
-                new_dicts = [
-                    await _new_path(r, uni_id=uni_id) for r in old_dicts
-                ]
-                shadow_diff = _diff_runs(old_dicts, new_dicts)
-                _write_report(
-                    shadow_diff,
-                    uni_id=uni_id,
-                    slug=_uni_cfg.slug,
-                    old_job_id=runtime_job_id,
-                    new_job_id=f"{runtime_job_id}:new_path",
-                )
-            except Exception as _shadow_exc:
-                log.warning("shadow[%s/%d] failed (non-fatal): %s", _uni_cfg.slug, uni_id, _shadow_exc)
-        # ── END SHADOW MODE ───────────────────────────────────────────────────
-
-        # T206: sibling-cache back-fill. Runs after every per-course
-        # extract has settled but BEFORE staging — by then we've seen
-        # the high-quality english-test slots from siblings that did
-        # extract them, and we want every staged row to benefit. Mutates
-        # the per-course payload dicts in place.
-        try:
-            from app.services.scraper.sibling_cache import (
-                backfill_english_from_siblings,
+        # ── Apply final hard cap so merged link sets (BFS + sitemap supplement
+        # + always_sitemap_supplement) never exceed max_courses regardless of
+        # the order in which discovery methods returned results.  This ensures
+        # ``_MAX_COURSES_PER_JOB`` (and its per-uni YAML override via
+        # ``max_candidates``) is applied to sitemap-sourced links just as it
+        # is for BFS links.
+        if len(links) > max_courses:
+            log.info(
+                "[EXTRACT] capping %d discovered links to max_courses=%d for %s",
+                len(links), max_courses, uni_name,
             )
-
-            sibling_dicts = [r for r in results if isinstance(r, dict)]
-            # Bond University: require at least 2 courses to agree on an
-            # English score before promoting it to the sibling cache.  Bond's
-            # marketing and experience pages mention "IELTS 6.5" in running
-            # text; with min_quorum=1 (the default) a single such page seeds
-            # the cache and backfills all 50+ siblings with a value that may
-            # not apply to the specific program. min_quorum=2 requires a
-            # second independent extraction to corroborate the score first.
-            # Hosts where a single page can seed the sibling cache with
-            # institution-wide English scores that don't apply to specific
-            # courses.  min_quorum=2 requires at least two independent
-            # per-course extractions to agree before the value is promoted.
-            #   Bond: marketing pages mention "IELTS 6.5" in running text.
-            #   CDU:  category overview pages contain an English-requirement
-            #         image that vision OCR extracts; without quorum=2 the
-            #         extracted IELTS score backfills every course in the run.
-            # Week 1 Prompt 6 — global minimum is now 2 (set as the
-            # ``backfill_english_from_siblings`` default).  Bond / CDU
-            # entries are kept here for documentation: they were the
-            # original drivers for the higher quorum and remain in the
-            # set so a future raise to 3+ can target them explicitly
-            # without rediscovery.
-            _high_quorum_hosts = frozenset({
-                "bond.edu.au", "www.bond.edu.au",
-                "cdu.edu.au", "www.cdu.edu.au",
-            })
-            _sibling_quorum = max(2, 2 if _scrape_host in _high_quorum_hosts else 2)
-            fills = await backfill_english_from_siblings(
-                sibling_dicts, emit=emit, min_quorum=_sibling_quorum
-            )
-            if fills:
-                log.info("sibling-cache backfilled %d slot(s) across siblings", fills)
-        except Exception as exc:  # noqa: BLE001 — never abort the run on cache failure
-            log.warning("sibling-cache backfill failed: %s", exc)
             await emit(
                 "status",
-                f"[EXTRACT] [sibling cache ✗] {exc}",
+                f"[EXTRACT] capping {len(links)} links to {max_courses} (max_courses limit)",
                 phase="extract",
-                kind="sibling_cache_error",
+                kind="links_capped",
+                original=len(links),
+                capped=max_courses,
             )
+            links = links[:max_courses]
+            job.total_found = len(links)
+            await db.commit()
 
-        # 2) Staging phase — serial writes through one fresh session per course.
-        # Heartbeat is now handled by the dedicated ``_heartbeat_pulser``
-        # background task (see top of file) — it spans BOTH this loop
-        # and the preceding extraction phase, on its own session, so the
-        # /active reaper sees a fresh ``heartbeat_at`` regardless of what
-        # the main session is doing. We keep the in-memory mutation
-        # below for parity with the historical UI / log consumers, but
-        # the DB write is no longer this loop's responsibility.
+        # 2) Extraction + staging split into batches so completed courses are
+        # staged and freed before the next batch starts.  For large universities
+        # (Ulster: 1000 courses) a single asyncio.gather keeps every result
+        # dict in memory until all courses complete; batching caps peak memory
+        # to ≈ _EXTRACTION_BATCH_SIZE × avg_result_size.
+        #
+        # Heartbeat is handled by the dedicated ``_heartbeat_pulser`` background
+        # task (see top of file) — it spans both extraction and staging phases.
         _total_gemini_cost_usd: float = 0.0
         _total_gemini_in_tokens: int = 0
         _total_gemini_out_tokens: int = 0
@@ -3399,68 +3316,685 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             budget_usd=_get_budget(_uni_slug),
         )
 
-        # ── Gemini call log — batch-write all call entries from all courses ───
+        # Accumulated across all batches — written to gemini_call_log once
+        # after every batch has completed so completed-batch calls are always
+        # persisted even if the job is interrupted mid-run.
         _all_gemini_calls: list[dict] = []
-        for _r in results:
-            if isinstance(_r, dict):
-                _calls = _r.get("gemini_calls") or []
-                for _call in _calls:
-                    _all_gemini_calls.append({**_call, "course_url": _r.get("url")})
 
-        # ── per-run performance savings ────────────────────────────────────────
-        _http_skipped_count = sum(
-            1 for _r in results
-            if isinstance(_r, dict) and (_r.get("_perf") or {}).get("http_skipped")
-        )
-        _vision_skipped_count = sum(
-            1 for _r in results
-            if isinstance(_r, dict) and (_r.get("_perf") or {}).get("vision_skipped")
-        )
-        _empty_text_count = sum(
-            1 for _r in results
-            if isinstance(_r, dict) and (_r.get("_perf") or {}).get("empty_text_static")
-        )
-        _browser_retry_empty_count = sum(
-            1 for _r in results
-            if isinstance(_r, dict) and (_r.get("_perf") or {}).get("browser_retry_empty_text")
-        )
-        _skipped_empty_count = sum(
-            1 for _r in results
-            if isinstance(_r, dict) and (_r.get("_perf") or {}).get("skipped_empty_text")
-        )
-        _fallback_skipped_count = sum(
-            1 for _r in results
-            if isinstance(_r, dict) and (_r.get("_perf") or {}).get("fallback_skipped_empty_text")
-        )
-        # 3 s per avoided HTTP attempt + 4 s per avoided vision OCR pass (empirical)
-        # 2 s per avoided Gemini call on empty text (prompt build + API round-trip)
-        # 15 s per bailed course (no browser timeout waiting)
-        _est_seconds_saved = (
-            _http_skipped_count * 3
-            + _vision_skipped_count * 4
-            + _empty_text_count * 2
-            + _skipped_empty_count * 15
-        )
-        # $0.00015 per Gemini vision call; $0.00020 per avoided primary Gemini call
-        _est_cost_saved_usd = round(
-            _vision_skipped_count * 0.00015 + _empty_text_count * 0.00020, 5
-        )
-        _any_savings = (
-            _http_skipped_count or _vision_skipped_count or _empty_text_count
-            or _browser_retry_empty_count or _skipped_empty_count
-        )
-        _perf_savings = {
-            "http_fetches_skipped": _http_skipped_count,
-            "vision_ocr_skipped": _vision_skipped_count,
-            "empty_text_ai_skipped": _empty_text_count,
-            "browser_retry_empty_text": _browser_retry_empty_count,
-            "skipped_empty_text": _skipped_empty_count,
-            "fallback_skipped_empty_text": _fallback_skipped_count,
-            "estimated_seconds_saved": _est_seconds_saved,
-            "estimated_ai_calls_saved": _vision_skipped_count + _empty_text_count,
-            "estimated_cost_saved_usd": _est_cost_saved_usd,
-        } if _any_savings else None
+        # Perf-stat counters — accumulated across batches, used to compute
+        # _perf_savings after the batch loop finishes.
+        _http_skipped_count: int = 0
+        _vision_skipped_count: int = 0
+        _empty_text_count: int = 0
+        _browser_retry_empty_count: int = 0
+        _skipped_empty_count: int = 0
+        _fallback_skipped_count: int = 0
 
+        # Collect non-error result dicts across all batches for the data-quality
+        # check that runs after staging (it reads payloads, not the DB).
+        _all_staged_dicts: list[dict] = []
+
+        # ── Batch extraction + staging ────────────────────────────────────────
+        # Allow per-uni YAML to tune the batch size via `extraction.batch_size`.
+        _effective_batch_size = _EXTRACTION_BATCH_SIZE
+        try:
+            _yaml_bs = getattr(get_uni_config().extraction, "batch_size", None)
+            if _yaml_bs and int(_yaml_bs) >= 1:
+                _effective_batch_size = int(_yaml_bs)
+        except Exception:  # noqa: BLE001
+            pass
+
+        _link_batches = [
+            links[i : i + _effective_batch_size]
+            for i in range(0, len(links), _effective_batch_size)
+        ]
+        _n_batches = len(_link_batches)
+        if _n_batches > 1:
+            log.info(
+                "[BATCH] %d courses → %d batch(es) of \u2264%d for %s",
+                len(links), _n_batches, _effective_batch_size, uni_name,
+            )
+            await emit(
+                "status",
+                f"[BATCH] {len(links)} courses \u2192 {_n_batches} batch(es) of \u2264{_effective_batch_size}",
+                phase="extract",
+                kind="batch_info",
+                n_batches=_n_batches,
+                batch_size=_effective_batch_size,
+            )
+
+        for _batch_idx, _batch_links in enumerate(_link_batches):
+            if _n_batches > 1:
+                _b_start = _batch_idx * _effective_batch_size + 1
+                _b_end = _b_start + len(_batch_links) - 1
+                log.info(
+                    "[BATCH] extracting batch %d/%d (courses %d\u2013%d)",
+                    _batch_idx + 1, _n_batches, _b_start, _b_end,
+                )
+            results = await asyncio.gather(
+                *[_bounded(lk) for lk in _batch_links], return_exceptions=True
+            )
+
+            # Honor stop request observed during the gather phase before we
+            # spend any time on staging. Anything already extracted is dropped
+            # — no half-staged batch lands in scraped_courses.
+            if stop_flag[0]:
+                return await _finalize_stopped()
+
+            # ── SHADOW MODE ──────────────────────────────────────────────────────
+            # When SHADOW_MODE_UNI_IDS includes this uni, run all course links
+            # through the new extraction code path and diff the results.
+            # Only the old-path results (``results``) proceed to staging — shadow
+            # mode is verification only. Cutover (new path becomes authoritative)
+            # is a separate explicit step via SHADOW_CUTOVER_UNI_IDS.
+            #
+            # Both paths share the same vision_image_cache (asyncio Future dict).
+            # Old path runs first (its gather completes before this block); every
+            # image URL it processes is stored as a settled Future. When the new
+            # path gather runs, those URLs are already cached → it awaits the same
+            # Future and gets identical OCR values without a new Gemini call.
+            # This makes the within-run diff immune to vision-OCR non-determinism
+            # (Gemini returning different values for the same image on different days
+            # cannot affect a single shadow run — both paths see the same cache hit).
+            # Cross-run non-determinism (different values across the 5-run streak)
+            # is expected and acceptable: each run's old↔new diff will still be
+            # clean as long as the new code path is equivalent to the old one.
+            from app.services.scraper.shadow.mode import is_shadow_enabled as _shadow_on
+            if _shadow_on(uni_id):
+                from app.services.scraper.shadow.diff import diff_staged_runs as _diff_runs
+                from app.services.scraper.shadow.new_path import extract_new_path as _new_path
+                from app.services.scraper.shadow.report import write_shadow_report as _write_report
+
+                try:
+                    old_dicts = [r for r in results if isinstance(r, dict)]
+                    log.info(
+                        "shadow[%s/%d] applying new-path transformation to %d extracted results",
+                        _uni_cfg.slug, uni_id, len(old_dicts),
+                    )
+                    # New path transforms the already-extracted old results — no re-fetch,
+                    # no second Playwright session, no second Gemini call. This is "Option A"
+                    # correctly implemented: one network fetch, both code paths run on the
+                    # same already-fetched content. Initially a no-op (deep copy), diverging
+                    # only when per-uni config transformations are added in new_path.py.
+                    new_dicts = [
+                        await _new_path(r, uni_id=uni_id) for r in old_dicts
+                    ]
+                    shadow_diff = _diff_runs(old_dicts, new_dicts)
+                    _write_report(
+                        shadow_diff,
+                        uni_id=uni_id,
+                        slug=_uni_cfg.slug,
+                        old_job_id=runtime_job_id,
+                        new_job_id=f"{runtime_job_id}:new_path",
+                    )
+                except Exception as _shadow_exc:
+                    log.warning("shadow[%s/%d] failed (non-fatal): %s", _uni_cfg.slug, uni_id, _shadow_exc)
+            # ── END SHADOW MODE ───────────────────────────────────────────────────
+
+            # T206: sibling-cache back-fill. Runs after every per-course
+            # extract has settled but BEFORE staging — by then we've seen
+            # the high-quality english-test slots from siblings that did
+            # extract them, and we want every staged row to benefit. Mutates
+            # the per-course payload dicts in place.
+            try:
+                from app.services.scraper.sibling_cache import (
+                    backfill_english_from_siblings,
+                )
+
+                sibling_dicts = [r for r in results if isinstance(r, dict)]
+                # Bond University: require at least 2 courses to agree on an
+                # English score before promoting it to the sibling cache.  Bond's
+                # marketing and experience pages mention "IELTS 6.5" in running
+                # text; with min_quorum=1 (the default) a single such page seeds
+                # the cache and backfills all 50+ siblings with a value that may
+                # not apply to the specific program. min_quorum=2 requires a
+                # second independent extraction to corroborate the score first.
+                # Hosts where a single page can seed the sibling cache with
+                # institution-wide English scores that don't apply to specific
+                # courses.  min_quorum=2 requires at least two independent
+                # per-course extractions to agree before the value is promoted.
+                #   Bond: marketing pages mention "IELTS 6.5" in running text.
+                #   CDU:  category overview pages contain an English-requirement
+                #         image that vision OCR extracts; without quorum=2 the
+                #         extracted IELTS score backfills every course in the run.
+                # Week 1 Prompt 6 — global minimum is now 2 (set as the
+                # ``backfill_english_from_siblings`` default).  Bond / CDU
+                # entries are kept here for documentation: they were the
+                # original drivers for the higher quorum and remain in the
+                # set so a future raise to 3+ can target them explicitly
+                # without rediscovery.
+                _high_quorum_hosts = frozenset({
+                    "bond.edu.au", "www.bond.edu.au",
+                    "cdu.edu.au", "www.cdu.edu.au",
+                })
+                _sibling_quorum = max(2, 2 if _scrape_host in _high_quorum_hosts else 2)
+                fills = await backfill_english_from_siblings(
+                    sibling_dicts, emit=emit, min_quorum=_sibling_quorum
+                )
+                if fills:
+                    log.info("sibling-cache backfilled %d slot(s) across siblings", fills)
+            except Exception as exc:  # noqa: BLE001 — never abort the run on cache failure
+                log.warning("sibling-cache backfill failed: %s", exc)
+                await emit(
+                    "status",
+                    f"[EXTRACT] [sibling cache ✗] {exc}",
+                    phase="extract",
+                    kind="sibling_cache_error",
+                )
+
+            # ── per-run performance savings ────────────────────────────────────────
+            _http_skipped_count += sum(
+                1 for _r in results
+                if isinstance(_r, dict) and (_r.get("_perf") or {}).get("http_skipped")
+            )
+            _vision_skipped_count += sum(
+                1 for _r in results
+                if isinstance(_r, dict) and (_r.get("_perf") or {}).get("vision_skipped")
+            )
+            _empty_text_count += sum(
+                1 for _r in results
+                if isinstance(_r, dict) and (_r.get("_perf") or {}).get("empty_text_static")
+            )
+            _browser_retry_empty_count += sum(
+                1 for _r in results
+                if isinstance(_r, dict) and (_r.get("_perf") or {}).get("browser_retry_empty_text")
+            )
+            _skipped_empty_count += sum(
+                1 for _r in results
+                if isinstance(_r, dict) and (_r.get("_perf") or {}).get("skipped_empty_text")
+            )
+            _fallback_skipped_count += sum(
+                1 for _r in results
+                if isinstance(_r, dict) and (_r.get("_perf") or {}).get("fallback_skipped_empty_text")
+            )
+            # ── Bug 3: within-batch name dedup ───────────────────────────────────
+            # Multiple distinct URLs can yield the same course_name (e.g. Flinders
+            # /study/bsc-computing and /study/bsc-biology both produce H1 =
+            # "Bachelor of Science"). Stage only the highest-confidence result per
+            # (course_name, degree_tier) pair; mark the rest so the staging loop
+            # skips them as rejected: duplicate_name_deduplicated.
+            #
+            # We key on a NORMALISED degree tier rather than the raw degree_level
+            # string because one duplicate may have degree_level="Bachelor's" while
+            # another (from a different URL that the pipeline processed slightly
+            # differently) has degree_level=None.  Both should collapse into the
+            # same bucket so dedup actually fires.
+            def _degree_tier(name: str, level: str) -> str:
+                """Map (course_name, degree_level) → a coarse comparable tier."""
+                combined = (name + " " + level).lower()
+                if any(w in combined for w in ("doctor", "phd", "doctorate")):
+                    return "doctorate"
+                if any(w in combined for w in ("master", "mba", "msc", "mphil")):
+                    return "master"
+                if any(w in combined for w in ("bachelor",)):
+                    return "bachelor"
+                if "graduate" in combined and "diploma" in combined:
+                    return "graduate diploma"
+                if "graduate" in combined and "certificate" in combined:
+                    return "graduate certificate"
+                if any(w in combined for w in ("certificate", "diploma", "associate")):
+                    return "cert/diploma"
+                return level.strip().lower()
+
+            try:
+                from urllib.parse import urlparse  # noqa: PLC0415
+
+                from app.services.scraper.confidence import (  # noqa: PLC0415
+                    score_payload as _sc_score,
+                )
+
+                def _slug_of(url: str) -> str:
+                    """Return the last meaningful path segment of ``url``."""
+                    try:
+                        p = urlparse(url or "").path.rstrip("/")
+                    except Exception:
+                        return ""
+                    if not p:
+                        return ""
+                    return p.rsplit("/", 1)[-1].lower()
+
+                def _strip_common_prefix_tokens(slugs: list[str]) -> list[str]:
+                    """Strip dash-separated tokens shared by every slug.
+
+                    ``['bits', 'bits-application-development', 'bits-cyber-security']``
+                    → ``['', 'application-development', 'cyber-security']`` so the
+                    disambiguating suffix is the *unique* tail, not the redundant
+                    program-prefix.
+                    """
+                    token_lists = [s.split("-") if s else [] for s in slugs]
+                    common = 0
+                    if all(token_lists):
+                        for col in zip(*token_lists):
+                            if len(set(col)) == 1:
+                                common += 1
+                            else:
+                                break
+                    return ["-".join(toks[common:]) for toks in token_lists]
+
+                # First pass: GROUP results by (name, tier) — don't reject yet.
+                _groups: dict[tuple[str, str], list[dict]] = {}
+                for _r in results:
+                    if not isinstance(_r, dict) or _r.get("error"):
+                        continue
+                    _pl = _r.get("payload") or {}
+                    _raw_name = (_pl.get("course_name") or _r.get("name") or "").strip()
+                    if not _raw_name:
+                        continue
+                    _key = (
+                        _raw_name.lower(),
+                        _degree_tier(_raw_name, _pl.get("degree_level") or ""),
+                    )
+                    _groups.setdefault(_key, []).append(_r)
+
+                # Second pass: resolve each group.
+                #
+                # If every member of a multi-result group has a DISTINCT URL slug
+                # (e.g. VIT's /bits, /bits/bits-application-development,
+                # /bits/bits-cyber-security, …) the pages are legitimately different
+                # courses (specialisations / majors of the same parent program),
+                # NOT duplicates.  Keep all of them and disambiguate ``course_name``
+                # with the slug-derived suffix so they remain distinguishable in
+                # the UI and in the staged-row unique constraint.
+                #
+                # Otherwise (e.g. Flinders' two distinct programs that both expose
+                # the H1 "Bachelor of Science" with no slug differentiator the user
+                # can read) fall back to the original behaviour: keep the highest-
+                # confidence result and reject the rest.
+                for _key, _bucket in _groups.items():
+                    if len(_bucket) <= 1:
+                        continue
+
+                    _slugs = [_slug_of(_r.get("url") or "") for _r in _bucket]
+                    # Gate is strict: EVERY member must have a non-empty slug AND
+                    # all slugs must be unique. A single empty slug (e.g. a hostname-
+                    # rooted URL like https://uni.edu/) signals an ambiguous parent
+                    # page that we cannot safely disambiguate from a sibling, so we
+                    # fall through to the score-based dedup.
+                    if (
+                        len(_slugs) >= 2
+                        and all(_slugs)
+                        and len(set(_slugs)) == len(_slugs)
+                    ):
+                        # All members have distinct, non-empty-or-distinguishably-
+                        # rooted slugs → distinct courses.  Disambiguate names.
+                        _suffixes = _strip_common_prefix_tokens(_slugs)
+                        for _r, _suffix in zip(_bucket, _suffixes):
+                            _pl = _r.get("payload") or {}
+                            _orig = (_pl.get("course_name") or "").strip()
+                            if not _suffix:
+                                # Root URL of the program (e.g. /bits) — keep the
+                                # original course_name unchanged.
+                                continue
+                            _hint = _suffix.replace("-", " ").replace("_", " ").strip().title()
+                            if _hint and _hint.lower() not in _orig.lower():
+                                _pl["course_name"] = (
+                                    f"{_orig} ({_hint})" if _orig else _hint
+                                )
+                                _r["payload"] = _pl
+                        continue
+
+                    # Slugs are missing or non-distinct → fall back to score-based
+                    # dedup; reject all but the highest-confidence member.
+                    _best = _bucket[0]
+                    _best_score = _sc_score(_best.get("payload") or {})["score"]
+                    for _candidate in _bucket[1:]:
+                        _new_score = _sc_score(_candidate.get("payload") or {})["score"]
+                        if _new_score > _best_score:
+                            _best["error"] = "rejected: duplicate_name_deduplicated"
+                            _best, _best_score = _candidate, _new_score
+                        else:
+                            _candidate["error"] = "rejected: duplicate_name_deduplicated"
+
+                _dedup_count = sum(
+                    1 for _r in results
+                    if isinstance(_r, dict)
+                    and _r.get("error") == "rejected: duplicate_name_deduplicated"
+                )
+                if _dedup_count:
+                    log.info(
+                        "[STAGE] dedup: suppressed %d duplicate-name result(s)",
+                        _dedup_count,
+                    )
+                    await emit(
+                        "status",
+                        f"[STAGE] dedup: {_dedup_count} duplicate-name course(s) suppressed "
+                        "(same course_name+degree_level from multiple URLs — "
+                        "keeping highest-confidence result per pair)",
+                        phase="stage",
+                        kind="dedup_name",
+                        count=_dedup_count,
+                    )
+            except Exception as _dedup_exc:  # noqa: BLE001 — never abort on dedup failure
+                log.warning("name-dedup pass failed (continuing): %s", _dedup_exc)
+
+            for r in results:
+                # Accumulate Gemini PRIMARY cost (zero when Gemini was skipped/unavailable)
+                if isinstance(r, dict):
+                    _course_cost = r.get("gemini_primary_cost_usd", 0.0)
+                    _total_gemini_cost_usd += _course_cost
+                    _cost_monitor.record_call(_course_cost)
+
+                # Stop check between rows: lets the user interrupt mid-batch.
+                # Anything left in ``results`` at this point came back from the
+                # gather phase BEFORE the stop click — we drop it on the floor
+                # rather than persist a partial batch the user just cancelled.
+                if stop_flag[0]:
+                    return await _finalize_stopped()
+                if isinstance(r, Exception):
+                    summary["errors"] += 1
+                    log.warning("worker raised: %s", r)
+                    await emit(
+                        "status",
+                        f"[STAGE] worker exception: {r}",
+                        phase="stage",
+                        kind="worker_error",
+                    )
+                    continue
+                if r.get("_retry_after"):
+                    # Rate-limited and all retries exhausted — never had a payload.
+                    # Skip quickly without calling stage_course (empty payload would
+                    # just be rejected at the staging gate anyway, wasting a DB call).
+                    summary["fetch_failed"] += 1
+                    log.warning(
+                        "[429-EXHAUSTED] all retries used up for %s — skipping staging",
+                        r.get("url", "?")[:80],
+                    )
+                    await emit(
+                        "status",
+                        f"[STAGE] 429-exhausted (all retries): {r.get('name', '?')}",
+                        phase="stage",
+                        kind="rate_limited_exhausted",
+                        url=r.get("url"),
+                    )
+                    continue
+                if r.get("error"):
+                    if r["error"].startswith("fetch") or "fetch_failed" in r.get("error", ""):
+                        summary["fetch_failed"] += 1
+                    else:
+                        summary["errors"] += 1
+                    await emit(
+                        "status",
+                        f"[STAGE] skipped {r.get('name','?')}: {r['error']}",
+                        phase="stage",
+                        kind="extract_error",
+                        url=r.get("url"),
+                    )
+                    continue
+                payload = dict(r.get("payload") or {})
+
+                # ── Provider-name suffix strip ────────────────────────────────
+                # Some universities embed their own name in H1 elements:
+                #   "Bachelor of Business - Aibi" → "Bachelor of Business"
+                # The course_name extractor handles well-known suffixes (USQ,
+                # Charles Sturt University, etc.) but misses custom short names.
+                # Use the actual uni_name + domain short name for a targeted strip
+                # so course_name is always provider-free before staging.
+                _raw_cn = (payload.get("course_name") or "").strip()
+                if _raw_cn:
+                    _clean_cn = _strip_provider_name_from_title(
+                        _raw_cn, uni_name, uni_scrape_url
+                    )
+                    if _clean_cn != _raw_cn:
+                        payload["course_name"] = _clean_cn
+
+                # ── CSU name typo correction ──────────────────────────────────
+                # CSU's website HTML occasionally contains misspellings in link
+                # text and H1 elements that slip past the HTML extractor.
+                # Fix known typos for CSU (university_id=207) only so the
+                # correction is scoped and doesn't affect other unis.
+                if uni_id == 207:
+                    _cn_now = (payload.get("course_name") or "").strip()
+                    _cn_fixed = (
+                        _cn_now
+                        .replace("Busness", "Business")
+                        .replace("busness", "business")
+                        .replace("Proffessional", "Professional")
+                        .replace("proffessional", "professional")
+                    )
+                    if _cn_fixed != _cn_now:
+                        log.info(
+                            "[CSU-TYPO] fixed course name %r → %r",
+                            _cn_now,
+                            _cn_fixed,
+                        )
+                        payload["course_name"] = _cn_fixed
+
+                # ── Bug 5: defaultStudyMode config override ───────────────────
+                # When a university's scrape_config (or UI override) contains
+                # "defaultStudyMode", use it as the authoritative mode whenever
+                # the extractor returned None (no signal found) or produced a
+                # low-confidence "Online" value from the bare-keyword fallback.
+                # This lets admins fix false online_only rejections without code
+                # changes (e.g. KBS Bachelor of Business marketing copy contains
+                # "Apply Online" which fires the \bonline\b fallback).
+                _default_mode = (
+                    effective_config.get("defaultStudyMode")
+                    or rp.get("defaultStudyMode")
+                )
+                if _default_mode:
+                    _cur_mode = (payload.get("study_mode") or "").strip()
+                    if not _cur_mode or _cur_mode.lower() == "online":
+                        payload["study_mode"] = _default_mode
+
+                # ── parser_error guard (UOW / UniSQ) ─────────────────────────────
+                # When the per-course browser pass rendered the page but critical
+                # fields (fee, IELTS) remained empty after the full extractor suite,
+                # single_course.py sets payload["parser_error"] = True. We skip
+                # staging entirely so the review queue is never polluted with
+                # obviously-incomplete rows. The URL and missing fields are logged
+                # so the problem is visible without the row appearing in the UI.
+                if payload.get("parser_error"):
+                    _pe_fields = payload.get("parser_error_fields") or []
+                    summary["skipped"] += 1
+                    skip_reasons["parser_error"] = skip_reasons.get("parser_error", 0) + 1
+                    log.warning(
+                        "[PARSER ERROR] %s — skipped staging; critical fields missing "
+                        "after browser render: %s",
+                        r.get("url"),
+                        ", ".join(_pe_fields) if _pe_fields else "unknown",
+                    )
+                    await emit(
+                        "status",
+                        f"[PARSER ERROR] skipped: {r.get('name','?')} — "
+                        f"missing after render: {', '.join(_pe_fields) if _pe_fields else 'unknown'}",
+                        phase="stage",
+                        kind="parser_error_skip",
+                        url=r.get("url"),
+                        fields=_pe_fields,
+                    )
+                    continue
+
+                try:
+                    # [FIELD TRACE] — log key fields just before staging so we can
+                    # diagnose drop-off between extraction and the DB row.  This
+                    # runs BEFORE stage_course (which internally calls
+                    # enforce_source_evidence). Any field that appears non-None
+                    # here but is NULL in the staged row was dropped by the
+                    # source-evidence guard (missing snippet or source_url).
+                    _trace_fields = {
+                        k: payload.get(k)
+                        for k in (
+                            "international_fee", "ielts_overall",
+                            "duration", "duration_term",
+                            "intake_months", "location",
+                            "study_mode", "english_test_name",
+                        )
+                    }
+                    log.info(
+                        "[FIELD TRACE] %s → fee=%s ielts=%s dur=%s%s intake=%s "
+                        "loc=%s mode=%s",
+                        r.get("name", "?"),
+                        _trace_fields["international_fee"],
+                        _trace_fields["ielts_overall"],
+                        _trace_fields["duration"],
+                        _trace_fields["duration_term"] or "",
+                        _trace_fields["intake_months"],
+                        _trace_fields["location"],
+                        _trace_fields["study_mode"],
+                    )
+
+                    # ── Recipe rules (operator no-code transforms) ────────────
+                    # Applied BEFORE staging so rule-cleaned values are stored
+                    # with full provenance.  Soft-fail: a recipe rule error must
+                    # never abort the scrape.
+                    _recipe_rules_cfg = dict((uni_scrape_config or {}).get("recipe") or {})
+                    # Bridge YAML extraction.fees fee-calculation fields into the
+                    # recipe dict so operators can configure them in per-uni YAMLs
+                    # without needing a DB-stored recipe entry.  YAML wins when
+                    # both YAML and DB recipe set the same key.
+                    _yaml_fees_bridge_keys = (
+                        "fee_calculation_mode",
+                        "fee_prevent_full_course_rollup",
+                        "max_annual_fee",
+                        # default_currency: YAML wins over AI-filled fee_currency.
+                        # Without this, the AI fallback sets fee_currency=AUD for
+                        # UK universities (e.g. BCU, WLV) and the YAML GBP config
+                        # has no effect on the final stored value.
+                        "default_currency",
+                    )
+                    from app.services.scraper.config.context import get_uni_config as _get_uc_fees
+                    _yaml_uni_cfg = _get_uc_fees()
+                    if _yaml_uni_cfg is not None:
+                        _yaml_fees = _yaml_uni_cfg.extraction.fees
+                        for _bk in _yaml_fees_bridge_keys:
+                            _bv = getattr(_yaml_fees, _bk, None)
+                            if _bv is not None:
+                                _recipe_rules_cfg[_bk] = _bv
+                        # Bridge YAML extraction.text_cleaning.location fields into the
+                        # recipe dict.  YAML non-empty list wins over DB empty-list default.
+                        # This allows operators to configure campus allowlists and nav-text
+                        # reject patterns in per-uni YAMLs without touching the DB recipe.
+                        try:
+                            _yaml_loc = _yaml_uni_cfg.extraction.text_cleaning.location
+                            if _yaml_loc.reject_values:
+                                _recipe_rules_cfg["location_reject_values"] = list(_yaml_loc.reject_values)
+                            if _yaml_loc.allowed_values:
+                                _recipe_rules_cfg["location_allowed_values"] = list(_yaml_loc.allowed_values)
+                        except Exception:  # noqa: BLE001
+                            pass
+                    if _recipe_rules_cfg:
+                        try:
+                            from app.services.scraper.recipe_rules import apply_recipe_rules
+                            payload = apply_recipe_rules(payload, _recipe_rules_cfg)
+                        except Exception as _rr_exc:  # noqa: BLE001
+                            log.warning(
+                                "[RECIPE] recipe_rules failed for %s: %s",
+                                r.get("name", "?"),
+                                _rr_exc,
+                            )
+
+                    async with AsyncSessionLocal() as stage_db:
+                        # If the URL already matched course_detail_url_patterns during
+                        # the pre-extraction link gate (lines ~2154), skip the global
+                        # is_blocked_page() check inside stage_course.  Those patterns
+                        # are an explicit allow-list; re-running the block-list would
+                        # falsely reject courses whose URL contains a listing-page
+                        # substring (e.g. Lancaster /study/postgraduate/…).
+                        _cur_url = r.get("url") or ""
+                        _skip_url_block = bool(
+                            _gate_detail_pats
+                            and any(p.search(_cur_url) for p in _gate_detail_pats)
+                        )
+                        res = await stage_course(
+                            stage_db,
+                            scrape_job_id=runtime_job_id,
+                            university_id=uni_id,
+                            course_name=r["name"],
+                            payload=payload,
+                            # Bug D: pass per-field evidence so it lands in
+                            # scraped_field_evidence and the review modal can
+                            # render it instead of a blank body.
+                            evidence=r.get("evidence") or [],
+                            source_url=r.get("url"),
+                            skip_url_block=_skip_url_block,
+                        )
+                        # ── Phase 9: Verification Engine ──────────────────────────
+                        # Runs inside the same session (already committed by
+                        # stage_course) so evidence rows are visible.  Soft-fail
+                        # only — a verification error must never abort the scrape.
+                        if res.saved and res.scraped_course_id:
+                            try:
+                                from app.services.scraper.verification_engine import (
+                                    run_field_verification,
+                                )
+                                from app.models import ScrapedCourse as _VeSC
+
+                                _vr = await run_field_verification(
+                                    stage_db, res.scraped_course_id
+                                )
+                                if _vr["avg_confidence"] > 0:
+                                    _ve_sc = await stage_db.get(
+                                        _VeSC, res.scraped_course_id
+                                    )
+                                    if _ve_sc is not None:
+                                        _ve_sc.avg_verification_confidence = _vr[
+                                            "avg_confidence"
+                                        ]
+                                        await stage_db.commit()
+                            except Exception as _ve_exc:  # noqa: BLE001
+                                log.warning(
+                                    "verification_engine: sc %s failed: %s",
+                                    res.scraped_course_id,
+                                    _ve_exc,
+                                )
+                    if res.saved:
+                        summary["staged"] += 1
+                        await emit(
+                            "status",
+                            f"[STAGE] saved: {r['name']}",
+                            phase="stage",
+                            kind="staged",
+                            scraped_course_id=res.scraped_course_id,
+                            url=r.get("url"),
+                        )
+                    else:
+                        summary["skipped"] += 1
+                        _skip_key = (res.reason or "unknown").replace(" ", "_").lower()[:40]
+                        skip_reasons[_skip_key] = skip_reasons.get(_skip_key, 0) + 1
+                        # Collect sample URLs for category_landing_page_* sub-reasons
+                        # so operators can diagnose root causes without reading raw logs.
+                        if res.reason and res.reason.startswith("category_landing_page_"):
+                            _samples = skip_reason_samples.setdefault(res.reason, [])
+                            if len(_samples) < 10:
+                                _samples.append({
+                                    "url": r.get("url") or "",
+                                    "name": r.get("name") or "",
+                                })
+                        await emit(
+                            "status",
+                            f"[STAGE] skipped {r['name']}: {res.reason}",
+                            phase="stage",
+                            kind="skipped",
+                            reason=res.reason,
+                            url=r.get("url"),
+                        )
+                except Exception as exc:  # noqa: BLE001
+                    summary["errors"] += 1
+                    log.warning("stage_course failed for %s: %s", r.get("url"), exc)
+                    await emit(
+                        "status",
+                        f"[STAGE] error on {r.get('name','?')}: {exc}",
+                        phase="stage",
+                        kind="stage_error",
+                        url=r.get("url"),
+                    )
+
+                # ``heartbeat_at`` is kept fresh by the dedicated
+                # ``_heartbeat_pulser`` background task on its own session
+                # (see top of file). The in-memory assignment below is
+                # purely cosmetic for any future code path that reads the
+                # local ``job`` instance before the next commit.
+                job.heartbeat_at = datetime.now(timezone.utc)
+            # Accumulate staged dicts for the data-quality check that runs
+            # after all batches (it inspects payloads, not DB rows).
+            _all_staged_dicts.extend(
+                _r for _r in results if isinstance(_r, dict) and not _r.get("error")
+            )
+            # Explicitly free the batch result list so GC can reclaim the
+            # memory before the next batch's extraction begins.
+            del results
+
+        # ── Write Gemini call log once after all batches ──────────────────────
         if _all_gemini_calls:
             try:
                 from sqlalchemy import text as _gcl_text
@@ -3501,484 +4035,36 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             except Exception as _gcl_exc:
                 log.warning("gemini_call_log write failed: %s", _gcl_exc)
 
-        # ── Bug 3: within-batch name dedup ───────────────────────────────────
-        # Multiple distinct URLs can yield the same course_name (e.g. Flinders
-        # /study/bsc-computing and /study/bsc-biology both produce H1 =
-        # "Bachelor of Science"). Stage only the highest-confidence result per
-        # (course_name, degree_tier) pair; mark the rest so the staging loop
-        # skips them as rejected: duplicate_name_deduplicated.
-        #
-        # We key on a NORMALISED degree tier rather than the raw degree_level
-        # string because one duplicate may have degree_level="Bachelor's" while
-        # another (from a different URL that the pipeline processed slightly
-        # differently) has degree_level=None.  Both should collapse into the
-        # same bucket so dedup actually fires.
-        def _degree_tier(name: str, level: str) -> str:
-            """Map (course_name, degree_level) → a coarse comparable tier."""
-            combined = (name + " " + level).lower()
-            if any(w in combined for w in ("doctor", "phd", "doctorate")):
-                return "doctorate"
-            if any(w in combined for w in ("master", "mba", "msc", "mphil")):
-                return "master"
-            if any(w in combined for w in ("bachelor",)):
-                return "bachelor"
-            if "graduate" in combined and "diploma" in combined:
-                return "graduate diploma"
-            if "graduate" in combined and "certificate" in combined:
-                return "graduate certificate"
-            if any(w in combined for w in ("certificate", "diploma", "associate")):
-                return "cert/diploma"
-            return level.strip().lower()
+        # ── Compute perf savings from accumulated batch counters ──────────────
+        # 3 s per avoided HTTP attempt + 4 s per avoided vision OCR pass (empirical)
+        # 2 s per avoided Gemini call on empty text (prompt build + API round-trip)
+        # 15 s per bailed course (no browser timeout waiting)
+        _est_seconds_saved = (
+            _http_skipped_count * 3
+            + _vision_skipped_count * 4
+            + _empty_text_count * 2
+            + _skipped_empty_count * 15
+        )
+        # $0.00015 per Gemini vision call; $0.00020 per avoided primary Gemini call
+        _est_cost_saved_usd = round(
+            _vision_skipped_count * 0.00015 + _empty_text_count * 0.00020, 5
+        )
+        _any_savings = (
+            _http_skipped_count or _vision_skipped_count or _empty_text_count
+            or _browser_retry_empty_count or _skipped_empty_count
+        )
+        _perf_savings = {
+            "http_fetches_skipped": _http_skipped_count,
+            "vision_ocr_skipped": _vision_skipped_count,
+            "empty_text_ai_skipped": _empty_text_count,
+            "browser_retry_empty_text": _browser_retry_empty_count,
+            "skipped_empty_text": _skipped_empty_count,
+            "fallback_skipped_empty_text": _fallback_skipped_count,
+            "estimated_seconds_saved": _est_seconds_saved,
+            "estimated_ai_calls_saved": _vision_skipped_count + _empty_text_count,
+            "estimated_cost_saved_usd": _est_cost_saved_usd,
+        } if _any_savings else None
 
-        try:
-            from urllib.parse import urlparse  # noqa: PLC0415
-
-            from app.services.scraper.confidence import (  # noqa: PLC0415
-                score_payload as _sc_score,
-            )
-
-            def _slug_of(url: str) -> str:
-                """Return the last meaningful path segment of ``url``."""
-                try:
-                    p = urlparse(url or "").path.rstrip("/")
-                except Exception:
-                    return ""
-                if not p:
-                    return ""
-                return p.rsplit("/", 1)[-1].lower()
-
-            def _strip_common_prefix_tokens(slugs: list[str]) -> list[str]:
-                """Strip dash-separated tokens shared by every slug.
-
-                ``['bits', 'bits-application-development', 'bits-cyber-security']``
-                → ``['', 'application-development', 'cyber-security']`` so the
-                disambiguating suffix is the *unique* tail, not the redundant
-                program-prefix.
-                """
-                token_lists = [s.split("-") if s else [] for s in slugs]
-                common = 0
-                if all(token_lists):
-                    for col in zip(*token_lists):
-                        if len(set(col)) == 1:
-                            common += 1
-                        else:
-                            break
-                return ["-".join(toks[common:]) for toks in token_lists]
-
-            # First pass: GROUP results by (name, tier) — don't reject yet.
-            _groups: dict[tuple[str, str], list[dict]] = {}
-            for _r in results:
-                if not isinstance(_r, dict) or _r.get("error"):
-                    continue
-                _pl = _r.get("payload") or {}
-                _raw_name = (_pl.get("course_name") or _r.get("name") or "").strip()
-                if not _raw_name:
-                    continue
-                _key = (
-                    _raw_name.lower(),
-                    _degree_tier(_raw_name, _pl.get("degree_level") or ""),
-                )
-                _groups.setdefault(_key, []).append(_r)
-
-            # Second pass: resolve each group.
-            #
-            # If every member of a multi-result group has a DISTINCT URL slug
-            # (e.g. VIT's /bits, /bits/bits-application-development,
-            # /bits/bits-cyber-security, …) the pages are legitimately different
-            # courses (specialisations / majors of the same parent program),
-            # NOT duplicates.  Keep all of them and disambiguate ``course_name``
-            # with the slug-derived suffix so they remain distinguishable in
-            # the UI and in the staged-row unique constraint.
-            #
-            # Otherwise (e.g. Flinders' two distinct programs that both expose
-            # the H1 "Bachelor of Science" with no slug differentiator the user
-            # can read) fall back to the original behaviour: keep the highest-
-            # confidence result and reject the rest.
-            for _key, _bucket in _groups.items():
-                if len(_bucket) <= 1:
-                    continue
-
-                _slugs = [_slug_of(_r.get("url") or "") for _r in _bucket]
-                # Gate is strict: EVERY member must have a non-empty slug AND
-                # all slugs must be unique. A single empty slug (e.g. a hostname-
-                # rooted URL like https://uni.edu/) signals an ambiguous parent
-                # page that we cannot safely disambiguate from a sibling, so we
-                # fall through to the score-based dedup.
-                if (
-                    len(_slugs) >= 2
-                    and all(_slugs)
-                    and len(set(_slugs)) == len(_slugs)
-                ):
-                    # All members have distinct, non-empty-or-distinguishably-
-                    # rooted slugs → distinct courses.  Disambiguate names.
-                    _suffixes = _strip_common_prefix_tokens(_slugs)
-                    for _r, _suffix in zip(_bucket, _suffixes):
-                        _pl = _r.get("payload") or {}
-                        _orig = (_pl.get("course_name") or "").strip()
-                        if not _suffix:
-                            # Root URL of the program (e.g. /bits) — keep the
-                            # original course_name unchanged.
-                            continue
-                        _hint = _suffix.replace("-", " ").replace("_", " ").strip().title()
-                        if _hint and _hint.lower() not in _orig.lower():
-                            _pl["course_name"] = (
-                                f"{_orig} ({_hint})" if _orig else _hint
-                            )
-                            _r["payload"] = _pl
-                    continue
-
-                # Slugs are missing or non-distinct → fall back to score-based
-                # dedup; reject all but the highest-confidence member.
-                _best = _bucket[0]
-                _best_score = _sc_score(_best.get("payload") or {})["score"]
-                for _candidate in _bucket[1:]:
-                    _new_score = _sc_score(_candidate.get("payload") or {})["score"]
-                    if _new_score > _best_score:
-                        _best["error"] = "rejected: duplicate_name_deduplicated"
-                        _best, _best_score = _candidate, _new_score
-                    else:
-                        _candidate["error"] = "rejected: duplicate_name_deduplicated"
-
-            _dedup_count = sum(
-                1 for _r in results
-                if isinstance(_r, dict)
-                and _r.get("error") == "rejected: duplicate_name_deduplicated"
-            )
-            if _dedup_count:
-                log.info(
-                    "[STAGE] dedup: suppressed %d duplicate-name result(s)",
-                    _dedup_count,
-                )
-                await emit(
-                    "status",
-                    f"[STAGE] dedup: {_dedup_count} duplicate-name course(s) suppressed "
-                    "(same course_name+degree_level from multiple URLs — "
-                    "keeping highest-confidence result per pair)",
-                    phase="stage",
-                    kind="dedup_name",
-                    count=_dedup_count,
-                )
-        except Exception as _dedup_exc:  # noqa: BLE001 — never abort on dedup failure
-            log.warning("name-dedup pass failed (continuing): %s", _dedup_exc)
-
-        for r in results:
-            # Accumulate Gemini PRIMARY cost (zero when Gemini was skipped/unavailable)
-            if isinstance(r, dict):
-                _course_cost = r.get("gemini_primary_cost_usd", 0.0)
-                _total_gemini_cost_usd += _course_cost
-                _cost_monitor.record_call(_course_cost)
-
-            # Stop check between rows: lets the user interrupt mid-batch.
-            # Anything left in ``results`` at this point came back from the
-            # gather phase BEFORE the stop click — we drop it on the floor
-            # rather than persist a partial batch the user just cancelled.
-            if stop_flag[0]:
-                return await _finalize_stopped()
-            if isinstance(r, Exception):
-                summary["errors"] += 1
-                log.warning("worker raised: %s", r)
-                await emit(
-                    "status",
-                    f"[STAGE] worker exception: {r}",
-                    phase="stage",
-                    kind="worker_error",
-                )
-                continue
-            if r.get("_retry_after"):
-                # Rate-limited and all retries exhausted — never had a payload.
-                # Skip quickly without calling stage_course (empty payload would
-                # just be rejected at the staging gate anyway, wasting a DB call).
-                summary["fetch_failed"] += 1
-                log.warning(
-                    "[429-EXHAUSTED] all retries used up for %s — skipping staging",
-                    r.get("url", "?")[:80],
-                )
-                await emit(
-                    "status",
-                    f"[STAGE] 429-exhausted (all retries): {r.get('name', '?')}",
-                    phase="stage",
-                    kind="rate_limited_exhausted",
-                    url=r.get("url"),
-                )
-                continue
-            if r.get("error"):
-                if r["error"].startswith("fetch") or "fetch_failed" in r.get("error", ""):
-                    summary["fetch_failed"] += 1
-                else:
-                    summary["errors"] += 1
-                await emit(
-                    "status",
-                    f"[STAGE] skipped {r.get('name','?')}: {r['error']}",
-                    phase="stage",
-                    kind="extract_error",
-                    url=r.get("url"),
-                )
-                continue
-            payload = dict(r.get("payload") or {})
-
-            # ── Provider-name suffix strip ────────────────────────────────
-            # Some universities embed their own name in H1 elements:
-            #   "Bachelor of Business - Aibi" → "Bachelor of Business"
-            # The course_name extractor handles well-known suffixes (USQ,
-            # Charles Sturt University, etc.) but misses custom short names.
-            # Use the actual uni_name + domain short name for a targeted strip
-            # so course_name is always provider-free before staging.
-            _raw_cn = (payload.get("course_name") or "").strip()
-            if _raw_cn:
-                _clean_cn = _strip_provider_name_from_title(
-                    _raw_cn, uni_name, uni_scrape_url
-                )
-                if _clean_cn != _raw_cn:
-                    payload["course_name"] = _clean_cn
-
-            # ── CSU name typo correction ──────────────────────────────────
-            # CSU's website HTML occasionally contains misspellings in link
-            # text and H1 elements that slip past the HTML extractor.
-            # Fix known typos for CSU (university_id=207) only so the
-            # correction is scoped and doesn't affect other unis.
-            if uni_id == 207:
-                _cn_now = (payload.get("course_name") or "").strip()
-                _cn_fixed = (
-                    _cn_now
-                    .replace("Busness", "Business")
-                    .replace("busness", "business")
-                    .replace("Proffessional", "Professional")
-                    .replace("proffessional", "professional")
-                )
-                if _cn_fixed != _cn_now:
-                    log.info(
-                        "[CSU-TYPO] fixed course name %r → %r",
-                        _cn_now,
-                        _cn_fixed,
-                    )
-                    payload["course_name"] = _cn_fixed
-
-            # ── Bug 5: defaultStudyMode config override ───────────────────
-            # When a university's scrape_config (or UI override) contains
-            # "defaultStudyMode", use it as the authoritative mode whenever
-            # the extractor returned None (no signal found) or produced a
-            # low-confidence "Online" value from the bare-keyword fallback.
-            # This lets admins fix false online_only rejections without code
-            # changes (e.g. KBS Bachelor of Business marketing copy contains
-            # "Apply Online" which fires the \bonline\b fallback).
-            _default_mode = (
-                effective_config.get("defaultStudyMode")
-                or rp.get("defaultStudyMode")
-            )
-            if _default_mode:
-                _cur_mode = (payload.get("study_mode") or "").strip()
-                if not _cur_mode or _cur_mode.lower() == "online":
-                    payload["study_mode"] = _default_mode
-
-            # ── parser_error guard (UOW / UniSQ) ─────────────────────────────
-            # When the per-course browser pass rendered the page but critical
-            # fields (fee, IELTS) remained empty after the full extractor suite,
-            # single_course.py sets payload["parser_error"] = True. We skip
-            # staging entirely so the review queue is never polluted with
-            # obviously-incomplete rows. The URL and missing fields are logged
-            # so the problem is visible without the row appearing in the UI.
-            if payload.get("parser_error"):
-                _pe_fields = payload.get("parser_error_fields") or []
-                summary["skipped"] += 1
-                skip_reasons["parser_error"] = skip_reasons.get("parser_error", 0) + 1
-                log.warning(
-                    "[PARSER ERROR] %s — skipped staging; critical fields missing "
-                    "after browser render: %s",
-                    r.get("url"),
-                    ", ".join(_pe_fields) if _pe_fields else "unknown",
-                )
-                await emit(
-                    "status",
-                    f"[PARSER ERROR] skipped: {r.get('name','?')} — "
-                    f"missing after render: {', '.join(_pe_fields) if _pe_fields else 'unknown'}",
-                    phase="stage",
-                    kind="parser_error_skip",
-                    url=r.get("url"),
-                    fields=_pe_fields,
-                )
-                continue
-
-            try:
-                # [FIELD TRACE] — log key fields just before staging so we can
-                # diagnose drop-off between extraction and the DB row.  This
-                # runs BEFORE stage_course (which internally calls
-                # enforce_source_evidence). Any field that appears non-None
-                # here but is NULL in the staged row was dropped by the
-                # source-evidence guard (missing snippet or source_url).
-                _trace_fields = {
-                    k: payload.get(k)
-                    for k in (
-                        "international_fee", "ielts_overall",
-                        "duration", "duration_term",
-                        "intake_months", "location",
-                        "study_mode", "english_test_name",
-                    )
-                }
-                log.info(
-                    "[FIELD TRACE] %s → fee=%s ielts=%s dur=%s%s intake=%s "
-                    "loc=%s mode=%s",
-                    r.get("name", "?"),
-                    _trace_fields["international_fee"],
-                    _trace_fields["ielts_overall"],
-                    _trace_fields["duration"],
-                    _trace_fields["duration_term"] or "",
-                    _trace_fields["intake_months"],
-                    _trace_fields["location"],
-                    _trace_fields["study_mode"],
-                )
-
-                # ── Recipe rules (operator no-code transforms) ────────────
-                # Applied BEFORE staging so rule-cleaned values are stored
-                # with full provenance.  Soft-fail: a recipe rule error must
-                # never abort the scrape.
-                _recipe_rules_cfg = dict((uni_scrape_config or {}).get("recipe") or {})
-                # Bridge YAML extraction.fees fee-calculation fields into the
-                # recipe dict so operators can configure them in per-uni YAMLs
-                # without needing a DB-stored recipe entry.  YAML wins when
-                # both YAML and DB recipe set the same key.
-                _yaml_fees_bridge_keys = (
-                    "fee_calculation_mode",
-                    "fee_prevent_full_course_rollup",
-                    "max_annual_fee",
-                    # default_currency: YAML wins over AI-filled fee_currency.
-                    # Without this, the AI fallback sets fee_currency=AUD for
-                    # UK universities (e.g. BCU, WLV) and the YAML GBP config
-                    # has no effect on the final stored value.
-                    "default_currency",
-                )
-                from app.services.scraper.config.context import get_uni_config as _get_uc_fees
-                _yaml_uni_cfg = _get_uc_fees()
-                if _yaml_uni_cfg is not None:
-                    _yaml_fees = _yaml_uni_cfg.extraction.fees
-                    for _bk in _yaml_fees_bridge_keys:
-                        _bv = getattr(_yaml_fees, _bk, None)
-                        if _bv is not None:
-                            _recipe_rules_cfg[_bk] = _bv
-                    # Bridge YAML extraction.text_cleaning.location fields into the
-                    # recipe dict.  YAML non-empty list wins over DB empty-list default.
-                    # This allows operators to configure campus allowlists and nav-text
-                    # reject patterns in per-uni YAMLs without touching the DB recipe.
-                    try:
-                        _yaml_loc = _yaml_uni_cfg.extraction.text_cleaning.location
-                        if _yaml_loc.reject_values:
-                            _recipe_rules_cfg["location_reject_values"] = list(_yaml_loc.reject_values)
-                        if _yaml_loc.allowed_values:
-                            _recipe_rules_cfg["location_allowed_values"] = list(_yaml_loc.allowed_values)
-                    except Exception:  # noqa: BLE001
-                        pass
-                if _recipe_rules_cfg:
-                    try:
-                        from app.services.scraper.recipe_rules import apply_recipe_rules
-                        payload = apply_recipe_rules(payload, _recipe_rules_cfg)
-                    except Exception as _rr_exc:  # noqa: BLE001
-                        log.warning(
-                            "[RECIPE] recipe_rules failed for %s: %s",
-                            r.get("name", "?"),
-                            _rr_exc,
-                        )
-
-                async with AsyncSessionLocal() as stage_db:
-                    # If the URL already matched course_detail_url_patterns during
-                    # the pre-extraction link gate (lines ~2154), skip the global
-                    # is_blocked_page() check inside stage_course.  Those patterns
-                    # are an explicit allow-list; re-running the block-list would
-                    # falsely reject courses whose URL contains a listing-page
-                    # substring (e.g. Lancaster /study/postgraduate/…).
-                    _cur_url = r.get("url") or ""
-                    _skip_url_block = bool(
-                        _gate_detail_pats
-                        and any(p.search(_cur_url) for p in _gate_detail_pats)
-                    )
-                    res = await stage_course(
-                        stage_db,
-                        scrape_job_id=runtime_job_id,
-                        university_id=uni_id,
-                        course_name=r["name"],
-                        payload=payload,
-                        # Bug D: pass per-field evidence so it lands in
-                        # scraped_field_evidence and the review modal can
-                        # render it instead of a blank body.
-                        evidence=r.get("evidence") or [],
-                        source_url=r.get("url"),
-                        skip_url_block=_skip_url_block,
-                    )
-                    # ── Phase 9: Verification Engine ──────────────────────────
-                    # Runs inside the same session (already committed by
-                    # stage_course) so evidence rows are visible.  Soft-fail
-                    # only — a verification error must never abort the scrape.
-                    if res.saved and res.scraped_course_id:
-                        try:
-                            from app.services.scraper.verification_engine import (
-                                run_field_verification,
-                            )
-                            from app.models import ScrapedCourse as _VeSC
-
-                            _vr = await run_field_verification(
-                                stage_db, res.scraped_course_id
-                            )
-                            if _vr["avg_confidence"] > 0:
-                                _ve_sc = await stage_db.get(
-                                    _VeSC, res.scraped_course_id
-                                )
-                                if _ve_sc is not None:
-                                    _ve_sc.avg_verification_confidence = _vr[
-                                        "avg_confidence"
-                                    ]
-                                    await stage_db.commit()
-                        except Exception as _ve_exc:  # noqa: BLE001
-                            log.warning(
-                                "verification_engine: sc %s failed: %s",
-                                res.scraped_course_id,
-                                _ve_exc,
-                            )
-                if res.saved:
-                    summary["staged"] += 1
-                    await emit(
-                        "status",
-                        f"[STAGE] saved: {r['name']}",
-                        phase="stage",
-                        kind="staged",
-                        scraped_course_id=res.scraped_course_id,
-                        url=r.get("url"),
-                    )
-                else:
-                    summary["skipped"] += 1
-                    _skip_key = (res.reason or "unknown").replace(" ", "_").lower()[:40]
-                    skip_reasons[_skip_key] = skip_reasons.get(_skip_key, 0) + 1
-                    # Collect sample URLs for category_landing_page_* sub-reasons
-                    # so operators can diagnose root causes without reading raw logs.
-                    if res.reason and res.reason.startswith("category_landing_page_"):
-                        _samples = skip_reason_samples.setdefault(res.reason, [])
-                        if len(_samples) < 10:
-                            _samples.append({
-                                "url": r.get("url") or "",
-                                "name": r.get("name") or "",
-                            })
-                    await emit(
-                        "status",
-                        f"[STAGE] skipped {r['name']}: {res.reason}",
-                        phase="stage",
-                        kind="skipped",
-                        reason=res.reason,
-                        url=r.get("url"),
-                    )
-            except Exception as exc:  # noqa: BLE001
-                summary["errors"] += 1
-                log.warning("stage_course failed for %s: %s", r.get("url"), exc)
-                await emit(
-                    "status",
-                    f"[STAGE] error on {r.get('name','?')}: {exc}",
-                    phase="stage",
-                    kind="stage_error",
-                    url=r.get("url"),
-                )
-
-            # ``heartbeat_at`` is kept fresh by the dedicated
-            # ``_heartbeat_pulser`` background task on its own session
-            # (see top of file). The in-memory assignment below is
-            # purely cosmetic for any future code path that reads the
-            # local ``job`` instance before the next commit.
-            job.heartbeat_at = datetime.now(timezone.utc)
 
         # ── Data-quality validation ───────────────────────────────────────────
         # Run after the staging loop so every staged payload is inspected.
@@ -3988,7 +4074,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             from app.services.scraper.data_quality import run_quality_checks
             from app.services.scraper.config.context import get_uni_config as _get_uc_dq
 
-            _staged_dicts = [r for r in results if isinstance(r, dict) and not r.get("error")]
+            _staged_dicts = _all_staged_dicts
             try:
                 _dq_uni_cfg = _get_uc_dq()
             except Exception:

@@ -26,10 +26,11 @@
 #   - Raised to 700: improved coverage but still left courses at positions 700-986
 #     untouched, missing PT and some FT courses.
 #   - Raised to 1000 (current): covers all 987 raw sitemap URLs in one job.
-#     The orchestrator's extraction loop uses a semaphore of 4 concurrent fetches,
-#     so peak memory from simultaneous Scrape.do renders is ~2 MB regardless of
-#     candidate count — 1000 candidates is safe.  The previous "OOM at 961" report
-#     predates the semaphore-controlled asyncio.gather path and is no longer a risk.
+#     Memory is no longer a concern: the orchestrator now splits the course list
+#     into batches of _EXTRACTION_BATCH_SIZE (default 50) and stages each batch
+#     before starting the next, so peak in-memory result set is bounded regardless
+#     of total candidate count.  The previous "OOM at 961" report predates this
+#     batched extraction loop and the semaphore-controlled concurrency cap.
 
 discovery:
   # Explicit sitemap URL — fetched via Scrape.do since direct HTTP returns 403.
