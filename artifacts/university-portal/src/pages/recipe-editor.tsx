@@ -3274,7 +3274,7 @@ export default function RecipeEditorPage() {
                   </p>
                   {(recipe.api?.api_allow_url_patterns || [""]).map((pat, i) => (
                     <RegexPatternRow
-                      key={`${i}:${pat}`}
+                      key={i}
                       value={pat}
                       placeholder="/study/qualifications/"
                       onChange={v => {
@@ -3300,7 +3300,7 @@ export default function RecipeEditorPage() {
                   </p>
                   {(recipe.api?.api_block_url_patterns || [""]).map((pat, i) => (
                     <RegexPatternRow
-                      key={`${i}:${pat}`}
+                      key={i}
                       value={pat}
                       placeholder="^\\.pdf$"
                       onChange={v => {
