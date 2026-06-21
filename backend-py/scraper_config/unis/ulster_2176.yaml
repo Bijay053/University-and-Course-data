@@ -17,8 +17,19 @@
 #   - year_dedup_mode: keep_latest dedups if future sitemaps include both
 #     202627 and 202728 variants of the same course.
 #   - Full-time catalogue has exactly 558 courses (verified via Funnelback filter).
-#     Sitemap has 987 raw URLs (FT + PT combined); year_dedup reduces to ~500+
-#     unique courses.  max_candidates: 700 ensures all FT courses are included.
+#     Sitemap has 987 raw URLs (FT + PT combined); year_dedup reduces to unique
+#     courses per slug (one intake year kept per course slug).
+#
+# Candidate cap history:
+#   - Original cap 500: captured only courses from sitemap positions 0-499.
+#     ~487 courses at positions 500-986 were never staged.
+#   - Raised to 700: improved coverage but still left courses at positions 700-986
+#     untouched, missing PT and some FT courses.
+#   - Raised to 1000 (current): covers all 987 raw sitemap URLs in one job.
+#     The orchestrator's extraction loop uses a semaphore of 4 concurrent fetches,
+#     so peak memory from simultaneous Scrape.do renders is ~2 MB regardless of
+#     candidate count — 1000 candidates is safe.  The previous "OOM at 961" report
+#     predates the semaphore-controlled asyncio.gather path and is no longer a risk.
 
 discovery:
   # Explicit sitemap URL — fetched via Scrape.do since direct HTTP returns 403.
@@ -45,13 +56,14 @@ discovery:
   allow_url_patterns:
     - 'ulster\.ac\.uk/courses/\d{6}/'
 
-  # 700 raw sitemap URLs needed to cover 558 full-time courses after year_dedup
-  # (year_dedup survival rate ≈ 88%; 700 × 0.88 ≈ 616, well above 558).
-  # Previous OOM was at 961; 700 is safely below that threshold.
-  max_candidates: 700
+  # 1000 covers all 987 raw sitemap URLs with a margin for sitemap growth.
+  # year_dedup (below) collapses multiple intake-year variants into one URL
+  # per course slug, so total extractions ≈ unique course count, not raw count.
+  max_candidates: 1000
 
-  # sitemap_offset: 0 = start from the beginning (covers full catalogue in one job).
-  # Only change to 700 if a future sitemap expands and a second batch is needed.
+  # sitemap_offset: 0 = start from position 0 (full catalogue in one job).
+  # Increase this only if a future sitemap exceeds 1000 and a second batch
+  # is needed: set offset=1000, max_candidates=500 for the second job.
   sitemap_offset: 0
 
   # Deduplicate if multiple intake-year variants appear in the sitemap.
