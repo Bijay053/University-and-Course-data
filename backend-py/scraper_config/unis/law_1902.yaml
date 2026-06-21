@@ -1,83 +1,41 @@
 # University of Law
 # Hostname: www.law.ac.uk
 # Country: United Kingdom  |  Currency: GBP
-#
-# Discovery: REST JSON API at https://law.ac.uk/api/coursesearch/find
-#   ?page=1&size=200 returns all 172 courses in a single response.
-#   Root key: "Courses"  — each item has: Url, Name, Award, Level.Name,
-#   Method.Name (On Campus / Online), StudyModes[].Name, Campuses[].Name
-#
-# Previous issues fixed:
-#   1. API was returning only 20 courses — missing size=200 and page param
-#   2. always_sitemap_supplement added 137 sitemap URLs including non-course
-#      pages (/sqe-pass-rates, /information-for-firms etc.)
-#   3. allow_url_patterns in extraction was dropping valid course URLs
 
 discovery:
+  # API returns exactly 20 results per page regardless of pageSize param.
+  # TotalResults=172, TotalPages=9 — all 9 pages must be seeded explicitly.
   seed_urls:
-    - https://www.law.ac.uk/study/
+    - 'https://law.ac.uk/api/coursesearch/find?page=1'
+    - 'https://law.ac.uk/api/coursesearch/find?page=2'
+    - 'https://law.ac.uk/api/coursesearch/find?page=3'
+    - 'https://law.ac.uk/api/coursesearch/find?page=4'
+    - 'https://law.ac.uk/api/coursesearch/find?page=5'
+    - 'https://law.ac.uk/api/coursesearch/find?page=6'
+    - 'https://law.ac.uk/api/coursesearch/find?page=7'
+    - 'https://law.ac.uk/api/coursesearch/find?page=8'
+    - 'https://law.ac.uk/api/coursesearch/find?page=9'
 
-  # API covers all 172 courses — sitemap adds non-course noise
-  always_sitemap_supplement: false
+  always_sitemap_supplement: true
 
   generic_search_api:
     enabled: true
     method: GET
     url: 'https://law.ac.uk/api/coursesearch/find'
     root_path: 'Courses'
-    url_fields: [Url]
-    title_fields: [Name]
+    url_fields: ['Url']
+    title_fields: ['Name', 'Award']
     normalize_relative_urls: true
     base_url: 'https://www.law.ac.uk'
-    # Static params — size=200 means all 172 arrive in page 1 response
-    params:
-      size: '200'
-    # Dynamic page-number pagination (law.ac.uk uses 1-indexed pages)
-    page_size: 200
-    page_number_param: 'page'
-    max_pages: 5   # page 2 will return 0 items and stop immediately
-    # Only keep URLs under /study/ — filters out any stray API results
-    allow_url_patterns:
-      - '/study/'
-
-  # BFS URL filter — restrict to depth-2 listing pages and depth-3 subject pages ONLY.
-  #
-  # IMPORTANT: do NOT allow depth-4 course pages (e.g. /study/postgraduate/law/llm-x/).
-  # When BFS visits an LLM course page it classifies it as a "listing" (55 campus/mode
-  # variant links) and extracts those links with breadcrumb-style anchor text such as
-  # "Postgraduate Courses Master of Laws LLM X".  Those messy names overlap with the
-  # API-discovered URLs, enter _seen_urls, and the category_landing_page_title_block
-  # gate drops them — causing ~28 LLM courses to go missing.
-  #
-  # With depth-3-anchored patterns BFS visits:
-  #   /study/undergraduate/         (depth-2 top-level listing)
-  #   /study/postgraduate/          (depth-2 top-level listing)
-  #   /study/undergraduate/law/     (depth-3 subject listing — finds course links)
-  #   /study/postgraduate/law/      (depth-3 subject listing — finds course links)
-  # but does NOT visit individual course pages (depth-4+), so it never generates
-  # the polluted anchor text.  All 172 API URLs arrive with clean names via either
-  # BFS candidates (anchor text from the clean subject-listing page) or _api_only.
-  allow_url_patterns:
-    - '/study/undergraduate/$'        # depth-2: /study/undergraduate/
-    - '/study/postgraduate/$'         # depth-2: /study/postgraduate/
-    - '/study/undergraduate/[^/]+/$'  # depth-3: /study/undergraduate/law/
-    - '/study/postgraduate/[^/]+/$'   # depth-3: /study/postgraduate/law/
-
-  block_url_patterns:
-    - '/sqe-assessments'
-    - '/pass-rates'
-    - '/information-for'
-    - '/apply'
-    - '/help-and-support'
-    - '/events'
-    - '/news'
-    - '/about'
-    - '/contact'
-    - '/careers'
-    - '/blog'
-    - '/legal'
-    - '/privacy'
-    - '/sitemap'
+    # FIX 1: API hard-returns 20 per page — set this to match reality
+    page_size: 20
+    # FIX 2: API reports TotalPages=9, set max_pages to cover all + buffer
+    max_pages: 10
+    # FIX 3: tell the paginator which field holds total page count
+    total_pages_field: 'TotalPages'
+    total_results_field: 'TotalResults'
+    page_param: 'page'
+    first_page: 1
 
 extraction:
   fees:
@@ -90,7 +48,6 @@ extraction:
       - 'UK student'
       - 'UK fee'
       - 'Domestic'
-      - 'home'
 
   english:
     trust_vision_ocr: false
@@ -105,19 +62,11 @@ extraction:
     strip_title_suffixes:
       - ' | University of Law'
       - ' - University of Law'
-      - ' | ULaw'
-      - ' - ULaw'
 
   filters:
-    domestic_only:
+    online_only:
       enabled: false
-    allow_url_patterns:
-      - '/study/undergraduate/'
-      - '/study/postgraduate/'
-    block_url_patterns:
-      - '/sqe-assessments'
-      - '/pass-rates'
-      - '/information-for'
+
   staging:
     reject_if_missing:
       - course_name
