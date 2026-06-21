@@ -521,10 +521,12 @@ async def delete_university(
     db: Annotated[AsyncSession, Depends(get_db)],
     _user: Annotated[dict, Depends(require_permission("universities.delete"))],
 ) -> None:
+    from sqlalchemy import text as sa_text
+
     u = await db.get(University, uni_id)
     if not u:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="University not found")
-    await db.delete(u)
+    await db.execute(sa_text("DELETE FROM universities WHERE id = :uid"), {"uid": uni_id})
     await db.commit()
 
 

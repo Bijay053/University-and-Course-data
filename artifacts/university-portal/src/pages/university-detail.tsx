@@ -1133,6 +1133,8 @@ export default function UniversityDetail() {
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [importingAll, setImportingAll] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
+  const [confirmDeleteLiveCourseId, setConfirmDeleteLiveCourseId] = useState<number | null>(null);
+  const [deletingLiveCourseId, setDeletingLiveCourseId] = useState<number | null>(null);
   const [confirmImportAllOpen, setConfirmImportAllOpen] = useState(false);
 
   // ── Raw data row selection ───────────────────────────────────────────────
@@ -1466,6 +1468,22 @@ export default function UniversityDetail() {
 
   function handleDelete(courseId: number) {
     setConfirmDeleteId(courseId);
+  }
+
+  async function performDeleteLiveCourse(courseId: number) {
+    setConfirmDeleteLiveCourseId(null);
+    setDeletingLiveCourseId(courseId);
+    try {
+      const res = await fetch(`${BASE}/api/courses/${courseId}`, { method: "DELETE" });
+      if (!res.ok) throw new Error(await res.text());
+      toast({ title: "Course deleted", description: "The course has been permanently removed." });
+      await queryClient.invalidateQueries({ queryKey: getListCoursesQueryKey({ universityId: id }) });
+      await queryClient.invalidateQueries({ queryKey: getGetUniversityQueryKey(id) });
+    } catch (e) {
+      toast({ title: "Error", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setDeletingLiveCourseId(null);
+    }
   }
 
   async function performDelete(courseId: number) {
@@ -3460,7 +3478,7 @@ export default function UniversityDetail() {
                   ) : (
                     <th className="px-2 py-2 border-r text-center" colSpan={4} style={{ background: "#ecfeff", color: "#0e7490" }}>Academic Req.</th>
                   )}
-                  <th className="px-2 py-2 text-center" colSpan={2} style={{ background: "#fefce8", color: "#a16207" }}>Other</th>
+                  <th className="px-2 py-2 text-center" colSpan={3} style={{ background: "#fefce8", color: "#a16207" }}>Other</th>
                 </tr>
                 <tr className="border-b bg-gray-50">
                   <th className="sticky left-0 z-30 bg-gray-50 px-2 py-2 text-center font-semibold text-gray-500 min-w-[40px]">SN.</th>
@@ -3533,13 +3551,14 @@ export default function UniversityDetail() {
                   )}
                   <th className="px-2 py-2 text-gray-600 font-medium min-w-[120px]">Other Req.</th>
                   <th className="px-2 py-2 text-amber-700 font-medium min-w-[120px]">Scholarship</th>
+                  <th className="px-2 py-2 text-gray-500 font-medium min-w-[60px]">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
                 {coursesLoading ? (
-                  <tr><td colSpan={41 + (distinctAcadCountries.length > 0 ? distinctAcadCountries.length * 3 : 4)} className="text-center py-12 text-muted-foreground">Loading courses...</td></tr>
+                  <tr><td colSpan={42 + (distinctAcadCountries.length > 0 ? distinctAcadCountries.length * 3 : 4)} className="text-center py-12 text-muted-foreground">Loading courses...</td></tr>
                 ) : courses.length === 0 ? (
-                  <tr><td colSpan={41 + (distinctAcadCountries.length > 0 ? distinctAcadCountries.length * 3 : 4)} className="text-center py-12 text-muted-foreground">No courses found</td></tr>
+                  <tr><td colSpan={42 + (distinctAcadCountries.length > 0 ? distinctAcadCountries.length * 3 : 4)} className="text-center py-12 text-muted-foreground">No courses found</td></tr>
                 ) : courses.map((c, idx) => (
                   <tr key={c.id} className="hover:bg-blue-50/30 transition-colors">
                     <td className="sticky left-0 bg-white px-2 py-2 text-center text-gray-400 font-mono text-[11px] min-w-[40px]">
@@ -3649,6 +3668,16 @@ export default function UniversityDetail() {
                           </div>
                         );
                       })()}
+                    </td>
+                    <td className="px-2 py-2 text-center">
+                      <button
+                        onClick={() => setConfirmDeleteLiveCourseId(c.id)}
+                        disabled={deletingLiveCourseId === c.id}
+                        title="Delete course"
+                        className="p-1 rounded hover:bg-red-100 text-red-500 disabled:opacity-40 cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -5013,7 +5042,7 @@ export default function UniversityDetail() {
         </Dialog>
       )}
 
-      {/* ── Confirm Delete Dialog ── */}
+      {/* ── Confirm Delete Staged Course Dialog ── */}
       {confirmDeleteId !== null && (
         <Dialog open onOpenChange={() => setConfirmDeleteId(null)}>
           <DialogContent className="max-w-sm">
@@ -5026,6 +5055,24 @@ export default function UniversityDetail() {
             <DialogFooter className="gap-2 sm:gap-0">
               <Button variant="outline" onClick={() => setConfirmDeleteId(null)}>Cancel</Button>
               <Button variant="destructive" onClick={() => performDelete(confirmDeleteId)}>Delete</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* ── Confirm Delete Live Course Dialog ── */}
+      {confirmDeleteLiveCourseId !== null && (
+        <Dialog open onOpenChange={() => setConfirmDeleteLiveCourseId(null)}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Delete approved course?</DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-muted-foreground py-2">
+              This will permanently delete the course and all its associated fees, intakes, English requirements, academic requirements, and scholarships. <strong>This cannot be undone.</strong>
+            </p>
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button variant="outline" onClick={() => setConfirmDeleteLiveCourseId(null)}>Cancel</Button>
+              <Button variant="destructive" onClick={() => void performDeleteLiveCourse(confirmDeleteLiveCourseId)}>Delete</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
