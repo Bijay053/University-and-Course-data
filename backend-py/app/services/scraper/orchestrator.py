@@ -1564,16 +1564,36 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 discovery_config=_uni_cfg.discovery,
             )
             # Merge YAML API links (pre-BFS) with BFS/sitemap results.
-            # API links are kept as seed — BFS links are deduplicated on top.
+            # For URLs discovered by BOTH the API and BFS, prefer the API link
+            # dict so the API's clean course name wins over BFS anchor text.
+            # BFS anchor text is often a breadcrumb concatenation such as
+            # "Postgraduate Courses Master of Laws LLM X" (extracted from the
+            # sidebar navigation of a depth-4 course listing page), which
+            # triggers the category_landing_page_title_block extraction gate and
+            # silently drops valid courses.  The API name is authoritative.
             if _yaml_api_partial and _pre_bfs_links:
+                _pre_bfs_url_map: dict[str, dict] = {
+                    lk["url"]: lk for lk in _pre_bfs_links if lk.get("url")
+                }
                 _seen_urls: set[str] = {lk["url"] for lk in links}
                 _api_only = [lk for lk in _pre_bfs_links if lk["url"] not in _seen_urls]
+                # Replace BFS link dicts with API link dicts for overlapping URLs.
+                # This ensures the clean API name reaches the extraction gate
+                # instead of the potentially-messy BFS anchor text.
+                _overlap_count = sum(
+                    1 for lk in links if lk.get("url") in _pre_bfs_url_map
+                )
+                links = [
+                    _pre_bfs_url_map.get(lk.get("url"), lk) for lk in links
+                ]
                 if _api_only:
                     links = links + _api_only
-                    log.info(
-                        "[YAML_API] merged %d API-only link(s) with %d BFS/sitemap link(s) → %d total",
-                        len(_api_only), len(links) - len(_api_only), len(links),
-                    )
+                log.info(
+                    "[YAML_API] merged %d API-only link(s) with %d BFS/sitemap link(s)"
+                    " → %d total (%d overlapping URLs used API name)",
+                    len(_api_only), len(links) - len(_api_only), len(links),
+                    _overlap_count,
+                )
 
         # ── Fallback 1 / Primary: Generic Playwright browser discovery ────────
         # When always_browser_discover=True: browser is the PRIMARY discovery
