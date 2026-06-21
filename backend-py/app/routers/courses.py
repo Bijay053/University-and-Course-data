@@ -274,3 +274,40 @@ async def delete_course(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
     await db.delete(c)
     await db.commit()
+
+
+@router.post("/courses/bulk-delete", status_code=status.HTTP_200_OK)
+async def bulk_delete_courses(
+    body: dict,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _user: Annotated[dict, Depends(get_current_user)],
+) -> dict:
+    from sqlalchemy import text as sa_text
+
+    ids = list(body.get("course_ids", []))
+    if not ids:
+        return {"deleted": 0}
+    result = await db.execute(
+        sa_text("DELETE FROM courses WHERE id = ANY(:ids) RETURNING id"),
+        {"ids": ids},
+    )
+    count = len(result.fetchall())
+    await db.commit()
+    return {"deleted": count}
+
+
+@router.delete("/universities/{uni_id}/courses", status_code=status.HTTP_200_OK)
+async def delete_all_courses_for_university(
+    uni_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _user: Annotated[dict, Depends(get_current_user)],
+) -> dict:
+    from sqlalchemy import text as sa_text
+
+    result = await db.execute(
+        sa_text("DELETE FROM courses WHERE university_id = :uid RETURNING id"),
+        {"uid": uni_id},
+    )
+    count = len(result.fetchall())
+    await db.commit()
+    return {"deleted": count}

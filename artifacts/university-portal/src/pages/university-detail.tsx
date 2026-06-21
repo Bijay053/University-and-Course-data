@@ -1135,6 +1135,13 @@ export default function UniversityDetail() {
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const [confirmDeleteLiveCourseId, setConfirmDeleteLiveCourseId] = useState<number | null>(null);
   const [deletingLiveCourseId, setDeletingLiveCourseId] = useState<number | null>(null);
+  const [selectedLiveCourseIds, setSelectedLiveCourseIds] = useState<Set<number>>(new Set());
+  const [showBulkDeleteLiveConfirm, setShowBulkDeleteLiveConfirm] = useState(false);
+  const [showDeleteAllLiveConfirm, setShowDeleteAllLiveConfirm] = useState(false);
+  const [bulkDeletingLive, setBulkDeletingLive] = useState(false);
+  const [bulkDeleteRawRunning, setBulkDeleteRawRunning] = useState(false);
+  const [showBulkDeleteRawConfirm, setShowBulkDeleteRawConfirm] = useState(false);
+  const [showDeleteAllRawConfirm, setShowDeleteAllRawConfirm] = useState(false);
   const [confirmImportAllOpen, setConfirmImportAllOpen] = useState(false);
 
   // ── Raw data row selection ───────────────────────────────────────────────
@@ -1152,9 +1159,18 @@ export default function UniversityDetail() {
     setRawSelectedIds(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
 
   const toggleSelectAllRaw = () => {
-    const pendingIds = filteredRaw.filter(c => c.status === "pending").map(c => c.id);
-    const allSelected = pendingIds.every(id => rawSelectedIds.has(id));
-    setRawSelectedIds(allSelected ? new Set() : new Set(pendingIds));
+    const allIds = filteredRaw.map(c => c.id);
+    const allSelected = allIds.length > 0 && allIds.every(id => rawSelectedIds.has(id));
+    setRawSelectedIds(allSelected ? new Set() : new Set(allIds));
+  };
+
+  const toggleLiveSelect = (id: number) =>
+    setSelectedLiveCourseIds(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
+
+  const toggleSelectAllLive = () => {
+    const allIds = courses.map(c => c.id as number);
+    const allSelected = allIds.length > 0 && allIds.every(id => selectedLiveCourseIds.has(id));
+    setSelectedLiveCourseIds(allSelected ? new Set() : new Set(allIds));
   };
 
   const handleBulkMap = async (forceOverwrite: boolean) => {
@@ -1483,6 +1499,88 @@ export default function UniversityDetail() {
       toast({ title: "Error", description: (e as Error).message, variant: "destructive" });
     } finally {
       setDeletingLiveCourseId(null);
+    }
+  }
+
+  async function performBulkDeleteLive() {
+    setBulkDeletingLive(true);
+    setShowBulkDeleteLiveConfirm(false);
+    const ids = [...selectedLiveCourseIds];
+    try {
+      const res = await fetch(`${BASE}/api/courses/bulk-delete`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ course_ids: ids }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.detail ?? "Bulk delete failed");
+      toast({ title: "Courses deleted", description: `${json.deleted} course${json.deleted !== 1 ? "s" : ""} permanently removed.` });
+      setSelectedLiveCourseIds(new Set());
+      await queryClient.invalidateQueries({ queryKey: getListCoursesQueryKey({ universityId: id }) });
+      await queryClient.invalidateQueries({ queryKey: getGetUniversityQueryKey(id) });
+    } catch (e) {
+      toast({ title: "Error", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setBulkDeletingLive(false);
+    }
+  }
+
+  async function performDeleteAllLive() {
+    setBulkDeletingLive(true);
+    setShowDeleteAllLiveConfirm(false);
+    try {
+      const res = await fetch(`${BASE}/api/universities/${id}/courses`, { method: "DELETE" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.detail ?? "Delete all failed");
+      toast({ title: "All courses deleted", description: `${json.deleted} course${json.deleted !== 1 ? "s" : ""} permanently removed.` });
+      setSelectedLiveCourseIds(new Set());
+      await queryClient.invalidateQueries({ queryKey: getListCoursesQueryKey({ universityId: id }) });
+      await queryClient.invalidateQueries({ queryKey: getGetUniversityQueryKey(id) });
+    } catch (e) {
+      toast({ title: "Error", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setBulkDeletingLive(false);
+    }
+  }
+
+  async function performBulkDeleteRaw() {
+    setBulkDeleteRawRunning(true);
+    setShowBulkDeleteRawConfirm(false);
+    const ids = [...rawSelectedIds];
+    try {
+      const res = await fetch(`${BASE}/api/scrape/staged/bulk-delete`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.detail ?? "Bulk delete failed");
+      toast({ title: "Deleted", description: `${json.deleted} staged course${json.deleted !== 1 ? "s" : ""} removed.` });
+      setRawSelectedIds(new Set());
+      await fetchRawData();
+      await queryClient.invalidateQueries({ queryKey: getGetUniversityQueryKey(id) });
+    } catch (e) {
+      toast({ title: "Error", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setBulkDeleteRawRunning(false);
+    }
+  }
+
+  async function performDeleteAllRaw() {
+    setBulkDeleteRawRunning(true);
+    setShowDeleteAllRawConfirm(false);
+    try {
+      const res = await fetch(`${BASE}/api/scrape/staged/all/${id}`, { method: "DELETE" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.detail ?? "Delete all failed");
+      toast({ title: "All staged data deleted", description: `${json.deleted} row${json.deleted !== 1 ? "s" : ""} removed.` });
+      setRawSelectedIds(new Set());
+      await fetchRawData();
+      await queryClient.invalidateQueries({ queryKey: getGetUniversityQueryKey(id) });
+    } catch (e) {
+      toast({ title: "Error", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setBulkDeleteRawRunning(false);
     }
   }
 
@@ -3446,7 +3544,46 @@ export default function UniversityDetail() {
               </Button>
             )}
             <span className="ml-auto text-sm text-muted-foreground">{total} course{total !== 1 ? "s" : ""}</span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowDeleteAllLiveConfirm(true)}
+              disabled={bulkDeletingLive || total === 0}
+              className="h-9 border-red-300 text-red-600 hover:bg-red-50"
+            >
+              <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+              Remove All
+            </Button>
           </div>
+
+          {/* Bulk selection action bar — Courses tab */}
+          {selectedLiveCourseIds.size > 0 && (
+            <div className="flex items-center gap-2 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-sm">
+              <span className="font-medium text-red-700">
+                {selectedLiveCourseIds.size} course{selectedLiveCourseIds.size !== 1 ? "s" : ""} selected
+              </span>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={bulkDeletingLive}
+                onClick={() => setShowBulkDeleteLiveConfirm(true)}
+                className="h-7 text-xs border-red-400 text-red-700 bg-red-50 hover:bg-red-100"
+              >
+                {bulkDeletingLive
+                  ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+                  : <Trash2 className="h-3.5 w-3.5 mr-1" />}
+                {bulkDeletingLive ? "Deleting…" : `Delete (${selectedLiveCourseIds.size})`}
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setSelectedLiveCourseIds(new Set())}
+                className="h-7 text-xs text-muted-foreground"
+              >
+                Clear
+              </Button>
+            </div>
+          )}
 
           <div ref={tableScrollRef} className="courses-table border border-gray-100 rounded-xl overflow-auto" style={{ maxHeight: "70vh" }}>
             <table className="text-xs whitespace-nowrap border-collapse" style={{ minWidth: 3000 }}>
@@ -3481,9 +3618,20 @@ export default function UniversityDetail() {
                   <th className="px-2 py-2 text-center" colSpan={3} style={{ background: "#fefce8", color: "#a16207" }}>Other</th>
                 </tr>
                 <tr className="border-b bg-gray-50">
-                  <th className="sticky left-0 z-30 bg-gray-50 px-2 py-2 text-center font-semibold text-gray-500 min-w-[40px]">SN.</th>
-                  <th className="sticky bg-gray-50 border-r px-3 py-2 text-left font-semibold text-gray-700 min-w-[220px]" style={{ left: 40, zIndex: 30 }}>Course Name</th>
-                  <th className="sticky bg-gray-50 border-r px-2 py-2 text-left font-semibold text-gray-700 min-w-[80px]" style={{ left: 260, zIndex: 29 }}>Category</th>
+                  <th className="sticky left-0 z-30 bg-gray-50 px-2 py-2 text-center font-semibold text-gray-500 min-w-[52px]">
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="checkbox"
+                        className="cursor-pointer rounded"
+                        checked={courses.length > 0 && courses.every(c => selectedLiveCourseIds.has(c.id as number))}
+                        onChange={toggleSelectAllLive}
+                        title="Select all on page"
+                      />
+                      <span>#</span>
+                    </div>
+                  </th>
+                  <th className="sticky bg-gray-50 border-r px-3 py-2 text-left font-semibold text-gray-700 min-w-[220px]" style={{ left: 52, zIndex: 30 }}>Course Name</th>
+                  <th className="sticky bg-gray-50 border-r px-2 py-2 text-left font-semibold text-gray-700 min-w-[80px]" style={{ left: 272, zIndex: 29 }}>Category</th>
                   <th className="px-2 py-2 text-gray-600 font-medium min-w-[100px]">Sub Category</th>
                   <th className="px-2 py-2 text-gray-600 font-medium min-w-[60px]">Website</th>
                   <th className="px-2 py-2 text-gray-600 font-medium min-w-[70px]">Duration</th>
@@ -3560,14 +3708,22 @@ export default function UniversityDetail() {
                 ) : courses.length === 0 ? (
                   <tr><td colSpan={42 + (distinctAcadCountries.length > 0 ? distinctAcadCountries.length * 3 : 4)} className="text-center py-12 text-muted-foreground">No courses found</td></tr>
                 ) : courses.map((c, idx) => (
-                  <tr key={c.id} className="hover:bg-blue-50/30 transition-colors">
-                    <td className="sticky left-0 bg-white px-2 py-2 text-center text-gray-400 font-mono text-[11px] min-w-[40px]">
-                      {(page - 1) * limit + idx + 1}
+                  <tr key={c.id} className={`hover:bg-blue-50/30 transition-colors ${selectedLiveCourseIds.has(c.id as number) ? "bg-blue-50/40" : ""}`}>
+                    <td className="sticky left-0 bg-white px-2 py-2 text-gray-400 font-mono text-[11px] min-w-[52px]">
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          type="checkbox"
+                          className="cursor-pointer rounded shrink-0"
+                          checked={selectedLiveCourseIds.has(c.id as number)}
+                          onChange={() => toggleLiveSelect(c.id as number)}
+                        />
+                        <span>{(page - 1) * limit + idx + 1}</span>
+                      </div>
                     </td>
-                    <td className="sticky bg-white border-r px-3 py-2 font-medium text-blue-700 hover:underline cursor-pointer min-w-[220px]" style={{ left: 40 }}>
+                    <td className="sticky bg-white border-r px-3 py-2 font-medium text-blue-700 hover:underline cursor-pointer min-w-[220px]" style={{ left: 52 }}>
                       <span className="line-clamp-2">{c.name}</span>
                     </td>
-                    <td className="sticky bg-white border-r px-2 py-2 text-gray-600 min-w-[80px]" style={{ left: 260 }}>
+                    <td className="sticky bg-white border-r px-2 py-2 text-gray-600 min-w-[80px]" style={{ left: 272 }}>
                       <span className="line-clamp-1">{txt(c.category)}</span>
                     </td>
                     <td className="px-2 py-2 text-gray-500"><span className="line-clamp-1">{txt(c.subCategory)}</span></td>
@@ -4297,6 +4453,18 @@ export default function UniversityDetail() {
                 <RefreshCw className={`h-4 w-4 mr-1.5 ${rawLoading ? "animate-spin" : ""}`} />
                 Refresh
               </Button>
+              {rawData.length > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowDeleteAllRawConfirm(true)}
+                  disabled={bulkDeleteRawRunning}
+                  className="border-red-300 text-red-600 hover:bg-red-50"
+                >
+                  <Trash2 className="h-4 w-4 mr-1.5" />
+                  Remove All
+                </Button>
+              )}
               {pendingCount > 0 && (
                 <Button
                   size="sm"
@@ -4371,6 +4539,18 @@ export default function UniversityDetail() {
                 >
                   {bulkRejectRunning ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <XCircle className="h-3.5 w-3.5 mr-1" />}
                   {bulkRejectRunning ? "Rejecting…" : `Reject (${rawSelectedIds.size})`}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={bulkDeleteRawRunning || bulkMapRunning || bulkApproveRunning || bulkRejectRunning}
+                  onClick={() => setShowBulkDeleteRawConfirm(true)}
+                  className="h-7 text-xs border-red-400 text-red-700 bg-red-50 hover:bg-red-100"
+                >
+                  {bulkDeleteRawRunning
+                    ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+                    : <Trash2 className="h-3.5 w-3.5 mr-1" />}
+                  {bulkDeleteRawRunning ? "Deleting…" : `Delete (${rawSelectedIds.size})`}
                 </Button>
                 <Button
                   size="sm"
@@ -4582,12 +4762,9 @@ export default function UniversityDetail() {
                         <input
                           type="checkbox"
                           className="cursor-pointer rounded"
-                          checked={
-                            filteredRaw.filter(c => c.status === "pending").length > 0 &&
-                            filteredRaw.filter(c => c.status === "pending").every(c => rawSelectedIds.has(c.id))
-                          }
+                          checked={filteredRaw.length > 0 && filteredRaw.every(c => rawSelectedIds.has(c.id))}
                           onChange={toggleSelectAllRaw}
-                          title="Select all pending"
+                          title="Select all"
                         />
                         <span>#</span>
                       </div>
@@ -4642,16 +4819,12 @@ export default function UniversityDetail() {
                         c.status === "rejected" ? "bg-red-50" : "bg-white"
                       }`}>
                         <div className="flex items-center gap-1.5">
-                          {c.status === "pending" ? (
-                            <input
-                              type="checkbox"
-                              className="cursor-pointer rounded shrink-0"
-                              checked={rawSelectedIds.has(c.id)}
-                              onChange={() => toggleRawSelect(c.id)}
-                            />
-                          ) : (
-                            <span className="inline-block w-3.5" />
-                          )}
+                          <input
+                            type="checkbox"
+                            className="cursor-pointer rounded shrink-0"
+                            checked={rawSelectedIds.has(c.id)}
+                            onChange={() => toggleRawSelect(c.id)}
+                          />
                           <span>{idx + 1}</span>
                         </div>
                       </td>
@@ -5077,6 +5250,94 @@ export default function UniversityDetail() {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* ── Bulk Delete Live Courses Confirm ── */}
+      <Dialog open={showBulkDeleteLiveConfirm} onOpenChange={setShowBulkDeleteLiveConfirm}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-700">
+              <Trash2 className="w-4 h-4" />
+              Delete {selectedLiveCourseIds.size} course{selectedLiveCourseIds.size !== 1 ? "s" : ""}?
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground py-2">
+            Permanently deletes the selected <strong>{selectedLiveCourseIds.size}</strong> course{selectedLiveCourseIds.size !== 1 ? "s" : ""} and all their associated fees, intakes, and requirements. <strong>This cannot be undone.</strong>
+          </p>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setShowBulkDeleteLiveConfirm(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={() => void performBulkDeleteLive()} disabled={bulkDeletingLive}>
+              {bulkDeletingLive ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Trash2 className="h-4 w-4 mr-1.5" />}
+              Delete {selectedLiveCourseIds.size}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Delete All Live Courses Confirm ── */}
+      <Dialog open={showDeleteAllLiveConfirm} onOpenChange={setShowDeleteAllLiveConfirm}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-700">
+              <Trash2 className="w-4 h-4" />
+              Remove all {total} courses?
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground py-2">
+            This will permanently delete <strong>all {total} approved courses</strong> for this university, including all fees, intakes, English requirements, academic requirements, and scholarships. <strong>This cannot be undone.</strong>
+          </p>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setShowDeleteAllLiveConfirm(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={() => void performDeleteAllLive()} disabled={bulkDeletingLive}>
+              {bulkDeletingLive ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Trash2 className="h-4 w-4 mr-1.5" />}
+              Delete All
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Bulk Delete Raw (staged) Courses Confirm ── */}
+      <Dialog open={showBulkDeleteRawConfirm} onOpenChange={setShowBulkDeleteRawConfirm}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-700">
+              <Trash2 className="w-4 h-4" />
+              Delete {rawSelectedIds.size} staged row{rawSelectedIds.size !== 1 ? "s" : ""}?
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground py-2">
+            Permanently removes <strong>{rawSelectedIds.size}</strong> staged row{rawSelectedIds.size !== 1 ? "s" : ""}. If any are approved (linked to live courses), those live courses will also be deleted. <strong>This cannot be undone.</strong>
+          </p>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setShowBulkDeleteRawConfirm(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={() => void performBulkDeleteRaw()} disabled={bulkDeleteRawRunning}>
+              {bulkDeleteRawRunning ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Trash2 className="h-4 w-4 mr-1.5" />}
+              Delete {rawSelectedIds.size}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Delete All Raw (staged) Courses Confirm ── */}
+      <Dialog open={showDeleteAllRawConfirm} onOpenChange={setShowDeleteAllRawConfirm}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-700">
+              <Trash2 className="w-4 h-4" />
+              Remove all staged data?
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground py-2">
+            Permanently deletes <strong>all {rawData.length} staged row{rawData.length !== 1 ? "s" : ""}</strong> for this university. Approved rows will also remove the linked live courses. <strong>This cannot be undone.</strong>
+          </p>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setShowDeleteAllRawConfirm(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={() => void performDeleteAllRaw()} disabled={bulkDeleteRawRunning}>
+              {bulkDeleteRawRunning ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Trash2 className="h-4 w-4 mr-1.5" />}
+              Delete All
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* ── Confirm Import All Dialog ── */}
       <Dialog open={confirmImportAllOpen} onOpenChange={setConfirmImportAllOpen}>

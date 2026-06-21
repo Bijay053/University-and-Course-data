@@ -2899,6 +2899,47 @@ async def expire_rejections(
     }
 
 
+@router.post("/staged/bulk-delete")
+async def staged_bulk_delete(body: dict, db: Annotated[AsyncSession, Depends(get_db)]) -> dict:
+    ids = list(body.get("ids", []))
+    if not ids:
+        return {"ok": True, "deleted": 0}
+    await db.execute(
+        text(
+            "DELETE FROM courses WHERE id IN ("
+            "  SELECT course_id FROM scraped_courses WHERE id = ANY(:ids) AND course_id IS NOT NULL"
+            ")"
+        ),
+        {"ids": ids},
+    )
+    result = await db.execute(
+        text("DELETE FROM scraped_courses WHERE id = ANY(:ids) RETURNING id"),
+        {"ids": ids},
+    )
+    count = len(result.fetchall())
+    await db.commit()
+    return {"ok": True, "deleted": count}
+
+
+@router.delete("/staged/all/{university_id}")
+async def staged_delete_all(university_id: int, db: Annotated[AsyncSession, Depends(get_db)]) -> dict:
+    await db.execute(
+        text(
+            "DELETE FROM courses WHERE id IN ("
+            "  SELECT course_id FROM scraped_courses WHERE university_id = :uid AND course_id IS NOT NULL"
+            ")"
+        ),
+        {"uid": university_id},
+    )
+    result = await db.execute(
+        text("DELETE FROM scraped_courses WHERE university_id = :uid RETURNING id"),
+        {"uid": university_id},
+    )
+    count = len(result.fetchall())
+    await db.commit()
+    return {"ok": True, "deleted": count}
+
+
 @router.delete("/staged/{sc_id}")
 async def staged_delete(sc_id: int, db: Annotated[AsyncSession, Depends(get_db)]) -> dict:
     from app.models import ScrapedCourse
