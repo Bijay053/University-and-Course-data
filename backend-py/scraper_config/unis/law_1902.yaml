@@ -40,10 +40,28 @@ discovery:
     allow_url_patterns:
       - '/study/'
 
-  # BFS URL filter — only follow /study/undergraduate/ and /study/postgraduate/ paths
+  # BFS URL filter — restrict to depth-2 listing pages and depth-3 subject pages ONLY.
+  #
+  # IMPORTANT: do NOT allow depth-4 course pages (e.g. /study/postgraduate/law/llm-x/).
+  # When BFS visits an LLM course page it classifies it as a "listing" (55 campus/mode
+  # variant links) and extracts those links with breadcrumb-style anchor text such as
+  # "Postgraduate Courses Master of Laws LLM X".  Those messy names overlap with the
+  # API-discovered URLs, enter _seen_urls, and the category_landing_page_title_block
+  # gate drops them — causing ~28 LLM courses to go missing.
+  #
+  # With depth-3-anchored patterns BFS visits:
+  #   /study/undergraduate/         (depth-2 top-level listing)
+  #   /study/postgraduate/          (depth-2 top-level listing)
+  #   /study/undergraduate/law/     (depth-3 subject listing — finds course links)
+  #   /study/postgraduate/law/      (depth-3 subject listing — finds course links)
+  # but does NOT visit individual course pages (depth-4+), so it never generates
+  # the polluted anchor text.  All 172 API URLs arrive with clean names via either
+  # BFS candidates (anchor text from the clean subject-listing page) or _api_only.
   allow_url_patterns:
-    - '/study/undergraduate/'
-    - '/study/postgraduate/'
+    - '/study/undergraduate/$'        # depth-2: /study/undergraduate/
+    - '/study/postgraduate/$'         # depth-2: /study/postgraduate/
+    - '/study/undergraduate/[^/]+/$'  # depth-3: /study/undergraduate/law/
+    - '/study/postgraduate/[^/]+/$'   # depth-3: /study/postgraduate/law/
 
   block_url_patterns:
     - '/sqe-assessments'
