@@ -118,3 +118,7 @@ extraction:
       - '/sqe-assessments'
       - '/pass-rates'
       - '/information-for'
+  reject_if_missing:
+    - course_name
+  skip_degree_qualifier_check: true
+  require_international_fee: false
