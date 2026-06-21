@@ -1,24 +1,65 @@
 # University of Law
 # Hostname: www.law.ac.uk
 # Country: United Kingdom  |  Currency: GBP
-# Discovery: JSON/REST API course catalogue extraction
-# Notes: Adapted from the provided Scrapy spider. Courses are pulled directly from the /api/coursesearch/find endpoint.
+#
+# Discovery: REST JSON API at https://law.ac.uk/api/coursesearch/find
+#   ?page=1&size=200 returns all 172 courses in a single response.
+#   Root key: "Courses"  — each item has: Url, Name, Award, Level.Name,
+#   Method.Name (On Campus / Online), StudyModes[].Name, Campuses[].Name
+#
+# Previous issues fixed:
+#   1. API was returning only 20 courses — missing size=200 and page param
+#   2. always_sitemap_supplement added 137 sitemap URLs including non-course
+#      pages (/sqe-pass-rates, /information-for-firms etc.)
+#   3. allow_url_patterns in extraction was dropping valid course URLs
 
 discovery:
   seed_urls:
-    - https://law.ac.uk/api/coursesearch/find?page=1&size=200
-  always_sitemap_supplement: true
+    - https://www.law.ac.uk/study/
+
+  # API covers all 172 courses — sitemap adds non-course noise
+  always_sitemap_supplement: false
+
   generic_search_api:
     enabled: true
     method: GET
     url: 'https://law.ac.uk/api/coursesearch/find'
     root_path: 'Courses'
     url_fields: [Url]
-    title_fields: [Name, Award]
+    title_fields: [Name]
     normalize_relative_urls: true
     base_url: 'https://www.law.ac.uk'
-    page_size: 100
-    max_pages: 20
+    # Static params — size=200 means all 172 arrive in page 1 response
+    params:
+      size: '200'
+    # Dynamic page-number pagination (law.ac.uk uses 1-indexed pages)
+    page_size: 200
+    page_number_param: 'page'
+    max_pages: 5   # page 2 will return 0 items and stop immediately
+    # Only keep URLs under /study/ — filters out any stray API results
+    allow_url_patterns:
+      - '/study/'
+
+  # BFS URL filter — only follow /study/undergraduate/ and /study/postgraduate/ paths
+  allow_url_patterns:
+    - '/study/undergraduate/'
+    - '/study/postgraduate/'
+
+  block_url_patterns:
+    - '/sqe-assessments'
+    - '/pass-rates'
+    - '/information-for'
+    - '/apply'
+    - '/help-and-support'
+    - '/events'
+    - '/news'
+    - '/about'
+    - '/contact'
+    - '/careers'
+    - '/blog'
+    - '/legal'
+    - '/privacy'
+    - '/sitemap'
 
 extraction:
   fees:
@@ -31,6 +72,7 @@ extraction:
       - 'UK student'
       - 'UK fee'
       - 'Domestic'
+      - 'home'
 
   english:
     trust_vision_ocr: false
@@ -45,7 +87,16 @@ extraction:
     strip_title_suffixes:
       - ' | University of Law'
       - ' - University of Law'
+      - ' | ULaw'
+      - ' - ULaw'
 
   filters:
-    online_only:
+    domestic_only:
       enabled: false
+    allow_url_patterns:
+      - '/study/undergraduate/'
+      - '/study/postgraduate/'
+    block_url_patterns:
+      - '/sqe-assessments'
+      - '/pass-rates'
+      - '/information-for'
