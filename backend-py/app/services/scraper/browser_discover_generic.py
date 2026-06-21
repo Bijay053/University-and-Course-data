@@ -455,12 +455,27 @@ async def browser_discover_generic(
     _time_budget_s: int = _DEFAULT_TIME_BUDGET_S
     _early_stop_courses: int = _DEFAULT_EARLY_STOP_COURSES
     _extra_block_patterns: list[str] = []
+    # allow_url_patterns / block_url_patterns: compiled once here and applied
+    # at the results.append call site so browser-mode discovery honours the
+    # same YAML filters as static BFS and sitemap supplement.
+    _browser_allow_pats: list[re.Pattern] = []
+    _browser_block_pats: list[re.Pattern] = []
     try:
         from app.services.scraper.config.context import require_uni_config
         _ucfg = require_uni_config()
         _time_budget_s = getattr(_ucfg.discovery, "browser_time_budget_s", _DEFAULT_TIME_BUDGET_S)
         _early_stop_courses = getattr(_ucfg.discovery, "browser_early_stop_courses", _DEFAULT_EARLY_STOP_COURSES)
         _extra_block_patterns = list(getattr(_ucfg.discovery, "block_nav_patterns", []) or [])
+        for _raw in list(getattr(_ucfg.discovery, "allow_url_patterns", []) or []):
+            try:
+                _browser_allow_pats.append(re.compile(_raw, re.IGNORECASE))
+            except re.error:
+                log.warning("browser_discover_generic: invalid allow_url_patterns regex %r — skipped", _raw)
+        for _raw in list(getattr(_ucfg.discovery, "block_url_patterns", []) or []):
+            try:
+                _browser_block_pats.append(re.compile(_raw, re.IGNORECASE))
+            except re.error:
+                log.warning("browser_discover_generic: invalid block_url_patterns regex %r — skipped", _raw)
     except Exception:
         pass  # contextvar not set (e.g. test / standalone call) — use defaults
 
@@ -753,6 +768,18 @@ async def browser_discover_generic(
             seen.add(url)
 
             if _looks_like_course(url, name):
+                # Honour YAML allow_url_patterns / block_url_patterns for
+                # browser-mode discovery (same semantics as static BFS).
+                if _browser_allow_pats and not any(p.search(url) for p in _browser_allow_pats):
+                    log.debug(
+                        "browser_discover_generic: allow_url_patterns rejected %s", url
+                    )
+                    continue
+                if _browser_block_pats and any(p.search(url) for p in _browser_block_pats):
+                    log.debug(
+                        "browser_discover_generic: block_url_patterns rejected %s", url
+                    )
+                    continue
                 results.append({"url": url, "name": name})
             elif _is_nav_url(url) and not _is_known_non_course_url(url):
                 # Score the URL before deciding whether to queue it.

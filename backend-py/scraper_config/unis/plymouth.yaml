@@ -2,15 +2,28 @@
 # Hostname: www.plymouth.ac.uk
 # Country: United Kingdom  |  Currency: GBP
 # Discovery: Restricted BFS discovery to strict course directories
-# Notes: Blocked heavy pollution from /study/cpd, /schools, and /apprenticeships. Disabled online_only filter to prevent valid UK blended courses from being dropped.
+# Notes: Blocked heavy pollution from /study/cpd, /schools, and /apprenticeships.
+#        Disabled online_only filter to prevent valid UK blended courses from being dropped.
+#
+# IMPORTANT — sub-page pollution fix (2026-06-20):
+#   Plymouth course pages have sub-pages for student profiles, industry stories, etc.
+#   URL pattern: /courses/undergraduate/<course-slug>/<sub-page-slug>
+#   These are NOT courses (e.g. /courses/undergraduate/beng-civil-engineering/mark-wray-graduate-profile).
+#   Without anchoring, allow_url_patterns matched both the course level AND its sub-pages,
+#   causing 491 links discovered — mostly graduate profiles — with only 46.6% completeness.
+#   Fix: [^/?]+/?$ anchors the pattern to stop at the course slug level; sub-page
+#   URLs contain an extra / and fail the end-anchor.
 
 discovery:
   always_sitemap_supplement: true
   seed_urls:
     - 'https://www.plymouth.ac.uk/courses'
   allow_url_patterns:
-    - '/courses/undergraduate/'
-    - '/courses/postgraduate/'
+    # Match /courses/undergraduate/<course-slug>/ only — NOT deeper sub-pages.
+    # [^/?]+ = one course-slug segment (no slash or query-string chars).
+    # /?$ = optional trailing slash then end-of-string (or end-of-path component).
+    - '/courses/undergraduate/[^/?]+/?$'
+    - '/courses/postgraduate/[^/?]+/?$'
   block_url_patterns:
     - '/news'
     - '/events'
@@ -21,6 +34,12 @@ discovery:
     - '/study/cpd'
     - '/study/apprenticeships'
     - '/business-partners/'
+    # Belt-and-suspenders: explicitly block known sub-page slug patterns even if
+    # the allow anchor above already stops them.
+    - '-graduate-profile'
+    - '-student-voice-'
+    - 'connecting-with-the-industry'
+    - 'connecting-with-industry'
 
 extraction:
   fees:
