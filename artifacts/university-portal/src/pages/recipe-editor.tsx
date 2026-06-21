@@ -319,6 +319,7 @@ function StringListEditor({
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkText, setBulkText] = useState("");
   const [regexError, setRegexError] = useState<string | null>(null);
+  const [bulkInvalidLines, setBulkInvalidLines] = useState<string[]>([]);
 
   const checkRegex = (v: string): string | null => {
     if (!validateRegex || !v.trim()) return null;
@@ -351,7 +352,15 @@ function StringListEditor({
       .map(s => s.trim())
       .filter(s => s && !values.includes(s));
     const unique = [...new Set(lines)];
-    if (unique.length > 0) onChange([...values, ...unique]);
+    if (validateRegex) {
+      const invalid = unique.filter(s => checkRegex(s) !== null);
+      const valid = unique.filter(s => checkRegex(s) === null);
+      setBulkInvalidLines(invalid);
+      if (valid.length > 0) onChange([...values, ...valid]);
+      if (invalid.length > 0) return;
+    } else {
+      if (unique.length > 0) onChange([...values, ...unique]);
+    }
     setBulkText("");
     setBulkOpen(false);
   };
@@ -398,11 +407,24 @@ function StringListEditor({
             className="text-xs font-mono min-h-[100px] resize-y"
             autoFocus
           />
+          {bulkInvalidLines.length > 0 && (
+            <div className="rounded-md border border-destructive/40 bg-destructive/5 p-2 space-y-1">
+              <p className="flex items-center gap-1 text-xs font-medium text-destructive">
+                <AlertCircle className="h-3 w-3 shrink-0" />
+                {bulkInvalidLines.length} invalid regex pattern{bulkInvalidLines.length > 1 ? "s" : ""} rejected — valid lines were added
+              </p>
+              <ul className="space-y-0.5">
+                {bulkInvalidLines.map((line, i) => (
+                  <li key={i} className="text-xs font-mono text-destructive truncate">{line}</li>
+                ))}
+              </ul>
+            </div>
+          )}
           <div className="flex gap-2">
             <Button type="button" size="sm" onClick={addBulk} disabled={!bulkText.trim()}>
               Add All
             </Button>
-            <Button type="button" size="sm" variant="ghost" onClick={() => { setBulkText(""); setBulkOpen(false); }}>
+            <Button type="button" size="sm" variant="ghost" onClick={() => { setBulkText(""); setBulkOpen(false); setBulkInvalidLines([]); }}>
               Cancel
             </Button>
           </div>
