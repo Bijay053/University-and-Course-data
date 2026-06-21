@@ -1,60 +1,55 @@
-# ─── AUTO-GENERATED YAML for plymouth ───────────────────
-# Source:    acap.yaml
-# Generated: 2026-05-15 04:56 UTC
-# Generator: yaml_cascade.run_cascade_for_university()
-#
-# This file was cloned from the highest-scoring existing per-uni
-# YAML based on CMS-family + region + URL-shape signals. It is a
-# starting stub, NOT a finished tuning. After the next scrape:
-#   1. Compare staged completeness vs the source uni.
-#   2. Refine fee/intake/IELTS extractors per the per-uni-fix
-#      convention documented in replit.md.
-#   3. Delete this header once the file is hand-reviewed.
-#
-# target_university_id=7
-# target_university_name=University of Plymouth
-# target_url=https://www.plymouth.ac.uk
-# target_families=['none-detected']
-# target_region=uk
-# chosen_candidate=acap (score=3.0)
-# ─────────────────────────────────────────────────────────────
+# University of Plymouth
+# Hostname: www.plymouth.ac.uk
+# Country: United Kingdom  |  Currency: GBP
+# Discovery: Restricted BFS discovery to strict course directories
+# Notes: Blocked heavy pollution from /study/cpd, /schools, and /apprenticeships. Disabled online_only filter to prevent valid UK blended courses from being dropped.
 
-# Australian College of Applied Professions (ACAP)
-# Hostname: www.acap.edu.au
-#
-# Bug history / rationale:
-#   - Domestic-only filter: ACAP's course listing includes domestic-only programs
-#     that are not marked as such.  Enabling the filter drops courses whose name
-#     or metadata matches the _DOMESTIC_ONLY_RE patterns (domestic campus codes,
-#     "domestic students only" text, etc.).
-#   - Vision OCR hallucinations: Gemini consistently hallucinates IELTS/PTE scores
-#     from ACAP's decorative counselling images.  trust_vision_ocr: false forces
-#     the extractor to use HTML-only parsing for English requirements.
-#   - Location string noise: ACAP emits '^Available in Perth' prefix cruft in some
-#     location fields.  strip_patterns removes these before location parsing.
-#   - NameError (re module) in single_course.py: FIXED in commit b935cb2 (Phase 4).
-#     Graduate Diploma degree-level correction now uses _re alias correctly.
-#
-# DONE (Phase 3): domestic_only filter wired into staging gate.
-# DONE (Phase 5): trust_vision_ocr: false wired — vision OCR skipped for ACAP.
-# DONE (Phase 6): strip_patterns wired into location.extract() — ACAP footnote cruft removed.
+discovery:
+  always_sitemap_supplement: true
+  seed_urls:
+    - 'https://www.plymouth.ac.uk/courses'
+  allow_url_patterns:
+    - '/courses/undergraduate/'
+    - '/courses/postgraduate/'
+  block_url_patterns:
+    - '/news'
+    - '/events'
+    - '/about'
+    - '/staff'
+    - '/research'
+    - '/schools'
+    - '/study/cpd'
+    - '/study/apprenticeships'
+    - '/business-partners/'
 
 extraction:
+  fees:
+    default_currency: 'GBP'
+    prefer_international: true
+    prefer_annual_over_total: true
+    reject_keywords:
+      - 'Home student'
+      - 'Home fee'
+      - 'UK student'
+      - 'UK fee'
+      - 'Domestic'
+      - 'Part time'
+      - 'Part-time'
+
   english:
     trust_vision_ocr: false
+    default_ielts: 6.0
+    default_pte: 60
+    default_toefl: 80
+
+  intake:
+    start_dates_only: true
+
+  course_name:
+    strip_title_suffixes:
+      - ' | University of Plymouth'
+      - ' - University of Plymouth'
 
   filters:
-    domestic_only:
-      enabled: true
-
-  text_cleaning:
-    location:
-      strip_patterns:
-        # ACAP footnote pattern: "Perth^ ^Available in Perth from Trimester 3, 2026"
-        # The '^' is a CSS superscript footnote marker that the HTML extractor reads
-        # as literal text.  This regex strips from the first "^ ^" sequence to
-        # end-of-string, leaving only the real campus city names before the marker.
-        # Also handles the degenerate case where the entire string IS the footnote
-        # (e.g. "^ ^Available in Perth" with no leading city name → empty → null).
-        - '\^\s*\^.*$'
-        - '\(\s*domestic\s+only\s*\)'   # inline '(domestic only)' markers
+    online_only:
+      enabled: false
