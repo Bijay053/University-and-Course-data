@@ -1,0 +1,60 @@
+# Swansea University
+# Hostname: www.swansea.ac.uk
+# Country: United Kingdom  |  Currency: GBP
+# Discovery: Seeded search lists strictly routed to course subdirectories
+# Notes: Standard UK pattern applied. Online-only filter disabled to protect blended courses; standard UK fee blocklist applied to reject "Home" pricing.
+
+discovery:
+  always_sitemap_supplement: true
+  seed_urls:
+    - 'https://www.swansea.ac.uk/search/?c=www-en-meta&f%5Bpage+type%5D=undergraduate+course&q='
+    - 'https://www.swansea.ac.uk/search/?c=www-en-meta&f%5Bpage+type%5D=postgraduate+taught+course&q='
+  
+  allow_url_patterns:
+    - '/undergraduate/courses/'
+    - '/postgraduate/taught/'
+
+  block_url_patterns:
+    - '/news'
+    - '/events'
+    - '/about'
+    - '/staff'
+    - '/research'
+    - '/alumni'
+    - '/international-students/'  # General landing pages
+    - '\.pdf$'
+
+extraction:
+  fees:
+    default_currency: 'GBP'
+    prefer_international: true
+    prefer_annual_over_total: true
+    reject_keywords:
+      - 'Home student'
+      - 'Home fee'
+      - 'UK student'
+      - 'UK fee'
+      - 'Domestic'
+      - 'Part time'
+      - 'Part-time'
+
+  english:
+    trust_vision_ocr: false
+    default_ielts: 6.0
+    default_pte: 60
+    default_toefl: 80
+
+  intake:
+    start_dates_only: true
+
+  course_name:
+    strip_title_suffixes:
+      - ' | Swansea University'
+      - ' - Swansea University'
+
+  filters:
+    online_only:
+      enabled: false
+  staging:
+    skip_degree_qualifier_check: true
+    require_international_fee: false
