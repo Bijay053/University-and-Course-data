@@ -1,19 +1,64 @@
-# Royal Holloway University London International College
+# Royal Holloway University London International College (RHULISC)
 # Hostname: www.rhulisc.com
-# Country: United States  |  Currency: USD
+# Country: United Kingdom  |  Currency: GBP
 # Slug: rhulisc
-# Auto-generated: 2026-06-22
 #
-# This stub was created automatically on the first scrape of this university.
-# Review and expand it to improve discovery and extraction quality.
-# See scraper_config/defaults.yaml for all available options.
+# Site behaviour: Cloudflare-protected — every direct HTTP request returns a
+# 403/challenge page.  skip_initial_http_fetch skips the wasted HTTP round-trip
+# and goes straight to the Playwright browser.  retry_on_cloudflare gives the
+# first browser pass time to set the cf_clearance cookie so the second attempt
+# (real extraction) passes through.
+#
+# Programme structure: /programmes/<type>/<stream>
+#   international-foundation-year  →  Foundation
+#   international-year-one         →  Bachelor  (Year 1 direct-entry)
+#   pre-masters                    →  Pre-Masters
+#
+# /programmes/pre-courses/ contains short non-degree prep programmes
+# (English Language Preparation, Prepare for Success, AI Digital Literacy)
+# and is excluded via block_url_patterns.
 
-discovery: {}
+discovery:
+  allow_url_patterns:
+    - '/programmes/'
+
+  block_url_patterns:
+    - '/programmes/pre-courses'   # Short non-degree prep programmes — exclude
 
 extraction:
+  # ── Cloudflare bypass ──────────────────────────────────────────────────────
+  skip_initial_http_fetch: true   # HTTP always blocked — go straight to browser
+  retry_on_cloudflare: true       # Retry browser once after cf_clearance is set
+
+  # ── Fees ───────────────────────────────────────────────────────────────────
   fees:
-    default_currency: USD
+    default_currency: GBP         # UK-based college (was incorrectly USD in stub)
+
+  # ── English defaults ───────────────────────────────────────────────────────
+  english:
+    default_ielts: 5.5
+    default_pte: 52
+    default_toefl: 72
+
+  # ── Staging ────────────────────────────────────────────────────────────────
   staging:
-    skip_degree_qualifier_check: true
+    skip_degree_qualifier_check: true   # Stream names have no BSc/MSc qualifier
     require_international_fee: false
-    dedup_use_full_url: true     
+    dedup_use_full_url: true            # Foundation/IY1/Pre-Masters streams share slugs
+
+  # ── degree_level from URL path ─────────────────────────────────────────────
+  # Course names ("Business Management", "Sciences") carry no degree qualifier.
+  # Assign degree_level from the URL path segment so:
+  #   (a) missing_degree_level warnings are resolved
+  #   (b) same-subject streams at different levels get distinct dedup keys
+  text_cleaning:
+    field_overrides:
+      - url_regex: '/programmes/international-foundation-year/'
+        field: 'degree_level'
+        value: 'Foundation'
+      - url_regex: '/programmes/international-year-one/'
+        field: 'degree_level'
+        value: 'Bachelor'
+      - url_regex: '/programmes/pre-masters/'
+        field: 'degree_level'
+        value: 'Pre-Masters'
