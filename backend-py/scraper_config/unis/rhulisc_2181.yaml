@@ -12,7 +12,7 @@ discovery: {}
 
 extraction:
   fees:
-    default_currency: 
+    default_currency: GBP
   filters:
     online_only:
      enabled: false
