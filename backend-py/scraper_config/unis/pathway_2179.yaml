@@ -1,18 +1,52 @@
 # Brunel University London Pathway College (BPC)
 # Hostname: pathway.brunel.ac.uk
 # Country: United Kingdom  |  Currency: GBP
-# Discovery: Seeded BFS strictly whitelisting stream sub-paths
-# Notes: Navitas Pathway college. Stream pages lack BSc/MSc qualifiers in H1. Overrode staging gate check. 
+# Discovery: Seeded BFS whitelisting /study/undergraduate/ and /study/postgraduate/ paths
+# Notes: Navitas Pathway college. Stream pages lack BSc/MSc qualifiers in H1.
+#
+# Known issues fixed here:
+#   1. Seed URLs /study/undergraduate/ and /study/postgraduate/ were globally blocked
+#      because they matched the shared is_blocked_page() patterns.  The previous
+#      allow_url_patterns used [a-z0-9-]+/?$ which requires a slug AFTER the level
+#      segment — so the seeds themselves weren't covered and BFS yielded 0 candidates.
+#      Fix: use simple substring patterns '/study/undergraduate/' and '/study/postgraduate/'
+#      which match both the seed listing pages AND the individual stream pages.
+#
+#   2. Course names ("Business Management", "Engineering and Design") have no degree
+#      qualifier (BSc/MSc/etc.) so degree_level was NULL for all staged courses.
+#      This caused two side-effects:
+#        a) missing_degree_level DATA QUALITY warning × 8
+#        b) UG and PG streams with the same subject name (e.g. "Business Management")
+#           had the same dedup key (course_name + NULL) → one was suppressed.
+#      Fix: text_cleaning.field_overrides assigns degree_level from the URL path:
+#        /study/undergraduate/  →  degree_level = "Foundation"
+#        /study/postgraduate/   →  degree_level = "Pre-Masters"
+#      This also unblocks the dedup: Foundation-Business-Management ≠ Pre-Masters-Business-Management.
 
 discovery:
   always_sitemap_supplement: true
   seed_urls:
     - 'https://pathway.brunel.ac.uk/study/undergraduate/'
     - 'https://pathway.brunel.ac.uk/study/postgraduate/'
-  
+
+  # Simple substring patterns — must match BOTH the seed listing pages (which are
+  # globally blocked) AND the individual stream course pages under them.
+  # The previous [a-z0-9-]+/?$ pattern required a slug after the level segment so
+  # the seed URLs themselves were never allowed → BFS yielded 0 candidates.
   allow_url_patterns:
-    - '/study/undergraduate/[a-z0-9-]+/?$'
-    - '/study/postgraduate/[a-z0-9-]+/?$'
+    - '/study/undergraduate/'
+    - '/study/postgraduate/'
+
+  block_url_patterns:
+    - '/admission/'
+    - '/about/'
+    - '/student-life/'
+    - '/news/'
+    - '/events/'
+    - '/contact/'
+    - '/legal/'
+    - '/privacy/'
+    - '/sitemap'
 
 extraction:
   fees:
@@ -27,5 +61,17 @@ extraction:
     default_toefl: 70
 
   staging:
-    skip_degree_qualifier_check: true   # Forces staging to accept stream names like "Business Management"
-    require_international_fee: false    # Allows central fee cache to attach post-staging
+    skip_degree_qualifier_check: true   # Accept stream names like "Business Management" without BSc/MSc
+    require_international_fee: false    # Central fee cache attaches post-staging
+
+  text_cleaning:
+    field_overrides:
+      # Assign degree_level from the URL path so:
+      #   (a) missing_degree_level warnings are resolved
+      #   (b) UG and PG streams with the same subject name get different dedup keys
+      - url_regex: '/study/undergraduate/'
+        field: 'degree_level'
+        value: 'Foundation'
+      - url_regex: '/study/postgraduate/'
+        field: 'degree_level'
+        value: 'Pre-Masters'
