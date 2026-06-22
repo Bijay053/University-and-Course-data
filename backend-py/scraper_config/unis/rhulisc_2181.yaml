@@ -77,6 +77,14 @@ extraction:
   study_mode:
     online_only_requires_strong_evidence: true
 
+  # ── Filters ────────────────────────────────────────────────────────────────
+  # rhulisc.com pages don't publish campus location in static HTML, so
+  # study_mode:no_location_online_override fires and marks every course as
+  # Online.  The guard must be disabled here — courses are on-campus at Egham.
+  filters:
+    online_only:
+      enabled: false
+
   # ── Staging ────────────────────────────────────────────────────────────────
   staging:
     skip_degree_qualifier_check: true   # Stream names have no BSc/MSc qualifier
