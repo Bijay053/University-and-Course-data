@@ -49,6 +49,9 @@ extraction:
   # ── Cloudflare bypass ──────────────────────────────────────────────────────
   skip_initial_http_fetch: true    # HTTP always blocked — go straight to browser
   retry_on_cloudflare: true        # Retry browser once after cf_clearance is set
+  max_parallel_fetch: 2            # Reduce from 4→2: 4 simultaneous scrape.do sessions
+                                   # trigger aggressive rate-limiting (pages 1-8 fail,
+                                   # pages 9-17 succeed = burst quota exceeded pattern)
 
   # ── Location default ───────────────────────────────────────────────────────
   # Without a location, study_mode:no_location_online_override fires and sets
@@ -65,6 +68,14 @@ extraction:
     default_ielts: 5.5
     default_pte: 52
     default_toefl: 72
+
+  # ── Study mode ─────────────────────────────────────────────────────────────
+  # The weak 'no_location_online_override' heuristic fires when location_text=None
+  # and incorrectly marks on-campus courses as Online → rejected:online_only.
+  # With strong_evidence=true, only explicit "fully online"/"100% online"/
+  # "distance learning" phrases can set study_mode='Online'.
+  study_mode:
+    online_only_requires_strong_evidence: true
 
   # ── Staging ────────────────────────────────────────────────────────────────
   staging:
