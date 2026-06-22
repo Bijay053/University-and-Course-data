@@ -1,0 +1,31 @@
+# Brunel University London Pathway College (BPC)
+# Hostname: pathway.brunel.ac.uk
+# Country: United Kingdom  |  Currency: GBP
+# Discovery: Seeded BFS strictly whitelisting stream sub-paths
+# Notes: Navitas Pathway college. Stream pages lack BSc/MSc qualifiers in H1. Overrode staging gate check. 
+
+discovery:
+  always_sitemap_supplement: true
+  seed_urls:
+    - 'https://pathway.brunel.ac.uk/study/undergraduate/'
+    - 'https://pathway.brunel.ac.uk/study/postgraduate/'
+  
+  allow_url_patterns:
+    - '/study/undergraduate/[a-z0-9-]+/?$'
+    - '/study/postgraduate/[a-z0-9-]+/?$'
+
+extraction:
+  fees:
+    default_currency: 'GBP'
+    prefer_international: true
+    central_page: 'https://pathway.brunel.ac.uk/admission/fees/international/'
+
+  english:
+    trust_vision_ocr: false
+    default_ielts: 5.5
+    default_pte: 50
+    default_toefl: 70
+
+  staging:
+    skip_degree_qualifier_check: true   # Forces staging to accept stream names like "Business Management"
+    require_international_fee: false    # Allows central fee cache to attach post-staging
