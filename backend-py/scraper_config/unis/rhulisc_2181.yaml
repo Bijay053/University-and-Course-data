@@ -1,0 +1,19 @@
+# Royal Holloway University London International College
+# Hostname: www.rhulisc.com
+# Country: United States  |  Currency: USD
+# Slug: rhulisc
+# Auto-generated: 2026-06-22
+#
+# This stub was created automatically on the first scrape of this university.
+# Review and expand it to improve discovery and extraction quality.
+# See scraper_config/defaults.yaml for all available options.
+
+discovery: {}
+
+extraction:
+  fees:
+    default_currency: USD
+  staging:
+    skip_degree_qualifier_check: true
+    require_international_fee: false
+    dedup_use_full_url: true     
