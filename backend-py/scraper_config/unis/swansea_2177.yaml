@@ -10,9 +10,7 @@ discovery:
     - 'https://www.swansea.ac.uk/search/?c=www-en-meta&f%5Bpage+type%5D=undergraduate+course&q='
     - 'https://www.swansea.ac.uk/search/?c=www-en-meta&f%5Bpage+type%5D=postgraduate+taught+course&q='
   
-  allow_url_patterns:
-    - '/undergraduate/courses/'
-    - '/postgraduate/taught/'
+
 
   block_url_patterns:
     - '/news'
