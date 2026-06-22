@@ -12,7 +12,10 @@ discovery: {}
 
 extraction:
   fees:
-    default_currency: USD
+    default_currency: GBP
+  filters:
+    online_only:
+     enabled: false
   staging:
     skip_degree_qualifier_check: true   
     require_international_fee: false   
