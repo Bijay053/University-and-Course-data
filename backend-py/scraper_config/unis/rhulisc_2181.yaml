@@ -1,119 +1,22 @@
-# Royal Holloway University London International College (RHULISC)
+# Royal Holloway University London International College
 # Hostname: www.rhulisc.com
-# Country: United Kingdom  |  Currency: GBP
+# Country: United States  |  Currency: USD
 # Slug: rhulisc
+# Auto-generated: 2026-06-22
 #
-# ── Site behaviour ────────────────────────────────────────────────────────────
-# Cloudflare-protected — homepage HTTP is blocked for BFS; per-course HTTP is
-# also blocked.  Two mitigations:
-#   1. seed_urls bypasses the homepage so BFS starts directly from /programmes
-#      (which is less aggressively guarded than the marketing homepage).
-#   2. skip_initial_http_fetch + retry_on_cloudflare handle per-course pages.
-#
-# ── URL structure (current) ───────────────────────────────────────────────────
-# /programmes/ug/pathway/international-foundation-year/<stream>  → Foundation
-# /programmes/ug/pathway/international-year-one/<stream>         → Bachelor
-# /programmes/pg/pathway/pre-masters/<stream>                    → Pre-Masters
-# /programmes/online/pg/accelerated-pre-masters/<stream>         → online, excluded
-#
-# Legacy (old URL structure the site previously used; may still redirect):
-# /programmes/international-foundation-year/<stream>             → Foundation
-# /programmes/international-year-one/<stream>                    → Bachelor
-# /programmes/pre-masters/<stream>                               → Pre-Masters
-#
-# ── Junk pages blocked ────────────────────────────────────────────────────────
-# /programmes/online/            — online accelerated programme (different product)
-# /programmes/*/fees/            — fee-info admin pages, not course pages
-# /programmes/pre-courses/       — non-degree short prep programmes
-# /zh/                           — Chinese-language duplicate pages
+# This stub was created automatically on the first scrape of this university.
+# Review and expand it to improve discovery and extraction quality.
+# See scraper_config/defaults.yaml for all available options.
 
-discovery:
-  seed_urls:
-    - 'https://www.rhulisc.com/programmes'   # Bypass CF-blocked homepage
-
-  always_sitemap_supplement: true            # Sitemap runs alongside BFS, not only on fallback
-
-  allow_url_patterns:
-    - '/programmes/'
-
-  block_url_patterns:
-    - '/programmes/online'          # Online accelerated courses — separate product
-    - '/programmes/pre-courses'     # Non-degree prep programmes
-    - '/programmes/.*/fees'         # Fee info pages (e.g. /ug/fees/how-to-pay)
-    - '/fees/'                      # Any standalone fee pages
-    - '/zh/'                        # Chinese-language duplicates
-    - '/subjects$'                  # Subject-listing hub (/pg/subjects)
-    - '/how-to-pay'                 # Specific admin page seen in Wayback
+discovery: {}
 
 extraction:
-  # ── Cloudflare bypass ──────────────────────────────────────────────────────
-  skip_initial_http_fetch: true    # HTTP always blocked — go straight to browser
-  retry_on_cloudflare: true        # Retry browser once after cf_clearance is set
-  max_parallel_fetch: 2            # Reduce from 4→2: 4 simultaneous scrape.do sessions
-                                   # trigger aggressive rate-limiting (pages 1-8 fail,
-                                   # pages 9-17 succeed = burst quota exceeded pattern)
-
-  # ── Location default ───────────────────────────────────────────────────────
-  # Without a location, study_mode:no_location_online_override fires and sets
-  # study_mode='Online', which causes staging to reject the course as online_only.
-  # The campus is in Egham, Surrey — use this as the fallback.
-  default_course_location: 'Egham'
-
-  # ── Fees ───────────────────────────────────────────────────────────────────
   fees:
-    default_currency: GBP
-
-  # ── English defaults ───────────────────────────────────────────────────────
-  english:
-    default_ielts: 5.5
-    default_pte: 52
-    default_toefl: 72
-
-  # ── Study mode ─────────────────────────────────────────────────────────────
-  # The weak 'no_location_online_override' heuristic fires when location_text=None
-  # and incorrectly marks on-campus courses as Online → rejected:online_only.
-  # With strong_evidence=true, only explicit "fully online"/"100% online"/
-  # "distance learning" phrases can set study_mode='Online'.
-  study_mode:
-    online_only_requires_strong_evidence: true
-
-  # ── Filters ────────────────────────────────────────────────────────────────
-  # rhulisc.com pages don't publish campus location in static HTML, so
-  # study_mode:no_location_online_override fires and marks every course as
-  # Online.  The guard must be disabled here — courses are on-campus at Egham.
+    default_currency: 
   filters:
     online_only:
-      enabled: false
-
-  # ── Staging ────────────────────────────────────────────────────────────────
+     enabled: false
   staging:
-    skip_degree_qualifier_check: true   # Stream names have no BSc/MSc qualifier
+    skip_degree_qualifier_check: true
     require_international_fee: false
-    dedup_use_full_url: true            # Streams share slugs across levels
-
-  # ── degree_level from URL path ─────────────────────────────────────────────
-  # Course names ("Business Management", "Sciences") carry no degree qualifier.
-  # Cover both the current /ug|pg/pathway/ structure and the old /programmes/<type>/
-  # structure (which may still appear via redirected BFS discovery).
-  text_cleaning:
-    field_overrides:
-      # Current URL structure
-      - url_regex: '/programmes/ug/pathway/international-foundation-year/'
-        field: 'degree_level'
-        value: 'Foundation'
-      - url_regex: '/programmes/ug/pathway/international-year-one/'
-        field: 'degree_level'
-        value: 'Bachelor'
-      - url_regex: '/programmes/pg/pathway/pre-masters/'
-        field: 'degree_level'
-        value: 'Pre-Masters'
-      # Legacy URL structure (old paths that may still resolve via redirect)
-      - url_regex: '/programmes/international-foundation-year/'
-        field: 'degree_level'
-        value: 'Foundation'
-      - url_regex: '/programmes/international-year-one/'
-        field: 'degree_level'
-        value: 'Bachelor'
-      - url_regex: '/programmes/pre-masters/'
-        field: 'degree_level'
-        value: 'Pre-Masters'
+    dedup_use_full_url: true     
