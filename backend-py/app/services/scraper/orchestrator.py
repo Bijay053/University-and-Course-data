@@ -3167,7 +3167,17 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # Hard ceiling: 16 slots (beyond that we risk OOM on the Celery worker).
         _MAX_PER_UNI_PARALLEL = 16
         try:
-            _uc_max = getattr(get_uni_config().extraction, "max_parallel_fetch", None)
+            # Use _uni_cfg directly (already loaded local variable) rather than
+            # get_uni_config() contextvar, which can silently return None when
+            # asyncio context propagation drops the ContextVar between the
+            # set_uni_config() call and here, causing the except to fire and
+            # silently fall back to the global default concurrency of 4.
+            _cfg_for_parallel = _uni_cfg if "_uni_cfg" in dir() else get_uni_config()
+            _uc_max = getattr(
+                _cfg_for_parallel.extraction if _cfg_for_parallel is not None else None,
+                "max_parallel_fetch",
+                None,
+            )
             _effective_parallel = (
                 min(_uc_max, _MAX_PER_UNI_PARALLEL) if _uc_max else _MAX_PARALLEL_FETCH
             )
