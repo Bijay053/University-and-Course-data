@@ -2288,6 +2288,20 @@ class StagingConfig(BaseModel):
             "(e.g. PGCE courses with a fee) are kept."
         ),
     )
+    dedup_use_full_url: bool = Field(
+        default=False,
+        description=(
+            "When True, the within-batch name dedup checks the FULL URL path rather "
+            "than just the last path segment (slug) to determine whether same-named "
+            "courses are duplicates.  Two courses with different full URLs are always "
+            "kept as distinct entries — no score-based dedup is applied between them. "
+            "Use for pathway/foundation colleges (e.g. Brunel Pathway College) where "
+            "the same subject name appears under both /study/undergraduate/ and "
+            "/study/postgraduate/ as genuinely different programmes.  Without this "
+            "flag the last-slug comparison sees 'business-management' == "
+            "'business-management' and incorrectly suppresses one of the pair."
+        ),
+    )
 
 
 # ── Top-level ExtractionConfig ───────────────────────────────────────────────

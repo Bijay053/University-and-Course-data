@@ -3573,6 +3573,26 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                         return ""
                     return p.rsplit("/", 1)[-1].lower()
 
+                def _full_url_path(url: str) -> str:
+                    """Return the normalised full URL path (no trailing slash, lower)."""
+                    try:
+                        return urlparse(url or "").path.rstrip("/").lower()
+                    except Exception:
+                        return (url or "").lower()
+
+                # Read per-uni dedup mode from YAML staging config.
+                # dedup_use_full_url=True → treat any two courses with different
+                # full URL paths as distinct (never score-dedup them), regardless
+                # of whether their last path segment is identical.
+                _dedup_full_url: bool = False
+                try:
+                    if _uni_cfg and _uni_cfg.extraction and _uni_cfg.extraction.staging:
+                        _dedup_full_url = bool(
+                            getattr(_uni_cfg.extraction.staging, "dedup_use_full_url", False)
+                        )
+                except Exception:
+                    pass
+
                 def _strip_common_prefix_tokens(slugs: list[str]) -> list[str]:
                     """Strip dash-separated tokens shared by every slug.
 
@@ -3623,6 +3643,20 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 for _key, _bucket in _groups.items():
                     if len(_bucket) <= 1:
                         continue
+
+                    # When dedup_use_full_url=True, compare full URL paths instead
+                    # of just the last slug segment.  This correctly distinguishes
+                    # /study/undergraduate/business-management/ from
+                    # /study/postgraduate/business-management/ — both have the same
+                    # last slug but are genuinely different courses.
+                    if _dedup_full_url:
+                        _url_paths = [_full_url_path(_r.get("url") or "") for _r in _bucket]
+                        if len(_url_paths) >= 2 and all(_url_paths) and len(set(_url_paths)) == len(_url_paths):
+                            # Every course in this group has a distinct full URL path
+                            # → they are distinct programmes; keep all without renaming.
+                            continue
+                        # Duplicate full URLs (exact same URL scraped twice) → fall
+                        # through to score-based dedup below.
 
                     _slugs = [_slug_of(_r.get("url") or "") for _r in _bucket]
                     # Gate is strict: EVERY member must have a non-empty slug AND

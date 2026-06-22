@@ -63,6 +63,7 @@ extraction:
   staging:
     skip_degree_qualifier_check: true   # Accept stream names like "Business Management" without BSc/MSc
     require_international_fee: false    # Central fee cache attaches post-staging
+    dedup_use_full_url: true            # UG and PG streams share slugs — deduplicate by full URL, not by name
 
   text_cleaning:
     field_overrides:
