@@ -3,36 +3,62 @@
 # Country: United Kingdom  |  Currency: GBP
 # Slug: rhulisc
 #
-# Site behaviour: Cloudflare-protected — every direct HTTP request returns a
-# 403/challenge page.  skip_initial_http_fetch skips the wasted HTTP round-trip
-# and goes straight to the Playwright browser.  retry_on_cloudflare gives the
-# first browser pass time to set the cf_clearance cookie so the second attempt
-# (real extraction) passes through.
+# ── Site behaviour ────────────────────────────────────────────────────────────
+# Cloudflare-protected — homepage HTTP is blocked for BFS; per-course HTTP is
+# also blocked.  Two mitigations:
+#   1. seed_urls bypasses the homepage so BFS starts directly from /programmes
+#      (which is less aggressively guarded than the marketing homepage).
+#   2. skip_initial_http_fetch + retry_on_cloudflare handle per-course pages.
 #
-# Programme structure: /programmes/<type>/<stream>
-#   international-foundation-year  →  Foundation
-#   international-year-one         →  Bachelor  (Year 1 direct-entry)
-#   pre-masters                    →  Pre-Masters
+# ── URL structure (current) ───────────────────────────────────────────────────
+# /programmes/ug/pathway/international-foundation-year/<stream>  → Foundation
+# /programmes/ug/pathway/international-year-one/<stream>         → Bachelor
+# /programmes/pg/pathway/pre-masters/<stream>                    → Pre-Masters
+# /programmes/online/pg/accelerated-pre-masters/<stream>         → online, excluded
 #
-# /programmes/pre-courses/ contains short non-degree prep programmes
-# (English Language Preparation, Prepare for Success, AI Digital Literacy)
-# and is excluded via block_url_patterns.
+# Legacy (old URL structure the site previously used; may still redirect):
+# /programmes/international-foundation-year/<stream>             → Foundation
+# /programmes/international-year-one/<stream>                    → Bachelor
+# /programmes/pre-masters/<stream>                               → Pre-Masters
+#
+# ── Junk pages blocked ────────────────────────────────────────────────────────
+# /programmes/online/            — online accelerated programme (different product)
+# /programmes/*/fees/            — fee-info admin pages, not course pages
+# /programmes/pre-courses/       — non-degree short prep programmes
+# /zh/                           — Chinese-language duplicate pages
 
 discovery:
+  seed_urls:
+    - 'https://www.rhulisc.com/programmes'   # Bypass CF-blocked homepage
+
+  always_sitemap_supplement: true            # Sitemap runs alongside BFS, not only on fallback
+
   allow_url_patterns:
     - '/programmes/'
 
   block_url_patterns:
-    - '/programmes/pre-courses'   # Short non-degree prep programmes — exclude
+    - '/programmes/online'          # Online accelerated courses — separate product
+    - '/programmes/pre-courses'     # Non-degree prep programmes
+    - '/programmes/.*/fees'         # Fee info pages (e.g. /ug/fees/how-to-pay)
+    - '/fees/'                      # Any standalone fee pages
+    - '/zh/'                        # Chinese-language duplicates
+    - '/subjects$'                  # Subject-listing hub (/pg/subjects)
+    - '/how-to-pay'                 # Specific admin page seen in Wayback
 
 extraction:
   # ── Cloudflare bypass ──────────────────────────────────────────────────────
-  skip_initial_http_fetch: true   # HTTP always blocked — go straight to browser
-  retry_on_cloudflare: true       # Retry browser once after cf_clearance is set
+  skip_initial_http_fetch: true    # HTTP always blocked — go straight to browser
+  retry_on_cloudflare: true        # Retry browser once after cf_clearance is set
+
+  # ── Location default ───────────────────────────────────────────────────────
+  # Without a location, study_mode:no_location_online_override fires and sets
+  # study_mode='Online', which causes staging to reject the course as online_only.
+  # The campus is in Egham, Surrey — use this as the fallback.
+  default_course_location: 'Egham'
 
   # ── Fees ───────────────────────────────────────────────────────────────────
   fees:
-    default_currency: GBP         # UK-based college (was incorrectly USD in stub)
+    default_currency: GBP
 
   # ── English defaults ───────────────────────────────────────────────────────
   english:
@@ -44,15 +70,25 @@ extraction:
   staging:
     skip_degree_qualifier_check: true   # Stream names have no BSc/MSc qualifier
     require_international_fee: false
-    dedup_use_full_url: true            # Foundation/IY1/Pre-Masters streams share slugs
+    dedup_use_full_url: true            # Streams share slugs across levels
 
   # ── degree_level from URL path ─────────────────────────────────────────────
   # Course names ("Business Management", "Sciences") carry no degree qualifier.
-  # Assign degree_level from the URL path segment so:
-  #   (a) missing_degree_level warnings are resolved
-  #   (b) same-subject streams at different levels get distinct dedup keys
+  # Cover both the current /ug|pg/pathway/ structure and the old /programmes/<type>/
+  # structure (which may still appear via redirected BFS discovery).
   text_cleaning:
     field_overrides:
+      # Current URL structure
+      - url_regex: '/programmes/ug/pathway/international-foundation-year/'
+        field: 'degree_level'
+        value: 'Foundation'
+      - url_regex: '/programmes/ug/pathway/international-year-one/'
+        field: 'degree_level'
+        value: 'Bachelor'
+      - url_regex: '/programmes/pg/pathway/pre-masters/'
+        field: 'degree_level'
+        value: 'Pre-Masters'
+      # Legacy URL structure (old paths that may still resolve via redirect)
       - url_regex: '/programmes/international-foundation-year/'
         field: 'degree_level'
         value: 'Foundation'
