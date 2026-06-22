@@ -14,6 +14,6 @@ extraction:
   fees:
     default_currency: USD
   staging:
-    skip_degree_qualifier_check: true   # Accept stream names like "Business Management" without BSc/MSc
-    require_international_fee: false    # Central fee cache attaches post-staging
+    skip_degree_qualifier_check: true   
+    require_international_fee: false   
     dedup_use_full_url: true    
