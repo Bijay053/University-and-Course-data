@@ -17,16 +17,29 @@
 #   - English section detected but IELTS scores blank: suspected JS-rendered
 #     tab for entry requirements.  Browser retry is enabled (skip_per_course_browser
 #     NOT set) so the per_course_browser module will render when text_len=0.
+#     default_ielts: 6.0 provides a fallback for courses where neither browser
+#     nor regex can extract the score.
 #   - Non-course pages ("Study here", "Study At Teesside") found via broad
 #     discovery: constrained by allow_url_patterns below.
 #   - Location extracts marketing copy: fixed in _MARKETING_HINTS expansion.
+#   - Degree Apprenticeship courses have no international fee and get rejected
+#     at staging (employer-funded, domestic-only programmes).  Blocked at
+#     discovery to avoid wasting browser/AI budget.
+#   - AI fallback was setting fee_currency=AUD for GBP fees; fixed globally
+#     in single_course.py (CURRENCY-FIX block) — default_currency: GBP here
+#     triggers the override.
 
 discovery:
   allow_url_patterns:
     - '/undergraduate_courses/'
     - '/postgraduate_courses/'
+  block_url_patterns:
+    - '_degree_apprenticeship'
+    - '_degree_apprentice'
 
 extraction:
   strip_non_admission_content: false
   fees:
     default_currency: GBP
+  english:
+    default_ielts: 6.0

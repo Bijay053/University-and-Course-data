@@ -4922,6 +4922,36 @@ async def extract_course(
         # so AI-filled units don't silently drop on the floor. See B20.
         _apply_ai_duration_mapping(payload, ai_filled)
 
+        # ── Restore YAML default_currency after AI fallback ───────────────
+        # AI fallback (fill_missing) may fill fee_currency='AUD' for
+        # non-AUD universities (GBP, NZD, etc.) because AUD is the model's
+        # training-data default for "international tuition fee".
+        # data_quality.py reads payload["fee_currency"] first when deciding
+        # whether a fee is a domestic/CSP amount, so an AI-set 'AUD' on a
+        # GBP university produces false-positive possible_domestic_fee and
+        # annual_fee_too_low_warning alerts.
+        # Guard: only override when YAML has an EXPLICIT non-AUD currency
+        # (i.e. the operator intentionally configured it) AND the payload
+        # currently holds 'AUD' (from AI) or nothing.
+        try:
+            _af_fees_cfg = getattr(
+                getattr(get_uni_config(), "extraction", None), "fees", None
+            )
+            _af_yaml_cur: str = (
+                getattr(_af_fees_cfg, "default_currency", "AUD") or "AUD"
+            )
+            if _af_yaml_cur != "AUD":
+                _ai_set_cur = payload.get("fee_currency") or "AUD"
+                if _ai_set_cur == "AUD":
+                    payload["fee_currency"] = _af_yaml_cur
+                    log.debug(
+                        "[CURRENCY-FIX] %s: fee_currency AUD → %s "
+                        "(YAML default_currency override after AI fallback)",
+                        url, _af_yaml_cur,
+                    )
+        except Exception:  # noqa: BLE001
+            pass  # never break extraction on config-access error
+
         # ── Post-ai_fallback study_mode correction (2026-05-31) ──────────
         # The first _rule_only_online / _low_conf_online correction earlier
         # in this function runs BEFORE ai_fallback fills course_location, so
