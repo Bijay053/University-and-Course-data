@@ -71,6 +71,27 @@ _RE_LEVEL_CATEGORY = re.compile(
     r"offerings?|options?)$",
     re.IGNORECASE,
 )
+# Navigation / promotional page titles — these are site navigation or
+# marketing pages, not individual course detail pages.  Catches Teesside's
+# "Study here" / "Study At Teesside", generic "Find a Course" listings,
+# "Why Study With Us" promotional pages, etc.
+_RE_NAV_PAGE_TITLE = re.compile(
+    r"^(?:"
+    # "Study here", "Study online", "Study abroad"
+    r"study\s+(?:here|online|abroad)"
+    # "Study At Teesside", "Study In London", "Study With Us" — any trailing words
+    r"|study\s+(?:at|in|with)\b.*"
+    r"|why\s+study(?:\s+with\s+us)?"
+    r"|find\s+a\s+course"
+    r"|browse\s+(?:our\s+)?courses?"
+    r"|all\s+(?:our\s+)?courses?"
+    r"|our\s+courses?"
+    r"|explore\s+(?:our\s+)?courses?"
+    r"|courses?\s+(?:listing|search|overview|finder)"
+    r"|(?:undergraduate|postgraduate)\s+courses?"
+    r")$",
+    re.IGNORECASE,
+)
 _RE_FEE_HELP_NEG = re.compile(
     r"\bfee-help\b|\bhelp loan\b|\bvet student loan\b|\bloan limit\b"
 )
@@ -169,6 +190,13 @@ def is_generic_course_category_name(name: str) -> bool:
     # and slip through the should_stage_course name check — this guard catches them
     # before they reach the staging decision.
     if _RE_LEVEL_CATEGORY.match(raw):
+        return True
+    # Catch navigation / promotional page titles: "Study here", "Study At Teesside",
+    # "Why Study With Us", "Find a Course", "Browse Courses", etc.
+    # These are site navigation or marketing pages found by the discovery crawler
+    # when URL patterns are too broad — they reach extraction before the degree-
+    # qualifier check can catch them.
+    if _RE_NAV_PAGE_TITLE.match(raw.strip()):
         return True
     return False
 

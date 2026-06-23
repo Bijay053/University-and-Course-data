@@ -4,12 +4,29 @@
 # Slug: tees
 # Auto-generated: 2026-06-23
 #
-# This stub was created automatically on the first scrape of this university.
-# Review and expand it to improve discovery and extraction quality.
-# See scraper_config/defaults.yaml for all available options.
+# CMS: ColdFusion (.cfm pages), server-rendered HTML.
+# URL structure: /undergraduate_courses/<dept>/<course>.cfm
+#                /postgraduate_courses/<dept>/<course>.cfm
+#
+# Known issues (2026-06-23):
+#   - text_len=0 on many pages: the admission filter over-strips when the CMS
+#     wraps all body sections in elements whose class/id matches
+#     _NON_ADMISSION_CLASS_FRAGS.  strip_non_admission_content disabled until
+#     confirmed safe (the safety-revert heuristic in admission_text_filter.py
+#     should catch this, but belt-and-suspenders for Teesside).
+#   - English section detected but IELTS scores blank: suspected JS-rendered
+#     tab for entry requirements.  Browser retry is enabled (skip_per_course_browser
+#     NOT set) so the per_course_browser module will render when text_len=0.
+#   - Non-course pages ("Study here", "Study At Teesside") found via broad
+#     discovery: constrained by allow_url_patterns below.
+#   - Location extracts marketing copy: fixed in _MARKETING_HINTS expansion.
 
-discovery: {}
+discovery:
+  allow_url_patterns:
+    - '/undergraduate_courses/'
+    - '/postgraduate_courses/'
 
 extraction:
+  strip_non_admission_content: false
   fees:
     default_currency: GBP

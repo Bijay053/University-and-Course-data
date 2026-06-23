@@ -212,6 +212,35 @@ def filter_admission_html(html: str, url: str = "") -> str:
                 url,
                 removed_sections,
             )
+
+        # ── Safety revert: prevent over-stripping ─────────────────────────
+        # If the filter reduced visible text to < 15 % of the original (or
+        # below 150 chars absolute), it has likely removed course-specific
+        # content (e.g. when the CMS wraps all body sections in elements
+        # whose class names happen to match _NON_ADMISSION_CLASS_FRAGS).
+        # In that case, return the original HTML unchanged so Gemini still
+        # has something to work with.  The threshold only fires when the
+        # original had > 300 visible chars so we don't revert on genuinely
+        # empty pages.
+        if removed_sections:
+            import re as _re
+
+            def _vlen(h: str) -> int:
+                return len(_re.sub(r"\s+", " ", _re.sub(r"<[^>]+>", " ", h)).strip())
+
+            _orig_visible = _vlen(html)
+            _filt_visible = _vlen(str(soup))
+            if _orig_visible > 300 and _filt_visible < max(150, _orig_visible * 0.15):
+                log.warning(
+                    "[ADM-FILTER] safety-revert for %s: filter reduced visible "
+                    "text %d → %d chars (%.0f%%) — reverting to original HTML",
+                    url,
+                    _orig_visible,
+                    _filt_visible,
+                    100 * _filt_visible / max(_orig_visible, 1),
+                )
+                return html
+
         return str(soup)
 
     except ImportError:

@@ -31,7 +31,14 @@ LOCATION_LABEL = re.compile(
 # Strips trailing footnote markers (*, †, ^, ‡) before matching LOCATION_LABEL.
 _FOOTNOTE_TRAILER_RE = re.compile(r"[*†^‡\u2020\u2021]+$")
 _MARKETING_HINTS = re.compile(
-    r"\b(?:focuses on|knowledge and skills|this (?:course|program|degree|qualification)|our (?:courses?|programs?))\b",
+    r"\b(?:focuses on|knowledge and skills|this (?:course|program|degree|qualification)|our (?:courses?|programs?))\b"
+    r"|study\s+in\s+our\b"
+    r"|(?:£|€|\$)\s*\d+(?:\.\d+)?\s*(?:m(?:illion)?|bn|billion)\b"
+    r"|(?:state[-\s]of[-\s]the[-\s]art|world[-\s]class)\s+facilit"
+    r"|town[-\s]cent(?:re|er)\s+campus"
+    r"|million(?:\s+pound)?\s+(?:invest|redevelop|campus|facilit)"
+    r"|friendly\s+(?:town|city|campus)"
+    r"|\d+m\s+(?:invest|redevelop|campus|facilit)",
     re.I,
 )
 _JUNK = re.compile(
