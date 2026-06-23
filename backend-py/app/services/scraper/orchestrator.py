@@ -939,7 +939,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             # onboarded unis can opt in via YAML without a code change.
             try:
                 _yaml_pb = getattr(_uni_cfg.discovery, "bfs_page_budget", None)
-                if _yaml_pb and int(_yaml_pb) > max_pages:
+                if _yaml_pb is not None:
                     max_pages = int(_yaml_pb)
             except Exception:  # noqa: BLE001
                 pass

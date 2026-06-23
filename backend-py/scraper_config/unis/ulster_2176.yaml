@@ -57,6 +57,14 @@ discovery:
   allow_url_patterns:
     - 'ulster\.ac\.uk/courses/\d{6}/'
 
+  # Skip BFS entirely — the sitemap has all 987 courses and
+  # always_sitemap_supplement:true runs it unconditionally.  BFS is pure waste
+  # for Ulster: every page costs ~25 s through the HTTP→cffi→Wayback→Scrape.do
+  # fallback chain (Cloudflare Enterprise blocks HTTP and cffi; Wayback returns
+  # 429).  Setting bfs_page_budget:0 sets max_pages=0 so the BFS while-loop
+  # never executes and discovery jumps straight to the sitemap.
+  bfs_page_budget: 0
+
   # 1000 covers all 987 raw sitemap URLs with a margin for sitemap growth.
   # year_dedup (below) collapses multiple intake-year variants into one URL
   # per course slug, so total extractions ≈ unique course count, not raw count.
