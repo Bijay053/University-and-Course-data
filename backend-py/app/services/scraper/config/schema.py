@@ -2315,6 +2315,39 @@ class ExtractionConfig(BaseModel):
     study_mode: StudyModeConfig = Field(default_factory=StudyModeConfig)
     filters: FiltersConfig = Field(default_factory=FiltersConfig)
     text_cleaning: TextCleaningConfig = Field(default_factory=TextCleaningConfig)
+    strip_non_admission_content: bool = Field(
+        default=True,
+        description=(
+            "Strip non-admission sections (career outcomes, how to apply, "
+            "open days, student life, course structure/modules) from the HTML "
+            "copy sent to Gemini. The original HTML used by regex/CSS/structural "
+            "extractors is unchanged. Reduces Gemini input by ~30-50 %% and "
+            "prevents marketing copy from being mistaken for fee or IELTS data. "
+            "Set to false only if a university buries fee or requirement data "
+            "inside sections with non-admission headings (rare edge case). "
+            "Default: True."
+        ),
+    )
+    follow_admission_links: bool = Field(
+        default=False,
+        description=(
+            "When True, detect links to admission-relevant sub-pages (fees, "
+            "entry requirements, English requirements, international info, "
+            "intake, scholarships) on the course detail page and fetch them "
+            "before Gemini extraction. The fetched text is appended to the "
+            "page content Gemini sees so it can extract data split across tabs "
+            "or sub-pages. Controlled by max_admission_linked_pages. "
+            "Default: False (each linked page adds ~15 s fetch latency)."
+        ),
+    )
+    max_admission_linked_pages: int = Field(
+        default=4,
+        description=(
+            "Maximum number of admission-relevant sub-pages to fetch per course "
+            "when follow_admission_links is True. Higher values surface more data "
+            "but increase per-course latency (~15 s/page). Default: 4."
+        ),
+    )
     course_name: CourseNameConfig = Field(default_factory=CourseNameConfig)
     staging: StagingConfig = Field(default_factory=StagingConfig)
     url_rewrites: list[UrlRewrite] = Field(

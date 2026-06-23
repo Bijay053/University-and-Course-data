@@ -2957,6 +2957,72 @@ async def extract_course(
             else:
                 # Full extraction needed — run the complete Gemini primary prompt.
                 _gp_html = rendered_html or html
+
+                # ── Admission-only text filter ────────────────────────────────
+                # Strip non-admission sections (career outcomes, how-to-apply,
+                # open days, student life, course structure/modules) from the
+                # HTML copy sent to Gemini.  The original HTML used by regex /
+                # CSS / structural extractors above is untouched.
+                # Reduces Gemini input by ~30-50 % and prevents marketing copy
+                # from being misidentified as fee or IELTS data.
+                # Enabled by default; disable per-uni with:
+                #   extraction:
+                #     strip_non_admission_content: false
+                _adm_filter_on = getattr(
+                    getattr(_uc, "extraction", None),
+                    "strip_non_admission_content",
+                    True,
+                )
+                if _adm_filter_on and _gp_html:
+                    from app.services.scraper.admission_text_filter import (
+                        filter_admission_html as _adm_filter_html,
+                    )
+                    _gp_html = _adm_filter_html(_gp_html, url=url)
+
+                # ── Per-course linked admission pages ─────────────────────────
+                # When follow_admission_links=true in YAML, detect links to
+                # per-course sub-pages (fees, entry requirements, English
+                # requirements, international info, intake, scholarships) and
+                # fetch them before calling Gemini.  The fetched text is
+                # appended to _gp_html so Gemini can extract data that is
+                # split across tabs or separate URLs.
+                # Off by default; enable per-uni with:
+                #   extraction:
+                #     follow_admission_links: true
+                #     max_admission_linked_pages: 4   # optional, default 4
+                _follow_links_on = getattr(
+                    getattr(_uc, "extraction", None),
+                    "follow_admission_links",
+                    False,
+                )
+                if _follow_links_on:
+                    from app.services.scraper.per_course_linked_pages import (
+                        fetch_linked_pages_text as _fetch_linked,
+                    )
+                    _max_linked = int(
+                        getattr(
+                            getattr(_uc, "extraction", None),
+                            "max_admission_linked_pages",
+                            4,
+                        )
+                    )
+                    try:
+                        _linked_text = await asyncio.wait_for(
+                            _fetch_linked(
+                                url,
+                                html or "",
+                                max_pages=_max_linked,
+                                emit=emit,
+                            ),
+                            timeout=60.0,
+                        )
+                        if _linked_text:
+                            _gp_html = (_gp_html or "") + "\n\n" + _linked_text
+                    except Exception as _lp_exc:
+                        log.debug(
+                            "[LINKED-PAGES] skipped for %s: %s", url, _lp_exc
+                        )
+
                 _gp_filled, _gp_cost, _gp_in_tok, _gp_out_tok, _gp_dbg = await asyncio.wait_for(
                     _gp.extract_primary(_gp_html, url),
                     timeout=_AI_FALLBACK_TIMEOUT_SEC,
