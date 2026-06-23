@@ -87,26 +87,32 @@ extraction:
 
   # Cloudflare bypass — Ulster is fully Cloudflare Bot Management protected.
   # httpx returns 403, curl_cffi also blocked (Enterprise Bot Management).
-  # Wayback Machine snapshots exist but the 2025-12 archives typically lack
-  # international fee tables and IELTS scores — resulting in 86% of staged
-  # courses getting data_quality_failure due to missing IELTS / fee data.
   #
-  # Scrape.do headless Chrome (render=true) bypasses Cloudflare by executing
-  # JavaScript in a real Chrome instance.  Ulster's fee tables and English
-  # requirement sections are rendered server-side but gated behind Cloudflare;
-  # Scrape.do's residential Chrome renders the full page so extractors see
-  # fee rows and IELTS scores.
+  # Per-job trace (2026-06-23): static=249KB rendered=0B using=static.
+  # Scrape.do render=true is also being blocked by Cloudflare Enterprise
+  # (rendered=0B every course), so scrape_do_render adds zero value and is
+  # disabled.  Scrape.do STATIC returns the full SSR HTML (249KB) which is
+  # sufficient: fee regex finds £17,490, intake regex finds September/May,
+  # study_mode rule fires correctly.  IELTS is not present in static HTML —
+  # accept this as a data gap rather than spending 30-60s per course on
+  # Playwright (also blocked: rendered=0B / 403) or repeated render retries.
   #
-  # scrape_do_skip_fallbacks=true: skips the wasted httpx+curl_cffi round-trips
-  # (both always fail for Ulster) and goes straight to Scrape.do render.
-  # Saves ~2-3s per course × ~500 courses = several minutes per batch.
-  #
-  # auto_interact_all=true: expands any collapsed accordions / <details> panels
-  # after page load so fee tables or IELTS sections inside "show more" blocks
-  # are visible to the extractors before html = page.content() is called.
-  scrape_do_render: true
+  # scrape_do_skip_fallbacks=true: skips wasted httpx+curl_cffi attempts and
+  # goes directly to Scrape.do static. ~3-4s saved per course × 987 courses.
   scrape_do_skip_fallbacks: true
-  auto_interact_all: true
+
+  # Skip ALL Playwright per-course browser fetches.  Ulster's Cloudflare
+  # Enterprise blocks Playwright headless Chrome the same way it blocks plain
+  # httpx and curl_cffi — the browser always gets 403 / rendered=0B and wastes
+  # 30-60s per course with zero benefit.
+  skip_per_course_browser: true
+  skip_browser_rescue: true
+
+  # Raise parallel extraction slots.  Ulster fetches go via Scrape.do static
+  # (no direct IP, no per-host rate limit).  Default 4 → 987 courses at 25s
+  # each = 100+ minutes.  8 slots cuts that to ~50 minutes; hard ceiling in
+  # orchestrator is 16.
+  max_parallel_fetch: 8
 
   staging:
     skip_degree_qualifier_check: true
