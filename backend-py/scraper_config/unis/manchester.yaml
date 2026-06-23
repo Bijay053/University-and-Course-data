@@ -18,6 +18,10 @@
 #   scrape.do is used for per-course extraction.
 
 discovery:
+  # Raise max_candidates above the global 500 cap so all 934 courses are
+  # extracted in a single job (UG ~366 + PGT ~321 + PGR ~247).
+  max_candidates: 1000
+
   manchester_xml:
     ug_year: "2026"        # UG feed rotates annually — update each admissions cycle
     include_ug:  true      # ~366 undergraduate courses
@@ -25,9 +29,17 @@ discovery:
     include_pgr: true      # ~247 postgraduate research (PhD/MPhil) courses
 
 extraction:
-  max_parallel_fetch: 2
-  skip_browser_rescue: false
-  skip_per_course_browser: false
+  # Raised from 2 to 8: per-course pages go via Scrape.do static (no direct
+  # Manchester IP exposed); Playwright / browser rescue are also Cloudflare-
+  # blocked (rendered=0B every course) so they are disabled below.
+  # 934 courses / 8 slots × ~7s/fetch ≈ 14 min total (well under 30).
+  max_parallel_fetch: 8
+  # Playwright is also blocked by Manchester's Cloudflare Enterprise WAF —
+  # browser rescue and per-course browser both return rendered=0B and waste
+  # 30-60s per course with zero benefit.  Gemini extracts all required fields
+  # from the Scrape.do static HTML (32-44KB text per page) successfully.
+  skip_browser_rescue: true
+  skip_per_course_browser: true
   browser_wait_strategy: domcontentloaded
 
   allow_url_patterns:
