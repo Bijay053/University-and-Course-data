@@ -560,3 +560,82 @@ def test_uow_wollongong_location_with_blank_mode_derives_on_campus():
     assert derive_mode_from_location("Sydney, Wollongong") == "On Campus"
     assert derive_mode_from_location("") is None
     assert derive_mode_from_location(None) is None
+
+
+# ── Manchester PGCE regression (2026-06-23) ───────────────────────────────────
+# Manchester PGCE course pages always contain the structured header:
+#   "PGCE Full-time: In person"
+# followed by the site-wide marketing snippet:
+#   "Meet us Join us online or in person to learn more about the University"
+#
+# Bug: the pipeline's _only_rule_based_on_campus guard was downgrading
+# On Campus → Online for PGCE courses because:
+#   1. The extractor correctly returned On Campus (from "in person" match).
+#   2. course_location was blank at that point — default_course_location:
+#      Manchester is applied ~4 500 lines later in the pipeline (line ~7071).
+#   3. _has_physical_location was False → the "sidebar contamination" guard
+#      fired → Online.
+#
+# Fix: the guard now also reads the YAML default_course_location via
+# get_uni_config() so that universities with that YAML key set are not
+# affected by the guard.
+#
+# These tests cover the *extractor* layer (the first of the two components):
+def test_manchester_pgce_full_time_in_person_is_on_campus():
+    """'Full-time: In person' header → On Campus at the extractor level.
+
+    This is the structured delivery-schedule format used on all Manchester
+    course pages.  The extractor must recognise it as an On Campus signal
+    even when the page also contains the sitewide nav phrase
+    'Join us online or in person'.
+    """
+    html = (
+        "<h2>PGCE Full-time: In person</h2>"
+        "<p>Meet us Join us online or in person to learn more about the "
+        "University and our courses.</p>"
+    )
+    out, method, conf = study_mode.classify_study_mode(html)
+    assert out == "On Campus", (
+        f"'Full-time: In person' must yield On Campus, got {out!r} "
+        f"(method={method!r}, conf={conf})"
+    )
+
+
+def test_manchester_in_person_beats_nav_online_text():
+    """'In person' delivery label beats bare 'online' in nav/marketing text."""
+    html = (
+        "Duration: 1 year PGCE Full-time: In person Full entry requirements "
+        "Register now Meet us Join us online or in person to learn more about "
+        "the University and our courses."
+    )
+    out, method, _ = study_mode.classify_study_mode(html)
+    assert out == "On Campus", (
+        f"Structural 'In person' label must dominate nav 'online' copy. "
+        f"Got {out!r} (method={method!r})"
+    )
+
+
+def test_online_or_in_person_nav_phrase_extractor_returns_on_campus():
+    """Bare 'Join us online or in person' nav phrase → On Campus at extractor level.
+
+    _ON_CAMPUS_RE matches the 'in person' fragment so the low-level extractor
+    returns On Campus even from nav/marketing copy.  This is intentional —
+    the extractor operates on raw text and cannot tell marketing copy apart
+    from delivery info.  The pipeline-level _only_rule_based_on_campus guard
+    (single_course.py) is responsible for reversing this when no physical
+    location evidence corroborates it (e.g. course_location is blank AND no
+    default_course_location is configured in the YAML).
+
+    For Manchester, the YAML sets default_course_location: Manchester, so the
+    guard correctly keeps On Campus.  For a university with no location info,
+    the guard would downgrade to Online for the online_only guard to evaluate.
+    """
+    html = (
+        "Meet us Join us online or in person to learn more about the "
+        "University and our courses. Learn more"
+    )
+    out, _, _ = study_mode.classify_study_mode(html)
+    assert out == "On Campus", (
+        f"Extractor-level: 'in person' in nav text matches _ON_CAMPUS_RE → On Campus. "
+        f"Got {out!r}. Pipeline guard handles location-less reversal separately."
+    )

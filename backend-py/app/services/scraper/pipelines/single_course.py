@@ -2555,11 +2555,11 @@ async def extract_course(
     # Belt-and-suspenders guard for Bug 1 (UniSQ "Recently viewed" sidebar):
     # If study_mode was set to "On Campus" EXCLUSIVELY by the keyword-rule
     # extractor (study_mode:rule — the last-resort fallback that scans raw
-    # tag-stripped text), AND both course_location AND location_text are
-    # blank, the "On Campus" match almost certainly came from sidebar noise
-    # (e.g. "Recently viewed" widget listing other courses' campus names).
-    # In that case the course's own Location field either says "Online" or
-    # was not captured — neither supports a confident "On Campus" assignment.
+    # tag-stripped text), AND there is NO location evidence of any kind, the
+    # "On Campus" match almost certainly came from sidebar noise (e.g.
+    # "Recently viewed" widget listing other courses' campus names).  In that
+    # case the course's own Location field either says "Online" or was not
+    # captured — neither supports a confident "On Campus" assignment.
     #
     # Action: downgrade to "Online" so the online_only guard in guards.py
     # can evaluate and reject the course when appropriate.  This ONLY fires
@@ -2567,10 +2567,41 @@ async def extract_course(
     # data_attribute, strong_label, gemini_primary, etc.) — those methods
     # would have returned before the keyword fallback and would appear with
     # a different method name in the evidence list.
+    #
+    # Location evidence hierarchy (any is sufficient to suppress the downgrade):
+    #   1. _has_physical_location  — extractor found a campus name in the HTML
+    #   2. location_text           — raw text from which the location was parsed
+    #   3. course_location preset  — universities with default_course_location set
+    #      in their YAML (e.g. Manchester → "Manchester") fill course_location
+    #      without setting location_text.  A non-online preset city IS real campus
+    #      evidence and must not trigger the sidebar-contamination downgrade.
+    # course_location may not yet be filled from default_course_location at
+    # this point in the pipeline (that YAML fallback runs ~4 500 lines later
+    # at line ~7071).  Read the YAML setting directly so that universities
+    # with default_course_location configured (e.g. Manchester → "Manchester")
+    # are not incorrectly downgraded to Online just because no per-page
+    # location extractor fired.
+    _preset_loc = (payload.get("course_location") or "").strip()
+    if not _preset_loc:
+        try:
+            _uc_preset = get_uni_config()
+            _preset_loc = (
+                getattr(
+                    getattr(_uc_preset, "extraction", None),
+                    "default_course_location",
+                    None,
+                ) or ""
+            ).strip()
+        except Exception:  # noqa: BLE001
+            _preset_loc = ""
+    _has_preset_physical_location = bool(_preset_loc) and _preset_loc.lower() not in (
+        "online", "distance learning", "distance", "virtual"
+    )
     _only_rule_based_on_campus = (
         payload.get("study_mode") == "On Campus"
         and not _has_physical_location
         and not (payload.get("location_text") or "").strip()
+        and not _has_preset_physical_location
         and bool(_study_mode_evidence)
         and all(
             (e.get("method") or "").startswith("study_mode:rule")
