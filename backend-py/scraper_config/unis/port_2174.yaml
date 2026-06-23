@@ -38,6 +38,11 @@ discovery:
     - 'port\.ac\.uk/study/courses/[^/]+/[^/]+/?$'
 
 extraction:
+  # Portsmouth course pages often have /fees/ and /entry-requirements/ sub-tabs
+  # as separate URLs — follow them to fill missing fee and IELTS fields.
+  follow_admission_links: true
+  max_admission_linked_pages: 3
+
   fees:
     default_currency: GBP
   filters:

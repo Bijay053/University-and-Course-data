@@ -43,6 +43,11 @@ discovery:
     - "/study/postgraduate/"
 
 extraction:
+  # Flinders course pages link to /entry-requirements/ and /fees-and-scholarships/
+  # sub-pages that contain IELTS and fee data not always visible on the main page.
+  follow_admission_links: true
+  max_admission_linked_pages: 3
+
   english:
     # Disable tier-1 (non-DOM-anchored) vision OCR for English test score
     # fields.  Tier-0 images (inside Entry Requirements DOM section) still
