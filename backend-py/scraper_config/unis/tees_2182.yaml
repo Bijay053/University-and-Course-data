@@ -34,8 +34,8 @@ discovery:
     - '/undergraduate_courses/'
     - '/postgraduate_courses/'
   block_url_patterns:
-    - '_degree_apprenticeship'
-    - '_degree_apprentice'
+    - 'degree_apprenticeship'
+    - '(apprenticeship)'
 
 extraction:
   strip_non_admission_content: false
