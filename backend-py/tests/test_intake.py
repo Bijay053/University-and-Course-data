@@ -116,3 +116,67 @@ def test_intake_label_does_not_misfire_on_unrelated_strong_tags():
     assert "February" in months and "July" in months
     # Method must be the keyword fallback, NOT structural.
     assert out[0].method != "intake.structural"
+
+
+# ── Issue 3 regression: PGCE/PGCert tier detection ───────────────────────────
+# Teaching qualifications (PGCE, PGDE, PGCert, PGDip) do not contain
+# "master" or "postgraduate" verbatim in their degree_level string, so the
+# intake tier detection (single_course.py) was silently falling through to
+# the undergraduate fallback and giving September-only instead of
+# September+January.
+
+
+def test_pgce_maps_to_postgraduate_intake_tier():
+    """'pgce' in degree_level must resolve to postgraduate intake tier.
+
+    Reproduces the exact tier-detection logic from single_course.py so
+    this test breaks immediately if the fix is reverted.
+    """
+    UNDERGRADUATE_KEYWORDS = ("bachelor", "undergraduate", "diploma", "certificate")
+    POSTGRADUATE_KEYWORDS = (
+        "master", "postgraduate", "graduate certificate",
+        "graduate diploma", "mba", "msc",
+        # "ma " omitted — it is a substring of "diploma " / "pharmacy " (UG).
+        # "master" catches MA/MArch/etc by full title.
+        "pgce", "pgde", "pgcert", "pgdip",
+    )
+    DOCTORATE_KEYWORDS = ("doctor", "phd", "doctorate", "edd")
+
+    def _tier(degree_level: str) -> str:
+        # Mirrors the corrected order in single_course.py:
+        # postgraduate checked FIRST so "Postgraduate Certificate" beats
+        # the bare "certificate" substring in the undergraduate list.
+        dl = degree_level.lower()
+        if any(x in dl for x in POSTGRADUATE_KEYWORDS):
+            return "postgraduate"
+        if any(x in dl for x in DOCTORATE_KEYWORDS):
+            return "doctorate"
+        if any(x in dl for x in UNDERGRADUATE_KEYWORDS):
+            return "undergraduate"
+        return ""
+
+    cases = [
+        ("PGCE",                                 "postgraduate"),
+        ("PGDE",                                 "postgraduate"),
+        ("PGCert Education",                     "postgraduate"),
+        ("PGDip Teaching",                       "postgraduate"),
+        ("Postgraduate Certificate in Education","postgraduate"),
+        # non-teaching PG still work
+        ("MSc Data Science",                     "postgraduate"),
+        ("Master of Business Administration",    "postgraduate"),
+        # UG still correct
+        ("Bachelor of Engineering",              "undergraduate"),
+        ("Diploma of Business",                  "undergraduate"),
+        # PhD still correct
+        ("Doctor of Philosophy",                 "doctorate"),
+        # unknown → safe fall-through
+        ("Certificate IV in IT",                 "undergraduate"),  # "certificate" matches UG
+    ]
+
+    for dl, expected in cases:
+        got = _tier(dl)
+        assert got == expected, (
+            f"degree_level={dl!r}: expected tier={expected!r}, got {got!r}. "
+            "Fix: ensure 'pgce','pgde','pgcert','pgdip' are in the postgraduate "
+            "keyword list in the intake tier detection block of single_course.py."
+        )

@@ -3387,11 +3387,34 @@ async def extract_course(
                     if _cur_method and _is_structural_course_page_method(_cur_method):
                         continue  # course page structural extractor owns this field
 
-                # PRIMARY: always overwrite payload value.
+                # Guard: never overwrite an existing non-null value with None.
+                # Gemini returning null means it could not find the value on
+                # this page; it should not erase what a prior extractor found.
+                # Root cause of Issue 1 (Manchester review): Gemini returns
+                # {"international_fee": null, "ielts_overall": null, ...} for
+                # fields it can't find, which was silently overwriting regex /
+                # structural values already in the payload.
+                if _gp_v is None and payload.get(_gp_k) is not None:
+                    log.debug(
+                        "[GEMINI NULL SKIP] %s: %s already=%r — null from "
+                        "Gemini ignored; existing value preserved",
+                        url, _gp_k, payload.get(_gp_k),
+                    )
+                    continue
+
+                # PRIMARY: overwrite payload value (null-overwrite guard above).
                 # Keep prior evidence rows so Evidence Review can show every
                 # source that found a value — mark them "superseded" so the UI
                 # can distinguish them from the winning entry.
+                _prior_for_qa = payload.get(_gp_k)
                 payload[_gp_k] = _gp_v
+                # QA Issue-6: log field overwrites so merge behaviour is auditable.
+                if _prior_for_qa is not None and _gp_v is not None and _prior_for_qa != _gp_v:
+                    log.info(
+                        "[FIELD_OVERWRITE] %s: gemini_primary changed %s "
+                        "from %r → %r",
+                        url, _gp_k, _prior_for_qa, _gp_v,
+                    )
                 for _prior_ev in evidence:
                     if _prior_ev.get("field_key") == _gp_k:
                         _prior_ev["decision_status"] = "superseded"
@@ -4462,6 +4485,18 @@ async def extract_course(
             elif _vision_is_tier0 and can_override(_prior_method, "per_course_vision"):
                 # Tier-0 image (from English requirements DOM section) beats
                 # tier-3 text — supersede the existing value.
+                # QA Issue-6: log when OCR overrides a structured/Gemini value.
+                _vision_prior_val = payload.get(k)
+                if (
+                    _vision_prior_val is not None
+                    and _prior_method
+                    and not _prior_method.startswith("per_course_vision")
+                ):
+                    log.info(
+                        "[OCR_CONFLICT] %s: tier-0 vision %s=%r overrides "
+                        "%s=%r — structured/Gemini value superseded by OCR",
+                        url, k, v, _prior_method, _vision_prior_val,
+                    )
                 for _ev in evidence:
                     if _ev.get("field_key") == k and _ev.get("decision_status") != "superseded":
                         _ev["decision_status"] = "superseded"
@@ -6728,6 +6763,20 @@ async def extract_course(
     if _fee_heading_found and _fee_blank:
         if "fee_section_detected_fee_blank" not in _scrape_warnings:
             _scrape_warnings.append("fee_section_detected_fee_blank")
+        # QA Issue-6: detect whether a fee value was extracted at some point
+        # during the pipeline but then discarded (e.g. by a validation step
+        # or a null-overwrite from a later extractor).
+        _ev_had_fee = any(
+            ev.get("field_key") == "international_fee"
+            and ev.get("value") not in (None, "", 0)
+            for ev in evidence
+        )
+        if _ev_had_fee:
+            log.info(
+                "[FEE_DISAPPEARED] %s — fee was extracted (see evidence log) "
+                "but is blank in final payload; check merge/validation steps",
+                payload.get("course_name") or url,
+            )
         if emit:
             await emit(
                 "status",
@@ -6883,19 +6932,33 @@ async def extract_course(
         ):
             _dl_map: dict = dict(_intk_cfg.default_by_level or {})
             _course_dl = (payload.get("degree_level") or "").lower()
-            # Normalise degree_level to the three recognised tiers
+            # Normalise degree_level to the three recognised tiers.
+            # ORDERING MATTERS: postgraduate is checked FIRST because its
+            # keyword set contains "certificate" as a substring via
+            # "graduate certificate" / "pgcert", and the undergraduate set
+            # also contains the bare word "certificate".  Checking UG first
+            # would misclassify "Postgraduate Certificate in Education" as
+            # undergraduate.  Doctorate before undergraduate for same reason
+            # ("edd" < "diploma" conflict is unlikely but order is explicit).
             _dl_tier = (
-                "undergraduate" if any(
-                    x in _course_dl for x in ("bachelor", "undergraduate", "diploma", "certificate")
-                )
-                else "postgraduate" if any(
+                "postgraduate" if any(
                     x in _course_dl for x in (
                         "master", "postgraduate", "graduate certificate",
-                        "graduate diploma", "mba", "msc", "ma ",
+                        "graduate diploma", "mba", "msc",
+                        # NOTE: "ma " intentionally omitted — it is a substring
+                        # of "diploma " and "pharmacy " which are UG.  "Master"
+                        # catches MA/MArch/etc by their full title.
+                        # Teaching qualifications: PGCE/PGDE/PGCert/PGDip do
+                        # not contain "master" or "postgraduate" verbatim but
+                        # are postgraduate level → September+January default.
+                        "pgce", "pgde", "pgcert", "pgdip",
                     )
                 )
                 else "doctorate" if any(
                     x in _course_dl for x in ("doctor", "phd", "doctorate", "edd")
+                )
+                else "undergraduate" if any(
+                    x in _course_dl for x in ("bachelor", "undergraduate", "diploma", "certificate")
                 )
                 else ""
             )

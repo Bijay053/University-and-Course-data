@@ -77,6 +77,11 @@ extraction:
   english:
     source: course_page
     source_xpath: "//div[contains(@id, 'entry-requirements')] | //section[contains(@id, 'entry-requirements')] | //div[contains(@class, 'course-profile-content')] | //main"
+    # Issue 5: Manchester pages are text-rich — IELTS/PTE/TOEFL scores are
+    # parseable from structured HTML so OCR adds noise, not value.
+    # Disabling vision prevents tier-0 image OCR from overriding regex /
+    # Gemini values that were extracted correctly from page text.
+    trust_vision_ocr: false
 
     ielts:
       raw_xpath: ".//*[contains(text(), 'IELTS')] | .//li[contains(., 'IELTS')]"
