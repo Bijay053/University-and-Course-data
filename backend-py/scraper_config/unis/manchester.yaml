@@ -18,10 +18,6 @@
 #   scrape.do is used for per-course extraction.
 
 discovery:
-  # Raise max_candidates above the global 500 cap so all 934 courses are
-  # extracted in a single job (UG ~366 + PGT ~321 + PGR ~247).
-  max_candidates: 1000
-
   manchester_xml:
     ug_year: "2026"        # UG feed rotates annually — update each admissions cycle
     include_ug:  true      # ~366 undergraduate courses
