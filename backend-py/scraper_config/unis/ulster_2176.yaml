@@ -44,11 +44,12 @@ discovery:
   seed_urls:
     - 'https://www.ulster.ac.uk/courses?query=&f.Attendance_u|modeft=Full-time'
 
-  # REQUIRED: BFS finds ~38 /study/* links which pass _looks_like_course_url()
-  # (because /study/ is in _COURSE_URL_HINTS), so BFS count ≥ threshold(5) and
-  # the automatic sitemap fallback never fires.  always_sitemap_supplement forces
-  # the sitemap to run unconditionally and merge its results with BFS.
-  always_sitemap_supplement: true
+  # NOTE: always_sitemap_supplement removed — bfs_page_budget:0 means BFS
+  # always finds 0 candidates (< the 5-candidate threshold), which triggers
+  # the automatic sitemap fallback unconditionally.  Keeping
+  # always_sitemap_supplement:true would cause a redundant second sitemap
+  # fetch (~25s per run via Scrape.do) with no additional courses discovered.
+  # always_sitemap_supplement: true  # ← intentionally removed
 
   # Accept /courses/<6-digit-year>/<slug> URLs only.
   # re.search finds 'ulster.ac.uk/courses/202627/' anywhere in the full URL.
@@ -108,11 +109,10 @@ extraction:
   skip_per_course_browser: true
   skip_browser_rescue: true
 
-  # Raise parallel extraction slots.  Ulster fetches go via Scrape.do static
-  # (no direct IP, no per-host rate limit).  Default 4 → 987 courses at 25s
-  # each = 100+ minutes.  8 slots cuts that to ~50 minutes; hard ceiling in
-  # orchestrator is 16.
-  max_parallel_fetch: 8
+  # Raise parallel extraction slots to the orchestrator hard ceiling (16).
+  # Ulster fetches go via Scrape.do static (no direct Ulster IP, no per-host
+  # rate limit on Scrape.do proxy).  8 slots → ~48 min; 16 slots → ~24 min.
+  max_parallel_fetch: 16
 
   staging:
     skip_degree_qualifier_check: true
