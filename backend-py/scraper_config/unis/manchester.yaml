@@ -28,6 +28,12 @@ extraction:
   # Hard ceiling is 16; at ~7s per Scrape.do slot and 934 courses this gives
   # ≈ 934 × 7 / 16 ≈ 408 s ≈ 7 min (well under the 30-min target).
   max_parallel_fetch: 16
+
+  # Manchester course pages link to /fees/ and /entry-requirements/ sub-pages
+  # that contain fee tables and English-requirement details not always present
+  # on the main course page.  Enable link-following to fetch those before Gemini.
+  follow_admission_links: true
+  max_admission_linked_pages: 3
   # Playwright is also blocked by Manchester's Cloudflare Enterprise WAF —
   # browser rescue and per-course browser both return rendered=0B and waste
   # 30-60s per course with zero benefit.  Gemini extracts all required fields

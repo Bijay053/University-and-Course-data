@@ -9,10 +9,20 @@ auto-publishes. The fix:
 * English requirement: any one of IELTS overall, PTE overall, TOEFL overall,
   Cambridge overall, or Duolingo overall counts.
 * Decision threshold (completeness %) lives in settings.
+
+Hard-required field gates (in addition to the completeness floor):
+* course_name  — must be present and ≥ 3 chars
+* degree_level — must be present
+* English test — at least one of IELTS/PTE/TOEFL/Cambridge/Duolingo overall
+* duration     — must be non-null (every legitimate course has a duration)
+* intake_months — must be non-empty, UNLESS the course is online-only
+  (online-only courses sometimes don't publish intake windows)
 """
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
+from typing import Any
 
 from app.config import settings
 from app.models import ScrapedCourse
@@ -38,6 +48,28 @@ def _has_english(sc: ScrapedCourse) -> bool:
     )
 
 
+def _has_intake(sc: ScrapedCourse) -> bool:
+    """Return True if intake_months is a non-empty list."""
+    raw: Any = sc.intake_months
+    if raw is None:
+        return False
+    if isinstance(raw, list):
+        return len(raw) > 0
+    if isinstance(raw, str):
+        try:
+            parsed = json.loads(raw)
+            return isinstance(parsed, list) and len(parsed) > 0
+        except (ValueError, TypeError):
+            return bool(raw.strip())
+    return bool(raw)
+
+
+def _is_online_only(sc: ScrapedCourse) -> bool:
+    """Return True when the course is explicitly online-only."""
+    mode = (sc.study_mode or "").lower()
+    return "online" in mode and "campus" not in mode and "on-campus" not in mode
+
+
 # Phase A — hard floor for auto-publish.  The configurable
 # ``min_completeness_for_auto_publish`` setting can be lowered for
 # debugging, but Phase A enforces an absolute lower bound: nothing with
@@ -51,12 +83,17 @@ def should_auto_publish(sc: ScrapedCourse) -> AutoPublishDecision:
     completeness = sc.completeness or 0
     score = float(sc.decision_score or 0)
 
+    # ── Hard-required field checks ────────────────────────────────────────
     if not sc.course_name or len(sc.course_name.strip()) < 3:
         return AutoPublishDecision(False, "Missing or invalid course name", score)
     if not sc.degree_level:
         return AutoPublishDecision(False, "Missing degree level", score)
     if not _has_english(sc):
         return AutoPublishDecision(False, "No English-test score (IELTS/PTE/TOEFL/etc.)", score)
+    if sc.duration is None:
+        return AutoPublishDecision(False, "Missing duration", score)
+    if not _has_intake(sc) and not _is_online_only(sc):
+        return AutoPublishDecision(False, "Missing intake months (required for non-online courses)", score)
 
     # Phase A: take the higher of the configured threshold and the hard floor.
     # The hard floor wins when settings.min_completeness_for_auto_publish < 85,
