@@ -25,11 +25,9 @@ discovery:
     include_pgr: true      # ~247 postgraduate research (PhD/MPhil) courses
 
 extraction:
-  # Raised from 2 to 8: per-course pages go via Scrape.do static (no direct
-  # Manchester IP exposed); Playwright / browser rescue are also Cloudflare-
-  # blocked (rendered=0B every course) so they are disabled below.
-  # 934 courses / 8 slots × ~7s/fetch ≈ 14 min total (well under 30).
-  max_parallel_fetch: 8
+  # Hard ceiling is 16; at ~7s per Scrape.do slot and 934 courses this gives
+  # ≈ 934 × 7 / 16 ≈ 408 s ≈ 7 min (well under the 30-min target).
+  max_parallel_fetch: 16
   # Playwright is also blocked by Manchester's Cloudflare Enterprise WAF —
   # browser rescue and per-course browser both return rendered=0B and waste
   # 30-60s per course with zero benefit.  Gemini extracts all required fields
@@ -122,6 +120,27 @@ extraction:
         - toefl_listening
         - toefl_speaking
 
+  # ── Intake defaults ───────────────────────────────────────────────────────
+  # Manchester course pages often omit explicit start dates (especially for UG
+  # courses where September is universal).  Pre-filling intake_months before
+  # the Gemini gate check means the gate fires "classification_only" instead of
+  # "full_extraction_needed" for these courses, dropping per-course Gemini cost
+  # from ~$0.000875 to ~$0.000044 — a 95% reduction.
+  # use_default_when_missing only fires when ALL regex/CSS/vision extractors
+  # return no intake; a regex hit (e.g. "May" for Nursing) still wins.
+  intake:
+    use_default_when_missing: true
+    default_source_note: Manchester default intake (not extracted from page)
+    default_by_level:
+      undergraduate:
+        - September
+      postgraduate:
+        - September
+        - January
+      doctorate:
+        - September
+        - January
+
   text_cleaning:
     global_substring_blocklist:
       - Apply now
@@ -130,6 +149,11 @@ extraction:
       - Request a prospectus
       - Chat with a student
       - Our use of cookies
+
+  # Manchester courses are always on-campus in Manchester city.  Pre-filling
+  # the location eliminates the AI-fallback call that would otherwise fire
+  # just to write "Manchester" for every single course.
+  default_course_location: Manchester
 
   staging:
     reject_if_missing:

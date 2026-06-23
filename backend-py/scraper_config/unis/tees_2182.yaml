@@ -1,0 +1,15 @@
+# Teesside University
+# Hostname: www.tees.ac.uk
+# Country: United Kingdom  |  Currency: GBP
+# Slug: tees
+# Auto-generated: 2026-06-23
+#
+# This stub was created automatically on the first scrape of this university.
+# Review and expand it to improve discovery and extraction quality.
+# See scraper_config/defaults.yaml for all available options.
+
+discovery: {}
+
+extraction:
+  fees:
+    default_currency: GBP
