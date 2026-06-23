@@ -66,7 +66,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
     });
-    const data = await res.json();
+    let data: Record<string, unknown> = {};
+    try {
+      data = await res.json();
+    } catch {
+      throw new Error(
+        res.status === 0
+          ? "Cannot reach the server. Please try again."
+          : `Server error (${res.status || "no response"}). Please try again.`,
+      );
+    }
     if (!res.ok) {
       const detail = data?.detail;
       const message =
