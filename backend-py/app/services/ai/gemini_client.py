@@ -48,24 +48,32 @@ _OUTPUT_USD_PER_M = 0.30
 # ---------------------------------------------------------------------------
 # 429 retry-with-backoff
 # ---------------------------------------------------------------------------
-# When 8 concurrent workers hit Gemini simultaneously the free-tier RPM is
-# exhausted and every call gets 429 RESOURCE_EXHAUSTED.  Rather than
-# propagating the error immediately (wasting all the page-fetching work
-# already done), we retry up to _MAX_RETRIES times, respecting the API's
-# own `retryDelay` hint.  The circuit breaker is only recorded after all
-# retries are exhausted so transient bursts don't trip it prematurely.
-_MAX_RETRIES = 3
-_MAX_RETRY_WAIT_S = 60.0
-_JITTER_FACTOR = 0.25          # ±25 % of the suggested delay
+# With 8+ concurrent workers hitting Gemini simultaneously the RPM is
+# exhausted and every call gets 429 RESOURCE_EXHAUSTED.  We retry ONCE with
+# a short wait rather than 3 times with 20s waits — the thundering-herd
+# problem means all 8 coroutines sleep the same duration then retry together,
+# repeating 3× and wasting up to 60s per course.  One quick retry (≤8s)
+# is enough for transient spikes; the circuit breaker handles sustained quota
+# exhaustion by skipping Gemini entirely for 2 minutes.
+_MAX_RETRIES = 1               # was 3 — one retry is enough; circuit breaker handles sustained quota
+_MAX_RETRY_WAIT_S = 15.0       # was 60.0
+_JITTER_FACTOR = 0.30          # ±30 % — wider spread reduces thundering-herd retry sync
 
 # Parse  'retryDelay': '20s'  from the 429 error body.
 _RETRY_DELAY_RE = re.compile(r"retryDelay['\"]?:\s*['\"]?(\d+)s?['\"]?", re.IGNORECASE)
 
 
-def _parse_retry_delay(err_str: str, default: float = 20.0) -> float:
-    """Return retry delay seconds suggested by the API, or *default*."""
+def _parse_retry_delay(err_str: str, default: float = 8.0) -> float:
+    """Return retry delay seconds suggested by the API, capped for speed.
+
+    Google suggests 20s; we cap at 8s default because:
+    - One fast retry is preferable to a long wait before the circuit trips.
+    - The circuit breaker handles sustained quota failure (8 errors in 60s).
+    """
     m = _RETRY_DELAY_RE.search(err_str)
-    return float(m.group(1)) if m else default
+    raw = float(m.group(1)) if m else default
+    # Don't respect excessively long API-suggested delays — cap at 10s.
+    return min(raw, 10.0)
 
 
 # ---------------------------------------------------------------------------

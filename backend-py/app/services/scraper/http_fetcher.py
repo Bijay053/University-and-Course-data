@@ -38,6 +38,17 @@ log = logging.getLogger(__name__)
 _sem = asyncio.Semaphore(settings.max_http_concurrency)
 
 # ---------------------------------------------------------------------------
+# Per-process Cloudflare fast-path cache
+# ---------------------------------------------------------------------------
+# When BOTH httpx AND curl_cffi return a Cloudflare block for a host, every
+# subsequent request to that host skips those two tiers and goes straight to
+# Scrape.do static.  This saves 20-40 s per course on heavily CF-protected
+# sites like Westminster where the httpx+cffi chain always fails.
+# The set persists for the life of the Celery worker process — acceptable
+# because CF protection on a domain rarely disappears between scrape jobs.
+_cf_always_scrape_do: set[str] = set()
+
+# ---------------------------------------------------------------------------
 # Shared persistent AsyncClient — connection-pool reuse
 # ---------------------------------------------------------------------------
 # Creating a fresh AsyncClient() per request pays a new TCP+TLS handshake for
@@ -387,7 +398,7 @@ async def fetch_html_cffi(url: str) -> str | None:
         async with AsyncSession(impersonate="chrome124") as s:
             r = await s.get(
                 url,
-                timeout=30,
+                timeout=15,
                 allow_redirects=True,
                 headers={
                     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
@@ -592,6 +603,25 @@ async def fetch_html(url: str, *, retries: int = 2) -> str | None:
                 return _static
             return None
 
+    # Fast-path: if BOTH httpx and curl_cffi previously failed for this host
+    # (recorded in _cf_always_scrape_do), skip straight to Scrape.do static
+    # instead of wasting 15-30 s on tiers that always fail.  Saves ~35 s/course
+    # for heavily CF-protected sites like Westminster.
+    from urllib.parse import urlparse as _urlparse
+    _host = _urlparse(url).netloc
+    if _host in _cf_always_scrape_do and _has_scrape_do:
+        log.info(
+            "fetch %s: host %s known CF-always-blocked — going straight to Scrape.do static",
+            url, _host,
+        )
+        _fast = await fetch_html_scrape_do(url, render=False)
+        if _fast is not None and not _is_spa_shell(_fast):
+            return _fast
+        if _scrape_do_render:
+            _fast_r = await fetch_html_scrape_do(url, render=True)
+            return _fast_r
+        return None
+
     last_exc: Exception | None = None
     got_cloudflare_block = False
     got_hard_403 = False
@@ -672,6 +702,16 @@ async def fetch_html(url: str, *, retries: int = 2) -> str | None:
             from app.services.scraper.snapshot_context import stage_snapshot as _stage
             _stage(url, cffi_result, "cffi")
             return cffi_result
+        # Both httpx AND cffi failed → record host as always-CF-blocked so
+        # future requests in this process skip both tiers immediately.
+        from urllib.parse import urlparse as _urlparse2
+        _blocked_host = _urlparse2(url).netloc
+        if _blocked_host not in _cf_always_scrape_do:
+            _cf_always_scrape_do.add(_blocked_host)
+            log.info(
+                "fetch %s: httpx+cffi both CF-blocked — caching host '%s' for Scrape.do fast-path",
+                url, _blocked_host,
+            )
         # Tier 2.5: Scrape.do render fast-path for explicit SPA universities.
         # When scrape_do_render=True the university is tagged as an Angular/
         # React SPA whose data is injected at runtime by JavaScript.  Wayback

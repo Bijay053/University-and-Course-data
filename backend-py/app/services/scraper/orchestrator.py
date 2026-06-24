@@ -275,7 +275,7 @@ async def _emit(db, runtime_job_id: str, sequence: int, event: str, message: str
 
 
 _MAX_COURSES_PER_JOB = 1000
-_MAX_PARALLEL_FETCH = 8
+_MAX_PARALLEL_FETCH = 12
 # Courses extracted and staged per batch before the next batch starts.
 # Higher values reduce staging overhead on large universities.
 # 100 covers most large unis (>500 courses) in 5 batches instead of 10.
