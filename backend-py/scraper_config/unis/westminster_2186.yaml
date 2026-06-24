@@ -1,31 +1,130 @@
 # University of Westminster
 # Hostname: www.westminster.ac.uk
 # Country: United Kingdom  |  Currency: GBP
-# Discovery: Drupal search listing pagination to /study/ detail pages
-# Notes: Whitelisted '/course-search' to ensure the seed itself isn't rejected at the gate.
+# Discovery: Pre-seeded all 71 pagination pages (841 courses ÷ 12/page).
+# BFS used only as a mop-up pass after seed pages are processed.
+#
+# Root cause of original 193-course undercount:
+#   BFS budget (60 pages) was consumed by Drupal facet-filter variant URLs
+#   (mode_of_study:xxx, course_start_date:xxx, course_type:3551) and non-course
+#   /study/ hub pages (accommodation, student-life, etc.) — leaving only 3-4
+#   pagination pages reached before budget exhausted.
+# Fix: all 71 pages pre-seeded as seed_urls; filter-variant and non-course
+#   /study/ paths explicitly blocked so BFS budget is spent on course pages only.
 
 discovery:
   always_sitemap_supplement: true
-  bfs_page_budget: 60          # Generous buffer for Drupal View pagination 
+  # Budget just needs to cover seed pages + any adjacent course detail links.
+  # Filter variants and non-course /study/ paths are blocked below.
+  bfs_page_budget: 100
   max_candidates: 1200
-  
+
+  # 841 courses ÷ 12 per page = 71 pages (page=0 … page=70).
+  # page=0 is identical to the base URL — included for safety.
   seed_urls:
     - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=0'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=1'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=2'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=3'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=4'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=5'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=6'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=7'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=8'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=9'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=10'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=11'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=12'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=13'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=14'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=15'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=16'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=17'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=18'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=19'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=20'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=21'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=22'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=23'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=24'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=25'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=26'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=27'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=28'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=29'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=30'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=31'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=32'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=33'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=34'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=35'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=36'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=37'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=38'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=39'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=40'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=41'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=42'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=43'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=44'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=45'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=46'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=47'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=48'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=49'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=50'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=51'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=52'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=53'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=54'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=55'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=56'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=57'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=58'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=59'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=60'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=61'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=62'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=63'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=64'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=65'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=66'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=67'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=68'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=69'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=70'
 
   allow_url_patterns:
-    - '/course-search'         # CRITICAL: Allows the seed page itself to be fetched & paginated
-    - '/study/'                # Catches Westminster's standard detail pages (e.g., /study/full-time/law-llb)
-    - '/courses/'              # Secondary safety net
+    - '/course-search'
+    - '/study/'
+    - '/courses/'
+    - '/business-services/workforce-development/'
+    - '/business-and-community/workforce-development/'
 
   block_url_patterns:
+    # ── Non-course /study/ hub pages that waste BFS budget ───────────────────
+    - '/study/subjects'
+    - '/study/open-days'
+    - '/study/fees-and-funding'
+    - '/study/accommodation'
+    - '/study/student-life'
+    - '/study/language-tests'
+    - '/study/degree-apprenticeships-for-applicants'
+    - '/study/postgraduate/research-degrees'  # separate seed below if needed
+    # ── Drupal facet-filter variant URLs — subsets of the 841, waste budget ──
+    - 'mode_of_study'          # blocks &f[x]=mode_of_study:xxx variants
+    - 'course_start_date'      # blocks &f[x]=course_start_date:xxx variants
+    - 'course_type%3A3551'     # blocks distance-learning filter variant
+    - 'f%5B2%5D'               # blocks any URL with a 3rd facet filter
+    # ── Standard non-course paths ────────────────────────────────────────────
     - '/news'
     - '/events'
     - '/about'
     - '/staff'
     - '/research/'
     - '/alumni'
-    - '/student-life/'
-    - '/business/'             # Enterprise/B2B services
+    - '/business/'
     - '\.pdf$'
 
 extraction:
@@ -60,6 +159,7 @@ extraction:
   filters:
     online_only:
       enabled: false
+
   staging:
     reject_if_missing:
       - course_name

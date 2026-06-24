@@ -82,14 +82,15 @@ discovery:
   use_wayback: false
 
 extraction:
-  # Canterbury NZ blocks direct httpx + curl_cffi + Playwright (all return 403
-  # or empty). The [BROWSER↑] rescue path in single_course.py bypasses the
-  # Scrape.do chain entirely, so without this flag Scrape.do is never tried
-  # and every course ends as fetch_failed.
-  # scrape_do_skip_fallbacks=true makes Scrape.do the FIRST (and only) HTTP
-  # attempt, so httpx is never "blocked" and [BROWSER↑] never fires.
-  # Canterbury NZ uses AEM (server-side rendered) so static mode is sufficient.
-  scrape_do_skip_fallbacks: true
+  # Canterbury NZ blocks direct httpx + curl_cffi + Playwright (all 403/empty).
+  # The [BROWSER↑] rescue path in single_course.py is only reached when the
+  # initial fetch_html() returns None. scrape_do_static=true activates
+  # scrape_do_static_scope() in single_course.py (line 1448), which makes
+  # http_fetcher.py skip httpx entirely and call Scrape.do with render=False
+  # as the FIRST and only attempt. Canterbury NZ is AEM (server-side rendered)
+  # so static mode returns full HTML. If Scrape.do returns content, html is not
+  # None, [BROWSER↑] path at line 1452 is never reached.
+  scrape_do_static: true
   skip_browser_rescue: true
   skip_per_course_browser: true
   # Scrape.do proxies have no per-host rate limit — raise from 4 → 8.
