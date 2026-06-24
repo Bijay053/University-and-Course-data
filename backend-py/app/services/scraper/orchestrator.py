@@ -631,21 +631,84 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
     _snap_jid_token = _snap_jid_cv.set(runtime_job_id)
 
     _seq = [1]
+
+    # ── Per-job emit buffer ───────────────────────────────────────────────────
+    # Problem: _emit() opens one new DB connection per log line. Large
+    # universities (Manchester ~934, Ulster ~987 courses) with ~67 emit
+    # call-sites in single_course.py generate 60 000+ individual DB sessions
+    # per run. At 16 concurrent extraction slots the SQLAlchemy pool
+    # (size=20, overflow=10) exhausts → asyncio event loop stalls waiting for
+    # a free connection → the scraper appears to "freeze".
+    #
+    # Fix: buffer rows in-memory; a background task bulk-inserts them every
+    # _EMIT_FLUSH_INTERVAL seconds using ONE session per flush.  This converts
+    # ~60 000 individual DB sessions → ~1 000 bulk-insert sessions per run.
+    # Terminal events ("complete"/"error"/"stopped") and full buffers trigger
+    # an immediate flush so the final status row is always persisted.
+    _emit_buf: list[dict] = []
+    _emit_flush_lock = asyncio.Lock()
+    _EMIT_FLUSH_INTERVAL: float = 0.8   # seconds between background flushes
+    _EMIT_FLUSH_BATCH: int = 30         # also flush when buffer hits this size
+    _emit_flush_stop = asyncio.Event()
+
+    async def _flush_emit_buf() -> None:
+        """Bulk-insert all buffered emit rows in a single DB round-trip."""
+        async with _emit_flush_lock:
+            if not _emit_buf:
+                return
+            rows = _emit_buf[:]
+            _emit_buf.clear()
+        if not rows:
+            return
+        from sqlalchemy import text as _sql_t
+        from datetime import datetime as _dte, timezone as _tze
+        import json as _jsone
+        now = _dte.now(_tze.utc)
+        try:
+            async with AsyncSessionLocal() as _edb:
+                await _edb.execute(
+                    _sql_t(
+                        "INSERT INTO scrape_runtime_logs "
+                        "(runtime_job_id, sequence, event, payload, created_at) "
+                        "VALUES (:rid, :seq, :ev, CAST(:pl AS jsonb), :ts)"
+                    ),
+                    [{"rid": r["rid"], "seq": r["seq"], "ev": r["ev"],
+                      "pl": r["pl"], "ts": now} for r in rows],
+                )
+                await _edb.commit()
+        except Exception as _efx:  # noqa: BLE001
+            log.warning("emit buffer flush failed (%d rows): %s", len(rows), _efx)
+
+    async def _emit_flush_loop() -> None:
+        """Background task: drain emit buffer every _EMIT_FLUSH_INTERVAL seconds."""
+        while not _emit_flush_stop.is_set():
+            await asyncio.sleep(_EMIT_FLUSH_INTERVAL)
+            await _flush_emit_buf()
+        await _flush_emit_buf()  # final drain after stop signal
+
+    _emit_flush_task = asyncio.create_task(_emit_flush_loop())
+
     async def emit(event: str, message: str, **kw):
-        # Allocate the sequence number BEFORE awaiting the insert. asyncio is
-        # cooperatively scheduled, so this read-then-increment is atomic
-        # between awaits. Allocating after the await would let four parallel
-        # extract coroutines all read the same value and clash on the unique
-        # (runtime_job_id, sequence) index, dropping log rows to the floor.
+        # Allocate the sequence number BEFORE awaiting — asyncio is cooperatively
+        # scheduled so this read-then-increment is atomic between awaits.
         seq = _seq[0]
         _seq[0] += 1
         # Bug E: derive a UI-facing colour bucket from the message prefix
         # unless the caller passed an explicit ``level`` (which always wins).
-        # Stamped into the JSONB payload so the React log viewer can style
-        # rows without re-parsing the message.
         if "level" not in kw:
             kw["level"] = infer_log_level(message)
-        await _emit(db, runtime_job_id, seq, event, message, kw or None)
+        import json as _json_e
+        p: dict = {"message": message}
+        p.update(kw)
+        _emit_buf.append({
+            "rid": runtime_job_id, "seq": seq, "ev": event,
+            "pl": _json_e.dumps(p),
+        })
+        # Flush immediately on terminal events or when the buffer is full.
+        # Background loop handles routine flushing for in-progress messages.
+        if event in ("complete", "error", "stopped") or len(_emit_buf) >= _EMIT_FLUSH_BATCH:
+            await _flush_emit_buf()
+
     await emit("status", f"Worker claimed queued scrape job (job_id={runtime_job_id})", phase="queue")
 
     # Wipe stale pending/rejected scraped_courses rows for this university so
@@ -3249,20 +3312,26 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     progress[0] += 1
                     idx = progress[0]
                     nm = (link.get("name") or "").strip() or link.get("url", "?")
-                    await emit(
-                        "status",
-                        f"[EXTRACT] {idx}/{total}: {nm}",
-                        phase="extract",
-                        kind="extract_start",
-                        index=idx,
-                        total=total,
-                        url=link.get("url"),
-                    )
-                    # Also emit a structured `progress` log row so the frontend
-                    # progress bar (which keys off event="progress" with
-                    # `current`/`total` fields) renders the live N/total counter,
-                    # elapsed time, and ETA. The status emit above keeps the
-                    # familiar `[EXTRACT] N/total: name` line in the textual log.
+                    # Throttle textual [EXTRACT] status messages for large runs.
+                    # For universities with >200 courses, emitting every single
+                    # course floods the log table and adds DB pressure.  We emit
+                    # every _emit_tick-th course so the live log always shows
+                    # ~50 progress lines regardless of total course count.
+                    # The structured "progress" event is ALWAYS emitted (every
+                    # course) so the frontend progress bar stays smooth.
+                    _emit_tick = max(1, total // 50) if total > 200 else 1
+                    if idx % _emit_tick == 0 or idx == 1 or idx == total:
+                        await emit(
+                            "status",
+                            f"[EXTRACT] {idx}/{total}: {nm}",
+                            phase="extract",
+                            kind="extract_start",
+                            index=idx,
+                            total=total,
+                            url=link.get("url"),
+                        )
+                    # Always emit the structured progress event — the frontend
+                    # progress bar keys off event="progress" with current/total.
                     await emit(
                         "progress",
                         f"Fetching {idx}/{total}: {nm}",
@@ -3367,12 +3436,20 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # ── Batch extraction + staging ────────────────────────────────────────
         # Allow per-uni YAML to tune the batch size via `extraction.batch_size`.
         _effective_batch_size = _EXTRACTION_BATCH_SIZE
+        _yaml_bs = None
         try:
             _yaml_bs = getattr(get_uni_config().extraction, "batch_size", None)
             if _yaml_bs and int(_yaml_bs) >= 1:
                 _effective_batch_size = int(_yaml_bs)
         except Exception:  # noqa: BLE001
             pass
+        # Auto-scale batch size for very large universities when no YAML override
+        # is present.  Halves the number of sibling-cache + dedup overhead passes:
+        #   987-course Ulster: 20 passes (batch=50) → 10 passes (batch=100).
+        # Memory impact is bounded — extraction results are mostly small dicts;
+        # HTML is not retained past extract_course().
+        if not _yaml_bs and len(links) > 400:
+            _effective_batch_size = 100
 
         _link_batches = [
             links[i : i + _effective_batch_size]
@@ -4896,6 +4973,20 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # both tasks first so they tear down concurrently, then await
         # each in turn — sequential await would mean waiting up to
         # two full sleep intervals end-to-end.
+        #
+        # Emit flush task: signal stop, cancel, then do a final drain so
+        # no buffered log rows are silently dropped when the job ends.
+        try:
+            _emit_flush_stop.set()
+            _emit_flush_task.cancel()
+            try:
+                await _emit_flush_task
+            except (asyncio.CancelledError, Exception):  # noqa: BLE001
+                pass
+            await _flush_emit_buf()  # drain any rows buffered after last tick
+        except Exception:  # noqa: BLE001
+            pass
+
         stop_flag[0] = True
         stop_poll_task.cancel()
         heartbeat_task.cancel()
