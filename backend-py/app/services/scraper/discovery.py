@@ -1223,8 +1223,16 @@ async def discover_course_links(
                 else None
             )
             _sm_offset = int(getattr(discovery_config, "sitemap_offset", None) or 0)
+            _fb_allow_pats: list[re.Pattern[str]] = []
+            if discovery_config is not None:
+                for _ap_str in (list(getattr(discovery_config, "allow_url_patterns", None) or [])):
+                    try:
+                        _fb_allow_pats.append(re.compile(_ap_str, re.IGNORECASE))
+                    except re.error:
+                        pass
             sitemap_courses = await discover_from_sitemap(
-                origin, emit=emit, sitemap_url=_explicit_sm, offset=_sm_offset
+                origin, emit=emit, sitemap_url=_explicit_sm, offset=_sm_offset,
+                allow_url_patterns=_fb_allow_pats or None,
             )
         except Exception as exc:
             log.warning("sitemap fallback failed for %s: %s", origin, exc)
@@ -1343,7 +1351,8 @@ async def discover_course_links(
             )
             _sm_offset2 = int(getattr(discovery_config, "sitemap_offset", None) or 0)
             _supp_courses = await discover_from_sitemap(
-                origin, emit=emit, sitemap_url=_explicit_sm2, offset=_sm_offset2
+                origin, emit=emit, sitemap_url=_explicit_sm2, offset=_sm_offset2,
+                allow_url_patterns=_supp_allow_pats or None,
             )
         except Exception as _supp_exc:
             log.warning("sitemap supplement failed for %s: %s", origin, _supp_exc)

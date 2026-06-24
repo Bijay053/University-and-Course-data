@@ -210,6 +210,7 @@ async def discover_from_sitemap(
     emit=None,
     sitemap_url: str | None = None,
     offset: int = 0,
+    allow_url_patterns: "list[re.Pattern[str]] | None" = None,
 ) -> list[dict]:
     """Probe sitemap.xml + robots.txt at ``origin`` and return course candidates.
 
@@ -235,6 +236,26 @@ async def discover_from_sitemap(
     parsed = urlparse(origin)
     base = f"{parsed.scheme}://{parsed.netloc}" if parsed.netloc else origin.rstrip("/")
     base_host = urlparse(base).netloc
+
+    def _accept(loc: str) -> bool:
+        """Return True if ``loc`` should be kept as a course candidate.
+
+        When ``allow_url_patterns`` are provided (from per-uni YAML), any URL
+        matching one of those patterns is accepted after the SSRF and non-course
+        blocklist checks — bypassing the generic ``_COURSE_URL_HINTS`` filter.
+        This lets universities whose course URLs use non-standard path shapes
+        (e.g. ``/{subject}-courses/{year}/…`` at Westminster) appear in sitemap
+        discovery without adding brittle global hints.
+        """
+        if base_host:
+            loc_host = urlparse(loc).netloc
+            if loc_host and not _same_registrable_host(base_host, loc_host):
+                return False
+        if allow_url_patterns:
+            if _is_known_non_course_url(loc):
+                return False
+            return any(p.search(loc) for p in allow_url_patterns)
+        return _is_course_loc(loc, base_host=base_host)
 
     candidates: list[str] = list(f"{base}{p}" for p in _SITEMAP_INDEX_PATHS)
 
@@ -312,7 +333,7 @@ async def discover_from_sitemap(
                     if (
                         loc in found
                         or _is_nested_loc(loc)
-                        or not _is_course_loc(loc, base_host=base_host)
+                        or not _accept(loc)
                     ):
                         continue
                     found[loc] = _slug_to_name(loc)
@@ -334,7 +355,7 @@ async def discover_from_sitemap(
             if (
                 loc in found
                 or _is_nested_loc(loc)
-                or not _is_course_loc(loc, base_host=base_host)
+                or not _accept(loc)
             ):
                 continue
             found[loc] = _slug_to_name(loc)
