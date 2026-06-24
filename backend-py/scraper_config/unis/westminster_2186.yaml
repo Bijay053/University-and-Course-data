@@ -1,7 +1,8 @@
 # University of Westminster
 # Hostname: www.westminster.ac.uk
 # Country: United Kingdom  |  Currency: GBP
-# Discovery: Pre-seeded all 71 pagination pages (841 courses ÷ 12/page).
+# Discovery: Pre-seeded all 85 pagination pages (page=0 … page=84).
+# Westminster confirmed: 841 courses across 85 pages (10/page avg), 0-indexed.
 # BFS used only as a mop-up pass after seed pages are processed.
 #
 # Root cause of original 193-course undercount:
@@ -9,17 +10,17 @@
 #   (mode_of_study:xxx, course_start_date:xxx, course_type:3551) and non-course
 #   /study/ hub pages (accommodation, student-life, etc.) — leaving only 3-4
 #   pagination pages reached before budget exhausted.
-# Fix: all 71 pages pre-seeded as seed_urls; filter-variant and non-course
-#   /study/ paths explicitly blocked so BFS budget is spent on course pages only.
+# Fix: all 85 pages pre-seeded as seed_urls; allow_url_patterns uses
+#   '-courses/20' to match actual course URLs (/{subject}-courses/{year}/...).
 
 discovery:
   always_sitemap_supplement: true
-  # Budget just needs to cover seed pages + any adjacent course detail links.
+  # Budget: 86 seeds (base + page=0..84) + ~20 BFS mop-up = 110.
   # Filter variants and non-course /study/ paths are blocked below.
-  bfs_page_budget: 100
+  bfs_page_budget: 110
   max_candidates: 1200
 
-  # 841 courses ÷ 12 per page = 71 pages (page=0 … page=70).
+  # 841 courses across 85 pages (page=0 … page=84), ~10/page avg.
   # page=0 is identical to the base URL — included for safety.
   seed_urls:
     - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926'
@@ -94,6 +95,20 @@ discovery:
     - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=68'
     - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=69'
     - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=70'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=71'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=72'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=73'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=74'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=75'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=76'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=77'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=78'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=79'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=80'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=81'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=82'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=83'
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=84'
 
   # Westminster actual course URL pattern (discovered from extraction logs):
   #   /{subject}-courses/{year}/{month}/{mode}/{course-slug}
