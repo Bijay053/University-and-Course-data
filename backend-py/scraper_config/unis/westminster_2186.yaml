@@ -1,0 +1,67 @@
+# University of Westminster
+# Hostname: www.westminster.ac.uk
+# Country: United Kingdom  |  Currency: GBP
+# Discovery: Drupal search listing pagination to /study/ detail pages
+# Notes: Whitelisted '/course-search' to ensure the seed itself isn't rejected at the gate.
+
+discovery:
+  always_sitemap_supplement: true
+  bfs_page_budget: 60          # Generous buffer for Drupal View pagination 
+  max_candidates: 1200
+  
+  seed_urls:
+    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926'
+
+  allow_url_patterns:
+    - '/course-search'         # CRITICAL: Allows the seed page itself to be fetched & paginated
+    - '/study/'                # Catches Westminster's standard detail pages (e.g., /study/full-time/law-llb)
+    - '/courses/'              # Secondary safety net
+
+  block_url_patterns:
+    - '/news'
+    - '/events'
+    - '/about'
+    - '/staff'
+    - '/research/'
+    - '/alumni'
+    - '/student-life/'
+    - '/business/'             # Enterprise/B2B services
+    - '\.pdf$'
+
+extraction:
+  fees:
+    default_currency: 'GBP'
+    prefer_international: true
+    prefer_annual_over_total: true
+    reject_keywords:
+      - 'Home student'
+      - 'Home fee'
+      - 'UK student'
+      - 'UK fee'
+      - 'Domestic'
+      - 'Part time'
+      - 'Part-time'
+
+  english:
+    trust_vision_ocr: false
+    default_ielts: 6.0
+    default_pte: 60
+    default_toefl: 80
+
+  intake:
+    start_dates_only: true
+
+  course_name:
+    strip_title_suffixes:
+      - ' | University of Westminster'
+      - ' - University of Westminster'
+      - ' | University of Westminster, London'
+
+  filters:
+    online_only:
+      enabled: false
+  staging:
+    reject_if_missing:
+      - course_name
+    skip_degree_qualifier_check: true
+    require_international_fee: false
