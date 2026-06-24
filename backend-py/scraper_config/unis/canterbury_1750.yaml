@@ -16,8 +16,9 @@ hostname_guard: "canterbury.ac.nz"
 #   NOT individual degree qualifications. These pages have no fee, no IELTS,
 #   no duration, no degree level. All 178 courses were missing 4+ key fields.
 #
-# Fix: switch to the qualifications collection (uoc2|sp-aem-all-qualifications)
-#   which returns actual degree pages (/study/academic-study/qualifications/...),
+# Fix: switch to the qualifications collection (uoc2~sp-aem-qualifications,
+#   profile=qualifications-results-page) which returns actual degree pages
+#   (/study/academic-study/qualifications/...) — 227 results in one request.
 #   e.g. /study/academic-study/qualifications/bachelor-of-commerce,
 #        /study/academic-study/qualifications/master-of-science.
 
@@ -27,7 +28,7 @@ discovery:
   generic_search_api:
     enabled: true
     method: GET
-    url: "https://search.canterbury.ac.nz/s/search.json?s=%21PadreNull&MBL=300&num_ranks=300&profile=all-qualifications-results-page&collection=uoc2%7Esp-aem-all-qualifications&sort=title"
+    url: "https://search.canterbury.ac.nz/s/search.json?s=%21PadreNull&MBL=300&num_ranks=300&profile=qualifications-results-page&collection=uoc2%7Esp-aem-qualifications&sort=title"
     root_path: "response.resultPacket.results"
     url_fields:
       - "liveUrl"
