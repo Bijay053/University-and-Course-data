@@ -95,28 +95,26 @@ discovery:
     - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=69'
     - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926&page=70'
 
+  # Westminster actual course URL pattern (discovered from extraction logs):
+  #   /{subject}-courses/{year}/{month}/{mode}/{course-slug}
+  # e.g. /accounting-and-finance-courses/2026-27/september/full-time/accounting-and-finance-bsc-honours
+  # Apprenticeships live under /business-services/... and /business-and-community/...
+  # /course-search is needed only for BFS crawl (to extract course links from listing pages).
+  # /study/ is intentionally NOT in allow_url_patterns — Westminster /study/ pages
+  # are hub/programme-spec pages (offer-holders, prospectus, accommodation, etc.)
+  # that cause 450+ false candidates to be extracted as if they were courses.
   allow_url_patterns:
     - '/course-search'
-    - '/study/'
-    - '/courses/'
+    - '-courses/20'                                  # /{subject}-courses/{year}/...
     - '/business-services/workforce-development/'
     - '/business-and-community/workforce-development/'
 
   block_url_patterns:
-    # ── Non-course /study/ hub pages that waste BFS budget ───────────────────
-    - '/study/subjects'
-    - '/study/open-days'
-    - '/study/fees-and-funding'
-    - '/study/accommodation'
-    - '/study/student-life'
-    - '/study/language-tests'
-    - '/study/degree-apprenticeships-for-applicants'
-    - '/study/postgraduate/research-degrees'  # separate seed below if needed
-    # ── Drupal facet-filter variant URLs — subsets of the 841, waste budget ──
-    - 'mode_of_study'          # blocks &f[x]=mode_of_study:xxx variants
-    - 'course_start_date'      # blocks &f[x]=course_start_date:xxx variants
-    - 'course_type%3A3551'     # blocks distance-learning filter variant
-    - 'f%5B2%5D'               # blocks any URL with a 3rd facet filter
+    # ── Drupal facet-filter variant URLs (subsets of the 841, waste budget) ──
+    - 'mode_of_study'
+    - 'course_start_date'
+    - 'course_type%3A3551'
+    - 'f%5B2%5D'
     # ── Standard non-course paths ────────────────────────────────────────────
     - '/news'
     - '/events'
