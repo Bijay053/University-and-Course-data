@@ -1343,6 +1343,31 @@ async def discover_course_links(
                 phase="discover",
                 kind="sitemap_supplement",
             )
+        # Per-uni allow_url_patterns pre-filter (CQU regression 2026-05-11):
+        # CQU's sitemap returns 726 URLs in raw order — /study/* category
+        # landings appear at indices 0..30 and the first HE-style /courses/c<x>NN
+        # URL doesn't appear until index 364.  Without this pre-filter the
+        # supplement loop fills the 200-slot cap with /study/* + alphabetic
+        # PDC/TAFE codes long before any HE degree URL is seen, and the
+        # orchestrator's Phase A.5b allow filter then drops 100% of survivors
+        # → 0 staged.  Applying the per-uni allow_url_patterns here means
+        # non-matching URLs simply don't consume cap slots, so the 194 HE
+        # URLs CQU publishes all get a chance to be added.
+        # NOTE: compiled before the discover_from_sitemap() call so they can
+        # also be passed into the sitemap module to bypass the generic
+        # _COURSE_URL_HINTS check for universities with non-standard URL shapes
+        # (e.g. Westminster's /{subject}-courses/{year}/... format).
+        _supp_allow_pats: list[re.Pattern[str]] = []
+        if discovery_config is not None:
+            _ap_raw = list(getattr(discovery_config, "allow_url_patterns", None) or [])
+            for _ap_str in _ap_raw:
+                try:
+                    _supp_allow_pats.append(re.compile(_ap_str, re.IGNORECASE))
+                except re.error:
+                    log.warning(
+                        "discovery.allow_url_patterns: invalid regex skipped (sitemap supplement): %s",
+                        _ap_str,
+                    )
         try:
             _explicit_sm2 = (
                 discovery_config.sitemap_url
@@ -1357,27 +1382,6 @@ async def discover_course_links(
         except Exception as _supp_exc:
             log.warning("sitemap supplement failed for %s: %s", origin, _supp_exc)
             _supp_courses = []
-        # Per-uni allow_url_patterns pre-filter (CQU regression 2026-05-11):
-        # CQU's sitemap returns 726 URLs in raw order — /study/* category
-        # landings appear at indices 0..30 and the first HE-style /courses/c<x>NN
-        # URL doesn't appear until index 364.  Without this pre-filter the
-        # supplement loop fills the 200-slot cap with /study/* + alphabetic
-        # PDC/TAFE codes long before any HE degree URL is seen, and the
-        # orchestrator's Phase A.5b allow filter then drops 100% of survivors
-        # → 0 staged.  Applying the per-uni allow_url_patterns here means
-        # non-matching URLs simply don't consume cap slots, so the 194 HE
-        # URLs CQU publishes all get a chance to be added.
-        _supp_allow_pats: list[re.Pattern[str]] = []
-        if discovery_config is not None:
-            _ap_raw = list(getattr(discovery_config, "allow_url_patterns", None) or [])
-            for _ap_str in _ap_raw:
-                try:
-                    _supp_allow_pats.append(re.compile(_ap_str, re.IGNORECASE))
-                except re.error:
-                    log.warning(
-                        "discovery.allow_url_patterns: invalid regex skipped (sitemap supplement): %s",
-                        _ap_str,
-                    )
         _supp_added = 0
         for _sc in _supp_courses:
             _su = _sc.get("url")
