@@ -1,0 +1,60 @@
+# University of Chichester
+# Hostname: www.chi.ac.uk
+# Country: United Kingdom  |  Currency: GBP
+# Discovery: Standard server-rendered HTML extraction via /courses/ listing
+# Notes: Standard UK pattern applied. Online-only filter disabled to protect blended courses; standard UK fee blocklist applied to reject "Home" pricing.
+
+discovery:
+  always_sitemap_supplement: true
+  seed_urls:
+    - 'https://www.chi.ac.uk/courses/'
+  
+  allow_url_patterns:
+    - '/courses/'
+
+  block_url_patterns:
+    - '/news'
+    - '/events'
+    - '/about'
+    - '/staff'
+    - '/research'
+    - '/alumni'
+    - '\.pdf$'
+
+extraction:
+  fees:
+    default_currency: 'GBP'
+    prefer_international: true
+    prefer_annual_over_total: true
+    reject_keywords:
+      - 'Home student'
+      - 'Home fee'
+      - 'UK student'
+      - 'UK fee'
+      - 'Domestic'
+      - 'Part time'
+      - 'Part-time'
+
+  english:
+    trust_vision_ocr: false
+    default_ielts: 6.0
+    default_pte: 60
+    default_toefl: 80
+
+  intake:
+    start_dates_only: true
+
+  course_name:
+    strip_title_suffixes:
+      - ' | University of Chichester'
+      - ' - University of Chichester'
+      - ' | Chichester'
+
+  filters:
+    online_only:
+      enabled: false
+  staging:
+    reject_if_missing:
+      - course_name
+    skip_degree_qualifier_check: true
+    require_international_fee: false
