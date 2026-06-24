@@ -1,32 +1,68 @@
 # Leeds Beckett University
 # Hostname: www.leedsbeckett.ac.uk
-# Country: United Kingdom  |  Currency: GBP
+# Country: United Kingdom | Currency: GBP
 
 discovery:
   always_sitemap_supplement: true
+  seed_urls:
+    - "https://www.leedsbeckett.ac.uk/search/?form=partial&query=Courses&f.Filters%7Cleedsbeckett-courses=Courses&collection=leedsbeckett-meta&f.Level%7CcourseLevel=Undergraduate&f.Level%7CcourseLevel=Postgraduate"
+  allow_url_patterns:
+    - '/courses/'                        # Matches individual course pages like /courses/bachelor-of-arts/
+  block_url_patterns:
+    - '/news'
+    - '/events'
+    - '/about'
+    - '/staff'
+    - '/research'
+
 
 extraction:
+  browser_wait_strategy: networkidle    # Wait for JS to load dynamic content
+  browser_dcl_settle_ms: 1500           # Additional wait time after DCL
+
   fees:
-    default_currency: GBP
-    prefer_international: true
-    # Central fee page lists all programme fees in £
-    central_pages:
-      - url: "https://www.leedsbeckett.ac.uk/international-students/course-fees-and-living-costs/"
-        type: fees
+    default_currency: "GBP"
+    prefer_international: true          # Spider explicitly looks for international fees
+    prefer_annual_over_total: true      # Spider extracts annual fee ("year")
+    prefer_year_one_over_total: true    # Implied by annual fee extraction
+    reject_keywords:                    # Drop any row that mentions domestic fees
+      - "Home student"
+      - "Home fee"
+      - "UK student"
+      - "UK fee"
+      - "Domestic"
 
-  filters:
-    domestic_only:
-      enabled: false
-    online_only:
-      enabled: false
+  english:
+    course_english_priority: true       # Spider extracts IELTS details from individual course pages
+    trust_vision_ocr: false             # UK sites often have decorative IELTS images
+    default_ielts: 6.0                  # Fallback default if not found on page
+    default_pte: 60                     # Fallback default if not found on page
+    default_toefl: 80                   # Fallback default if not found on page
 
-  study_mode:
-    # Campus university — suppress \bonline\b nav-link false positives
-    suppress_nav_rule: true
+  intake:
+    start_dates_only: true              # Spider extracts specific start dates/months
 
   course_name:
     strip_title_suffixes:
       - " | Leeds Beckett University"
       - " - Leeds Beckett University"
-      - " | LBU"
-      - " - LBU"
+      - " — Leeds Beckett University"
+      - "| Leeds Beckett University"     # Without leading space, just in case
+      - " | LBU"                        # Common abbreviation
+
+  filters:
+    online_only:
+      enabled: false                    # Allow online courses for international students (common for UK)
+
+  text_cleaning:
+    duration:
+      reject_sentence_patterns:
+        - 'up to \d+(?:\.\d+)? (?:years?|months?)'
+        - 'maximum of \d+ (?:years?|months?)'
+        - 'candidature.*\d+ years'
+
+  staging:
+    reject_if_missing:
+      - course_name
+    skip_degree_qualifier_check: true   # SPA H1 might lack full degree prefix; allow for flexibility
+    require_international_fee: false    # Fees might be on JS tabs or dynamically loaded; stage for review if missing
