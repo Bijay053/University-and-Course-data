@@ -130,6 +130,10 @@ discovery:
     - 'course_start_date'
     - 'course_type%3A3551'
     - 'f%5B2%5D'
+    # ── Single-filter search pages (UG-only / PG-only) end here; seed URLs ──
+    # ── have *both* f[0] and f[1] so they don't match these patterns.     ──
+    - 'course_type%3A26$'    # /course-search?...f[0]=course_type:26  (UG-only listing)
+    - 'course_type%3A926$'   # /course-search?...f[0]=course_type:926 (PG-only listing)
     # ── Standard non-course paths ────────────────────────────────────────────
     - '/news'
     - '/events'
