@@ -1,0 +1,57 @@
+# University of Edinburgh
+# Hostname: study.ed.ac.uk
+# Country: United Kingdom  |  Currency: GBP
+# Discovery: Seeded BFS via specific programme directories
+# Notes: Standard UK pattern applied with Scottish fee exclusions. Online-only filter disabled to protect blended courses.
+
+discovery:
+  always_sitemap_supplement: true
+  seed_urls:
+    - 'https://study.ed.ac.uk/programmes/undergraduate'
+    - 'https://study.ed.ac.uk/programmes/postgraduate-research'
+    - 'https://study.ed.ac.uk/programmes/postgraduate-taught'
+  
+  allow_url_patterns:
+    - '/programmes/'
+
+  block_url_patterns:
+    - '/news'
+    - '/events'
+    - '/about'
+    - '/staff'
+    - '/alumni'
+    - '\.pdf$'
+
+extraction:
+  fees:
+    default_currency: 'GBP'
+    prefer_international: true
+    prefer_annual_over_total: true
+    reject_keywords:
+      - 'Home student'
+      - 'Home fee'
+      - 'UK student'
+      - 'UK fee'
+      - 'Domestic'
+      - 'Scottish'
+
+  english:
+    trust_vision_ocr: false
+    course_english_priority: true
+
+  intake:
+    start_dates_only: true
+
+  course_name:
+    strip_title_suffixes:
+      - ' | The University of Edinburgh'
+      - ' - The University of Edinburgh'
+
+  filters:
+    online_only:
+      enabled: false
+  staging:
+    reject_if_missing:
+      - course_name
+    skip_degree_qualifier_check: true
+    require_international_fee: false
