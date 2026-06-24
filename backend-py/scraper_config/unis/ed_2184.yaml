@@ -2,15 +2,147 @@
 # Hostname: study.ed.ac.uk
 # Country: United Kingdom  |  Currency: GBP
 # Discovery: Seeded BFS via specific programme directories
-# Notes: Standard UK pattern applied with Scottish fee exclusions. Online-only filter disabled to protect blended courses.
+# Notes: Standard UK pattern applied with Scottish fee exclusions.
+#        Online-only filter disabled to protect blended courses.
+#
+# Pagination (as of 2026-06-24):
+#   Undergraduate:        73 pages  (page=0 … page=72)
+#   Postgraduate Research: 19 pages  (page=0 … page=18)
+#   Postgraduate Taught:   28 pages  (page=0 … page=27)
+#
+# BFS does not auto-follow ?page=N query-param pagination, so all 120
+# listing pages are pre-seeded (same pattern as UOW 70-page pre-seed).
+# bfs_page_budget is raised to 130 to cover the full seed set.
 
 discovery:
   always_sitemap_supplement: true
+  bfs_page_budget: 130
+
   seed_urls:
+    # ── Undergraduate (page=0 is the base URL; pages 1–72 pre-seeded) ──────
     - 'https://study.ed.ac.uk/programmes/undergraduate'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=1'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=2'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=3'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=4'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=5'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=6'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=7'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=8'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=9'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=10'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=11'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=12'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=13'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=14'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=15'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=16'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=17'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=18'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=19'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=20'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=21'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=22'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=23'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=24'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=25'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=26'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=27'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=28'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=29'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=30'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=31'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=32'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=33'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=34'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=35'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=36'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=37'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=38'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=39'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=40'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=41'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=42'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=43'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=44'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=45'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=46'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=47'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=48'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=49'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=50'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=51'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=52'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=53'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=54'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=55'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=56'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=57'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=58'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=59'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=60'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=61'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=62'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=63'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=64'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=65'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=66'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=67'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=68'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=69'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=70'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=71'
+    - 'https://study.ed.ac.uk/programmes/undergraduate?query=&page=72'
+    # ── Postgraduate Research (page=0 is the base URL; pages 1–18 pre-seeded)
     - 'https://study.ed.ac.uk/programmes/postgraduate-research'
+    - 'https://study.ed.ac.uk/programmes/postgraduate-research?page=1'
+    - 'https://study.ed.ac.uk/programmes/postgraduate-research?page=2'
+    - 'https://study.ed.ac.uk/programmes/postgraduate-research?page=3'
+    - 'https://study.ed.ac.uk/programmes/postgraduate-research?page=4'
+    - 'https://study.ed.ac.uk/programmes/postgraduate-research?page=5'
+    - 'https://study.ed.ac.uk/programmes/postgraduate-research?page=6'
+    - 'https://study.ed.ac.uk/programmes/postgraduate-research?page=7'
+    - 'https://study.ed.ac.uk/programmes/postgraduate-research?page=8'
+    - 'https://study.ed.ac.uk/programmes/postgraduate-research?page=9'
+    - 'https://study.ed.ac.uk/programmes/postgraduate-research?page=10'
+    - 'https://study.ed.ac.uk/programmes/postgraduate-research?page=11'
+    - 'https://study.ed.ac.uk/programmes/postgraduate-research?page=12'
+    - 'https://study.ed.ac.uk/programmes/postgraduate-research?page=13'
+    - 'https://study.ed.ac.uk/programmes/postgraduate-research?page=14'
+    - 'https://study.ed.ac.uk/programmes/postgraduate-research?page=15'
+    - 'https://study.ed.ac.uk/programmes/postgraduate-research?page=16'
+    - 'https://study.ed.ac.uk/programmes/postgraduate-research?page=17'
+    - 'https://study.ed.ac.uk/programmes/postgraduate-research?page=18'
+    # ── Postgraduate Taught (page=0 is the base URL; pages 1–27 pre-seeded) ─
     - 'https://study.ed.ac.uk/programmes/postgraduate-taught'
-  
+    - 'https://study.ed.ac.uk/programmes/postgraduate-taught?page=1'
+    - 'https://study.ed.ac.uk/programmes/postgraduate-taught?page=2'
+    - 'https://study.ed.ac.uk/programmes/postgraduate-taught?page=3'
+    - 'https://study.ed.ac.uk/programmes/postgraduate-taught?page=4'
+    - 'https://study.ed.ac.uk/programmes/postgraduate-taught?page=5'
+    - 'https://study.ed.ac.uk/programmes/postgraduate-taught?page=6'
+    - 'https://study.ed.ac.uk/programmes/postgraduate-taught?page=7'
+    - 'https://study.ed.ac.uk/programmes/postgraduate-taught?page=8'
+    - 'https://study.ed.ac.uk/programmes/postgraduate-taught?page=9'
+    - 'https://study.ed.ac.uk/programmes/postgraduate-taught?page=10'
+    - 'https://study.ed.ac.uk/programmes/postgraduate-taught?page=11'
+    - 'https://study.ed.ac.uk/programmes/postgraduate-taught?page=12'
+    - 'https://study.ed.ac.uk/programmes/postgraduate-taught?page=13'
+    - 'https://study.ed.ac.uk/programmes/postgraduate-taught?page=14'
+    - 'https://study.ed.ac.uk/programmes/postgraduate-taught?page=15'
+    - 'https://study.ed.ac.uk/programmes/postgraduate-taught?page=16'
+    - 'https://study.ed.ac.uk/programmes/postgraduate-taught?page=17'
+    - 'https://study.ed.ac.uk/programmes/postgraduate-taught?page=18'
+    - 'https://study.ed.ac.uk/programmes/postgraduate-taught?page=19'
+    - 'https://study.ed.ac.uk/programmes/postgraduate-taught?page=20'
+    - 'https://study.ed.ac.uk/programmes/postgraduate-taught?page=21'
+    - 'https://study.ed.ac.uk/programmes/postgraduate-taught?page=22'
+    - 'https://study.ed.ac.uk/programmes/postgraduate-taught?page=23'
+    - 'https://study.ed.ac.uk/programmes/postgraduate-taught?page=24'
+    - 'https://study.ed.ac.uk/programmes/postgraduate-taught?page=25'
+    - 'https://study.ed.ac.uk/programmes/postgraduate-taught?page=26'
+    - 'https://study.ed.ac.uk/programmes/postgraduate-taught?page=27'
+
   allow_url_patterns:
     - '/programmes/'
 
@@ -24,7 +156,7 @@ discovery:
 
 extraction:
   fees:
-    default_currency: 'GBP'
+    default_currency: GBP
     prefer_international: true
     prefer_annual_over_total: true
     reject_keywords:
@@ -50,6 +182,7 @@ extraction:
   filters:
     online_only:
       enabled: false
+
   staging:
     reject_if_missing:
       - course_name
