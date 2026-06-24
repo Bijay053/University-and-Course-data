@@ -73,7 +73,7 @@ class Settings(BaseSettings):
 
     # Scraping
     max_browser_concurrency: int = 10
-    max_http_concurrency: int = 20
+    max_http_concurrency: int = 40
     per_uni_timeout_seconds: int = 1500
 
     # Auto-publish thresholds (Bug #6 — looser than Node defaults)

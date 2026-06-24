@@ -275,12 +275,11 @@ async def _emit(db, runtime_job_id: str, sequence: int, event: str, message: str
 
 
 _MAX_COURSES_PER_JOB = 1000
-_MAX_PARALLEL_FETCH = 4
+_MAX_PARALLEL_FETCH = 8
 # Courses extracted and staged per batch before the next batch starts.
-# Lower values reduce peak memory at the cost of slightly more staging
-# overhead.  50 is a good default for large universities (>200 courses)
-# without harming smaller ones (a single batch covers them entirely).
-_EXTRACTION_BATCH_SIZE = 50
+# Higher values reduce staging overhead on large universities.
+# 100 covers most large unis (>500 courses) in 5 batches instead of 10.
+_EXTRACTION_BATCH_SIZE = 100
 # How long a pending/rejected scraped_courses row may sit before the next
 # scrape is allowed to wipe it. Anything older than this is considered
 # left-over from a failed prior run and is safe to clear so dedup does not

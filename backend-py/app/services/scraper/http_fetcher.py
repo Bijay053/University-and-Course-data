@@ -38,6 +38,39 @@ log = logging.getLogger(__name__)
 _sem = asyncio.Semaphore(settings.max_http_concurrency)
 
 # ---------------------------------------------------------------------------
+# Shared persistent AsyncClient — connection-pool reuse
+# ---------------------------------------------------------------------------
+# Creating a fresh AsyncClient() per request pays a new TCP+TLS handshake for
+# every URL even when hitting the same host repeatedly (500 courses → 500
+# handshakes).  A module-level shared client with keep-alive reuses open
+# connections across coroutines, cutting per-request overhead to ~5-20ms.
+# asyncio is single-threaded/cooperative so there is no data-race risk on the
+# client object itself; httpx.AsyncClient is explicitly documented as
+# concurrency-safe.
+_shared_http_client: httpx.AsyncClient | None = None
+
+
+def _get_shared_client() -> httpx.AsyncClient:
+    """Return (or lazily create) the module-level shared AsyncClient."""
+    global _shared_http_client
+    if _shared_http_client is None or _shared_http_client.is_closed:
+        _shared_http_client = httpx.AsyncClient(
+            timeout=httpx.Timeout(15.0, connect=10.0),
+            follow_redirects=True,
+            limits=httpx.Limits(
+                max_connections=60,
+                max_keepalive_connections=40,
+                keepalive_expiry=30,
+            ),
+            headers={
+                "User-Agent": _BROWSER_UA,
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                "Accept-Language": "en-US,en;q=0.9",
+            },
+        )
+    return _shared_http_client
+
+# ---------------------------------------------------------------------------
 # Scrape.do render gate — extraction-only ContextVar
 # ---------------------------------------------------------------------------
 # `_scrape_do_render_active` is False by default so that discovery, sitemap,
@@ -411,7 +444,7 @@ async def fetch_html_wayback(url: str) -> str | None:
     if cached_ts:
         raw_url = f"https://web.archive.org/web/{cached_ts}id_/{url}"
         try:
-            async with httpx.AsyncClient(timeout=60, follow_redirects=True) as c:
+            async with httpx.AsyncClient(timeout=25, follow_redirects=True) as c:
                 r = await c.get(raw_url, headers={"User-Agent": _BROWSER_UA})
                 if r.status_code == 200:
                     log.info(
@@ -465,7 +498,7 @@ async def fetch_html_wayback(url: str) -> str | None:
 
     raw_url = snapshot_url.replace(f"/web/{timestamp}/", f"/web/{timestamp}id_/", 1)
     try:
-        async with httpx.AsyncClient(timeout=60, follow_redirects=True) as c:
+        async with httpx.AsyncClient(timeout=25, follow_redirects=True) as c:
             r = await c.get(raw_url, headers={"User-Agent": _BROWSER_UA})
             if r.status_code == 200:
                 log.info(
@@ -485,18 +518,9 @@ async def fetch_html_wayback(url: str) -> str | None:
 
 @asynccontextmanager
 async def _client():
-    async with httpx.AsyncClient(
-        timeout=30,
-        follow_redirects=True,
-        headers={
-            # Many university sites refuse anything that looks like a bot. We
-            # use a real browser UA and accept-headers so plain HTML pages load.
-            "User-Agent": _BROWSER_UA,
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            "Accept-Language": "en-US,en;q=0.9",
-        },
-    ) as c:
-        yield c
+    # Yield the shared persistent client (connection-pool reuse).
+    # No enter/exit — the shared client stays open for the life of the worker.
+    yield _get_shared_client()
 
 
 async def fetch_html(url: str, *, retries: int = 2) -> str | None:
@@ -606,7 +630,7 @@ async def fetch_html(url: str, *, retries: int = 2) -> str | None:
             except Exception as exc:
                 last_exc = exc
                 log.warning("fetch %s attempt %s failed: %s", url, attempt, exc)
-        await asyncio.sleep(1.5 * (attempt + 1))
+        await asyncio.sleep(0.5 * (attempt + 1))
 
     if got_hard_403:
         # Server explicitly rejected the request — no point trying cffi or
