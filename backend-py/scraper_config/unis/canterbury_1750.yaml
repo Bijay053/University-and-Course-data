@@ -44,7 +44,10 @@ discovery:
   always_sitemap_supplement: true
   sitemap_url: https://www.canterbury.ac.nz/sitemap.xml
 
-  bfs_page_budget: 80
+  # Skip BFS — site blocks direct httpx on all pages. The Funnelback API
+  # (generic_search_api above) delivers all 179 course links via browser
+  # session. BFS would only waste 2 failed fetches before giving up.
+  bfs_page_budget: 0
   max_candidates: 700
   expected_min_courses: 200
 
@@ -79,9 +82,18 @@ discovery:
   use_wayback: false
 
 extraction:
+  # Canterbury NZ blocks direct httpx + curl_cffi + Playwright (all return 403
+  # or empty). The [BROWSER↑] rescue path in single_course.py bypasses the
+  # Scrape.do chain entirely, so without this flag Scrape.do is never tried
+  # and every course ends as fetch_failed.
+  # scrape_do_skip_fallbacks=true makes Scrape.do the FIRST (and only) HTTP
+  # attempt, so httpx is never "blocked" and [BROWSER↑] never fires.
+  # Canterbury NZ uses AEM (server-side rendered) so static mode is sufficient.
+  scrape_do_skip_fallbacks: true
   skip_browser_rescue: true
   skip_per_course_browser: true
-  max_parallel_fetch: 4
+  # Scrape.do proxies have no per-host rate limit — raise from 4 → 8.
+  max_parallel_fetch: 8
 
   fees:
     central_page: https://www.canterbury.ac.nz/study/getting-started/study-and-living-costs/study-costs/international-tuition-fees
