@@ -11,6 +11,7 @@ discovery:
   
   allow_url_patterns:
     - '/courses/'
+    - '/course/'
 
   block_url_patterns:
     - '/news'
