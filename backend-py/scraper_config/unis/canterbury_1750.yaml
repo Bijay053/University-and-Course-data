@@ -180,6 +180,8 @@ extraction:
   staging:
     reject_if_missing:
       - course_name
-
+    skip_degree_qualifier_check: true
+    require_international_fee: false
+    dedup_use_full_url: true   
   default_course_location: Christchurch
   prefer_blended_over_on_campus: true
