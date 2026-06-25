@@ -633,7 +633,8 @@ async def browser_discover_generic(
             # 3. Name / title fields (plain string or Elastic App Search {"raw": "..."})
             if not name:
                 for key in ("title", "name", "label", "course_name",
-                            "courseTitle", "heading", "courseName"):
+                            "courseTitle", "heading", "courseName",
+                            "menu_title"):
                     val = item.get(key)
                     if isinstance(val, str) and val:
                         name = val
@@ -1068,20 +1069,23 @@ async def browser_discover_generic(
                                                 f"total_results={_eas_total_res} "
                                                 f"total_pages={_eas_total_pages or '?'}"
                                             )
-                                        _eas_items = _eas_data.get("results", [])
                                         _eas_before = len(results)
-                                        for _eas_it in _eas_items:
-                                            if isinstance(_eas_it, dict):
-                                                # Deduplicate by raw URL across query rounds
-                                                _eas_it_url = (
-                                                    _eas_it.get("link")
-                                                    or _eas_it.get("url")
-                                                    or ""
-                                                )
-                                                if _eas_it_url in _eas_seen_urls:
-                                                    continue
-                                                _eas_seen_urls.add(_eas_it_url)
-                                                _from_item(_eas_it)
+                                        # Use the shared XHR extractor (resolves relative
+                                        # URLs, applies _looks_like_course filter).
+                                        # Do NOT call _from_item directly — it is a
+                                        # closure inside _extract_courses_from_xhr_json
+                                        # and is not in scope here.
+                                        _eas_cands = _extract_courses_from_xhr_json(
+                                            _eas_data
+                                        )
+                                        for _eas_cand in _eas_cands:
+                                            _eas_cand_url = _eas_cand.get("url", "")
+                                            if (
+                                                _eas_cand_url
+                                                and _eas_cand_url not in _eas_seen_urls
+                                            ):
+                                                _eas_seen_urls.add(_eas_cand_url)
+                                                results.append(_eas_cand)
                                         _eas_gained = len(results) - _eas_before
                                         log.info(
                                             "[EAS] q=%r page %d/%s → +%d new courses (total=%d)",

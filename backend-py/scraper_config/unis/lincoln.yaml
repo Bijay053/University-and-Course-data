@@ -9,7 +9,7 @@
 #       POST /_search-proxy/api/as/v1/engines/--dummy-value--/search.json
 #     The proxy adds the API key server-side; no auth token is needed from the browser.
 #
-#   - Root cause of 17-27/118 bug (TWO separate problems):
+#   - Root cause of 17-27/118 bug (TWO separate problems, now fixed):
 #     1. The SPA does NOT auto-query Elastic App Search on page load — it waits for
 #        user interaction (typing in the search box).  So the XHR interceptor NEVER
 #        fires during the seed visit.  Result: 0 courses from XHR, BFS nav takes over,
@@ -18,12 +18,22 @@
 #        `total_results` but Elastic App Search stores it at `meta.page.total_results`
 #        (nested), so only page 1 (15 results) would have been collected.
 #
+#   - Root cause of 39/118 bug (third problem, fixed 2026-06-25):
+#     The elastic_api_bootstrap code called `_from_item()` which is a closure defined
+#     INSIDE `_extract_courses_from_xhr_json()` at indent 8.  The bootstrap code runs
+#     at indent 48 in the outer scope → NameError on every item → caught by the
+#     per-page `except Exception: break` handler → 0 courses from all 4 queries.
+#     Only the XHR interceptor (which calls _extract_courses_from_xhr_json correctly)
+#     captured 39 courses — from bachelor query page 1 only (1 JSON API endpoint).
+#     Fix: replaced the broken _from_item() per-item loop with a call to
+#     _extract_courses_from_xhr_json(_eas_data) (in scope at indent 4), deduped by
+#     resolved URL, appended to outer results list.
+#
 #   - Fix: discovery.elastic_api_bootstrap config (new in browser_discover_generic.py).
 #     After the seed page loads in the patchright browser (giving Cloudflare clearance),
 #     the scraper POSTs to the Elastic API directly via page.evaluate() — inheriting
 #     the CF clearance cookies — and paginates through all result pages.
-#     118 courses / 100 per page = 2 pages. Once bootstrap finishes (~200 courses found
-#     at seed time), _seeds_filled=True → BFS is skipped entirely.
+#     Once bootstrap finishes, _seeds_filled=True → BFS is skipped entirely.
 #
 #   - A small number of UG courses at /study/courses-2/course-search/<slug>/ would
 #     have been missed by BFS nav; allow_url_patterns covers both paths for any
