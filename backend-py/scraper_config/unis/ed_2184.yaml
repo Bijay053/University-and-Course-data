@@ -166,18 +166,6 @@ discovery:
     - '/user/'                           # CMS login/user redirects
     - 'entry-requirements'               # sub-pages fetched via follow_admission_links, not standalone courses
 
-  # Phase A.5c extraction gate — BFS crawls listing pages freely; only URLs
-  # matching one of these regexes are kept for per-course extraction.
-  # Patterns distinguish individual course pages from pagination/listing URLs:
-  #   UG courses:  /programmes/undergraduate/NNN-slug  (digit after the slash)
-  #   PGT courses: /programmes/postgraduate-taught/alpha-slug  (letter after the slash)
-  #   PGR courses: /programmes/postgraduate-research/alpha-slug  (letter after the slash)
-  # Pagination (?page=N), fee pages, login redirects and sub-pages are all excluded.
-  course_detail_url_patterns:
-    - '/programmes/undergraduate/\d'
-    - '/programmes/postgraduate-taught/[a-z]'
-    - '/programmes/postgraduate-research/[a-z]'
-
 extraction:
   fees:
     default_currency: GBP
