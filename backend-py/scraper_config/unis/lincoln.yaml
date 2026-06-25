@@ -4,22 +4,37 @@
 # DIAGNOSIS (2026-06-03, updated 2026-06-25):
 #   - www.lincoln.ac.nz returns HTTP 403 to plain-HTTP requests from cloud IPs.
 #   - All 118 courses live at /study/study-programmes/programme-search/<slug>/.
-#     The SPA at programme-search/ calls Elastic App Search via a server-side proxy:
+#     The SPA at programme-search/ exposes them via Elastic App Search through a
+#     server-side proxy at:
 #       POST /_search-proxy/api/as/v1/engines/--dummy-value--/search.json
-#     The proxy adds the API key server-side; no auth token needed from the browser.
-#   - Root cause of 17/118 bug: the XHR interceptor correctly captured page 1 (15
-#     results), but the pagination detector did not find the total because Elastic
-#     App Search stores it at meta.page.total_results (nested), not at the root
-#     level. Fix: browser_discover_generic.py now checks that nested path and
-#     uses POST-body pagination (page: {current: N, size: 15}) for subsequent pages.
-#   - A small number of UG courses also live at /study/courses-2/course-search/<slug>/
-#     (found by browser nav); allow_url_patterns covers both paths.
+#     The proxy adds the API key server-side; no auth token is needed from the browser.
+#
+#   - Root cause of 17-27/118 bug (TWO separate problems):
+#     1. The SPA does NOT auto-query Elastic App Search on page load — it waits for
+#        user interaction (typing in the search box).  So the XHR interceptor NEVER
+#        fires during the seed visit.  Result: 0 courses from XHR, BFS nav takes over,
+#        finds 27 before the 150s time budget expires.
+#     2. Even if the XHR had fired, the pagination detector checked root-level keys for
+#        `total_results` but Elastic App Search stores it at `meta.page.total_results`
+#        (nested), so only page 1 (15 results) would have been collected.
+#
+#   - Fix: discovery.elastic_api_bootstrap config (new in browser_discover_generic.py).
+#     After the seed page loads in the patchright browser (giving Cloudflare clearance),
+#     the scraper POSTs to the Elastic API directly via page.evaluate() — inheriting
+#     the CF clearance cookies — and paginates through all result pages.
+#     118 courses / 100 per page = 2 pages. Once bootstrap finishes (~200 courses found
+#     at seed time), _seeds_filled=True → BFS is skipped entirely.
+#
+#   - A small number of UG courses at /study/courses-2/course-search/<slug>/ would
+#     have been missed by BFS nav; allow_url_patterns covers both paths for any
+#     courses the Elastic API might return with that URL structure.
 #   - All per-course pages require browser rendering (Cloudflare blocks plain HTTP).
 #   - Lincoln is a New Zealand university — CRICOS does not apply.
 #
 # CONFIG STRATEGY:
 #   - always_browser_discover: true — bypass 403 HTTP BFS
-#   - seed_urls: programme-search/ (XHR pagination then fetches all 118 courses)
+#   - seed_urls: programme-search/ — browser navigates here for CF clearance
+#   - elastic_api_bootstrap: POSTs to /_search-proxy/... directly after seed loads
 #   - allow_url_patterns: BOTH UG (courses-2/course-search) AND PG (programme-search)
 #   - block_url_patterns: suppress resources/schools/farming/nav noise
 #   - use_stealth_browser: true — per-course extraction AND central pages via patchright
@@ -27,8 +42,7 @@
 #   - english.central_page: absolute URL for same reason
 #   - force_central_fee_stage: true — mark has_central_fee_page even when parser finds 0
 #     records (prevents staging gate rejection while fix is being validated)
-#   - browser_time_budget_s: 150 — XHR pagination runs AFTER the BFS loop, so time
-#     budget only affects nav traversal, not pagination
+#   - browser_time_budget_s: 150 — budget only limits BFS nav; bootstrap runs first
 
 discovery:
   always_browser_discover: true
@@ -36,6 +50,14 @@ discovery:
 
   seed_urls:
     - https://www.lincoln.ac.nz/study/study-programmes/programme-search/
+
+  # After the seed page loads (Cloudflare clearance), POST directly to the
+  # Elastic App Search proxy.  The SPA does not auto-query on page load so
+  # the XHR interceptor never fires — this bootstrap replaces it.
+  elastic_api_bootstrap:
+    api_url: "/_search-proxy/api/as/v1/engines/--dummy-value--/search.json"
+    page_size: 100    # Elastic App Search max; 118 courses = 2 pages
+    max_pages: 5
 
   allow_url_patterns:
     # PG individual course pages

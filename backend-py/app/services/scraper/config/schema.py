@@ -832,6 +832,44 @@ class SwiftypeConfig(BaseModel):
     )
 
 
+class ElasticApiBootstrapConfig(BaseModel):
+    """Bootstrap config for Elastic App Search SPAs that do not auto-query on page load.
+
+    The XHR interceptor only fires when the SPA automatically queries Elastic after the
+    page loads.  Some SPAs (e.g. Lincoln University) require user interaction (typing in
+    a search box) before making the API call, so the interceptor never sees a response.
+
+    When this config is present the scraper, after navigating to the seed URL inside the
+    patchright browser (to obtain Cloudflare clearance), immediately POSTs to the Elastic
+    API endpoint via ``page.evaluate()`` and paginates through every result page — all
+    from within the browser context so session cookies / CF tokens are inherited.
+
+    Example::
+
+        discovery:
+          elastic_api_bootstrap:
+            api_url: "/_search-proxy/api/as/v1/engines/--dummy-value--/search.json"
+            page_size: 100   # Elastic App Search max
+            max_pages: 10
+    """
+
+    api_url: str = Field(
+        description=(
+            "Elastic App Search proxy URL to POST to. "
+            "Relative paths (starting with /) are resolved against the university's "
+            "origin hostname.  E.g. '/_search-proxy/api/as/v1/engines/--dummy-value--/search.json'."
+        ),
+    )
+    page_size: int = Field(
+        default=100,
+        description="Results per page. Standard Elastic App Search maximum is 100.",
+    )
+    max_pages: int = Field(
+        default=10,
+        description="Hard cap on pagination rounds to prevent runaway loops.",
+    )
+
+
 class DiscoveryConfig(BaseModel):
     """Safe to replay against unknown universities (Tier-3 playbook matching)."""
 
@@ -908,6 +946,16 @@ class DiscoveryConfig(BaseModel):
             "The API tier runs immediately after SearchStax — if it returns ≥1 "
             "link, BFS and browser tiers are skipped. Falls through to BFS if "
             "0 links returned. See GenericSearchApiConfig for full field docs."
+        ),
+    )
+    elastic_api_bootstrap: Optional[ElasticApiBootstrapConfig] = Field(
+        default=None,
+        description=(
+            "When present, call the Elastic App Search API directly from within the "
+            "patchright browser after each seed page loads — inheriting Cloudflare "
+            "clearance cookies via page.evaluate(). Use when the SPA at the seed URL "
+            "does not auto-query Elastic on page load (requires user interaction), so "
+            "the XHR interceptor never fires. See ElasticApiBootstrapConfig."
         ),
     )
     auto_api_discovery: bool = Field(

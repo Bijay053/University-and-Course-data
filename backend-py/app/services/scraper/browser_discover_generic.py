@@ -954,6 +954,122 @@ async def browser_discover_generic(
                                 _process_links(_sv_raw2 or [])
                             except Exception:
                                 pass
+                        # ── Elastic App Search bootstrap ───────────────────────
+                        # When the SPA does not auto-query Elastic on page load
+                        # (requires user interaction) the XHR interceptor never
+                        # fires.  Use page.evaluate() to POST directly to the
+                        # Elastic proxy from within the patchright browser context
+                        # — this inherits Cloudflare clearance cookies already
+                        # obtained during the seed page navigation above.
+                        _eas_cfg = getattr(
+                            getattr(_ucfg, "discovery", None),
+                            "elastic_api_bootstrap",
+                            None,
+                        )
+                        if _eas_cfg is not None:
+                            _eas_api_url: str = _eas_cfg.api_url
+                            if _eas_api_url.startswith("/"):
+                                _eas_api_url = f"{origin_str.rstrip('/')}{_eas_api_url}"
+                            _eas_page_size: int = _eas_cfg.page_size
+                            _eas_max_pages: int = _eas_cfg.max_pages
+                            log.info(
+                                "[EAS] Elastic API bootstrap: url=%s page_size=%d",
+                                _eas_api_url, _eas_page_size,
+                            )
+                            await _emit(
+                                f"[DISCOVER] Elastic API bootstrap: {_eas_api_url} "
+                                f"(page_size={_eas_page_size})"
+                            )
+                            _eas_total_pages: "int | None" = None
+                            for _eas_pn in range(1, _eas_max_pages + 1):
+                                try:
+                                    _eas_raw = await page.evaluate(
+                                        """async (args) => {
+                                            try {
+                                                const r = await fetch(args.url, {
+                                                    method: 'POST',
+                                                    headers: {
+                                                        'Content-Type': 'application/json'
+                                                    },
+                                                    credentials: 'include',
+                                                    body: JSON.stringify({
+                                                        query: '',
+                                                        page: {
+                                                            current: args.pageNum,
+                                                            size: args.pageSize
+                                                        }
+                                                    })
+                                                });
+                                                if (!r.ok) return null;
+                                                const ct = r.headers.get('content-type') || '';
+                                                if (!ct.includes('json')) return null;
+                                                return await r.text();
+                                            } catch (e) { return null; }
+                                        }""",
+                                        {
+                                            "url": _eas_api_url,
+                                            "pageNum": _eas_pn,
+                                            "pageSize": _eas_page_size,
+                                        },
+                                    )
+                                    if not _eas_raw:
+                                        log.warning(
+                                            "[EAS] page %d returned empty — stopping", _eas_pn,
+                                        )
+                                        break
+                                    _eas_data = _json.loads(_eas_raw)
+                                    if _eas_total_pages is None:
+                                        _eas_meta_pg = (
+                                            (_eas_data.get("meta") or {}).get("page") or {}
+                                        )
+                                        _eas_total_pages = _eas_meta_pg.get("total_pages")
+                                        _eas_total_res = _eas_meta_pg.get("total_results", "?")
+                                        log.info(
+                                            "[EAS] total_results=%s total_pages=%s",
+                                            _eas_total_res, _eas_total_pages,
+                                        )
+                                        await _emit(
+                                            f"[DISCOVER] Elastic API: "
+                                            f"total_results={_eas_total_res} "
+                                            f"total_pages={_eas_total_pages or '?'}"
+                                        )
+                                    _eas_items = _eas_data.get("results", [])
+                                    _eas_before = len(results)
+                                    for _eas_it in _eas_items:
+                                        if isinstance(_eas_it, dict):
+                                            _from_item(_eas_it)
+                                    _eas_gained = len(results) - _eas_before
+                                    log.info(
+                                        "[EAS] page %d/%s → +%d courses (total=%d)",
+                                        _eas_pn, _eas_total_pages or "?",
+                                        _eas_gained, len(results),
+                                    )
+                                    await _emit(
+                                        f"[DISCOVER] Elastic API page {_eas_pn}"
+                                        f"/{_eas_total_pages or '?'} "
+                                        f"→ +{_eas_gained} courses "
+                                        f"(total={len(results)})"
+                                    )
+                                    if (
+                                        _eas_total_pages is not None
+                                        and _eas_pn >= _eas_total_pages
+                                    ):
+                                        log.info(
+                                            "[EAS] Reached last page (%d/%d) — done",
+                                            _eas_pn, _eas_total_pages,
+                                        )
+                                        break
+                                    if not _eas_items or len(_eas_items) < _eas_page_size:
+                                        log.info(
+                                            "[EAS] page %d had %d < %d items — done",
+                                            _eas_pn, len(_eas_items), _eas_page_size,
+                                        )
+                                        break
+                                except Exception as _eas_exc:
+                                    log.warning(
+                                        "[EAS] page %d error: %s", _eas_pn, _eas_exc,
+                                    )
+                                    break
                         _pre_seeded.add(_sv_url)
                     except Exception as _sv_exc:
                         log.warning("[SEED] Failed to navigate %s: %s", _sv_url, _sv_exc)
