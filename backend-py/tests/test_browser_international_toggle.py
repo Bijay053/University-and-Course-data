@@ -36,6 +36,7 @@ class _FakePage:
     """Mimics the subset of Playwright's Page API the toggle code uses."""
 
     def __init__(self, *, evaluate_returns: bool = True) -> None:
+        self.url: str = ""
         self.evaluate_calls: list[str] = []
         self.wait_for_load_state_calls: list[tuple[str, int | None]] = []
         self.wait_for_timeout_calls: list[int] = []

@@ -44,6 +44,10 @@ args = "task236-challenge-shell"
 task = "workflow.run"
 args = "task235-skip-counters"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "task237-flaky-tests"
+
 [[workflows.workflow]]
 name = "backend-py: FastAPI"
 author = "agent"
@@ -118,6 +122,17 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "cd backend-py && PYTHONPATH=. python -m pytest tests/test_skip_counters.py -q -c /dev/null -p no:cacheprovider"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow]]
+name = "task237-flaky-tests"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd backend-py && PYTHONPATH=. python -m pytest tests/test_gemini_gate.py tests/test_browser_international_toggle.py -q -c /dev/null -p no:cacheprovider"
 
 [workflows.workflow.metadata]
 isValidation = true
