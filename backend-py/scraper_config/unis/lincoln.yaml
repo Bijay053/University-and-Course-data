@@ -1,34 +1,35 @@
 # Lincoln University (NZ) — slug "lincoln"
 # Hostname: www.lincoln.ac.nz
 #
-# DIAGNOSIS (2026-06-03):
+# DIAGNOSIS (2026-06-03 updated 2026-06-25):
 #   - www.lincoln.ac.nz returns HTTP 403 to plain-HTTP requests from cloud IPs.
 #   - /courses/ is a JavaScript course-search tool — contains NO static .htm links.
-#     The browser wanders to navigation pages (/study/...) instead.
-#   - Actual individual programme pages appear at:
-#       /study/study-programmes/programme-search/<slug>/
-#     e.g. /study/study-programmes/programme-search/doctor-of-philosophy-phd/
+#   - Actual individual programme pages exist on TWO different URL paths:
+#       PG:  /study/study-programmes/programme-search/<slug>/
+#       UG:  /study/courses-2/course-search/<slug>/
+#     The undergraduate-study/ seed page links to UG courses at /courses-2/course-search/
+#     and the postgraduate-study/ seed page links to PG at /programme-search/.
+#   - Root cause of 58/118 bug: allow_url_patterns only contained programme-search,
+#     so UG links on the undergraduate-study/ seed page were classified as nav
+#     candidates (score=140) and queued in a 517-deep heap, exhausting the 150s
+#     browser budget before most were processed.
+#   - Fix: add courses-2/course-search/[^/]+/?$ to allow_url_patterns so UG course
+#     links are classified as course candidates at seed-visit time (no nav traversal
+#     needed, budget is irrelevant).
 #   - All per-course pages require browser rendering (Cloudflare blocks plain HTTP).
-#   - Fee page (https://www.lincoln.ac.nz/study/fees) is also Cloudflare-protected —
-#     plain HTTP and standard Chromium both get blocked; patchright+Xvfb required.
-#   - English page (/study/entry-requirements) same Cloudflare situation.
 #   - Lincoln is a New Zealand university — CRICOS does not apply.
 #
 # CONFIG STRATEGY:
 #   - always_browser_discover: true — bypass 403 HTTP BFS
-#   - seed_urls: BOTH undergraduate AND postgraduate listing pages (direct seeds so
-#     all 118 courses are found without relying on nav BFS exploration within the
-#     90s time budget).  The /programme-search/ listing is a JS search widget that
-#     renders 0 static links — do NOT seed it.
-#   - allow_url_patterns: individual programme pages only
+#   - seed_urls: BOTH undergraduate AND postgraduate listing pages
+#   - allow_url_patterns: BOTH UG (courses-2/course-search) AND PG (programme-search)
 #   - block_url_patterns: suppress resources/schools/farming/nav noise
 #   - use_stealth_browser: true — per-course extraction AND central pages via patchright
 #   - fees.central_page: absolute URL (relative URLs from auto_config fail schema check)
 #   - english.central_page: absolute URL for same reason
 #   - force_central_fee_stage: true — mark has_central_fee_page even when parser finds 0
 #     records (prevents staging gate rejection while fix is being validated)
-#   - browser_time_budget_s: 150 — extra headroom in case either listing page triggers
-#     additional nav candidates before all course links are emitted
+#   - browser_time_budget_s: 150 — sufficient once UG courses are found at seed-visit time
 
 discovery:
   always_browser_discover: true
@@ -39,7 +40,10 @@ discovery:
     - https://www.lincoln.ac.nz/study/study-programmes/postgraduate-study/
 
   allow_url_patterns:
+    # PG individual course pages
     - "lincoln\\.ac\\.nz/study/study-programmes/programme-search/[^/]+/?$"
+    # UG individual course pages (different URL path — root cause of 58/118 bug)
+    - "lincoln\\.ac\\.nz/study/courses-2/course-search/[^/]+/?$"
 
   block_url_patterns:
     - "/resources-for-careers-advisors"
