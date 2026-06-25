@@ -173,6 +173,9 @@ extraction:
       - 'Domestic'
       - 'Scottish'
 
+  follow_admission_links: true
+  max_admission_linked_pages: 2
+
   english:
     trust_vision_ocr: false
     course_english_priority: true
