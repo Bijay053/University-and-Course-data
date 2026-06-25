@@ -30,7 +30,6 @@ discovery:
 
   seed_urls:
     - https://www.lincoln.ac.nz/study/study-programmes/programme-search/
-    - https://www.lincoln.ac.nz/study/study-programmes/undergraduate-study/
     - https://www.lincoln.ac.nz/study/study-programmes/postgraduate-study/
 
   allow_url_patterns:
