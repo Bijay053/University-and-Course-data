@@ -1506,6 +1506,21 @@ class FeesConfig(BaseModel):
             "``uni_config:fee_default`` and confidence 0.35."
         ),
     )
+    fee_crit_min_aud: Optional[float] = Field(
+        default=None,
+        description=(
+            "Per-university override for the critical-minimum annual fee threshold "
+            "used by the data-quality checker (expressed in AUD regardless of the "
+            "university's ``default_currency``).  When set, this value replaces "
+            "the degree-level default (e.g. AUD 12,000 for master's).  Use for "
+            "non-AU universities whose legitimate part-time international fees "
+            "convert below the AU-tuned default — e.g. UK universities where a "
+            "2-year part-time MSc may cost GBP 4,500/yr (≈ AUD 8,775), well below "
+            "the AU crit_min of AUD 12,000.  Setting 6000 allows GBP fees of "
+            "~£3,000+/yr to pass the critical gate and land in the review queue "
+            "as warnings rather than data_quality_failure blocks."
+        ),
+    )
 
 
 class BandSpec(BaseModel):

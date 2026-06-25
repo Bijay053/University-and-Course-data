@@ -60,6 +60,13 @@ extraction:
     default_currency: 'GBP'
     prefer_international: true
     prefer_annual_over_total: true
+    # UK part-time international fees can legitimately be GBP 3,000-7,000/yr
+    # (roughly half the full-time annual fee for a 2-year PT programme).
+    # The default AU-tuned critical minimum (AUD 12,000 ≈ GBP 6,150) incorrectly
+    # blocks these as data_quality_failure.  Setting 6,000 AUD (≈ GBP 3,077)
+    # moves genuinely-low fees to annual_fee_too_low_warning (review queue)
+    # instead of data_quality_failure (hidden from operators entirely).
+    fee_crit_min_aud: 6000
     reject_keywords:
       - 'Home student'
       - 'Home fee'

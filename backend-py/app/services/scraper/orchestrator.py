@@ -4076,6 +4076,11 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 if r.get("error"):
                     if r["error"].startswith("fetch") or "fetch_failed" in r.get("error", ""):
                         summary["fetch_failed"] += 1
+                    elif r["error"] == "rejected: duplicate_name_deduplicated":
+                        # Dedup rejections are correct behaviour (same course from
+                        # multiple URLs — best version kept).  Count as skipped, not
+                        # errors, so the DONE line reflects a real error count.
+                        summary["skipped"] += 1
                     else:
                         summary["errors"] += 1
                     await emit(

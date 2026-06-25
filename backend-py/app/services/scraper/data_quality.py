@@ -324,6 +324,7 @@ def _check_course(
     campus_allowlist: list[str] | None = None,
     default_currency: str = "AUD",
     require_international_fee: bool = True,
+    crit_min_aud_override: float | None = None,
 ) -> list[QualityIssue]:
     """Return a list of quality issues for one staged course payload.
 
@@ -536,6 +537,11 @@ def _check_course(
                     _warn_min, _crit_min, _warn_max, _crit_max = _annual_fee_range(
                         degree_level_raw
                     )
+                    # Per-university override for the critical minimum (e.g. UK
+                    # universities where legitimate part-time fees are below the
+                    # AU-tuned default).  Set via YAML extraction.fees.fee_crit_min_aud.
+                    if crit_min_aud_override is not None:
+                        _crit_min = float(crit_min_aud_override)
                     # Normalise fee to AUD so GBP/USD/EUR fees are not falsely
                     # flagged against AUD thresholds.  fee_val remains in
                     # original currency for display; _fee_aud is used for logic.
@@ -544,7 +550,11 @@ def _check_course(
                     _range_str = f"{_warn_min:,.0f}–{_warn_max:,.0f}/yr (AUD)"
                     _dl_label = degree_level_raw or "this degree level"
                     if _fee_aud < _crit_min:
-                        if _fee_aud <= _CSP_HECS_MAX:
+                        # possible_domestic_fee uses Australian HECS/CSP terminology
+                        # and the AUD 13,000 threshold — only meaningful for AUD fees.
+                        # For GBP/USD/EUR fees use the generic annual_fee_too_low_critical
+                        # so operators see an appropriate diagnostic message.
+                        if fee_currency == "AUD" and _fee_aud <= _CSP_HECS_MAX:
                             add(
                                 "critical",
                                 "possible_domestic_fee",
@@ -899,6 +909,7 @@ async def run_quality_checks(
     campus_allowlist: list[str] = []
     _default_currency: str = "AUD"
     _require_intl_fee: bool = True  # default: missing fee is CRITICAL
+    _crit_min_aud_override: float | None = None
     if uni_config is not None:
         try:
             campus_allowlist = uni_config.extraction.campus_allowlist or []
@@ -917,6 +928,10 @@ async def run_quality_checks(
             # CRITICAL to WARNING so those courses land in the review queue
             # instead of data_quality_failure.
             _require_intl_fee = uni_config.extraction.staging.require_international_fee
+        except AttributeError:
+            pass
+        try:
+            _crit_min_aud_override = uni_config.extraction.fees.fee_crit_min_aud
         except AttributeError:
             pass
 
@@ -938,6 +953,7 @@ async def run_quality_checks(
             campus_allowlist=campus_allowlist or None,
             default_currency=_default_currency,
             require_international_fee=_require_intl_fee,
+            crit_min_aud_override=_crit_min_aud_override,
         )
         all_issues.extend(course_issues)
 
