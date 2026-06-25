@@ -41,3 +41,4 @@
 - [Large-scrape resume + contention limits](task229-resume-and-limits.md) — raised Celery ceiling + URL-resume checkpoint (not chunk handoff); rate_limiter/max_concurrent all default-off + fail-open; never wipe current/resumable staged rows.
 - [Per-course latency gates](task233-latency-gates.md) — Gemini timeout at SDK boundary feeds shared breaker deque; vision early-exit needs no-tier0+all-overall-filled; browser-only host gate needs 2KB substantive-HTML floor.
 - [genai/pydantic import stall in dev](env-genai-import-stall.md) — load ~36 on 2 cores stalls cold google.genai/pydantic + pytest conftest; run isolated copies with -c /dev/null and stub the lazy genai, or wait for scrape load to drop.
+- [Pure-function extraction for isolated testing](pure-module-isolation.md) — extract stdlib-only functions into a no-app-deps module; transitive pydantic/genai imports stall pytest collection under heavy Celery load.

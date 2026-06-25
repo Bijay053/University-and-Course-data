@@ -1489,7 +1489,7 @@ async def extract_course(
                 BROWSER_RATE_LIMITED, pool as _bp,
             )
             from app.services.scraper.per_course_browser import (
-                _browser_config_for, note_browser_rescue, should_retry_browser,
+                _browser_config_for, is_challenge_shell, note_browser_rescue, should_retry_browser,
             )
             if emit:
                 await emit(
@@ -1577,7 +1577,12 @@ async def extract_course(
             # browser-only and skip HTTP for courses HTTP actually serves, so we
             # require a minimum body length (a fully-rendered course page is
             # never this small; an interstitial/empty shell is).
-            if html and _http_attempted and len(html) >= _BROWSER_RESCUE_MIN_HTML_LEN:
+            if (
+                html
+                and _http_attempted
+                and len(html) >= _BROWSER_RESCUE_MIN_HTML_LEN
+                and not is_challenge_shell(html)
+            ):
                 note_browser_rescue(_fetch_host)
         except Exception as _exc:
             log.warning("browser fallback failed for %s: %s", url, _exc)

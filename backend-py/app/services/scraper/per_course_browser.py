@@ -89,6 +89,16 @@ def is_confirmed_browser_only(host: str) -> bool:
     return d.get(host, 0) >= _BROWSER_ONLY_CONFIRM_THRESHOLD
 
 
+# ── Task #236: content-based anti-bot challenge shell detection ───────────────
+# Imported from challenge_shell.py which has no application dependencies so
+# the pure detection logic can be tested in isolation under any load.
+from app.services.scraper.challenge_shell import (  # noqa: E402
+    _CHALLENGE_SHELL_PATTERNS,
+    _CHALLENGE_SHELL_SAMPLE,
+    is_challenge_shell,
+)
+
+
 # T005: hosts where the per-course browser pass should also click the
 # "International students" toggle to surface the international fees /
 # admissions panel. Add new hosts here as we encounter them.
