@@ -105,6 +105,18 @@ class Settings(BaseSettings):
     scrape_do_rate_limit_per_sec: float = 0.0
     gemini_rate_limit_per_sec: float = 0.0
 
+    # Task #233: per-course Gemini primary-extraction timeout (seconds).
+    # The full-extraction Gemini call is wrapped in asyncio.wait_for around the
+    # SDK call (AFTER the rate-limiter token is acquired, so this measures only
+    # genuine API/SDK slowness — not limiter backpressure).  A healthy
+    # gemini-2.5-flash-lite call returns in well under 10s; the old hard-coded
+    # 30s default meant every full-extraction course on a large catalogue paid
+    # up to 30s for a guaranteed-empty result whenever Gemini was slow.  Repeated
+    # timeouts now also trip the circuit breaker (see GeminiQuotaTracker.
+    # record_timeout) so subsequent courses skip Gemini instantly.  Override via
+    # the GEMINI_PRIMARY_TIMEOUT_S env var on prod.
+    gemini_primary_timeout_s: float = 20.0
+
     # Auto-publish thresholds (Bug #6 — looser than Node defaults)
     min_completeness_for_auto_publish: int = 75
     rejection_block_days: int = 7  # Bug #7: was 30 in Node

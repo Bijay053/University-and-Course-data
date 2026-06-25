@@ -32,6 +32,10 @@ args = "Redis"
 task = "workflow.run"
 args = "recovery-pdf-budget-static-check"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "task233-latency-gates"
+
 [[workflows.workflow]]
 name = "backend-py: FastAPI"
 author = "agent"
@@ -73,6 +77,17 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "cd backend-py && python -m pytest tests/test_recovery_pdf.py::TestNoPdfBudgetInlineConstruction -v"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow]]
+name = "task233-latency-gates"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd backend-py && python -m pytest tests/test_gemini_timeout_circuit.py tests/test_browser_only_gate.py tests/test_vision_overall_gate.py -q"
 
 [workflows.workflow.metadata]
 isValidation = true

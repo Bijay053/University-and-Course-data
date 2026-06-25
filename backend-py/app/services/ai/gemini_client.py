@@ -140,6 +140,41 @@ class GeminiQuotaTracker:
                 error_message,
             )
 
+    def record_timeout(self, timeout_s: float | None = None) -> None:
+        """Record a Gemini API-call timeout (SDK/network slowness — not a quota
+        error).  Task #233.
+
+        Timeouts are recorded into the SAME ``_recent_failures`` deque and use
+        the SAME failure threshold as quota errors, so sustained Gemini slowness
+        opens the circuit and subsequent calls short-circuit instantly instead of
+        each paying the full per-call timeout.  A distinct log reason keeps
+        timeouts observable separately from quota 429/503s.
+
+        This exists because the per-course timeout previously lived in a
+        ``wait_for`` *wrapping* :func:`generate`; on timeout that cancelled the
+        inner coroutine before its ``except`` block ran, so timeouts never
+        reached :meth:`record_failure` and never tripped the breaker.  The
+        timeout now lives inside :func:`generate` and calls this method directly.
+        """
+        now = datetime.now(timezone.utc)
+        self._recent_failures.append(now)
+        window_start = now - timedelta(seconds=self.window_seconds)
+        recent = [t for t in self._recent_failures if t >= window_start]
+        log.debug(
+            "[GEMINI TIMEOUT] timeout_s=%s — %d/%d in window",
+            timeout_s, len(recent), self.failure_threshold,
+        )
+        if len(recent) >= self.failure_threshold:
+            self._circuit_open_until = now + timedelta(seconds=self.cool_down_seconds)
+            log.warning(
+                "[GEMINI CIRCUIT OPEN] %d failures in %ds (incl. API timeouts) — "
+                "pausing %.0fs until %s",
+                len(recent),
+                self.window_seconds,
+                self.cool_down_seconds,
+                self._circuit_open_until.isoformat(),
+            )
+
     def is_circuit_open(self) -> bool:
         if self._circuit_open_until is None:
             return False
@@ -309,6 +344,7 @@ async def generate(
     max_output_tokens: int = 2048,
     call_type: str = "primary_full",
     course_url: str | None = None,
+    timeout_s: float | None = None,
 ) -> GeminiResponse:
     started = datetime.now(timezone.utc)
     in_tok = _estimate_tokens(prompt)
@@ -360,11 +396,20 @@ async def generate(
     try:
         for attempt in range(_MAX_RETRIES + 1):
             try:
-                resp = await c.aio.models.generate_content(
+                _gen_coro = c.aio.models.generate_content(
                     model=model_name,
                     contents=prompt,
                     config=_gtypes.GenerateContentConfig(max_output_tokens=max_output_tokens),
                 )
+                # Task #233: bound the SDK call itself (the rate-limiter token was
+                # already acquired above, so this measures genuine API/SDK latency
+                # only — not limiter backpressure).  On timeout we trip the breaker
+                # via record_timeout() so sustained slowness short-circuits the rest
+                # of the run instead of every course paying the full timeout.
+                if timeout_s is not None and timeout_s > 0:
+                    resp = await asyncio.wait_for(_gen_coro, timeout=timeout_s)
+                else:
+                    resp = await _gen_coro
                 text = (getattr(resp, "text", "") or "").strip()
                 out_tok = _estimate_tokens(text)
                 cost = (in_tok * _INPUT_USD_PER_M + out_tok * _OUTPUT_USD_PER_M) / 1_000_000
@@ -372,6 +417,25 @@ async def generate(
                 duration_ms = int((datetime.now(timezone.utc) - started).total_seconds() * 1000)
                 _append_call_log(call_type, model_name, in_tok, out_tok, cost, duration_ms, True, None, course_url)
                 return GeminiResponse(text, in_tok, out_tok, cost, call_type=call_type, model=model_name)
+            except asyncio.TimeoutError:
+                # Genuine SDK/API slowness — do NOT retry (that would double the
+                # per-course wall-time this task is trying to cut).  Record the
+                # timeout so repeated ones open the circuit breaker.
+                _quota_tracker.record_timeout(timeout_s)
+                duration_ms = int((datetime.now(timezone.utc) - started).total_seconds() * 1000)
+                log.warning(
+                    "[GEMINI TIMEOUT] %s timed out after %ss [%s]",
+                    model_name, timeout_s, call_type,
+                )
+                _append_call_log(
+                    call_type, model_name, in_tok, 0, 0.0, duration_ms, False,
+                    f"timeout after {timeout_s}s", course_url,
+                )
+                return GeminiResponse(
+                    "", in_tok, 0, 0.0,
+                    skipped=True, skip_reason=f"timeout after {timeout_s}s",
+                    call_type=call_type, model=model_name,
+                )
             except Exception as exc:
                 err_str = str(exc)
                 err_code = getattr(exc, "code", None) or getattr(exc, "status_code", None)

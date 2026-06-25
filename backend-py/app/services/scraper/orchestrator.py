@@ -1106,6 +1106,12 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             db_scrape_config=uni_scrape_config,
         )
         set_uni_config(_uni_cfg)
+        # Task #233: start a fresh per-run browser-only tally (see
+        # per_course_browser.reset_browser_only_hosts).  Reset here — at run
+        # start, alongside set_uni_config — so a prior run on the same Celery
+        # worker cannot carry stale "confirmed browser-only" state into this run.
+        from app.services.scraper.per_course_browser import reset_browser_only_hosts as _reset_browser_only
+        _reset_browser_only()
         log.info(
             "UniConfig loaded: slug=%r yaml_file=%r always_browser=%r always_sitemap=%r stealth=%r",
             _uni_cfg.slug,

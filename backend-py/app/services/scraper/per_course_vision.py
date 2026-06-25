@@ -803,6 +803,25 @@ async def maybe_vision_refetch(
         log.info("[VISION SKIP] no candidate images found on page — %s", url)
         return {}, []
 
+    # ── Task #233: early no-op gate ───────────────────────────────────────
+    # Vision can only do two useful things: (a) FILL an empty English overall
+    # slot, or (b) OVERRIDE an existing text value — but override is permitted
+    # ONLY for tier-0 images (those anchored inside the English-requirements
+    # DOM section; see the TIER GUARD in single_course.py).  So when EVERY
+    # overall slot is already filled AND there is no tier-0 image on the page,
+    # the entire OCR pass is guaranteed to be a no-op: every tier-1/2 image is
+    # skipped further down (regex-has-english skip) and there is nothing for a
+    # tier-0 image to override.  Bail here, before the BS4 re-parse + per-image
+    # loop.  This front-runs the existing per-image tier-1 skip, so it cannot
+    # starve sub-band recovery (which only runs while an overall is empty) nor
+    # ASAHE-style tier-0 override (which requires tier0_url_set to be non-empty).
+    if not tier0_url_set and all(payload.get(s) for s in _ENGLISH_OVERALL_SLOTS):
+        log.info(
+            "[VISION SKIP] all English overalls filled and no tier-0 image — "
+            "nothing for OCR to fill or override — %s", url,
+        )
+        return {}, []
+
     # Compute which English tests are mentioned anywhere in the page HTML.
     # Vision results for tests NOT mentioned on the page are hallucinations
     # (there is nothing for the model to read) and are discarded before

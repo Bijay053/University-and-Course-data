@@ -509,6 +509,13 @@ _DURATION_LABEL_PAT_RE = _re.compile(
 _PARTTIME_ONLY_PT_RE = _re.compile(r"\bpart[- ]?time\b", _re.IGNORECASE)
 _PARTTIME_ONLY_FT_RE = _re.compile(r"\bfull[- ]?time\b", _re.IGNORECASE)
 
+# Task #233: minimum browser-returned body length to count as a genuine
+# "browser rescue" (used by the confirmed-browser-only host gate).  A fully
+# rendered course page is tens of KB; a Cloudflare/anti-bot challenge
+# interstitial or empty shell is far smaller, so this floor prevents a few
+# unusable shells from wrongly marking a host browser-only.
+_BROWSER_RESCUE_MIN_HTML_LEN = 2000
+
 
 def _is_parttime_only_page(html: str) -> bool:
     """Return True when the course-length cell contains Part-time but not Full-time.
@@ -1421,6 +1428,12 @@ async def extract_course(
     # the course to be skipped without applying fee/IELTS defaults.
     _bail_empty_text: bool = False
 
+    # Task #233: track whether the initial HTTP fetch actually ran, and the host
+    # of the (finalised) URL.  Used below to (a) skip the reliably-wasted HTTP
+    # attempt on confirmed browser-only hosts and (b) only count a browser
+    # *rescue* when HTTP was genuinely attempted and failed.
+    _http_attempted = False
+    _fetch_host = (urlparse(url).netloc or "").lower()
     if html is None:
         # ── skip_initial_http_fetch gate ──────────────────────────────────────
         # For 100%-Cloudflare-protected universities (e.g. UEL), every plain
@@ -1428,19 +1441,31 @@ async def extract_course(
         # Setting skip_initial_http_fetch=true in the YAML bypasses the wasted
         # round-trip and jumps straight to the browser path below.
         _uc_http = get_uni_config()
-        _skip_http = (
+        from app.services.scraper.per_course_browser import (
+            is_confirmed_browser_only as _is_confirmed_browser_only,
+        )
+        _yaml_skip_http = (
             _uc_http is not None
             and getattr(_uc_http.extraction, "skip_initial_http_fetch", False)
         )
+        # Task #233: once a host has been browser-rescued enough times this run,
+        # the initial HTTP fetch is reliably wasted — skip straight to browser.
+        _confirmed_browser_only = _is_confirmed_browser_only(_fetch_host)
+        _skip_http = _yaml_skip_http or _confirmed_browser_only
         if _skip_http:
             _perf_flags["http_skipped"] = True
             if emit:
+                _skip_reason = (
+                    "skip_initial_http_fetch=true" if _yaml_skip_http
+                    else "confirmed browser-only host"
+                )
                 await emit(
                     "status",
-                    f"[BROWSER-FIRST] skip_initial_http_fetch=true — skipping HTTP, going straight to browser for {url[:70]}",
+                    f"[BROWSER-FIRST] {_skip_reason} — skipping HTTP, going straight to browser for {url[:70]}",
                     phase="extract", kind="skip_initial_http", url=url,
                 )
         else:
+            _http_attempted = True
             if _use_scrape_do_render:
                 with scrape_do_render_scope():
                     html = await fetch_html(url)
@@ -1464,7 +1489,7 @@ async def extract_course(
                 BROWSER_RATE_LIMITED, pool as _bp,
             )
             from app.services.scraper.per_course_browser import (
-                _browser_config_for, should_retry_browser,
+                _browser_config_for, note_browser_rescue, should_retry_browser,
             )
             if emit:
                 await emit(
@@ -1543,6 +1568,17 @@ async def extract_course(
                     if html is BROWSER_RATE_LIMITED:
                         html = None
                         break
+            # Task #233: count a genuine browser *rescue* only when the initial
+            # HTTP fetch was actually attempted and failed AND the browser then
+            # returned *substantive* HTML.  The BROWSER_RATE_LIMITED sentinel is
+            # already nulled+returned above, but a Cloudflare/anti-bot challenge
+            # interstitial ("Just a moment…") can still come back truthy-but-tiny.
+            # Counting those would let 3 challenge shells wrongly mark a host
+            # browser-only and skip HTTP for courses HTTP actually serves, so we
+            # require a minimum body length (a fully-rendered course page is
+            # never this small; an interstitial/empty shell is).
+            if html and _http_attempted and len(html) >= _BROWSER_RESCUE_MIN_HTML_LEN:
+                note_browser_rescue(_fetch_host)
         except Exception as _exc:
             log.warning("browser fallback failed for %s: %s", url, _exc)
 

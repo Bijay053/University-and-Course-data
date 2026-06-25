@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from contextvars import ContextVar
 from typing import Any, Awaitable, Callable
 from urllib.parse import urlparse
 
@@ -34,6 +35,59 @@ from app.services.scraper.extractors import (
 from app.services.scraper.extractors import course_name as course_name_extractor
 from app.services.scraper.extractors.base import ExtractionResult
 from app.services.scraper.extractors._text import compact, html_to_text
+
+log = logging.getLogger(__name__)
+
+# ── Task #233: run-scoped "confirmed browser-only host" tracking ──────────────
+# On large JS-rendered catalogues (e.g. UTAS/CSU) every plain HTTP fetch returns
+# a challenge / empty shell and the browser fallback rescues it — but that means
+# every course re-pays a guaranteed-to-fail HTTP round-trip first.  After a host
+# has been rescued by the browser ``_BROWSER_ONLY_CONFIRM_THRESHOLD`` times in a
+# run, we mark it "confirmed browser-only" and skip the wasted HTTP attempt for
+# the remaining courses in that run.
+#
+# Scope is one scrape/repair run: the dict lives in a ContextVar that
+# orchestrator.run_scrape() / repair.run_repair() reset at the start of each run
+# (mirroring set_uni_config()).  Celery prefork isolates the dict per worker
+# process; the per-run reset prevents same-worker carry-over across resume passes.
+# All helpers are sync (never await) so the dict is mutated safely inside the
+# single asyncio event loop.  Worst-case false positive only routes a host to the
+# (slower but still correct) browser for the rest of the run.
+_browser_only_hosts: ContextVar[dict[str, int] | None] = ContextVar(
+    "browser_only_hosts", default=None
+)
+_BROWSER_ONLY_CONFIRM_THRESHOLD = 3
+
+
+def reset_browser_only_hosts() -> None:
+    """Start a fresh per-run browser-only tally.  Call once at run start."""
+    _browser_only_hosts.set({})
+
+
+def note_browser_rescue(host: str) -> None:
+    """Record that the browser rescued a course HTTP could not fetch for ``host``.
+
+    Call ONLY when HTTP was actually attempted and failed/empty AND the browser
+    returned substantive HTML (not a rate-limit/challenge shell).
+    """
+    if not host:
+        return
+    d = _browser_only_hosts.get(None)
+    if d is None:
+        return
+    d[host] = d.get(host, 0) + 1
+
+
+def is_confirmed_browser_only(host: str) -> bool:
+    """True once ``host`` has been browser-rescued enough times this run that the
+    initial HTTP fetch is reliably wasted and should be skipped."""
+    if not host:
+        return False
+    d = _browser_only_hosts.get(None)
+    if d is None:
+        return False
+    return d.get(host, 0) >= _BROWSER_ONLY_CONFIRM_THRESHOLD
+
 
 # T005: hosts where the per-course browser pass should also click the
 # "International students" toggle to surface the international fees /

@@ -741,7 +741,7 @@ async def extract_primary(
     html: str,
     url: str,
     *,
-    timeout: float = 30.0,
+    timeout: float | None = None,
 ) -> tuple[dict[str, Any], float, int, int, dict]:
     """Run one Gemini Flash call to extract all hard fields.
 
@@ -752,7 +752,13 @@ async def extract_primary(
     url:
         Course page URL (included in prompt for context).
     timeout:
-        Hard wall-clock ceiling in seconds.  Defaults to 30 s.
+        Hard wall-clock ceiling in seconds for the Gemini SDK call.  ``None``
+        (the default) reads ``settings.gemini_primary_timeout_s`` (default
+        20 s, ``GEMINI_PRIMARY_TIMEOUT_S`` env-overridable).  Task #233: the
+        ceiling is enforced *inside* :func:`gemini_client.generate` around the
+        SDK call so it (a) excludes rate-limiter wait and (b) actually trips the
+        circuit breaker on repeated timeouts — the old outer ``wait_for`` here
+        cancelled the inner coroutine, so timeouts never reached the breaker.
 
     Returns
     -------
@@ -762,6 +768,10 @@ async def extract_primary(
         ``cost_usd``, ``input_tokens``, ``output_tokens`` are zero on failure.
     """
     import asyncio as _asyncio
+
+    if timeout is None:
+        from app.config import settings as _settings
+        timeout = float(getattr(_settings, "gemini_primary_timeout_s", 20.0))
 
     fields_block = "\n".join(f"- {k}: {hint}" for k, hint in _HARD_FIELDS.items())
     text = _trim_text(html, url=url)
@@ -795,14 +805,15 @@ async def extract_primary(
     except Exception:
         pass
 
+    # Task #233: the timeout now lives INSIDE generate() (around the SDK call,
+    # after the rate-limiter token is acquired) so it measures real API slowness
+    # and trips the circuit breaker via record_timeout().  generate() returns a
+    # skipped response (skip_reason="timeout after Ns") on timeout — handled by
+    # the `resp.skipped` branch below — so no outer wait_for is needed here.
     try:
-        resp = await _asyncio.wait_for(
-            gemini_client.generate(prompt, max_output_tokens=768),
-            timeout=timeout,
+        resp = await gemini_client.generate(
+            prompt, max_output_tokens=768, timeout_s=timeout,
         )
-    except _asyncio.TimeoutError:
-        log.warning("gemini_primary: timed out after %ss on %s", timeout, url)
-        return {}, 0.0, 0, 0, {"skipped": True, "skip_reason": f"timeout after {timeout}s"}
     except Exception as exc:
         log.warning("gemini_primary: generate failed on %s: %s", url, exc)
         return {}, 0.0, 0, 0, {"skipped": True, "skip_reason": str(exc)}

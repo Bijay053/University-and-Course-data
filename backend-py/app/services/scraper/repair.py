@@ -257,6 +257,10 @@ async def run_repair(db: AsyncSession, runtime_job_id: str) -> dict:
             db_scrape_config=dict(uni.scrape_config) if uni.scrape_config else None,
         )
         set_uni_config(_repair_cfg)
+        # Task #233: fresh per-run browser-only tally (see
+        # per_course_browser.reset_browser_only_hosts) — mirrors run_scrape().
+        from app.services.scraper.per_course_browser import reset_browser_only_hosts as _reset_browser_only
+        _reset_browser_only()
         log.debug("UniConfig set for repair job: slug=%r", _repair_cfg.slug)
         # ──────────────────────────────────────────────────────────────────
 
