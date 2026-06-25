@@ -54,10 +54,25 @@ discovery:
   # After the seed page loads (Cloudflare clearance), POST directly to the
   # Elastic App Search proxy.  The SPA does not auto-query on page load so
   # the XHR interceptor never fires — this bootstrap replaces it.
+  #
+  # KEY FINDINGS (2026-06-25 direct HTTP tests):
+  #   - Endpoint IS accessible via plain HTTP POST (no browser needed for auth)
+  #   - BUT: empty-string query → HTTP 400 "bool query malformed" — proxy rejects it
+  #   - AND: pagination (page 2+) → HTTP 403 Cloudflare rate-limiting for plain HTTP
+  #   - Fix: use non-empty degree-level queries; paginate from WITHIN the patchright
+  #     browser (which has CF clearance cookies) via page.evaluate() fetch calls
+  #   - Response fields: link (relative URL), menu_title (course name)
+  #   - Each query is ranked by relevance → programme pages score highest → all courses
+  #     of that degree type appear on page 1 (size=100), 2 pages covers all 118 total
   elastic_api_bootstrap:
     api_url: "/_search-proxy/api/as/v1/engines/--dummy-value--/search.json"
-    page_size: 100    # Elastic App Search max; 118 courses = 2 pages
-    max_pages: 5
+    queries:
+      - "bachelor"                       # Bachelor of Agriculture, Commerce, Science …
+      - "master"                         # Master of Applied Science, Commerce …
+      - "diploma certificate graduate"   # PG Diploma, Graduate Certificate …
+      - "doctorate"                      # Doctor of Philosophy
+    page_size: 100    # Elastic App Search max
+    max_pages: 3      # per query; 118 total courses across 4 queries = ≤2 pages each
 
   allow_url_patterns:
     # PG individual course pages

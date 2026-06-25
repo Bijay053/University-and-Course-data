@@ -21,7 +21,7 @@ hallucinations from polluting a brand-new university's scrape).
 """
 from __future__ import annotations
 
-from typing import Optional, Union
+from typing import List, Optional, Union
 
 from pydantic import BaseModel, Field
 
@@ -844,13 +844,25 @@ class ElasticApiBootstrapConfig(BaseModel):
     API endpoint via ``page.evaluate()`` and paginates through every result page — all
     from within the browser context so session cookies / CF tokens are inherited.
 
+    Each entry in ``queries`` triggers a separate pagination round; results are merged
+    and deduplicated by URL.  Use one entry per degree level so that Elastic's relevance
+    ranking puts the matching programme pages at the top of each result page.
+
+    IMPORTANT: the proxy rejects an empty-string query with HTTP 400 — every query must
+    be a non-empty string.
+
     Example::
 
         discovery:
           elastic_api_bootstrap:
             api_url: "/_search-proxy/api/as/v1/engines/--dummy-value--/search.json"
+            queries:
+              - "bachelor"
+              - "master"
+              - "diploma certificate graduate"
+              - "doctorate"
             page_size: 100   # Elastic App Search max
-            max_pages: 10
+            max_pages: 3     # per query
     """
 
     api_url: str = Field(
@@ -860,13 +872,22 @@ class ElasticApiBootstrapConfig(BaseModel):
             "origin hostname.  E.g. '/_search-proxy/api/as/v1/engines/--dummy-value--/search.json'."
         ),
     )
+    queries: List[str] = Field(
+        default=["bachelor", "master", "diploma", "doctorate"],
+        description=(
+            "Search terms to use for each pagination round.  The proxy rejects empty "
+            "strings; use degree-level keywords so the most relevant programme pages "
+            "appear on page 1 of each query.  Results across all queries are merged and "
+            "deduplicated by URL."
+        ),
+    )
     page_size: int = Field(
         default=100,
         description="Results per page. Standard Elastic App Search maximum is 100.",
     )
     max_pages: int = Field(
-        default=10,
-        description="Hard cap on pagination rounds to prevent runaway loops.",
+        default=3,
+        description="Hard cap on pagination rounds per query to prevent runaway loops.",
     )
 
 
