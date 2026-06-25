@@ -504,7 +504,11 @@ async def _save_api_json_snapshot_safe(url: str, api_result: dict) -> None:
 
 
 async def _clear_stale_dedup(
-    db: AsyncSession, university_id: int, *, minutes: int = _STALE_DEDUP_MINUTES
+    db: AsyncSession,
+    university_id: int,
+    *,
+    minutes: int = _STALE_DEDUP_MINUTES,
+    current_job_id: str | None = None,
 ) -> int:
     """Delete *pending* ``scraped_courses`` rows older than ``minutes``.
 
@@ -537,6 +541,8 @@ async def _clear_stale_dedup(
     was built for).
     """
     from sqlalchemy import text as _text
+    from app.config import settings as _settings
+
     # Clear pending rows from all non-running jobs (including completed jobs).
     # This ensures that when a new scrape starts it replaces stale pending rows
     # from previous runs so reviewers always see fresh data.
@@ -549,13 +555,48 @@ async def _clear_stale_dedup(
     # That protection caused the opposite problem: new scrapes found all courses
     # blocked by existing pending rows and staged 0 new courses. Users now
     # prefer fresh replacement over stale history preservation.
+    #
+    # RESUME CHECKPOINT preservation (large-scrape reliability):
+    #   1. NEVER wipe the current job's OWN rows.  A re-dispatched / re-claimed
+    #      job (status briefly flips out of 'running') must keep the courses it
+    #      already staged so it can resume instead of restarting from course 0.
+    #   2. When resume is enabled, also preserve pending rows from a *recently
+    #      interrupted* run of this university — a job that timed out (failed),
+    #      is still queued (worker restart re-dispatch), or was MANUALLY STOPPED
+    #      by the operator — within the resume window.  These are the partial
+    #      progress of a large scrape; the new run skips their URLs (see the
+    #      resume filter in run_scrape) so the catalogue completes across runs.
+    #      'stopped' is included so a deliberate stop → re-trigger resumes too,
+    #      not just crashes/timeouts.  Genuinely old / completed / orphaned
+    #      leftovers (outside the window, or from completed runs) are still
+    #      wiped so the review UI never accumulates dead rows.
+    params: dict = {"uid": university_id, "m": str(minutes)}
+    _preserve_current = ""
+    if current_job_id:
+        _preserve_current = "AND sc.scrape_job_id <> :cur_job"
+        params["cur_job"] = current_job_id
+
+    _preserve_resumable = ""
+    if _settings.scrape_resume_enabled:
+        _preserve_resumable = (
+            "AND NOT EXISTS ("
+            "    SELECT 1 FROM scrape_runtime_jobs j2"
+            "    WHERE j2.runtime_job_id = sc.scrape_job_id"
+            "      AND j2.status IN ('queued', 'failed', 'stopped')"
+            "      AND j2.updated_at > NOW() - (:rw || ' minutes')::interval"
+            ")"
+        )
+        params["rw"] = str(_settings.scrape_resume_window_minutes)
+
     res = await db.execute(
         _text(
-            """
+            f"""
             DELETE FROM scraped_courses sc
             WHERE sc.university_id = :uid
               AND sc.status = 'pending'
               AND sc.created_at < NOW() - (:m || ' minutes')::interval
+              {_preserve_current}
+              {_preserve_resumable}
               AND NOT EXISTS (
                   SELECT 1 FROM scrape_runtime_jobs j
                   WHERE j.runtime_job_id = sc.scrape_job_id
@@ -563,10 +604,64 @@ async def _clear_stale_dedup(
               )
             """
         ),
-        {"uid": university_id, "m": str(minutes)},
+        params,
     )
     await db.commit()
     return res.rowcount or 0
+
+
+def _normalize_course_url(url: str | None) -> str:
+    """Canonicalise a course URL for resume-checkpoint matching.
+
+    Strips the scheme, a leading ``www.``, and any trailing slash so that
+    ``https://uni.edu/course/x`` and ``http://www.uni.edu/course/x/`` compare
+    equal.  Query strings ARE preserved because some universities key the
+    international-fee view off a query param (``?international=true``) and those
+    pages are genuinely distinct course views.
+    """
+    if not url:
+        return ""
+    u = url.strip().lower()
+    for _scheme in ("https://", "http://"):
+        if u.startswith(_scheme):
+            u = u[len(_scheme):]
+            break
+    if u.startswith("www."):
+        u = u[4:]
+    return u.rstrip("/")
+
+
+async def _already_staged_urls(
+    db: AsyncSession, university_id: int, *, current_job_id: str | None = None
+) -> set[str]:
+    """Return the set of normalised course URLs already staged for a university.
+
+    Task #229 resume checkpoint: a large scrape that died on the time ceiling
+    leaves its partial progress in ``scraped_courses``.  On the next run we skip
+    every course URL already staged (excluding reviewer-rejected rows, whose
+    decision must be honoured by re-attempting them) so the catalogue completes
+    across runs instead of restarting from course 0.
+
+    Rejected rows are intentionally NOT treated as "already done": a reviewer
+    rejection means the course should be re-evaluated, and ``stage_course`` owns
+    the rejection-block window.  Excluding them here keeps that behaviour intact.
+    """
+    from sqlalchemy import text as _text
+
+    rows = (await db.execute(
+        _text(
+            """
+            SELECT course_website
+            FROM scraped_courses
+            WHERE university_id = :uid
+              AND status <> 'rejected'
+              AND course_website IS NOT NULL
+              AND course_website <> ''
+            """
+        ),
+        {"uid": university_id},
+    )).scalars().all()
+    return {_normalize_course_url(u) for u in rows if u}
 
 
 async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
@@ -714,7 +809,9 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
     # a previous failed run cannot block dedup on this attempt. Done before
     # discovery so the cleared count is visible early in the live log.
     try:
-        cleared = await _clear_stale_dedup(db, job.university_id)
+        cleared = await _clear_stale_dedup(
+            db, job.university_id, current_job_id=runtime_job_id
+        )
         await emit(
             "status",
             f"Cleared {cleared} stale pending/rejected scraped_courses rows "
@@ -758,6 +855,13 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
     _uni_lock_redis: Any | None = None
     _uni_lock_key: str | None = None
     _uni_lock_acquired: bool = False
+
+    # Task #229: global concurrency slot state (fleet-wide cap on simultaneous
+    # scrapes so the shared Scrape.do/Gemini accounts aren't overrun).  Disabled
+    # when settings.max_concurrent_scrapes <= 0.
+    _global_slot_redis: Any | None = None
+    _global_slot_acquired: bool = False
+    _GLOBAL_SLOT_KEY = "scrape:active_runs"
 
     async def _finalize_stopped() -> dict:
         """Mark the job as user-stopped and emit a terminal log row."""
@@ -894,6 +998,77 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 )
                 await db.commit()
                 return {"ok": False, "reason": "concurrent_university_scrape"}
+
+        # ── Task #229: fleet-wide concurrency cap ────────────────────────────
+        # The 8 Celery prefork workers share ONE Scrape.do account and ONE
+        # Gemini quota.  When too many large scrapes run at once they collude to
+        # storm those shared accounts with 429s.  A global slot counter (Redis
+        # ZSET of active run-ids, scored by start time) caps the number of
+        # simultaneous scrapes.  Stale entries (older than the hard ceiling) are
+        # swept on each acquire so a crashed worker never permanently leaks a
+        # slot.  Disabled when max_concurrent_scrapes <= 0; fail-open on any
+        # Redis error.  Because the resume checkpoint makes re-runs cheap, an
+        # over-cap job is safely aborted (operator/beat can re-trigger; it will
+        # resume) rather than risk corrupting the requeue machinery.
+        _max_concurrent = settings.max_concurrent_scrapes
+        if _max_concurrent and _max_concurrent > 0:
+            try:
+                import redis.asyncio as _aioredis
+                _global_slot_redis = _aioredis.from_url(
+                    settings.redis_url, decode_responses=True, socket_timeout=3
+                )
+                _now_ts = datetime.now(timezone.utc).timestamp()
+                _stale_before = _now_ts - float(settings.scrape_task_hard_time_limit_s)
+                # Atomic acquire: sweep crashed/leaked slots, count current
+                # holders, and claim a slot — all in one Redis round-trip so two
+                # workers starting simultaneously can never both pass a stale
+                # check-then-add and exceed the cap.  Returns -1 on success, or
+                # the current active count when the cap is already reached.
+                _slot_lua = (
+                    "redis.call('ZREMRANGEBYSCORE', KEYS[1], '-inf', ARGV[2])\n"
+                    "local active = redis.call('ZCARD', KEYS[1])\n"
+                    "if active >= tonumber(ARGV[3]) then return active end\n"
+                    "redis.call('ZADD', KEYS[1], ARGV[1], ARGV[4])\n"
+                    "return -1"
+                )
+                _slot_res = await _global_slot_redis.eval(
+                    _slot_lua, 1, _GLOBAL_SLOT_KEY,
+                    str(_now_ts), str(_stale_before),
+                    str(_max_concurrent), runtime_job_id,
+                )
+                _active = int(_slot_res)
+                if _active >= 0:
+                    log.warning(
+                        "Global scrape slot cap reached (%d/%d active) — "
+                        "deferring job %s (will resume on re-trigger)",
+                        _active, _max_concurrent, runtime_job_id,
+                    )
+                    await emit(
+                        "status",
+                        f"Deferred — {_active} scrapes already running "
+                        f"(max {_max_concurrent}). Re-trigger to resume.",
+                        phase="queue",
+                        level="warn",
+                    )
+                    await db.execute(
+                        _text(
+                            "UPDATE scrape_runtime_jobs "
+                            "SET status = 'stopped', completed_at = NOW(), "
+                            "error_message = 'Deferred: global scrape "
+                            "concurrency cap reached' "
+                            "WHERE runtime_job_id = :jid AND status = 'running'"
+                        ),
+                        {"jid": runtime_job_id},
+                    )
+                    await db.commit()
+                    return {"ok": False, "reason": "max_concurrent_scrapes"}
+                # _slot_res == -1 → the Lua script already claimed our slot.
+                _global_slot_acquired = True
+            except Exception as _slot_err:  # noqa: BLE001 — fail open
+                log.warning(
+                    "Global slot check failed (failing open): %s", _slot_err
+                )
+                _global_slot_acquired = False
 
         # ── Snapshot uni fields to plain locals ──────────────────────────────
         # The session will be used by other coroutines during gather() and we
@@ -3390,6 +3565,49 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             job.total_found = len(links)
             await db.commit()
 
+        # ── Task #229: RESUME CHECKPOINT — skip already-staged courses ─────────
+        # A large catalogue that died on the time ceiling left its partial
+        # progress in scraped_courses.  Filter those URLs out of the work list so
+        # this run continues from where the previous one stopped instead of
+        # re-extracting (and re-paying Scrape.do/Gemini for) hundreds of courses
+        # that are already staged.  Reviewer-rejected rows are NOT skipped (see
+        # _already_staged_urls) so a rejection is always re-evaluated.
+        if settings.scrape_resume_enabled and job.university_id and links:
+            try:
+                _done_urls = await _already_staged_urls(
+                    db, job.university_id, current_job_id=runtime_job_id
+                )
+                if _done_urls:
+                    _before = len(links)
+                    links = [
+                        lk for lk in links
+                        if _normalize_course_url(lk.get("url")) not in _done_urls
+                    ]
+                    _skipped_resume = _before - len(links)
+                    if _skipped_resume > 0:
+                        job.total_found = len(links)
+                        await db.commit()
+                        log.info(
+                            "[RESUME] %s: skipping %d already-staged course(s); "
+                            "%d remaining to extract",
+                            uni_name, _skipped_resume, len(links),
+                        )
+                        await emit(
+                            "status",
+                            f"[RESUME] resuming interrupted scrape — "
+                            f"{_skipped_resume} course(s) already staged, "
+                            f"{len(links)} remaining",
+                            phase="extract",
+                            kind="resume_checkpoint",
+                            already_staged=_skipped_resume,
+                            remaining=len(links),
+                        )
+            except Exception as _resume_exc:  # noqa: BLE001 — never abort on resume
+                log.warning(
+                    "[RESUME] checkpoint filter failed for uni %s (continuing "
+                    "with full link set): %s", job.university_id, _resume_exc,
+                )
+
         # 2) Extraction + staging split into batches so completed courses are
         # staged and freed before the next batch starts.  For large universities
         # (Ulster: 1000 courses) a single asyncio.gather keeps every result
@@ -4961,6 +5179,21 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 )
             try:
                 await _uni_lock_redis.aclose()
+            except Exception:  # noqa: BLE001
+                pass
+
+        # ── Task #229: release the global concurrency slot ──────────────────
+        if _global_slot_redis is not None:
+            try:
+                if _global_slot_acquired:
+                    await _global_slot_redis.zrem(_GLOBAL_SLOT_KEY, runtime_job_id)
+            except Exception as _slot_rel_err:  # noqa: BLE001
+                log.warning(
+                    "Failed to release global scrape slot for %s: %s",
+                    runtime_job_id, _slot_rel_err,
+                )
+            try:
+                await _global_slot_redis.aclose()
             except Exception:  # noqa: BLE001
                 pass
 

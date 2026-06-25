@@ -316,6 +316,14 @@ async def fetch_html_scrape_do(
     if not token:
         log.debug("fetch_html_scrape_do: SCRAPE_DO_TOKEN not set — skipping")
         return None
+    # Task #229: cross-process throttle so the 8-worker fleet doesn't exhaust the
+    # shared Scrape.do account in bursts.  No-op unless scrape_do_rate_limit_per_sec
+    # is configured > 0; fail-open on any Redis issue.
+    try:
+        from app.services.scraper.rate_limiter import acquire_scrape_do
+        await acquire_scrape_do()
+    except Exception as _rl_exc:  # noqa: BLE001 — never block a fetch on the limiter
+        log.debug("scrape_do rate-limit acquire skipped: %s", _rl_exc)
     try:
         params: dict[str, str] = {"token": token, "url": url}
         if render:

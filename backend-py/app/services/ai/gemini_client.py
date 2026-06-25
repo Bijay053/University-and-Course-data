@@ -349,6 +349,14 @@ async def generate(
 
     from google.genai import types as _gtypes
 
+    # Task #229: cross-process throttle so the 8-worker fleet doesn't burst the
+    # shared Gemini quota into 429s.  No-op unless gemini_rate_limit_per_sec > 0.
+    try:
+        from app.services.scraper.rate_limiter import acquire_gemini
+        await acquire_gemini()
+    except Exception as _rl_exc:  # noqa: BLE001 — never block a call on the limiter
+        log.debug("gemini rate-limit acquire skipped: %s", _rl_exc)
+
     try:
         for attempt in range(_MAX_RETRIES + 1):
             try:
@@ -440,6 +448,13 @@ async def generate_with_images(
         detected = _detect_mime_type(img)
         parts.append(_gtypes.Part.from_bytes(data=img, mime_type=detected))
     parts.append(_gtypes.Part.from_text(text=prompt))
+
+    # Task #229: cross-process throttle (shared with the text-only path above).
+    try:
+        from app.services.scraper.rate_limiter import acquire_gemini
+        await acquire_gemini()
+    except Exception as _rl_exc:  # noqa: BLE001 — never block a call on the limiter
+        log.debug("gemini rate-limit acquire skipped: %s", _rl_exc)
 
     try:
         for attempt in range(_MAX_RETRIES + 1):

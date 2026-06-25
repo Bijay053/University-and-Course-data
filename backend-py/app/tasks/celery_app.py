@@ -66,12 +66,15 @@ celery_app.conf.update(
     # Hard ceiling so a single hung scrape can never block the worker
     # indefinitely (prod incident: ASA job sat for 660+ minutes; Replit
     # incident: UEL browser discovery hung for 45+ min blocking all 4 workers).
-    # 45 min soft limit covers all known real scrapes (longest: Bond ~30 min).
     # soft_time_limit raises SoftTimeLimitExceeded inside the task so the
     # orchestrator can mark the job failed cleanly; time_limit sends SIGKILL
-    # after an extra 10 minutes if the soft signal is not handled.
-    task_soft_time_limit=2700,   # 45 min → raises SoftTimeLimitExceeded
-    task_time_limit=3000,        # 50 min → SIGKILL fallback
+    # after the configured extra window if the soft signal is not handled.
+    # Task #229: configurable safety ceiling (was a hardcoded 45-min/2700s soft
+    # limit that killed healthy 500+ course scrapes mid-run). Now sourced from
+    # settings and deliberately generous; large catalogues that still exceed it
+    # resume from the staged-course checkpoint on re-run rather than restarting.
+    task_soft_time_limit=settings.scrape_task_soft_time_limit_s,
+    task_time_limit=settings.scrape_task_hard_time_limit_s,
     # Diff item L (MIGRATION_AUDIT.md §6): daily snapshot at 03:00 UTC.
     # The Node ``daily-backup.ts`` ran hourly and short-circuited when
     # today's row already existed (catch-up safety net for missed

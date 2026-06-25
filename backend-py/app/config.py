@@ -76,6 +76,35 @@ class Settings(BaseSettings):
     max_http_concurrency: int = 40
     per_uni_timeout_seconds: int = 1500
 
+    # ── Task #229: large-catalogue scrape lifetime + contention bounding ──────
+    # Celery soft/hard task time limits (seconds).  The old hardcoded 45-min
+    # (2700s) soft ceiling killed otherwise-healthy 500+ course scrapes mid-run.
+    # These are now a *safety* ceiling, deliberately generous; combine with the
+    # resume checkpoint (below) so a catalogue that exceeds even this finishes
+    # across re-runs without losing progress.  Env-overridable per deployment.
+    scrape_task_soft_time_limit_s: int = 7200   # 2h
+    scrape_task_hard_time_limit_s: int = 7500   # 2h05m (must be > soft)
+
+    # Resume checkpoint: when True, a re-run of an interrupted large scrape skips
+    # course URLs already staged for the university (instead of restarting from
+    # course 0), and _clear_stale_dedup preserves an interrupted run's partial
+    # progress rather than wiping it.  resume_window bounds how recent a prior
+    # interrupted run must be for its rows to be treated as a resumable checkpoint.
+    scrape_resume_enabled: bool = True
+    scrape_resume_window_minutes: int = 180
+
+    # Global cap on how many universities may scrape concurrently across ALL
+    # Celery workers (Redis-coordinated).  0 = disabled (no global cap; existing
+    # behaviour).  Bounds Scrape.do / Gemini contention at the job level.
+    max_concurrent_scrapes: int = 0
+
+    # Cross-process token-bucket rate limits (calls/sec, Redis-coordinated).
+    # In-process semaphores cannot bound contention across the 8 prefork workers
+    # that share ONE Scrape.do account and ONE Gemini quota.  0.0 = disabled
+    # (no throttling; existing behaviour).  Set >0 on prod to tame 429 storms.
+    scrape_do_rate_limit_per_sec: float = 0.0
+    gemini_rate_limit_per_sec: float = 0.0
+
     # Auto-publish thresholds (Bug #6 — looser than Node defaults)
     min_completeness_for_auto_publish: int = 75
     rejection_block_days: int = 7  # Bug #7: was 30 in Node
