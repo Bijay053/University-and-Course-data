@@ -82,3 +82,8 @@ extraction:
         ielts: 6.5
       doctorate:
         ielts: 6.5
+  staging:
+    reject_if_missing:
+      - course_name
+    skip_degree_qualifier_check: true   # SPA H1 might lack full degree prefix; allow for flexibility
+    require_international_fee: false  
