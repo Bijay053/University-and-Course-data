@@ -1444,6 +1444,7 @@ async def extract_course(
         from app.services.scraper.per_course_browser import (
             is_confirmed_browser_only as _is_confirmed_browser_only,
         )
+        from app.services.skip_counters import note_skip as _note_skip
         _yaml_skip_http = (
             _uc_http is not None
             and getattr(_uc_http.extraction, "skip_initial_http_fetch", False)
@@ -1454,6 +1455,8 @@ async def extract_course(
         _skip_http = _yaml_skip_http or _confirmed_browser_only
         if _skip_http:
             _perf_flags["http_skipped"] = True
+            if _confirmed_browser_only:
+                _note_skip("browser_http_skipped")
             if emit:
                 _skip_reason = (
                     "skip_initial_http_fetch=true" if _yaml_skip_http
@@ -1491,6 +1494,7 @@ async def extract_course(
             from app.services.scraper.per_course_browser import (
                 _browser_config_for, is_challenge_shell, note_browser_rescue, should_retry_browser,
             )
+            from app.services.skip_counters import note_skip as _note_skip
             if emit:
                 await emit(
                     "status",
@@ -1577,13 +1581,11 @@ async def extract_course(
             # browser-only and skip HTTP for courses HTTP actually serves, so we
             # require a minimum body length (a fully-rendered course page is
             # never this small; an interstitial/empty shell is).
-            if (
-                html
-                and _http_attempted
-                and len(html) >= _BROWSER_RESCUE_MIN_HTML_LEN
-                and not is_challenge_shell(html)
-            ):
-                note_browser_rescue(_fetch_host)
+            if html and _http_attempted and len(html) >= _BROWSER_RESCUE_MIN_HTML_LEN:
+                if is_challenge_shell(html):
+                    _note_skip("challenge_shell")
+                else:
+                    note_browser_rescue(_fetch_host)
         except Exception as _exc:
             log.warning("browser fallback failed for %s: %s", url, _exc)
 

@@ -39,6 +39,7 @@ from typing import Any
 
 from app.config import settings
 from app.services.ai import budget
+from app.services.skip_counters import note_skip as _note_skip
 
 log = logging.getLogger(__name__)
 
@@ -360,6 +361,7 @@ async def generate(
             call_type=call_type, model=model_name,
         )
         _append_call_log(call_type, model_name, in_tok, 0, 0.0, 0, False, "circuit_open", course_url)
+        _note_skip("gemini_circuit_open")
         return resp
 
     # Daily budget check
@@ -431,6 +433,7 @@ async def generate(
                     call_type, model_name, in_tok, 0, 0.0, duration_ms, False,
                     f"timeout after {timeout_s}s", course_url,
                 )
+                _note_skip("gemini_timeout")
                 return GeminiResponse(
                     "", in_tok, 0, 0.0,
                     skipped=True, skip_reason=f"timeout after {timeout_s}s",
@@ -494,6 +497,7 @@ async def generate_with_images(
         wait = _quota_tracker.time_until_circuit_close()
         log.info("[GEMINI SKIP-CIRCUIT] circuit open %.0fs more — skipping vision", wait)
         _append_call_log(call_type, model_name, in_tok, 0, 0.0, 0, False, "circuit_open", course_url)
+        _note_skip("gemini_circuit_open")
         return GeminiResponse("", in_tok, 0, 0.0, skipped=True, skip_reason="circuit_open", call_type=call_type, model=model_name)
 
     estimated = (in_tok * _INPUT_USD_PER_M + max_output_tokens * _OUTPUT_USD_PER_M) / 1_000_000

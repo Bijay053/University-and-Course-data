@@ -1112,6 +1112,8 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # worker cannot carry stale "confirmed browser-only" state into this run.
         from app.services.scraper.per_course_browser import reset_browser_only_hosts as _reset_browser_only
         _reset_browser_only()
+        from app.services.skip_counters import reset_skip_counters as _reset_skip_counters
+        _reset_skip_counters()
         log.info(
             "UniConfig loaded: slug=%r yaml_file=%r always_browser=%r always_sitemap=%r stealth=%r",
             _uni_cfg.slug,
@@ -4648,6 +4650,20 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             avg_seconds_per_course=avg_per_course,
             level="info",
         )
+        # ── Task #235: gate skip counters ─────────────────────────────────────
+        from app.services.skip_counters import get_skip_counts as _get_skip_counts
+        _gate_skips = _get_skip_counts()
+        _nonzero_skips = {k: v for k, v in _gate_skips.items() if v}
+        if _nonzero_skips:
+            _gs_parts = " ".join(f"{k}={v}" for k, v in sorted(_nonzero_skips.items()))
+            await emit(
+                "status",
+                f"[GATE SKIPS] {_gs_parts}",
+                phase="complete",
+                kind="gate_skip_summary",
+                gate_skips=_nonzero_skips,
+                level="info",
+            )
         # Build human-readable skip breakdown for the log line.
         _skip_parts = [f"{k}={v}" for k, v in sorted(skip_reasons.items(), key=lambda x: -x[1])]
         _skip_detail = f" ({', '.join(_skip_parts)})" if _skip_parts else ""
@@ -4751,6 +4767,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # Scrape.do call counters (per-job ContextVar dict)
         job.scrape_do_render_calls = _sd_job_ctrs["render"]
         job.scrape_do_static_calls = _sd_job_ctrs["static"]
+        job.gate_skip_counts = _gate_skips if _nonzero_skips else None
         if _sd_job_ctrs["render"] or _sd_job_ctrs["static"]:
             log.info(
                 "[SCRAPE_DO] run=%s render_calls=%d static_calls=%d cost_est=$%.4f",

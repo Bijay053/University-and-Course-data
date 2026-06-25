@@ -40,6 +40,10 @@ args = "task233-latency-gates"
 task = "workflow.run"
 args = "task236-challenge-shell"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "task235-skip-counters"
+
 [[workflows.workflow]]
 name = "backend-py: FastAPI"
 author = "agent"
@@ -103,6 +107,17 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "cd backend-py && PYTHONPATH=. python -m pytest tests/test_challenge_shell_detection.py -q -c /dev/null -p no:cacheprovider"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow]]
+name = "task235-skip-counters"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd backend-py && PYTHONPATH=. python -m pytest tests/test_skip_counters.py -q -c /dev/null -p no:cacheprovider"
 
 [workflows.workflow.metadata]
 isValidation = true

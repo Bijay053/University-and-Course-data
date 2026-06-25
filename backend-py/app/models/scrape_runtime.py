@@ -52,6 +52,7 @@ class ScrapeRuntimeJob(Base):
     avg_verification_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
     scrape_do_render_calls: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     scrape_do_static_calls: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    gate_skip_counts: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )

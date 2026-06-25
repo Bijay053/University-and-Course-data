@@ -820,6 +820,8 @@ async def maybe_vision_refetch(
             "[VISION SKIP] all English overalls filled and no tier-0 image — "
             "nothing for OCR to fill or override — %s", url,
         )
+        from app.services.skip_counters import note_skip as _note_skip
+        _note_skip("vision_early_exit")
         return {}, []
 
     # Compute which English tests are mentioned anywhere in the page HTML.
