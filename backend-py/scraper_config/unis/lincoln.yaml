@@ -16,7 +16,10 @@
 #
 # CONFIG STRATEGY:
 #   - always_browser_discover: true — bypass 403 HTTP BFS
-#   - seed_urls: programme-search listing page (actual A-Z degree catalogue)
+#   - seed_urls: BOTH undergraduate AND postgraduate listing pages (direct seeds so
+#     all 118 courses are found without relying on nav BFS exploration within the
+#     90s time budget).  The /programme-search/ listing is a JS search widget that
+#     renders 0 static links — do NOT seed it.
 #   - allow_url_patterns: individual programme pages only
 #   - block_url_patterns: suppress resources/schools/farming/nav noise
 #   - use_stealth_browser: true — per-course extraction AND central pages via patchright
@@ -24,12 +27,15 @@
 #   - english.central_page: absolute URL for same reason
 #   - force_central_fee_stage: true — mark has_central_fee_page even when parser finds 0
 #     records (prevents staging gate rejection while fix is being validated)
+#   - browser_time_budget_s: 150 — extra headroom in case either listing page triggers
+#     additional nav candidates before all course links are emitted
 
 discovery:
   always_browser_discover: true
+  browser_time_budget_s: 150
 
   seed_urls:
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/
+    - https://www.lincoln.ac.nz/study/study-programmes/undergraduate-study/
     - https://www.lincoln.ac.nz/study/study-programmes/postgraduate-study/
 
   allow_url_patterns:
