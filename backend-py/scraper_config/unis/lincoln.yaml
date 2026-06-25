@@ -36,8 +36,7 @@ discovery:
   browser_time_budget_s: 150
 
   seed_urls:
-    - https://www.lincoln.ac.nz/study/study-programmes/undergraduate-study/
-    - https://www.lincoln.ac.nz/study/study-programmes/postgraduate-study/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/
 
   allow_url_patterns:
     # PG individual course pages
