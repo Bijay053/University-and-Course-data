@@ -1,27 +1,25 @@
 # Lincoln University (NZ) — slug "lincoln"
 # Hostname: www.lincoln.ac.nz
 #
-# DIAGNOSIS (2026-06-03 updated 2026-06-25):
+# DIAGNOSIS (2026-06-03, updated 2026-06-25):
 #   - www.lincoln.ac.nz returns HTTP 403 to plain-HTTP requests from cloud IPs.
-#   - /courses/ is a JavaScript course-search tool — contains NO static .htm links.
-#   - Actual individual programme pages exist on TWO different URL paths:
-#       PG:  /study/study-programmes/programme-search/<slug>/
-#       UG:  /study/courses-2/course-search/<slug>/
-#     The undergraduate-study/ seed page links to UG courses at /courses-2/course-search/
-#     and the postgraduate-study/ seed page links to PG at /programme-search/.
-#   - Root cause of 58/118 bug: allow_url_patterns only contained programme-search,
-#     so UG links on the undergraduate-study/ seed page were classified as nav
-#     candidates (score=140) and queued in a 517-deep heap, exhausting the 150s
-#     browser budget before most were processed.
-#   - Fix: add courses-2/course-search/[^/]+/?$ to allow_url_patterns so UG course
-#     links are classified as course candidates at seed-visit time (no nav traversal
-#     needed, budget is irrelevant).
+#   - All 118 courses live at /study/study-programmes/programme-search/<slug>/.
+#     The SPA at programme-search/ calls Elastic App Search via a server-side proxy:
+#       POST /_search-proxy/api/as/v1/engines/--dummy-value--/search.json
+#     The proxy adds the API key server-side; no auth token needed from the browser.
+#   - Root cause of 17/118 bug: the XHR interceptor correctly captured page 1 (15
+#     results), but the pagination detector did not find the total because Elastic
+#     App Search stores it at meta.page.total_results (nested), not at the root
+#     level. Fix: browser_discover_generic.py now checks that nested path and
+#     uses POST-body pagination (page: {current: N, size: 15}) for subsequent pages.
+#   - A small number of UG courses also live at /study/courses-2/course-search/<slug>/
+#     (found by browser nav); allow_url_patterns covers both paths.
 #   - All per-course pages require browser rendering (Cloudflare blocks plain HTTP).
 #   - Lincoln is a New Zealand university — CRICOS does not apply.
 #
 # CONFIG STRATEGY:
 #   - always_browser_discover: true — bypass 403 HTTP BFS
-#   - seed_urls: BOTH undergraduate AND postgraduate listing pages
+#   - seed_urls: programme-search/ (XHR pagination then fetches all 118 courses)
 #   - allow_url_patterns: BOTH UG (courses-2/course-search) AND PG (programme-search)
 #   - block_url_patterns: suppress resources/schools/farming/nav noise
 #   - use_stealth_browser: true — per-course extraction AND central pages via patchright
@@ -29,7 +27,8 @@
 #   - english.central_page: absolute URL for same reason
 #   - force_central_fee_stage: true — mark has_central_fee_page even when parser finds 0
 #     records (prevents staging gate rejection while fix is being validated)
-#   - browser_time_budget_s: 150 — sufficient once UG courses are found at seed-visit time
+#   - browser_time_budget_s: 150 — XHR pagination runs AFTER the BFS loop, so time
+#     budget only affects nav traversal, not pagination
 
 discovery:
   always_browser_discover: true

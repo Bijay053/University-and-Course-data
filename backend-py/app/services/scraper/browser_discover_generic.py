@@ -615,8 +615,8 @@ async def browser_discover_generic(
                 if isinstance(val, str) and val:
                     url = val
                     break
-                if isinstance(val, dict):  # Drupal path object
-                    alias = val.get("alias") or val.get("href") or val.get("url")
+                if isinstance(val, dict):  # Drupal path object or Elastic App Search {"raw": "..."}
+                    alias = val.get("raw") or val.get("alias") or val.get("href") or val.get("url")
                     if isinstance(alias, str) and alias:
                         url = alias
                         break
@@ -630,7 +630,7 @@ async def browser_discover_generic(
                         or (path_obj.get("alias") if isinstance(path_obj, dict) else None)
                     )
                     name = attrs.get("title") or attrs.get("name") or attrs.get("label")
-            # 3. Name / title fields
+            # 3. Name / title fields (plain string or Elastic App Search {"raw": "..."})
             if not name:
                 for key in ("title", "name", "label", "course_name",
                             "courseTitle", "heading", "courseName"):
@@ -638,6 +638,11 @@ async def browser_discover_generic(
                     if isinstance(val, str) and val:
                         name = val
                         break
+                    if isinstance(val, dict):
+                        _raw = val.get("raw") or val.get("snippet")
+                        if isinstance(_raw, str) and _raw:
+                            name = _raw
+                            break
             if not url:
                 return
             # Resolve relative URLs
@@ -709,6 +714,8 @@ async def browser_discover_generic(
                 # context and bypass Cloudflare).
                 if isinstance(data, dict):
                     _reported_total: int | None = None
+                    _is_elastic_app_search = False
+                    # Check root-level total keys (most REST APIs)
                     for _tk in ("total", "numFound", "count", "totalResults",
                                 "total_results", "totalCount", "totalItems",
                                 "total_count", "Total", "total_records"):
@@ -716,11 +723,22 @@ async def browser_discover_generic(
                         if isinstance(_tv, int) and _tv > 0:
                             _reported_total = _tv
                             break
+                    # Elastic App Search: total at meta.page.total_results
+                    # (POST-based pagination — must be handled separately below)
+                    if not _reported_total:
+                        _meta = data.get("meta")
+                        if isinstance(_meta, dict):
+                            _page_meta = _meta.get("page")
+                            if isinstance(_page_meta, dict):
+                                _tv2 = _page_meta.get("total_results")
+                                if isinstance(_tv2, int) and _tv2 > 0:
+                                    _reported_total = _tv2
+                                    _is_elastic_app_search = True
                     if _reported_total and _reported_total > len(extracted):
                         log.info(
                             "browser_discover_generic: XHR pagination detected "
-                            "at %s — total=%d, page=%d; will fetch remaining pages",
-                            ep_url, _reported_total, len(extracted),
+                            "at %s — total=%d, page=%d, elastic=%s; will fetch remaining pages",
+                            ep_url, _reported_total, len(extracted), _is_elastic_app_search,
                         )
                         await _emit(
                             f"[DISCOVER] Pagination detected: {ep_url} "
@@ -731,6 +749,7 @@ async def browser_discover_generic(
                             "url": ep_url,
                             "total": _reported_total,
                             "page_size": len(extracted),
+                            "elastic_app_search": _is_elastic_app_search,
                         })
             else:
                 log.debug(
@@ -1177,40 +1196,66 @@ async def browser_discover_generic(
                     _total     = _pg_info["total"]
                     _page_size = _pg_info["page_size"]
                     _fetched   = _page_size
+                    _is_eas     = _pg_info.get("elastic_app_search", False)
                     _parsed    = _uparse(_base_url)
                     _params    = _pqs(_parsed.query, keep_blank_values=True)
-                    # Detect offset / page parameter name used in the URL
+                    # Detect offset / page parameter name used in the URL (GET APIs)
                     _offset_key = next((k for k in _params if k in ("offset", "start", "from", "skip")), None)
                     _page_key   = next((k for k in _params if k in ("page", "p", "pageNum", "page_number", "pg")), None)
-                    # If no pagination param in URL, assume offset-based and inject one
-                    if not _offset_key and not _page_key:
+                    # If no pagination param in URL and not Elastic, assume offset-based
+                    if not _is_eas and not _offset_key and not _page_key:
                         _offset_key = "offset"
                     _consecutive_empty = 0
                     while _fetched < min(_total, _PAGINATION_SAFETY_CAP) and _consecutive_empty < 2:
-                        if _offset_key:
-                            _params[_offset_key] = [str(_fetched)]
-                            # Keep limit/size/rows consistent with what we already have
-                            for _sz_key in ("limit", "size", "rows", "per_page", "pageSize"):
-                                if _sz_key not in _params:
-                                    _params[_sz_key] = [str(_page_size)]
-                                break
-                        elif _page_key:
-                            _params[_page_key] = [str(_fetched // _page_size + 1)]
-                        _next_qs  = "&".join(f"{k}={_v}" for k, vs in _params.items() for _v in vs)
-                        _next_url = _uunparse(_parsed._replace(query=_next_qs))
+                        _cur_page_num = _fetched // _page_size + 1  # 1-based page number
                         try:
-                            _page_text = await page.evaluate(
-                                """async (url) => {
-                                    try {
-                                        const r = await fetch(url, {credentials: 'include'});
-                                        if (!r.ok) return null;
-                                        const ct = r.headers.get('content-type') || '';
-                                        if (!ct.includes('json')) return null;
-                                        return await r.text();
-                                    } catch(e) { return null; }
-                                }""",
-                                _next_url,
-                            )
+                            if _is_eas:
+                                # Elastic App Search uses POST with JSON body for pagination.
+                                # Use page.evaluate so the request inherits the browser's
+                                # session cookies and Cloudflare clearance token.
+                                _page_text = await page.evaluate(
+                                    """async (args) => {
+                                        try {
+                                            const r = await fetch(args.url, {
+                                                method: 'POST',
+                                                headers: {'Content-Type': 'application/json'},
+                                                credentials: 'include',
+                                                body: JSON.stringify({
+                                                    query: '',
+                                                    page: {current: args.pageNum, size: args.pageSize}
+                                                })
+                                            });
+                                            if (!r.ok) return null;
+                                            const ct = r.headers.get('content-type') || '';
+                                            if (!ct.includes('json')) return null;
+                                            return await r.text();
+                                        } catch(e) { return null; }
+                                    }""",
+                                    {"url": _base_url, "pageNum": _cur_page_num, "pageSize": _page_size},
+                                )
+                            else:
+                                if _offset_key:
+                                    _params[_offset_key] = [str(_fetched)]
+                                    for _sz_key in ("limit", "size", "rows", "per_page", "pageSize"):
+                                        if _sz_key not in _params:
+                                            _params[_sz_key] = [str(_page_size)]
+                                        break
+                                elif _page_key:
+                                    _params[_page_key] = [str(_cur_page_num)]
+                                _next_qs  = "&".join(f"{k}={_v}" for k, vs in _params.items() for _v in vs)
+                                _next_url = _uunparse(_parsed._replace(query=_next_qs))
+                                _page_text = await page.evaluate(
+                                    """async (url) => {
+                                        try {
+                                            const r = await fetch(url, {credentials: 'include'});
+                                            if (!r.ok) return null;
+                                            const ct = r.headers.get('content-type') || '';
+                                            if (!ct.includes('json')) return null;
+                                            return await r.text();
+                                        } catch(e) { return null; }
+                                    }""",
+                                    _next_url,
+                                )
                             if not _page_text:
                                 _consecutive_empty += 1
                                 _fetched += _page_size
@@ -1226,12 +1271,12 @@ async def browser_discover_generic(
                             _new_items = [c for c in _page_items if c["url"] not in _existing_urls]
                             _xhr_courses.extend(_new_items)
                             log.info(
-                                "browser_discover_generic: XHR paginate offset=%d → +%d course(s) (xhr_total=%d)",
-                                _fetched, len(_new_items), len(_xhr_courses),
+                                "browser_discover_generic: XHR paginate page=%d → +%d course(s) (xhr_total=%d, elastic=%s)",
+                                _cur_page_num, len(_new_items), len(_xhr_courses), _is_eas,
                             )
                             _fetched += _page_size
                         except Exception as _pe:
-                            log.debug("browser_discover_generic: XHR paginate error at offset=%d: %s", _fetched, _pe)
+                            log.debug("browser_discover_generic: XHR paginate error at page=%d: %s", _cur_page_num, _pe)
                             break
                 if _xhr_pagination:
                     await _emit(
