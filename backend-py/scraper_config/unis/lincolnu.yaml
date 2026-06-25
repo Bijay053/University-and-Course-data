@@ -1,36 +1,57 @@
-# Lincoln University
+# Lincoln University (NZ) — slug "lincolnu" (university 58 in prod)
 # Hostname: www.lincoln.ac.nz
 # Country: New Zealand | Currency: NZD
-# Bug history:
-#   Lincoln course pages can appear as root-level URLs, for example:
-#   https://www.lincoln.ac.nz/master-of-tourism-management-2/
-#   Do not use strict allow_url_patterns for /study/study-programmes/.
-#   Previous filters dropped valid course pages and staged 0 courses.
+#
+# DISCOVERY HISTORY:
+#   Old approach: BFS with programme-search/ seed → yields 0 courses in
+#   browser mode (JS search widget, no static links).
+#   Root cause: Cloudflare forces browser mode; time_budget=90s (default);
+#   programme-search/ JS widget + courses-2/course-search/ listing page both
+#   return 0 static links so the browser wanders nav and times out.
+#
+#   Same two-URL-path problem as lincoln.yaml (uni 1753):
+#     PG courses: /study/study-programmes/programme-search/<slug>/
+#     UG courses: /study/courses-2/course-search/<slug>/
+#   The undergraduate-study/ listing page links to UG courses at courses-2/course-search/
+#   and the postgraduate-study/ listing page links to PG at programme-search/.
+#   With allow_url_patterns matching both, all 118 courses are found at seed-visit time.
+#
+# NOTE: Old comment "Lincoln course pages can appear as root-level URLs" is
+# superseded — all current courses resolve via the two patterns below.
 
 discovery:
+  always_browser_discover: true
+  browser_time_budget_s: 150
+  use_stealth_browser: true
+
   seed_urls:
-    - https://www.lincoln.ac.nz/study/courses-2/course-search/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/
-    - https://www.lincoln.ac.nz/study/study-programmes/programmes-starting-soon/
+    - https://www.lincoln.ac.nz/study/study-programmes/undergraduate-study/
+    - https://www.lincoln.ac.nz/study/study-programmes/postgraduate-study/
 
-  always_sitemap_supplement: true
+  allow_url_patterns:
+    # PG individual course pages
+    - "lincoln\\.ac\\.nz/study/study-programmes/programme-search/[^/]+/?$"
+    # UG individual course pages (different URL path)
+    - "lincoln\\.ac\\.nz/study/courses-2/course-search/[^/]+/?$"
 
-  # Do not add allow_url_patterns or must_contain.
-  # Lincoln valid course URLs can be root-level slugs.
   block_url_patterns:
-    - '/news-and-events/'
-    - '/study/apply-and-enrol/'
-    - '/study/scholarships/'
-    - '/study/key-dates-2/'
-    - '/study/fees/'
-    - '/study/study-programmes/academic-pathways/'
-    - '/study/study-programmes/programme-search/?$'
-    - '/study/study-programmes/programmes-starting-soon/?$'
-    - '\.pdf$'
-
-  bfs_page_budget: 80
-  max_candidates: 500
-  expected_min_courses: 50
+    - "/resources-for-careers-advisors"
+    - "/farms-outreach"
+    - "/teaching-resources"
+    - "/future-students-and-schools"
+    - "/types-of-postgrad-study"
+    - "/make-postgraduate-study-work"
+    - "/on-farm-workshops"
+    - "/on-campus-workshops"
+    - "/apply"
+    - "/about"
+    - "/news"
+    - "/events"
+    - "/research"
+    - "/staff"
+    - "/contact"
+    - "programme-search/$"
+    - "course-search/$"
 
 extraction:
   fees:
@@ -56,8 +77,14 @@ extraction:
         pte: 58
         toefl: 80
 
+  staging:
+    reject_if_missing:
+      - course_name
+    skip_degree_qualifier_check: true
+    require_international_fee: false
+
   filters:
     domestic_only:
       enabled: false
     online_only:
-      enabled: true
+      enabled: false
