@@ -72,7 +72,8 @@ discovery:
     - "/postgraduate/courses/"
     - "/undergraduate/courses"
     - "/postgraduate/courses"
-    - "/postgraduate/taught/courses/"
+    - "/undergraduate/"
+    - "/postgraduate/"
   block_url_patterns:
     # ── PhD noise (most important — these were extracted as "courses" in logs) ──
     - '/phd/students'          # /<dept>/postgraduate/phd/students/<name>
