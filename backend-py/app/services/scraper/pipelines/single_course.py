@@ -1493,19 +1493,35 @@ async def extract_course(
         # CF-Enterprise-blocked site) where Playwright is also IP-blocked and
         # the 186 browser fallbacks wasted ~60 min returning rendered=0B.
         _uc_skip_pcb = get_uni_config()
-        _skip_all_browser = (
+        # skip_browser_rescue: true — wires the existing YAML flag into this path.
+        # This is the fix for Ulster: the flag was set but only guarded the
+        # *sparse-static rescue* (post-Gemini), not the initial HTTP-failure
+        # browser fallback.  Now it gates BOTH paths.
+        # skip_per_course_browser: true — broader YAML flag; also gates this path
+        # as a belt-and-suspenders for 100%-CF-blocked universities.
+        _skip_rescue = (
+            _uc_skip_pcb is not None
+            and getattr(_uc_skip_pcb.extraction, "skip_browser_rescue", False)
+        )
+        _skip_per_course = (
             _uc_skip_pcb is not None
             and getattr(_uc_skip_pcb.extraction, "skip_per_course_browser", False)
         )
+        _skip_all_browser = _skip_rescue or _skip_per_course
         if _skip_all_browser:
+            _skip_flag_name = (
+                "skip_browser_rescue=true"
+                if _skip_rescue
+                else "skip_per_course_browser=true"
+            )
             log.info(
-                "[BROWSER↑ SKIPPED] skip_per_course_browser=true — skipping browser fallback for %s",
-                url,
+                "[BROWSER↑ SKIPPED] %s — skipping browser fallback for %s",
+                _skip_flag_name, url,
             )
             if emit:
                 await emit(
                     "status",
-                    f"[BROWSER↑ SKIPPED] skip_per_course_browser=true — no browser fallback for {url[:70]}",
+                    f"[BROWSER↑ SKIPPED] {_skip_flag_name} — no browser fallback for {url[:70]}",
                     phase="extract", kind="browser_skipped_yaml", url=url,
                 )
         else:
