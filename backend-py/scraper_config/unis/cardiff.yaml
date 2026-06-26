@@ -1,14 +1,31 @@
 # Cardiff University
 # Hostname: www.cardiff.ac.uk
 #
-# CLOUDFLARE IP-BLOCK: All datacenter IPs return 403 — listing pages, course pages,
-# sitemap, robots.txt — everything. cffi (TLS impersonation) does NOT bypass it.
+# CLOUDFLARE ENTERPRISE IP-BLOCK: All datacenter IPs return 403 — listing pages,
+# course pages, sitemap, robots.txt.  cffi (TLS impersonation) does NOT bypass it.
 #
-# Strategy:
-#   1. auto_api_discovery: true — Playwright browser intercepts Cardiff's internal
-#      XHR/Fetch calls (course data is JS-rendered via an internal search API).
-#      This is the primary discovery path.
-#   2. Cardiff is a residential-proxy-only site; no free tier (httpx/curl_cffi/browser/Wayback) works.
+# Engineering recommendation (Task-253, 2026-06-26):
+#   Cardiff's Sitecore-rendered pages require a residential exit-node IP to bypass
+#   the Cloudflare Enterprise bot-management layer at the extraction stage.
+#   Scrape.do (SCRAPE_DO_TOKEN) provides headless-Chrome rendering through a
+#   residential proxy pool — this is the preferred path over purchasing a dedicated
+#   residential proxy service.
+#
+#   scrape_do_render: true    — routes each course-page fetch through Scrape.do's
+#                               headless Chrome (residential IP).  Replaces the
+#                               doomed httpx/cffi datacenter attempts.
+#   scrape_do_skip_fallbacks: true — skips the two datacenter HTTP attempts
+#                               (httpx + curl_cffi) for each page, saving ~1-2 s
+#                               per course before the Scrape.do fetch.  With 300+
+#                               courses this saves ~10 min per job.
+#   skip_browser_rescue: true — disables the Playwright browser-rescue path; that
+#                               browser also runs from a datacenter IP and would
+#                               return the same 403 as plain HTTP.  Scrape.do
+#                               already provides rendering; no rescue needed.
+#
+# If Scrape.do is not available (SCRAPE_DO_TOKEN unset), Cardiff cannot be scraped
+# from this environment — a PM decision to purchase residential proxy credits or
+# obtain Cardiff's internal search API token is required before proceeding.
 #
 # NOTE: discovery.parsers is NOT a valid schema key — it is silently ignored.
 # Per-listing-page XPath rules belong in extraction.selectors.course_list (see below).
@@ -38,6 +55,17 @@ discovery:
   use_wayback: false
 
 extraction:
+  # Scrape.do residential proxy bypasses the Cloudflare Enterprise block that
+  # returns 403 for all datacenter IPs (httpx, cffi, Playwright datacenter).
+  # scrape_do_render:true uses headless Chrome through Scrape.do's residential
+  # IP pool.  scrape_do_skip_fallbacks:true skips the two doomed datacenter
+  # HTTP attempts, saving ~1-2 s per course (~10 min across 300+ courses).
+  # skip_browser_rescue:true prevents the datacenter Playwright from firing
+  # (it also gets 403) — Scrape.do is already the rendering path.
+  scrape_do_render: true
+  scrape_do_skip_fallbacks: true
+  skip_browser_rescue: true
+
   max_parallel_fetch: 3
 
   filters:

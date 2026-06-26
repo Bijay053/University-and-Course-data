@@ -57,8 +57,12 @@ discovery:
 
 extraction:
   max_parallel_fetch: 12
-  skip_browser_rescue: false
-  skip_per_course_browser: false
+  # courses.uwe.ac.uk is UWE's own SSR search system, NOT behind Cloudflare
+  # Enterprise.  Static cffi fetches return full-content HTML for all fields
+  # (fee, IELTS, duration) that the XPath selectors below already parse.
+  # Browser rescue adds ~30 s per course for zero benefit; disable both.
+  skip_browser_rescue: true
+  skip_per_course_browser: true
   browser_wait_strategy: domcontentloaded
   browser_dcl_settle_ms: 800
 

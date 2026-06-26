@@ -8,17 +8,21 @@
 # URL structure: /undergraduate_courses/<dept>/<course>.cfm
 #                /postgraduate_courses/<dept>/<course>.cfm
 #
+# Layout templates (Task-253 fix, 2026-06-26):
+#   UG listing pages:     table layout  — <table><tbody><tr><td><a href="...cfm">
+#   PG taught listing:    card/teaser divs — <div class="teaser">...</a>
+#   The combined course_list XPath below covers both.
+#
 # Known issues (2026-06-23):
 #   - text_len=0 on many pages: the admission filter over-strips when the CMS
 #     wraps all body sections in elements whose class/id matches
 #     _NON_ADMISSION_CLASS_FRAGS.  strip_non_admission_content disabled until
 #     confirmed safe (the safety-revert heuristic in admission_text_filter.py
 #     should catch this, but belt-and-suspenders for Teesside).
-#   - English section detected but IELTS scores blank: suspected JS-rendered
-#     tab for entry requirements.  Browser retry is enabled (skip_per_course_browser
-#     NOT set) so the per_course_browser module will render when text_len=0.
-#     default_ielts: 6.0 provides a fallback for courses where neither browser
-#     nor regex can extract the score.
+#   - English section detected but IELTS scores blank: JS-rendered entry-
+#     requirements tab on some pages.  Browser retry is kept enabled
+#     (skip_per_course_browser NOT set) — the per_course_browser module renders
+#     when text_len=0.  default_ielts: 6.0 provides a fallback.
 #   - Non-course pages ("Study here", "Study At Teesside") found via broad
 #     discovery: constrained by allow_url_patterns below.
 #   - Location extracts marketing copy: fixed in _MARKETING_HINTS expansion.
@@ -30,6 +34,13 @@
 #     triggers the override.
 
 discovery:
+  # Cover listing hierarchy: ~6 UG dept pages + ~6 PG dept pages + sub-dept
+  # pages the BFS follows naturally = ~15-25 listing fetches.  Budget of 30
+  # gives a comfortable buffer for paginated category pages.
+  bfs_page_budget: 30
+
+  expected_min_courses: 80
+
   allow_url_patterns:
     - '/undergraduate_courses/'
     - '/postgraduate_courses/'
@@ -39,7 +50,81 @@ discovery:
 
 extraction:
   strip_non_admission_content: false
+  # Teesside is SSR ColdFusion — cffi returns full HTML for most pages.
+  # Browser retry is kept enabled (skip_per_course_browser NOT set) because
+  # the entry-requirements tab on some pages is JS-rendered; browser rescue
+  # recovers IELTS from those pages.  skip_browser_rescue is also NOT set
+  # so sparse-static pages (fee + duration both blank after Gemini) still
+  # trigger a browser refetch.
+
+  max_parallel_fetch: 4
+
   fees:
     default_currency: GBP
+
   english:
     default_ielts: 6.0
+
+  selectors:
+    # Combined XPath covering both layout templates:
+    #   UG listing:   <table><tbody><tr> ... <a href="/undergraduate_courses/...cfm">
+    #   PG taught:    <div class="teaser ..."> ... <a href="/postgraduate_courses/...cfm">
+    # Anchored on _courses/ so nav/footer links don't leak in.
+    course_list:
+      xpath: >-
+        //table//tbody/tr//a[contains(@href,'_courses/')]
+        | //div[contains(@class,'teaser')]//a[contains(@href,'_courses/')]
+        | //article//a[contains(@href,'_courses/')]
+
+    course_name:
+      xpath: "//h1[contains(@class,'course-title')] | //main//h1 | //h1"
+
+    city:
+      value: "Middlesbrough"
+
+    duration:
+      xpath: >-
+        //td[contains(normalize-space(.),'Duration')]/following-sibling::td[1]
+        | //dt[contains(normalize-space(.),'Duration')]/following-sibling::dd[1]
+        | //th[contains(normalize-space(.),'Duration')]/following-sibling::td[1]
+      remove_tags: true
+
+    study_load:
+      xpath: >-
+        //td[contains(normalize-space(.),'Mode')]/following-sibling::td[1]
+        | //dt[contains(normalize-space(.),'Mode of study')]/following-sibling::dd[1]
+        | //th[contains(normalize-space(.),'Mode')]/following-sibling::td[1]
+      remove_tags: true
+
+    intake_month:
+      xpath: >-
+        //td[contains(normalize-space(.),'Start date')]/following-sibling::td[1]
+        | //dt[contains(normalize-space(.),'Start')]/following-sibling::dd[1]
+        | //th[contains(normalize-space(.),'Start')]/following-sibling::td[1]
+      remove_tags: true
+
+    course_description:
+      xpath: >-
+        //div[contains(@class,'course-intro')]
+        | //div[contains(@id,'overview')]
+        | //h2[contains(normalize-space(.),'Overview')]/following-sibling::div[1]
+        | //h2[contains(normalize-space(.),'About')]/following-sibling::div[1]
+
+    other_requirements:
+      xpath: >-
+        //div[contains(@id,'entry-requirements')]
+        | //div[contains(@class,'entry-requirements')]
+        | //h2[contains(normalize-space(.),'Entry requirements')]/following-sibling::div[1]
+
+    fee_international:
+      xpath: >-
+        //td[contains(normalize-space(.),'International')]/following-sibling::td[1]
+        | //*[contains(normalize-space(.),'International') and contains(normalize-space(.),'fee')]
+        /following-sibling::*[contains(normalize-space(.),'£')][1]
+      remove_tags: true
+
+  staging:
+    reject_if_missing:
+      - course_name
+    skip_degree_qualifier_check: true
+    require_international_fee: false
