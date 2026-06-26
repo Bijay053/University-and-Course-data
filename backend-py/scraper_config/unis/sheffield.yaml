@@ -1,11 +1,80 @@
-# The University of Sheffield
-# Hostname: sheffield.ac.uk
-# Country: United Kingdom  |  Currency: GBP
-# Slug: sheffield
-# Auto-generated: 2026-06-15
+# University of Sheffield
+# Hostname: www.sheffield.ac.uk
+# Country: United Kingdom | Currency: GBP
+# Discovery: BFS from a filtered search results page. Course details pages are largely server-rendered HTML.
+# Notes: Extracts fees and English requirements directly from course pages. Course structure is complex with tabs, which may require browser interaction.
 
-discovery: {}
+discovery:
+  always_sitemap_supplement: true
+  seed_urls:
+    # Mimics the Python spider's start_urls, targeting 2025 courses.
+    # Adjust '2025' if broader year coverage is desired.
+    - "https://www.sheffield.ac.uk/find?f.Tabs%7Cuos%7Eds-courses-undergraduate-new%2Cuos%7Eds-courses%2Cuos%7Eds-courses-postgraduate=Courses&query=&f.Start+year%7CcourseYear=2025"
+  allow_url_patterns:
+    # Matches individual course pages based on typical University of Sheffield URL structure
+    - '/undergraduate/courses/'
+    - '/postgraduate/courses/'
+    - '/phd/' # Including for potential research degrees
+  block_url_patterns:
+    - '/news'
+    - '/events'
+    - '/about'
+    - '/staff'
+    - '/research' # Block general research pages, focus on course-specific ones
+
+  expected_min_courses: 500              # Estimate based on a large UK university
 
 extraction:
+  # Even if mostly server-rendered, some content might load dynamically
+  browser_wait_strategy: networkidle     # Wait for JS API calls to finish
+  browser_dcl_settle_ms: 1500            # Additional wait time after DOMContentLoaded
+
   fees:
-    default_currency: GBP
+    default_currency: "GBP"
+    prefer_international: true           # Python spider looks for 'overseas' fees
+    prefer_annual_over_total: true       # Python spider typically expects annual fees
+    prefer_year_one_over_total: true     # Implied by annual fee preference
+    reject_keywords:                     # Drop any row that mentions domestic fees
+      - "Home student"
+      - "Home fee"
+      - "UK student"
+      - "UK fee"
+      - "Domestic"
+
+  english:
+    central_page: "https://www.sheffield.ac.uk/international/applying/english-language-requirements" # Common central page for UoS
+    course_english_priority: true        # Python spider extracts IELTS directly from course page
+    trust_vision_ocr: false              # UK sites often have decorative IELTS images; prefer text extraction
+    default_ielts: 6.0                   # Standard UK fallback
+    default_pte: 60                      # Standard UK fallback
+    default_toefl: 80                    # Standard UK fallback
+
+  intake:
+    start_dates_only: true               # Python spider extracts specific start months
+
+  course_name:
+    strip_title_suffixes:
+      - " | The University of Sheffield"
+      - " - The University of Sheffield"
+      - " — The University of Sheffield"
+      - "| The University of Sheffield" # Without leading space, just in case
+      - " | University of Sheffield"
+      - " - University of Sheffield"
+
+  filters:
+    online_only:
+      enabled: false                     # UK universities often blend online + campus; allow online for international
+
+  text_cleaning:
+    duration:
+      reject_sentence_patterns:          # Reject common "maximum candidature" phrases
+        - 'up to \d+(?:\.\d+)? (?:years?|months?)'
+        - 'maximum of \d+ (?:years?|months?)'
+        - 'candidature.*\d+ years'
+
+  staging:
+    reject_if_missing:
+      - course_name
+    skip_degree_qualifier_check: true    # H1 might not always contain the full degree prefix
+    require_international_fee: false     # Allow staging even if fees are initially missing for human review,
+                                         # as fee extraction in spider was commented out.

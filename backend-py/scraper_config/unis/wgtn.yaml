@@ -1,0 +1,112 @@
+# Victoria University of Wellington (Te Herenga Waka)
+# Hostname: www.wgtn.ac.nz  → slug: wgtn
+# Country: New Zealand  |  Currency: NZD  |  uni_id: 61 (prod), 2188 (dev)
+#
+# ══ ROOT CAUSE HISTORY ══════════════════════════════════════════════════════
+#
+# ALL previous attempts used a file named wgtn_2188.yaml.
+# The loader derives slug 'wgtn' from hostname www.wgtn.ac.nz and looks for
+# wgtn.yaml — so the ENTIRE config was silently ignored every scrape.
+# Scraper ran with global defaults (no browser mode, no seeds, no allow_url_patterns)
+# → wrong BFS → 22 wrong "courses" (minors, student services, nav pages).
+#
+# THIS FILE (wgtn.yaml — correct slug) fixes that.
+#
+# ══ ACTUAL COURSE URL STRUCTURE ═════════════════════════════════════════════
+#   /study/programmes-courses/postgraduate/<subject>/<course-slug>
+#   /study/programmes-courses/undergraduate/<subject>/<course-slug>
+#   e.g. /study/programmes-courses/postgraduate/architecture/master-of-architecture-professional
+#   e.g. /study/programmes-courses/undergraduate/commerce/bachelor-of-commerce
+#
+#   Pages that are pure React SPA (9KB, "Loading...", rendered=0B) — avoid:
+#     /study/programmes-courses/postgraduate/phds-doctorates
+#     /study/programmes-courses/postgraduate/explore-postgraduate-subjects
+#     /international/study-options/*
+#
+#   Useful BFS nav page (NOT a course itself, but links to 80 real programmes):
+#     /study/programmes-courses/limited-entry  → seeded directly as primary seed
+#
+# ══ JS RENDERING ════════════════════════════════════════════════════════════
+#   Course pages are JS-rendered (user confirmed). networkidle strategy waits
+#   for all XHR/fetch to settle before capturing HTML — correct for both
+#   SSR pages (settle in <1s) and React SPA data loads. 5s DCL fallback settle.
+
+discovery:
+  always_browser_discover: true
+  browser_time_budget_s: 500
+  browser_early_stop_courses: 250
+
+  seed_urls:
+    # PRIMARY: This single page lists ~80 limited-entry programmes with direct links
+    # to individual /postgraduate/<subject>/<course> and /undergraduate/<subject>/<course>
+    # pages. BFS confirmed it finds 80 real course links in one visit.
+    - https://www.wgtn.ac.nz/study/programmes-courses/limited-entry
+    # FALLBACK: Level hubs for BFS to discover programmes NOT listed under limited-entry.
+    - https://www.wgtn.ac.nz/study/programmes-courses/postgraduate/
+    - https://www.wgtn.ac.nz/study/programmes-courses/undergraduate/
+
+  allow_url_patterns:
+    # Individual programme pages: exactly 2 non-empty path segments after the level.
+    # Matches /postgraduate/<subject>/<course-slug> but NOT depth-1 hub pages.
+    # Explicitly excludes known nav sections that appear at depth 2:
+    #   flexible-study (minors), short-courses, get-started, explore-research
+    - "wgtn\\.ac\\.nz/study/programmes-courses/(postgraduate|undergraduate)/(?!flexible-study/?|short-courses/?|get-started/?|explore-research/?)[^/?#]+/[^/?#]+"
+
+  block_url_patterns:
+    # Known nav noise — prevent BFS from adding as course candidates
+    - "/study/programmes-courses/undergraduate/taster-lectures"
+    - "/study/programmes-courses/undergraduate/how-degrees-work"
+    - "/study/programmes-courses/undergraduate/minors"
+    - "/study/programmes-courses/short-courses"
+    - "/study/programmes-courses/subjects"
+    - "/study/programmes-courses/study-in-trimester"
+    - "/study/programmes-courses/VicStart"
+    - "/study/programmes-courses/courses"
+    - "/study/programmes-courses/_edit"
+    - "/study/programmes-courses/postgraduate/phds-doctorates"
+    - "/study/programmes-courses/postgraduate/explore-research"
+    - "/study/programmes-courses/postgraduate/get-started"
+    - "/study/programmes-courses/postgraduate-subjects"
+    - "/flexible-study"          # blocks entire minors sub-tree from BFS
+    # Broken React-SPA section (rendered=0B even from browser — non-extractable)
+    - "/international/study-options"
+    # Student services — not programme pages
+    - "/students/"
+    - "/study/course-planning"
+    - "/study/apply-enrol"
+    - "/_edit"
+    - "/about"
+    - "/news"
+    - "/research"
+    - "/staff"
+    - "/contact"
+    - "/library"
+    - "/alumni"
+    - "/governance"
+    - "/news-events"
+    - "/key-dates"
+    - "/maori"
+    - "/pasifika"
+    - "/disability"
+    - "/wellington"
+    - "/giving"
+    - "/victoria-university-of-wellington-foundation"
+
+  use_stealth_browser: true
+
+extraction:
+  fees:
+    default_currency: NZD
+
+  # VUW programme pages need JS to fully render field data.
+  # networkidle waits for all XHR/fetch to settle before HTML capture.
+  # browser_dcl_settle_ms: 5000 is a secondary fallback settle window.
+  browser_wait_strategy: networkidle
+  browser_dcl_settle_ms: 5000
+
+  staging:
+    reject_if_missing:
+      - course_name
+    skip_degree_qualifier_check: true
+    require_international_fee: false
+    dedup_use_full_url: true
