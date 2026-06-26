@@ -56,6 +56,29 @@ discovery:
     - '\.pdf$'
 
 extraction:
+  # ── Speed optimisations (same pattern as Ulster — Cloudflare Enterprise) ──
+  #
+  # Westminster's Drupal site is behind Cloudflare Enterprise WAF.  All
+  # datacenter IPs (httpx, curl_cffi, Playwright headless Chrome) return 403.
+  # Only Scrape.do static proxy bypasses the WAF and returns full SSR HTML
+  # (~200–350KB per page) with all course data.
+  #
+  # scrape_do_skip_fallbacks: skip the wasted httpx → cffi → Wayback chain
+  # (~3-4s per course) and jump directly to Scrape.do static.
+  # At 841 courses this saves ~50 minutes of failed fallback attempts.
+  scrape_do_skip_fallbacks: true
+
+  # Skip ALL Playwright per-course browser fetches.  Westminster's Cloudflare
+  # Enterprise WAF blocks Playwright headless Chrome the same way it blocks
+  # plain httpx — the browser always gets 403/0B rendered content after 30s.
+  # Without this flag: 841 courses × ~30s Playwright timeout = ~7 hours wasted.
+  skip_per_course_browser: true
+  skip_browser_rescue: true
+
+  # 12 parallel Scrape.do slots.  Westminster has no per-host rate-limit on
+  # the Scrape.do proxy tier.  At ~7s per slot: 841 × 7s / 12 ≈ 490s ≈ 8 min.
+  max_parallel_fetch: 12
+
   fees:
     default_currency: 'GBP'
     prefer_international: true
