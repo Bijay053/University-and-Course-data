@@ -68,8 +68,12 @@ discovery:
   #     Phase A.5b to keep 21/25 wrong listing pages → 0 courses staged.
   #
   allow_url_patterns:
-    - '/undergraduate/courses/20\d\d/[^/?#]+'
-    - '/postgraduate/taught/courses/20\d\d/[^/?#]+'
+    - "/undergraduate/courses/"
+    - "/postgraduate/courses/"
+    - "/undergraduate/courses"
+    - "/postgraduate/courses"
+    - "/undergraduate/"
+    - "/postgraduate/"
   block_url_patterns:
     # ── PhD noise (most important — these were extracted as "courses" in logs) ──
     - '/phd/students'          # /<dept>/postgraduate/phd/students/<name>
