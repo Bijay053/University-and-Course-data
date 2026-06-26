@@ -31,6 +31,13 @@
 # Per-listing-page XPath rules belong in extraction.selectors.course_list (see below).
 
 discovery:
+  # Skip httpx + curl_cffi for listing pages — Cardiff's CF Enterprise blocks
+  # all datacenter IPs at the IP/ASN level, so both tiers always fail.
+  # Going straight to Scrape.do static (residential proxy, render=False,
+  # ~$0.0005/call) saves 2-4 wasted attempts per listing URL and prevents
+  # the host-cache from being populated only after those failures.
+  scrape_do_skip_fallbacks: true
+
   seed_urls:
     - https://www.cardiff.ac.uk/study/undergraduate/courses/a-to-z
     - https://www.cardiff.ac.uk/study/postgraduate/research/programmes/a-to-z

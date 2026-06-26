@@ -611,6 +611,41 @@ async def fetch_html(url: str, *, retries: int = 2) -> str | None:
                 return _static
             return None
 
+    # Discovery-phase fast-path: when discovery.scrape_do_skip_fallbacks=True,
+    # skip httpx + curl_cffi for listing/sitemap pages and go straight to
+    # Scrape.do static (residential proxy, render=False, ~$0.0005/call).
+    # Active only when we are NOT inside scrape_do_render_scope() or
+    # scrape_do_static_scope() — those scopes already handle their own routing.
+    # Cardiff is the canonical case: CF Enterprise blocks all datacenter IPs for
+    # both listing pages AND course pages, so the httpx→cffi chain always wastes
+    # 2-4 attempts per listing URL before the host-cache kicks in.
+    if not _scrape_do_render and not _scrape_do_static and _has_scrape_do:
+        _disc_skip = False
+        try:
+            from app.services.scraper.config.context import get_uni_config as _guc_disc
+            _disc_skip = _guc_disc().discovery.scrape_do_skip_fallbacks
+        except Exception:  # noqa: BLE001
+            pass
+        if _disc_skip:
+            log.info(
+                "fetch %s: discovery.scrape_do_skip_fallbacks=True"
+                " — going straight to Scrape.do static (skipping httpx/cffi)",
+                url,
+            )
+            _disc_static = await fetch_html_scrape_do(url, render=False)
+            if _disc_static is not None and not _is_spa_shell(_disc_static):
+                from app.services.scraper.snapshot_context import stage_snapshot as _stage
+                _stage(url, _disc_static, "scrape_do_static")
+                return _disc_static
+            # Scrape.do static failed or returned a SPA shell — fall through to
+            # normal httpx so discovery degrades gracefully rather than returning
+            # zero links.
+            log.warning(
+                "fetch %s: discovery scrape_do_skip_fallbacks fast-path failed"
+                " — falling back to direct httpx",
+                url,
+            )
+
     # Fast-path: if BOTH httpx and curl_cffi previously failed for this host
     # (recorded in _cf_always_scrape_do), skip straight to Scrape.do static
     # instead of wasting 15-30 s on tiers that always fail.  Saves ~35 s/course

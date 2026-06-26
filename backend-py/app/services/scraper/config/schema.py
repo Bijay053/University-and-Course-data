@@ -1027,6 +1027,21 @@ class DiscoveryConfig(BaseModel):
             "deep-faculty sites where BFS burns its page budget on info pages (AUT, ACU)."
         ),
     )
+    scrape_do_skip_fallbacks: bool = Field(
+        default=False,
+        description=(
+            "When True, skip httpx and curl_cffi entirely for discovery-phase "
+            "fetches (listing pages, sitemap, robots.txt, etc.) and go straight "
+            "to Scrape.do static (residential proxy, render=False, ~$0.0005/call). "
+            "Use when the university's Cloudflare Enterprise blocks all datacenter "
+            "IPs — including listing pages — so the standard httpx→cffi chain "
+            "always fails before the host-cache kicks in.  Requires SCRAPE_DO_TOKEN. "
+            "This is the discovery-phase analogue of extraction.scrape_do_skip_fallbacks "
+            "and mirrors its semantics: if Scrape.do static fails (no token, HTTP "
+            "error, SPA shell) the fetch falls back to direct httpx so discovery "
+            "degrades gracefully rather than silently returning zero links."
+        ),
+    )
     block_url_patterns: list[str] = Field(
         default_factory=list,
         description=(
