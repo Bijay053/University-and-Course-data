@@ -2724,6 +2724,23 @@ class ExtractionConfig(BaseModel):
             "      intakes: 5"
         ),
     )
+    skip_ai_fallback_keywords: list[str] = Field(
+        default_factory=list,
+        description=(
+            "List of phrases to check against the page text before running the AI "
+            "fallback (fill_missing) Gemini enrichment call.  If ANY phrase is found "
+            "(case-insensitive substring match) in the visible page text, the fallback "
+            "Gemini call is skipped and a '[SKIP-FALLBACK]' log line is emitted.  "
+            "The pre-baseline Gemini (category / study_load classification) is NOT "
+            "affected — only the late-stage ai_fallback.fill_missing() call is "
+            "suppressed.  Use for course types that genuinely have no international "
+            "fee, IELTS, or intake data so both Gemini calls would return all-nulls.  "
+            "Example (Ulster CPD short courses):\n"
+            "  extraction:\n"
+            "    skip_ai_fallback_keywords:\n"
+            "      - 'Short course and CPD'"
+        ),
+    )
 
 
 # ── Merged UniConfig ─────────────────────────────────────────────────────────

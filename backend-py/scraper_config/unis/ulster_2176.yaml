@@ -114,6 +114,23 @@ extraction:
   skip_per_course_browser: true
   skip_browser_rescue: true
 
+  # Vision OCR suppression — Ulster's static HTML does NOT contain IELTS
+  # scores; the scores are in a Cloudflare-gated JS-only overlay that is
+  # never returned by Scrape.do static.  Running vision OCR on 3-6 images
+  # per course (~33 min across 987 courses) finds nothing useful.
+  # trust_vision_ocr: false skips the entire per-course vision pass.
+  english:
+    trust_vision_ocr: false
+
+  # CPD / short-course fallback-Gemini suppression.  Ulster has ~250-300
+  # CPD "short course" pages that carry no international fee, no IELTS, and
+  # no intake date — two Gemini calls per course return all-nulls and add
+  # cost and latency.  Any page whose text contains one of these phrases is
+  # skipped by the fallback AI enrichment step; the pre-baseline Gemini
+  # (category / study_load classification) still runs normally.
+  skip_ai_fallback_keywords:
+    - "Short course and CPD"
+
   # Raise parallel extraction slots to the orchestrator hard ceiling (16).
   # Ulster fetches go via Scrape.do static (no direct Ulster IP, no per-host
   # rate limit on Scrape.do proxy).  8 slots → ~48 min; 16 slots → ~24 min.

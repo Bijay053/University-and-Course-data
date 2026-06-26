@@ -1487,7 +1487,29 @@ async def extract_course(
         # rather than the previous hardcoded domcontentloaded + 2s / 35s,
         # which left UTAS at 116/120 fetch_failed in prod (job_..._utas)
         # because the Cloudflare interstitial hadn't cleared yet.
-        try:
+        #
+        # skip_per_course_browser=true in YAML short-circuits here, before any
+        # browser imports or emit calls.  This is the fix for Ulster (and any
+        # CF-Enterprise-blocked site) where Playwright is also IP-blocked and
+        # the 186 browser fallbacks wasted ~60 min returning rendered=0B.
+        _uc_skip_pcb = get_uni_config()
+        _skip_all_browser = (
+            _uc_skip_pcb is not None
+            and getattr(_uc_skip_pcb.extraction, "skip_per_course_browser", False)
+        )
+        if _skip_all_browser:
+            log.info(
+                "[BROWSER↑ SKIPPED] skip_per_course_browser=true — skipping browser fallback for %s",
+                url,
+            )
+            if emit:
+                await emit(
+                    "status",
+                    f"[BROWSER↑ SKIPPED] skip_per_course_browser=true — no browser fallback for {url[:70]}",
+                    phase="extract", kind="browser_skipped_yaml", url=url,
+                )
+        else:
+          try:
             from app.services.scraper.browser_pool import (
                 BROWSER_RATE_LIMITED, pool as _bp,
             )
@@ -1586,7 +1608,7 @@ async def extract_course(
                     _note_skip("challenge_shell")
                 else:
                     note_browser_rescue(_fetch_host)
-        except Exception as _exc:
+          except Exception as _exc:
             log.warning("browser fallback failed for %s: %s", url, _exc)
 
     if not html:
@@ -4798,6 +4820,36 @@ async def extract_course(
     except Exception as exc:  # noqa: BLE001
         log.warning("vit_static_extract failed on %s: %s", url, exc)
 
+    # ── Content-based AI-fallback skip (skip_ai_fallback_keywords) ───────────
+    # If the YAML lists keyword phrases and ANY appears in the page text, skip
+    # the fallback Gemini enrichment (ai_fallback.fill_missing).  The pre-
+    # baseline Gemini (category / study_load) is NOT affected — only this late
+    # enrichment pass is suppressed.
+    # Ulster use case: ~250-300 CPD "Short course and CPD" pages have no
+    # international fee, IELTS, or intake data — both Gemini calls return
+    # all-nulls and waste ~45s/course × 300 courses ≈ 3.75 hours.
+    if use_ai_fallback:
+        _uc_kw = get_uni_config()
+        _skip_kws: list[str] = (
+            list(_uc_kw.extraction.skip_ai_fallback_keywords)
+            if _uc_kw else []
+        )
+        if _skip_kws:
+            _page_text_for_kw = (_h2t_gate(rendered_html or html or "") or "").lower()
+            for _kw in _skip_kws:
+                if _kw.lower() in _page_text_for_kw:
+                    use_ai_fallback = False
+                    log.info(
+                        "[SKIP-FALLBACK] CPD short course detected (%r) — skipping AI fallback on %s",
+                        _kw, url,
+                    )
+                    if emit:
+                        await emit(
+                            "status",
+                            f"[SKIP-FALLBACK] CPD short course detected ({_kw!r}) — skipping AI fallback",
+                            phase="extract", kind="ai_fallback_skipped_cpd", url=url,
+                        )
+                    break
 
     if use_ai_fallback:
         # Note which slots are still empty so the UI can show *what* the AI
