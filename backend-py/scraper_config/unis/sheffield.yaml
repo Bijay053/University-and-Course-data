@@ -1,39 +1,127 @@
 # University of Sheffield
 # Hostname: www.sheffield.ac.uk
-# Country: United Kingdom | Currency: GBP
-# Discovery: BFS from a filtered search results page. Course details pages are largely server-rendered HTML.
-# Notes: Extracts fees and English requirements directly from course pages. Course structure is complex with tabs, which may require browser interaction.
+# Country: United Kingdom  |  Currency: GBP
+#
+# ══ DISCOVERY FIX HISTORY ═══════════════════════════════════════════════════
+#
+# Problem (previous config):
+#   allow_url_patterns: ['/undergraduate/courses/', '/postgraduate/courses/', '/phd/']
+#
+#   This caused TWO simultaneous failures:
+#
+#   1. TOO RESTRICTIVE — dropped 27 real courses at department-direct paths
+#      that contain neither '/undergraduate/courses/' nor '/postgraduate/courses/'
+#      nor '/phd/'. Sheffield has dept-direct courses like:
+#        /management/mba
+#        /law/llm
+#        /<dept>/<course-slug>
+#
+#   2. TOO PERMISSIVE — '/phd/' as substring allowed PhD student/candidate
+#      PROFILE pages through:
+#        /<dept>/postgraduate/phd/students/<name>
+#        /<dept>/phd/candidates/<name>
+#        /<dept>/phd/profiles
+#      These are researcher bios with no fee/IELTS data. Wasted Gemini calls
+#      on every profile (cost $0.0003 each × 20+ profiles = Gemini budget waste)
+#
+#   3. Also let through /undergraduate/courses/home (UG search listing page, not a course)
+#
+#   Result: 222 courses extracted (user expected 330 based on Python script).
+#
+# Fix:
+#   - REMOVED allow_url_patterns entirely — no whitelist restriction
+#   - EXPANDED block_url_patterns to cover ALL noise types seen in logs:
+#     /phd/students/, /phd/candidates/, /phd/profiles, /courses/home, etc.
+#   - Sheffield's sitemap (already enabled via always_sitemap_supplement: true)
+#     contains ~531 URLs. With the whitelist removed and noise blocked, the
+#     ~330 real courses should pass through to extraction.
 
 discovery:
   always_sitemap_supplement: true
   seed_urls:
-    # Mimics the Python spider's start_urls, targeting 2025 courses.
-    # Adjust '2025' if broader year coverage is desired.
+    # Funnelback search seed — returns courses with start year 2025 pagination.
+    # BFS follows pagination links to discover more courses.
     - "https://www.sheffield.ac.uk/find?f.Tabs%7Cuos%7Eds-courses-undergraduate-new%2Cuos%7Eds-courses%2Cuos%7Eds-courses-postgraduate=Courses&query=&f.Start+year%7CcourseYear=2025"
-  allow_url_patterns:
-    # Matches individual course pages based on typical University of Sheffield URL structure
-    - '/undergraduate/courses/'
-    - '/postgraduate/courses/'
-    - '/phd/' # Including for potential research degrees
+    # Direct listing hubs — BFS can follow links from here to individual courses
+    - "https://www.sheffield.ac.uk/undergraduate/courses"
+    - "https://www.sheffield.ac.uk/postgraduate/courses"
+
+  # NO allow_url_patterns — whitelist was causing both missed courses AND admitting
+  # profiles. Use block_url_patterns to exclude noise instead.
+
   block_url_patterns:
+    # ── PhD noise (most important — these were extracted as "courses" in logs) ──
+    - '/phd/students'          # /<dept>/postgraduate/phd/students/<name>
+    - '/phd/candidates'        # /<dept>/phd/candidates/<name> (geography-planning pattern)
+    - '/phd/profiles'          # /<dept>/phd/profiles (listing pages)
+    - '/phd/scholarships'      # scholarship sub-pages
+    - '/phd/projects'          # individual research project listings
+    - '/phd/search'            # PhD search listing (not a programme page)
+    # ── Course listing pages (not individual courses) ──
+    - '/undergraduate/courses/home'     # UG course search home page
+    - '/undergraduate/courses/?$'       # bare UG listing page (regex: no slug after /)
+    - '/postgraduate/courses/?$'        # bare PG listing page
+    # ── Standard noise ──
     - '/news'
     - '/events'
     - '/about'
     - '/staff'
-    - '/research' # Block general research pages, focus on course-specific ones
-  expected_min_courses: 500              # Estimate based on a large UK university
+    - '/research'
+    - '/contact'
+    - '/apply'
+    - '/visit'
+    - '/open-days'
+    - '/international/'
+    - '/accommodation'
+    - '/finance'
+    - '/fees'
+    - '/scholarships'
+    - '/sport'
+    - '/health'
+    - '/wellbeing'
+    - '/careers'
+    - '/library'
+    - '/alumni'
+    - '/governance'
+    - '/jobs'
+    - '/vacancies'
+    - '/su/'
+    - '/students/'
+    # ── Sheffield-specific structural noise ──
+    - '/schools/home'
+    - '/schools/teachers-advisors'
+    - '/schools/activities'
+    - '/schools/programmes'
+    - '/schools/partnerships'
+    - '/schools/contact'
+    - '/departments/academic'
+    - '/departments/faculties'
+    - '/study/home'
+    - '/study/teaching'
+    - '/study/facilities'
+    - '/study/ranking'
+    - '/study/career'
+    - '/study/su'
+    - '/study/clubs-societies-sport'
+    - '/study/support'
+    - '/study/online-events'
+    - '/undergraduate/visit'
+
+  expected_min_courses: 300   # Confirmed ~330 from Python script; 500 was too high
 
 extraction:
-  # Even if mostly server-rendered, some content might load dynamically
-  browser_wait_strategy: networkidle     # Wait for JS API calls to finish
-  browser_dcl_settle_ms: 1500            # Additional wait time after DOMContentLoaded
+  # Sheffield course pages: mostly server-rendered but some content loads via JS.
+  # networkidle waits for XHR calls before capturing HTML.
+  browser_wait_strategy: networkidle
+  browser_dcl_settle_ms: 1500
 
   fees:
     default_currency: "GBP"
-    prefer_international: true           # Python spider looks for 'overseas' fees
-    prefer_annual_over_total: true       # Python spider typically expects annual fees
-    prefer_year_one_over_total: true     # Implied by annual fee preference
-    reject_keywords:                     # Drop any row that mentions domestic fees
+    prefer_international: true
+    prefer_annual_over_total: true
+    prefer_year_one_over_total: true
+    central_page: "https://www.sheffield.ac.uk/postgraduate/taught/fees"
+    reject_keywords:
       - "Home student"
       - "Home fee"
       - "UK student"
@@ -41,32 +129,32 @@ extraction:
       - "Domestic"
 
   english:
-    central_page: "https://www.sheffield.ac.uk/international/applying/english-language-requirements" # Common central page for UoS
-    course_english_priority: true        # Python spider extracts IELTS directly from course page
-    trust_vision_ocr: false              # UK sites often have decorative IELTS images; prefer text extraction
-    default_ielts: 6.0                   # Standard UK fallback
-    default_pte: 60                      # Standard UK fallback
-    default_toefl: 80                    # Standard UK fallback
+    central_page: "https://www.sheffield.ac.uk/international/applying/english-language-requirements"
+    course_english_priority: true
+    trust_vision_ocr: false
+    default_ielts: 6.0
+    default_pte: 60
+    default_toefl: 80
 
   intake:
-    start_dates_only: true               # Python spider extracts specific start months
+    start_dates_only: true
 
   course_name:
     strip_title_suffixes:
       - " | The University of Sheffield"
       - " - The University of Sheffield"
       - " — The University of Sheffield"
-      - "| The University of Sheffield" # Without leading space, just in case
+      - "| The University of Sheffield"
       - " | University of Sheffield"
       - " - University of Sheffield"
 
   filters:
     online_only:
-      enabled: false                     # UK universities often blend online + campus; allow online for international
+      enabled: false
 
   text_cleaning:
     duration:
-      reject_sentence_patterns:          # Reject common "maximum candidature" phrases
+      reject_sentence_patterns:
         - 'up to \d+(?:\.\d+)? (?:years?|months?)'
         - 'maximum of \d+ (?:years?|months?)'
         - 'candidature.*\d+ years'
@@ -74,6 +162,5 @@ extraction:
   staging:
     reject_if_missing:
       - course_name
-    skip_degree_qualifier_check: true    # H1 might not always contain the full degree prefix
-    require_international_fee: false     # Allow staging even if fees are initially missing for human review,
-                                         
+    skip_degree_qualifier_check: true
+    require_international_fee: false
