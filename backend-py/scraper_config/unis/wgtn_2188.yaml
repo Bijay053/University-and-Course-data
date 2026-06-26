@@ -8,8 +8,10 @@
 # Review and expand it to improve discovery and extraction quality.
 # See scraper_config/defaults.yaml for all available options.
 
-discovery: {}
-
+discovery: 
+  seed_urls:
+    - https://www.wgtn.ac.nz/international/study-options/postgraduate
+    - https://www.wgtn.ac.nz/international/study-options/undergraduate
 extraction:
   fees:
     default_currency: NZD
