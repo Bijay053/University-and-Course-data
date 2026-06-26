@@ -945,6 +945,26 @@ async def browser_discover_generic(
                         except Exception:
                             pass
                         await asyncio.sleep(_SETTLE_S)
+                        # Extra configurable settle for JS SPAs that need time to
+                        # complete their API call and render the full course list.
+                        _extra_settle: float = float(
+                            getattr(
+                                getattr(_ucfg, "discovery", None),
+                                "seed_page_settle_s",
+                                0.0,
+                            ) or 0.0
+                        )
+                        if _extra_settle > 0:
+                            log.info(
+                                "[SEED] seed_page_settle_s=%.1fs — waiting for SPA "
+                                "to finish loading %s",
+                                _extra_settle, _sv_url,
+                            )
+                            await _emit(
+                                f"[SEED] Waiting {_extra_settle:.0f}s for SPA to "
+                                f"finish loading {_sv_url}…"
+                            )
+                            await asyncio.sleep(_extra_settle)
                         # Wrap evaluate in its own try/except so a JS crash or
                         # page-navigate-away error (common on SPA seed pages that
                         # redirect) does NOT kill the entire seed block and prevent

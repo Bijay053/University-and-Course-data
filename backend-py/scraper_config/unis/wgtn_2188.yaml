@@ -1,20 +1,100 @@
-# Victoria University of Wellington
+# Victoria University of Wellington (Te Herenga Waka)
 # Hostname: www.wgtn.ac.nz
 # Country: New Zealand  |  Currency: NZD
-# Slug: wgtn
-# Auto-generated: 2026-06-24
+# Slug: wgtn  |  uni_id: 2188
 #
-# This stub was created automatically on the first scrape of this university.
-# Review and expand it to improve discovery and extraction quality.
-# See scraper_config/defaults.yaml for all available options.
+# DIAGNOSIS (2026-06-26):
+#   - Both seed pages (/international/study-options/postgraduate and /undergraduate)
+#     are JavaScript SPAs that fetch ~100 course cards each from an API on load.
+#   - Without extra settle time, the browser extracts only 6+1=7 courses because
+#     the API call hasn't completed before _EXTRACT_LINKS_JS runs.
+#   - BFS was finding the wrong pages (category/info pages like "Taster Lectures",
+#     "Minors in the Bachelor of Arts") instead of individual programme pages.
+#   - The seed URLs were being blocked by category_landing_page_url_block during
+#     BFS — they still work as seed URLs (separate path) but BFS itself was wasting
+#     time on non-course pages.
+#
+# INDIVIDUAL COURSE URL PATTERNS (confirmed from scrape logs):
+#   International programme pages:
+#     https://www.wgtn.ac.nz/international/study-options/<prog-slug>
+#     e.g. /international/study-options/phd2
+#     e.g. /international/study-options/master-of-commerce
+#     NOT the listing hubs: /international/study-options/postgraduate (no slug depth)
+#                           /international/study-options/undergraduate (no slug depth)
+#   Main study programme pages:
+#     https://www.wgtn.ac.nz/study/programmes-courses/postgraduate/<prog-slug>/
+#     https://www.wgtn.ac.nz/study/programmes-courses/undergraduate/<prog-slug>/
+#
+# CONFIG STRATEGY:
+#   - always_browser_discover: true — use browser for ALL discovery (SPA site)
+#   - seed_page_settle_s: 10.0 — wait 10s after initial 3s for API to complete
+#   - allow_url_patterns: match ONLY individual programme pages (not listing hubs)
+#   - block_url_patterns: suppress all non-programme pages
+#   - browser_time_budget_s: 300 — 2 seeds × 13s settle + extraction headroom
+#   - browser_early_stop_courses: 250 — stop BFS nav once all ~200 found from seeds
 
-discovery: 
+discovery:
+  always_browser_discover: true
+  browser_time_budget_s: 300
+  browser_early_stop_courses: 250
+
   seed_urls:
+    # Both pages are JS SPAs that load ~100 courses each via API call on page load.
+    # seed_page_settle_s gives the SPA 10 extra seconds (on top of the default 3s)
+    # to complete the API call and render all programme cards before link extraction.
     - https://www.wgtn.ac.nz/international/study-options/postgraduate
     - https://www.wgtn.ac.nz/international/study-options/undergraduate
+
+  # Extra wait after the standard 3s settle for SPA API call to complete.
+  seed_page_settle_s: 10.0
+
+  # Only accept individual programme pages — not the listing hubs themselves.
+  # The listing hubs end at /postgraduate or /undergraduate (no deeper slug).
+  # Individual pages have a programme slug: /international/study-options/<slug>
+  # or /study/programmes-courses/(postgraduate|undergraduate)/<slug>/
+  allow_url_patterns:
+    # International individual programme pages (slug after /study-options/)
+    # Negative lookahead via two-segment rule: must have a non-empty slug after
+    # study-options/ that is NOT "postgraduate" or "undergraduate".
+    - "wgtn\\.ac\\.nz/international/study-options/(?!postgraduate/?$|undergraduate/?$)[^/?#]+"
+    # Main study programme pages (postgraduate or undergraduate with a specific slug)
+    - "wgtn\\.ac\\.nz/study/programmes-courses/(postgraduate|undergraduate)/[^/?#]+"
+
+  block_url_patterns:
+    # Block the listing hub pages themselves (not individual programmes)
+    - "/international/study-options/postgraduate/?$"
+    - "/international/study-options/undergraduate/?$"
+    # Block non-programme study pages
+    - "/study/programmes-courses/undergraduate/taster-lectures"
+    - "/study/programmes-courses/undergraduate/how-degrees-work"
+    - "/study/programmes-courses/undergraduate/minors"
+    - "/study/programmes-courses/short-courses"
+    - "/study/course-planning"
+    - "/study/apply-enrol"
+    - "/study/programmes-courses/subjects"
+    - "/study/programmes-courses/study-in-trimester"
+    - "/_edit"
+    - "/about"
+    - "/news"
+    - "/research"
+    - "/staff"
+    - "/contact"
+    - "/library"
+    - "/alumni"
+    - "/giving"
+    - "/victoria-university-of-wellington-foundation"
+    - "/maori"
+    - "/pasifika"
+    - "/disability"
+    - "/wellington"
+    - "/governance"
+    - "/news-events"
+    - "/key-dates"
+
 extraction:
   fees:
     default_currency: NZD
+
   staging:
     reject_if_missing:
       - course_name

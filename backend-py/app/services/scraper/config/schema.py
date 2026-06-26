@@ -1332,6 +1332,19 @@ class DiscoveryConfig(BaseModel):
             "the path. Empty list (default) = no-op. Per-uni opt-in via YAML."
         ),
     )
+    seed_page_settle_s: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=60.0,
+        description=(
+            "Extra seconds to wait after the standard 3s settle before extracting "
+            "links from each seed URL.  Use when the seed page is a JavaScript SPA "
+            "that fetches all course data from an API on page load and needs more "
+            "than 3s to finish rendering the full course list.  Default 0 (disabled). "
+            "Example: set to 8.0 for a listing page that takes ~6-8s to complete its "
+            "API call and render 100+ course cards."
+        ),
+    )
     browser_time_budget_s: int = Field(
         default=90,
         description=(
