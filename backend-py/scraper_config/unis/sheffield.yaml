@@ -68,8 +68,6 @@ discovery:
   #     Phase A.5b to keep 21/25 wrong listing pages → 0 courses staged.
   #
   allow_url_patterns:
-    - "https://www.sheffield.ac.uk/undergraduate/courses"
-    - "https://www.sheffield.ac.uk/postgraduate/courses"
     - "/undergraduate/courses/"
     - "/postgraduate/courses/"
     - "/undergraduate/courses"
