@@ -361,9 +361,15 @@ def _dedup_year_variants(items: list[dict]) -> list[dict]:
         url = item.get("url", "")
         m = _YEAR_SUFFIX_RE.search(url)
         if m:
-            # base = everything before /20XX (e.g. /course-name-1007294)
-            base = url[: m.start()]
-            groups.setdefault(base, []).append((int(m.group(1)), item))
+            # Dedup key = prefix-before-year + suffix-after-year so that
+            # year-in-middle URLs (e.g. /courses/2026/<slug>) correctly group
+            # per slug, not per listing page.  Year-at-end URLs (SCU-style:
+            # /course/<slug>/2026) have an empty suffix so key == base,
+            # preserving the original behaviour.
+            prefix = url[: m.start()]
+            suffix = url[m.end():]
+            key = (prefix + "/" + suffix) if suffix else prefix
+            groups.setdefault(key, []).append((int(m.group(1)), item))
         else:
             non_year.append(item)
 

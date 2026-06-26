@@ -45,10 +45,10 @@ discovery:
     # /postgraduate/taught/courses/2026 → 128 PG links, both in static HTML.
     # The generic /undergraduate/courses hub page is a React SPA (no links visible).
     # 2026 entry year:
-    - "https://www.sheffield.ac.uk/undergraduate/courses/2026"
-    - "https://www.sheffield.ac.uk/postgraduate/taught/courses/2026"
+    - "https://sheffield.ac.uk/undergraduate/courses/2026"
+    - "https://sheffield.ac.uk/postgraduate/taught/courses/2026"
     # 2027 entry year (UG only — PG 2027 not yet published as of 2026-06-26):
-    - "https://www.sheffield.ac.uk/undergraduate/courses/2027"
+    - "https://sheffield.ac.uk/undergraduate/courses/2027"
 
   # ── allow_url_patterns ────────────────────────────────────────────────────
   # Derived from University_of_Sheffield_Updated xlsx (329 courses).
@@ -74,6 +74,21 @@ discovery:
   allow_url_patterns:
     - '/undergraduate/courses/20\d\d/[^/?#]+'
     - '/postgraduate/taught/courses/20\d\d/[^/?#]+'
+
+  # ── force_candidate_url_patterns ─────────────────────────────────────────
+  # When BFS visits the year-specific seed listing pages (/undergraduate/
+  # courses/2026, /postgraduate/taught/courses/2026) it finds 141+128 course
+  # links with paths like /undergraduate/courses/2026/accounting-ba.
+  # _is_category_landing() returns True for these (the year segment looks like
+  # a sub-category hub), so without this setting BFS puts them in the drill-in
+  # queue rather than found — with a 25-page budget and nav links consuming
+  # most slots, 409 course links would never be visited.
+  # force_candidate_url_patterns bypasses that: any outbound link whose path
+  # matches is added directly to found (the candidate set) immediately.
+  force_candidate_url_patterns:
+    - '/undergraduate/courses/20\d\d/[^/?#]+'
+    - '/postgraduate/taught/courses/20\d\d/[^/?#]+'
+
   block_url_patterns:
     # ── PhD noise (most important — these were extracted as "courses" in logs) ──
     - '/phd/students'          # /<dept>/postgraduate/phd/students/<name>
@@ -87,29 +102,34 @@ discovery:
     - '/undergraduate/courses/?$'       # bare UG listing page (regex: no slug after /)
     - '/postgraduate/courses/?$'        # bare PG listing page
     # ── Standard noise ──
-    - '/news'
-    - '/events'
-    - '/about'
-    - '/staff'
-    - '/research'
-    - '/contact'
-    - '/apply'
-    - '/visit'
-    - '/open-days'
+    # IMPORTANT: patterns that are short words must be anchored with (?:/|$)
+    # so they don't match course SLUGS that start with the same word.
+    # e.g. '/careers' would block /courses/2026/careers-management-ba because
+    # re.search('/careers') finds '/careers' inside '/2026/careers-management-ba'.
+    # The (?:/|$) anchor ensures the word is a complete path SEGMENT.
+    - '/news(?:/|$)'
+    - '/events(?:/|$)'
+    - '/about(?:/|$)'
+    - '/staff(?:/|$)'
+    - '/research(?:/|$)'
+    - '/contact(?:/|$)'
+    - '/apply(?:/|$)'
+    - '/visit(?:/|$)'
+    - '/open-days(?:/|$)'
     - '/international/'
-    - '/accommodation'
-    - '/finance'
-    - '/fees'
-    - '/scholarships'
-    - '/sport'
-    - '/health'
-    - '/wellbeing'
-    - '/careers'
-    - '/library'
-    - '/alumni'
-    - '/governance'
-    - '/jobs'
-    - '/vacancies'
+    - '/accommodation(?:/|$)'
+    - '/finance(?:/|$)'
+    - '/fees(?:/|$)'
+    - '/scholarships(?:/|$)'
+    - '/sport(?:/|$)'
+    - '/health(?:/|$)'
+    - '/wellbeing(?:/|$)'
+    - '/careers(?:/|$)'
+    - '/library(?:/|$)'
+    - '/alumni(?:/|$)'
+    - '/governance(?:/|$)'
+    - '/jobs(?:/|$)'
+    - '/vacancies(?:/|$)'
     - '/su/'
     - '/students/'
     # ── Sheffield-specific structural noise ──
