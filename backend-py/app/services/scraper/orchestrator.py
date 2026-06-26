@@ -1338,6 +1338,34 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 await db.commit()
                 return
 
+        # ── VUW (Victoria University of Wellington) JSON API provider ────────
+        # When discovery.vuw_api is set, fetch all 4 VUW catalogue JSON endpoints
+        # and build pre-populated results. The course pages are a React SPA that
+        # returns a loading shell — this provider bypasses them entirely.
+        _vuw_api_cfg = getattr(_uni_cfg.discovery, "vuw_api", None)
+        if _vuw_api_cfg is not None and getattr(_vuw_api_cfg, "enabled", True):
+            from app.services.scraper.vuw_api import fetch_vuw_links
+            log.info("[VUW_API] vuw_api discovery configured — querying 4 endpoints ...")
+            _vuw_error: str | None = None
+            try:
+                links = await fetch_vuw_links(_vuw_api_cfg, emit=emit)
+            except Exception as _vuw_exc:  # noqa: BLE001
+                log.error("[VUW_API] provider failed: %s", _vuw_exc, exc_info=True)
+                links = []
+                _vuw_error = str(_vuw_exc)
+            _always_browser = False  # never fall through to browser/BFS
+            if not links:
+                _failure_msg = (
+                    f"VUW API provider returned 0 links — aborting. "
+                    f"Check that the 4 VUW endpoints are reachable. "
+                    f"Provider error: {_vuw_error or 'none'}."
+                )
+                log.error(_failure_msg)
+                job.status = "failed"
+                job.error_message = _failure_msg
+                await db.commit()
+                return
+
         # When a uni's YAML declares a discovery.searchstax block, the course
         # catalogue is fetched straight from its SearchStax Solr core. Each doc
         # already carries structured fields + full page text, so we build

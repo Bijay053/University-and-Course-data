@@ -942,6 +942,36 @@ class ElasticApiBootstrapConfig(BaseModel):
     )
 
 
+class VuwApiConfig(BaseModel):
+    """Victoria University of Wellington — direct JSON API provider.
+
+    VUW publishes its full course catalogue across 4 JSON endpoints
+    (pg-programmes, ug-programmes, grad-quals, other-quals).  Each item
+    carries structured metadata (fee, duration, intakes, location, mode)
+    so no per-course HTML fetch is needed.
+
+    Set ``discovery.vuw_api: enabled: true`` in the YAML.  The 4 endpoint
+    paths are hardcoded in ``vuw_api.py``; only ``base_url`` and ``currency``
+    are configurable here.
+
+    Example::
+
+        discovery:
+          vuw_api:
+            enabled: true
+    """
+
+    enabled: bool = Field(default=True, description="Set false to disable without removing the block.")
+    base_url: str = Field(
+        default="https://www.wgtn.ac.nz",
+        description="Base URL for the 4 VUW JSON API endpoints.",
+    )
+    currency: str = Field(
+        default="NZD",
+        description="Currency code for international fees (default NZD).",
+    )
+
+
 class DiscoveryConfig(BaseModel):
     """Safe to replay against unknown universities (Tier-3 playbook matching)."""
 
@@ -1018,6 +1048,17 @@ class DiscoveryConfig(BaseModel):
             "The API tier runs immediately after SearchStax — if it returns ≥1 "
             "link, BFS and browser tiers are skipped. Falls through to BFS if "
             "0 links returned. See GenericSearchApiConfig for full field docs."
+        ),
+    )
+    vuw_api: Optional[VuwApiConfig] = Field(
+        default=None,
+        description=(
+            "Victoria University of Wellington — direct JSON API provider. "
+            "When present, fetches all 4 VUW catalogue endpoints and builds "
+            "pre-populated course results (fee, duration, intakes, location, mode) "
+            "without any per-course HTML fetch. The VUW course pages are a React "
+            "SPA that returns a loading shell — this provider bypasses them entirely. "
+            "See VuwApiConfig."
         ),
     )
     seed_page_click_pagination: Optional[SeedPageClickPaginationConfig] = Field(

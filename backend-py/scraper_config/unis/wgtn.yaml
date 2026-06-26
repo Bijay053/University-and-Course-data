@@ -2,81 +2,46 @@
 # Hostname: www.wgtn.ac.nz  → slug: wgtn
 # Country: New Zealand  |  Currency: NZD  |  uni_id: 61 (prod), 2188 (dev)
 #
-# ══ DISCOVERY: VUW JSON API endpoints ═══════════════════════════════════════
+# ══ DISCOVERY + EXTRACTION: VUW JSON API provider ═══════════════════════════
 #
-# VUW publishes 4 JSON API endpoints that together cover the full programme
-# catalogue.  Each returns {"items": [...]} with structured course metadata
-# including the full course page URL, name, internationalFeeTotal, duration,
-# intake dates (keyDateSet), and location.
+# VUW course pages are a React SPA that returns only:
+#   "Victoria University of Wellington Loading ... The application is loading,
+#    please wait." (86 bytes of visible text).
+# Neither static fetch nor Playwright browser rescue can extract course data.
+#
+# VUW publishes 4 JSON API endpoints with FULL structured course data:
 #
 #   Endpoint               Count   Covers
 #   pg-programmes          179     Postgraduate taught + research degrees
 #   ug-programmes           26     Undergraduate bachelor degrees
 #   grad-quals              21     Graduate certificates / diplomas
-#   other-quals              5     Non-degree quals (English cert, etc.)
-#   TOTAL                  231
+#   other-quals              5     Non-degree qualifications
+#   TOTAL                 ~231
 #
-# Course page URL format (from the API url field):
-#   https://www.wgtn.ac.nz/explore/postgraduate-programmes/<slug>/overview
-#   https://www.wgtn.ac.nz/explore/degrees/<slug>/overview
-#   https://www.wgtn.ac.nz/explore/graduate-quals/<slug>/overview
-#   https://www.wgtn.ac.nz/explore/other-quals/<slug>/overview
+# Each item carries: name, url, internationalFeeTotal, internationalFeeTerm,
+# durationDescription/duration, keyDateSet (intakes), location,
+# internationalLocation, partTimeQual/fullTimeQual, intDistance, description.
 #
-# ══ DISCOVERY HISTORY ═══════════════════════════════════════════════════════
+# vuw_api.py fetches all 4 endpoints in parallel, maps fields directly to
+# pre-built staged-course payloads stored under "searchstax_result" in each
+# link dict. _extract_only returns them verbatim — zero HTML fetches needed.
 #
-# Attempt 1-2 — file named wgtn_2188.yaml (loader ignored it, used defaults)
-# Attempt 3   — always_browser_discover: true → Playwright found only 4 wrong
-#               /explore/ study-abroad pages. BFS needed instead.
-# Attempt 4   — BFS from seed URLs. DB auto_config had rest_json provider
-#               pointing at /endpoints/other-quals → returned 4 study-abroad
-#               links → set links=non-empty → BFS skipped entirely.
-#               Fix: cleared DB auto_config.
-# Attempt 5   — BFS from seed URLs (correct). BUT the course pages are at
-#               /explore/<type>/<slug>/overview which the BFS doesn't find
-#               reliably via static HTML (SPA-rendered listing pages).
-# THIS VERSION — Use all 4 JSON API endpoints directly. No BFS/browser needed
-#               for discovery. Per-course extraction still visits each URL.
+# ══ IELTS ════════════════════════════════════════════════════════════════════
+# VUW's English requirements are not published per-course. Standard minimums:
+#   UG: IELTS 6.0 overall (no band below 5.5)
+#   PG: IELTS 6.5 overall (no band below 6.0)
+# These are applied as YAML defaults — the operator can update per-course.
 
 discovery:
-  # Primary: fetch all 231 courses directly from VUW's 4 JSON API endpoints.
-  # The orchestrator's generic_search_api tier fires before BFS — API result
-  # wins when it returns ≥1 link (which it always does for these endpoints).
-  generic_search_api:
-    url: "https://www.wgtn.ac.nz/endpoints/pg-programmes"
-    additional_urls:
-      - "https://www.wgtn.ac.nz/endpoints/ug-programmes"
-      - "https://www.wgtn.ac.nz/endpoints/grad-quals"
-      - "https://www.wgtn.ac.nz/endpoints/other-quals"
-    root_path: "items"          # response shape: {"items": [...]}
-    url_fields:
-      - "url"                   # each item has a "url" field with the full course URL
-    title_fields:
-      - "name"                  # each item has a "name" field with the course name
-    allow_url_patterns:
-      # Only course overview pages — filter out any non-course items
-      - 'wgtn\.ac\.nz/explore/.+/overview'
-
-  # No BFS or browser discovery needed — APIs return all 231 URLs directly.
-  always_browser_discover: false
-  skip_browser_discovery: true
-  always_sitemap_supplement: false
-
-  expected_min_courses: 180   # APIs consistently return 200+; warn if significantly fewer
+  vuw_api:
+    enabled: true
+    base_url: "https://www.wgtn.ac.nz"
+    currency: NZD
 
 extraction:
   fees:
     default_currency: NZD
     prefer_international: true
-    prefer_annual_over_total: true
-
-  # VUW course pages are JS-rendered — networkidle waits for API calls to settle.
-  browser_wait_strategy: networkidle
-  browser_dcl_settle_ms: 5000
-
-  # Per-course browser allowed for individual course pages where static HTML
-  # returns empty/challenge shell.
-  skip_per_course_browser: false
-  skip_browser_rescue: false
 
   english:
     default_ielts: 6.0
