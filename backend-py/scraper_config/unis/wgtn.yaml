@@ -2,120 +2,93 @@
 # Hostname: www.wgtn.ac.nz  → slug: wgtn
 # Country: New Zealand  |  Currency: NZD  |  uni_id: 61 (prod), 2188 (dev)
 #
-# ══ ROOT CAUSE HISTORY ══════════════════════════════════════════════════════
+# ══ DISCOVERY: VUW JSON API endpoints ═══════════════════════════════════════
 #
-# Attempt 1-2 (all attempts): File was named wgtn_2188.yaml.
-#   Loader derives slug 'wgtn' from hostname www.wgtn.ac.nz and looks for
-#   wgtn.yaml — ENTIRE config silently ignored every scrape. Ran with defaults.
+# VUW publishes 4 JSON API endpoints that together cover the full programme
+# catalogue.  Each returns {"items": [...]} with structured course metadata
+# including the full course page URL, name, internationalFeeTotal, duration,
+# intake dates (keyDateSet), and location.
 #
-# Attempt 3 (wgtn.yaml, always_browser_discover: true):
-#   Rename fixed the loading bug. BUT Playwright visits of seed pages found only
-#   4 wrong candidates (2× /explore/other-quals/... Study Abroad pages, 2× dropped
-#   by category gate). Real programme pages at /study/programmes-courses/... were
-#   not found. Cause: VUW serves different content to headless browsers vs plain
-#   HTTP (Cloudflare-style bot detection on listing pages). Static HTTP BFS with
-#   default config had previously found 80+ programme links just fine.
+#   Endpoint               Count   Covers
+#   pg-programmes          179     Postgraduate taught + research degrees
+#   ug-programmes           26     Undergraduate bachelor degrees
+#   grad-quals              21     Graduate certificates / diplomas
+#   other-quals              5     Non-degree quals (English cert, etc.)
+#   TOTAL                  231
 #
-# THIS VERSION: Lancaster pattern — static HTTP for discovery, browser reserved
-# for per-course extraction only (like Lancaster which also serves JS-rendered
-# course pages but uses SSR listing pages for discovery).
+# Course page URL format (from the API url field):
+#   https://www.wgtn.ac.nz/explore/postgraduate-programmes/<slug>/overview
+#   https://www.wgtn.ac.nz/explore/degrees/<slug>/overview
+#   https://www.wgtn.ac.nz/explore/graduate-quals/<slug>/overview
+#   https://www.wgtn.ac.nz/explore/other-quals/<slug>/overview
 #
-# ══ ACTUAL COURSE URL STRUCTURE ═════════════════════════════════════════════
-#   /study/programmes-courses/postgraduate/<subject>/<course-slug>
-#   /study/programmes-courses/undergraduate/<subject>/<course-slug>
-#   e.g. /study/programmes-courses/postgraduate/architecture/master-of-architecture-professional
-#   e.g. /study/programmes-courses/undergraduate/commerce/bachelor-of-commerce
+# ══ DISCOVERY HISTORY ═══════════════════════════════════════════════════════
 #
-#   Confirmed NOT course pages (must block):
-#     /explore/other-quals/... — Study Abroad, exchange, non-degree programmes
-#     /study/programmes-courses/postgraduate/phds-doctorates — nav hub SPA (rendered=0B)
-#     /international/study-options/* — React SPA (rendered=0B)
-#
-#   Good BFS entry: /study/programmes-courses/limited-entry — static HTML listing
-#   page that links to ~80 real programme pages. Previously found 80 links via
-#   plain HTTP BFS (confirmed working with default config before YAML fix).
+# Attempt 1-2 — file named wgtn_2188.yaml (loader ignored it, used defaults)
+# Attempt 3   — always_browser_discover: true → Playwright found only 4 wrong
+#               /explore/ study-abroad pages. BFS needed instead.
+# Attempt 4   — BFS from seed URLs. DB auto_config had rest_json provider
+#               pointing at /endpoints/other-quals → returned 4 study-abroad
+#               links → set links=non-empty → BFS skipped entirely.
+#               Fix: cleared DB auto_config.
+# Attempt 5   — BFS from seed URLs (correct). BUT the course pages are at
+#               /explore/<type>/<slug>/overview which the BFS doesn't find
+#               reliably via static HTML (SPA-rendered listing pages).
+# THIS VERSION — Use all 4 JSON API endpoints directly. No BFS/browser needed
+#               for discovery. Per-course extraction still visits each URL.
 
 discovery:
-  # Static HTTP BFS — VUW listing pages are accessible via plain HTTP.
-  # Browser discovery was tried and found only 4 wrong /explore/... links.
-  # Skip browser entirely for discovery; use it only for per-course extraction.
+  # Primary: fetch all 231 courses directly from VUW's 4 JSON API endpoints.
+  # The orchestrator's generic_search_api tier fires before BFS — API result
+  # wins when it returns ≥1 link (which it always does for these endpoints).
+  generic_search_api:
+    url: "https://www.wgtn.ac.nz/endpoints/pg-programmes"
+    additional_urls:
+      - "https://www.wgtn.ac.nz/endpoints/ug-programmes"
+      - "https://www.wgtn.ac.nz/endpoints/grad-quals"
+      - "https://www.wgtn.ac.nz/endpoints/other-quals"
+    root_path: "items"          # response shape: {"items": [...]}
+    url_fields:
+      - "url"                   # each item has a "url" field with the full course URL
+    title_fields:
+      - "name"                  # each item has a "name" field with the course name
+    allow_url_patterns:
+      # Only course overview pages — filter out any non-course items
+      - 'wgtn\.ac\.nz/explore/.+/overview'
+
+  # No BFS or browser discovery needed — APIs return all 231 URLs directly.
   always_browser_discover: false
   skip_browser_discovery: true
+  always_sitemap_supplement: false
 
-  seed_urls:
-    # PRIMARY: Lists ~80 limited-entry programmes with direct links to individual
-    # /postgraduate/<subject>/<course> and /undergraduate/<subject>/<course> pages.
-    # Previously confirmed to find 80 programme links via static HTTP BFS.
-    # FALLBACK: Level hubs so BFS also discovers programmes NOT in limited-entry list.
-    - https://www.wgtn.ac.nz/study/programmes-courses/postgraduate/
-    - https://www.wgtn.ac.nz/study/programmes-courses/undergraduate/
-
-  allow_url_patterns:
-    # Individual programme pages: 2 non-empty segments after the level.
-    # Matches /postgraduate/<subject>/<course-slug> but NOT depth-1 hub pages or
-    # known nav sections (get-started, explore-research, flexible-study, short-courses).
-    - "wgtn\\.ac\\.nz/study/programmes-courses/(postgraduate|undergraduate)/(?!flexible-study/?|short-courses/?|get-started/?|explore-research/?)[^/?#]+/[^/?#]+"
-
-  # course_detail_url_patterns: final gate before extraction (like Lancaster).
-  # Drops any URL that slipped through allow_url_patterns.
-  course_detail_url_patterns:
-    - '/study/programmes-courses/(postgraduate|undergraduate)/[^/]+/[^/]+/?$'
-
-  block_url_patterns:
-    # /explore/ section: Study Abroad, exchange, English programmes — NOT degrees
-    - "/explore/"
-    # Known nav noise under programmes-courses
-    - "/study/programmes-courses/undergraduate/taster-lectures"
-    - "/study/programmes-courses/undergraduate/how-degrees-work"
-    - "/study/programmes-courses/undergraduate/minors"
-    - "/study/programmes-courses/short-courses"
-    - "/study/programmes-courses/subjects"
-    - "/study/programmes-courses/study-in-trimester"
-    - "/study/programmes-courses/VicStart"
-    - "/study/programmes-courses/courses"
-    - "/study/programmes-courses/_edit"
-    - "/study/programmes-courses/postgraduate/phds-doctorates"
-    - "/study/programmes-courses/postgraduate/explore-research"
-    - "/study/programmes-courses/postgraduate/get-started"
-    - "/study/programmes-courses/postgraduate-subjects"
-    - "/flexible-study"
-    # Confirmed React-SPA sections (rendered=0B even from browser)
-    - "/international/study-options"
-    # General noise
-    - "/students/"
-    - "/study/course-planning"
-    - "/study/apply-enrol"
-    - "/_edit"
-    - "/about"
-    - "/news"
-    - "/research"
-    - "/staff"
-    - "/contact"
-    - "/library"
-    - "/alumni"
-    - "/governance"
-    - "/news-events"
-    - "/key-dates"
-    - "/maori"
-    - "/pasifika"
-    - "/disability"
-    - "/wellington"
-    - "/giving"
-    - "/victoria-university-of-wellington-foundation"
+  expected_min_courses: 180   # APIs consistently return 200+; warn if significantly fewer
 
 extraction:
   fees:
     default_currency: NZD
+    prefer_international: true
+    prefer_annual_over_total: true
 
-  # VUW course pages are JS-rendered — use networkidle to wait for XHR/fetch
-  # to settle before capturing HTML. browser_dcl_settle_ms as fallback.
-  # This mirrors Lancaster's approach: browser reserved for extraction only.
+  # VUW course pages are JS-rendered — networkidle waits for API calls to settle.
   browser_wait_strategy: networkidle
   browser_dcl_settle_ms: 5000
 
-  # Allow browser rescue for any page where HTTP returns empty/challenge shell.
+  # Per-course browser allowed for individual course pages where static HTML
+  # returns empty/challenge shell.
   skip_per_course_browser: false
   skip_browser_rescue: false
+
+  english:
+    default_ielts: 6.0
+    default_pte: 58
+    default_toefl: 80
+
+  course_name:
+    strip_title_suffixes:
+      - " | Victoria University of Wellington - Te Herenga Waka"
+      - " | Victoria University of Wellington"
+      - " - Victoria University of Wellington"
+      - " | Te Herenga Waka"
 
   staging:
     reject_if_missing:
