@@ -32,8 +32,17 @@ extraction:
   # Manchester course pages link to /fees/ and /entry-requirements/ sub-pages
   # that contain fee tables and English-requirement details not always present
   # on the main course page.  Enable link-following to fetch those before Gemini.
+  #
+  # Budget is capped at 2 (not 3):
+  #   At ~7s per Scrape.do slot with 16 parallel workers and ~934 courses:
+  #     max_admission_linked_pages: 3 → 934 × 4 pages / 16 × 7s ≈ 1634s ≈ 27 min
+  #     max_admission_linked_pages: 2 → 934 × 3 pages / 16 × 7s ≈ 1225s ≈ 20 min
+  #   Manchester's /fees/ page is almost always the first linked page found
+  #   and /entry-requirements/ the second — both are captured at budget=2.
+  #   The third linked page (if any) typically adds no fee/IELTS data that
+  #   the first two haven't already covered.
   follow_admission_links: true
-  max_admission_linked_pages: 3
+  max_admission_linked_pages: 2
   # Playwright is also blocked by Manchester's Cloudflare Enterprise WAF —
   # browser rescue and per-course browser both return rendered=0B and waste
   # 30-60s per course with zero benefit.  Gemini extracts all required fields
