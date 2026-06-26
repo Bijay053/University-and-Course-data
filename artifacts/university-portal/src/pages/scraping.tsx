@@ -2715,7 +2715,7 @@ export default function Scraping() {
                                 ? [course.intakeMonths]
                                 : null;
                             return months?.length ? (
-                              months.map(m => m.slice(0, 3)).join(", ")
+                              months.map(m => String(m).slice(0, 3)).join(", ")
                             ) : (
                               <span className="inline-flex items-center gap-0.5 text-amber-600 text-xs font-medium" title="Missing intake months">
                                 <AlertTriangle className="w-3 h-3" />
