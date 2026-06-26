@@ -7112,10 +7112,11 @@ async def extract_course(
                 payload["intake_months"] = _default_months
                 _intake_months = _default_months
                 _src_note = getattr(_intk_cfg, "default_source_note", "YAML default intake")
+                _intk_conf = float(getattr(_intk_cfg, "default_confidence", 0.4))
                 evidence.append({
                     "field_key": "intake_months",
                     "value": _default_months,
-                    "confidence": 0.4,
+                    "confidence": _intk_conf,
                     "method": "yaml_default_intake",
                     "snippet": (
                         f"{_src_note}: degree_level={_course_dl!r} → tier={_dl_tier!r} "

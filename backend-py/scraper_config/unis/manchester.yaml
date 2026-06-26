@@ -151,6 +151,17 @@ extraction:
   intake:
     use_default_when_missing: true
     default_source_note: Manchester default intake (not extracted from page)
+    # Raise intake-default confidence to 0.75 (above the Gemini gate threshold
+    # of 0.70) so YAML-default intake months count toward the gate's coverage
+    # calculation.  Manchester's intake schedule is highly predictable:
+    #   UG     → September (universal across all 366 courses)
+    #   PGT/PGR → September + January (correct for >95% of programmes)
+    # With this setting a course that already has fee + IELTS + duration +
+    # course_name + study_mode all at ≥ 0.70 will trigger "classification_only"
+    # instead of "full_extraction_needed" — saving ~75% of per-course Gemini
+    # cost (cheap 80-token prompt vs full extraction ~500 tokens).
+    # Do NOT copy this to universities with variable/unpublished intake schedules.
+    default_confidence: 0.75
     default_by_level:
       undergraduate:
         - September

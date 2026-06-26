@@ -2060,6 +2060,29 @@ class IntakeConfig(BaseModel):
             "know the intake was not extracted from the course page."
         ),
     )
+    default_confidence: float = Field(
+        default=0.4,
+        description=(
+            "Confidence level assigned to the synthetic evidence row when "
+            "use_default_when_missing fires.  The Gemini skip gate counts a "
+            "field as 'populated' only when its evidence confidence is "
+            "≥ 0.70 (CONFIDENCE_THRESHOLD in gemini_gate.py).  The default "
+            "value of 0.4 keeps the old behaviour: intake defaults do NOT "
+            "count toward the gate threshold, so Gemini still runs a full "
+            "extraction pass to check for explicit intake months on the page.\n\n"
+            "Set to 0.75 for universities whose intake schedule is highly "
+            "predictable and well-calibrated (e.g. The University of Manchester "
+            "where UG → September and PGT/PGR → September + January is "
+            "universally correct).  This raises the intake evidence to gate-"
+            "eligible confidence so that courses already having fee + IELTS + "
+            "duration + name + mode at ≥ 0.70 trigger 'classification_only' "
+            "instead of 'full_extraction_needed', cutting Gemini cost by ~75% "
+            "per gated course (cheap 80-token prompt vs full extraction).\n\n"
+            "Do NOT set above 0.70 for universities with variable intake "
+            "schedules — it would mask real per-course intake differences "
+            "that Gemini could otherwise catch from the page text."
+        ),
+    )
 
 
 class FiltersConfig(BaseModel):
