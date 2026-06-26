@@ -31,7 +31,22 @@
 #
 #  ONLY ~160 COURSES FOUND (BFS PAGE CAP):
 #    The BFS default of 25 pages caps discovery at ~25 subject areas.  QMUL has
-#    many more.  Increased to 60 below.
+#    many more.  Increased to 100 below.
+#
+#  COURSE COUNT REGRESSION (root cause fixed 2026-06-26):
+#    QMUL course pages contain "online" in navigation and utility text:
+#      - "Apply Online" buttons
+#      - "Online Learning" sidebar links
+#      - "Online Prospectus" references
+#    The bare \bonline\b keyword fallback in the study_mode extractor fired on
+#    this navigation copy and set study_mode="Online" at confidence 0.5.
+#    With online_only.enabled=true, those courses were then silently rejected
+#    even though every one of them is an on-campus programme.
+#    Fix: online_only_requires_strong_evidence=true suppresses the bare
+#    \bonline\b fallback (confidence < 0.7); only unambiguous phrases like
+#    "fully online", "100% online", or "distance learning" now mark a course
+#    as Online-only.  The filter remains enabled to correctly reject QMUL's
+#    small number of genuinely distance-learning programmes.
 #
 # ── DEPLOYMENT ────────────────────────────────────────────────────────────────
 # After editing this file, trigger a new scrape from the Scraping Jobs page.
@@ -41,9 +56,16 @@
 discovery:
   # BFS page budget: default 25 misses many QMUL subject areas.
   # Each subject page (/study/{subject}/) counts as one BFS page.
-  # QMUL has 20+ subject areas — 60 covers all subjects with room for
-  # pagination and sub-pages.
-  bfs_page_budget: 60
+  # QMUL has 20+ subject areas plus sub-pages and pagination.
+  # Raised from 60 → 100 to ensure all subjects are visited even as
+  # QMUL's subject catalogue grows each admissions cycle.
+  bfs_page_budget: 100
+
+  # Alert threshold: fire a discovery-failure alert when a QMUL scrape
+  # stages fewer than 370 courses (5% below the 396-course baseline).
+  # This catches a repeat of the silent online_only regression without
+  # waiting for a manual review.
+  expected_min_courses: 370
 
   # Remove known non-course pages from the candidate set after BFS.
   # These patterns match the SPA entry pages and listing roots that the
@@ -76,5 +98,29 @@ extraction:
     domestic_only:
       enabled: false
     online_only:
-      # QMUL offers some online programmes — skip them.
+      # Keep the filter enabled — QMUL does offer a small number of
+      # genuinely distance-learning programmes that should be rejected.
+      # The regression fix is in study_mode (below), not here.
       enabled: true
+
+  study_mode:
+    # QMUL course pages embed "online" in navigation and utility copy:
+    #   - "Apply Online" call-to-action buttons (present on every page)
+    #   - "Online Learning" section links in the sidebar
+    #   - "Online Prospectus" and "Online Open Day" links
+    # The bare \bonline\b fallback (confidence 0.5) fires on those phrases
+    # and incorrectly sets study_mode="Online" for on-campus courses, which
+    # are then silently rejected by the online_only filter.
+    #
+    # online_only_requires_strong_evidence suppresses any Online result
+    # with confidence < 0.7 (i.e. the bare keyword fallback).  Only
+    # structured labels ("Mode of study: Online") or high-specificity
+    # phrases ("fully online", "100% online", "distance learning") remain.
+    online_only_requires_strong_evidence: true
+    #
+    # Belt-and-suspenders: if a physical campus location has already been
+    # extracted for the course, a bare-keyword Online result is suppressed
+    # in favour of "On Campus".  QMUL lists campus names (Mile End,
+    # Whitechapel) in every course's key facts — this preference prevents
+    # a stray "apply online" phrase from overriding the campus evidence.
+    prefer_location_over_online_keyword: true
