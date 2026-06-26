@@ -46,7 +46,6 @@ discovery:
     # PRIMARY: Lists ~80 limited-entry programmes with direct links to individual
     # /postgraduate/<subject>/<course> and /undergraduate/<subject>/<course> pages.
     # Previously confirmed to find 80 programme links via static HTTP BFS.
-    - https://www.wgtn.ac.nz/study/programmes-courses/limited-entry
     # FALLBACK: Level hubs so BFS also discovers programmes NOT in limited-entry list.
     - https://www.wgtn.ac.nz/study/programmes-courses/postgraduate/
     - https://www.wgtn.ac.nz/study/programmes-courses/undergraduate/
