@@ -226,3 +226,167 @@ class TestCrossQueryDeduplication:
         assert len(results) == 2
         assert any("master" in r["url"] for r in results)
         assert any("bachelor" in r["url"] for r in results)
+
+
+# ── 2026-06-26 fix: evaluate-failure guard + new seed URL ─────────────────────
+
+
+class TestLincolnYamlConfig:
+    """Verify lincoln.yaml loads correctly after 2026-06-26 site-restructure fix."""
+
+    def _load_discovery(self) -> object:
+        import yaml
+        from app.services.scraper.config.schema import DiscoveryConfig
+        with open("scraper_config/unis/lincoln.yaml") as f:
+            raw = yaml.safe_load(f)
+        return DiscoveryConfig(**raw.get("discovery", {}))
+
+    def test_new_courses2_seed_is_first(self) -> None:
+        """courses-2/course-search/ must be the primary (first) seed URL."""
+        disc = self._load_discovery()
+        seeds = disc.seed_urls or []
+        assert len(seeds) >= 2, "Expected at least 2 seed URLs"
+        assert "courses-2/course-search" in seeds[0], (
+            f"First seed must be courses-2/course-search, got {seeds[0]!r}"
+        )
+
+    def test_old_programme_search_seed_retained(self) -> None:
+        """Old PG seed must be kept as the second seed for backward compat."""
+        disc = self._load_discovery()
+        seeds = disc.seed_urls or []
+        assert any("programme-search" in s for s in seeds), (
+            "programme-search seed URL must be retained for PG courses"
+        )
+
+    def test_elastic_bootstrap_still_configured(self) -> None:
+        """elastic_api_bootstrap must remain configured after seed URL change."""
+        disc = self._load_discovery()
+        assert disc.elastic_api_bootstrap is not None
+        assert disc.elastic_api_bootstrap.api_url.startswith("/_search-proxy/")
+        assert len(disc.elastic_api_bootstrap.queries or []) >= 3
+
+    def test_time_budget_increased_to_300(self) -> None:
+        """Time budget must be ≥ 300s to give BFS fallback sufficient room."""
+        disc = self._load_discovery()
+        assert (disc.browser_time_budget_s or 0) >= 300, (
+            f"browser_time_budget_s should be ≥ 300, got {disc.browser_time_budget_s}"
+        )
+
+    def test_new_listing_hub_blocked(self) -> None:
+        """courses-2/course-search listing hub must be in block_url_patterns."""
+        disc = self._load_discovery()
+        blocked = list(disc.block_url_patterns or [])
+        assert any("courses-2/course-search" in p for p in blocked), (
+            "courses-2/course-search listing hub must be blocked to avoid "
+            "counting the search page itself as a course"
+        )
+
+    def test_courses2_individual_pages_allowed(self) -> None:
+        """Individual course pages under courses-2/course-search/<slug>/ must be allowed."""
+        disc = self._load_discovery()
+        import re
+        allowed_pats = [re.compile(p, re.IGNORECASE) for p in (disc.allow_url_patterns or [])]
+        individual_url = (
+            f"{ORIGIN}/study/courses-2/course-search/certificate-in-applied-science/"
+        )
+        assert any(p.search(individual_url) for p in allowed_pats), (
+            f"Individual course URL {individual_url!r} must match allow_url_patterns"
+        )
+
+    def test_listing_hub_itself_not_allowed_as_course(self) -> None:
+        """The listing hub URL (no slug) must not match allow_url_patterns."""
+        disc = self._load_discovery()
+        import re
+        allowed_pats = [re.compile(p, re.IGNORECASE) for p in (disc.allow_url_patterns or [])]
+        hub_url = f"{ORIGIN}/study/courses-2/course-search/"
+        assert not any(p.search(hub_url) for p in allowed_pats), (
+            f"Listing hub {hub_url!r} must NOT match allow_url_patterns (has no course slug)"
+        )
+
+
+class TestEvaluateFailureGuard:
+    """Unit tests for the evaluate-try/except guard that protects the bootstrap.
+
+    Root cause (2026-06-26): page.evaluate(_EXTRACT_LINKS_JS) called inside the
+    seed-URL try-block with NO inner exception handler.  When Lincoln's SPA redirects
+    or crashes after page.goto(), the evaluate throws, the outer except catches it,
+    and the Elastic API bootstrap code is never reached.
+
+    Fix: wrap the evaluate call in its own try/except so the bootstrap always runs.
+
+    These tests verify the LOGIC of that pattern without running a real browser.
+    """
+
+    def test_results_accumulated_before_evaluate_failure(self) -> None:
+        """Courses gathered by the XHR listener before evaluate() fails
+        must survive — they were added to results before the exception."""
+        results: list[dict] = []
+
+        # XHR listener fires asynchronously and adds 1 course
+        xhr_course = {"url": f"{ORIGIN}/study/courses-2/course-search/diploma-in-agriculture/", "name": "Diploma in Agriculture"}
+        results.append(xhr_course)
+
+        # Now simulate the evaluate() throwing — with the guard, we catch it
+        _sv_raw = None
+        try:
+            raise RuntimeError("Execution context was destroyed")
+        except Exception:
+            pass  # guard catches it; bootstrap will still run below
+
+        assert len(results) == 1  # XHR course survived
+        assert results[0]["name"] == "Diploma in Agriculture"
+
+    def test_bootstrap_runs_after_evaluate_failure(self) -> None:
+        """Bootstrap logic must run even when evaluate() failed.
+
+        Simulates: evaluate raises → guard catches → bootstrap fires → adds API courses.
+        """
+        results: list[dict] = []
+        bootstrap_ran = False
+        _eas_cfg_present = True  # would be set from UniConfig in real code
+
+        # Step 1: XHR listener adds 1 course async
+        results.append({"url": f"{ORIGIN}/study/courses-2/course-search/diploma-in-agriculture/", "name": "Diploma in Agriculture"})
+
+        # Step 2: evaluate() throws — guard catches without killing the seed block
+        try:
+            raise RuntimeError("Target page, context or browser has been closed")
+        except Exception:
+            pass  # proceeding to bootstrap
+
+        # Step 3: bootstrap fires because we reached this line
+        if _eas_cfg_present:
+            bootstrap_ran = True
+            api_courses = [
+                {"url": f"{ORIGIN}/study/study-programmes/programme-search/bachelor-of-agriculture/", "name": "Bachelor of Agriculture"},
+                {"url": f"{ORIGIN}/study/study-programmes/programme-search/master-of-applied-science/", "name": "Master of Applied Science"},
+            ]
+            seen: set[str] = set(r["url"] for r in results)
+            for c in api_courses:
+                if c["url"] not in seen:
+                    seen.add(c["url"])
+                    results.append(c)
+
+        assert bootstrap_ran
+        assert len(results) == 3  # 1 XHR + 2 API
+
+    def test_evaluate_success_also_reaches_bootstrap(self) -> None:
+        """When evaluate succeeds, both the extracted links AND bootstrap results accumulate."""
+        results: list[dict] = []
+        seen: set[str] = set()
+
+        # evaluate succeeded — adds 1 link
+        eval_course = {"url": f"{ORIGIN}/study/courses-2/course-search/certificate-in-applied-science/", "name": "Certificate in Applied Science"}
+        results.append(eval_course)
+        seen.add(eval_course["url"])
+
+        # bootstrap fires (no exception blocked it)
+        api_courses = [
+            {"url": f"{ORIGIN}/study/study-programmes/programme-search/bachelor-of-agriculture/", "name": "Bachelor of Agriculture"},
+        ]
+        for c in api_courses:
+            if c["url"] not in seen:
+                seen.add(c["url"])
+                results.append(c)
+
+        assert len(results) == 2

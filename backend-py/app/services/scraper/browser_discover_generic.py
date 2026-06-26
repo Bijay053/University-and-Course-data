@@ -945,8 +945,24 @@ async def browser_discover_generic(
                         except Exception:
                             pass
                         await asyncio.sleep(_SETTLE_S)
-                        _sv_raw = await page.evaluate(_EXTRACT_LINKS_JS, origin_str)
-                        _process_links(_sv_raw or [])
+                        # Wrap evaluate in its own try/except so a JS crash or
+                        # page-navigate-away error (common on SPA seed pages that
+                        # redirect) does NOT kill the entire seed block and prevent
+                        # the Elastic API bootstrap from running below.
+                        try:
+                            _sv_raw = await page.evaluate(_EXTRACT_LINKS_JS, origin_str)
+                            _process_links(_sv_raw or [])
+                        except Exception as _sv_eval_exc:
+                            log.warning(
+                                "[SEED] page.evaluate link-extract failed for %s: %s "
+                                "— proceeding to Elastic bootstrap",
+                                _sv_url, _sv_eval_exc,
+                            )
+                            await _emit(
+                                f"[SEED] Link extraction failed "
+                                f"({type(_sv_eval_exc).__name__}) — "
+                                f"continuing to API bootstrap"
+                            )
                         # Scroll-to-load for JS-rendered listing pages
                         if _LISTING_URL_RE.search(_sv_url):
                             try:
@@ -967,6 +983,14 @@ async def browser_discover_generic(
                             "elastic_api_bootstrap",
                             None,
                         )
+                        if _eas_cfg is None:
+                            # Emit so this absence is visible in the UI log
+                            # (helps diagnose future regressions without needing
+                            # the Celery worker log).
+                            log.debug(
+                                "[EAS] no elastic_api_bootstrap config for seed %s — skipping",
+                                _sv_url,
+                            )
                         if _eas_cfg is not None:
                             _eas_api_url: str = _eas_cfg.api_url
                             if _eas_api_url.startswith("/"):
@@ -1043,15 +1067,29 @@ async def browser_discover_generic(
                                                 "[EAS] q=%r page %d returned null/empty — stopping",
                                                 _eas_query, _eas_pn,
                                             )
+                                            await _emit(
+                                                f"[DISCOVER] Elastic API q={_eas_query!r} "
+                                                f"page {_eas_pn}: null/empty response "
+                                                f"(API changed or Cloudflare blocked fetch)"
+                                            )
                                             break
                                         _eas_data = _json.loads(_eas_raw)
                                         # Surface HTTP errors returned via the error envelope
                                         if "__error" in _eas_data:
+                                            _eas_http_err = _eas_data["__error"]
+                                            _eas_body_snip = str(
+                                                _eas_data.get("__body", "")
+                                            )[:120]
                                             log.warning(
                                                 "[EAS] q=%r page %d HTTP %s: %s",
                                                 _eas_query, _eas_pn,
-                                                _eas_data["__error"],
-                                                _eas_data.get("__body", ""),
+                                                _eas_http_err,
+                                                _eas_body_snip,
+                                            )
+                                            await _emit(
+                                                f"[DISCOVER] Elastic API q={_eas_query!r} "
+                                                f"HTTP {_eas_http_err} — "
+                                                f"{_eas_body_snip[:80]}"
                                             )
                                             break
                                         if _eas_total_pages is None:

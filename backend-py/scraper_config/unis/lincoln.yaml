@@ -56,9 +56,14 @@
 
 discovery:
   always_browser_discover: true
-  browser_time_budget_s: 150
+  browser_time_budget_s: 300  # 150s exhausted with only 1 course; give BFS fallback room
 
   seed_urls:
+    # NEW primary seed (2026-06-26): Lincoln restructured their site — the UG course
+    # search is now at /study/courses-2/course-search/ (appeared as BFS nav score=120).
+    # This is tried FIRST so the Elastic bootstrap fires from the new SPA page.
+    - https://www.lincoln.ac.nz/study/courses-2/course-search/
+    # Keep old PG seed as fallback — PG courses may still live at programme-search/
     - https://www.lincoln.ac.nz/study/study-programmes/programme-search/
 
   # After the seed page loads (Cloudflare clearance), POST directly to the
@@ -106,7 +111,8 @@ discovery:
     - "/research"
     - "/staff"
     - "/contact"
-    - "programme-search/$"
+    - "programme-search/$"        # old PG listing hub (not a course page)
+    - "courses-2/course-search/$" # new UG listing hub (not a course page)
 
   use_stealth_browser: true
 
