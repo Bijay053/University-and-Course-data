@@ -159,12 +159,6 @@ discovery:
     - '/staff'
     - '/alumni'
     - '\.pdf$'
-    - '/programmes/undergraduate-fees'   # per-course JS fee pages — no course data
-    - '/programmes/search'               # search results page
-    - '/programmes/a-z'                  # A-Z listing page
-    - '/programmes/subjects'             # subjects listing page
-    - '/user/'                           # CMS login/user redirects
-    - 'entry-requirements'               # sub-pages fetched via follow_admission_links, not standalone courses
 
 extraction:
   fees:
@@ -178,9 +172,6 @@ extraction:
       - 'UK fee'
       - 'Domestic'
       - 'Scottish'
-
-  follow_admission_links: true
-  max_admission_linked_pages: 2
 
   english:
     trust_vision_ocr: false
@@ -203,3 +194,4 @@ extraction:
       - course_name
     skip_degree_qualifier_check: true
     require_international_fee: false
+    dedup_use_full_url: true
