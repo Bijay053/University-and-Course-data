@@ -15,3 +15,9 @@ discovery:
 extraction:
   fees:
     default_currency: NZD
+  staging:
+    reject_if_missing:
+      - course_name
+    skip_degree_qualifier_check: true
+    require_international_fee: false
+    dedup_use_full_url: true
