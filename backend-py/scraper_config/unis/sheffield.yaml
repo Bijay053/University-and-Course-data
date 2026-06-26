@@ -46,12 +46,29 @@ discovery:
     - "https://www.sheffield.ac.uk/undergraduate/courses"
     - "https://www.sheffield.ac.uk/postgraduate/courses"
 
-  # NO allow_url_patterns — whitelist was causing both missed courses AND admitting
-  # profiles. Use block_url_patterns to exclude noise instead.
+  # ── allow_url_patterns ────────────────────────────────────────────────────
+  # Derived from 389 staged Sheffield URLs. Key finding:
+  #
+  #   REAL COURSES (21 URLs) — ALL contain '/courses/' in the path:
+  #     /undergraduate/courses/20xx/<slug>        ← standard UG (year-prefixed)
+  #     /postgraduate/taught/courses/20xx/<slug>  ← standard PG (has '/taught/'!)
+  #     /<dept>/undergraduate/courses/<slug>      ← dept-level UG
+  #     /<dept>/postgraduate/courses/<slug>       ← dept-level PG
+  #     /ahpnm/apprenticeships/programmes/<slug>  ← apprenticeships (no /courses/)
+  #
+  #   NOISE (366 URLs): profiles, phd students, candidates, meet-our-students,
+  #   pre-arrival, engineering summer schools, mba-2026-<country> events — none
+  #   of these contain '/courses/' → the whitelist cleanly separates them.
+  #
   allow_url_patterns:
-    - "/undergraduate/courses/"
-    - "/postgraduate/taught/courses/"
-    - "/postgraduate/courses"
+    # Standard UG individual courses (year-prefixed): /undergraduate/courses/20xx/<slug>
+    - 'sheffield\.ac\.uk/undergraduate/courses/20\d\d/[^/?#]+'
+    # Standard PG taught courses (has /taught/ segment): /postgraduate/taught/courses/20xx/<slug>
+    - 'sheffield\.ac\.uk/postgraduate/taught/courses/20\d\d/[^/?#]+'
+    # Dept-level courses: /<dept>/(undergraduate|postgraduate)/courses/<slug>
+    - 'sheffield\.ac\.uk/[^/?#]+/(undergraduate|postgraduate)/courses/[^/?#]+'
+    # Apprenticeship programmes (only real non-/courses/ course type)
+    - 'sheffield\.ac\.uk/ahpnm/apprenticeships/programmes/[^/?#]+'
 
   block_url_patterns:
     # ── PhD noise (most important — these were extracted as "courses" in logs) ──
