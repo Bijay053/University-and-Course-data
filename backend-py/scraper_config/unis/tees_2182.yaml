@@ -34,12 +34,79 @@
 #     triggers the override.
 
 discovery:
-  # Cover listing hierarchy: ~6 UG dept pages + ~6 PG dept pages + sub-dept
-  # pages the BFS follows naturally = ~15-25 listing fetches.  Budget of 30
-  # gives a comfortable buffer for paginated category pages.
-  bfs_page_budget: 30
+  # The site has 29 UG dept directories + 28 PG dept directories = 57 listing
+  # pages.  BFS starting from the root wastes budget on irrelevant nav pages
+  # (sections/schoolscolleges, sections/international, etc.) before reaching
+  # all dept pages.  seed_urls pre-populates the BFS queue with every dept
+  # directory so no listing page is missed, even with limited budget.
+  # Budget of 80 covers: 2 hub roots + 57 dept dirs + a safety buffer.
+  bfs_page_budget: 80
 
   expected_min_courses: 80
+
+  # All UG + PG department listing directories seeded directly.
+  # Discovered 2026-06-26 by fetching /undergraduate_courses/ and
+  # /postgraduate_courses/ root listing pages.
+  seed_urls:
+    - 'https://www.tees.ac.uk/undergraduate_courses/'
+    - 'https://www.tees.ac.uk/postgraduate_courses/'
+    - 'https://www.tees.ac.uk/undergraduate_courses/accounting_&_economics/'
+    - 'https://www.tees.ac.uk/undergraduate_courses/animation_concept_art_&_visual_effects/'
+    - 'https://www.tees.ac.uk/undergraduate_courses/art_&_design/'
+    - 'https://www.tees.ac.uk/undergraduate_courses/aviation_&_tourism/'
+    - 'https://www.tees.ac.uk/undergraduate_courses/biosciences/'
+    - 'https://www.tees.ac.uk/undergraduate_courses/business_management_&_enterprise/'
+    - 'https://www.tees.ac.uk/undergraduate_courses/computer_games/'
+    - 'https://www.tees.ac.uk/undergraduate_courses/computing_&_cyber_security/'
+    - 'https://www.tees.ac.uk/undergraduate_courses/criminology/'
+    - 'https://www.tees.ac.uk/undergraduate_courses/education_&_youth/'
+    - 'https://www.tees.ac.uk/undergraduate_courses/engineering_&_construction/'
+    - 'https://www.tees.ac.uk/undergraduate_courses/english_&_creative_writing/'
+    - 'https://www.tees.ac.uk/undergraduate_courses/food_&_nutrition/'
+    - 'https://www.tees.ac.uk/undergraduate_courses/forensic_&_crime_scene_sciences/'
+    - 'https://www.tees.ac.uk/undergraduate_courses/history/'
+    - 'https://www.tees.ac.uk/undergraduate_courses/human_resource_management/'
+    - 'https://www.tees.ac.uk/undergraduate_courses/initial_teacher_training/'
+    - 'https://www.tees.ac.uk/undergraduate_courses/law/'
+    - 'https://www.tees.ac.uk/undergraduate_courses/marketing/'
+    - 'https://www.tees.ac.uk/undergraduate_courses/media_&_journalism/'
+    - 'https://www.tees.ac.uk/undergraduate_courses/music_production/'
+    - 'https://www.tees.ac.uk/undergraduate_courses/nursing_&_health/'
+    - 'https://www.tees.ac.uk/undergraduate_courses/pharmacy_&_pharmaceutical_sciences/'
+    - 'https://www.tees.ac.uk/undergraduate_courses/policing_&_investigation/'
+    - 'https://www.tees.ac.uk/undergraduate_courses/politics/'
+    - 'https://www.tees.ac.uk/undergraduate_courses/psychology/'
+    - 'https://www.tees.ac.uk/undergraduate_courses/social_work/'
+    - 'https://www.tees.ac.uk/undergraduate_courses/sociology/'
+    - 'https://www.tees.ac.uk/undergraduate_courses/sport_&_exercise/'
+    - 'https://www.tees.ac.uk/postgraduate_courses/accounting_&_economics/'
+    - 'https://www.tees.ac.uk/postgraduate_courses/animation_concept_art_&_visual_effects/'
+    - 'https://www.tees.ac.uk/postgraduate_courses/art_&_design/'
+    - 'https://www.tees.ac.uk/postgraduate_courses/aviation_&_tourism/'
+    - 'https://www.tees.ac.uk/postgraduate_courses/biosciences/'
+    - 'https://www.tees.ac.uk/postgraduate_courses/business_management_&_enterprise/'
+    - 'https://www.tees.ac.uk/postgraduate_courses/computer_games/'
+    - 'https://www.tees.ac.uk/postgraduate_courses/computing_&_cyber_security/'
+    - 'https://www.tees.ac.uk/postgraduate_courses/criminology/'
+    - 'https://www.tees.ac.uk/postgraduate_courses/education_&_youth/'
+    - 'https://www.tees.ac.uk/postgraduate_courses/engineering_&_construction/'
+    - 'https://www.tees.ac.uk/postgraduate_courses/english_&_creative_writing/'
+    - 'https://www.tees.ac.uk/postgraduate_courses/food_&_nutrition/'
+    - 'https://www.tees.ac.uk/postgraduate_courses/forensic_&_crime_scene_sciences/'
+    - 'https://www.tees.ac.uk/postgraduate_courses/geosciences/'
+    - 'https://www.tees.ac.uk/postgraduate_courses/history/'
+    - 'https://www.tees.ac.uk/postgraduate_courses/human_resource_management/'
+    - 'https://www.tees.ac.uk/postgraduate_courses/initial_teacher_training/'
+    - 'https://www.tees.ac.uk/postgraduate_courses/law/'
+    - 'https://www.tees.ac.uk/postgraduate_courses/marketing/'
+    - 'https://www.tees.ac.uk/postgraduate_courses/media_&_journalism/'
+    - 'https://www.tees.ac.uk/postgraduate_courses/nursing_&_health/'
+    - 'https://www.tees.ac.uk/postgraduate_courses/policing_&_investigation/'
+    - 'https://www.tees.ac.uk/postgraduate_courses/politics/'
+    - 'https://www.tees.ac.uk/postgraduate_courses/project_management/'
+    - 'https://www.tees.ac.uk/postgraduate_courses/psychology/'
+    - 'https://www.tees.ac.uk/postgraduate_courses/sociology/'
+    - 'https://www.tees.ac.uk/postgraduate_courses/sport_&_exercise/'
 
   allow_url_patterns:
     - '/undergraduate_courses/'
