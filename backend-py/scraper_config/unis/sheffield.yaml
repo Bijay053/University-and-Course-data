@@ -67,7 +67,13 @@ discovery:
   #     /management/postgraduate/courses/our-marketing-courses, causing
   #     Phase A.5b to keep 21/25 wrong listing pages → 0 courses staged.
   #
-
+  allow_url_patterns:
+    - "https://www.sheffield.ac.uk/undergraduate/courses"
+    - "https://www.sheffield.ac.uk/postgraduate/courses"
+    - "/undergraduate/courses/"
+    - "/postgraduate/courses/"
+    - "/undergraduate/courses/"
+    - "/postgraduate/courses/"
 
   block_url_patterns:
     # ── PhD noise (most important — these were extracted as "courses" in logs) ──
