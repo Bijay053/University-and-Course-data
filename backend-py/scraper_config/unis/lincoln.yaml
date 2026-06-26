@@ -1,67 +1,103 @@
 # Lincoln University (NZ) — slug "lincoln"
 # Hostname: www.lincoln.ac.nz
 #
-# DIAGNOSIS (2026-06-03, updated 2026-06-26):
-#   - www.lincoln.ac.nz returns HTTP 403 to plain-HTTP requests from cloud IPs.
-#   - All 118 courses live at /study/study-programmes/programme-search/<slug>/.
-#     The SPA at programme-search/ paginates results: 8 pages × ~15 courses each.
-#     Pagination is driven by numbered page buttons (Elastic App Search React UI).
+# ROOT CAUSE (confirmed 2026-06-26, definitive):
+#   Lincoln uses Elastic App Search React UI for TWO separate SPA listings:
+#   (A) /study/study-programmes/programme-search/ — 118 programmes across 8 pages
+#   (B) /study/courses-2/course-search/ — UG individual courses (separate catalogue)
 #
-#   - History of failed approaches:
-#     1. XHR interceptor (original): SPA does NOT auto-query Elastic on page load —
-#        it waits for user interaction → interceptor never fires → 0 courses.
-#     2. elastic_api_bootstrap (2026-06-25): POSTs to /_search-proxy/ via page.evaluate().
-#        Fails because (a) page 2+ returns HTTP 403 Cloudflare rate-limiting for plain
-#        HTTP POST even inside the browser; (b) bootstrap code had NameError on _from_item()
-#        (closure not in scope at bootstrap indent). Net: 0 courses.
-#     3. evaluate-failure guard (2026-06-26): wrapped page.evaluate in try/except but
-#        the underlying API calls still 403 for pagination. Net: still 0 courses.
+#   CRITICAL: Both SPAs do NOT auto-query Elastic on page load.
+#   They render an empty search form and wait for the user to click "Search".
+#   This is why:
+#     - The seed page returns 0 courses regardless of wait time.
+#     - The pagination container is never found (appears only after results load).
+#     - seed_page_settle_s alone does NOT fix this — the SPA is idle, not slow.
 #
-#   - NEW APPROACH (2026-06-26): seed_page_click_pagination
-#     Navigate to programme-search/ in the Cloudflare-cleared browser, then click
-#     each numbered page button (2, 3 … 8) and extract links after each click.
-#     The SPA re-renders the course list client-side after each click — no new
-#     HTTP request to the proxy, just React state update from cached data.
-#     This is 100% in-browser and inherits CF clearance automatically.
+#   HISTORY of all failed approaches:
+#     1. XHR interceptor: never fires (SPA doesn't query on load) → 0
+#     2. elastic_api_bootstrap: page 2+ 403 CF + NameError closure → 0
+#     3. evaluate-failure guard: underlying API still 403 → 0
+#     4. seed_page_click_pagination (3s settle): no pagination container → 0
+#        (container appears ONLY after search results are shown)
+#     5. BFS areas-of-specialisation: finds 57 PG courses reliably, misses
+#        ~61 UG courses at courses-2/course-search/ (also SPA, same problem)
 #
-#   - All per-course pages require browser rendering (Cloudflare blocks plain HTTP).
-#   - Lincoln is a New Zealand university — CRICOS does not apply.
+#   DEFINITIVE FIX (2026-06-26): seed_page_trigger_js
+#   After settling on the seed page, evaluate JS that clicks the Search button.
+#   This submits an empty Elastic query → SPA renders all 15 results on page 1
+#   → rc-pagination component appears → pagination clicks pages 2-8 → 118 links.
 #
-# CONFIG STRATEGY:
-#   - always_browser_discover: true — bypass 403 HTTP BFS
-#   - seed_urls: programme-search/ — the paginated SPA listing (8 pages, 118 courses)
-#   - seed_page_click_pagination: clicks page 2…8 in the browser, harvests links
-#   - allow_url_patterns: BOTH UG (courses-2/course-search) AND PG (programme-search)
-#   - block_url_patterns: suppress resources/schools/farming/nav noise
-#   - use_stealth_browser: true — per-course extraction AND central pages via patchright
-#   - fees.central_page: absolute URL (relative URLs from auto_config fail schema check)
-#   - english.central_page: absolute URL for same reason
-#   - force_central_fee_stage: true — mark has_central_fee_page even when parser finds 0
-#     records (prevents staging gate rejection while fix is being validated)
-#   - browser_time_budget_s: 350 — 8 pages × 3s settle + per-course extraction headroom
+# BELT-AND-SUSPENDERS:
+#   All /study/areas-of-specialisation/<area>/ pages are added as seeds too.
+#   These are STATIC HTML (no JS required), reliably find ~57 PG courses even
+#   if both SPAs fail. They run AFTER the SPA seeds so if SPA works, early_stop
+#   fires before reaching them (saving time).
 
 discovery:
   always_browser_discover: true
-  browser_time_budget_s: 350  # 8 pages × 3s settle + navigation headroom
+  browser_time_budget_s: 600   # 2 SPA seeds × (3+5)s + 8 pag pages × 3s + nav
+  browser_early_stop_courses: 150  # 118 courses + margin
 
   seed_urls:
-    # Confirmed listing URL: 118 courses, 8 pages of ~15 each.
-    # Browser navigates here first to get Cloudflare clearance, then
-    # seed_page_click_pagination clicks through pages 2–8.
+    # PRIMARY: SPA listing all 118 programmes (PG + UG mix). trigger_js below
+    # clicks Search button → results appear → pagination clicks pages 2-8.
     - https://www.lincoln.ac.nz/study/study-programmes/programme-search/
+    # SECONDARY: UG individual courses listing (separate SPA). Same trigger approach.
+    - https://www.lincoln.ac.nz/study/courses-2/course-search/
+    # FALLBACK: Static HTML area pages — reliably find PG courses without JS trigger.
+    # Seeded directly so BFS visits them early if SPAs fail.
+    - https://www.lincoln.ac.nz/study/areas-of-specialisation/agriculture-horticulture-and-viticulture/
+    - https://www.lincoln.ac.nz/study/areas-of-specialisation/business/
+    - https://www.lincoln.ac.nz/study/areas-of-specialisation/environment/
+    - https://www.lincoln.ac.nz/study/areas-of-specialisation/food-wine-and-beer/
+    - https://www.lincoln.ac.nz/study/areas-of-specialisation/landscape-architecture/
+    - https://www.lincoln.ac.nz/study/areas-of-specialisation/property-and-valuation/
+    - https://www.lincoln.ac.nz/study/areas-of-specialisation/science/
+    - https://www.lincoln.ac.nz/study/areas-of-specialisation/tourism/
+    - https://www.lincoln.ac.nz/study/areas-of-specialisation/technology/
 
-  # Click through the 8 pagination pages of the SPA listing.
-  # After each click the React UI re-renders the course cards client-side.
-  # We wait 3 s per page for the DOM to update, then extract the new links.
+  # Clicked on every seed page after the 3s default settle.
+  # For SPA seeds: clicks the Search/submit button so Elastic renders all results
+  # and the rc-pagination component appears. After JS fires, the code waits 5s.
+  # For static area-of-specialisation pages: harmless (no search button present).
+  seed_page_trigger_js: |
+    (function() {
+      var selectors = [
+        '.sui-search-box__submit',
+        'button[type="submit"]',
+        '[aria-label="Search"]',
+        'button.search-button',
+        'button[class*="search"]',
+        'form button'
+      ];
+      for (var i = 0; i < selectors.length; i++) {
+        var btn = document.querySelector(selectors[i]);
+        if (btn) { btn.click(); return; }
+      }
+      var inp = document.querySelector(
+        '.sui-search-box__text-input, input[type="search"], input[name="q"]'
+      );
+      if (inp) {
+        inp.dispatchEvent(new KeyboardEvent('keydown',
+          {key: 'Enter', keyCode: 13, which: 13, bubbles: true}));
+        inp.dispatchEvent(new KeyboardEvent('keyup',
+          {key: 'Enter', keyCode: 13, which: 13, bubbles: true}));
+      }
+    })();
+
+  # After trigger JS fires and the code waits 5s, click pages 2-8.
+  # At this point the SPA should have rendered page 1 results + pagination.
   seed_page_click_pagination:
     max_pages: 8    # 8 pages × ~15 courses = 118 total
-    settle_s: 3.0   # seconds to wait after clicking each page button
+    settle_s: 3.0   # seconds to wait after each page button click
 
   allow_url_patterns:
-    # PG individual course pages
+    # PG programme pages (programme-search SPA)
     - "lincoln\\.ac\\.nz/study/study-programmes/programme-search/[^/]+/?$"
-    # UG individual course pages (different URL path — root cause of 58/118 bug)
+    # UG course pages (course-search SPA)
     - "lincoln\\.ac\\.nz/study/courses-2/course-search/[^/]+/?$"
+    # Belt-and-suspenders: individual course pages under area specialisation listings
+    - "lincoln\\.ac\\.nz/study/areas-of-specialisation/[^/]+/[^/]+/?$"
 
   block_url_patterns:
     - "/resources-for-careers-advisors"
@@ -79,8 +115,14 @@ discovery:
     - "/research"
     - "/staff"
     - "/contact"
-    - "programme-search/$"        # old PG listing hub (not a course page)
-    - "courses-2/course-search/$" # new UG listing hub (not a course page)
+    - "programme-search/$"           # PG listing hub (not a course page)
+    - "courses-2/course-search/$"    # UG listing hub (not a course page)
+    - "/areas-of-specialisation/$"   # area index page (not a course)
+    - "/star-programme"
+    - "/programmes-starting-soon"
+    - "/english-language"
+    - "/study-abroad"
+    - "/student-exchange"
 
   use_stealth_browser: true
 
@@ -92,16 +134,10 @@ extraction:
 
   english:
     central_page: "https://www.lincoln.ac.nz/study/entry-requirements"
-    # Lincoln NZ publicly states degree-level entry minimums on their
-    # entry-requirements page (/study/entry-requirements), but the page is
-    # Cloudflare-protected and the rendered text does not contain parseable
-    # IELTS patterns (as of 2026-06-03).  These YAML defaults apply as a
-    # last-resort fallback (confidence 0.40) only when ALL other extractors
-    # (per-course HTML, browser, vision, central page) return null.
-    # Source: https://www.lincoln.ac.nz/study/entry-requirements
-    #   UG:  IELTS Academic 6.0 overall (no band below 5.5)
-    #   PG:  IELTS Academic 6.5 overall (no band below 6.0)
-    #   PhD: IELTS Academic 6.5 overall (no band below 6.0)
+    # Lincoln NZ publicly states degree-level entry minimums:
+    # UG:  IELTS Academic 6.0 overall (no band below 5.5)
+    # PG:  IELTS Academic 6.5 overall (no band below 6.0)
+    # PhD: IELTS Academic 6.5 overall (no band below 6.0)
     default_ielts: 6.0
     degree_level_defaults:
       undergraduate:
@@ -110,8 +146,9 @@ extraction:
         ielts: 6.5
       doctorate:
         ielts: 6.5
+
   staging:
     reject_if_missing:
       - course_name
-    skip_degree_qualifier_check: true   # SPA H1 might lack full degree prefix; allow for flexibility
-    require_international_fee: false  
+    skip_degree_qualifier_check: true
+    require_international_fee: false

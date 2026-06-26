@@ -1332,6 +1332,20 @@ class DiscoveryConfig(BaseModel):
             "the path. Empty list (default) = no-op. Per-uni opt-in via YAML."
         ),
     )
+    seed_page_trigger_js: str = Field(
+        default="",
+        description=(
+            "JavaScript snippet evaluated on the seed page AFTER the settle wait, "
+            "before link extraction and pagination.  Use to trigger a JavaScript SPA "
+            "that does not auto-query on page load (e.g. Elastic App Search React UI "
+            "that waits for the user to click Search).  The snippet should submit or "
+            "click the search form so the SPA renders all results.  After the snippet "
+            "runs, the code waits an extra 5 s for the SPA to re-render before "
+            "extracting links.  Empty string (default) = no-op.  "
+            "Example (Lincoln NZ / Elastic App Search): "
+            "'var b=document.querySelector(\".sui-search-box__submit,button[type=submit]\"); if(b) b.click();'"
+        ),
+    )
     seed_page_settle_s: float = Field(
         default=0.0,
         ge=0.0,

@@ -965,6 +965,38 @@ async def browser_discover_generic(
                                 f"finish loading {_sv_url}…"
                             )
                             await asyncio.sleep(_extra_settle)
+                        # Trigger JS: submit a search form that the SPA waits for
+                        # before showing results (e.g. Elastic App Search React UI
+                        # that renders an empty form and waits for user input).
+                        _trigger_js: str = (
+                            getattr(
+                                getattr(_ucfg, "discovery", None),
+                                "seed_page_trigger_js",
+                                "",
+                            ) or ""
+                        ).strip()
+                        if _trigger_js:
+                            try:
+                                await page.evaluate(_trigger_js)
+                                log.info(
+                                    "[SEED] seed_page_trigger_js fired on %s "
+                                    "— waiting 5s for SPA to re-render",
+                                    _sv_url,
+                                )
+                                await _emit(
+                                    f"[SEED] Search trigger fired on {_sv_url} "
+                                    f"— waiting 5s for results to render…"
+                                )
+                                await asyncio.sleep(5.0)
+                            except Exception as _tj_exc:
+                                log.warning(
+                                    "[SEED] seed_page_trigger_js failed on %s: %s",
+                                    _sv_url, _tj_exc,
+                                )
+                                await _emit(
+                                    f"[SEED] Search trigger JS error "
+                                    f"({type(_tj_exc).__name__}) — continuing"
+                                )
                         # Wrap evaluate in its own try/except so a JS crash or
                         # page-navigate-away error (common on SPA seed pages that
                         # redirect) does NOT kill the entire seed block and prevent
