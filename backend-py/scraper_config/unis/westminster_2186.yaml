@@ -11,115 +11,63 @@
 #
 # Course URL format: /{subject}-courses/{year}/{month}/{mode}/{slug}
 # e.g. /accounting-and-finance-courses/2026-27/september/full-time/accounting-and-finance-bsc-honours
-
 discovery:
-  # Sitemap page 1 contains all 841 course URLs — point directly to it.
-  sitemap_url: "https://www.westminster.ac.uk/sitemap.xml?page=1"
+  sitemap_url: https://www.westminster.ac.uk/sitemap.xml?page=1
   always_sitemap_supplement: true
-
-  # Minimal BFS just to catch any apprenticeship/workforce paths not in sitemap.
-  bfs_page_budget: 10
+  bfs_page_budget: 1000
   max_candidates: 1200
-
   seed_urls:
-    - 'https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926'
-    - 'https://www.westminster.ac.uk/business-services/workforce-development/'
-    - 'https://www.westminster.ac.uk/business-and-community/workforce-development/'
-
-  # Westminster actual course URL pattern:
-  #   /{subject}-courses/{year}/{month}/{mode}/{course-slug}
-  # Apprenticeships live under /business-services/... and /business-and-community/...
-  # /course-search is needed only for BFS crawl.
-  allow_url_patterns:
-    - '/course-search'
-    - '-courses/20'                                  # /{subject}-courses/{year}/...
-    - '/business-services/workforce-development/'
-    - '/business-and-community/workforce-development/'
-
+  - https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926
   block_url_patterns:
-    # ── Drupal facet-filter variant URLs (waste budget) ──────────────────────
-    - 'mode_of_study'
-    - 'course_start_date'
-    - 'course_type%3A3551'
-    - 'f%5B2%5D'
-    # ── Single-filter search pages (UG-only / PG-only) ───────────────────────
-    - 'course_type%3A26$'    # /course-search?...f[0]=course_type:26  (UG-only listing)
-    - 'course_type%3A926$'   # /course-search?...f[0]=course_type:926 (PG-only listing)
-    # ── Standard non-course paths ────────────────────────────────────────────
-    - '/news'
-    - '/events'
-    - '/about'
-    - '/staff'
-    - '/research/'
-    - '/alumni'
-    - '/business/'
-    - '\.pdf$'
-
+  - /apply
+  - /contact
+  - /news
+  - /events
+  - /blog
+  - /about
+  - /research
+  - /alumni
+  - /outreach
+  - /parents
+  - /jobs
+  - /careers
+  - /accommodation
+  - /life-on-campus
+  - /fees-and-funding$
+  - /international/living
+  allow_url_patterns:
+  - /[^/]+/[^/]+/[^/]+/[^/]+/[^/]+/?$
 extraction:
-  # ── Speed optimisations (same pattern as Ulster — Cloudflare Enterprise) ──
-  #
-  # Westminster's Drupal site is behind Cloudflare Enterprise WAF.  All
-  # datacenter IPs (httpx, curl_cffi, Playwright headless Chrome) return 403.
-  # Only Scrape.do static proxy bypasses the WAF and returns full SSR HTML
-  # (~200–350KB per page) with all course data.
-  #
-  # scrape_do_skip_fallbacks: skip the wasted httpx → cffi → Wayback chain
-  # (~3-4s per course) and jump directly to Scrape.do static.
-  # At 841 courses this saves ~50 minutes of failed fallback attempts.
-  scrape_do_skip_fallbacks: true
-
-  # Skip ALL Playwright per-course browser fetches.  Westminster's Cloudflare
-  # Enterprise WAF blocks Playwright headless Chrome the same way it blocks
-  # plain httpx — the browser always gets 403/0B rendered content after 30s.
-  # Without this flag: 841 courses × ~30s Playwright timeout = ~7 hours wasted.
-  skip_per_course_browser: true
-  skip_browser_rescue: true
-
-  # 12 parallel Scrape.do slots.  Westminster has no per-host rate-limit on
-  # the Scrape.do proxy tier.  At ~7s per slot: 841 × 7s / 12 ≈ 490s ≈ 8 min.
-  max_parallel_fetch: 12
-
   fees:
-    default_currency: 'GBP'
+    default_currency: GBP
     prefer_international: true
     prefer_annual_over_total: true
-    # Westminster part-time international fees can be as low as GBP 1,778/yr
-    # (≈ AUD 3,467), well below the AU-tuned default critical threshold of
-    # AUD 13,000.  Setting 1,500 AUD (≈ GBP 769) disables false-positive
-    # domestic-fee flags while still catching genuine parsing errors (any real
-    # course is above £769/year).
-    fee_crit_min_aud: 1500
-    # NOTE: Do NOT add 'Part time' or 'Part-time' here — those match legitimate
-    # international part-time fee rows (e.g. "International Part-time: £4,500").
-    # Only reject explicit domestic/UK labels.
+    fee_crit_min_aud: 6000
     reject_keywords:
-      - 'Home student'
-      - 'Home fee'
-      - 'UK student'
-      - 'UK fee'
-      - 'Domestic'
-
+    - Home student
+    - Home fee
+    - UK student
+    - UK fee
+    - Domestic
+    - Part time
+    - Part-time
   english:
     trust_vision_ocr: false
     default_ielts: 6.0
     default_pte: 60
     default_toefl: 80
-
   intake:
     start_dates_only: true
-
   course_name:
     strip_title_suffixes:
-      - ' | University of Westminster'
-      - ' - University of Westminster'
-      - ' | University of Westminster, London'
-
+    - ' | University of Westminster'
+    - ' - University of Westminster'
+    - ' | University of Westminster, London'
   filters:
     online_only:
       enabled: false
-
   staging:
     reject_if_missing:
-      - course_name
+    - course_name
     skip_degree_qualifier_check: true
     require_international_fee: false
