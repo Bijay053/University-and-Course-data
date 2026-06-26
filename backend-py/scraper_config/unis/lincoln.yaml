@@ -32,6 +32,12 @@
 #   These are STATIC HTML (no JS required), reliably find ~57 PG courses even
 #   if both SPAs fail. They run AFTER the SPA seeds so if SPA works, early_stop
 #   fires before reaching them (saving time).
+#
+# ══ LANCASTER LESSON ════════════════════════════════════════════════════════
+# Lancaster works because it uses static HTTP for discovery (SSR JSON prop) and
+# reserves browser only for per-course extraction. Lincoln's SPAs genuinely need
+# browser for discovery (unlike Lancaster / WGTN), but the same extraction
+# principle applies: browser_wait_strategy + skip_per_course_browser: false.
 
 discovery:
   always_browser_discover: true
@@ -99,6 +105,12 @@ discovery:
     # Belt-and-suspenders: individual course pages under area specialisation listings
     - "lincoln\\.ac\\.nz/study/areas-of-specialisation/[^/]+/[^/]+/?$"
 
+  # Final URL gate before extraction — mirrors Lancaster's course_detail_url_patterns.
+  course_detail_url_patterns:
+    - '/study/study-programmes/programme-search/[^/]+/?$'
+    - '/study/courses-2/course-search/[^/]+/?$'
+    - '/study/areas-of-specialisation/[^/]+/[^/]+/?$'
+
   block_url_patterns:
     - "/resources-for-careers-advisors"
     - "/farms-outreach"
@@ -146,6 +158,13 @@ extraction:
         ielts: 6.5
       doctorate:
         ielts: 6.5
+
+  # Lancaster pattern: browser available for per-course extraction rescue.
+  # Lincoln course pages may need JS to render full details (fees, IELTS).
+  browser_wait_strategy: networkidle
+  browser_dcl_settle_ms: 3000
+  skip_per_course_browser: false
+  skip_browser_rescue: false
 
   staging:
     reject_if_missing:

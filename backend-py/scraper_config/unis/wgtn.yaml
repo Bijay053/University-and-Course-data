@@ -4,13 +4,21 @@
 #
 # ══ ROOT CAUSE HISTORY ══════════════════════════════════════════════════════
 #
-# ALL previous attempts used a file named wgtn_2188.yaml.
-# The loader derives slug 'wgtn' from hostname www.wgtn.ac.nz and looks for
-# wgtn.yaml — so the ENTIRE config was silently ignored every scrape.
-# Scraper ran with global defaults (no browser mode, no seeds, no allow_url_patterns)
-# → wrong BFS → 22 wrong "courses" (minors, student services, nav pages).
+# Attempt 1-2 (all attempts): File was named wgtn_2188.yaml.
+#   Loader derives slug 'wgtn' from hostname www.wgtn.ac.nz and looks for
+#   wgtn.yaml — ENTIRE config silently ignored every scrape. Ran with defaults.
 #
-# THIS FILE (wgtn.yaml — correct slug) fixes that.
+# Attempt 3 (wgtn.yaml, always_browser_discover: true):
+#   Rename fixed the loading bug. BUT Playwright visits of seed pages found only
+#   4 wrong candidates (2× /explore/other-quals/... Study Abroad pages, 2× dropped
+#   by category gate). Real programme pages at /study/programmes-courses/... were
+#   not found. Cause: VUW serves different content to headless browsers vs plain
+#   HTTP (Cloudflare-style bot detection on listing pages). Static HTTP BFS with
+#   default config had previously found 80+ programme links just fine.
+#
+# THIS VERSION: Lancaster pattern — static HTTP for discovery, browser reserved
+# for per-course extraction only (like Lancaster which also serves JS-rendered
+# course pages but uses SSR listing pages for discovery).
 #
 # ══ ACTUAL COURSE URL STRUCTURE ═════════════════════════════════════════════
 #   /study/programmes-courses/postgraduate/<subject>/<course-slug>
@@ -18,42 +26,46 @@
 #   e.g. /study/programmes-courses/postgraduate/architecture/master-of-architecture-professional
 #   e.g. /study/programmes-courses/undergraduate/commerce/bachelor-of-commerce
 #
-#   Pages that are pure React SPA (9KB, "Loading...", rendered=0B) — avoid:
-#     /study/programmes-courses/postgraduate/phds-doctorates
-#     /study/programmes-courses/postgraduate/explore-postgraduate-subjects
-#     /international/study-options/*
+#   Confirmed NOT course pages (must block):
+#     /explore/other-quals/... — Study Abroad, exchange, non-degree programmes
+#     /study/programmes-courses/postgraduate/phds-doctorates — nav hub SPA (rendered=0B)
+#     /international/study-options/* — React SPA (rendered=0B)
 #
-#   Useful BFS nav page (NOT a course itself, but links to 80 real programmes):
-#     /study/programmes-courses/limited-entry  → seeded directly as primary seed
-#
-# ══ JS RENDERING ════════════════════════════════════════════════════════════
-#   Course pages are JS-rendered (user confirmed). networkidle strategy waits
-#   for all XHR/fetch to settle before capturing HTML — correct for both
-#   SSR pages (settle in <1s) and React SPA data loads. 5s DCL fallback settle.
+#   Good BFS entry: /study/programmes-courses/limited-entry — static HTML listing
+#   page that links to ~80 real programme pages. Previously found 80 links via
+#   plain HTTP BFS (confirmed working with default config before YAML fix).
 
 discovery:
-  always_browser_discover: true
-  browser_time_budget_s: 500
-  browser_early_stop_courses: 250
+  # Static HTTP BFS — VUW listing pages are accessible via plain HTTP.
+  # Browser discovery was tried and found only 4 wrong /explore/... links.
+  # Skip browser entirely for discovery; use it only for per-course extraction.
+  always_browser_discover: false
+  skip_browser_discovery: true
 
   seed_urls:
-    # PRIMARY: This single page lists ~80 limited-entry programmes with direct links
-    # to individual /postgraduate/<subject>/<course> and /undergraduate/<subject>/<course>
-    # pages. BFS confirmed it finds 80 real course links in one visit.
+    # PRIMARY: Lists ~80 limited-entry programmes with direct links to individual
+    # /postgraduate/<subject>/<course> and /undergraduate/<subject>/<course> pages.
+    # Previously confirmed to find 80 programme links via static HTTP BFS.
     - https://www.wgtn.ac.nz/study/programmes-courses/limited-entry
-    # FALLBACK: Level hubs for BFS to discover programmes NOT listed under limited-entry.
+    # FALLBACK: Level hubs so BFS also discovers programmes NOT in limited-entry list.
     - https://www.wgtn.ac.nz/study/programmes-courses/postgraduate/
     - https://www.wgtn.ac.nz/study/programmes-courses/undergraduate/
 
   allow_url_patterns:
-    # Individual programme pages: exactly 2 non-empty path segments after the level.
-    # Matches /postgraduate/<subject>/<course-slug> but NOT depth-1 hub pages.
-    # Explicitly excludes known nav sections that appear at depth 2:
-    #   flexible-study (minors), short-courses, get-started, explore-research
+    # Individual programme pages: 2 non-empty segments after the level.
+    # Matches /postgraduate/<subject>/<course-slug> but NOT depth-1 hub pages or
+    # known nav sections (get-started, explore-research, flexible-study, short-courses).
     - "wgtn\\.ac\\.nz/study/programmes-courses/(postgraduate|undergraduate)/(?!flexible-study/?|short-courses/?|get-started/?|explore-research/?)[^/?#]+/[^/?#]+"
 
+  # course_detail_url_patterns: final gate before extraction (like Lancaster).
+  # Drops any URL that slipped through allow_url_patterns.
+  course_detail_url_patterns:
+    - '/study/programmes-courses/(postgraduate|undergraduate)/[^/]+/[^/]+/?$'
+
   block_url_patterns:
-    # Known nav noise — prevent BFS from adding as course candidates
+    # /explore/ section: Study Abroad, exchange, English programmes — NOT degrees
+    - "/explore/"
+    # Known nav noise under programmes-courses
     - "/study/programmes-courses/undergraduate/taster-lectures"
     - "/study/programmes-courses/undergraduate/how-degrees-work"
     - "/study/programmes-courses/undergraduate/minors"
@@ -67,10 +79,10 @@ discovery:
     - "/study/programmes-courses/postgraduate/explore-research"
     - "/study/programmes-courses/postgraduate/get-started"
     - "/study/programmes-courses/postgraduate-subjects"
-    - "/flexible-study"          # blocks entire minors sub-tree from BFS
-    # Broken React-SPA section (rendered=0B even from browser — non-extractable)
+    - "/flexible-study"
+    # Confirmed React-SPA sections (rendered=0B even from browser)
     - "/international/study-options"
-    # Student services — not programme pages
+    # General noise
     - "/students/"
     - "/study/course-planning"
     - "/study/apply-enrol"
@@ -92,17 +104,19 @@ discovery:
     - "/giving"
     - "/victoria-university-of-wellington-foundation"
 
-  use_stealth_browser: true
-
 extraction:
   fees:
     default_currency: NZD
 
-  # VUW programme pages need JS to fully render field data.
-  # networkidle waits for all XHR/fetch to settle before HTML capture.
-  # browser_dcl_settle_ms: 5000 is a secondary fallback settle window.
+  # VUW course pages are JS-rendered — use networkidle to wait for XHR/fetch
+  # to settle before capturing HTML. browser_dcl_settle_ms as fallback.
+  # This mirrors Lancaster's approach: browser reserved for extraction only.
   browser_wait_strategy: networkidle
   browser_dcl_settle_ms: 5000
+
+  # Allow browser rescue for any page where HTTP returns empty/challenge shell.
+  skip_per_course_browser: false
+  skip_browser_rescue: false
 
   staging:
     reject_if_missing:
