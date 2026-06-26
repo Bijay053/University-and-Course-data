@@ -39,12 +39,16 @@
 discovery:
   always_sitemap_supplement: true
   seed_urls:
-    # Funnelback search seed — returns courses with start year 2025 pagination.
-    # BFS follows pagination links to discover more courses.
-    - "https://www.sheffield.ac.uk/find?f.Tabs%7Cuos%7Eds-courses-undergraduate-new%2Cuos%7Eds-courses%2Cuos%7Eds-courses-postgraduate=Courses&query=&f.Start+year%7CcourseYear=2025"
-    # Direct listing hubs — BFS can follow links from here to individual courses
-    - "https://www.sheffield.ac.uk/undergraduate/courses"
-    - "https://www.sheffield.ac.uk/postgraduate/courses"
+    # Year-specific listing pages — these are SERVER-RENDERED (no JS needed).
+    # Each page lists all courses for that entry year in plain HTML.
+    # Verified 2026-06-26: /undergraduate/courses/2026 → 141 UG course links,
+    # /postgraduate/taught/courses/2026 → 128 PG links, both in static HTML.
+    # The generic /undergraduate/courses hub page is a React SPA (no links visible).
+    # 2026 entry year:
+    - "https://www.sheffield.ac.uk/undergraduate/courses/2026"
+    - "https://www.sheffield.ac.uk/postgraduate/taught/courses/2026"
+    # 2027 entry year (UG only — PG 2027 not yet published as of 2026-06-26):
+    - "https://www.sheffield.ac.uk/undergraduate/courses/2027"
 
   # ── allow_url_patterns ────────────────────────────────────────────────────
   # Derived from University_of_Sheffield_Updated xlsx (329 courses).
