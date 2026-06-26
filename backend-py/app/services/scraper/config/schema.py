@@ -1060,6 +1060,20 @@ class DiscoveryConfig(BaseModel):
             "latest year available.  Example: 2027"
         ),
     )
+    year_dedup_strip_trailing_id: bool = Field(
+        default=False,
+        description=(
+            "When True, strips a trailing -<numeric-id> (4-6 digits) from each URL "
+            "path segment AFTER year removal, so that URLs like\n"
+            "  /courses/202627/law-40288  and  /courses/202728/law-41910\n"
+            "both collapse to /courses-YYYY/law and are recognised as the same "
+            "course even though the database ID changes between intake years.  "
+            "Enable for universities (e.g. Ulster) whose sitemap assigns a fresh "
+            "numeric ID to every intake-year variant of the same course.  "
+            "Confined to 4-6 digit suffixes to avoid stripping short tokens such "
+            "as 'level-3' or 'mba-2-year'."
+        ),
+    )
     allow_url_patterns: list[str] = Field(
         default_factory=list,
         description=(

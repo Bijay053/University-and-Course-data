@@ -3242,20 +3242,26 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 if _uni_cfg is not None
                 else None
             )
-            # BCU-aware regex: matches BOTH bare YYYY (2027) and academic-year
-            # pairs YYYY-YY (2026-27, 2027-28).  The pair form MUST be tried
-            # first so '-2026-27' is captured as '2026-27' (not just '2026',
-            # which would leave '-27' in the stripped slug and create different
-            # keys for otherwise-identical courses).
+            # BCU-aware regex: matches YYYY-YY pairs (2026-27), 6-digit compact
+            # academic years (202627, 202728 — Ulster-style), and bare YYYY (2027).
+            # Order matters: pair form first so '-2026-27' captures as '2026-27'
+            # not '2026'; compact 6-digit form second so '202627' captures as
+            # '202627' not just '2026'; bare YYYY last.
             _YEAR_SEG_Y = _re_y.compile(
                 r"[/_\-](20\d{2}-\d{2})(?=[/_\?\#]|$)"   # YYYY-YY pair first
-                r"|[/_\-](20\d{2})(?=[/_\?\#]|$)"          # bare YYYY second
+                r"|[/_\-](20\d{4})(?=[/_\?\#]|$)"          # YYYYNN compact second (202627)
+                r"|[/_\-](20\d{2})(?=[/_\?\#]|$)"          # bare YYYY third
+            )
+            _yd_strip_id_y: bool = (
+                _uni_cfg.discovery.year_dedup_strip_trailing_id
+                if _uni_cfg is not None
+                else False
             )
 
             def _url_year_y(u: str) -> "int | None":
                 m = _YEAR_SEG_Y.search(u)
                 if m:
-                    raw = m.group(1) or m.group(2) or ""
+                    raw = m.group(1) or m.group(2) or m.group(3) or ""
                     return int(raw[:4])  # start-year as sort key
                 return None
 
@@ -3263,7 +3269,16 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 # Replace the year token (and its leading separator) so that
                 # marketing-msc-2026-27 and marketing-msc-2027-28 both become
                 # marketing-msc-YYYY and are grouped as the same course.
-                return _YEAR_SEG_Y.sub("-YYYY", u)
+                stripped = _YEAR_SEG_Y.sub("-YYYY", u)
+                if _yd_strip_id_y:
+                    # Strip trailing -<numeric-id> (4-6 digits) from each path
+                    # segment so that /courses/202627/law-40288 and
+                    # /courses/202728/law-41910 both reduce to /courses-YYYY/law
+                    # and are recognised as the same course.  Confined to
+                    # 4-6 digit IDs to avoid stripping short numeric tokens
+                    # like course-level-3 or mba-2-year.
+                    stripped = _re_y.sub(r"-\d{4,6}(?=[/?#]|$)", "", stripped)
+                return stripped
 
             _yr_groups_y: "dict[str, list[tuple[int, dict]]]" = _ddict_y(list)
             _no_yr_links_y: "list[dict]" = []

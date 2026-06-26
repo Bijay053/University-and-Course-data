@@ -77,7 +77,25 @@ discovery:
   sitemap_offset: 0
 
   # Deduplicate if multiple intake-year variants appear in the sitemap.
+  # Ulster's sitemap now includes both /202627/ and /202728/ variants of the
+  # same course.  keep_latest prefers 202728.  year_dedup_strip_trailing_id
+  # is required because Ulster assigns a NEW numeric database ID to each
+  # intake-year instance of a course (e.g. law-40288 in 202627 vs law-41910
+  # in 202728), so the slug-without-year dedup key would differ without ID
+  # stripping.  The flag strips trailing -\d{4,6} after year removal so both
+  # reduce to the same /courses-YYYY/law key and the 202728 version wins.
   year_dedup_mode: keep_latest
+  year_dedup_strip_trailing_id: true
+
+  # Block course types that are domestic-only in the UK and never available
+  # to international students:
+  #   pgce                 — Postgraduate Certificate in Education (teacher
+  #                          training); funded by DfE bursary, requires UK QTS
+  #   degree-apprenticeship — employer-funded; only open to UK residents with
+  #                           an employer sponsor
+  block_url_patterns:
+    - 'pgce'
+    - 'degree-apprenticeship'
 
 extraction:
   # Ulster course pages have dedicated /fees/ and /entry-requirements/ sub-pages
