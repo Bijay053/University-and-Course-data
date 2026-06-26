@@ -72,6 +72,8 @@ discovery:
     - '/undergraduate/courses/20\d\d/[^/?#]+'
     # PG taught individual courses: /postgraduate/taught/courses/<year>/<slug>
     - '/postgraduate/taught/courses/20\d\d/[^/?#]+'
+    - "https://www.sheffield.ac.uk/undergraduate/courses"
+    - "https://www.sheffield.ac.uk/postgraduate/courses"
 
   block_url_patterns:
     # ── PhD noise (most important — these were extracted as "courses" in logs) ──
