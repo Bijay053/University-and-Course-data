@@ -48,6 +48,10 @@ discovery:
 
   # NO allow_url_patterns — whitelist was causing both missed courses AND admitting
   # profiles. Use block_url_patterns to exclude noise instead.
+  allow_url_patterns:
+    - "/undergraduate/courses/"
+    - "/postgraduate/taught/courses/"
+    - "/postgraduate/courses"
 
   block_url_patterns:
     # ── PhD noise (most important — these were extracted as "courses" in logs) ──
