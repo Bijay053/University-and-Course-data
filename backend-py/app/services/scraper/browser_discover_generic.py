@@ -1180,79 +1180,159 @@ async def browser_discover_generic(
                                 f"[DISCOVER] Pagination: clicking pages 2–{_pag_max} "
                                 f"of {_sv_url} (settle={_pag_settle}s each)"
                             )
-                            _CLICK_PAGE_JS = """
-async (args) => {
-    const n = args.pageNum;
-    // Strategy 1: aria-label="Page N" or "Go to page N"
-    let btn = document.querySelector(
-        '[aria-label="Page ' + n + '"], [aria-label="Go to page ' + n + '"]'
-    );
-    // Strategy 2: button/a/[role=button] with exact trimmed text === "N"
-    if (!btn) {
-        const candidates = [
-            ...document.querySelectorAll('button, a, [role="button"], li')
-        ];
-        btn = candidates.find(el => el.textContent.trim() === String(n));
-    }
-    // Strategy 3: data-page or data-page-number attribute
-    if (!btn) {
-        btn = document.querySelector(
-            '[data-page="' + n + '"], [data-page-number="' + n + '"]'
-        );
-    }
-    if (!btn) return null;
-    btn.scrollIntoView({block:'center'});
-    btn.click();
-    return btn.textContent.trim();
-}
-"""
-                            for _pg_num in range(2, _pag_max + 1):
-                                if time.monotonic() - _t_start >= _time_budget_s:
+                            # Wait for pagination elements to appear in the DOM.
+                            # Elastic App Search React UI uses rc-pagination; give
+                            # the SPA up to 8s to finish rendering after navigation.
+                            _PAGINATION_SELECTORS = [
+                                ".rc-pagination",
+                                ".sui-paging",
+                                "[class*='pagination']",
+                                "[aria-label*='pagination' i]",
+                                "[aria-label*='page' i]",
+                            ]
+                            _pag_container_found = False
+                            for _psel in _PAGINATION_SELECTORS:
+                                try:
+                                    await page.wait_for_selector(
+                                        _psel, timeout=8000, state="attached"
+                                    )
+                                    _pag_container_found = True
+                                    log.info(
+                                        "[PAGINATE] pagination container found: %r", _psel
+                                    )
                                     await _emit(
-                                        f"[DISCOVER] Pagination: time budget reached "
-                                        f"at page {_pg_num} — stopping"
+                                        f"[DISCOVER] Pagination: container found ({_psel})"
                                     )
                                     break
+                                except Exception:
+                                    pass
+                            if not _pag_container_found:
+                                # Snapshot DOM for diagnosis (first 3 KB)
                                 try:
-                                    _pg_before = len(results)
-                                    _clicked = await page.evaluate(
-                                        _CLICK_PAGE_JS, {"pageNum": _pg_num}
+                                    _dom_snap: str = await page.evaluate(
+                                        "document.body.innerHTML.slice(0, 3000)"
                                     )
-                                    if not _clicked:
+                                except Exception:
+                                    _dom_snap = "(evaluate failed)"
+                                log.warning(
+                                    "[PAGINATE] no pagination container found on %s; "
+                                    "DOM head: %s",
+                                    _sv_url, _dom_snap[:500],
+                                )
+                                await _emit(
+                                    f"[DISCOVER] Pagination: no pagination container "
+                                    f"found on {_sv_url} — skipping click-through"
+                                )
+                            else:
+                                # JS that finds a page-N button using multiple
+                                # strategies covering Elastic App Search, rc-pagination,
+                                # and generic SPAs.
+                                _CLICK_PAGE_JS = """
+async (args) => {
+    const n = args.pageNum;
+    const ns = String(n);
+
+    // Strategy 1: rc-pagination title attribute (Elastic App Search / Search UI)
+    // <li title="2" class="rc-pagination-item">
+    let btn = document.querySelector('li[title="' + ns + '"]');
+
+    // Strategy 2: aria-label="Page N" or "Go to page N"
+    if (!btn) {
+        btn = document.querySelector(
+            '[aria-label="Page ' + ns + '"], ' +
+            '[aria-label="Go to page ' + ns + '"], ' +
+            '[aria-label="page ' + ns + '"]'
+        );
+    }
+
+    // Strategy 3: any button/a/li whose trimmed textContent is exactly the number
+    if (!btn) {
+        const tags = ['button', 'a', 'li', '[role="button"]'];
+        outer: for (const tag of tags) {
+            for (const el of document.querySelectorAll(tag)) {
+                if (el.textContent.trim() === ns) {
+                    btn = el;
+                    break outer;
+                }
+            }
+        }
+    }
+
+    // Strategy 4: data-page / data-page-number attribute
+    if (!btn) {
+        btn = document.querySelector(
+            '[data-page="' + ns + '"], [data-page-number="' + ns + '"]'
+        );
+    }
+
+    if (!btn) {
+        // Return diagnostic info so Python can log what IS in the DOM
+        const pag = document.querySelector(
+            '.rc-pagination, .sui-paging, [class*="pagination"]'
+        );
+        return {found: false, pagHtml: pag ? pag.outerHTML.slice(0, 500) : '(none)'};
+    }
+
+    btn.scrollIntoView({block: 'center'});
+    btn.click();
+    return {found: true, text: btn.textContent.trim()};
+}
+"""
+                                for _pg_num in range(2, _pag_max + 1):
+                                    if time.monotonic() - _t_start >= _time_budget_s:
+                                        await _emit(
+                                            f"[DISCOVER] Pagination: time budget reached "
+                                            f"at page {_pg_num} — stopping"
+                                        )
+                                        break
+                                    try:
+                                        _pg_before = len(results)
+                                        _click_result = await page.evaluate(
+                                            _CLICK_PAGE_JS, {"pageNum": _pg_num}
+                                        )
+                                        if not isinstance(_click_result, dict):
+                                            _click_result = {"found": bool(_click_result)}
+                                        if not _click_result.get("found"):
+                                            _pag_html = _click_result.get("pagHtml", "")
+                                            log.warning(
+                                                "[PAGINATE] page %d button not found — "
+                                                "pagination HTML: %s",
+                                                _pg_num, _pag_html[:300],
+                                            )
+                                            await _emit(
+                                                f"[DISCOVER] Pagination: page {_pg_num} "
+                                                f"button not found — stopped. "
+                                                f"Pag HTML: {_pag_html[:200]}"
+                                            )
+                                            break
+                                        await asyncio.sleep(_pag_settle)
+                                        _pg_raw = await page.evaluate(
+                                            _EXTRACT_LINKS_JS, origin_str
+                                        )
+                                        _process_links(_pg_raw or [])
+                                        _pg_gained = len(results) - _pg_before
+                                        log.info(
+                                            "[PAGINATE] page %d/%d → +%d courses "
+                                            "(total=%d)",
+                                            _pg_num, _pag_max,
+                                            _pg_gained, len(results),
+                                        )
+                                        await _emit(
+                                            f"[DISCOVER] Pagination: page "
+                                            f"{_pg_num}/{_pag_max} → "
+                                            f"+{_pg_gained} courses "
+                                            f"(total={len(results)})"
+                                        )
+                                    except Exception as _pg_exc:
                                         log.warning(
-                                            "[PAGINATE] page %d button not found — "
-                                            "stopping pagination for %s",
-                                            _pg_num, _sv_url,
+                                            "[PAGINATE] page %d error: %s — stopping",
+                                            _pg_num, _pg_exc,
                                         )
                                         await _emit(
                                             f"[DISCOVER] Pagination: page {_pg_num} "
-                                            f"button not found — stopped"
+                                            f"error ({type(_pg_exc).__name__}) — stopped"
                                         )
                                         break
-                                    await asyncio.sleep(_pag_settle)
-                                    _pg_raw = await page.evaluate(
-                                        _EXTRACT_LINKS_JS, origin_str
-                                    )
-                                    _process_links(_pg_raw or [])
-                                    _pg_gained = len(results) - _pg_before
-                                    log.info(
-                                        "[PAGINATE] page %d/%d → +%d courses (total=%d)",
-                                        _pg_num, _pag_max, _pg_gained, len(results),
-                                    )
-                                    await _emit(
-                                        f"[DISCOVER] Pagination: page {_pg_num}/{_pag_max}"
-                                        f" → +{_pg_gained} courses (total={len(results)})"
-                                    )
-                                except Exception as _pg_exc:
-                                    log.warning(
-                                        "[PAGINATE] page %d error: %s — stopping",
-                                        _pg_num, _pg_exc,
-                                    )
-                                    await _emit(
-                                        f"[DISCOVER] Pagination: page {_pg_num} error "
-                                        f"({type(_pg_exc).__name__}) — stopped"
-                                    )
-                                    break
                         _pre_seeded.add(_sv_url)
                     except Exception as _sv_exc:
                         log.warning("[SEED] Failed to navigate %s: %s", _sv_url, _sv_exc)
