@@ -1,50 +1,36 @@
 # Lincoln University (NZ) — slug "lincoln"
 # Hostname: www.lincoln.ac.nz
 #
-# DIAGNOSIS (2026-06-03, updated 2026-06-25):
+# DIAGNOSIS (2026-06-03, updated 2026-06-26):
 #   - www.lincoln.ac.nz returns HTTP 403 to plain-HTTP requests from cloud IPs.
 #   - All 118 courses live at /study/study-programmes/programme-search/<slug>/.
-#     The SPA at programme-search/ exposes them via Elastic App Search through a
-#     server-side proxy at:
-#       POST /_search-proxy/api/as/v1/engines/--dummy-value--/search.json
-#     The proxy adds the API key server-side; no auth token is needed from the browser.
+#     The SPA at programme-search/ paginates results: 8 pages × ~15 courses each.
+#     Pagination is driven by numbered page buttons (Elastic App Search React UI).
 #
-#   - Root cause of 17-27/118 bug (TWO separate problems, now fixed):
-#     1. The SPA does NOT auto-query Elastic App Search on page load — it waits for
-#        user interaction (typing in the search box).  So the XHR interceptor NEVER
-#        fires during the seed visit.  Result: 0 courses from XHR, BFS nav takes over,
-#        finds 27 before the 150s time budget expires.
-#     2. Even if the XHR had fired, the pagination detector checked root-level keys for
-#        `total_results` but Elastic App Search stores it at `meta.page.total_results`
-#        (nested), so only page 1 (15 results) would have been collected.
+#   - History of failed approaches:
+#     1. XHR interceptor (original): SPA does NOT auto-query Elastic on page load —
+#        it waits for user interaction → interceptor never fires → 0 courses.
+#     2. elastic_api_bootstrap (2026-06-25): POSTs to /_search-proxy/ via page.evaluate().
+#        Fails because (a) page 2+ returns HTTP 403 Cloudflare rate-limiting for plain
+#        HTTP POST even inside the browser; (b) bootstrap code had NameError on _from_item()
+#        (closure not in scope at bootstrap indent). Net: 0 courses.
+#     3. evaluate-failure guard (2026-06-26): wrapped page.evaluate in try/except but
+#        the underlying API calls still 403 for pagination. Net: still 0 courses.
 #
-#   - Root cause of 39/118 bug (third problem, fixed 2026-06-25):
-#     The elastic_api_bootstrap code called `_from_item()` which is a closure defined
-#     INSIDE `_extract_courses_from_xhr_json()` at indent 8.  The bootstrap code runs
-#     at indent 48 in the outer scope → NameError on every item → caught by the
-#     per-page `except Exception: break` handler → 0 courses from all 4 queries.
-#     Only the XHR interceptor (which calls _extract_courses_from_xhr_json correctly)
-#     captured 39 courses — from bachelor query page 1 only (1 JSON API endpoint).
-#     Fix: replaced the broken _from_item() per-item loop with a call to
-#     _extract_courses_from_xhr_json(_eas_data) (in scope at indent 4), deduped by
-#     resolved URL, appended to outer results list.
+#   - NEW APPROACH (2026-06-26): seed_page_click_pagination
+#     Navigate to programme-search/ in the Cloudflare-cleared browser, then click
+#     each numbered page button (2, 3 … 8) and extract links after each click.
+#     The SPA re-renders the course list client-side after each click — no new
+#     HTTP request to the proxy, just React state update from cached data.
+#     This is 100% in-browser and inherits CF clearance automatically.
 #
-#   - Fix: discovery.elastic_api_bootstrap config (new in browser_discover_generic.py).
-#     After the seed page loads in the patchright browser (giving Cloudflare clearance),
-#     the scraper POSTs to the Elastic API directly via page.evaluate() — inheriting
-#     the CF clearance cookies — and paginates through all result pages.
-#     Once bootstrap finishes, _seeds_filled=True → BFS is skipped entirely.
-#
-#   - A small number of UG courses at /study/courses-2/course-search/<slug>/ would
-#     have been missed by BFS nav; allow_url_patterns covers both paths for any
-#     courses the Elastic API might return with that URL structure.
 #   - All per-course pages require browser rendering (Cloudflare blocks plain HTTP).
 #   - Lincoln is a New Zealand university — CRICOS does not apply.
 #
 # CONFIG STRATEGY:
 #   - always_browser_discover: true — bypass 403 HTTP BFS
-#   - seed_urls: programme-search/ — browser navigates here for CF clearance
-#   - elastic_api_bootstrap: POSTs to /_search-proxy/... directly after seed loads
+#   - seed_urls: programme-search/ — the paginated SPA listing (8 pages, 118 courses)
+#   - seed_page_click_pagination: clicks page 2…8 in the browser, harvests links
 #   - allow_url_patterns: BOTH UG (courses-2/course-search) AND PG (programme-search)
 #   - block_url_patterns: suppress resources/schools/farming/nav noise
 #   - use_stealth_browser: true — per-course extraction AND central pages via patchright
@@ -52,42 +38,24 @@
 #   - english.central_page: absolute URL for same reason
 #   - force_central_fee_stage: true — mark has_central_fee_page even when parser finds 0
 #     records (prevents staging gate rejection while fix is being validated)
-#   - browser_time_budget_s: 150 — budget only limits BFS nav; bootstrap runs first
+#   - browser_time_budget_s: 350 — 8 pages × 3s settle + per-course extraction headroom
 
 discovery:
   always_browser_discover: true
-  browser_time_budget_s: 300  # 150s exhausted with only 1 course; give BFS fallback room
+  browser_time_budget_s: 350  # 8 pages × 3s settle + navigation headroom
 
   seed_urls:
-    # NEW primary seed (2026-06-26): Lincoln restructured their site — the UG course
-    # search is now at /study/courses-2/course-search/ (appeared as BFS nav score=120).
-    # This is tried FIRST so the Elastic bootstrap fires from the new SPA page.
-    - https://www.lincoln.ac.nz/study/courses-2/course-search/
-    # Keep old PG seed as fallback — PG courses may still live at programme-search/
+    # Confirmed listing URL: 118 courses, 8 pages of ~15 each.
+    # Browser navigates here first to get Cloudflare clearance, then
+    # seed_page_click_pagination clicks through pages 2–8.
     - https://www.lincoln.ac.nz/study/study-programmes/programme-search/
 
-  # After the seed page loads (Cloudflare clearance), POST directly to the
-  # Elastic App Search proxy.  The SPA does not auto-query on page load so
-  # the XHR interceptor never fires — this bootstrap replaces it.
-  #
-  # KEY FINDINGS (2026-06-25 direct HTTP tests):
-  #   - Endpoint IS accessible via plain HTTP POST (no browser needed for auth)
-  #   - BUT: empty-string query → HTTP 400 "bool query malformed" — proxy rejects it
-  #   - AND: pagination (page 2+) → HTTP 403 Cloudflare rate-limiting for plain HTTP
-  #   - Fix: use non-empty degree-level queries; paginate from WITHIN the patchright
-  #     browser (which has CF clearance cookies) via page.evaluate() fetch calls
-  #   - Response fields: link (relative URL), menu_title (course name)
-  #   - Each query is ranked by relevance → programme pages score highest → all courses
-  #     of that degree type appear on page 1 (size=100), 2 pages covers all 118 total
-  elastic_api_bootstrap:
-    api_url: "/_search-proxy/api/as/v1/engines/--dummy-value--/search.json"
-    queries:
-      - "bachelor"                       # Bachelor of Agriculture, Commerce, Science …
-      - "master"                         # Master of Applied Science, Commerce …
-      - "diploma certificate graduate"   # PG Diploma, Graduate Certificate …
-      - "doctorate"                      # Doctor of Philosophy
-    page_size: 100    # Elastic App Search max
-    max_pages: 3      # per query; 118 total courses across 4 queries = ≤2 pages each
+  # Click through the 8 pagination pages of the SPA listing.
+  # After each click the React UI re-renders the course cards client-side.
+  # We wait 3 s per page for the DOM to update, then extract the new links.
+  seed_page_click_pagination:
+    max_pages: 8    # 8 pages × ~15 courses = 118 total
+    settle_s: 3.0   # seconds to wait after clicking each page button
 
   allow_url_patterns:
     # PG individual course pages

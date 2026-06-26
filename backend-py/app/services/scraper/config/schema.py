@@ -832,6 +832,57 @@ class SwiftypeConfig(BaseModel):
     )
 
 
+class SeedPageClickPaginationConfig(BaseModel):
+    """Click through numbered pagination buttons on a seed listing page to harvest all courses.
+
+    Use when the university's course listing is a paginated JavaScript SPA (e.g. Elastic App
+    Search, React Search UI) that renders a fixed number of courses per page and exposes
+    numbered page buttons in the DOM.
+
+    After the scraper navigates to the seed URL (getting Cloudflare clearance), it:
+
+    1. Extracts course links from page 1 (already loaded).
+    2. For each subsequent page (2 … ``max_pages``): clicks the numbered page button,
+       waits ``settle_s`` seconds for the SPA to re-render, then extracts course links again.
+    3. Harvests are merged and deduplicated by URL.
+
+    The page buttons are located by a three-strategy cascade (first match wins):
+
+    * aria-label  — ``aria-label="Page N"`` or ``aria-label="Go to page N"``
+    * text content — any ``<button>``, ``<a>``, or ``[role="button"]`` whose
+      ``textContent.trim()`` equals ``"N"``
+    * data attribute — ``data-page="N"`` or ``data-page-number="N"``
+
+    Example::
+
+        discovery:
+          seed_page_click_pagination:
+            max_pages: 8
+            settle_s: 3.0
+    """
+
+    max_pages: int = Field(
+        default=8,
+        ge=1,
+        le=50,
+        description=(
+            "Total number of pagination pages to click through (including page 1 which "
+            "is loaded by the initial seed navigation). For example, 8 means the scraper "
+            "will click pages 2, 3, 4, 5, 6, 7, 8 after loading page 1."
+        ),
+    )
+    settle_s: float = Field(
+        default=3.0,
+        ge=0.5,
+        le=15.0,
+        description=(
+            "Seconds to wait after clicking a page button before extracting links. "
+            "The SPA must finish fetching and rendering the new page within this window. "
+            "Increase for slow universities; decrease for fast ones."
+        ),
+    )
+
+
 class ElasticApiBootstrapConfig(BaseModel):
     """Bootstrap config for Elastic App Search SPAs that do not auto-query on page load.
 
@@ -967,6 +1018,16 @@ class DiscoveryConfig(BaseModel):
             "The API tier runs immediately after SearchStax — if it returns ≥1 "
             "link, BFS and browser tiers are skipped. Falls through to BFS if "
             "0 links returned. See GenericSearchApiConfig for full field docs."
+        ),
+    )
+    seed_page_click_pagination: Optional[SeedPageClickPaginationConfig] = Field(
+        default=None,
+        description=(
+            "When present, after loading each seed URL the scraper clicks through "
+            "numbered pagination buttons (page 2 … max_pages), waiting settle_s seconds "
+            "after each click for the SPA to re-render, then harvesting links. "
+            "Use when the course listing is a paginated JS SPA (e.g. Lincoln University "
+            "programme-search: 8 pages × 15 courses each). See SeedPageClickPaginationConfig."
         ),
     )
     elastic_api_bootstrap: Optional[ElasticApiBootstrapConfig] = Field(

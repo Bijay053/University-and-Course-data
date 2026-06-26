@@ -1158,6 +1158,101 @@ async def browser_discover_generic(
                                             _eas_query, _eas_pn, _eas_exc,
                                         )
                                         break
+                        # ── Seed-page click-through pagination ──────────────────
+                        # For SPAs with numbered pagination buttons (e.g. Lincoln
+                        # University programme-search: 8 pages × 15 courses).
+                        # Click page 2…max_pages from within the live browser,
+                        # wait for the SPA to re-render, then harvest more links.
+                        _paginate_cfg = getattr(
+                            getattr(_ucfg, "discovery", None),
+                            "seed_page_click_pagination",
+                            None,
+                        )
+                        if _paginate_cfg is not None:
+                            _pag_max: int = _paginate_cfg.max_pages
+                            _pag_settle: float = float(_paginate_cfg.settle_s)
+                            log.info(
+                                "[PAGINATE] seed_page_click_pagination: "
+                                "clicking pages 2..%d for %s (settle=%.1fs)",
+                                _pag_max, _sv_url, _pag_settle,
+                            )
+                            await _emit(
+                                f"[DISCOVER] Pagination: clicking pages 2–{_pag_max} "
+                                f"of {_sv_url} (settle={_pag_settle}s each)"
+                            )
+                            _CLICK_PAGE_JS = """
+async (args) => {
+    const n = args.pageNum;
+    // Strategy 1: aria-label="Page N" or "Go to page N"
+    let btn = document.querySelector(
+        '[aria-label="Page ' + n + '"], [aria-label="Go to page ' + n + '"]'
+    );
+    // Strategy 2: button/a/[role=button] with exact trimmed text === "N"
+    if (!btn) {
+        const candidates = [
+            ...document.querySelectorAll('button, a, [role="button"], li')
+        ];
+        btn = candidates.find(el => el.textContent.trim() === String(n));
+    }
+    // Strategy 3: data-page or data-page-number attribute
+    if (!btn) {
+        btn = document.querySelector(
+            '[data-page="' + n + '"], [data-page-number="' + n + '"]'
+        );
+    }
+    if (!btn) return null;
+    btn.scrollIntoView({block:'center'});
+    btn.click();
+    return btn.textContent.trim();
+}
+"""
+                            for _pg_num in range(2, _pag_max + 1):
+                                if time.monotonic() - _t_start >= _time_budget_s:
+                                    await _emit(
+                                        f"[DISCOVER] Pagination: time budget reached "
+                                        f"at page {_pg_num} — stopping"
+                                    )
+                                    break
+                                try:
+                                    _pg_before = len(results)
+                                    _clicked = await page.evaluate(
+                                        _CLICK_PAGE_JS, {"pageNum": _pg_num}
+                                    )
+                                    if not _clicked:
+                                        log.warning(
+                                            "[PAGINATE] page %d button not found — "
+                                            "stopping pagination for %s",
+                                            _pg_num, _sv_url,
+                                        )
+                                        await _emit(
+                                            f"[DISCOVER] Pagination: page {_pg_num} "
+                                            f"button not found — stopped"
+                                        )
+                                        break
+                                    await asyncio.sleep(_pag_settle)
+                                    _pg_raw = await page.evaluate(
+                                        _EXTRACT_LINKS_JS, origin_str
+                                    )
+                                    _process_links(_pg_raw or [])
+                                    _pg_gained = len(results) - _pg_before
+                                    log.info(
+                                        "[PAGINATE] page %d/%d → +%d courses (total=%d)",
+                                        _pg_num, _pag_max, _pg_gained, len(results),
+                                    )
+                                    await _emit(
+                                        f"[DISCOVER] Pagination: page {_pg_num}/{_pag_max}"
+                                        f" → +{_pg_gained} courses (total={len(results)})"
+                                    )
+                                except Exception as _pg_exc:
+                                    log.warning(
+                                        "[PAGINATE] page %d error: %s — stopping",
+                                        _pg_num, _pg_exc,
+                                    )
+                                    await _emit(
+                                        f"[DISCOVER] Pagination: page {_pg_num} error "
+                                        f"({type(_pg_exc).__name__}) — stopped"
+                                    )
+                                    break
                         _pre_seeded.add(_sv_url)
                     except Exception as _sv_exc:
                         log.warning("[SEED] Failed to navigate %s: %s", _sv_url, _sv_exc)
