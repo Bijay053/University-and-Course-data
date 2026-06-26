@@ -72,8 +72,8 @@ discovery:
     - "https://www.sheffield.ac.uk/postgraduate/courses"
     - "/undergraduate/courses/"
     - "/postgraduate/courses/"
-    - "/undergraduate/courses/"
-    - "/postgraduate/courses/"
+    - "/undergraduate/courses"
+    - "/postgraduate/courses"
 
   block_url_patterns:
     # ── PhD noise (most important — these were extracted as "courses" in logs) ──
