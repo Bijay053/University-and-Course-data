@@ -47,28 +47,31 @@ discovery:
     - "https://www.sheffield.ac.uk/postgraduate/courses"
 
   # ── allow_url_patterns ────────────────────────────────────────────────────
-  # Derived from 389 staged Sheffield URLs. Key finding:
+  # Derived from University_of_Sheffield_Updated xlsx (329 courses).
+  # Every single course in the export is at exactly one of these two shapes:
   #
-  #   REAL COURSES (21 URLs) — ALL contain '/courses/' in the path:
-  #     /undergraduate/courses/20xx/<slug>        ← standard UG (year-prefixed)
-  #     /postgraduate/taught/courses/20xx/<slug>  ← standard PG (has '/taught/'!)
-  #     /<dept>/undergraduate/courses/<slug>      ← dept-level UG
-  #     /<dept>/postgraduate/courses/<slug>       ← dept-level PG
-  #     /ahpnm/apprenticeships/programmes/<slug>  ← apprenticeships (no /courses/)
+  #   /undergraduate/courses/2025/<slug>         (177 UG courses)
+  #   /postgraduate/taught/courses/2025/<slug>   (152 PG taught courses)
   #
-  #   NOISE (366 URLs): profiles, phd students, candidates, meet-our-students,
-  #   pre-arrival, engineering summer schools, mba-2026-<country> events — none
-  #   of these contain '/courses/' → the whitelist cleanly separates them.
+  # IMPORTANT — patterns must be PATH-BASED (no hostname prefix).
+  # The BFS allow-override check (discovery.py line 927) runs against
+  # _url_parsed.path only.  Including 'sheffield\.ac\.uk/' in the pattern
+  # means BFS never matches it (path has no hostname), so the pattern is a
+  # no-op as a BFS allow-override and also matches listing pages in Phase A.5b.
+  # Phase A.5b (orchestrator.py line 2913) does search the full URL, so
+  # path-only patterns work correctly in both places.
+  #
+  # Previous pattern 3 (/<dept>/(ug|pg)/courses/<slug>) was removed because:
+  #   - Zero courses in the xlsx follow that format
+  #   - It was matching Sheffield Business School listing pages like
+  #     /management/postgraduate/courses/our-marketing-courses, causing
+  #     Phase A.5b to keep 21/25 wrong listing pages → 0 courses staged.
   #
   allow_url_patterns:
-    # Standard UG individual courses (year-prefixed): /undergraduate/courses/20xx/<slug>
-    - 'sheffield\.ac\.uk/undergraduate/courses/20\d\d/[^/?#]+'
-    # Standard PG taught courses (has /taught/ segment): /postgraduate/taught/courses/20xx/<slug>
-    - 'sheffield\.ac\.uk/postgraduate/taught/courses/20\d\d/[^/?#]+'
-    # Dept-level courses: /<dept>/(undergraduate|postgraduate)/courses/<slug>
-    - 'sheffield\.ac\.uk/[^/?#]+/(undergraduate|postgraduate)/courses/[^/?#]+'
-    # Apprenticeship programmes (only real non-/courses/ course type)
-    - 'sheffield\.ac\.uk/ahpnm/apprenticeships/programmes/[^/?#]+'
+    # UG individual courses: /undergraduate/courses/<year>/<slug>
+    - '/undergraduate/courses/20\d\d/[^/?#]+'
+    # PG taught individual courses: /postgraduate/taught/courses/<year>/<slug>
+    - '/postgraduate/taught/courses/20\d\d/[^/?#]+'
 
   block_url_patterns:
     # ── PhD noise (most important — these were extracted as "courses" in logs) ──
