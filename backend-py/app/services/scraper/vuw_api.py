@@ -64,41 +64,43 @@ _ENDPOINTS = [
 
 
 # ── Degree level from programme name ─────────────────────────────────────────
+# Values MUST match CANONICAL_DEGREE_LEVELS in extractors/degree_level.py.
+# Non-canonical values are cleared by stage_course.py's DL-NONCANON guard and
+# re-inferred from course_name — which works, but loses confidence and wastes
+# a re-inference call.  Always use the exact canonical strings below.
 
 def _degree_level(name: str) -> str:
     n = name.lower().strip()
     if n.startswith("bachelor"):
-        return "Bachelor's Degree"
-    if n.startswith("master"):
-        return "Master's Degree"
+        return "Bachelor's"
+    if n.startswith("master") or "mba" in n:
+        return "Master's"
     if n.startswith("doctor") or "phd" in n:
         return "Doctorate"
-    if "postgraduate diploma" in n or n.startswith("postgraduate diploma"):
-        return "Postgraduate Diploma"
-    if "postgraduate certificate" in n:
-        return "Postgraduate Certificate"
-    if "graduate diploma" in n:
+    # "Postgraduate Diploma/Certificate" are VUW label variants of the canonical
+    # "Graduate Diploma/Certificate" (both are AQF/NZQF level 8 qualifications).
+    if "postgraduate diploma" in n or "graduate diploma" in n:
         return "Graduate Diploma"
-    if "graduate certificate" in n:
+    if "postgraduate certificate" in n or "graduate certificate" in n:
         return "Graduate Certificate"
     if n.startswith("certificate"):
         return "Certificate"
-    if n.startswith("diploma"):
+    # "Artist Diploma", "Diploma in …" — catch-all diploma
+    if "diploma" in n:
         return "Diploma"
-    return "Other"
+    return ""   # empty → stage_course re-infers from course_name; avoids "Other"
 
 
 def _academic_level(degree_level: str) -> Optional[str]:
-    if "Bachelor" in degree_level:
-        return "Undergraduate"
-    if degree_level in (
-        "Master's Degree", "Postgraduate Diploma", "Postgraduate Certificate",
-        "Graduate Certificate", "Graduate Diploma",
-    ):
-        return "Postgraduate"
-    if "Doctorate" in degree_level:
-        return "Doctorate"
-    return None
+    return {
+        "Bachelor's":          "Undergraduate",
+        "Master's":            "Postgraduate",
+        "Graduate Certificate":"Postgraduate",
+        "Graduate Diploma":    "Postgraduate",
+        "Doctorate":           "Doctorate",
+        "Certificate":         "Undergraduate",
+        "Diploma":             "Undergraduate",
+    }.get(degree_level)
 
 
 # ── Duration ─────────────────────────────────────────────────────────────────
@@ -234,15 +236,28 @@ def _map_item(item: dict, cfg: VuwApiConfig) -> Optional[dict]:
     """Map one discovery API item to a {name, url, searchstax_result} link dict.
 
     Returns None when the item has no URL or name (malformed item).
+    The stored ``course_website`` always has ``?international=true`` appended so
+    that operators who click through from the review panel land on the
+    international-student view of the course page.
     """
     name = (item.get("name") or "").strip()
-    url = (item.get("url") or "").strip()
-    if not name or not url:
+    raw_url = (item.get("url") or "").strip()
+    if not name or not raw_url:
         return None
 
-    # Ensure URL ends with /overview (strip query strings added by old scraper)
-    if "/overview" not in url:
-        return None
+    # Normalise: strip any existing query string and ensure /overview suffix.
+    # VUW URLs from the API are canonical: .../explore/.../overview
+    # Drop items that look like listing/hub pages (no /overview anywhere).
+    from urllib.parse import urlparse, urlunparse, parse_qs, urlencode
+    _parsed = urlparse(raw_url)
+    base_url = urlunparse(_parsed._replace(query="", fragment=""))
+    if not base_url.rstrip("/").endswith("/overview"):
+        # Graceful: accept the URL as-is rather than discarding the course.
+        # Some valid courses may have non-/overview paths in future API versions.
+        log.debug("[VUW_API] unexpected URL shape (no /overview): %s", base_url)
+
+    # Append ?international=true so the stored link shows the international view.
+    intl_url = base_url + "?international=true"
 
     degree_level = _degree_level(name)
     acad_level = _academic_level(degree_level)
@@ -259,32 +274,35 @@ def _map_item(item: dict, cfg: VuwApiConfig) -> Optional[dict]:
     payload: dict[str, Any] = {
         "course_name": name,
         "degree_level": degree_level,
+        # course_website stores the ?international=true URL so the staging review
+        # panel links directly to the international-student view of the course.
+        "course_website": intl_url,
     }
     evidence: list[dict] = [
-        _ev("course_name", name, "vuw_api:name", url, "course", 0.95),
-        _ev("degree_level", degree_level, "vuw_api:name_parse", url, "course", 0.90),
+        _ev("course_name", name, "vuw_api:name", intl_url, "course", 0.95),
+        _ev("degree_level", degree_level, "vuw_api:name_parse", intl_url, "course", 0.90),
     ]
 
     if acad_level:
         payload["academic_level"] = acad_level
-        evidence.append(_ev("academic_level", acad_level, "vuw_api:name_parse", url, "course", 0.90))
+        evidence.append(_ev("academic_level", acad_level, "vuw_api:name_parse", intl_url, "course", 0.90))
 
     if location:
         payload["course_location"] = location
-        evidence.append(_ev("course_location", location, "vuw_api:internationalLocation", url, "course", 0.85))
+        evidence.append(_ev("course_location", location, "vuw_api:internationalLocation", intl_url, "course", 0.85))
 
     if mode:
         payload["study_mode"] = mode
-        evidence.append(_ev("study_mode", mode, "vuw_api:partTimeQual_fullTimeQual", url, "course", 0.85))
+        evidence.append(_ev("study_mode", mode, "vuw_api:partTimeQual_fullTimeQual", intl_url, "course", 0.85))
 
     if duration is not None:
         payload["duration"] = duration
         payload["duration_term"] = duration_term
-        evidence.append(_ev("duration", duration, "vuw_api:durationDescription", url, "course", 0.85))
+        evidence.append(_ev("duration", duration, "vuw_api:durationDescription", intl_url, "course", 0.85))
 
     if months:
         payload["intake_months"] = months
-        evidence.append(_ev("intake_months", months, "vuw_api:keyDateSet", url, "course", 0.85))
+        evidence.append(_ev("intake_months", months, "vuw_api:keyDateSet", intl_url, "course", 0.85))
 
     if fee_amount is not None:
         payload["international_fee"] = fee_amount
@@ -292,7 +310,7 @@ def _map_item(item: dict, cfg: VuwApiConfig) -> Optional[dict]:
         payload["currency"] = cfg.currency
         if fee_year:
             payload["fee_year"] = fee_year
-        evidence.append(_ev("international_fee", fee_amount, "vuw_api:internationalFeeTotal", url, "course", 0.88))
+        evidence.append(_ev("international_fee", fee_amount, "vuw_api:internationalFeeTotal", intl_url, "course", 0.88))
 
     if description:
         payload["description"] = description
@@ -302,10 +320,10 @@ def _map_item(item: dict, cfg: VuwApiConfig) -> Optional[dict]:
 
     return {
         "name": name,
-        "url": url,
+        "url": intl_url,  # orchestrator uses this as the canonical course URL
         "searchstax_result": {
             "name": name,
-            "url": url,
+            "url": intl_url,
             "payload": payload,
             "evidence": evidence,
         },

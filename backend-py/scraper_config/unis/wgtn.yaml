@@ -39,6 +39,22 @@ discovery:
     currency: NZD
 
 extraction:
+  # VUW course pages are a React SPA — the HTML shell contains only a loading
+  # spinner. All course data comes from the vuw_api provider (4 JSON endpoints)
+  # which pre-builds the complete payload in each link's searchstax_result so
+  # _extract_only returns it verbatim without any HTML fetch.
+  #
+  # browser_wait_strategy is set here as a safety net for:
+  #   - repair-mode passes that target individual page URLs
+  #   - future changes where per-course HTML may be needed
+  #   - any code path that bypasses the searchstax_result short-circuit
+  #
+  # VUW URLs stored in course_website always carry ?international=true so that
+  # operators who click through from the staging-review panel land on the
+  # international-student view of the course (fees, IELTS, intakes).
+  browser_wait_strategy: networkidle
+  browser_dcl_settle_ms: 2500
+
   fees:
     default_currency: NZD
     prefer_international: true
@@ -60,4 +76,6 @@ extraction:
       - course_name
     skip_degree_qualifier_check: true
     require_international_fee: false
+    # dedup_use_full_url: true is intentionally kept — all VUW URLs now carry
+    # the ?international=true param uniformly, so full-URL dedup works correctly.
     dedup_use_full_url: true
