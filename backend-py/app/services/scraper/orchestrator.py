@@ -634,32 +634,55 @@ def _normalize_course_url(url: str | None) -> str:
 async def _already_staged_urls(
     db: AsyncSession, university_id: int, *, current_job_id: str | None = None
 ) -> set[str]:
-    """Return the set of normalised course URLs already staged for a university.
+    """Return course URLs the resume checkpoint should skip on the next run.
 
     Task #229 resume checkpoint: a large scrape that died on the time ceiling
     leaves its partial progress in ``scraped_courses``.  On the next run we skip
-    every course URL already staged (excluding reviewer-rejected rows, whose
-    decision must be honoured by re-attempting them) so the catalogue completes
-    across runs instead of restarting from course 0.
+    every course URL already staged so the catalogue completes across runs instead
+    of restarting from course 0.
+
+    Scope is intentionally narrow to avoid blocking legitimate re-scrapes:
+
+    * Only ``pending`` rows count.  Approved/published courses are never skipped
+      so each scrape refreshes them and reviewers see up-to-date data.
+    * Only rows from jobs that are still "in-flight" (queued / running) or from
+      recently interrupted runs (failed / stopped, within the resume window) count.
+      Rows from *completed* jobs are not protected — a completed run is done and
+      the next run should replace its pending rows with fresh data.
+    * The current job's own rows are never in the skip set (they are the partial
+      progress being written right now; skipping them would cause duplicates).
 
     Rejected rows are intentionally NOT treated as "already done": a reviewer
     rejection means the course should be re-evaluated, and ``stage_course`` owns
-    the rejection-block window.  Excluding them here keeps that behaviour intact.
+    the rejection-block window.
     """
     from sqlalchemy import text as _text
+    from app.config import settings as _settings
+
+    window_minutes = _settings.scrape_resume_window_minutes
+    params: dict = {"uid": university_id, "rw": str(window_minutes)}
+
+    not_current = ""
+    if current_job_id:
+        not_current = "AND j.runtime_job_id <> :cur_job"
+        params["cur_job"] = current_job_id
 
     rows = (await db.execute(
         _text(
-            """
-            SELECT course_website
-            FROM scraped_courses
-            WHERE university_id = :uid
-              AND status <> 'rejected'
-              AND course_website IS NOT NULL
-              AND course_website <> ''
+            f"""
+            SELECT sc.course_website
+            FROM scraped_courses sc
+            JOIN scrape_runtime_jobs j ON j.runtime_job_id = sc.scrape_job_id
+            WHERE sc.university_id = :uid
+              AND sc.status = 'pending'
+              AND j.status IN ('queued', 'running', 'stopped', 'failed')
+              AND j.updated_at > NOW() - (:rw || ' minutes')::interval
+              AND sc.course_website IS NOT NULL
+              AND sc.course_website <> ''
+              {not_current}
             """
         ),
-        {"uid": university_id},
+        params,
     )).scalars().all()
     return {_normalize_course_url(u) for u in rows if u}
 
