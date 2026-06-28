@@ -288,6 +288,29 @@ def _from_bcu_panel(html: str) -> tuple[str | None, str, str | None]:
     return None, "unknown", None
 
 
+# Mapping from canonical degree_level values to academic_level.
+# "Undergraduate" / "Postgraduate" / "Doctorate" are the three accepted values
+# in the gemini_primary.py controlled vocabulary (see _ACADEMIC_LEVEL_ALIASES).
+_DEGREE_TO_ACADEMIC_LEVEL: dict[str, str] = {
+    "Bachelor's":          "Undergraduate",
+    "Associate Degree":    "Undergraduate",
+    "Advanced Diploma":    "Undergraduate",
+    "Diploma":             "Undergraduate",
+    "Certificate":         "Undergraduate",
+    "Foundation":          "Undergraduate",
+    "Master's":            "Postgraduate",
+    "Graduate Certificate":"Postgraduate",
+    "Graduate Diploma":    "Postgraduate",
+    "Doctorate":           "Doctorate",
+}
+
+
+def _academic_level_from_degree(degree: str) -> str | None:
+    """Return the canonical academic_level for a known degree_level value,
+    or ``None`` when the mapping is undefined."""
+    return _DEGREE_TO_ACADEMIC_LEVEL.get(degree)
+
+
 async def extract(html: str, url: str, course_name: str | None = None) -> list[ExtractionResult]:
     # The pipeline doesn't pass ``course_name`` directly — by the time this
     # extractor runs the course-name extractor has populated payload, but
@@ -301,7 +324,7 @@ async def extract(html: str, url: str, course_name: str | None = None) -> list[E
     # from other-course listings, nav text, or page prose.
     _bcu_degree, _bcu_method, _bcu_snippet = _from_bcu_panel(html)
     if _bcu_degree:
-        return [
+        results: list[ExtractionResult] = [
             ExtractionResult(
                 field_key=field_key,
                 value=_bcu_degree,
@@ -311,13 +334,24 @@ async def extract(html: str, url: str, course_name: str | None = None) -> list[E
                 snippet=_bcu_snippet,
             )
         ]
+        _acad = _academic_level_from_degree(_bcu_degree)
+        if _acad:
+            results.append(ExtractionResult(
+                field_key="academic_level",
+                value=_acad,
+                normalized={"academic_level": _acad},
+                confidence=0.82,  # structural derivation — lower than Gemini (0.9+)
+                method="degree_level:derived_academic_level",
+                snippet=f"academic_level derived from degree_level={_bcu_degree!r}",
+            ))
+        return results
 
     name = course_name or _title_from_html(html) or ""
     degree, method, snippet = classify_degree_level(name, html)
     if not degree:
         return []
     confidence = {"name": 0.9, "aqf": 0.8, "label": 0.75, "page_lead": 0.65}.get(method, 0.5)
-    return [
+    results = [
         ExtractionResult(
             field_key=field_key,
             value=degree,
@@ -327,6 +361,21 @@ async def extract(html: str, url: str, course_name: str | None = None) -> list[E
             snippet=snippet,
         )
     ]
+    # Co-derive academic_level from the degree_level classification.
+    # This fills the field for universities where Gemini is skipped by
+    # the gemini_gate cost-optimisation pass (e.g. Sheffield).  Gemini
+    # results (confidence ≥ 0.9) will always override this when they run.
+    _acad = _academic_level_from_degree(degree)
+    if _acad:
+        results.append(ExtractionResult(
+            field_key="academic_level",
+            value=_acad,
+            normalized={"academic_level": _acad},
+            confidence=0.82,  # below Gemini threshold so Gemini always wins
+            method="degree_level:derived_academic_level",
+            snippet=f"academic_level derived from degree_level={degree!r}",
+        ))
+    return results
 
 
 _TITLE_RE = re.compile(r"<title[^>]*>([^<]{1,300})</title>", re.IGNORECASE)

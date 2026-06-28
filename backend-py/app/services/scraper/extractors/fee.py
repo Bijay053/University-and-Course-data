@@ -80,6 +80,14 @@ _INTL_CTX = re.compile(
 )
 _TUITION_CTX = re.compile(r"\b(tuition|fee|fees|cost\s+of\s+study)\b", re.IGNORECASE)
 _PER_YEAR_CTX = re.compile(r"\b(per\s+year|per\s+annum|p\.?a\.?|annual|annually|yearly)\b", re.IGNORECASE)
+# Scholarship / discount context — amounts in this context must NEVER win as
+# the international tuition fee.  Sheffield pages show "£2,500 per year
+# scholarships for international students" where "international" passes
+# _INTL_CTX but the amount is a scholarship, not a tuition fee.
+_SCHOLARSHIP_CTX = re.compile(
+    r"\b(scholarships?|bursar(?:y|ies)|discounts?|waivers?|prizes?|awards?|grants?|reductions?)\b",
+    re.IGNORECASE,
+)
 # Full-course-total context — strongly prefer over annual / per-year amounts
 # (Murdoch shows "Full course fee: $125,970" alongside "First year fee: $41,990").
 _FULL_COURSE_LABEL_CTX = re.compile(
@@ -754,6 +762,11 @@ def _score(amount: int, ctx: str, *, prefer_year_one: bool = False) -> int:
     # Extend upper bound to 400k so full-course totals also receive the bonus.
     if 12_000 <= amount <= 400_000:
         s += 1
+    # Scholarship/bursary/discount: heavy penalty so these never win even
+    # when they carry an "international" cue (e.g. "£2,500 scholarships for
+    # international students").
+    if _SCHOLARSHIP_CTX.search(ctx):
+        s -= 8
     return s
 
 
@@ -955,6 +968,100 @@ def _from_uwl_nationality_select(
     return amount, ctx
 
 
+# ── Sheffield fee helpers ──────────────────────────────────────────────────
+# Sheffield renders tuition fees inside <div class="feebox"> elements, which
+# are injected by JavaScript from two sources:
+#
+#   UG courses (2026 entry, confirmed fees):
+#     The browser-rendered page has .feebox divs in the #fees section:
+#       <div class="feecost">£25,000</div>
+#       <strong>Overseas students</strong>
+#
+#   PG taught courses:
+#     The page's Drupal settings JSON embeds courseFees.pgt.{code, year}
+#     which maps to: GET /api/course-fees/pgt/{code}/{year}
+#     → JSON { "feesHtml": "<div class='feebox'>…</div>" }
+#       <div class="feecost">£32,905</div>
+#       <strong>Overseas students</strong>
+#
+#   UG 2027 courses:
+#     Fees not confirmed for 2027-28 entry, page shows only home fee
+#     and scholarship amounts. Neither feebox path applies.
+#
+# NOTE: The static HTML (without browser rendering) only contains scholarship
+# amounts (£2,500/£3,000 "scholarships for international students") which
+# would pass _INTL_CTX and be wrongly captured as fees.  When the Sheffield
+# pre-pass fires and finds nothing, the cascade returns [] (NULL fee) so the
+# scholarship amount never pollutes the staged record.
+_SHEFFIELD_HOST_RE = re.compile(r"sheffield\.ac\.uk", re.IGNORECASE)
+_SHEFFIELD_PGT_CODE_RE = re.compile(
+    r'"courseFees"\s*:\s*\{"pgt"\s*:\s*\{"code"\s*:\s*"([A-Z0-9]+)"\s*,'
+    r'\s*"year"\s*:\s*"(\d{4})"',
+)
+
+
+def _from_sheffield_feebox(html: str) -> "tuple[int, str] | None":
+    """Parse Sheffield's .feebox fee section from browser-rendered HTML.
+
+    Structure: <div class='feecost'>£AMOUNT</div><strong>Overseas students</strong>
+    The label is BELOW the amount so the generic text-window scanner cannot pair them.
+    Returns (amount, ctx) for the Overseas/International fee, or None if absent.
+    """
+    from bs4 import BeautifulSoup
+    soup = BeautifulSoup(html, "html.parser")
+    for box in soup.select(".feebox"):
+        label_el = box.find("strong")
+        cost_el = box.select_one(".feecost")
+        if (
+            label_el
+            and cost_el
+            and re.search(r"\b(overseas|international)\b", label_el.get_text(), re.IGNORECASE)
+        ):
+            # cost_el text looks like "£25,000" — use _AMOUNT_RE to strip
+            # the currency symbol, then _parse_amount for the numeric part.
+            _am = _AMOUNT_RE.search(cost_el.get_text())
+            raw_num = (_am.group(2) or _am.group(3)) if _am else None
+            amount = _parse_amount(raw_num) if raw_num else None
+            if amount is not None and amount > 5_000:
+                ctx = (
+                    f"Sheffield feebox: {cost_el.get_text().strip()}"
+                    f" ({label_el.get_text().strip()})"
+                )
+                return amount, ctx
+    return None
+
+
+async def _from_sheffield_pgt_api(html: str) -> "tuple[int, str] | None":
+    """Call Sheffield's course-fees API for PG taught courses.
+
+    The page's Drupal settings JSON exposes ``courseFees.pgt.{code, year}``.
+    Returns (amount, ctx) for the Overseas fee, or None when not a PG page
+    or the API is unavailable.
+    """
+    m = _SHEFFIELD_PGT_CODE_RE.search(html)
+    if not m:
+        return None
+    code, year = m.group(1), m.group(2)
+    import httpx as _httpx
+    try:
+        async with _httpx.AsyncClient(timeout=8.0) as _cl:
+            r = await _cl.get(
+                f"https://sheffield.ac.uk/api/course-fees/pgt/{code}/{year}",
+                headers={"User-Agent": "Mozilla/5.0"},
+            )
+        if r.status_code != 200:
+            return None
+        data = r.json()
+        fee_html = data.get("feesHtml", "")
+        result = _from_sheffield_feebox(fee_html)
+        if result is not None:
+            amount, _ = result
+            return amount, f"Sheffield PGT API ({code}/{year}): overseas fee"
+    except Exception:
+        pass
+    return None
+
+
 def _from_roehampton_int_tab(
     html: str, url: str
 ) -> "tuple[int, str] | None":
@@ -1125,6 +1232,38 @@ async def extract(
             prefer_yr1 = bool(_cfg.extraction.fees.prefer_year_one_over_total)
     except Exception:  # noqa: BLE001 — defensive; keep extractor working
         prefer_yr1 = False
+
+    # ── Pre-pass Sheffield: .feebox DOM + PGT fee API ────────────────────────
+    # Sheffield course pages inject fees via JavaScript (browser-rendered .feebox
+    # divs for UG 2026, or from GET /api/course-fees/pgt/{code}/{year} for PGT).
+    # The static HTML only contains scholarship amounts (£2,500/£3,000
+    # "scholarships for international students") which would pass _INTL_CTX and
+    # be wrongly captured as tuition fees by the generic cascade.
+    # Priority: feebox (browser-rendered) > PGT API > return [] (no fee).
+    # For UG 2027 courses where fees are unconfirmed, both paths return None
+    # → we return [] so the staged record gets NULL fee (correct) rather than
+    # a scholarship amount.
+    if _SHEFFIELD_HOST_RE.search(url):
+        _shef_fee = _from_sheffield_feebox(html)
+        if _shef_fee is None:
+            _shef_fee = await _from_sheffield_pgt_api(html)
+        if _shef_fee is not None:
+            _shef_amount, _shef_ctx = _shef_fee
+            return [
+                ExtractionResult(
+                    field_key="international_fee",
+                    value=_shef_amount,
+                    normalized={
+                        "international_fee": _shef_amount,
+                        "currency": "GBP",
+                        "fee_term": "Annual",
+                    },
+                    confidence=0.93,
+                    snippet=_shef_ctx[:200],
+                    method="fee.sheffield",
+                )
+            ]
+        return []  # Sheffield page but no fee found — suppress scholarship amounts
 
     # ── Pre-pass UWL: nationality-pricing select ─────────────────────────────
     # UWL (University of West London) Angular SPA pages expose a
