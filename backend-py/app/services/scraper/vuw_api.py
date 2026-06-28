@@ -159,6 +159,23 @@ def _fee(item: dict) -> tuple[Optional[float], str, str]:
     """Return (amount, fee_term, fee_year).
 
     fee_term is "Year" (annual) or "Total" (full programme).
+
+    VUW API term variants observed across all 4 endpoints:
+      "per 120 points"                 → annual  (UG, 120 pts = 1 year FT)
+      "approx per 120 points"          → annual
+      "approx. per 120 points"         → annual
+      "for the full programme"         → total   (most PG taught / grad-quals)
+      "for full programme"             → total
+      "full programme"                 → total*  (* see sanity check below)
+      "Full programme"                 → total
+      "for two trimester"              → total   (Study Abroad/Exchange)
+
+    Edge case — VUW API inconsistency: some multi-year UG degrees (e.g.
+    Bachelor of Biomedical Science, 3 years) label their ANNUAL per-120-points
+    fee as "full programme" instead of "per 120 points".  Detecting them:
+    if treating the amount as a total gives < NZD 8 000 per trimester, the
+    per-trimester rate is unrealistically low for a full-time international
+    enrolment, so the fee must be annual, not a total.
     """
     raw_total = str(item.get("internationalFeeTotal") or "0").strip()
     term_text = str(item.get("internationalFeeTerm") or "").strip()
@@ -172,12 +189,36 @@ def _fee(item: dict) -> tuple[Optional[float], str, str]:
     if amount <= 0:
         return None, term_text, fee_year
 
+    term_lower = term_text.lower()
+
     # "per 120 points" / "approx. per 120 points" / "per year" → annual
-    # "for the full programme" / "total" → total
-    if "per 120 points" in term_text or "per year" in term_text.lower():
+    if "per 120 points" in term_lower or "per year" in term_lower:
         fee_term = "Year"
-    elif "full programme" in term_text.lower() or "total" in term_text.lower():
+
+    # "for two trimester" / "for N trimester(s)" → total for that fixed period
+    elif re.search(r"for\s+\w+\s+trimester", term_lower):
         fee_term = "Total"
+
+    # "for the full programme" / "full programme" / "for full programme" → total
+    # … unless the per-trimester sanity check fires (see docstring).
+    elif "full programme" in term_lower or "total" in term_lower:
+        dur_raw = str(item.get("durationDescription") or item.get("duration") or "")
+        dur_trims: Optional[int] = None
+        m = _TRIMESTER_RE.search(dur_raw)
+        if m:
+            dur_trims = int(m.group(1))
+        else:
+            m = _YEAR_RE.search(dur_raw)
+            if m:
+                dur_trims = round(float(m.group(1)) * 3)
+
+        if dur_trims and dur_trims > 0 and (amount / dur_trims) < 8_000:
+            # Treating as total gives < NZD 8 000/trimester — unrealistically
+            # low for a full-time international student.  Fee is annual.
+            fee_term = "Year"
+        else:
+            fee_term = "Total"
+
     else:
         fee_term = "Year"  # conservative default — NZD annual
 
