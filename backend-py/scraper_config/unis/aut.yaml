@@ -2,12 +2,13 @@
 # Hostname: www.aut.ac.nz
 #
 # Bug history / rationale:
-#   - AUT has ~12 study-area faculties.  The BFS start URL (/study) links to both
-#     faculty listing pages AND info pages (entry requirements, semester dates, parents
-#     info, etc.).  In practice, BFS burns the 25-page budget on info pages before
-#     visiting all faculty listing pages — only the first two alphabetically
-#     (architecture, art-design) are reached.  Sitemap supplement catches all courses
-#     across remaining faculties.
+#   - AUT has ~13 study-area faculties.  The BFS start URL (homepage) links to many
+#     info pages.  With the default 25-page budget, BFS exhausts its quota on
+#     homepage navigation before visiting all faculty listing pages — only a subset
+#     of faculties are reached.  AUT has NO sitemap (sitemap.xml returns 404) so
+#     the old always_sitemap_supplement approach was silently doing nothing.
+#     Fix: pre-seed all 13 faculty listing pages as seed_urls so BFS visits them
+#     with highest priority before any generic nav crawl.  bfs_page_budget=80.
 #   - AUT is a NZ university.  Fees are in NZD, not AUD.
 #   - Graduate Diploma / Graduate Certificate duration split reported:
 #     raw strings like '1 year (full-time) / 0.5 year (full-time)' need slash splitting.
@@ -16,9 +17,42 @@
 #     students-and-alumni, research, facilities, partner pages) to
 #     "/study/study-options/[^/]+/courses/" (requires the /courses/ segment).
 #     Added block_url_patterns for sub-page pollution remaining within /courses/ paths.
+#   - 5 AUT online courses live on online.aut.ac.nz (separate subdomain, BFS cannot
+#     reach them).  Added as extra_course_urls.
 
 discovery:
-  always_sitemap_supplement: true
+  # BFS page budget: 13 faculty listing pages + homepage overhead + sub-listing headroom.
+  # AUT has no sitemap so all discovery comes from BFS + pre-seeded listing pages.
+  bfs_page_budget: 80
+
+  # Pre-seed all 13 faculty listing pages.  seed_urls[0] = BFS start URL (replaces
+  # the homepage); seed_urls[1:] = additional pages pre-seeded into the BFS queue.
+  # Homepage is first so BFS also follows /courses/* direct-path links from homepage nav.
+  seed_urls:
+    - "https://www.aut.ac.nz/"
+    - "https://www.aut.ac.nz/study/study-options/health-sciences"
+    - "https://www.aut.ac.nz/study/study-options/business"
+    - "https://www.aut.ac.nz/study/study-options/engineering-computer-and-mathematical-sciences"
+    - "https://www.aut.ac.nz/study/study-options/art-and-design"
+    - "https://www.aut.ac.nz/study/study-options/architecture-and-built-environment"
+    - "https://www.aut.ac.nz/study/study-options/communication-studies"
+    - "https://www.aut.ac.nz/study/study-options/creative-technologies"
+    - "https://www.aut.ac.nz/study/study-options/education"
+    - "https://www.aut.ac.nz/study/study-options/hospitality-tourism-and-events"
+    - "https://www.aut.ac.nz/study/study-options/law"
+    - "https://www.aut.ac.nz/study/study-options/science"
+    - "https://www.aut.ac.nz/study/study-options/social-sciences-and-public-policy"
+    - "https://www.aut.ac.nz/study/study-options/sport-and-recreation"
+
+  # 5 AUT Online courses live on a separate subdomain (online.aut.ac.nz).
+  # They cannot be reached by BFS from www.aut.ac.nz, so inject them directly.
+  extra_course_urls:
+    - "https://online.aut.ac.nz/courses/master-of-business-administration-aut-online"
+    - "https://online.aut.ac.nz/courses/master-of-educational-leadership-aut-online"
+    - "https://online.aut.ac.nz/courses/postgraduate-certificate-in-business-administration"
+    - "https://online.aut.ac.nz/courses/postgraduate-certificate-in-educational-leadership"
+    - "https://online.aut.ac.nz/courses/postgraduate-diploma-in-business-administration"
+
   allow_url_patterns:
     # Require the /courses/ segment — eliminates faculty landing/info pages entirely
     - "/study/study-options/[^/]+/courses/"
