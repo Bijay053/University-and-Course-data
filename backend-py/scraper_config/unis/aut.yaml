@@ -19,7 +19,7 @@ discovery:
     - "/courses/"
 
   block_url_patterns:
-    - '^https://www\.waikato\.ac\.nz/study/qualifications/?$'
+    - '/study/qualifications/?$'
     - '/study/qualifications/undergraduate/?$'
     - '/study/qualifications/postgraduate/?$'
     - '/study/qualifications/research/?$'
