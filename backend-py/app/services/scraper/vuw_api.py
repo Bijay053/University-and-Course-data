@@ -196,8 +196,22 @@ def _study_mode(item: dict) -> Optional[str]:
         parts.append("Full-time")
     if pt:
         parts.append("Part-time")
-    if dist:
-        parts.append("Distance/Online")
+    # VUW's `intDistance` flag means the qualification *can* be studied by distance
+    # (flexible/correspondence option) — it does NOT mean the course is exclusively
+    # online.  CRITICAL: guards.py's online_only filter checks
+    #   if "online" in study_mode and no campus keyword → reject
+    # So using "Distance/Online" here would cause campus courses whose API item only
+    # has intDistance=True (and no fullTimeQual/partTimeQual) to be silently rejected
+    # as "online_only" — e.g. "Bachelor of Arts with Honours".
+    # Fix: when distance is the only flag, use "Blended" which:
+    #   a) passes the _has_campus_component check in guards.py ("blended" is a
+    #      recognised campus keyword)
+    #   b) accurately reflects VUW's mixed-mode delivery philosophy where
+    #      distance courses typically have on-campus engagement weeks.
+    # When ft/pt is also set, the campus mode is clear — skip the distance flag
+    # to keep the study_mode value concise and unambiguous.
+    if dist and not (ft or pt):
+        parts.append("Blended")
 
     return ", ".join(parts) if parts else None
 
@@ -309,7 +323,12 @@ def _map_item(item: dict, cfg: VuwApiConfig) -> Optional[dict]:
         payload["fee_term"] = fee_term
         payload["currency"] = cfg.currency
         if fee_year:
-            payload["fee_year"] = fee_year
+            # scraped_courses.fee_year is an INTEGER column — cast from the
+            # string value returned by the VUW API.
+            try:
+                payload["fee_year"] = int(fee_year)
+            except (ValueError, TypeError):
+                pass  # omit fee_year if it can't be parsed as an integer
         evidence.append(_ev("international_fee", fee_amount, "vuw_api:internationalFeeTotal", intl_url, "course", 0.88))
 
     if description:

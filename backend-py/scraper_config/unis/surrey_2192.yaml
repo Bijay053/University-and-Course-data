@@ -3,70 +3,70 @@
 # Country: United Kingdom | Currency: GBP
 # Discovery: BFS from main study levels (undergraduate, postgraduate, research) following course links. Pages are primarily server-rendered HTML.
 # Notes: Extracts fees and English requirements directly from individual course pages. Allows online-only international courses.
-
 discovery:
-  always_sitemap_supplement: true        # Keeps sitemap as safety net
+  always_sitemap_supplement: true
   seed_urls:
-    - "https://www.surrey.ac.uk/undergraduate"
-    - "https://www.surrey.ac.uk/postgraduate"
-    - "https://www.surrey.ac.uk/postgraduate/research"
+  - https://www.surrey.ac.uk/undergraduate
+  - https://www.surrey.ac.uk/postgraduate
+  - https://www.surrey.ac.uk/postgraduate/research
   allow_url_patterns:
-    - '/undergraduate/courses/'          # Likely pattern for individual UG courses
-    - '/postgraduate/courses/'           # Likely pattern for individual PG courses
-    - '/postgraduate/research/'          # Broader pattern for research courses
+  - /postgraduate/[^/]+/?$
   block_url_patterns:
-    - '/news'
-    - '/events'
-    - '/about'
-    - '/staff'
-    - '/research/projects/'              # Block general research projects, focus on degree programs
-
-  expected_min_courses: 400              # A reasonable estimate for University of Surrey
-
+  - /apply
+  - /contact
+  - /news
+  - /events
+  - /blog
+  - /about
+  - /research
+  - /alumni
+  - /outreach
+  - /parents
+  - /jobs
+  - /careers
+  - /accommodation
+  - /life-on-campus
+  - /fees-and-funding$
+  - /international/living
+  expected_min_courses: 400
 extraction:
   fees:
-    default_currency: "GBP"
-    prefer_international: true           # Spider explicitly looks for 'Overseas fee'
-    prefer_annual_over_total: true       # Spider extracts annual fee and 'year' term
-    prefer_year_one_over_total: true     # Implied by annual fee extraction
-    reject_keywords:                     # Drop any row that mentions domestic fees
-      - "Home student"
-      - "Home fee"
-      - "UK student"
-      - "UK fee"
-      - "Domestic"
-
+    default_currency: GBP
+    prefer_international: true
+    prefer_annual_over_total: true
+    prefer_year_one_over_total: true
+    reject_keywords:
+    - Home student
+    - Home fee
+    - UK student
+    - UK fee
+    - Domestic
   english:
-    central_page: "https://www.surrey.ac.uk/apply/international/english-language-requirements" # Central English requirements page
-    course_english_priority: true        # Spider extracts IELTS details from individual course pages
-    trust_vision_ocr: false              # UK sites often have decorative IELTS images; prefer text extraction
-    default_ielts: 6.0                   # Standard UK fallback if not found on page
-    default_pte: 60                      # Standard UK fallback
-    default_toefl: 80                    # Standard UK fallback
-
+    central_page: https://www.surrey.ac.uk/apply/international/english-language-requirements
+    course_english_priority: true
+    trust_vision_ocr: false
+    default_ielts: 6.0
+    default_pte: 60
+    default_toefl: 80
   intake:
-    start_dates_only: true               # Spider extracts specific start dates/months
-
+    start_dates_only: true
   course_name:
     strip_title_suffixes:
-      - " | University of Surrey"
-      - " - University of Surrey"
-      - " — University of Surrey"
-      - "| University of Surrey"          # Without leading space, just in case
-
+    - ' | University of Surrey'
+    - ' - University of Surrey'
+    - ' — University of Surrey'
+    - '| University of Surrey'
   filters:
     online_only:
-      enabled: false                     # Spider explicitly checks for "Online" or "Distance" study modes
-
+      enabled: false
   text_cleaning:
     duration:
-      reject_sentence_patterns:          # Reject common "maximum candidature" phrases
-        - 'up to \d+(?:\.\d+)? (?:years?|months?)'
-        - 'maximum of \d+ (?:years?|months?)'
-        - 'candidature.*\d+ years'
-
+      reject_sentence_patterns:
+      - up to \d+(?:\.\d+)? (?:years?|months?)
+      - maximum of \d+ (?:years?|months?)
+      - candidature.*\d+ years
   staging:
     reject_if_missing:
-      - course_name
-    skip_degree_qualifier_check: true    # H1 might not always contain the full degree prefix
-    require_international_fee: false     # Allow staging even if fees are initially missing for human review
+    - course_name
+    skip_degree_qualifier_check: true
+    require_international_fee: false
