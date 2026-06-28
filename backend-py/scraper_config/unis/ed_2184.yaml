@@ -8,12 +8,12 @@
 # Pagination (as of 2026-06-24):
 #   Undergraduate:        73 pages  (page=0 … page=72)   724 results
 #   Postgraduate Research: 19 pages  (page=0 … page=18)  187 results
-#   Postgraduate Taught:   28 pages  (page=0 … page=27)  280 results
-#   Total listing entries: ~1,191  (pre-dedup)
+#   Postgraduate Taught:   29 pages  (page=0 … page=28)  281 results
+#   Total listing entries: ~1,192  (pre-dedup)
 #
-# BFS does not auto-follow ?page=N query-param pagination, so all 120
+# BFS does not auto-follow ?page=N query-param pagination, so all 121
 # listing pages are pre-seeded (same pattern as UOW 70-page pre-seed).
-# bfs_page_budget: 130 covers the full seed set (120 pages + headroom).
+# bfs_page_budget: 130 covers the full seed set (121 pages + headroom).
 #
 # IMPORTANT — candidates cap: the default BFS candidate cap of 1,000 was
 # hit after PG Taught page=10, cutting off pages 11–27 (≈170 courses).
@@ -148,6 +148,7 @@ discovery:
     - 'https://study.ed.ac.uk/programmes/postgraduate-taught?page=25'
     - 'https://study.ed.ac.uk/programmes/postgraduate-taught?page=26'
     - 'https://study.ed.ac.uk/programmes/postgraduate-taught?page=27'
+    - 'https://study.ed.ac.uk/programmes/postgraduate-taught?page=28'
 
   allow_url_patterns:
     # Edinburgh course URLs follow the pattern:
