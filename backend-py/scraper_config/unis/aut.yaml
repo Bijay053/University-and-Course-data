@@ -2,33 +2,43 @@
 # Hostname: www.aut.ac.nz
 #
 # Bug history / rationale:
-#   - AUT has ~13 study-area faculties.  The BFS start URL (homepage) links to many
+#   - AUT has ~14 study-area faculties.  The BFS start URL (homepage) links to many
 #     info pages.  With the default 25-page budget, BFS exhausts its quota on
-#     homepage navigation before visiting all faculty listing pages — only a subset
-#     of faculties are reached.  AUT has NO sitemap (sitemap.xml returns 404) so
-#     the old always_sitemap_supplement approach was silently doing nothing.
-#     Fix: pre-seed all 13 faculty listing pages as seed_urls so BFS visits them
-#     with highest priority before any generic nav crawl.  bfs_page_budget=80.
+#     homepage navigation before visiting all faculty listing pages.  AUT has NO sitemap
+#     (sitemap.xml returns 404) so always_sitemap_supplement was silently doing nothing.
+#     Fix: pre-seed all 14 faculty listing pages as seed_urls; bfs_page_budget raised.
 #   - AUT is a NZ university.  Fees are in NZD, not AUD.
 #   - Graduate Diploma / Graduate Certificate duration split reported:
 #     raw strings like '1 year (full-time) / 0.5 year (full-time)' need slash splitting.
 #   - Discovery pollution fix (2026-06-28): narrowed allow_url_patterns from
-#     "/study/study-options/" (too broad — caught faculty landing pages, academic-staff,
-#     students-and-alumni, research, facilities, partner pages) to
-#     "/study/study-options/[^/]+/courses/" (requires the /courses/ segment).
-#     Added block_url_patterns for sub-page pollution remaining within /courses/ paths.
+#     "/study/study-options/" (too broad) to "/study/study-options/[^/]+/courses/".
+#     Added block_url_patterns for sub-page pollution within /courses/ paths.
 #   - 5 AUT online courses live on online.aut.ac.nz (separate subdomain, BFS cannot
-#     reach them).  Added as extra_course_urls.
+#     reach them from www.aut.ac.nz).  Added as extra_course_urls.
+#   - Grandchild discovery fix (2026-06-28): 41 courses still missing after the above
+#     fix because they are specialisation sub-pages (depth 3+ URLs like
+#     /courses/{parent}/{major} or /study/study-options/{fac}/courses/{parent}/{spec}).
+#     BFS discovers these only by VISITING the parent course page.  With 80-page budget,
+#     BFS was wasting ~22 slots on info/research/about pollution pages (entry-requirements,
+#     semester-dates, career-advisors, research/*, international/* etc.) before it could
+#     visit parent course pages.  Fixes:
+#       1. Block patterns added for all observed pollution pages → frees ~22 BFS slots.
+#       2. All 22 parent-course pages that have grandchild specialisations pre-seeded,
+#          so BFS visits them with highest priority and enqueues grandchildren.
+#       3. bfs_page_budget raised to 120 (14 faculty + 22 parent + 84 headroom).
 
 discovery:
-  # BFS page budget: 13 faculty listing pages + homepage overhead + sub-listing headroom.
-  # AUT has no sitemap so all discovery comes from BFS + pre-seeded listing pages.
-  bfs_page_budget: 80
+  # BFS page budget: 14 faculty seeds + 22 parent-course seeds + headroom.
+  # AUT has no sitemap so all discovery comes from BFS + pre-seeded pages.
+  bfs_page_budget: 120
 
-  # Pre-seed all 13 faculty listing pages.  seed_urls[0] = BFS start URL (replaces
-  # the homepage); seed_urls[1:] = additional pages pre-seeded into the BFS queue.
-  # Homepage is first so BFS also follows /courses/* direct-path links from homepage nav.
+  # seed_urls[0]    = BFS start URL (replaces the default scrape_url homepage)
+  # seed_urls[1:13] = 14 faculty listing pages (all return HTTP 200; verified 2026-06-28)
+  # seed_urls[14:]  = 22 parent course pages that have specialisation grandchildren.
+  #                   Pre-seeding these guarantees BFS visits them to discover the
+  #                   grandchild URLs before budget is exhausted.
   seed_urls:
+    # ── BFS start + faculty listing pages ────────────────────────────────────
     - "https://www.aut.ac.nz/"
     - "https://www.aut.ac.nz/study/study-options/health-sciences"
     - "https://www.aut.ac.nz/study/study-options/business"
@@ -40,9 +50,35 @@ discovery:
     - "https://www.aut.ac.nz/study/study-options/education"
     - "https://www.aut.ac.nz/study/study-options/hospitality-tourism-and-events"
     - "https://www.aut.ac.nz/study/study-options/law"
+    - "https://www.aut.ac.nz/study/study-options/maori-and-indigenous-development"
     - "https://www.aut.ac.nz/study/study-options/science"
     - "https://www.aut.ac.nz/study/study-options/social-sciences-and-public-policy"
     - "https://www.aut.ac.nz/study/study-options/sport-and-recreation"
+    # ── Parent course pages with specialisation grandchildren ─────────────────
+    # /courses/* parents
+    - "https://www.aut.ac.nz/courses/bachelor-of-arts"
+    - "https://www.aut.ac.nz/courses/bachelor-of-arts-honours"
+    - "https://www.aut.ac.nz/courses/bachelor-of-design-te-tohu-paetahi-mo-te-hoahoa"
+    - "https://www.aut.ac.nz/courses/bachelor-of-engineering-honours"
+    - "https://www.aut.ac.nz/courses/bachelor-of-science"
+    - "https://www.aut.ac.nz/courses/master-of-arts"
+    # /study/study-options/*/courses/* parents
+    - "https://www.aut.ac.nz/study/study-options/architecture-and-built-environment/courses/bachelor-of-construction"
+    - "https://www.aut.ac.nz/study/study-options/art-and-design/courses/bachelor-of-visual-arts"
+    - "https://www.aut.ac.nz/study/study-options/business/courses/bachelor-of-business"
+    - "https://www.aut.ac.nz/study/study-options/business/courses/bachelor-of-business-honours"
+    - "https://www.aut.ac.nz/study/study-options/business/courses/master-of-business"
+    - "https://www.aut.ac.nz/study/study-options/communication-studies/courses/bachelor-of-communication-studies"
+    - "https://www.aut.ac.nz/study/study-options/education/courses/bachelor-of-education"
+    - "https://www.aut.ac.nz/study/study-options/engineering-computer-and-mathematical-sciences/courses/bachelor-of-computer-and-information-sciences"
+    - "https://www.aut.ac.nz/study/study-options/engineering-computer-and-mathematical-sciences/courses/bachelor-of-engineering-technology"
+    - "https://www.aut.ac.nz/study/study-options/health-sciences/courses/bachelor-of-health-science"
+    - "https://www.aut.ac.nz/study/study-options/health-sciences/courses/master-of-health-practice"
+    - "https://www.aut.ac.nz/study/study-options/health-sciences/courses/master-of-health-science"
+    - "https://www.aut.ac.nz/study/study-options/health-sciences/courses/postgraduate-certificate-in-health-science"
+    - "https://www.aut.ac.nz/study/study-options/health-sciences/courses/postgraduate-diploma-in-health-science"
+    - "https://www.aut.ac.nz/study/study-options/hospitality-tourism-and-events/courses/bachelor-of-international-hospitality-management"
+    - "https://www.aut.ac.nz/study/study-options/sport-and-recreation/courses/bachelor-of-sport-exercise-and-health"
 
   # 5 AUT Online courses live on a separate subdomain (online.aut.ac.nz).
   # They cannot be reached by BFS from www.aut.ac.nz, so inject them directly.
@@ -59,6 +95,34 @@ discovery:
     - "/courses/"
 
   block_url_patterns:
+    # ── Info / apply / fees pages (non-course, waste BFS budget) ─────────────
+    - '/study/entry-requirements'
+    - '/study/changing-my-enrolment'
+    - '/study/information-for-high-school'
+    - '/study/careers-advisors'
+    - '/study/parents'
+    - '/study/returning-to-study'
+    - '/study/semester-dates'
+    - '/study/why-study'
+    - '/study/applying'
+    - '/study/course-search'
+    - '/study/fees-and-scholarships'
+    - '/study/study-options$'              # /study/study-options landing page itself
+    - '/study/study-options/compare'       # compare-aut-degrees info page
+    - '/study/study-options/workplace-experience'
+    - '/study/study-options/degree-builder'
+    - '/study/study-options/programme-guides'
+    - '/study/study-options/future-career-sheets'
+    - '/study/study-options/pathway'
+    - '/study/study-options/short-courses'
+    - '/study/study-options/language-and-culture'  # domestic-only; 0 intl courses
+    - '/international/'
+    - '/research/faculty-postgraduate'
+    - '/research/academic-departments'
+    - '/research/postgraduate-student-support'
+    - '/research/postgraduate-study-and-research'
+    - '/student-life/'
+    - '/about/'
     # ── Previously-blocking patterns (keep) ───────────────────────────────────
     - '/study/qualifications/?$'
     - '/study/qualifications/undergraduate/?$'
@@ -85,7 +149,6 @@ discovery:
     - '\?'
     - '\.pdf$'
     # ── Sub-page pollution within /courses/ paths ─────────────────────────────
-    # Course sub-pages (not course landing pages)
     - 'what-you-study'           # /what-you-study and /what-you-study-accordion
     - 'accredited-by'            # accreditation info sub-pages
     - 'info-for-students-who-started-before'  # old-cohort info pages
@@ -136,6 +199,4 @@ extraction:
       - course_name
     skip_degree_qualifier_check: true
     require_international_fee: false
-    # dedup_use_full_url: true is intentionally kept — all VUW URLs now carry
-    # the ?international=true param uniformly, so full-URL dedup works correctly.
     dedup_use_full_url: true
