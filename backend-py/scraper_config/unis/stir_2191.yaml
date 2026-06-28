@@ -12,10 +12,12 @@ discovery:
     - "https://www.stir.ac.uk/courses/?f.Level%7Clevel=postgraduate+%28taught%29&query="
   # Define patterns for individual course pages
   allow_url_patterns:
-    - '/courses/undergraduate/'
-    - '/courses/postgraduate/'
-    - '/courses/phd/'                        
-    - '/courses/mphil/'
+    - '/courses/ug/'
+    - '/courses/pg-taught/'
+    - '/courses/postgraduate-research-degrees/'    
+    - "https://www.stir.ac.uk/courses/?f.Level%7Clevel=postgraduate+%28research%29&query="
+    - "https://www.stir.ac.uk/courses/?f.Level%7Clevel=undergraduate&query="
+    - "https://www.stir.ac.uk/courses/?f.Level%7Clevel=postgraduate+%28taught%29&query="                
   block_url_patterns:
     - '/news'
     - '/events'
