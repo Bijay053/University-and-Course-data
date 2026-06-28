@@ -150,7 +150,15 @@ discovery:
     - 'https://study.ed.ac.uk/programmes/postgraduate-taught?page=27'
 
   allow_url_patterns:
-    - '/programmes/'
+    # Edinburgh course URLs follow the pattern:
+    #   /programmes/{type}/{numeric-id}-{slug}
+    # e.g. /programmes/postgraduate-research/510-analysis
+    # Listing/pagination pages (/programmes/postgraduate-research?page=N) do
+    # NOT have a numeric segment, so they are excluded as course candidates
+    # while still being crawled by BFS for link discovery (they are in seed_urls).
+    - '/programmes/undergraduate/\d+'
+    - '/programmes/postgraduate-research/\d+'
+    - '/programmes/postgraduate-taught/\d+'
 
   block_url_patterns:
     - '/news'
@@ -159,6 +167,10 @@ discovery:
     - '/staff'
     - '/alumni'
     - '\.pdf$'
+    # Fees sidebar and login-redirect pages linked from course pages — these
+    # produce "Tuition Fees" and "Redirecting" course names when extracted.
+    - '/undergraduate-fees'
+    - '/user/login'
 
 extraction:
   fees:
