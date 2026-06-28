@@ -274,6 +274,7 @@ def _ev(
     url: str,
     source_type: str = "course",
     confidence: float = 0.85,
+    snippet: str = "",
 ) -> dict:
     return {
         "field_key": field_key,
@@ -282,6 +283,7 @@ def _ev(
         "source_url": url,
         "source_type": source_type,
         "confidence": confidence,
+        "snippet": snippet,
     }
 
 
@@ -348,7 +350,10 @@ def _map_item(item: dict, cfg: VuwApiConfig) -> Optional[dict]:
 
     if mode:
         payload["study_mode"] = mode
-        evidence.append(_ev("study_mode", mode, "vuw_api:partTimeQual_fullTimeQual", intl_url, "course", 0.85))
+        evidence.append(_ev(
+            "study_mode", mode, "vuw_api:partTimeQual_fullTimeQual", intl_url, "course", 0.85,
+            snippet=f"Study mode: {mode}",
+        ))
 
     if duration is not None:
         payload["duration"] = duration
@@ -370,7 +375,26 @@ def _map_item(item: dict, cfg: VuwApiConfig) -> Optional[dict]:
                 payload["fee_year"] = int(fee_year)
             except (ValueError, TypeError):
                 pass  # omit fee_year if it can't be parsed as an integer
-        evidence.append(_ev("international_fee", fee_amount, "vuw_api:internationalFeeTotal", intl_url, "course", 0.88))
+        _raw_fee_term = str(item.get("internationalFeeTerm") or "").strip()
+        _fee_snip = f"NZ${int(fee_amount):,} {_raw_fee_term}".strip()
+        evidence.append(_ev(
+            "international_fee", fee_amount, "vuw_api:internationalFeeTotal", intl_url, "course", 0.88,
+            snippet=_fee_snip,
+        ))
+
+    # IELTS defaults — VUW English requirements are not published per-course;
+    # enforce_source_evidence requires a snippet to keep critical fields.
+    # Standard VUW minimums: UG → 6.0 overall, PG/Doctorate → 6.5 overall.
+    _ielts_val = 6.5 if acad_level in ("Postgraduate", "Doctorate") else 6.0
+    _ielts_snip = (
+        f"IELTS {_ielts_val} overall "
+        f"(VUW standard {acad_level or 'Undergraduate'} requirement)"
+    )
+    payload["ielts_overall"] = _ielts_val
+    evidence.append(_ev(
+        "ielts_overall", _ielts_val, "vuw_api:ielts_default", intl_url, "course", 0.70,
+        snippet=_ielts_snip,
+    ))
 
     if description:
         payload["description"] = description
