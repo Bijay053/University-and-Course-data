@@ -13,7 +13,8 @@
 #
 # BFS does not auto-follow ?page=N query-param pagination, so all 121
 # listing pages are pre-seeded (same pattern as UOW 70-page pre-seed).
-# bfs_page_budget: 130 covers the full seed set (121 pages + headroom).
+# bfs_page_budget: 200 covers the full seed set (121 pages + headroom for
+# UG page crawling — raised from 130 after UG unblock added 73 real fetches).
 #
 # IMPORTANT — candidates cap: the default BFS candidate cap of 1,000 was
 # hit after PG Taught page=10, cutting off pages 11–27 (≈170 courses).
@@ -21,8 +22,18 @@
 
 discovery:
   always_sitemap_supplement: true
-  bfs_page_budget: 130
+  # 73 UG + 19 PGR + 29 PGT = 121 listing pages; 200 gives headroom for any
+  # course-page traversal BFS picks up via sidebar links.
+  bfs_page_budget: 200
   max_candidates: 1400
+
+  # UG listing pages (/programmes/undergraduate and ?query=&page=N variants)
+  # are blocked by guards.py _BLOCK_URL_LAST_SEGMENTS["undergraduate"] because
+  # their last path segment is literally "undergraduate".  This field tells BFS
+  # to crawl them for course links but NOT add them to the extraction candidate
+  # pool (i.e. they will never be staged as courses themselves).
+  allow_blocked_listing_patterns:
+    - '/programmes/undergraduate'
 
   seed_urls:
     # ── Undergraduate (page=0 is the base URL; pages 1–72 pre-seeded) ──────
