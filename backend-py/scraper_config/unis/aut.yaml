@@ -11,14 +11,21 @@
 #   - AUT is a NZ university.  Fees are in NZD, not AUD.
 #   - Graduate Diploma / Graduate Certificate duration split reported:
 #     raw strings like '1 year (full-time) / 0.5 year (full-time)' need slash splitting.
+#   - Discovery pollution fix (2026-06-28): narrowed allow_url_patterns from
+#     "/study/study-options/" (too broad — caught faculty landing pages, academic-staff,
+#     students-and-alumni, research, facilities, partner pages) to
+#     "/study/study-options/[^/]+/courses/" (requires the /courses/ segment).
+#     Added block_url_patterns for sub-page pollution remaining within /courses/ paths.
 
 discovery:
   always_sitemap_supplement: true
   allow_url_patterns:
-    - "/study/study-options/"
+    # Require the /courses/ segment — eliminates faculty landing/info pages entirely
+    - "/study/study-options/[^/]+/courses/"
     - "/courses/"
 
   block_url_patterns:
+    # ── Previously-blocking patterns (keep) ───────────────────────────────────
     - '/study/qualifications/?$'
     - '/study/qualifications/undergraduate/?$'
     - '/study/qualifications/postgraduate/?$'
@@ -43,6 +50,41 @@ discovery:
     - '/events'
     - '\?'
     - '\.pdf$'
+    # ── Sub-page pollution within /courses/ paths ─────────────────────────────
+    # Course sub-pages (not course landing pages)
+    - 'what-you-study'           # /what-you-study and /what-you-study-accordion
+    - 'accredited-by'            # accreditation info sub-pages
+    - 'info-for-students-who-started-before'  # old-cohort info pages
+    - 'welcome-information'      # orientation sub-pages
+    - 'frequently-asked-questions'
+    - '/videos$'
+    # Short courses, continuing-education, non-degree programmes
+    - 'short-course'             # *-short-course, short-course-in-*
+    - 'refresher-short'          # extra safety for refresher-short-course patterns
+    - 'certificate-of-proficiency'
+    - 'body-composition-anthropometry'
+    - 'fitness-foundations'
+    - 'fitness-instructing'
+    - 'personal-training$'
+    - 'sports-massage'
+    - 'barista-beginner'
+    - 'te-reo-maori-courses'
+    - 'paramedic-assessment-for-registration'
+    - '3-lead-ecg'
+    - 'pre-hospital-paediatrics'
+    - 'prehospital-cardiology'
+    - 'Pre-Hospital-Antenatal-Care'
+    - 'drug-assisted-airway-management'
+    # Specialisation sub-pages (depth-6 forks off a qualification page)
+    - 'podiatry-master'
+    - 'podiatry-postgraduate'
+    - 'podiatry-certificate'
+    - 'critical-care-paramedicine'
+    - 'extended-care-paramedicine'
+    # Personal / gallery pages discovered under /fitness-foundations/
+    - 'lisa-hartnett'
+    - 'stephanie-mansfield'
+    - 'maisci-'
 
 extraction:
   fees:
