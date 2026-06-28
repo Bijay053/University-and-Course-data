@@ -8,7 +8,7 @@ discovery:
   seed_urls:
   - https://www.stir.ac.uk/courses/
   allow_url_patterns:
-  - /[^/]+/[^/]+/[^/]+/?$
+  - /courses/
   block_url_patterns:
   - /apply
   - /contact
