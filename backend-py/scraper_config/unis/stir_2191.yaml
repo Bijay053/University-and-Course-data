@@ -3,78 +3,73 @@
 # Country: United Kingdom | Currency: GBP
 # CMS: JavaScript SPA for course listings. The provided seed URLs are dynamic search pages.
 # Discovery: BFS starting from level-filtered search pages. Course content is loaded via JavaScript.
-
 discovery:
-  always_sitemap_supplement: true        # Keeps sitemap as safety net for additional URLs
+  always_sitemap_supplement: true
   seed_urls:
-    - "https://www.stir.ac.uk/courses/?f.Level%7Clevel=postgraduate+%28research%29&query="
-    - "https://www.stir.ac.uk/courses/?f.Level%7Clevel=undergraduate&query="
-    - "https://www.stir.ac.uk/courses/?f.Level%7Clevel=postgraduate+%28taught%29&query="
-  # Define patterns for individual course pages
+  - https://www.stir.ac.uk/courses/
   allow_url_patterns:
-    - '/courses/undergraduate/'
-    - '/courses/postgraduate/'
-    - '/courses/phd/'                         # Common pattern for PhD programs
-    - '/courses/mphil/'                       # Common pattern for MPhil programs
+  - /[^/]+/[^/]+/[^/]+/?$
   block_url_patterns:
-    - '/news'
-    - '/events'
-    - '/about'
-    - '/staff/'
-    - '/research/centres/'                    # Block general research centers/projects, focus on degree programs
-
-  expected_min_courses: 400                  # Estimate for a university of this size in the UK
-  browser_time_budget_s: 1800                # Allow more time for browser-based SPA discovery
-  browser_early_stop_courses: 500            # Stop early if a sufficient number of unique course URLs are found
-
+  - /apply
+  - /contact
+  - /news
+  - /events
+  - /blog
+  - /about
+  - /research
+  - /alumni
+  - /outreach
+  - /parents
+  - /jobs
+  - /careers
+  - /accommodation
+  - /life-on-campus
+  - /fees-and-funding$
+  - /international/living
+  expected_min_courses: 400
+  browser_time_budget_s: 1800
+  browser_early_stop_courses: 500
 extraction:
-  browser_wait_strategy: networkidle         # Wait for JavaScript network activity to settle on course pages
-  browser_dcl_settle_ms: 2000                # Additional settle time after DOMContentLoaded for SPA content
-
+  browser_wait_strategy: networkidle
+  browser_dcl_settle_ms: 2000
   fees:
-    default_currency: "GBP"
-    prefer_international: true               # Prioritise international fees
-    prefer_annual_over_total: true           # Prefer annual fee over total course fee
-    prefer_year_one_over_total: true         # Prefer year one fee if available
-    central_page: "https://www.stir.ac.uk/study/international/fees-and-funding/" # Central fees page
-    reject_keywords:                         # Drop any fee entry that mentions domestic student terms
-      - "Home student"
-      - "Home fee"
-      - "UK student"
-      - "UK fee"
-      - "Domestic"
-
+    default_currency: GBP
+    prefer_international: true
+    prefer_annual_over_total: true
+    prefer_year_one_over_total: true
+    central_page: https://www.stir.ac.uk/study/international/fees-and-funding/
+    reject_keywords:
+    - Home student
+    - Home fee
+    - UK student
+    - UK fee
+    - Domestic
   english:
-    central_page: "https://www.stir.ac.uk/study/international/entry-requirements/english-language-requirements/" # Central English requirements page
-    trust_vision_ocr: false                  # UK sites often use decorative images for IELTS, prefer text extraction
-    default_ielts: 6.0                       # Default IELTS score for UK universities
-    default_pte: 60                          # Default PTE score for UK universities
-    default_toefl: 80                        # Default TOEFL score for UK universities
-
+    central_page: https://www.stir.ac.uk/study/international/entry-requirements/english-language-requirements/
+    trust_vision_ocr: false
+    default_ielts: 6.0
+    default_pte: 60
+    default_toefl: 80
   intake:
-    start_dates_only: true                   # Focus on actual course start dates, ignore application deadlines
-
+    start_dates_only: true
   course_name:
-    strip_title_suffixes:                    # Clean common university name suffixes from course titles
-      - " | University of Stirling"
-      - " - University of Stirling"
-      - " — University of Stirling"
-      - "| University of Stirling"            # Without leading space
-      - " | Stirling"
-
+    strip_title_suffixes:
+    - ' | University of Stirling'
+    - ' - University of Stirling'
+    - ' — University of Stirling'
+    - '| University of Stirling'
+    - ' | Stirling'
   filters:
     online_only:
-      enabled: false                         # Do not filter out online-only courses for international students (common for UK)
-
+      enabled: false
   text_cleaning:
     duration:
-      reject_sentence_patterns:              # Reject phrases referring to maximum candidature, not program length
-        - 'up to \d+(?:\.\d+)? (?:years?|months?)'
-        - 'maximum of \d+ (?:years?|months?)'
-        - 'candidature.*\d+ years'
-
+      reject_sentence_patterns:
+      - up to \d+(?:\.\d+)? (?:years?|months?)
+      - maximum of \d+ (?:years?|months?)
+      - candidature.*\d+ years
   staging:
     reject_if_missing:
-      - course_name                          # Course must have a name to be valid
-    skip_degree_qualifier_check: true        # SPA pages might omit degree prefixes in H1, allow for flexibility
-    require_international_fee: false         # Fees may be loaded dynamically; stage for human review if missing initially
+    - course_name
+    skip_degree_qualifier_check: true
+    require_international_fee: false
