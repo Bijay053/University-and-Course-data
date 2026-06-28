@@ -16,16 +16,17 @@
 # bfs_page_budget: 200 covers the full seed set (121 pages + headroom for
 # UG page crawling — raised from 130 after UG unblock added 73 real fetches).
 #
-# IMPORTANT — candidates cap: the default BFS candidate cap of 1,000 was
-# hit after PG Taught page=10, cutting off pages 11–27 (≈170 courses).
-# max_candidates is raised to 1,400 to capture all ~1,191 listing entries.
+# Candidates cap: default 1,000 was hit after PGT page=10 (earlier run).
+# Raised to 1,400 → verified run discovered 1,383 candidates (from 121
+# listing seeds + 79 UG course pages via sidebar traversal), approaching
+# the old cap.  Raised to 1,600 for safe headroom on future runs.
 
 discovery:
   always_sitemap_supplement: true
   # 73 UG + 19 PGR + 29 PGT = 121 listing pages; 200 gives headroom for any
   # course-page traversal BFS picks up via sidebar links.
   bfs_page_budget: 200
-  max_candidates: 1400
+  max_candidates: 1600
 
   # UG listing pages (/programmes/undergraduate and ?query=&page=N variants)
   # are blocked by guards.py _BLOCK_URL_LAST_SEGMENTS["undergraduate"] because
