@@ -186,10 +186,22 @@ discovery:
     - '/user/login'
 
 extraction:
+  # Edinburgh course pages render key sections as collapsed accordions
+  # (aria-expanded="false"). The per-course browser clicks these buttons so
+  # the full extractors (fee + other_requirement) see the expanded DOM content.
+  # expand_text is a contains-match so partial phrases work if Edinburgh changes
+  # the exact button label slightly.
+  actions:
+    - expand_text: "Fees and funding"
+    - expand_text: "Entry requirements"
+
   fees:
     default_currency: GBP
     prefer_international: true
     prefer_annual_over_total: true
+    # Edinburgh part-time PGT fees (~£9k/yr) convert to ~AUD 17k — below the
+    # default AU crit_min. Lower to 6000 so valid UK fees pass the quality gate.
+    fee_crit_min_aud: 6000
     reject_keywords:
       - 'Home student'
       - 'Home fee'
@@ -197,10 +209,24 @@ extraction:
       - 'UK fee'
       - 'Domestic'
       - 'Scottish'
+      - 'Rest of UK'
+      - 'RUK'
 
   english:
     trust_vision_ocr: false
     course_english_priority: true
+    # Edinburgh course pages display "—" for IELTS (meaning "standard
+    # requirement applies"). Set defaults by degree level so every course
+    # gets a value even when the per-course page shows a dash.
+    # Per-course values always win if the extractor finds an actual number.
+    default_ielts: 6.5
+    degree_level_defaults:
+      undergraduate:
+        ielts: 6.5
+      postgraduate:
+        ielts: 6.5
+      doctorate:
+        ielts: 7.0
 
   intake:
     start_dates_only: true
