@@ -14,6 +14,35 @@
 
 discovery:
   always_sitemap_supplement: true
+  allow_url_patterns:
+    - "/study/study-options/"
+    - "/courses/"
+
+  block_url_patterns:
+    - '^https://www\.waikato\.ac\.nz/study/qualifications/?$'
+    - '/study/qualifications/undergraduate/?$'
+    - '/study/qualifications/postgraduate/?$'
+    - '/study/qualifications/research/?$'
+    - '/int/about/'
+    - '/int/research/'
+    - '/int/study/apply/'
+    - '/int/study/fees'
+    - '/int/study/scholarships'
+    - '/int/study/key-university'
+    - '/int/study/prospectus'
+    - '/int/study/why-choose'
+    - '/int/study/work-integrated'
+    - '/int/study/student-success'
+    - '/int/study/options/'
+    - '/int/study/papers/'
+    - '/int/study/upskilling/'
+    - '/int/study/get-started/'
+    - '/int/study/subjects/'
+    - '/search'
+    - '/news'
+    - '/events'
+    - '\?'
+    - '\.pdf$'
 
 extraction:
   fees:
