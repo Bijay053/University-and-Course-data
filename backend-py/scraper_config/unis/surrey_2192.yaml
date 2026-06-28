@@ -11,6 +11,7 @@ discovery:
   - https://www.surrey.ac.uk/postgraduate/research
   allow_url_patterns:
   - /postgraduate/[^/]+/?$
+  - /undergraduate/[^/]+/\d{4}/?$
   block_url_patterns:
   - /apply
   - /contact
