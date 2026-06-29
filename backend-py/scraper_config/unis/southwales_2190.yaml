@@ -1,0 +1,81 @@
+# University of South Wales
+# Hostname: www.southwales.ac.uk
+# Country: United Kingdom | Currency: GBP
+# CMS: JavaScript SPA with paginated course listings, likely behind bot protection.
+# Discovery: Browser-based BFS from paginated search results page. Individual course pages are also JS-rendered.
+
+discovery:
+  use_stealth_browser: true               # Spider uses Playwright with custom headers, indicating bot protection
+  always_sitemap_supplement: true         # Keeps sitemap as safety net
+  seed_urls:
+    # Start BFS from the initial courses search page. The spider's pagination logic
+    # will be handled by the BFS if 'next' links are discoverable.
+    - "https://www.southwales.ac.uk/courses/"
+  allow_url_patterns:
+    # Pattern for individual course pages. Adjust if actual URLs differ.
+    - '/courses/.+'
+  block_url_patterns:
+    - '/news'
+    - '/events'
+    - '/about'
+    - '/staff'
+    - '/research'
+
+  bfs_page_budget: 30                     # Stealth is slower; allow a moderate budget
+  max_candidates: 1000                    # Expecting a good number of courses
+  expected_min_courses: 400               # Estimate for a UK university
+
+extraction:
+  max_parallel_fetch: 6                   # Stealth sessions are slow; limit concurrency
+  browser_wait_strategy: networkidle      # Wait for JS API calls to finish loading content
+  browser_dcl_settle_ms: 1500             # Additional settle time after DOMContentLoaded
+
+  fees:
+    default_currency: "GBP"
+    prefer_international: true            # Spider attempts to extract international fees
+    prefer_annual_over_total: true        # Prefer annual fee over total course fee
+    prefer_year_one_over_total: true      # Prefer year one fee if available
+    # Placeholders for central pages if they exist and spider doesn't find per-course fee
+    central_page: "https://www.southwales.ac.uk/study/fees-and-funding/" # Example central fees page
+    reject_keywords:                      # Drop any fee entry that mentions domestic student terms
+      - "Home student"
+      - "Home fee"
+      - "UK student"
+      - "UK fee"
+      - "Domestic"
+
+  english:
+    # Placeholders for central pages if they exist
+    central_page: "https://www.southwales.ac.uk/study/international/entry-requirements/" # Example central English requirements page
+    trust_vision_ocr: false               # UK sites often use decorative images for IELTS, prefer text extraction
+    default_ielts: 6.0                    # Default IELTS score for UK universities
+    default_pte: 60                       # Default PTE score for UK universities
+    default_toefl: 80                     # Default TOEFL score for UK universities
+
+  intake:
+    start_dates_only: true                # Spider attempts to extract start dates
+
+  course_name:
+    strip_title_suffixes:                 # Clean common university name suffixes from course titles
+      - " | University of South Wales"
+      - " - University of South Wales"
+      - " — University of South Wales"
+      - "| University of South Wales"     # Without leading space
+      - " | USW"                          # Common abbreviation
+
+  filters:
+    online_only:
+      enabled: false                      # Do not filter out online-only courses for international students (common for UK)
+
+  text_cleaning:
+    duration:
+      reject_sentence_patterns:           # Reject phrases referring to maximum candidature, not program length
+        - 'up to \d+(?:\.\d+)? (?:years?|months?)'
+        - 'maximum of \d+ (?:years?|months?)'
+        - 'candidature.*\d+ years'
+
+  staging:
+    reject_if_missing:
+      - course_name                       # Course must have a name to be valid
+    skip_degree_qualifier_check: true     # SPA H1s might lack full degree prefix, allow for flexibility
+    require_international_fee: false      # Fees may be dynamically loaded or difficult to extract; stage for human review if missing initially
