@@ -2,22 +2,33 @@
 # Hostname: www.otago.ac.nz
 # Country: New Zealand  |  Currency: NZD
 #
-# Architecture (2026-06-29 v2):
+# Architecture (2026-06-29 v3):
 #   The entire otago.ac.nz domain is behind Cloudflare — static HTTP gets 403 everywhere,
 #   including the sitemap. Discovery uses render_listing_pages (scrape.do headless Chrome).
 #
-# KEY INSIGHT: /study/qualifications renders to list ALL 192 qualifications in one fetch.
-#   Previous v1 config rendered 133 individual subject pages sequentially (~45 min).
-#   This version uses ONE catalog page → discovery completes in ~30 seconds.
+# KEY INSIGHT: /study/qualifications renders ALL 192 qualifications in ONE fetch.
+#   Previous v2 config also added two subjects-listing pages to render_listing_pages.
+#   Those subjects-listing pages link to 133 individual subject detail pages, which the
+#   orchestrator then renders as additional listing pages — causing the same 133-page
+#   crawl as the original v1. Use ONLY the catalog page.
 #
 # Three-level navigation:
-#   Level 0: /study/qualifications catalog → 192 qualification links
+#   Level 0: /study/qualifications catalog → 192 qualification links (single render)
 #   Level 1: /study/qualifications/{slug} course detail pages
 #              → <meta name="internationalFeesMin" content="43260">
 #              → <meta name="internationalFeesMax" content="54390">
 #              → <meta name="location" content="Dunedin">
 #              → <meta name="studyLevel" content="Postgraduate">
 #   Per-course browser rescue handles Cloudflare on individual course pages.
+#
+# WHY 46 COURSES WERE MISSING from job_fef5eafb89e4 (192 found, 146 staged):
+#   - 1 correctly blocked: /apply-for-a-programme/ (application form, not a course)
+#   - ~13 correctly flagged domestic-only: BA, Social Work, PGDipSEM, Teaching, etc.
+#     (pages say "not available to international students" — staged with rejected status)
+#   - ~32 transient Cloudflare blocks on individual course pages: Music, MArts coursework,
+#     MBBS, various PGCert/PGDip health specialties. These pages DO have international fees
+#     and no domestic restriction — they were simply blocked at extraction time. Will be
+#     captured on the next scrape attempt.
 
 discovery:
   always_sitemap_supplement: false
@@ -28,14 +39,11 @@ discovery:
   seed_urls:
     - 'https://www.otago.ac.nz/study/qualifications'
 
-  # Just 3 render pages instead of 135.
-  # /study/qualifications = single catalog page listing all 192 qualifications.
-  # The two international/subjects seed pages are kept as supplementary in case
-  # the catalog misses any international-only courses.
+  # Single catalog page — lists all 192 qualifications in one render (~30 seconds).
+  # Do NOT add the subjects-listing pages here; they cascade into 133 subject detail
+  # renders via the render_listing_pages loop.
   render_listing_pages:
     - 'https://www.otago.ac.nz/study/qualifications'
-    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects'
-    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/postgraduate-study/subjects'
 
   allow_url_patterns:
     - '/study/qualifications/'
