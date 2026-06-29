@@ -2,7 +2,7 @@
 # Hostname: www.otago.ac.nz
 # Country: New Zealand  |  Currency: NZD
 #
-# Architecture (2026-06-29 v3):
+# Architecture (2026-06-29 v4):
 #   The entire otago.ac.nz domain is behind Cloudflare — static HTTP gets 403 everywhere,
 #   including the sitemap. Discovery uses render_listing_pages (scrape.do headless Chrome).
 #
@@ -12,27 +12,28 @@
 #   orchestrator then renders as additional listing pages — causing the same 133-page
 #   crawl as the original v1. Use ONLY the catalog page.
 #
-# Three-level navigation:
-#   Level 0: /study/qualifications catalog → 192 qualification links (single render)
-#   Level 1: /study/qualifications/{slug} course detail pages
-#              → <meta name="internationalFeesMin" content="43260">
-#              → <meta name="internationalFeesMax" content="54390">
-#              → <meta name="location" content="Dunedin">
-#              → <meta name="studyLevel" content="Postgraduate">
-#   Per-course browser rescue handles Cloudflare on individual course pages.
+# WHY 41 COURSES WERE MISSING from job_1ffa3984e2b4 (191 found, 150 staged):
+#   Root cause 1 — skip_browser_rescue=true set by auto_config_generator:
+#     auto_config_generator sets skip_browser_rescue=True when it detects STRATEGY_WAYBACK
+#     or STRATEGY_PROXY. That flag blocks browser rescue when a per-course static fetch
+#     returns a Cloudflare challenge page (1MB of HTML, but zero visible text).
+#     Without browser rescue, those 41 courses get no fallback and are dropped.
+#     Fix: skip_browser_rescue: false (explicit override wins over auto_config).
 #
-# WHY 46 COURSES WERE MISSING from job_fef5eafb89e4 (192 found, 146 staged):
-#   - 1 correctly blocked: /apply-for-a-programme/ (application form, not a course)
-#   - ~13 correctly flagged domestic-only: BA, Social Work, PGDipSEM, Teaching, etc.
-#     (pages say "not available to international students" — staged with rejected status)
-#   - ~32 transient Cloudflare blocks on individual course pages: Music, MArts coursework,
-#     MBBS, various PGCert/PGDip health specialties. These pages DO have international fees
-#     and no domestic restriction — they were simply blocked at extraction time. Will be
-#     captured on the next scrape attempt.
+#   Root cause 2 — Gemini called with empty text → 20s timeout per course:
+#     When text_len=0 (Cloudflare challenge page), Gemini was still called, timed out
+#     after 20s, and then the circuit breaker tripped — cascading to more skips.
+#     Fix: skip_ai_when_text_empty: true — skips Gemini immediately if text=="" AND
+#     triggers a browser retry (scrape.do render=True) to get past Cloudflare.
+#
+#   Root cause 3 — BFS crawling 5 pages unnecessarily:
+#     The BFS from /study/qualifications follows links to /study and /study/departments,
+#     wasting time. The catalog page alone gives all 192 candidates.
+#     Fix: bfs_page_budget: 1 — crawl only the seed URL itself via BFS.
 
 discovery:
   always_sitemap_supplement: false
-  bfs_page_budget: 5
+  bfs_page_budget: 1
   max_candidates: 500
   expected_min_courses: 150
 
@@ -104,6 +105,17 @@ extraction:
   filters:
     online_only:
       enabled: false
+
+  # Override auto_config_generator which sets skip_browser_rescue=true for
+  # STRATEGY_WAYBACK / STRATEGY_PROXY detections. Otago needs browser rescue:
+  # when a per-course static fetch returns a Cloudflare challenge (1MB HTML,
+  # zero visible text), the browser retry fetches the real rendered page.
+  skip_browser_rescue: false
+
+  # When static text is empty (Cloudflare challenge page), skip Gemini immediately
+  # instead of timing out after 20 s per course (which also trips the circuit breaker).
+  # The code then auto-triggers a per-course browser retry to get past Cloudflare.
+  skip_ai_when_text_empty: true
 
   staging:
     reject_if_missing:
