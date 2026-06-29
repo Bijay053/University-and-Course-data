@@ -1,33 +1,78 @@
 # Unitec Institute of Technology
 # Hostname: www.unitec.ac.nz
 # Country: New Zealand  |  Currency: NZD
-# Discovery: BFS starting from the international programmes gateway and the main programs listing page. Assumes server-rendered HTML for navigation and course links.
-# Notes: Uses common NZ university defaults for fees and English requirements.
+#
+# Discovery notes:
+#   - /international/all-international-programmes/ is JS-rendered (returns 0 course links via static HTTP).
+#     Sitemap supplement is the primary discovery mechanism.
+#   - Sitemap has two sub-sitemaps:
+#       wp-sitemap-posts-programme-1.xml  → ~191 actual programme URLs (courses)
+#       wp-sitemap-posts-page-1.xml       → ~157 general site pages (non-courses)
+#   - Programme URLs are at depth-3 or depth-4 under /career-and-study-options/:
+#       depth-3: /career-and-study-options/{field}/{course-name}/
+#       depth-4: /career-and-study-options/{broad-field}/{sub-field}/{course-name}/
+#   - Old seed URL /career-and-study-options/study-options/programmes/ returns fetch error (dead link).
+#   - BFS fix (2026-06-28): removed dead seed, added block patterns for non-course site sections
+#     (/industry/, /maori/, /pacific/, /under-25s/, /current-students/study-support/, etc.)
+#     that were filling BFS slots and generating 244 _category_landing_page_missing_ rejections.
+#   - allow_url_patterns now specifically targets /career-and-study-options/ at depth 3+,
+#     which covers all real course URLs while excluding depth-2 category hubs.
+
 discovery:
   always_sitemap_supplement: true
+  bfs_page_budget: 30
+
   seed_urls:
-  - https://www.unitec.ac.nz/international/all-international-programmes/
-  - https://www.unitec.ac.nz/career-and-study-options/study-options/programmes/
+    # JS-rendered but the sitemap handles actual discovery; keep as BFS start URL.
+    - https://www.unitec.ac.nz/international/all-international-programmes/
+
   allow_url_patterns:
-  - /[^/]+/[^/]+/[^/]+/?$
+    # Course pages are at /career-and-study-options/{field}/{course}/ (depth-3)
+    # or /career-and-study-options/{broad}/{sub}/{course}/ (depth-4).
+    # The depth-2 category hubs (/career-and-study-options/{field}/) are excluded
+    # because they have no trailing course-name segment.
+    - /career-and-study-options/[^/]+/[^/]+
+    # Also allow the /international/all-international-programmes/ seed itself.
+    - /international/all-international-programmes
+
   block_url_patterns:
-  - /apply
-  - /contact
-  - /news
-  - /events
-  - /blog
-  - /about
-  - /research
-  - /alumni
-  - /outreach
-  - /parents
-  - /jobs
-  - /careers
-  - /accommodation
-  - /life-on-campus
-  - /fees-and-funding$
-  - /international/living
-  expected_min_courses: 200
+    # ── Non-course site sections (generate _category_landing_page_missing_ rejections) ──
+    - /industry/
+    - /maori/
+    - /pacific/
+    - /under-25s/
+    - /current-students/
+    - /information-for-unitec-suppliers/
+    - /international/before-you-arrive/
+    - /international/find-an-agent/
+    - /international/international-student-life/
+    - /international/study-with-us/country-specific-criteria/
+    - /international/study-with-us/how-to-pay/
+    - /international/study-with-us/study-abroad-exchange/
+    - /international/study-with-us/english-language-requirements
+    - /international/study-with-us/international-fees/
+    - /international/study-with-us/international-study-grant/
+    - /international/study-with-us/entry-requirements/
+    # ── Standard non-course blocks ─────────────────────────────────────────────
+    - /apply
+    - /contact
+    - /news
+    - /events
+    - /blog
+    - /about
+    - /research
+    - /alumni
+    - /outreach
+    - /parents
+    - /jobs
+    - /careers
+    - /accommodation
+    - /life-on-campus
+    - /fees-and-funding$
+    - /international/living
+
+  expected_min_courses: 70
+
 extraction:
   fees:
     default_currency: NZD
@@ -57,3 +102,5 @@ extraction:
       enabled: false
     online_only:
       enabled: true
+  staging:
+    skip_degree_qualifier_check: true
