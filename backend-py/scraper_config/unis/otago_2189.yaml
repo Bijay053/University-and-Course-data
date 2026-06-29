@@ -1,23 +1,186 @@
 # University of Otago
 # Hostname: www.otago.ac.nz
 # Country: New Zealand  |  Currency: NZD
-# Discovery: Seeded BFS via international future-student subject directories
-# Notes: Standard NZ pattern applied. NZ sites routinely publish both annual and full-course total fees; prefer_annual_over_total strictly enforced.
+#
+# Architecture (2026-06-29):
+#   The entire otago.ac.nz domain is behind Cloudflare — static HTTP gets 403 everywhere,
+#   including the sitemap. Discovery therefore uses render_listing_pages (scrape.do headless
+#   Chrome) to render all 133 subject pages and harvest /study/qualifications/ course links.
+#
+# Three-level navigation:
+#   Level 0: Seed pages — subjects listing (all 133 UG subjects, plus PG which overlaps)
+#   Level 1: Subject pages  → course cards linking to /study/qualifications/{slug}
+#   Level 2: Course detail  → /study/qualifications/{slug}
+#              → structured <meta> tags: internationalFeesMin/Max, location, studyLevel, etc.
+#              → per-course browser rescue handles Cloudflare at extraction time
+#
+# Note: both seed URLs link to the SAME 133 subject pages. All 133 are enumerated directly
+# in render_listing_pages so the orchestrator renders them individually, bypassing Cloudflare.
+# The BFS budget is kept minimal because BFS static-HTTP is universally 403 on this domain.
 
 discovery:
-  always_sitemap_supplement: true
-  bfs_page_budget: 80
-  max_candidates: 1000
+  # Sitemap is Cloudflare-blocked — cannot use
+  always_sitemap_supplement: false
+
+  # Tiny BFS budget — BFS gets 403 on all otago.ac.nz pages.
+  # Kept non-zero only as a safety net for any future Cloudflare relaxation.
+  bfs_page_budget: 5
+  max_candidates: 2000
+
   expected_min_courses: 200
 
   seed_urls:
-    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/postgraduate-study/subjects'
     - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/postgraduate-study/subjects'
 
+  # render_listing_pages: all 133 subject pages + the two seed listing pages.
+  # The orchestrator renders each one with scrape.do headless Chrome, extracts all
+  # hrefs matching allow_url_patterns, and adds them as course candidates.
+  # Enumerated 2026-06-29 by rendering the subjects-listing page via scrape.do.
+  render_listing_pages:
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/postgraduate-study/subjects'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/accounting'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/agricultural-innovation'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/anatomy'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/anthropology'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/aquaculture-and-fisheries'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/archaeology'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/biblical-studies'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/biochemistry'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/bioethics'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/biomedical-sciences'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/botany'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/buddhist-studies'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/business-analytics'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/chemistry'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/chinese'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/christian-thought-and-history'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/classics'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/communication-studies'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/community-health-care'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/composition-music'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/computational-modelling'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/computer-science'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/criminology'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/dance'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/data-science'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/dental-technology'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/dentistry'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/drugs-and-human-health'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/early-childhood-education'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/ecology'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/economics'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/education'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/english'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/english-and-linguistics'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/entrepreneurship'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/environment-and-society'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/environmental-management'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/exercise-and-sport-science'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/film-and-media-studies'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/finance'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/food-science'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/forensic-analytical-science'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/french'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/functional-human-biology'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/gender-studies'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/genetics'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/geographic-information-systems'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/geography'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/geology'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/german'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/global-studies'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/greek'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/health-sciences-first-year-hsfy'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/history'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/hospitality'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/human-nutrition'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/human-resource-management'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/human-services-law'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/indigenous-studies'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/infection-and-immunity'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/international-business'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/irish-studies'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/japanese'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/land-planning-and-development'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/language-and-linguistics'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/latin'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/law'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/linguistics'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/management'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/maori-health'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/maori-studies'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/marine-science'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/marketing'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/mathematics'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/medical-laboratory-science'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/medicine'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/microbiology'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/molecular-basis-of-health-and-disease'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/music'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/music-production'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/neuroscience'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/nutrition-and-metabolism-in-human-health'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/oral-health'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/pacific-and-global-health'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/pacific-islands-studies'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/pastoral-studies'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/pathology'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/performance-music'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/performing-arts'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/pharmaceutical-science'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/pharmacology'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/pharmacy'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/philosophy'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/philosophy-politics-and-economics'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/physical-activity-and-health'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/physical-education-activity-and-health'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/physics'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/physiology'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/physiotherapy'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/plant-biotechnology'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/politics'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/popular-music'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/primary-bicultural-education'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/primary-education'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/psychology'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/public-health'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/radiation-therapy'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/religious-studies'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/reproduction-genetics-and-development'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/science-communication'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/science-of-religion'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/secondary-education'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/social-work'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/sociology'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/software-engineering'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/spanish'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/sport-and-exercise-nutrition'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/sport-development-and-management'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/sports-technology'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/statistics'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/studio-production-music'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/surveying-surveying-measurement'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/sustainable-business'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/sustainable-energy'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/sustainable-finance'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/teaching'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/tesol'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/theatre-studies'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/theology'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/tourism'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/tourism-languages-and-cultures'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/writing'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects/zoology'
+
+  # Subject pages link to qualification pages at /study/qualifications/{slug} and /study/dipgrad/.
+  # The /subjects-courses/ pattern allows subject intermediary pages to be traversed.
+  # Strip ?subject=... query params via dedup_use_full_url: false (set in staging below).
   allow_url_patterns:
+    - '/study/qualifications/'
+    - '/study/dipgrad/'
     - '/subjects-courses/'
-    - '/courses/'
-    - '/qualifications/'
 
   block_url_patterns:
     - '/news'
@@ -28,12 +191,22 @@ discovery:
     - '/research/'
     - '/alumni'
     - '\.pdf$'
+    - '/courses/papers'
+    - '/courses/subjects'
+    - '/apply/'
+    - '/graduate-research/'
+    - '/postgraduate-study/'
+    - '/study/masters$'
+    - '/study/qualifications$'
 
 extraction:
   fees:
     default_currency: 'NZD'
     prefer_international: true
     prefer_annual_over_total: true
+    # International fees on Otago course pages are published in structured
+    # <meta name="internationalFeesMin" content="..."> / <meta name="internationalFeesMax" ...>
+    # The scraper picks these up automatically via the meta-tag fee extractor.
     reject_keywords:
       - 'Domestic'
       - 'New Zealand citizen'
@@ -43,7 +216,7 @@ extraction:
 
   english:
     trust_vision_ocr: false
-    central_page: 'https://www.otago.ac.nz/international/future-students/entry-requirements/english-language-requirements'
+    central_page: 'https://www.otago.ac.nz/international/future-students/entrance-requirements/english-language-requirements'
     degree_level_defaults:
       undergraduate:
         ielts: 6.0
@@ -66,11 +239,12 @@ extraction:
   filters:
     online_only:
       enabled: false
+
   staging:
     reject_if_missing:
       - course_name
     skip_degree_qualifier_check: true
     require_international_fee: false
-    # dedup_use_full_url: true is intentionally kept — all VUW URLs now carry
-    # the ?international=true param uniformly, so full-URL dedup works correctly.
-    dedup_use_full_url: true
+    # dedup on URL path only (strip ?subject=... query params which differ per
+    # subject page but refer to the same qualification).
+    dedup_use_full_url: false
