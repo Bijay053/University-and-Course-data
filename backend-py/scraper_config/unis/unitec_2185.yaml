@@ -1,15 +1,59 @@
-# Unitec
+# Unitec Institute of Technology
 # Hostname: www.unitec.ac.nz
 # Country: New Zealand  |  Currency: NZD
-# Slug: unitec
-# Auto-generated: 2026-06-24
-#
-# This stub was created automatically on the first scrape of this university.
-# Review and expand it to improve discovery and extraction quality.
-# See scraper_config/defaults.yaml for all available options.
+# Discovery: BFS starting from the international programmes gateway and the main programs listing page. Assumes server-rendered HTML for navigation and course links.
+# Notes: Uses common NZ university defaults for fees and English requirements.
 
-discovery: {}
+discovery:
+  always_sitemap_supplement: true        # Keeps sitemap as safety net
+  seed_urls:
+    # Starting from the provided international programmes page
+    - "https://www.unitec.ac.nz/international/all-international-programmes/"
+    # Also directly target the main programs listing page which is likely to link to all courses
+    - "https://www.unitec.ac.nz/career-and-study-options/study-options/programmes/"
+  allow_url_patterns:
+    # Pattern to capture individual course pages based on typical Unitec structure
+    - '/career-and-study-options/study-options/programmes/.*/'
+  block_url_patterns:
+    - '/news'
+    - '/events'
+    - '/about'
+    - '/staff'
+    - '/research'
+  expected_min_courses: 200              # Estimate for Unitec's international offerings
 
 extraction:
   fees:
-    default_currency: NZD
+    default_currency: "NZD"
+    prefer_annual_over_total: true       # NZ sites often show both annual + total
+    # Central fee page for international students if one exists
+    central_page: "https://www.unitec.ac.nz/international/study-with-us/fees-and-funding/"
+
+  english:
+    degree_level_defaults:
+      undergraduate:
+        ielts: 6.0
+        pte: 50
+        toefl: 80
+      postgraduate:
+        ielts: 6.5
+        pte: 58
+        toefl: 90
+    # Central English requirements page for international students
+    central_page: "https://www.unitec.ac.nz/international/study-with-us/entry-requirements/english-language-requirements-international/"
+
+  intake:
+    start_dates_only: true               # Focus on actual course start dates, ignore application deadlines
+
+  course_name:
+    strip_title_suffixes:
+      - " | Unitec"                      # Example suffix, verify on actual course pages
+      - " - Unitec"
+      - " — Unitec"
+      - "| Unitec"
+
+  filters:
+    domestic_only:
+      enabled: false
+    online_only:
+      enabled: true                      # Assume online-only courses are valid for international students in NZ
