@@ -1,15 +1,68 @@
 # University of Otago
 # Hostname: www.otago.ac.nz
 # Country: New Zealand  |  Currency: NZD
-# Slug: otago
-# Auto-generated: 2026-06-29
-#
-# This stub was created automatically on the first scrape of this university.
-# Review and expand it to improve discovery and extraction quality.
-# See scraper_config/defaults.yaml for all available options.
+# Discovery: Seeded BFS via international future-student subject directories
+# Notes: Standard NZ pattern applied. NZ sites routinely publish both annual and full-course total fees; prefer_annual_over_total strictly enforced.
 
-discovery: {}
+discovery:
+  always_sitemap_supplement: true
+  bfs_page_budget: 80
+  max_candidates: 1000
+  expected_min_courses: 200
+
+  seed_urls:
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/postgraduate-study/subjects'
+    - 'https://www.otago.ac.nz/international/future-students/subjects-courses/subjects'
+
+  allow_url_patterns:
+    - '/subjects-courses/'
+    - '/courses/'
+    - '/qualifications/'
+
+  block_url_patterns:
+    - '/news'
+    - '/events'
+    - '/about'
+    - '/staff'
+    - '/people/'
+    - '/research/'
+    - '/alumni'
+    - '\.pdf$'
 
 extraction:
   fees:
-    default_currency: NZD
+    default_currency: 'NZD'
+    prefer_international: true
+    prefer_annual_over_total: true
+    reject_keywords:
+      - 'Domestic'
+      - 'New Zealand citizen'
+      - 'NZ student'
+      - 'Part time'
+      - 'Part-time'
+
+  english:
+    trust_vision_ocr: false
+    central_page: 'https://www.otago.ac.nz/international/future-students/entry-requirements/english-language-requirements'
+    degree_level_defaults:
+      undergraduate:
+        ielts: 6.0
+        pte: 50
+        toefl: 80
+      postgraduate:
+        ielts: 6.5
+        pte: 58
+        toefl: 90
+
+  intake:
+    start_dates_only: true
+
+  course_name:
+    strip_title_suffixes:
+      - ' | University of Otago'
+      - ' - University of Otago'
+      - ' | University of Otago, New Zealand'
+
+  filters:
+    online_only:
+      enabled: false
