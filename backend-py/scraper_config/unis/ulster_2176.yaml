@@ -87,7 +87,8 @@ discovery:
   # duplicates the 2026/27 entries (same course, new numeric ID in the slug).
   #
   # Blocking 202728 eliminates the duplication:
-  #   592 (202627) − ~35 blocked (pgce + degree-apprenticeship) ≈ 557 courses
+  #   592 (202627) − 26 blocked (pgce:9 + degree-apprenticeship:17) = 566 candidates
+  # skip_staging_keywords then filters CPD pages by content → ~557 staged courses.
   # This matches the user-verified count of 557 international-eligible courses.
   #
   # Previous attempts:
@@ -107,22 +108,16 @@ discovery:
   #   degree-apprenticeship — employer-funded; only open to UK residents with
   #                           an employer sponsor
   #   202728               — incomplete future-year duplicate (see note above)
+  #
+  # NOTE: ID-range blocks (-5xxxx, -46/47xxx) were removed 2026-07-02.
+  # Analysis showed the ID range is NOT a reliable CPD indicator — legitimate
+  # academic courses (e.g. "Synthetic Biology" ID 51404) share those ranges.
+  # Blocking 87 courses by ID gave only 479 discovered vs the expected 566.
+  # CPD pages are correctly caught at staging by skip_staging_keywords below.
   block_url_patterns:
     - 'pgce'
     - 'degree-apprenticeship'
     - '/courses/202728/'
-    # CPD / short-course URL blocking by numeric ID range.
-    # Ulster uses the following ID ranges for non-degree content:
-    #   50000-59999  — "Short course and CPD" professional development courses
-    #                  (confirmed by page title: "Short course and CPD")
-    #   46000-47999  — Short professional modules / CPD units
-    #                  (confirmed: "Short course and CPD" in page title too)
-    # These are blocked at discovery time to avoid wasting fetch budget on
-    # pages with no international fee, IELTS, or intake data.
-    # Pattern: matches /courses/202627/<slug>-<5-digit-id-starting-with-5>.
-    # The regex is anchored to the end of the URL path segment.
-    - '-5\d{4}$'
-    - '-4[67]\d{3}$'
 
 extraction:
   # Ulster course pages have dedicated /fees/ and /entry-requirements/ sub-pages
@@ -169,13 +164,13 @@ extraction:
 
   # CPD / short-course suppression.
   # Ulster CPD pages contain "Short course and CPD" in their <title> and
-  # visible text.  Two suppression layers work together:
-  #   1. block_url_patterns above blocks the known CPD ID ranges at discovery.
-  #   2. skip_staging_keywords below catches any CPD page that slips through
-  #      (e.g. a CPD course with an ID outside the blocked ranges) and aborts
-  #      staging entirely — the course is never written to scraped_courses.
-  #   3. skip_ai_fallback_keywords suppresses the Gemini fallback call on any
-  #      CPD page that somehow reaches that stage.
+  # visible text.  Content-based suppression works in two layers:
+  #   1. skip_staging_keywords catches any CPD page and aborts staging —
+  #      the course is never written to scraped_courses.
+  #   2. skip_ai_fallback_keywords suppresses the Gemini fallback call on
+  #      any CPD page that reaches that stage (saves API cost).
+  # ID-range URL blocks were removed — they incorrectly excluded legitimate
+  # academic courses sharing the 5xxxx/46xxx/47xxx numeric ID ranges.
   skip_staging_keywords:
     - "Short course and CPD"
   skip_ai_fallback_keywords:
