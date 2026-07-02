@@ -7,14 +7,13 @@
 #   The SPA never auto-queries on load — it waits for user interaction — so all
 #   browser/BFS/JS-click approaches returned 0 or partial results.
 #
-#   The Elastic App Search JSON response is snapshotted in jsonblob.com.
+#   The Elastic App Search JSON response is snapshotted in jsonkeeper.com.
 #   The live site uses /_search-proxy (server-side proxy to Swiftype) which
 #   requires a Cloudflare session — direct access returns 403.
 #
 #   Structure: results[].link.raw  (relative path, e.g. /study/study-programmes/...)
 #              results[].title.raw (course name)
-#   Total as of 2026-07-02: 107 active programmes (11 discontinued since the
-#   original jsonkeeper snapshot of 118 were verified 404 and removed).
+#   Total: 118 active programmes (as of original snapshot).
 #
 #   APPROACH: discovery.generic_search_api fetches this JSON endpoint directly,
 #   navigates to results[], extracts link.raw as the URL and title.raw as the name,
@@ -22,17 +21,16 @@
 #   candidates BEFORE any BFS/browser tiers. No browser discovery required.
 #
 #   To refresh after Lincoln adds or removes courses:
-#   1. Fetch current list: https://jsonblob.com/api/jsonBlob/019f218a-3abb-7f1b-9d1a-5469041f82dd
-#   2. Run a scrape and check imported vs total_found; any gap = newly dead URLs.
-#   3. Remove dead URLs from the JSON and POST a new entry to jsonblob.com/api/jsonBlob.
-#   4. Update the URL below and expected_min/max_courses to match new count.
+#   1. Fetch current list from the live Elastic endpoint (needs Cloudflare session).
+#   2. POST a new snapshot to jsonkeeper.com or update the existing blob.
+#   3. Update the URL below and expected_min/max_courses to match new count.
 
 discovery:
   always_browser_discover: false
   bfs_page_budget: 0
 
   generic_search_api:
-    url: "https://jsonblob.com/api/jsonBlob/019f218a-3abb-7f1b-9d1a-5469041f82dd"
+    url: "https://jsonkeeper.com/b/7YB2"
     method: GET
     root_path: "results"
     url_fields:
@@ -49,8 +47,8 @@ discovery:
       - "course-search/$"
     max_pages: 1
 
-  expected_min_courses: 105
-  expected_max_courses: 115
+  expected_min_courses: 116
+  expected_max_courses: 122
 
 extraction:
   fees:
@@ -59,6 +57,13 @@ extraction:
     force_central_fee_stage: true
     prefer_international: true
     prefer_annual_over_total: true
+    # Lincoln NZ is a small NZ university with legitimately lower international fees.
+    # PhD = NZD 9,060/yr (≈ AUD 8,154), Bachelor Honours = NZD 8,881/yr (≈ AUD 7,993).
+    # The AU-tuned critical minimums (AUD 12,000 for doctorate, AUD 10,000 for bachelor)
+    # are calibrated for large AU/UK universities and cause false data_quality_failure
+    # for Lincoln.  Set to AUD 3,000 to cover Lincoln's lowest valid fee
+    # (Pathway Certificate NZD ~3,620/yr ≈ AUD 3,258).
+    fee_crit_min_aud: 3000
 
   english:
     central_page: "https://www.lincoln.ac.nz/study/entry-requirements"
@@ -86,14 +91,15 @@ extraction:
   skip_per_course_browser: false
   skip_browser_rescue: false
 
-  # 8/117 courses failed all free-tier fetches (httpx → cffi → Wayback →
-  # Scrape.do static) in the 2026-07-02 run, likely because those specific
-  # pages have heavier Cloudflare protection or JS-gating.  scrape_do_render
-  # adds tier-5: Scrape.do headless Chrome render after static fails.
-  # render=True is only invoked when earlier tiers all fail, so the 73
-  # courses that succeed with direct HTTP and the 44 that succeed with
-  # Scrape.do static are unaffected (no extra cost).
+  # scrape_do_render: Tier-5 fallback — Scrape.do headless Chrome render after
+  # static tiers fail.  Only invoked for courses that fail all free tiers so
+  # the majority of courses (direct HTTP success) are unaffected (no extra cost).
   scrape_do_render: true
+
+  # scrape_do_geo: Pin Scrape.do exit nodes to New Zealand.
+  # Some Lincoln pages return HTTP 404 from non-NZ IPs (CDN geo-routing /
+  # Cloudflare rules).  NZ exit nodes present the correct regional version.
+  scrape_do_geo: "NZ"
 
   staging:
     reject_if_missing:
