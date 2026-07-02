@@ -1,125 +1,40 @@
-# Lincoln University (NZ) — slug "lincoln"
+# Lincoln University (NZ)
 # Hostname: www.lincoln.ac.nz
+# uni_id: 1753  |  Country: NZ  |  Currency: NZD
 #
-# ROOT CAUSE (confirmed 2026-06-26, definitive):
-#   Lincoln uses Elastic App Search React UI for TWO separate SPA listings:
-#   (A) /study/study-programmes/programme-search/ — 118 programmes across 8 pages
-#   (B) /study/courses-2/course-search/ — UG individual courses (separate catalogue)
+# DISCOVERY (2026-06-29 v2 — API-seeded):
+#   Lincoln's programme-search page is an Elastic App Search SPA that never
+#   auto-queries on load, making all browser/BFS/JS-click approaches unreliable
+#   (history: XHR interceptor, elastic_api_bootstrap, pagination click, BFS
+#   fallback — all returned 0 or partial results).
 #
-#   CRITICAL: Both SPAs do NOT auto-query Elastic on page load.
-#   They render an empty search form and wait for the user to click "Search".
-#   This is why:
-#     - The seed page returns 0 courses regardless of wait time.
-#     - The pagination container is never found (appears only after results load).
-#     - seed_page_settle_s alone does NOT fix this — the SPA is idle, not slow.
+#   The live Elastic App Search JSON API endpoint was captured and snapshotted:
+#     https://jsonkeeper.com/b/7YB2
+#   It returns 118 programmes (total_pages: 1) with all links under results[].link.raw.
 #
-#   HISTORY of all failed approaches:
-#     1. XHR interceptor: never fires (SPA doesn't query on load) → 0
-#     2. elastic_api_bootstrap: page 2+ 403 CF + NameError closure → 0
-#     3. evaluate-failure guard: underlying API still 403 → 0
-#     4. seed_page_click_pagination (3s settle): no pagination container → 0
-#        (container appears ONLY after search results are shown)
-#     5. BFS areas-of-specialisation: finds 57 PG courses reliably, misses
-#        ~61 UG courses at courses-2/course-search/ (also SPA, same problem)
+#   APPROACH: discovery.extra_course_urls injects all 118 URLs directly as
+#   candidates after the (minimal) BFS phase. No browser discovery required.
+#   Each course page is then fetched individually for fee/IELTS/duration extraction.
 #
-#   DEFINITIVE FIX (2026-06-26): seed_page_trigger_js
-#   After settling on the seed page, evaluate JS that clicks the Search button.
-#   This submits an empty Elastic query → SPA renders all 15 results on page 1
-#   → rc-pagination component appears → pagination clicks pages 2-8 → 118 links.
-#
-# BELT-AND-SUSPENDERS:
-#   All /study/areas-of-specialisation/<area>/ pages are added as seeds too.
-#   These are STATIC HTML (no JS required), reliably find ~57 PG courses even
-#   if both SPAs fail. They run AFTER the SPA seeds so if SPA works, early_stop
-#   fires before reaching them (saving time).
-#
-# ══ LANCASTER LESSON ════════════════════════════════════════════════════════
-# Lancaster works because it uses static HTTP for discovery (SSR JSON prop) and
-# reserves browser only for per-course extraction. Lincoln's SPAs genuinely need
-# browser for discovery (unlike Lancaster / WGTN), but the same extraction
-# principle applies: browser_wait_strategy + skip_per_course_browser: false.
+#   If Lincoln adds new courses, re-fetch the API JSON and update extra_course_urls.
+#   API source: https://jsonkeeper.com/b/7YB2  (118 results, page 1/1)
 
 discovery:
-  always_browser_discover: true
-  browser_time_budget_s: 600   # 2 SPA seeds × (3+5)s + 8 pag pages × 3s + nav
-  browser_early_stop_courses: 150  # 118 courses + margin
+  always_browser_discover: false
+  bfs_page_budget: 1
+  expected_min_courses: 110
+  expected_max_courses: 130
 
   seed_urls:
-    # PRIMARY: SPA listing all 118 programmes (PG + UG mix). trigger_js below
-    # clicks Search button → results appear → pagination clicks pages 2-8.
     - https://www.lincoln.ac.nz/study/study-programmes/programme-search/
-    # SECONDARY: UG individual courses listing (separate SPA). Same trigger approach.
-    - https://www.lincoln.ac.nz/study/courses-2/course-search/
-    # FALLBACK: Static HTML area pages — reliably find PG courses without JS trigger.
-    # Seeded directly so BFS visits them early if SPAs fail.
-    - https://www.lincoln.ac.nz/study/areas-of-specialisation/agriculture-horticulture-and-viticulture/
-    - https://www.lincoln.ac.nz/study/areas-of-specialisation/business/
-    - https://www.lincoln.ac.nz/study/areas-of-specialisation/environment/
-    - https://www.lincoln.ac.nz/study/areas-of-specialisation/food-wine-and-beer/
-    - https://www.lincoln.ac.nz/study/areas-of-specialisation/landscape-architecture/
-    - https://www.lincoln.ac.nz/study/areas-of-specialisation/property-and-valuation/
-    - https://www.lincoln.ac.nz/study/areas-of-specialisation/science/
-    - https://www.lincoln.ac.nz/study/areas-of-specialisation/tourism/
-    - https://www.lincoln.ac.nz/study/areas-of-specialisation/technology/
-
-  # Clicked on every seed page after the 3s default settle.
-  # For SPA seeds: clicks the Search/submit button so Elastic renders all results
-  # and the rc-pagination component appears. After JS fires, the code waits 5s.
-  # For static area-of-specialisation pages: harmless (no search button present).
-  seed_page_trigger_js: |
-    (function() {
-      var selectors = [
-        '.sui-search-box__submit',
-        'button[type="submit"]',
-        '[aria-label="Search"]',
-        'button.search-button',
-        'button[class*="search"]',
-        'form button'
-      ];
-      for (var i = 0; i < selectors.length; i++) {
-        var btn = document.querySelector(selectors[i]);
-        if (btn) { btn.click(); return; }
-      }
-      var inp = document.querySelector(
-        '.sui-search-box__text-input, input[type="search"], input[name="q"]'
-      );
-      if (inp) {
-        inp.dispatchEvent(new KeyboardEvent('keydown',
-          {key: 'Enter', keyCode: 13, which: 13, bubbles: true}));
-        inp.dispatchEvent(new KeyboardEvent('keyup',
-          {key: 'Enter', keyCode: 13, which: 13, bubbles: true}));
-      }
-    })();
-
-  # After trigger JS fires and the code waits 5s, click pages 2-8.
-  # At this point the SPA should have rendered page 1 results + pagination.
-  seed_page_click_pagination:
-    max_pages: 8    # 8 pages × ~15 courses = 118 total
-    settle_s: 3.0   # seconds to wait after each page button click
 
   allow_url_patterns:
-    # PG programme pages (programme-search SPA)
     - "lincoln\\.ac\\.nz/study/study-programmes/programme-search/[^/]+/?$"
-    # UG course pages (course-search SPA)
     - "lincoln\\.ac\\.nz/study/courses-2/course-search/[^/]+/?$"
-    # Belt-and-suspenders: individual course pages under area specialisation listings
-    - "lincoln\\.ac\\.nz/study/areas-of-specialisation/[^/]+/[^/]+/?$"
-
-  # Final URL gate before extraction — mirrors Lancaster's course_detail_url_patterns.
-  course_detail_url_patterns:
-    - '/study/study-programmes/programme-search/[^/]+/?$'
-    - '/study/courses-2/course-search/[^/]+/?$'
-    - '/study/areas-of-specialisation/[^/]+/[^/]+/?$'
 
   block_url_patterns:
-    - "/resources-for-careers-advisors"
-    - "/farms-outreach"
-    - "/teaching-resources"
-    - "/future-students-and-schools"
-    - "/types-of-postgrad-study"
-    - "/make-postgraduate-study-work"
-    - "/on-farm-workshops"
-    - "/on-campus-workshops"
+    - "programme-search/$"
+    - "course-search/$"
     - "/apply"
     - "/about"
     - "/news"
@@ -127,40 +42,159 @@ discovery:
     - "/research"
     - "/staff"
     - "/contact"
-    - "programme-search/$"           # PG listing hub (not a course page)
-    - "courses-2/course-search/$"    # UG listing hub (not a course page)
-    - "/areas-of-specialisation/$"   # area index page (not a course)
-    - "/star-programme"
-    - "/programmes-starting-soon"
-    - "/english-language"
-    - "/study-abroad"
-    - "/student-exchange"
 
-  use_stealth_browser: true
+  # All 118 programme URLs sourced from the Elastic App Search JSON API snapshot
+  # (https://jsonkeeper.com/b/7YB2 — results[].link.raw, sorted alphabetically).
+  # These are injected directly as candidates after discovery, bypassing the SPA.
+  extra_course_urls:
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-agribusiness-and-food-marketing/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-agricultural-science/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-agriculture/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-commerce-accounting-and-finance-major/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-commerce-ag-and-prof-accounting/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-commerce-agriculture/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-commerce-entrepreneurship-and-innovation-major/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-commerce-food-and-resource-economics-major/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-commerce-global-business/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-commerce-horticulture/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-commerce-hotel-and-tourism-management-major/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-commerce-individual-major/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-commerce-marketing/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-commerce-supply-chain-management/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-commerce-sustainability/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-commerce-with-honours/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-environment-and-society-with-honours/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-environment-and-society/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-environmental-management-with-honours/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-environmental-management/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-environmental-policy-and-planning-hons/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-land-and-property-management/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-landscape-architecture-grad-entry/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-landscape-architecture/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-science-animal-science/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-science-brewing-and-fermentation-major/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-science-conservation-and-ecology-major/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-science-environmental-science-major/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-science-food-innovation/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-science-food-science-major/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-science-individual-major/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-science-plant-and-horticultural-sciences-major/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-science-with-honours/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-sport-and-rec-management-with-honours/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-sport-and-recreation-management/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-sustainable-tourism/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-tourism-management-with-honours/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-tourism-management/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-viticulture-and-oenology-honours/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-viticulture-and-oenology/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/certificate-in-university-studies/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/diploma-in-agriculture/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/diploma-in-applied-science/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/diploma-in-commerce/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/diploma-in-farm-management/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/diploma-in-horticultural-business/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/diploma-in-horticultural-management/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/diploma-in-horticulture/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/diploma-in-natural-resources/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/diploma-in-university-studies-2/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/doctor-of-philosophy-phd/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/english-language/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/graduate-certificate-in-academic-english/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/graduate-certificate-in-applied-science/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/graduate-certificate-in-business-and-sustainability/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/graduate-certificate-in-commerce/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/graduate-certificate-in-recreation-management/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/graduate-certificate-in-resource-studies/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/graduate-certificate-in-tourism-management/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/graduate-diploma-in-applied-science/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/graduate-diploma-in-brewing-and-fermentation/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/graduate-diploma-in-business-and-sustainability/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/graduate-diploma-in-commerce/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/graduate-diploma-in-property-management/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/graduate-diploma-in-recreation-management/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/graduate-diploma-in-resource-studies/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/graduate-diploma-in-tourism-management/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/graduate-diploma-in-valuation/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/graduate-diploma-in-viticulture-and-oenology/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/master-of-agricultural-science-research/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/master-of-app-sci-disaster-risk-and-resilience-r/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/master-of-app-sci-environmental-management-r/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/master-of-app-sci-int-rural-development-r/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/master-of-app-sci-land-and-society-research/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/master-of-app-sci-parks-rec-and-tourism-r/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/master-of-applied-computing/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/master-of-business-finance/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/master-of-business-global-management-and-marketing/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/master-of-commerce-agricultural-research/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/master-of-commerce-and-management-research/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/master-of-environment-and-agriculture/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/master-of-environmental-policy-and-management/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/master-of-fintech-and-investment-management/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/master-of-horticultural-science-research/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/master-of-international-nature-conservation-r/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/master-of-landscape-architecture-research/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/master-of-landscape-architecture/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/master-of-management-in-agribusiness/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/master-of-natural-resources-management-and-ecological-engineering/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/master-of-parks-management-2/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/master-of-pest-management/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/master-of-planning-2/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/master-of-precision-agriculture/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/master-of-professional-accounting-cpa/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/master-of-science-in-food-innovation/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/master-of-science-plant-breeding-research/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/master-of-science-research/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/master-of-sport-and-recreation-management/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/master-of-tourism-management/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/master-of-water-resource-management-research/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/master-of-water-science-and-management/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/master-of-wine-and-viticulture/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/pathway-certificate-for-mpa-entry/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/postgraduate-certificate-in-applied-science/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/postgraduate-certificate-in-commerce/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/postgraduate-certificate-in-enviro-management/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/postgraduate-certificate-in-int-rural-development/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/postgraduate-certificate-in-land-and-society/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/postgraduate-certificate-in-parks-rec-and-tourism/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/postgraduate-diploma-in-agricultural-science/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/postgraduate-diploma-in-applied-science/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/postgraduate-diploma-in-commerce/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/postgraduate-diploma-in-environmental-management/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/postgraduate-diploma-in-horticultural-science/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/postgraduate-diploma-in-int-rural-development/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/postgraduate-diploma-in-land-and-society/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/postgraduate-diploma-in-parks-rec-and-tourism/
+    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/postgraduate-diploma-in-water-resource-management/
 
 extraction:
   fees:
     central_page: "https://www.lincoln.ac.nz/study/fees"
     default_currency: "NZD"
     force_central_fee_stage: true
+    prefer_international: true
+    prefer_annual_over_total: true
 
   english:
     central_page: "https://www.lincoln.ac.nz/study/entry-requirements"
-    # Lincoln NZ publicly states degree-level entry minimums:
-    # UG:  IELTS Academic 6.0 overall (no band below 5.5)
-    # PG:  IELTS Academic 6.5 overall (no band below 6.0)
-    # PhD: IELTS Academic 6.5 overall (no band below 6.0)
+    # Lincoln NZ public minimums:
+    # UG:  IELTS 6.0 overall (no band below 5.5)
+    # PG:  IELTS 6.5 overall (no band below 6.0)
+    # PhD: IELTS 6.5 overall (no band below 6.0)
     default_ielts: 6.0
     degree_level_defaults:
       undergraduate:
         ielts: 6.0
+        pte: 50
+        toefl: 60
       postgraduate:
         ielts: 6.5
+        pte: 58
+        toefl: 80
       doctorate:
         ielts: 6.5
+        pte: 58
+        toefl: 80
 
-  # Lancaster pattern: browser available for per-course extraction rescue.
-  # Lincoln course pages may need JS to render full details (fees, IELTS).
   browser_wait_strategy: networkidle
   browser_dcl_settle_ms: 3000
   skip_per_course_browser: false
@@ -171,3 +205,9 @@ extraction:
       - course_name
     skip_degree_qualifier_check: true
     require_international_fee: false
+
+  filters:
+    domestic_only:
+      enabled: false
+    online_only:
+      enabled: false
