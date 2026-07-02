@@ -76,21 +76,28 @@ discovery:
   # is needed: set offset=1000, max_candidates=500 for the second job.
   sitemap_offset: 0
 
-  # Year dedup DISABLED (2026-07-02).
+  # Year dedup: block 202728 (incomplete future year), keep only 202627.
   #
-  # PROBLEM: keep_latest + year_dedup_strip_trailing_id:true was collapsing
-  # 998 sitemap URLs into only 362 unique courses instead of the expected ~557.
-  # Root cause: Ulster assigns a NEW numeric ID to each year-instance of a
-  # course (e.g. law-40288 in 202627 vs law-41910 in 202728).  strip_trailing_id
-  # strips those IDs before grouping — BUT it also collapses genuinely DIFFERENT
-  # courses that share the same base slug (e.g. two nursing programmes with
-  # slugs nursing-12345 and nursing-67890 both become "nursing" and one is
-  # dropped).  This caused 195 real distinct courses to be lost.
+  # Sitemap breakdown (verified 2026-07-02):
+  #   Total: 1050 URLs — 592 in /courses/202627/ + 458 in /courses/202728/
   #
-  # FIX: year_dedup_mode: none — all 998 sitemap URLs pass through to
-  # extraction.  The staging pipeline deduplicates on lower(course_name) per
-  # university, so year-variant duplicates (same course in 202627 and 202728)
-  # are naturally merged at the approve step without dropping unique courses.
+  # The 2026/27 catalog (592 URLs) is the CURRENT, COMPLETE academic year.
+  # The 2027/28 catalog (458 URLs) is the INCOMPLETE future year — only 77%
+  # of courses have been announced, meaning it is a partial subset that also
+  # duplicates the 2026/27 entries (same course, new numeric ID in the slug).
+  #
+  # Blocking 202728 eliminates the duplication:
+  #   592 (202627) − ~35 blocked (pgce + degree-apprenticeship) ≈ 557 courses
+  # This matches the user-verified count of 557 international-eligible courses.
+  #
+  # Previous attempts:
+  #   year_dedup_mode: keep_latest + strip_trailing_id:true  →  362 courses
+  #     (over-deduped because Ulster changes the numeric ID between years, so
+  #      genuinely different courses sharing a base slug were collapsed).
+  #   year_dedup_mode: none  →  998 courses extracted (all variants, double cost).
+  #
+  # When 2027/28 approaches completion (≥90% of 2026/27 count), switch to:
+  #   block_url_patterns: - '202627'  (and remove the 202728 block below)
   year_dedup_mode: none
 
   # Block course types that are domestic-only in the UK and never available
@@ -99,9 +106,11 @@ discovery:
   #                          training); funded by DfE bursary, requires UK QTS
   #   degree-apprenticeship — employer-funded; only open to UK residents with
   #                           an employer sponsor
+  #   202728               — incomplete future-year duplicate (see note above)
   block_url_patterns:
     - 'pgce'
     - 'degree-apprenticeship'
+    - '/courses/202728/'
 
 extraction:
   # Ulster course pages have dedicated /fees/ and /entry-requirements/ sub-pages
