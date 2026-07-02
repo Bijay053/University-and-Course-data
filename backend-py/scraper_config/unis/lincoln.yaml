@@ -2,169 +2,49 @@
 # Hostname: www.lincoln.ac.nz
 # uni_id: 1753  |  Country: NZ  |  Currency: NZD
 #
-# DISCOVERY (2026-06-29 v2 — API-seeded):
-#   Lincoln's programme-search page is an Elastic App Search SPA that never
-#   auto-queries on load, making all browser/BFS/JS-click approaches unreliable
-#   (history: XHR interceptor, elastic_api_bootstrap, pagination click, BFS
-#   fallback — all returned 0 or partial results).
+# DISCOVERY (v3 — generic_search_api):
+#   Lincoln's programme-search page is a React SPA backed by Elastic App Search.
+#   The SPA never auto-queries on load — it waits for user interaction — so all
+#   browser/BFS/JS-click approaches returned 0 or partial results.
 #
-#   The live Elastic App Search JSON API endpoint was captured and snapshotted:
+#   The Elastic App Search JSON response is snapshotted at:
 #     https://jsonkeeper.com/b/7YB2
-#   It returns 118 programmes (total_pages: 1) with all links under results[].link.raw.
+#   Structure: results[].link.raw  (relative path, e.g. /study/study-programmes/...)
+#              results[].title.raw (course name)
+#   Total: 118 programmes (single page, no pagination needed).
 #
-#   APPROACH: discovery.extra_course_urls injects all 118 URLs directly as
-#   candidates after the (minimal) BFS phase. No browser discovery required.
-#   Each course page is then fetched individually for fee/IELTS/duration extraction.
+#   APPROACH: discovery.generic_search_api fetches this JSON endpoint directly,
+#   navigates to results[], extracts link.raw as the URL and title.raw as the name,
+#   resolves relative paths against www.lincoln.ac.nz, and injects the links as
+#   candidates BEFORE any BFS/browser tiers. No browser discovery required.
 #
-#   If Lincoln adds new courses, re-fetch the API JSON and update extra_course_urls.
-#   API source: https://jsonkeeper.com/b/7YB2  (118 results, page 1/1)
+#   To refresh after Lincoln adds courses: update the jsonkeeper snapshot URL or
+#   replace with the live Elastic App Search endpoint if access credentials are obtained.
 
 discovery:
   always_browser_discover: false
-  bfs_page_budget: 1
+  bfs_page_budget: 0
+
+  generic_search_api:
+    url: "https://jsonkeeper.com/b/7YB2"
+    method: GET
+    root_path: "results"
+    url_fields:
+      - "link.raw"
+    title_fields:
+      - "title.raw"
+    normalize_relative_urls: true
+    base_url: "https://www.lincoln.ac.nz"
+    allow_url_patterns:
+      - "lincoln\\.ac\\.nz/study/study-programmes/programme-search/[^/]+/?$"
+      - "lincoln\\.ac\\.nz/study/courses-2/course-search/[^/]+/?$"
+    block_url_patterns:
+      - "programme-search/$"
+      - "course-search/$"
+    max_pages: 1
+
   expected_min_courses: 110
   expected_max_courses: 130
-
-  seed_urls:
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/
-
-  allow_url_patterns:
-    - "lincoln\\.ac\\.nz/study/study-programmes/programme-search/[^/]+/?$"
-    - "lincoln\\.ac\\.nz/study/courses-2/course-search/[^/]+/?$"
-
-  block_url_patterns:
-    - "programme-search/$"
-    - "course-search/$"
-    - "/apply"
-    - "/about"
-    - "/news"
-    - "/events"
-    - "/research"
-    - "/staff"
-    - "/contact"
-
-  # All 118 programme URLs sourced from the Elastic App Search JSON API snapshot
-  # (https://jsonkeeper.com/b/7YB2 — results[].link.raw, sorted alphabetically).
-  # These are injected directly as candidates after discovery, bypassing the SPA.
-  extra_course_urls:
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-agribusiness-and-food-marketing/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-agricultural-science/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-agriculture/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-commerce-accounting-and-finance-major/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-commerce-ag-and-prof-accounting/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-commerce-agriculture/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-commerce-entrepreneurship-and-innovation-major/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-commerce-food-and-resource-economics-major/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-commerce-global-business/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-commerce-horticulture/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-commerce-hotel-and-tourism-management-major/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-commerce-individual-major/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-commerce-marketing/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-commerce-supply-chain-management/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-commerce-sustainability/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-commerce-with-honours/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-environment-and-society-with-honours/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-environment-and-society/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-environmental-management-with-honours/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-environmental-management/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-environmental-policy-and-planning-hons/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-land-and-property-management/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-landscape-architecture-grad-entry/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-landscape-architecture/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-science-animal-science/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-science-brewing-and-fermentation-major/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-science-conservation-and-ecology-major/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-science-environmental-science-major/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-science-food-innovation/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-science-food-science-major/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-science-individual-major/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-science-plant-and-horticultural-sciences-major/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-science-with-honours/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-sport-and-rec-management-with-honours/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-sport-and-recreation-management/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-sustainable-tourism/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-tourism-management-with-honours/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-tourism-management/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-viticulture-and-oenology-honours/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/bachelor-of-viticulture-and-oenology/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/certificate-in-university-studies/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/diploma-in-agriculture/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/diploma-in-applied-science/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/diploma-in-commerce/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/diploma-in-farm-management/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/diploma-in-horticultural-business/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/diploma-in-horticultural-management/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/diploma-in-horticulture/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/diploma-in-natural-resources/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/diploma-in-university-studies-2/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/doctor-of-philosophy-phd/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/english-language/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/graduate-certificate-in-academic-english/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/graduate-certificate-in-applied-science/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/graduate-certificate-in-business-and-sustainability/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/graduate-certificate-in-commerce/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/graduate-certificate-in-recreation-management/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/graduate-certificate-in-resource-studies/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/graduate-certificate-in-tourism-management/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/graduate-diploma-in-applied-science/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/graduate-diploma-in-brewing-and-fermentation/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/graduate-diploma-in-business-and-sustainability/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/graduate-diploma-in-commerce/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/graduate-diploma-in-property-management/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/graduate-diploma-in-recreation-management/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/graduate-diploma-in-resource-studies/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/graduate-diploma-in-tourism-management/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/graduate-diploma-in-valuation/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/graduate-diploma-in-viticulture-and-oenology/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/master-of-agricultural-science-research/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/master-of-app-sci-disaster-risk-and-resilience-r/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/master-of-app-sci-environmental-management-r/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/master-of-app-sci-int-rural-development-r/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/master-of-app-sci-land-and-society-research/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/master-of-app-sci-parks-rec-and-tourism-r/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/master-of-applied-computing/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/master-of-business-finance/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/master-of-business-global-management-and-marketing/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/master-of-commerce-agricultural-research/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/master-of-commerce-and-management-research/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/master-of-environment-and-agriculture/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/master-of-environmental-policy-and-management/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/master-of-fintech-and-investment-management/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/master-of-horticultural-science-research/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/master-of-international-nature-conservation-r/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/master-of-landscape-architecture-research/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/master-of-landscape-architecture/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/master-of-management-in-agribusiness/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/master-of-natural-resources-management-and-ecological-engineering/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/master-of-parks-management-2/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/master-of-pest-management/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/master-of-planning-2/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/master-of-precision-agriculture/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/master-of-professional-accounting-cpa/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/master-of-science-in-food-innovation/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/master-of-science-plant-breeding-research/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/master-of-science-research/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/master-of-sport-and-recreation-management/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/master-of-tourism-management/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/master-of-water-resource-management-research/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/master-of-water-science-and-management/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/master-of-wine-and-viticulture/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/pathway-certificate-for-mpa-entry/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/postgraduate-certificate-in-applied-science/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/postgraduate-certificate-in-commerce/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/postgraduate-certificate-in-enviro-management/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/postgraduate-certificate-in-int-rural-development/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/postgraduate-certificate-in-land-and-society/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/postgraduate-certificate-in-parks-rec-and-tourism/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/postgraduate-diploma-in-agricultural-science/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/postgraduate-diploma-in-applied-science/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/postgraduate-diploma-in-commerce/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/postgraduate-diploma-in-environmental-management/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/postgraduate-diploma-in-horticultural-science/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/postgraduate-diploma-in-int-rural-development/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/postgraduate-diploma-in-land-and-society/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/postgraduate-diploma-in-parks-rec-and-tourism/
-    - https://www.lincoln.ac.nz/study/study-programmes/programme-search/postgraduate-diploma-in-water-resource-management/
 
 extraction:
   fees:
