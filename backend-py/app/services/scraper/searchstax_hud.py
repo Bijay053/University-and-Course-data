@@ -1365,7 +1365,7 @@ async def _fetch_links_only(cfg: SearchStaxConfig, emit=None) -> tuple[list[dict
         "[SEARCHSTAX links_only] total=%s queued=%s title_excl=%s (prefix=%s sub=%s) "
         "skipped_no_url=%s token=%s url_field=%s",
         total, len(links), _title_excluded, title_excl_prefix, title_excl_sub,
-        skipped, "yes" if token else "NO", _url_field,
+        skipped, "yes" if token else "NO", _url_fields_to_try,
     )
     _filter_stats: dict = {
         "searchstax_total": total or 0,
