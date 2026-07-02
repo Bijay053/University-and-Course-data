@@ -7,26 +7,32 @@
 #   The SPA never auto-queries on load — it waits for user interaction — so all
 #   browser/BFS/JS-click approaches returned 0 or partial results.
 #
-#   The Elastic App Search JSON response is snapshotted at:
-#     https://jsonkeeper.com/b/7YB2
+#   The Elastic App Search JSON response is snapshotted in jsonblob.com.
+#   The live site uses /_search-proxy (server-side proxy to Swiftype) which
+#   requires a Cloudflare session — direct access returns 403.
+#
 #   Structure: results[].link.raw  (relative path, e.g. /study/study-programmes/...)
 #              results[].title.raw (course name)
-#   Total: 118 programmes (single page, no pagination needed).
+#   Total as of 2026-07-02: 107 active programmes (11 discontinued since the
+#   original jsonkeeper snapshot of 118 were verified 404 and removed).
 #
 #   APPROACH: discovery.generic_search_api fetches this JSON endpoint directly,
 #   navigates to results[], extracts link.raw as the URL and title.raw as the name,
 #   resolves relative paths against www.lincoln.ac.nz, and injects the links as
 #   candidates BEFORE any BFS/browser tiers. No browser discovery required.
 #
-#   To refresh after Lincoln adds courses: update the jsonkeeper snapshot URL or
-#   replace with the live Elastic App Search endpoint if access credentials are obtained.
+#   To refresh after Lincoln adds or removes courses:
+#   1. Fetch current list: https://jsonblob.com/api/jsonBlob/019f218a-3abb-7f1b-9d1a-5469041f82dd
+#   2. Run a scrape and check imported vs total_found; any gap = newly dead URLs.
+#   3. Remove dead URLs from the JSON and POST a new entry to jsonblob.com/api/jsonBlob.
+#   4. Update the URL below and expected_min/max_courses to match new count.
 
 discovery:
   always_browser_discover: false
   bfs_page_budget: 0
 
   generic_search_api:
-    url: "https://jsonkeeper.com/b/7YB2"
+    url: "https://jsonblob.com/api/jsonBlob/019f218a-3abb-7f1b-9d1a-5469041f82dd"
     method: GET
     root_path: "results"
     url_fields:
@@ -43,8 +49,8 @@ discovery:
       - "course-search/$"
     max_pages: 1
 
-  expected_min_courses: 110
-  expected_max_courses: 130
+  expected_min_courses: 105
+  expected_max_courses: 115
 
 extraction:
   fees:
