@@ -155,10 +155,25 @@ extraction:
   skip_ai_fallback_keywords:
     - "Short course and CPD"
 
-  # Raise parallel extraction slots to the orchestrator hard ceiling (16).
-  # Ulster fetches go via Scrape.do static (no direct Ulster IP, no per-host
-  # rate limit on Scrape.do proxy).  8 slots → ~48 min; 16 slots → ~24 min.
-  max_parallel_fetch: 16
+  # Rate-limiting fix (2026-07-02):
+  # Analysis of job_036b8fe884a9 (998 URLs, 429 staged) showed only ~42%
+  # success rate spread equally across both year variants (202627: 41%,
+  # 202728: 45%), meaning ~181 unique courses had ALL their URL variants
+  # fail.  This random pattern is consistent with Scrape.do rate-limiting
+  # (HTTP 429 → _retry_after exhausted → fetch_failed) when 16 parallel
+  # connections all hit Scrape.do simultaneously.
+  #
+  # Fix: lower concurrency from 16 → 4 to reduce Scrape.do rate pressure.
+  # Expected: scrape time grows from ~22 min → ~88 min, but staged count
+  # should grow from ~429 → ~500+ (ideally covering all ~557 courses).
+  # If 4 slots still yields high fail rates, try 2.
+  max_parallel_fetch: 4
+
+  # Pin Scrape.do exit-node IPs to the UK.  Ulster's Cloudflare Enterprise
+  # WAF may apply less-restrictive rules to same-country (GB) visitors than
+  # to overseas IPs.  This matches what a prospective student browsing from
+  # the UK would see, and may improve the per-URL success rate.
+  scrape_do_geo: GB
 
   staging:
     skip_degree_qualifier_check: true
