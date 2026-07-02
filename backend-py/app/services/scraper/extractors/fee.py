@@ -593,7 +593,61 @@ def _extract_fee_table_row(
                 break
 
         if not is_fee_table:
-            continue
+            # Secondary check: column-based fee table where "International" is a
+            # column header rather than a row label.  Canonical example is
+            # Ulster University's credit-band table:
+            #   Credit Points | NI/ROI Cost | GB Cost | International Cost*
+            # Requires the header row to have "International" as a column AND a
+            # credit-band/NI-ROI marker so we don't trigger on unrelated tables.
+            if rows:
+                _hdr_text = " | ".join(rows[0])
+                _intl_hdr_col: "int | None" = None
+                for _ci, _cell in enumerate(rows[0]):
+                    if _ROW_INTL_RE.search(_cell):
+                        _intl_hdr_col = _ci
+                        break
+                _is_credit_band = bool(
+                    re.search(r"NI[/\s]*ROI|credit\s*points?", _hdr_text, re.I)
+                    and _intl_hdr_col is not None
+                )
+                if _is_credit_band:
+                    _cb_credits_seen: int = 0
+                    _cb_amount: "int | None" = None
+                    _cb_ctx: "str | None" = None
+                    for _row in rows[1:]:
+                        if len(_row) <= (_intl_hdr_col or 0):
+                            continue
+                        _credit_m = re.search(r"\b(\d{2,3})\b", _row[0])
+                        if not _credit_m:
+                            continue
+                        _credits = int(_credit_m.group(1))
+                        if _credits < 30 or _credits > 240:
+                            continue
+                        _intl_cell = _row[_intl_hdr_col]
+                        _am = _AMOUNT_RE.search(_intl_cell)
+                        if not _am:
+                            continue
+                        _raw = _am.group(2) or _am.group(3) or ""
+                        _amt = _parse_amount(_raw)
+                        if _amt is None or _amt < 5_000:
+                            continue
+                        # Prefer 120 credits (one FT year); otherwise highest ≤ 120.
+                        if _credits == 120 or (
+                            _credits <= 120 and _credits > _cb_credits_seen
+                        ):
+                            _cb_credits_seen = _credits
+                            _cb_amount = _amt
+                            _cb_ctx = (
+                                f"credit-band table ({_credits} credits): "
+                                + " | ".join(_row)
+                            )
+                    if _cb_amount is not None:
+                        found_fee_table = True
+                        if _cb_amount > (best_amount or 0):
+                            best_amount = _cb_amount
+                            best_ctx = _cb_ctx
+            if not found_fee_table:
+                continue
 
         found_fee_table = True
 
@@ -700,8 +754,17 @@ def _candidates(text: str) -> Iterable[tuple[int, str, str]]:
         # (home-student) fee, a per-module price, a CPD rate, or a part-time
         # module charge — unless the immediate context contains an explicit
         # "international" cue that confirms this is the international fee.
-        if cur == "GBP" and amount < _GBP_INTL_MIN and not _INTL_CTX.search(ctx):
-            continue
+        # Exception: credit-band tables (e.g. Ulster: NI/ROI | GB Cost | Intl*)
+        # have "International" as a COLUMN HEADER — that is not a fee label for
+        # this specific cell value, so the GBP floor guard must still apply.
+        if cur == "GBP" and amount < _GBP_INTL_MIN:
+            _has_intl_ctx = bool(_INTL_CTX.search(ctx))
+            if _has_intl_ctx and re.search(
+                r"NI[/\s]*ROI|\bGB\s+Cost\b", ctx, re.I
+            ):
+                _has_intl_ctx = False  # column header, not a fee label
+            if not _has_intl_ctx:
+                continue
         yield amount, cur, ctx
 
 
