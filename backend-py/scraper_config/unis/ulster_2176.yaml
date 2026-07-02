@@ -76,16 +76,22 @@ discovery:
   # is needed: set offset=1000, max_candidates=500 for the second job.
   sitemap_offset: 0
 
-  # Deduplicate if multiple intake-year variants appear in the sitemap.
-  # Ulster's sitemap now includes both /202627/ and /202728/ variants of the
-  # same course.  keep_latest prefers 202728.  year_dedup_strip_trailing_id
-  # is required because Ulster assigns a NEW numeric database ID to each
-  # intake-year instance of a course (e.g. law-40288 in 202627 vs law-41910
-  # in 202728), so the slug-without-year dedup key would differ without ID
-  # stripping.  The flag strips trailing -\d{4,6} after year removal so both
-  # reduce to the same /courses-YYYY/law key and the 202728 version wins.
-  year_dedup_mode: keep_latest
-  year_dedup_strip_trailing_id: true
+  # Year dedup DISABLED (2026-07-02).
+  #
+  # PROBLEM: keep_latest + year_dedup_strip_trailing_id:true was collapsing
+  # 998 sitemap URLs into only 362 unique courses instead of the expected ~557.
+  # Root cause: Ulster assigns a NEW numeric ID to each year-instance of a
+  # course (e.g. law-40288 in 202627 vs law-41910 in 202728).  strip_trailing_id
+  # strips those IDs before grouping — BUT it also collapses genuinely DIFFERENT
+  # courses that share the same base slug (e.g. two nursing programmes with
+  # slugs nursing-12345 and nursing-67890 both become "nursing" and one is
+  # dropped).  This caused 195 real distinct courses to be lost.
+  #
+  # FIX: year_dedup_mode: none — all 998 sitemap URLs pass through to
+  # extraction.  The staging pipeline deduplicates on lower(course_name) per
+  # university, so year-variant duplicates (same course in 202627 and 202728)
+  # are naturally merged at the approve step without dropping unique courses.
+  year_dedup_mode: none
 
   # Block course types that are domestic-only in the UK and never available
   # to international students:

@@ -18,51 +18,41 @@
 #
 # NOTE: Old comment "Lincoln course pages can appear as root-level URLs" is
 # superseded — all current courses resolve via the two patterns below.
-
 discovery:
   always_browser_discover: true
   browser_time_budget_s: 150
   use_stealth_browser: true
-
   seed_urls:
-    - https://www.lincoln.ac.nz/study/study-programmes/undergraduate-study/
-    - https://www.lincoln.ac.nz/study/study-programmes/postgraduate-study/
-
+  - https://www.lincoln.ac.nz/study/study-programmes/undergraduate-study/
+  - https://www.lincoln.ac.nz/study/study-programmes/postgraduate-study/
   allow_url_patterns:
-    # PG individual course pages
-    - "lincoln\\.ac\\.nz/study/study-programmes/programme-search/[^/]+/?$"
-    # UG individual course pages (different URL path)
-    - "lincoln\\.ac\\.nz/study/courses-2/course-search/[^/]+/?$"
-
+  - /study/study\-programmes/programme\-search/[^/]+/?$
   block_url_patterns:
-    - "/resources-for-careers-advisors"
-    - "/farms-outreach"
-    - "/teaching-resources"
-    - "/future-students-and-schools"
-    - "/types-of-postgrad-study"
-    - "/make-postgraduate-study-work"
-    - "/on-farm-workshops"
-    - "/on-campus-workshops"
-    - "/apply"
-    - "/about"
-    - "/news"
-    - "/events"
-    - "/research"
-    - "/staff"
-    - "/contact"
-    - "programme-search/$"
-    - "course-search/$"
-
+  - /apply
+  - /contact
+  - /news
+  - /events
+  - /blog
+  - /about
+  - /research
+  - /alumni
+  - /outreach
+  - /parents
+  - /jobs
+  - /careers
+  - /accommodation
+  - /life-on-campus
+  - /fees-and-funding$
+  - /international/living
 extraction:
   fees:
-    default_currency: "NZD"
-    central_page: "https://www.lincoln.ac.nz/study/fees/international-fees/"
+    default_currency: NZD
+    central_page: https://www.lincoln.ac.nz/study/fees/international-fees/
     force_central_fee_stage: true
     prefer_international: true
     prefer_annual_over_total: true
-
   english:
-    central_page: "https://www.lincoln.ac.nz/study/apply-and-enrol/apply/english-language-requirements/"
+    central_page: https://www.lincoln.ac.nz/study/apply-and-enrol/apply/english-language-requirements/
     degree_level_defaults:
       undergraduate:
         ielts: 6.0
@@ -76,13 +66,11 @@ extraction:
         ielts: 6.5
         pte: 58
         toefl: 80
-
   staging:
     reject_if_missing:
-      - course_name
+    - course_name
     skip_degree_qualifier_check: true
     require_international_fee: false
-
   filters:
     domestic_only:
       enabled: false
