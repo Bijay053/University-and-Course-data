@@ -1,37 +1,37 @@
 # Queen Mary University of London (QMUL)
 # Hostname: www.qmul.ac.uk
+# Country: United Kingdom  |  Currency: GBP
+# Slug: qmul  |  uni_id: 2203
+# Updated: 2026-07-02
 #
 # ── URL STRUCTURE ─────────────────────────────────────────────────────────────
-# Real UG course pages:  /undergraduate/coursefinder/courses/{slug}/
-# Real PG taught pages:  /postgraduate/taught/coursefinder/courses/{slug}/
-# Real PG research:      /postgraduate/research/projects/{slug}/ (vary)
+# Real UG course pages:  /undergraduate/coursefinder/courses/{year}/{slug}/
+# Real PG taught pages:  /postgraduate/taught/coursefinder/courses/{year}/{slug}/
+# Real PG research:      /postgraduate/research/projects/{slug}/
 #
-# SPA entry pages (NOT individual courses — must be blocked):
-#   /undergraduate/coursefinder/
-#   /undergraduate/coursefinder/index.html
-#   /postgraduate/coursefinder/index.html
-#   /postgraduate/taught/coursefinder/
-#   /postgraduate/pgrcoursefinder/index.html
+# ── DISCOVERY APPROACH ────────────────────────────────────────────────────────
+# QMUL's search page (https://www.qmul.ac.uk/search/) is powered by a
+# SearchStax-hosted Solr core (qmu-1736).  The BFS crawler finds only ~160–200
+# of the 409 courses because:
+#   1. Individual course pages are at /coursefinder/courses/{year}/{slug}/ which
+#      the BFS does not reach without visiting every subject-area listing page.
+#   2. Cloudflare blocks the search/listing pages from plain httpx; Scrape.do
+#      with geo=gb works but the BFS page budget runs out before full coverage.
 #
-# BFS listing pages (visit to find course links, do NOT add as candidates):
-#   /study/{subject}/  — subject-area category pages
-#   /study/            — root study page
+# Fix: query the Solr core directly (links_only=true) to obtain all 409 course
+# URLs in one pass, then run normal per-course extraction for fee/IELTS/intakes.
+#
+# Token is the read-only SPA token embedded in every browser request to
+# www.qmul.ac.uk/search/ — it is PUBLIC (visible in the page JS to any visitor)
+# and intentionally committed here.  Rotate if SearchStax revoke it.
+# Literal: bc0d2578c3f22cca23fdb327f7490ddb56098759
 #
 # ── KNOWN ISSUES (fixed in this YAML) ────────────────────────────────────────
-#
-#  SPA FINDER PAGES STAGED AS COURSES:
-#    /coursefinder/ roots and /coursefinder/index.html are JavaScript SPAs —
-#    they return empty page text and have no fee/IELTS data.  block_url_patterns
-#    below removes them from the candidate set AFTER BFS completes.
 #
 #  FEES SHOWN AS "AUD" WITH LOW-FEE WARNINGS:
 #    QMUL is a UK university — all fees are GBP.  Without default_currency: GBP
 #    the system defaults to AUD and fires annual_fee_too_low_warning for all
 #    valid £15k–£35k fees.  Fixed below.
-#
-#  ONLY ~160 COURSES FOUND (BFS PAGE CAP):
-#    The BFS default of 25 pages caps discovery at ~25 subject areas.  QMUL has
-#    many more.  Increased to 100 below.
 #
 #  COURSE COUNT REGRESSION (root cause fixed 2026-06-26):
 #    QMUL course pages contain "online" in navigation and utility text:
@@ -54,36 +54,54 @@
 # ─────────────────────────────────────────────────────────────────────────────
 
 discovery:
-  # BFS page budget: default 25 misses many QMUL subject areas.
-  # Each subject page (/study/{subject}/) counts as one BFS page.
-  # QMUL has 20+ subject areas plus sub-pages and pagination.
-  # Raised from 60 → 100 to ensure all subjects are visited even as
-  # QMUL's subject catalogue grows each admissions cycle.
-  bfs_page_budget: 100
+  # ── SearchStax Solr provider (replaces BFS discovery) ─────────────────────
+  # QMUL's search page is powered by SearchStax (same EU-West-2 cluster as
+  # HUD and WLV).  Querying Solr directly returns all 409 courses in one pass,
+  # bypassing Cloudflare and the BFS page budget limit.
+  #
+  # links_only: true — Solr provides the 409 course URLs only; each URL is then
+  # fetched individually by the per-course pipeline (Scrape.do static → browser
+  # fallback → Gemini) for fee, IELTS, duration, and intake extraction.  The
+  # Solr docs do NOT contain IELTS or structured fee data, so full per-course
+  # extraction is necessary.
+  searchstax:
+    endpoint: "https://searchcloud-1-eu-west-2.searchstax.com/29847/qmu-1736/emselect"
 
-  # Alert threshold: fire a discovery-failure alert when a QMUL scrape
-  # stages fewer than 370 courses (5% below the 396-course baseline).
-  # This catches a repeat of the silent online_only regression without
-  # waiting for a manual review.
-  expected_min_courses: 370
+    # Public read-only token — embedded in the page JS shipped to every browser
+    # visitor of www.qmul.ac.uk/search/.  Not a secret.
+    authorization_token: "bc0d2578c3f22cca23fdb327f7490ddb56098759"
 
-  # Remove known non-course pages from the candidate set after BFS.
-  # These patterns match the SPA entry pages and listing roots that the
-  # generic page classifier incorrectly accepts as "course-like".
-  # Applied case-insensitively against the full URL.
-  block_url_patterns:
-    # SPA entry pages — return empty JS shell, no extractable data
-    - "/coursefinder/index\\.html$"
-    - "/pgrcoursefinder/index\\.html$"
-    # SPA roots (trailing slash optional) — NOT individual courses.
-    # The regex anchors at end-of-string, so it does NOT match
-    # /coursefinder/courses/{slug}/ which follows the same prefix.
-    - "/coursefinder/?$"
-    - "/pgrcoursefinder/?$"
-    # /study/ root listing page (not a course)
-    - "qmul\\.ac\\.uk/study/?$"
-    # A-Z listing pages
-    - "/a-z-of-"
+    # Filter to course documents only (excludes news, events, staff pages, etc.)
+    filter_query: 'sectionType_s:"courses"'
+
+    # links_only mode: Solr supplies URLs + basic metadata; per-course pages
+    # supply fee, IELTS, duration, and intakes.
+    links_only: true
+
+    # QMUL Solr field → system field mapping for links_only mode.
+    # coursepageurl_t holds the full course page URL (not a bare code like WLV).
+    # coursetitle_t  holds the plain course name (e.g. "Accounting and Finance").
+    # awardname_t    holds the degree abbreviation (e.g. "MSc", "BSc (Hons)").
+    # level          holds "ug" or "pg" (academic level).
+    # campusname_t   holds campus name (e.g. "Mile End Campus").
+    # modeofattendancecode_s holds "Full-time", "F-FT", "Part-time", "P-PT".
+    url_fields:
+      - coursepageurl_t
+    title_fields:
+      - coursetitle_t
+      - awardname_t
+
+    field_map:
+      url:           coursepageurl_t
+      name:          coursetitle_t
+      degree_type:   awardname_t
+      degree_level:  level
+      location:      campusname_t
+      study_mode:    modeofattendancecode_s
+
+  # Alert threshold: fire a discovery-failure alert when fewer than 390 courses
+  # are staged (5% below the 409-course Solr baseline).
+  expected_min_courses: 390
 
 
 extraction:
