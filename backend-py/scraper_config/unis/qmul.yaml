@@ -105,6 +105,18 @@ discovery:
 
 
 extraction:
+  # QMUL is an on-campus university with its main campus at Mile End, London.
+  # Most Solr course docs have no campusname_t value, so course_location is
+  # often blank after per-course extraction.  Without a preset location the
+  # study_mode guard at single_course.py:2665–2685 downgrades "On Campus"
+  # (set via a study_mode:rule from the mode-of-attendance field) to "Online"
+  # when no page-extracted location is found — causing all courses to be
+  # rejected by the online_only filter.  This default provides the physical
+  # location evidence the guard requires without overriding a Solr-provided
+  # campus name (the guard checks course_location first and skips the preset
+  # when it is already populated).
+  default_course_location: "London"
+
   fees:
     # QMUL is in the UK — all fees are quoted in GBP.
     # Without this, the system defaults to AUD and fires low-fee warnings
@@ -142,3 +154,57 @@ extraction:
     # Whitechapel) in every course's key facts — this preference prevents
     # a stray "apply online" phrase from overriding the campus evidence.
     prefer_location_over_online_keyword: true
+
+  english:
+    # QMUL course pages do NOT publish IELTS requirements on individual
+    # course pages.  The entry requirements section links to a central
+    # English language requirements page instead.
+    #
+    # Central page (verified 2026-07-02):
+    #   https://www.qmul.ac.uk/international-students/englishlanguagerequirements/
+    #                                  undergraduate-and-postgraduate-programmes/
+    #
+    # Published IELTS bands from that page:
+    #   Undergraduate programmes: Band 5 — IELTS 7.0 overall, 6.0 in each component
+    #   Most Postgraduate programmes: Band 4 — IELTS 6.5 overall, 6.0 in each component
+    #   PG arts/creative programmes: Band 5 — IELTS 7.0 overall, 6.0 in each component
+    #     (MA Creative Arts; MA Digital Media; MA Linguistics; MA TESOL)
+    #
+    # The central_page is prefetched once per job and IELTS values are applied
+    # to all courses.  degree_level_defaults below act as a fallback when the
+    # central page cannot be matched to a specific course.
+    central_page: "https://www.qmul.ac.uk/international-students/englishlanguagerequirements/undergraduate-and-postgraduate-programmes/"
+
+    degree_level_defaults:
+      undergraduate:
+        # Band 5 — all UG programmes except listed exceptions
+        ielts: 7.0
+      postgraduate:
+        # Band 4 — most taught PG programmes
+        # Note: some arts PG require Band 5 (7.0); 6.5 is the majority default.
+        ielts: 6.5
+      doctorate:
+        # PhD/MRes — same as PG taught (Band 4)
+        ielts: 6.5
+
+    # Flat fallback for courses whose degree level cannot be determined.
+    default_ielts: 7.0
+
+  staging:
+    # QMUL's 2027 entry course pages display "Fees for 2027 entry will appear
+    # here shortly" — international fees have not yet been published for the
+    # upcoming intake year.  2026 entry pages confirm international fees exist
+    # (e.g. Biology 2026: £32,950 overseas).
+    #
+    # Setting require_international_fee: false allows courses to pass the
+    # staging gate without a fee and land in the review queue.  When QMUL
+    # publishes 2027 fees (typically 4–6 months before entry), a re-scrape
+    # will automatically populate them via the regex extractor.
+    require_international_fee: false
+    # QMUL course pages name courses by subject only — "Economics", "Law",
+    # "Biology" — without a degree qualifier in the H1.  The degree is shown
+    # in the sidebar/key-facts box, not the main heading.  The qualifier check
+    # would reject all of these as "category landing pages"; disable it here
+    # because the URL pattern /undergraduate/coursefinder/courses/2027/{slug}/
+    # already guarantees individual course pages (not listing pages).
+    skip_degree_qualifier_check: true

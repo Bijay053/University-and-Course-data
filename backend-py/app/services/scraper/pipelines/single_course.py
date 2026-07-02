@@ -7062,6 +7062,70 @@ async def extract_course(
         except (TypeError, ValueError):
             pass
 
+    # ── Duration degree_level_defaults fallback ──────────────────────────────
+    # When duration is still None after all extractors (including the sanity
+    # nullification above), apply the YAML-configured default years for this
+    # degree level.  Mirrors the fee degree_level_defaults pattern.
+    # Use for universities where duration lives in a JS-only widget that
+    # Scrape.do static HTML cannot reach (e.g. Ulster Cloudflare-gated widget).
+    try:
+        _dur_dl_cfg = None
+        try:
+            _dur_uc = get_uni_config()
+            if _dur_uc is not None:
+                _dur_dl_cfg = _dur_uc.extraction.text_cleaning.duration
+        except Exception:
+            pass
+        _dur_defaults_map: dict = getattr(_dur_dl_cfg, "degree_level_defaults", {}) or {}
+        if _dur_defaults_map and payload.get("duration") is None:
+            _ddl_raw = (payload.get("degree_level") or "").lower().strip()
+            _ddl_tier: str | None = None
+            if _ddl_raw:
+                import re as _re_dur
+                if any(k in _ddl_raw for k in ("bachelor", "honours", "honor", "hons", "associate", "bsc", "ba ", "beng", "bbus", "bcom")):
+                    _ddl_tier = "undergraduate"
+                elif any(k in _ddl_raw for k in ("master",)) or _re_dur.search(r"\b(msc|ma|meng|mba|mres|mphil|llm|mpa|mfa|mmus|mus\.m)\b", _ddl_raw):
+                    _ddl_tier = "postgraduate"
+                elif any(k in _ddl_raw for k in ("doctor", "phd", "dphil")) or _re_dur.search(r"\b(dba|edd|dsc)\b", _ddl_raw):
+                    _ddl_tier = "doctorate"
+                elif "postgraduate" in _ddl_raw or _re_dur.search(r"\bpg(dip|cert|diploma|certificate)\b", _ddl_raw):
+                    _ddl_tier = "postgraduate"
+                elif any(k in _ddl_raw for k in ("diploma", "certificate")):
+                    _ddl_tier = "undergraduate"
+            _ddl_years: float | None = None
+            if _ddl_tier:
+                _ddl_years = _dur_defaults_map.get(_ddl_tier)
+                if _ddl_years is None and _ddl_tier == "doctorate":
+                    _ddl_years = _dur_defaults_map.get("postgraduate")
+            if _ddl_years is not None and isinstance(_ddl_years, (int, float)):
+                _ddl_years_f = float(_ddl_years)
+                _ddl_term = "year" if _ddl_years_f == 1.0 else "years"
+                payload["duration"] = _ddl_years_f
+                payload.setdefault("duration_term", _ddl_term)
+                evidence.append({
+                    "field_key": "duration",
+                    "value": _ddl_years_f,
+                    "confidence": 0.30,
+                    "method": "uni_config:duration_default",
+                    "source_url": url,
+                    "snippet": (
+                        f"institutional duration default from per-uni YAML: "
+                        f"{_ddl_tier}={_ddl_years_f} {_ddl_term}"
+                    ),
+                })
+                if emit:
+                    await emit(
+                        "status",
+                        f"[DUR-DEFAULT] {payload.get('course_name', url)[:40]} — "
+                        f"YAML default: {_ddl_years_f} {_ddl_term} ({_ddl_tier})",
+                        phase="fallback",
+                        kind="duration_default_applied",
+                        url=url,
+                        filled=["duration"],
+                    )
+    except Exception as exc:  # noqa: BLE001 — never abort extraction
+        log.warning("duration degree_level_defaults fallback errored on %s: %s", url, exc)
+
     # ── No intake months ────────────────────────────────────────────────────
     _intake_months = payload.get("intake_months") or []
     if not _intake_months:

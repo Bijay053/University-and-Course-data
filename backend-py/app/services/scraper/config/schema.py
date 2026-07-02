@@ -2353,6 +2353,24 @@ class DurationCleaningConfig(BaseModel):
             "phrasing and would create false positives on other universities."
         ),
     )
+    degree_level_defaults: dict[str, float] = Field(
+        default_factory=dict,
+        description=(
+            "Fallback duration (in years, as a float) by degree-level tier, applied "
+            "when all other duration extractors return None.\n\n"
+            "Keys are tier names (case-insensitive): 'undergraduate', 'postgraduate', "
+            "'doctorate'.  Values are decimal years, e.g. 1.0, 3.0, 4.0.\n\n"
+            "Applied confidence is 0.30 (low) so reviewers can identify defaults. "
+            "Use for universities where the duration widget is JS-only and not "
+            "accessible via Scrape.do static HTML (e.g. Ulster's Cloudflare-gated "
+            "duration field).  UK conventions: BSc=3, MSc/MA=1, PhD=3.\n\n"
+            "Example:\n"
+            "  degree_level_defaults:\n"
+            "    undergraduate: 3.0\n"
+            "    postgraduate: 1.0\n"
+            "    doctorate: 3.0"
+        ),
+    )
 
 
 class FieldOverride(BaseModel):

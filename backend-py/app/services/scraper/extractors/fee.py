@@ -124,10 +124,10 @@ _CSP_DOMESTIC_CTX = re.compile(
     r"\b(?:commonwealth\s+supported(?:\s+place)?|"
     r"HECS(?:-HELP)?|"
     r"student\s+contribution(?:\s+amount)?|"
-    r"domestic\s+(?:student\s+)?(?:tuition\s+)?fee|"
-    # UK home-student labels
-    r"home\s+(?:student\s+)?(?:tuition\s+)?fee|"
-    r"uk\s+(?:student\s+)?(?:tuition\s+)?fee|"
+    r"domestic\s+(?:student\s+)?(?:tuition\s+)?fees?|"
+    # UK home-student labels — both singular "Home fee" and plural "Home fees"
+    r"home\s+(?:student\s+)?(?:tuition\s+)?fees?|"
+    r"uk\s+(?:student\s+)?(?:tuition\s+)?fees?|"
     r"(?:for\s+)?(?:uk|home)\s+students?|"
     # Per-module / per-credit / CPD prices (never annual international tuition)
     r"per\s+(?:module|credit|unit\s+of\s+credit)|"
@@ -1486,6 +1486,26 @@ async def extract(
                 method=method,
             )
         ]
+
+    # ── Pre-pass: "fee not yet published" sentinel ───────────────────────────
+    # Some universities publish the page structure before setting the
+    # international fee.  E.g. QMUL 2027 entry pages:
+    #   <dt>Home fees</dt><dd>£9,790</dd>
+    #   <dt>Overseas fees</dt><dd>Fees for 2027 entry will appear here shortly</dd>
+    # When the overseas/international label's dd explicitly says the fee
+    # hasn't been published yet, block the text-scan fallback so the
+    # adjacent home fee is never captured as the international tuition fee.
+    # The _CSP_DOMESTIC_CTX fix (home fees? plural) already handles this
+    # for the candidates loop; this sentinel is belt-and-suspenders to
+    # ensure zero false positives regardless of context window width.
+    if html and re.search(
+        r"<dt[^>]*>[^<]*(?:overseas|international)[^<]*</dt>\s*<dd[^>]*>[^<]*"
+        r"(?:will\s+appear|not\s+yet\s+(?:set|published|available|confirmed)|"
+        r"to\s+be\s+(?:confirmed|announced)|coming\s+soon|TBC|TBD)[^<]*</dd>",
+        html,
+        re.IGNORECASE | re.DOTALL,
+    ):
+        return []
 
     text = compact(html_to_text(html))
     if not text:

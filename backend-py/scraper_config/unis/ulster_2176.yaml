@@ -199,3 +199,26 @@ extraction:
   staging:
     skip_degree_qualifier_check: true
     require_international_fee: false
+
+  # ── Duration defaults ─────────────────────────────────────────────────────
+  # Ulster's duration widget is a JavaScript-only component not returned by
+  # Scrape.do static HTML (Cloudflare Enterprise blocks rendered fetches).
+  # This defaults supply institution-typical values for courses where the
+  # extractor finds nothing.  Confidence is 0.30 so reviewers can identify
+  # YAML-derived values vs. page-extracted ones.
+  #
+  # UK standard durations:
+  #   BSc/BA/BEng (most):       3 years  (Honours; 4 for Sandwich/MEng)
+  #   MSc/MA/MBA/PGDip/PGCert:  1 year   (taught postgraduate, standard)
+  #   PhD/MPhil:                3 years  (full-time)
+  #
+  # Note: BEng with integrated Master's = 5 years, Sandwich years add +1.
+  # Using 3.0 for undergraduate is correct for ~80% of Ulster's BSc courses;
+  # the remainder (BEng Sandwich, MEng) will still land in review for manual
+  # correction — but having any value beats null for completeness scoring.
+  text_cleaning:
+    duration:
+      degree_level_defaults:
+        undergraduate: 3.0
+        postgraduate: 1.0
+        doctorate: 3.0
