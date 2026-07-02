@@ -1186,7 +1186,13 @@ _BLOCK_URL_LAST_SEGMENTS: dict[str, str] = {
     "double-degrees":           "category_landing_page_url_block",
     "new-degrees":              "category_landing_page_url_block",
     "english-language-programs": "pathway_page",
-    "english-language":         "pathway_page",
+    # NOTE: "english-language" (bare slug) intentionally NOT here.
+    # The path-based patterns /english-language-programs and
+    # /english-language-program (in _BLOCK_URL_SUBSTRINGS) already catch
+    # real English language pathway listing pages.  The bare slug is too
+    # broad: Lincoln University (NZ) has a legitimate degree programme at
+    # /study/study-programmes/programme-search/english-language/ which was
+    # being incorrectly blocked by this entry.  Removed 2026-07-02.
     "saved-courses":            "ui_page",
     "favourites":               "ui_page",
     "favorites":                "ui_page",

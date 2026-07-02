@@ -80,6 +80,15 @@ extraction:
   skip_per_course_browser: false
   skip_browser_rescue: false
 
+  # 8/117 courses failed all free-tier fetches (httpx → cffi → Wayback →
+  # Scrape.do static) in the 2026-07-02 run, likely because those specific
+  # pages have heavier Cloudflare protection or JS-gating.  scrape_do_render
+  # adds tier-5: Scrape.do headless Chrome render after static fails.
+  # render=True is only invoked when earlier tiers all fail, so the 73
+  # courses that succeed with direct HTTP and the 44 that succeed with
+  # Scrape.do static are unaffected (no extra cost).
+  scrape_do_render: true
+
   staging:
     reject_if_missing:
       - course_name
