@@ -47,10 +47,15 @@ discovery:
       - "course-search/$"
     max_pages: 1
 
-  expected_min_courses: 116
-  expected_max_courses: 122
+  expected_min_courses: 114
+  expected_max_courses: 120
 
 extraction:
+  # Lincoln pages return ~1.8 MB of HTML via Scrape.do static (full SPA hydration
+  # payload).  Running more than 2 parallel requests causes Scrape.do to return 429
+  # for www.lincoln.ac.nz.  Keep at 2 to stay within Scrape.do's per-domain limit.
+  max_parallel_fetch: 2
+
   fees:
     central_page: "https://www.lincoln.ac.nz/study/fees"
     default_currency: "NZD"
@@ -86,20 +91,18 @@ extraction:
         pte: 58
         toefl: 80
 
-  browser_wait_strategy: networkidle
-  browser_dcl_settle_ms: 3000
-  skip_per_course_browser: false
-  skip_browser_rescue: false
+  # Playwright browser rescue is disabled for Lincoln.  Each page is ~1.8 MB of
+  # HTML — the Playwright 30 s timeout is always exceeded, resulting in
+  # "browser fallback exceeded 30s — aborting this course".  The Scrape.do static
+  # response already contains all course data in the SSR payload; browser is not
+  # needed and only causes aborts.
+  skip_per_course_browser: true
+  skip_browser_rescue: true
 
-  # scrape_do_render: Tier-5 fallback — Scrape.do headless Chrome render after
-  # static tiers fail.  Only invoked for courses that fail all free tiers so
-  # the majority of courses (direct HTTP success) are unaffected (no extra cost).
+  # Tier-5 fallback: Scrape.do headless Chrome render after static fails (429/404).
+  # Only invoked when all static tiers fail — leaves the 100+ courses that succeed
+  # with static unaffected (no extra cost).
   scrape_do_render: true
-
-  # scrape_do_geo: Pin Scrape.do exit nodes to New Zealand.
-  # Some Lincoln pages return HTTP 404 from non-NZ IPs (CDN geo-routing /
-  # Cloudflare rules).  NZ exit nodes present the correct regional version.
-  scrape_do_geo: "NZ"
 
   staging:
     reject_if_missing:
