@@ -2905,6 +2905,21 @@ class ExtractionConfig(BaseModel):
             "      intakes: 5"
         ),
     )
+    skip_staging_keywords: list[str] = Field(
+        default_factory=list,
+        description=(
+            "List of phrases to check against the page text BEFORE staging.  "
+            "If ANY phrase is found (case-insensitive substring match) the course "
+            "is silently dropped — extract_course returns early and nothing is "
+            "written to scraped_courses.  Use for page types (e.g. CPD short "
+            "courses) that should never appear in the approval queue regardless of "
+            "their URL.  Works as a second safety net after block_url_patterns.  "
+            "Example (Ulster CPD short courses):\n"
+            "  extraction:\n"
+            "    skip_staging_keywords:\n"
+            "      - 'Short course and CPD'"
+        ),
+    )
     skip_ai_fallback_keywords: list[str] = Field(
         default_factory=list,
         description=(

@@ -4147,6 +4147,11 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                         # multiple URLs — best version kept).  Count as skipped, not
                         # errors, so the DONE line reflects a real error count.
                         summary["skipped"] += 1
+                    elif r["error"].startswith("skipped:"):
+                        # Content-based skip (e.g. CPD/short-course detected via
+                        # skip_staging_keywords in YAML).  Count as skipped, not
+                        # errors — these are intentional drops, not failures.
+                        summary["skipped"] += 1
                     else:
                         summary["errors"] += 1
                     await emit(

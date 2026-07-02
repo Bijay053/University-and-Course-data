@@ -65,16 +65,27 @@ _NAME_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
     #   PGCE  = Postgraduate Certificate in Education (UK teacher training)
     #   PGDip = Postgraduate Diploma
     #   PGCert = Postgraduate Certificate
+    #   GradCert / GradDip = Ulster-style Graduate Certificate / Diploma
+    #   AdvCert / AdvDip   = Ulster Advanced Certificate / Diploma (level 6-7 PG awards)
     (re.compile(r"\bPGCE\b", re.IGNORECASE), "Graduate Certificate"),
     (re.compile(r"\bPG\s*Dip\b|\bPGDip\b", re.IGNORECASE), "Graduate Diploma"),
     (re.compile(r"\bPG\s*Cert\b|\bPGCert\b", re.IGNORECASE), "Graduate Certificate"),
+    (re.compile(r"\bGrad\s*Dip\b|\bGradDip\b", re.IGNORECASE), "Graduate Diploma"),
+    (re.compile(r"\bGrad\s*Cert\b|\bGradCert\b", re.IGNORECASE), "Graduate Certificate"),
+    (re.compile(r"\bAdv\s*Dip\b|\bAdvDip\b", re.IGNORECASE), "Graduate Diploma"),
+    (re.compile(r"\bAdv\s*Cert\b|\bAdvCert\b", re.IGNORECASE), "Graduate Certificate"),
     # ── Master's ─────────────────────────────────────────────────────────────
     # MA (Master of Arts), MPH (Master of Public Health), LLM (Master of Laws)
     # added. MPharm MUST come before MPH/MA to avoid partial match on "MPh".
     # Integrated masters (e.g. "Integrated Master of Engineering") also mapped.
+    # MFA  = Master of Fine Arts
+    # MAcc = Master of Accountancy
+    # MPA  = Master of Public Administration
+    # MDes = Master of Design
+    # MSci = Master in Science (UK 4-year integrated, treated as Master's)
     (re.compile(
         r"\b(master('?s)?|mba|m\.?sc|m\.?eng|m\.?ed|m\.?phil|m\.?res|m\.?arch"
-        r"|m\.?ph|ll\.?m|m\.?a)\b",
+        r"|m\.?ph|ll\.?m|m\.?a|mfa|macc|mpa|mdes|msci)\b",
         re.IGNORECASE,
     ), "Master's"),
     (re.compile(r"\bintegrated\s+masters?\b", re.IGNORECASE), "Master's"),
@@ -103,7 +114,10 @@ _NAME_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
     # BHons added explicitly for courses whose title leads with the honours tag.
     # BBA (Bachelor of Business Administration) and BSW (Bachelor of Social Work)
     # and BSN (Bachelor of Science in Nursing) added for US/UK university patterns.
-    (re.compile(r"\b(bachelor('?s)?|b\.?sc|b\.?eng|b\.?ed|b\.?a|b\.?bus|bba|bsw|bsn)\b", re.IGNORECASE), "Bachelor's"),
+    # BDes = Bachelor of Design (Ulster / Wolverhampton / many UK art schools)
+    # BMus = Bachelor of Music
+    # MBBS = Bachelor of Medicine, Bachelor of Surgery (UK 5-year medical UG degree)
+    (re.compile(r"\b(bachelor('?s)?|b\.?sc|b\.?eng|b\.?ed|b\.?a|b\.?bus|bba|bsw|bsn|b\.?des|b\.?mus|mbbs)\b", re.IGNORECASE), "Bachelor's"),
     (re.compile(r"\bb\.?hons?\b", re.IGNORECASE), "Bachelor's"),
     # ── Sub-degree ───────────────────────────────────────────────────────────
     (re.compile(r"\bassociate\s+degree\b", re.IGNORECASE), "Associate Degree"),

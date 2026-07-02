@@ -4836,6 +4836,40 @@ async def extract_course(
     except Exception as exc:  # noqa: BLE001
         log.warning("vit_static_extract failed on %s: %s", url, exc)
 
+    # ── Content-based staging skip (skip_staging_keywords) ──────────────────
+    # If the YAML lists keyword phrases and ANY appears in the page text, abort
+    # staging entirely — the course is never written to scraped_courses.
+    # This runs BEFORE any Gemini calls so CPD/short-course pages that slipped
+    # past the URL block_url_patterns filter are silently dropped without
+    # wasting API budget.
+    # Ulster use case: CPD pages carry "Short course and CPD" in their <title>
+    # but may have IDs outside the blocked 50xxx/46xxx/47xxx ranges.
+    _uc_stage_skip = get_uni_config()
+    _skip_stage_kws: list[str] = (
+        list(_uc_stage_skip.extraction.skip_staging_keywords)
+        if _uc_stage_skip else []
+    )
+    if _skip_stage_kws:
+        _page_text_for_stage_kw = (_h2t_gate(rendered_html or html or "") or "").lower()
+        for _skw in _skip_stage_kws:
+            if _skw.lower() in _page_text_for_stage_kw:
+                log.info(
+                    "[SKIP-STAGING] CPD/short-course detected (%r) — aborting staging on %s",
+                    _skw, url,
+                )
+                if emit:
+                    await emit(
+                        "status",
+                        f"[SKIP-STAGING] CPD/short-course detected ({_skw!r}) — not staging",
+                        phase="extract", kind="staging_skipped_cpd", url=url,
+                    )
+                return {
+                    "url": url,
+                    "error": "skipped:cpd_short_course",
+                    "payload": {},
+                    "evidence": [],
+                }
+
     # ── Content-based AI-fallback skip (skip_ai_fallback_keywords) ───────────
     # If the YAML lists keyword phrases and ANY appears in the page text, skip
     # the fallback Gemini enrichment (ai_fallback.fill_missing).  The pre-
