@@ -3698,6 +3698,15 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     _skipped_resume = _before - len(links)
                     if _skipped_resume > 0:
                         job.total_found = len(links)
+                        # Keep summary["discovered"] in lockstep — the
+                        # finalize step (`job.total_found =
+                        # summary["discovered"]`) otherwise clobbers this
+                        # resume-adjusted total back to the stale
+                        # pre-resume discovery count once the run
+                        # completes, making it look like N courses went
+                        # unaccounted for when they were actually
+                        # legitimately skipped here as already-staged.
+                        summary["discovered"] = len(links)
                         await db.commit()
                         log.info(
                             "[RESUME] %s: skipping %d already-staged course(s); "

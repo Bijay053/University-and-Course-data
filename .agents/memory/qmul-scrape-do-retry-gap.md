@@ -59,3 +59,28 @@ log line) purely because the worker process predated the file edit. Always
 restart that workflow (not just verify the file diff) after any change under
 `app/services/scraper/`, and confirm via `ps -o lstart` vs the file's mtime,
 or by grepping the fresh worker log for a marker unique to the new code.
+
+## "Missing courses" total_found mismatch (fixed) — not data loss, a display bug
+
+**Symptom:** a job reports `total_found=409` but `imported+skipped+errors`
+only sums to ~354-358, looking like ~50 courses were silently dropped.
+
+**Root cause:** the RESUME CHECKPOINT logic (`_already_staged_urls` in
+orchestrator.py) correctly skips courses already staged by a prior run and
+updates `job.total_found = len(links)` mid-run to the trimmed count. But job
+finalization unconditionally runs `job.total_found = summary["discovered"]`,
+and `summary["discovered"]` was never updated in the resume block — only
+`job.total_found` was. Finalize clobbered the resume-adjusted total back to
+the stale pre-resume full-discovery count, making a fully-accounted-for run
+look like a gap.
+
+**Fix:** wherever `job.total_found = len(links)` is set after trimming the
+links list (resume checkpoint, max_courses cap, etc.), also set
+`summary["discovered"] = len(links)` in the same block, since that's the
+value finalize uses to overwrite `job.total_found` at the very end — the two
+must stay in lockstep or any trim gets silently undone.
+
+**Diagnostic:** before assuming a job "lost" courses, check for a
+`resume_checkpoint` event in `scrape_runtime_logs` for that job. If present,
+verify `already_staged + imported + skipped + errors == total_found` — if it
+balances, nothing was lost, it's just a reporting artifact (pre-fix).
