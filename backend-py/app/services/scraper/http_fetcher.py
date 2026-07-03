@@ -483,36 +483,50 @@ async def fetch_html_wayback(url: str) -> str | None:
                 url, cached_ts, exc,
             )
 
-    # Slow path: Availability API lookup for URLs not in the CDX cache
-    # (e.g. PDF central pages, fee pages, or non-Wayback-discovered URLs).
-    _AVAIL_ENDPOINT = "https://archive.org/wayback/available"
+    # Slow path: live CDX search for URLs not in the CDX cache (e.g. PDF
+    # central pages, fee pages, or non-Wayback-discovered URLs).
+    #
+    # We deliberately do NOT use the Wayback Availability API
+    # (``archive.org/wayback/available``) here.  It returns the snapshot
+    # "closest" to a requested timestamp *regardless of HTTP status code*.
+    # For QMUL course pages we confirmed cases where the closest-in-time
+    # snapshot was itself a 403 (archived while the site's WAF was blocking
+    # the IA crawler too), while a perfectly good 200 snapshot existed
+    # months earlier or later — the Availability API silently returned the
+    # bad one and the caller gave up. A direct CDX query filtered to
+    # ``statuscode:200`` avoids this: we always pick from snapshots that
+    # are known-good responses, then take the most recent of those.
+    _CDX_ENDPOINT = "https://web.archive.org/cdx/search/cdx"
     try:
         async with httpx.AsyncClient(timeout=30, follow_redirects=True) as c:
-            avail_r = await c.get(
-                _AVAIL_ENDPOINT,
+            cdx_r = await c.get(
+                _CDX_ENDPOINT,
                 params={
                     "url": url,
-                    # Request a snapshot close to late 2025 — well before the
-                    # usual CF Enterprise Bot Management activation window and
-                    # likely to match snapshots in the CDX index.
-                    "timestamp": "20251201000000",
+                    "output": "json",
+                    "filter": "statuscode:200",
                 },
             )
-            if avail_r.status_code != 200:
+            if cdx_r.status_code != 200:
                 log.info(
-                    "wayback fetch: Availability API returned %s for %s",
-                    avail_r.status_code, url,
+                    "wayback fetch: CDX search returned %s for %s",
+                    cdx_r.status_code, url,
                 )
                 return None
-            data = avail_r.json()
-            closest = data.get("archived_snapshots", {}).get("closest", {})
-            if not closest or not closest.get("available"):
-                log.info("wayback fetch: no archived snapshot found for %s", url)
+            rows = cdx_r.json()
+            # First row is the header (["urlkey","timestamp",...]); real
+            # snapshot rows follow. No 200-status rows means genuinely no
+            # usable archive exists for this URL.
+            if not rows or len(rows) < 2:
+                log.info("wayback fetch: no 200-status snapshot found for %s", url)
                 return None
-            snapshot_url: str = closest["url"]
-            timestamp: str = closest.get("timestamp", "?")
+            snapshot_rows = rows[1:]
+            snapshot_rows.sort(key=lambda r: r[1])
+            timestamp: str = snapshot_rows[-1][1]
+            original: str = snapshot_rows[-1][2]
+            snapshot_url = f"https://web.archive.org/web/{timestamp}/{original}"
     except Exception as exc:
-        log.warning("wayback fetch: Availability API failed for %s: %s", url, exc)
+        log.warning("wayback fetch: CDX search failed for %s: %s", url, exc)
         return None
 
     raw_url = snapshot_url.replace(f"/web/{timestamp}/", f"/web/{timestamp}id_/", 1)

@@ -10,8 +10,8 @@ config for datacenter-IP-blocked hosts, e.g. Cardiff, QMUL), the
 fetch attempt for every course page — httpx, cffi, and Playwright are all
 deliberately skipped because they're blocked too.
 
-**Evolution of the fix (both landed in `http_fetcher.py`'s `scrape_do_skip_fallbacks`
-branch):**
+**Evolution of the fix (all three landed in `http_fetcher.py`'s `scrape_do_skip_fallbacks`
+branch / `fetch_html_wayback()`):**
 1. Originally this fast-path had zero retry. A single transient Scrape.do proxy
    blip (502 / "ROTATION_FAILED", common under concurrent load — same signature
    as the Ulster sitemap issue) on both render AND static permanently lost that
@@ -26,11 +26,19 @@ branch):**
    Scrape.do attempts already failed, so the extra round-trip cost is
    negligible.
 
-**How to apply:** if a skip_browser_rescue university still shows a residual
-`fetch_failed` tail after both fixes, check whether Wayback Machine actually
-has an archived snapshot for those specific course URLs (brand-new/renamed
-pages genuinely may have none) before assuming the code is still broken —
-that would be a site-side data gap, not a fetch-chain gap.
+3. Even with a Wayback last-resort tier, a residual tail can persist because
+   `fetch_html_wayback()` originally used the Availability API
+   (`archive.org/wayback/available?timestamp=...`), which returns whatever
+   snapshot is *closest in time* to the hint — regardless of HTTP status. A
+   403/error snapshot can be "closest" while a perfectly good 200 snapshot
+   exists at a different timestamp for the same URL, and the Availability API
+   has no way to skip it. Fix: replaced it with a direct CDX search
+   (`cdx/search/cdx?...&filter=statuscode:200`, no `closest`/`sort` params —
+   those params were empirically unreliable and sometimes returned empty),
+   then manually sort all returned 200-status rows by timestamp and fetch the
+   most recent via the `id_` raw-HTML modifier. Only query CDX for real gaps —
+   some URLs (e.g. QMUL's "MA War Studies") genuinely have zero 200-status
+   snapshots ever, which is a true data gap, not a fixable code path.
 
 **Diagnostic gotcha:** `log.info`/`log.warning` calls inside `fetch_html()`
 (the Python `logging` module) do NOT appear in the emit()-based job status

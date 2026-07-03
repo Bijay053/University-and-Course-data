@@ -192,6 +192,90 @@ async def test_returns_none_when_wayback_also_fails():
 
 
 @pytest.mark.asyncio
+async def test_wayback_cdx_picks_latest_200_snapshot_ignoring_availability_api():
+    """fetch_html_wayback must use a CDX search filtered to statuscode:200,
+    NOT the Wayback Availability API.
+
+    Root cause (QMUL job_5a35dc6f7f73, 2026-07-03): the Availability API
+    returns the snapshot "closest" to a requested timestamp regardless of
+    HTTP status. For several QMUL course URLs the closest-in-time snapshot
+    was itself a 403 (captured while archive.org's crawler was also
+    WAF-blocked), even though a perfectly good 200 snapshot existed at a
+    different time. This test locks in the CDX-based replacement: given
+    multiple 200-status snapshot rows, it must pick the most recent one and
+    fetch it via the ``id_`` raw-HTML modifier.
+    """
+    from app.services.scraper.http_fetcher import fetch_html_wayback
+
+    url = "https://www.qmul.ac.uk/postgraduate/taught/coursefinder/courses/urban-history-and-culture-ma/"
+    cdx_rows = [
+        ["urlkey", "timestamp", "original", "mimetype", "statuscode", "digest", "length"],
+        ["uk,ac,qmul)/...", "20191116235454", url, "text/html", "200", "AAA", "25241"],
+        ["uk,ac,qmul)/...", "20250811143334", url, "text/html", "200", "BBB", "29150"],
+    ]
+
+    class _FakeResponse:
+        def __init__(self, status_code: int, json_data: Any = None, text: str = ""):
+            self.status_code = status_code
+            self._json_data = json_data
+            self.text = text
+
+        def json(self) -> Any:
+            return self._json_data
+
+    calls: list[str] = []
+
+    async def _fake_get(self: Any, endpoint_url: str, *, params: Any = None, headers: Any = None) -> _FakeResponse:
+        calls.append(endpoint_url)
+        if "cdx/search" in endpoint_url:
+            return _FakeResponse(200, json_data=cdx_rows)
+        if "web.archive.org/web/20250811143334id_/" in endpoint_url:
+            return _FakeResponse(200, text=_MINIMAL_HTML)
+        raise AssertionError(f"unexpected raw fetch URL: {endpoint_url}")
+
+    with patch("httpx.AsyncClient.get", new=_fake_get):
+        result = await fetch_html_wayback(url)
+
+    assert result == _MINIMAL_HTML
+    assert any("cdx/search" in c for c in calls), "must query CDX search, not the Availability API"
+    assert not any("wayback/available" in c for c in calls), (
+        "must NOT use the Availability API — it returns closest-by-time "
+        "snapshots regardless of status code"
+    )
+
+
+@pytest.mark.asyncio
+async def test_wayback_cdx_returns_none_when_no_200_snapshot_exists():
+    """Genuine data gap: if CDX has no 200-status snapshot at all (e.g. QMUL's
+    'MA War Studies' — every archived crawl of that URL was itself blocked),
+    fetch_html_wayback must return None rather than raising or returning a
+    bad snapshot."""
+    from app.services.scraper.http_fetcher import fetch_html_wayback
+
+    url = "https://www.qmul.ac.uk/postgraduate/taught/coursefinder/courses/war-studies-ma/"
+    cdx_rows = [
+        ["urlkey", "timestamp", "original", "mimetype", "statuscode", "digest", "length"],
+    ]
+
+    class _FakeResponse:
+        def __init__(self, status_code: int, json_data: Any = None):
+            self.status_code = status_code
+            self._json_data = json_data
+
+        def json(self) -> Any:
+            return self._json_data
+
+    async def _fake_get(self: Any, endpoint_url: str, *, params: Any = None, headers: Any = None) -> _FakeResponse:
+        assert "cdx/search" in endpoint_url
+        return _FakeResponse(200, json_data=cdx_rows)
+
+    with patch("httpx.AsyncClient.get", new=_fake_get):
+        result = await fetch_html_wayback(url)
+
+    assert result is None
+
+
+@pytest.mark.asyncio
 async def test_no_retry_needed_when_render_succeeds_first_try():
     """Happy path is unaffected: no extra calls or delay when render succeeds
     on the very first attempt."""
