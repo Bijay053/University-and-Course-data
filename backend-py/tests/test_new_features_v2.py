@@ -274,6 +274,57 @@ def test_tier2_subdomain_probe_fires_when_low_candidates() -> None:
     )
 
 
+def test_alt_listing_probe_skipped_when_explicit_sitemap_url_configured() -> None:
+    """Alt-listing-path probe must NOT fire when the per-uni YAML sets an
+    explicit ``discovery.sitemap_url``.
+
+    2026-07-03 (Ulster job_ec86dc5866cb handoff): if the sitemap fetch
+    leaves ``found`` below the alt-probe threshold (e.g. a Cloudflare-
+    blocked host where the sitemap request itself fails), guessing at 7
+    more generic listing paths on the SAME blocked host is pure wasted
+    time (~25s each). An explicit sitemap_url means the operator has
+    already identified the definitive course-catalogue source, so the
+    alt-probe tier should be skipped entirely rather than attempted.
+    """
+    from app.services.scraper.discovery import discover_course_links
+
+    alt_probed: list[str] = []
+
+    async def _fake_fetch_html(url: str, **kwargs) -> str | None:
+        if any(p in url for p in (
+            "/our-courses", "/our-programs", "/courses/all",
+            "/all-courses", "/study/all",
+        )):
+            alt_probed.append(url)
+            return None
+        # Primary page yields nothing — forces `found` below the alt-probe
+        # threshold so the ONLY thing gating the alt-probe is sitemap_url.
+        return "<html><body></body></html>"
+
+    class _FakeDiscoveryConfig:
+        sitemap_url = "https://www.ulster.ac.uk/site-maps/sitemap-courses.xml"
+
+    _SITEMAP = "app.services.scraper.sitemap.discover_from_sitemap"
+    _EXPAND = "app.services.scraper.home_page_redirect.expand_course_list_with_categories"
+    with patch("app.services.scraper.discovery.fetch_html", side_effect=_fake_fetch_html), \
+         patch(_SITEMAP, new_callable=AsyncMock, return_value=[]), \
+         patch(_EXPAND, new_callable=AsyncMock, return_value=[]):
+        asyncio.run(
+            discover_course_links(
+                "https://www.ulster.ac.uk/courses",
+                max_pages=1,
+                max_courses=20,
+                emit=None,
+                discovery_config=_FakeDiscoveryConfig(),
+            )
+        )
+
+    assert alt_probed == [], (
+        f"Expected no alt-listing-path probes when sitemap_url is configured, "
+        f"but probed: {alt_probed}"
+    )
+
+
 def test_tier2_subdomain_probe_skipped_when_enough_candidates() -> None:
     """Tier-2 subdomain probe must NOT fire when BFS already found >= 5 candidates.
 

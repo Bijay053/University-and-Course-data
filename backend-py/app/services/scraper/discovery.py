@@ -669,6 +669,32 @@ async def discover_course_links(
     parsed = urlparse(start_url)
     origin = f"{parsed.scheme}://{parsed.netloc}"
 
+    # Diagnostic (2026-07-03, Ulster job_ec86dc5866cb re-run): a per-uni YAML
+    # can document `discovery.sitemap_url` in a comment without the key
+    # actually being set (silent config-authoring mistake) — the code then
+    # correctly, but confusingly, falls through to generic sitemap probing.
+    # Log the resolved value unconditionally at discovery start so a stall
+    # report can tell "sitemap_url=None despite YAML claiming one" apart
+    # from "stale worker code" in a single run, without needing to add
+    # print statements after the fact.
+    _resolved_sitemap_url = (
+        getattr(discovery_config, "sitemap_url", None)
+        if discovery_config is not None
+        else None
+    )
+    log.info(
+        "discover_course_links: origin=%s resolved_sitemap_url=%r",
+        origin,
+        _resolved_sitemap_url,
+    )
+    if emit:
+        await emit(
+            "status",
+            f"[DISCOVER] config: resolved sitemap_url={_resolved_sitemap_url!r}",
+            phase="discover",
+            kind="config_resolved",
+        )
+
     # ── Home-page → course-listing redirect (T001) ──────────────────────
     # When the caller hands us the marketing home page (path is "/" or
     # empty), VIT-style universities won't yield any course links from
@@ -1265,6 +1291,15 @@ async def discover_course_links(
     # paths (e.g. /our-courses/courses-grid-view) and harvest any linked
     # courses from each.  Only fires when found is below a generous threshold
     # so healthy universities with many results are unaffected.
+    #
+    # Skip entirely when the per-uni YAML sets an explicit `sitemap_url`
+    # (handoff note, 2026-07-03 Ulster job_ec86dc5866cb re-run): an explicit
+    # sitemap_url means the operator has already identified the definitive
+    # course-catalogue source for this university. If the sitemap fetch
+    # above still left `found` below threshold (bug, transient failure, or
+    # a Cloudflare-blocked host that also blocks these generic paths),
+    # guessing at 7 more unrelated listing paths on the same host is very
+    # unlikely to succeed and just adds ~25s of wasted time per path.
     _ALT_PROBE_THRESHOLD = 15
     _ALT_LISTING_PATHS: tuple[str, ...] = (
         "/our-courses/courses-grid-view",
@@ -1275,7 +1310,8 @@ async def discover_course_links(
         "/all-courses",
         "/study/all",
     )
-    if len(found) < _ALT_PROBE_THRESHOLD and origin:
+    _has_explicit_sitemap = bool(_resolved_sitemap_url)
+    if len(found) < _ALT_PROBE_THRESHOLD and origin and not _has_explicit_sitemap:
         if emit:
             await emit(
                 "status",

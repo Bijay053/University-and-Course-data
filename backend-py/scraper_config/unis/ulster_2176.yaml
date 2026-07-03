@@ -36,6 +36,17 @@ discovery:
   # Explicit sitemap URL — fetched via Scrape.do since direct HTTP returns 403.
   # 987 course URLs at pattern /courses/202627/<slug>-<id>.
   #
+  # BUG (found 2026-07-03, second stall report on job_ec86dc5866cb re-run):
+  # this key was documented in the comment above but the actual `sitemap_url:`
+  # line was never added to the YAML, so `discovery_config.sitemap_url`
+  # resolved to None at runtime and discover_from_sitemap() correctly (per
+  # its own `if sitemap_url:` branch) fell through to probing the 4 generic
+  # sitemap-index paths + robots.txt — i.e. exactly the old, slow behaviour,
+  # even though the sitemap short-circuit code itself was live. Root cause
+  # was a missing config value, not stale worker code or a code-path
+  # mismatch. Restoring the explicit URL here makes the short-circuit fire.
+  sitemap_url: 'https://www.ulster.ac.uk/site-maps/sitemap-courses.xml'
+
   # scrape_do_skip_fallbacks (2026-07-03 fix, job_ec86dc5866cb stall): the
   # extraction-phase flag below does NOT cover discovery-phase fetches.
   # discover_from_sitemap's httpx/robots.txt probes go through

@@ -190,6 +190,38 @@ async def test_probe_timeout_returns_empty_and_keeps_going(monkeypatch):
     assert text == ""
 
 
+def test_ulster_yaml_has_explicit_sitemap_url():
+    """Regression guard: ulster_2176.yaml must actually SET
+    discovery.sitemap_url, not just document it in a comment.
+
+    2026-07-03: the YAML had a comment claiming an explicit sitemap URL was
+    configured, but the `sitemap_url:` key itself was missing — so
+    discovery_config.sitemap_url resolved to None at runtime and discovery
+    silently fell back to generic sitemap-index probing + robots.txt,
+    reproducing the exact stall this fix was meant to eliminate. This test
+    fails loudly if that key is ever dropped again (e.g. during a future
+    YAML edit) instead of failing silently in production.
+    """
+    import pathlib
+
+    import yaml
+
+    yaml_path = (
+        pathlib.Path(__file__).resolve().parent.parent
+        / "scraper_config"
+        / "unis"
+        / "ulster_2176.yaml"
+    )
+    raw = yaml.safe_load(yaml_path.read_text())
+    sitemap_url = raw.get("discovery", {}).get("sitemap_url")
+    assert sitemap_url, (
+        "ulster_2176.yaml discovery.sitemap_url must be set (was missing/empty); "
+        "without it, discovery falls back to slow generic probing on a "
+        "Cloudflare-protected host."
+    )
+    assert sitemap_url == "https://www.ulster.ac.uk/site-maps/sitemap-courses.xml"
+
+
 def test_normalize_sitemap_strips_noise_params():
     norm = sitemap_mod._normalize_sitemap_url(
         "https://example.edu/courses/foo?students=intl&audience=undergrad&id=123"

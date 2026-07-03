@@ -35,6 +35,41 @@ is actually stuck).
 paths differently (e.g. "fetching configured URL" vs "probing N URL(s)") so
 the discovery log itself tells you which path was taken.
 
+## A YAML comment describing a config value is not the same as setting it
+
+A per-uni YAML had a detailed comment block saying "Explicit sitemap URL —
+fetched via Scrape.do..." directly above the `discovery:` section, but the
+actual `sitemap_url:` key was never added — it silently resolved to `None`
+at runtime, so a fully-correct short-circuit implementation still fell
+through to the slow generic-probing branch. From the logs alone this looked
+identical to "stale code hasn't deployed", wasting a full debug cycle.
+
+**Why:** comments describe intent, not runtime state; a key that's
+documented-but-missing produces zero errors or warnings — the config loader
+has no way to know the omission was a mistake vs. intentional.
+
+**How to apply:** when a stall/regression report says "the fix isn't taking
+effect" after a code change shipped, check resolved config values before
+suspecting stale workers or code-path mismatches — add (or look for) a log
+line that prints the actual resolved value of the relevant config field at
+the top of the function, and diff it against what the YAML *comment* claims.
+Also add a test that loads the YAML and asserts the key is actually set
+(not just present in a docstring/comment) for any config value a fix
+depends on.
+
+## Gate expensive fallback probes behind the same "explicit config wins" rule
+
+If a university has an explicit `sitemap_url` configured, an unrelated
+"alternative listing paths" probing tier (guessing at generic paths like
+`/our-courses`, `/all-courses`) should be skipped entirely too — not just
+made conditional on candidate count. An operator-supplied explicit source
+means further guessing on the same (likely blocked) host is waste, even if
+the primary explicit-source fetch came up short for some other reason.
+
+**How to apply:** any "guess a well-known fallback path" probing tier should
+check for an explicit per-uni override of the same kind before running, not
+just a generic "found < threshold" condition.
+
 ## Discovery-phase deadline pattern
 
 Wrap the whole `discover_course_links(...)` call (BFS + sitemap fallback +
