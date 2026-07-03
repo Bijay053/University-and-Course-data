@@ -609,6 +609,28 @@ async def fetch_html(url: str, *, retries: int = 2) -> str | None:
             _static = await fetch_html_scrape_do(url, render=False)
             if _static is not None and not _is_spa_shell(_static):
                 return _static
+            # Both render AND static failed on the first pass.  For universities
+            # that ALSO have skip_browser_rescue=true (e.g. QMUL — datacenter IP
+            # is blocked for both httpx and our own Playwright pool, so browser
+            # rescue would fail anyway), this fast-path is the *only* fetch
+            # attempt — there is no further fallback tier below it.  Under
+            # concurrent load (12 parallel HTTP workers) Scrape.do's proxy pool
+            # occasionally returns a transient 502/"ROTATION_FAILED" for a
+            # request that would succeed moments later (same failure signature
+            # documented for the Ulster sitemap fetch).  A single short-backoff
+            # retry recovers most of these without adding a real rescue tier.
+            # QMUL job_5f5ab180197a (2026-07-03): 47/409 courses (~11%) were
+            # lost to exactly this gap — render+static both failed once, and
+            # skip_browser_rescue left nothing else to try.
+            log.info(
+                "fetch %s: scrape_do_skip_fallbacks fast-path exhausted"
+                " (render+static) — retrying render once after backoff",
+                url,
+            )
+            await asyncio.sleep(3.0)
+            _rendered_retry = await fetch_html_scrape_do(url, render=True)
+            if _rendered_retry is not None:
+                return _rendered_retry
             return None
 
     # Discovery-phase fast-path: when discovery.scrape_do_skip_fallbacks=True,
