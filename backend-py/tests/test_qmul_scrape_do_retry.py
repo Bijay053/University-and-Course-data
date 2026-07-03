@@ -110,9 +110,11 @@ async def test_retry_rescues_transient_double_failure():
 
 
 @pytest.mark.asyncio
-async def test_returns_none_when_all_attempts_fail():
-    """When render, static, AND the retry all fail, fetch_html returns None
-    (there is no further fallback tier for skip_browser_rescue universities)."""
+async def test_falls_back_to_wayback_when_all_scrape_do_attempts_fail():
+    """When render, static, AND the retry all fail, fetch_html falls back to
+    the Wayback Machine as a last resort (archive.org is not subject to the
+    live WAF that blocks both httpx and Scrape.do's proxy pool for these
+    universities) before finally giving up."""
     set_uni_config(_qmul_uni_config())
 
     calls: list[dict] = []
@@ -121,10 +123,58 @@ async def test_returns_none_when_all_attempts_fail():
         calls.append({"url": url, "render": render})
         return None
 
+    async def _mock_wayback(url: str) -> str | None:
+        return _MINIMAL_HTML
+
     with (
         patch(
             "app.services.scraper.http_fetcher.fetch_html_scrape_do",
             side_effect=_mock_scrape_do,
+        ),
+        patch(
+            "app.services.scraper.http_fetcher.fetch_html_wayback",
+            side_effect=_mock_wayback,
+        ),
+        patch("app.services.scraper.http_fetcher.asyncio.sleep", return_value=None),
+        patch.dict(os.environ, {"SCRAPE_DO_TOKEN": "test-token-xyz"}),
+    ):
+        from app.services.scraper.http_fetcher import fetch_html
+        with scrape_do_render_scope():
+            result = await fetch_html(_QMUL_COURSE_URL)
+
+    render_calls = [c for c in calls if c["render"]]
+    assert len(render_calls) == 2, (
+        f"expected initial render attempt + one retry even on total failure, got "
+        f"{len(render_calls)}: {calls}"
+    )
+    assert result == _MINIMAL_HTML, (
+        "Wayback Machine success must be returned instead of giving up"
+    )
+
+
+@pytest.mark.asyncio
+async def test_returns_none_when_wayback_also_fails():
+    """When render, static, retry, AND Wayback Machine all fail, fetch_html
+    finally returns None (there is no further fallback tier)."""
+    set_uni_config(_qmul_uni_config())
+
+    calls: list[dict] = []
+
+    async def _mock_scrape_do(url: str, *, render: bool = False, **kw: Any) -> str | None:
+        calls.append({"url": url, "render": render})
+        return None
+
+    async def _mock_wayback(url: str) -> str | None:
+        return None
+
+    with (
+        patch(
+            "app.services.scraper.http_fetcher.fetch_html_scrape_do",
+            side_effect=_mock_scrape_do,
+        ),
+        patch(
+            "app.services.scraper.http_fetcher.fetch_html_wayback",
+            side_effect=_mock_wayback,
         ),
         patch("app.services.scraper.http_fetcher.asyncio.sleep", return_value=None),
         patch.dict(os.environ, {"SCRAPE_DO_TOKEN": "test-token-xyz"}),

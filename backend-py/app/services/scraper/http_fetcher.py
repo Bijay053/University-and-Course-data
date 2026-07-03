@@ -631,6 +631,33 @@ async def fetch_html(url: str, *, retries: int = 2) -> str | None:
             _rendered_retry = await fetch_html_scrape_do(url, render=True)
             if _rendered_retry is not None:
                 return _rendered_retry
+            # Last resort: Wayback Machine.  Universities with
+            # scrape_do_skip_fallbacks=True + skip_browser_rescue=True (e.g.
+            # QMUL) have NO other fallback tier — httpx/cffi are skipped by
+            # design (blocked by the live WAF the same as Scrape.do's proxy
+            # pool occasionally is) and browser rescue is disabled because
+            # Playwright is blocked from the same datacenter IP range.
+            # Archive.org is not subject to the live WAF at all, so it can
+            # recover the handful of courses (~5% of the fleet, QMUL
+            # job_aba92c0d3316 2026-07-03: 7/125) where Scrape.do's render
+            # AND static AND the render-retry all failed transiently. This
+            # only fires after 3 Scrape.do attempts already failed, so the
+            # extra archive.org round-trip cost is negligible.
+            log.info(
+                "fetch %s: scrape_do_skip_fallbacks fast-path exhausted"
+                " after render retry — trying Wayback Machine as last resort",
+                url,
+            )
+            _wayback_last_resort = await fetch_html_wayback(url)
+            if _wayback_last_resort is not None:
+                from app.services.scraper.snapshot_context import stage_snapshot as _stage
+                _stage(url, _wayback_last_resort, "wayback")
+                return _wayback_last_resort
+            log.info(
+                "fetch %s: scrape_do_skip_fallbacks fast-path — Wayback Machine"
+                " also failed/empty — giving up (fetch_failed)",
+                url,
+            )
             return None
 
     # Discovery-phase fast-path: when discovery.scrape_do_skip_fallbacks=True,
