@@ -24,3 +24,15 @@ render+static both fail on the first pass (`http_fetcher.py`, inside the
 fetch_failed rate after this, the block is likely permanent for those specific
 URLs (not transient) and needs a different fix (e.g. a different Scrape.do geo
 code, or the university genuinely needs `skip_browser_rescue: false`).
+
+**Celery does not hot-reload — a real gap this bug already exposed once.**
+The FastAPI workflow runs with `--reload`, so editing files under
+`backend-py/app/services/scraper/` takes effect immediately for API routes.
+The Celery worker workflow has no `--reload` flag and forks its pool at
+startup, so it keeps running the pre-edit code until the "backend-py: Celery
+worker" workflow is explicitly restarted — one scrape run after this exact
+fix landed still showed the old zero-retry behavior (0 occurrences of the new
+log line) purely because the worker process predated the file edit. Always
+restart that workflow (not just verify the file diff) after any change under
+`app/services/scraper/`, and confirm via `ps -o lstart` vs the file's mtime,
+or by grepping the fresh worker log for a marker unique to the new code.
