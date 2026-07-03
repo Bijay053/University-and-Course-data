@@ -208,3 +208,15 @@ extraction:
     # because the URL pattern /undergraduate/coursefinder/courses/2027/{slug}/
     # already guarantees individual course pages (not listing pages).
     skip_degree_qualifier_check: true
+
+  # QMUL's site is WAF-protected (Akamai-style 403 "The request could not be
+  # satisfied") and blocks our datacenter IP for BOTH plain HTTP (httpx) and
+  # our own Playwright browser fetch — job_291e348d325c (2026-07-03) showed
+  # 403 on ~87% of course pages via both paths, confirming this is an IP-level
+  # block, not a session/cookie issue that retries or longer settle times can
+  # fix. Same failure signature as Cardiff (see cardiff.yaml) — the working
+  # fix there is Scrape.do's residential-IP headless Chrome, which bypasses
+  # the datacenter-IP block entirely instead of retrying against it.
+  scrape_do_render: true
+  scrape_do_skip_fallbacks: true
+  skip_browser_rescue: true
