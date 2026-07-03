@@ -140,11 +140,17 @@ def test_kingston_max_parallel_fetch_unchanged():
 # ---------------------------------------------------------------------------
 
 def test_tees_bfs_page_budget():
-    """Teesside needs budget for UG dept pages + PG dept pages + sub-dept pages."""
+    """Teesside BFS is now a fallback behind generic_search_api (Task-257,
+    2026-07-03): the coursesearch JSON API returns all ~697 courses directly,
+    so BFS only runs if that API ever returns 0 links. Budget was raised from
+    30 to 80 in that fix to give the fallback path enough headroom to still
+    find a useful subset of courses via dept listing pages if the API breaks.
+    """
     cfg = _tees_cfg()
-    assert cfg.discovery.bfs_page_budget == 30, (
-        "bfs_page_budget must be 30: Teesside has ~6 UG + ~6 PG dept listing pages "
-        "plus sub-dept pages; default budget is insufficient"
+    assert cfg.discovery.bfs_page_budget == 80, (
+        "bfs_page_budget must be 80: raised from 30 in Task-257 so the BFS "
+        "fallback (used only if generic_search_api returns 0 links) still "
+        "covers UG dept + PG dept + sub-dept listing pages"
     )
 
 

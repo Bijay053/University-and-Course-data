@@ -66,18 +66,25 @@ def _uni_config_with_study_mode(**study_mode_kwargs) -> UniConfig:
 # ---------------------------------------------------------------------------
 
 def test_qmul_bfs_budget_is_100():
-    """bfs_page_budget must be 100 (raised from 60 to cover all subjects)."""
+    """bfs_page_budget is intentionally unset (None) since QMUL moved to
+    searchstax links_only discovery: the Solr core supplies all course URLs
+    directly, so BFS never runs and the page-budget knob is superseded.
+    """
     cfg = _qmul_cfg()
-    assert cfg.discovery.bfs_page_budget == 100, (
-        f"Expected 100, got {cfg.discovery.bfs_page_budget}"
+    assert cfg.discovery.bfs_page_budget is None, (
+        f"Expected None (BFS superseded by searchstax links_only), "
+        f"got {cfg.discovery.bfs_page_budget}"
     )
 
 
 def test_qmul_expected_min_courses_guard():
-    """expected_min_courses must be 370 (5% below 396-course baseline)."""
+    """expected_min_courses must be 390 (5% below the 409-course Solr baseline,
+    updated from the earlier 396-course/370 guard once discovery moved to
+    querying the SearchStax Solr core directly).
+    """
     cfg = _qmul_cfg()
-    assert cfg.discovery.expected_min_courses == 370, (
-        f"Expected 370, got {cfg.discovery.expected_min_courses}"
+    assert cfg.discovery.expected_min_courses == 390, (
+        f"Expected 390, got {cfg.discovery.expected_min_courses}"
     )
 
 
