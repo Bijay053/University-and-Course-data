@@ -1851,14 +1851,42 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
 
         if (not links or _yaml_api_partial) and not _always_browser:
             _pre_bfs_links = list(links)
-            links = await discover_course_links(
-                _bfs_start_url,
-                max_pages=max_pages,
-                max_courses=max_courses,
-                emit=_tracking_emit,
-                _blocked_fee_urls_sink=_discover_blocked_fee_urls,
-                discovery_config=_uni_cfg.discovery,
-            )
+            try:
+                links = await asyncio.wait_for(
+                    discover_course_links(
+                        _bfs_start_url,
+                        max_pages=max_pages,
+                        max_courses=max_courses,
+                        emit=_tracking_emit,
+                        _blocked_fee_urls_sink=_discover_blocked_fee_urls,
+                        discovery_config=_uni_cfg.discovery,
+                    ),
+                    timeout=settings.discovery_phase_timeout_s,
+                )
+            except asyncio.TimeoutError:
+                # Discovery-phase deadline (Ulster job_ec86dc5866cb,
+                # 2026-07-03): a BFS/sitemap probe stuck in the
+                # httpx->curl_cffi->Wayback->Scrape.do fallback chain held
+                # a worker claim indefinitely with no further log output.
+                # Raising here lets the existing `except Exception` handler
+                # in scrape_university call `_mark_failed()` with a clear
+                # reason, releasing the claim instead of blocking the queue
+                # for the full scrape_task_soft_time_limit_s ceiling.
+                _timeout_msg = (
+                    f"Discovery phase exceeded {settings.discovery_phase_timeout_s}s "
+                    "deadline — a BFS/sitemap fetch likely stuck on a blocked "
+                    "transport (Cloudflare-block, rate limit, or hung retry "
+                    "chain). Job marked failed so the worker slot is freed."
+                )
+                log.error("run_scrape %s: %s", runtime_job_id, _timeout_msg)
+                if _tracking_emit:
+                    await _tracking_emit(
+                        "error",
+                        f"[DISCOVER] {_timeout_msg}",
+                        phase="discover",
+                        kind="discovery_timeout",
+                    )
+                raise RuntimeError(_timeout_msg)
             # Merge YAML API links (pre-BFS) with BFS/sitemap results.
             # For URLs discovered by BOTH the API and BFS, prefer the API link
             # dict so the API's clean course name wins over BFS anchor text.

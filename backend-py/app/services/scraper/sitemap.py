@@ -20,8 +20,10 @@ the wild and a strict parser fails on the first un-escaped ampersand.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
+import time
 from typing import Final
 from urllib.parse import urlparse
 
@@ -165,13 +167,41 @@ def _is_course_loc(loc: str, *, base_host: str = "") -> bool:
     return True
 
 
-async def _fetch_text(url: str) -> str:
+# Hard per-probe timeout (handoff: Ulster job_ec86dc5866cb, 2026-07-03).
+# ``fetch_html`` can walk an httpx -> curl_cffi -> Wayback -> Scrape.do
+# fallback chain with its own internal retries; without an outer bound here
+# a single Cloudflare-blocked probe can stall for minutes with zero log
+# output in between, which from the outside looks like a dead worker.
+_PROBE_TIMEOUT_S: Final = 15.0
+
+
+async def _fetch_text(url: str, *, timeout: float = _PROBE_TIMEOUT_S) -> str:
     """``fetch_html`` returns "" on any error — the fallback should
-    keep going through the rest of the candidate list rather than abort."""
+    keep going through the rest of the candidate list rather than abort.
+
+    Wrapped in ``asyncio.wait_for`` so a hung transport can never block the
+    whole sitemap fallback indefinitely. Every outcome (success, timeout,
+    exception) is logged with the probe URL so a stuck run is diagnosable
+    from the worker log instead of just going silent.
+    """
+    start = time.monotonic()
     try:
-        return await fetch_html(url) or ""
+        text = await asyncio.wait_for(fetch_html(url), timeout=timeout)
+        elapsed = time.monotonic() - start
+        log.info(
+            "sitemap probe %s -> %d bytes in %.1fs", url, len(text or ""), elapsed
+        )
+        return text or ""
+    except asyncio.TimeoutError:
+        elapsed = time.monotonic() - start
+        log.warning(
+            "sitemap probe %s TIMED OUT after %.1fs (limit %.0fs)",
+            url, elapsed, timeout,
+        )
+        return ""
     except Exception as exc:
-        log.debug("sitemap fetch failed for %s: %s", url, exc)
+        elapsed = time.monotonic() - start
+        log.debug("sitemap probe %s failed after %.1fs: %s", url, elapsed, exc)
         return ""
 
 
@@ -257,45 +287,57 @@ async def discover_from_sitemap(
             return any(p.search(loc) for p in allow_url_patterns)
         return _is_course_loc(loc, base_host=base_host)
 
-    candidates: list[str] = list(f"{base}{p}" for p in _SITEMAP_INDEX_PATHS)
+    if sitemap_url:
+        # Explicit per-uni sitemap URL (``discovery.sitemap_url`` in YAML) —
+        # fetch ONLY that URL. Probing the four generic sitemap-index
+        # locations + robots.txt is a fallback heuristic for universities
+        # that haven't told us where their course sitemap lives; a
+        # university that HAS configured an explicit URL should never fall
+        # through to guessing (handoff: Ulster job_ec86dc5866cb, 2026-07-03
+        # — probing all 5 candidates turned one slow/blocked fetch of the
+        # *real* sitemap into an unattributable multi-minute silence).
+        candidates: list[str] = [sitemap_url]
+        if emit:
+            await emit(
+                "status",
+                f"[DISCOVER] sitemap: fetching configured URL {sitemap_url}",
+                phase="discover",
+                kind="sitemap_start",
+            )
+    else:
+        candidates = list(f"{base}{p}" for p in _SITEMAP_INDEX_PATHS)
 
-    # Explicit per-uni sitemap URL takes priority — insert at front so it is
-    # probed first and its URLs are added to `found` before any auto-detected
-    # sitemaps (which may contain noise pages that fill the dedup set first).
-    if sitemap_url and sitemap_url not in candidates:
-        candidates.insert(0, sitemap_url)
+        # robots.txt may publish non-standard sitemap locations — very common
+        # on large university sites that split by faculty.
+        robots = await _fetch_text(f"{base}/robots.txt")
+        if robots:
+            for m in _ROBOTS_SITEMAP_RE.findall(robots):
+                url = m.strip()
+                if not url:
+                    continue
+                # Some hosts publish a relative `Sitemap: /sitemap.xml`
+                # directive — RFC technically requires absolute, but real
+                # sites violate it. Resolve against base.
+                if url.startswith("/"):
+                    url = f"{base}{url}"
+                elif not url.lower().startswith(("http://", "https://")):
+                    url = f"{base}/{url.lstrip('/')}"
+                # SSRF guard: only accept robots-published sitemap URLs that
+                # live on the same registrable host.
+                sitemap_host = urlparse(url).netloc
+                if base_host and sitemap_host and not _same_registrable_host(base_host, sitemap_host):
+                    log.debug("sitemap: dropping off-host robots directive %s", url)
+                    continue
+                if url not in candidates:
+                    candidates.append(url)
 
-    # robots.txt may publish non-standard sitemap locations — very common
-    # on large university sites that split by faculty.
-    robots = await _fetch_text(f"{base}/robots.txt")
-    if robots:
-        for m in _ROBOTS_SITEMAP_RE.findall(robots):
-            url = m.strip()
-            if not url:
-                continue
-            # Some hosts publish a relative `Sitemap: /sitemap.xml`
-            # directive — RFC technically requires absolute, but real
-            # sites violate it. Resolve against base.
-            if url.startswith("/"):
-                url = f"{base}{url}"
-            elif not url.lower().startswith(("http://", "https://")):
-                url = f"{base}/{url.lstrip('/')}"
-            # SSRF guard: only accept robots-published sitemap URLs that
-            # live on the same registrable host.
-            sitemap_host = urlparse(url).netloc
-            if base_host and sitemap_host and not _same_registrable_host(base_host, sitemap_host):
-                log.debug("sitemap: dropping off-host robots directive %s", url)
-                continue
-            if url not in candidates:
-                candidates.append(url)
-
-    if emit:
-        await emit(
-            "status",
-            f"[DISCOVER] sitemap: probing {len(candidates)} URL(s) at {base}",
-            phase="discover",
-            kind="sitemap_start",
-        )
+        if emit:
+            await emit(
+                "status",
+                f"[DISCOVER] sitemap: probing {len(candidates)} URL(s) at {base}",
+                phase="discover",
+                kind="sitemap_start",
+            )
 
     found: dict[str, str] = {}
     seen_locs: set[str] = set()

@@ -1,6 +1,18 @@
 const TOKEN_KEY = "uniportal_auth_token";
 
 let _token: string | null = null;
+let _onUnauthorized: (() => void) | null = null;
+
+/**
+ * Register a callback invoked whenever `fetchWithAuth` receives a
+ * `401 Unauthorized` response (e.g. an expired/invalid session cookie).
+ * Used to trigger a global logout + redirect-to-login instead of letting
+ * every individual page show its own raw "Invalid session" error.
+ * Pass `null` to clear the handler.
+ */
+export function setOnUnauthorized(handler: (() => void) | null): void {
+  _onUnauthorized = handler;
+}
 
 export function setAuthToken(token: string | null): void {
   _token = token;
@@ -28,7 +40,7 @@ function getToken(): string | null {
   return loadAuthToken();
 }
 
-export function fetchWithAuth(
+export async function fetchWithAuth(
   input: RequestInfo | URL,
   init?: RequestInit,
 ): Promise<Response> {
@@ -37,5 +49,9 @@ export function fetchWithAuth(
   if (tok) {
     headers.set("Authorization", `Bearer ${tok}`);
   }
-  return fetch(input, { ...init, credentials: "include", headers });
+  const res = await fetch(input, { ...init, credentials: "include", headers });
+  if (res.status === 401) {
+    _onUnauthorized?.();
+  }
+  return res;
 }

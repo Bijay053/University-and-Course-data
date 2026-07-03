@@ -35,21 +35,37 @@
 discovery:
   # Explicit sitemap URL — fetched via Scrape.do since direct HTTP returns 403.
   # 987 course URLs at pattern /courses/202627/<slug>-<id>.
-  sitemap_url: 'https://www.ulster.ac.uk/site-maps/sitemap-courses.xml'
+  #
+  # scrape_do_skip_fallbacks (2026-07-03 fix, job_ec86dc5866cb stall): the
+  # extraction-phase flag below does NOT cover discovery-phase fetches.
+  # discover_from_sitemap's httpx/robots.txt probes go through
+  # http_fetcher.fetch_html the same as any other fetch, so WITHOUT this
+  # flag set here too, the sitemap fetch during discovery walks the full
+  # httpx -> curl_cffi -> Wayback -> Scrape.do chain (each leg blocked by
+  # Cloudflare Enterprise, ~15-60s each) before ever reaching Scrape.do.
+  # Setting it under discovery: makes the sitemap fetch go straight to
+  # Scrape.do, matching the existing extraction-phase behaviour.
+  scrape_do_skip_fallbacks: true
 
   # Seed URL for the Funnelback full-time filtered listing (558 courses).
   # NOTE: The Funnelback page uses virtual-list JS rendering so the browser
   # currently finds 0 hrefs from this page directly.  It is kept here as a
   # documented entry point and for when Scrape.do pagination support improves.
+  # The `|` in `Attendance_u|modeft` is percent-encoded (%7C) — an unencoded
+  # literal pipe is invalid in a URL and some HTTP clients silently mangle or
+  # reject it. Harmless today because bfs_page_budget:0 means this seed URL
+  # is never fetched, but a landmine if BFS is ever re-enabled for Ulster.
   seed_urls:
-    - 'https://www.ulster.ac.uk/courses?query=&f.Attendance_u|modeft=Full-time'
+    - 'https://www.ulster.ac.uk/courses?query=&f.Attendance_u%7Cmodeft=Full-time'
 
-  # NOTE: always_sitemap_supplement removed — bfs_page_budget:0 means BFS
-  # always finds 0 candidates (< the 5-candidate threshold), which triggers
-  # the automatic sitemap fallback unconditionally.  Keeping
-  # always_sitemap_supplement:true would cause a redundant second sitemap
-  # fetch (~25s per run via Scrape.do) with no additional courses discovered.
-  # always_sitemap_supplement: true  # ← intentionally removed
+  # NOTE: always_sitemap_supplement is intentionally NOT set here.
+  # bfs_page_budget:0 means BFS always finds 0 candidates (< the
+  # 5-candidate threshold), which triggers the automatic sitemap fallback
+  # unconditionally on its own. Setting always_sitemap_supplement:true on
+  # top of that would cause a redundant second sitemap fetch (~25s per run
+  # via Scrape.do) with no additional courses discovered — see the
+  # "Skip BFS entirely" note below for why bfs_page_budget:0 is sufficient
+  # by itself.
 
   # Accept /courses/<6-digit-year>/<slug> URLs only.
   # re.search finds 'ulster.ac.uk/courses/202627/' anywhere in the full URL.
@@ -66,14 +82,17 @@ discovery:
   # never executes and discovery jumps straight to the sitemap.
   bfs_page_budget: 0
 
-  # 1000 covers all 987 raw sitemap URLs with a margin for sitemap growth.
+  # 1500 covers the verified 2026-07-02 sitemap total (1050 URLs: 592 in
+  # /courses/202627/ + 458 in /courses/202728/) with a healthy margin for
+  # sitemap growth. Previously 1000, which already covered the current
+  # count but left little headroom — bumped per 2026-07-03 review.
   # year_dedup (below) collapses multiple intake-year variants into one URL
   # per course slug, so total extractions ≈ unique course count, not raw count.
-  max_candidates: 1000
+  max_candidates: 1500
 
   # sitemap_offset: 0 = start from position 0 (full catalogue in one job).
-  # Increase this only if a future sitemap exceeds 1000 and a second batch
-  # is needed: set offset=1000, max_candidates=500 for the second job.
+  # Increase this only if a future sitemap exceeds 1500 and a second batch
+  # is needed: set offset=1500, max_candidates=500 for the second job.
   sitemap_offset: 0
 
   # Year dedup: block 202728 (incomplete future year), keep only 202627.

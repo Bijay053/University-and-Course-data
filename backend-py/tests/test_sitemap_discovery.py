@@ -139,6 +139,57 @@ async def test_malformed_sitemap_does_not_raise(monkeypatch):
     assert out == []
 
 
+@pytest.mark.asyncio
+async def test_explicit_sitemap_url_skips_probing(monkeypatch):
+    """Regression for Ulster job_ec86dc5866cb (2026-07-03 discovery stall).
+
+    When a per-uni ``sitemap_url`` is configured, discovery must fetch ONLY
+    that URL — never the four generic index paths nor robots.txt. Probing
+    those extra candidates turned one slow/blocked fetch of the real
+    sitemap into an unattributable multi-minute silence.
+    """
+    sitemap_xml = """<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://example.edu/courses/bachelor-of-business</loc></url>
+</urlset>"""
+    calls = _patch_fetch(
+        monkeypatch,
+        {"https://example.edu/site-maps/sitemap-courses.xml": sitemap_xml},
+    )
+
+    emit, sink = _emits_collector()
+    out = await sitemap_mod.discover_from_sitemap(
+        "https://example.edu",
+        emit=emit,
+        sitemap_url="https://example.edu/site-maps/sitemap-courses.xml",
+    )
+
+    assert calls == ["https://example.edu/site-maps/sitemap-courses.xml"], (
+        "only the configured URL should be fetched — no probing of "
+        "sitemap.xml, sitemap_index.xml, or robots.txt"
+    )
+    urls = {c["url"] for c in out}
+    assert "https://example.edu/courses/bachelor-of-business" in urls
+    assert any("fetching configured URL" in s[1] for s in sink)
+    assert not any("probing" in s[1] for s in sink)
+
+
+@pytest.mark.asyncio
+async def test_probe_timeout_returns_empty_and_keeps_going(monkeypatch):
+    """A single hung probe must time out and yield "" rather than block
+    the whole sitemap fallback indefinitely."""
+    import asyncio
+
+    async def hanging_fetch_html(url: str) -> str:
+        await asyncio.sleep(10)
+        return "<urlset/>"
+
+    monkeypatch.setattr(sitemap_mod, "fetch_html", hanging_fetch_html)
+
+    text = await sitemap_mod._fetch_text("https://example.edu/sitemap.xml", timeout=0.05)
+    assert text == ""
+
+
 def test_normalize_sitemap_strips_noise_params():
     norm = sitemap_mod._normalize_sitemap_url(
         "https://example.edu/courses/foo?students=intl&audience=undergrad&id=123"

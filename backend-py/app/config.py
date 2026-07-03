@@ -85,6 +85,16 @@ class Settings(BaseSettings):
     scrape_task_soft_time_limit_s: int = 7200   # 2h
     scrape_task_hard_time_limit_s: int = 7500   # 2h05m (must be > soft)
 
+    # Discovery-phase deadline (Ulster job_ec86dc5866cb, 2026-07-03): a
+    # BFS/sitemap probe stuck in the httpx->curl_cffi->Wayback->Scrape.do
+    # fallback chain held a worker claim indefinitely with no further log
+    # output ("sitemap: probing 5 URL(s)" then silence). discover_course_links
+    # (BFS + sitemap fallback + sitemap supplement) is wrapped in
+    # asyncio.wait_for() at this deadline; on breach the job is marked failed
+    # with a clear reason instead of blocking the queue for the full
+    # scrape_task_soft_time_limit_s ceiling above.
+    discovery_phase_timeout_s: int = 300   # 5 min
+
     # Resume checkpoint: when True, a re-run of an interrupted large scrape skips
     # course URLs already staged for the university (instead of restarting from
     # course 0), and _clear_stale_dedup preserves an interrupted run's partial

@@ -1,5 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react";
-import { fetchWithAuth, setAuthToken, loadAuthToken } from "@/lib/api";
+import { fetchWithAuth, setAuthToken, loadAuthToken, setOnUnauthorized } from "@/lib/api";
+import { setUnauthorizedHandler } from "@workspace/api-client-react";
+import { toast } from "@/hooks/use-toast";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -59,6 +61,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refresh().finally(() => setLoading(false));
   }, [refresh]);
 
+  const forceLogout = useCallback(() => {
+    setAuthToken(null);
+    setUser((prev) => {
+      if (prev) {
+        toast({
+          title: "Session expired",
+          description: "Please log in again.",
+          variant: "destructive",
+        });
+      }
+      return null;
+    });
+    setPermissions(new Set());
+    setIsSuperAdmin(false);
+  }, []);
+
+  useEffect(() => {
+    setOnUnauthorized(forceLogout);
+    setUnauthorizedHandler(forceLogout);
+    return () => {
+      setOnUnauthorized(null);
+      setUnauthorizedHandler(null);
+    };
+  }, [forceLogout]);
+
   async function login(email: string, password: string) {
     const res = await fetch(`${BASE}/api/auth/login`, {
       method: "POST",
@@ -86,10 +113,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           : "Login failed";
       throw new Error(message);
     }
-    if (data.token) {
+    if (typeof data.token === "string") {
       setAuthToken(data.token);
     }
-    setUser(data.user);
+    setUser((data.user as User) ?? null);
     setPermissions(new Set<string>(Array.isArray(data.permissions) ? data.permissions : []));
     setIsSuperAdmin(Boolean(data.is_super_admin));
   }
