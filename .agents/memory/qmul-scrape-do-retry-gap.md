@@ -84,3 +84,38 @@ must stay in lockstep or any trim gets silently undone.
 `resume_checkpoint` event in `scrape_runtime_logs` for that job. If present,
 verify `already_staged + imported + skipped + errors == total_found` — if it
 balances, nothing was lost, it's just a reporting artifact (pre-fix).
+
+## Real fetch_failed burst root cause (fixed) — missing Scrape.do concurrency cap
+
+**Symptom:** even after the retry + Wayback tiers above, a run still shows a
+large genuine `extract_error`/`fetch_failed` burst (e.g. 116/409 = 28%,
+job_8221ce960e02), while manually re-fetching any one of the failed URLs in
+isolation succeeds immediately (confirmed by hand with the same
+`fetch_html_scrape_do` call).
+
+**Root cause:** `fetch_html_scrape_do()` had NO concurrency limit — unlike the
+plain-httpx path (`_sem = asyncio.Semaphore(max_http_concurrency)`), every
+call went straight to `httpx.AsyncClient.get()` unbounded. With
+`_MAX_PARALLEL_FETCH=12` course-fetch tasks running concurrently, and a
+university on `scrape_do_skip_fallbacks + skip_browser_rescue` (so *every*
+fetch for *every* course goes through Scrape.do), up to 12+ simultaneous
+`render=true` requests hit the one shared Scrape.do account at once. The
+account's plan-level concurrent-connection cap then rejects the overflow
+(502/429). Because all 12 tasks retry on the same fixed backoff (3s sleep),
+the retry lands in the same saturated window too, so the retry doesn't help —
+only Wayback (a genuinely different origin) rescued some, not all.
+`scrape_do_rate_limit_per_sec` (the existing Redis token-bucket) defaults to
+0.0 (disabled) and wouldn't have helped anyway — it smooths cross-worker call
+*rate*, not simultaneous in-flight *connections* from one process.
+
+**Fix:** added a dedicated `asyncio.Semaphore(settings.max_scrape_do_concurrency)`
+(default 5) wrapped directly around the outbound Scrape.do HTTP call in
+`fetch_html_scrape_do()`, independent of `_MAX_PARALLEL_FETCH`/`_sem`. Verified
+end-to-end: QMUL re-run (job_98f90a8c6023) went from 116 fetch_failed / 407
+render calls needed to **0 fetch_failed**, with exactly 407 render + 2 static
+calls for 409 courses (one call per course, no wasted retries at all).
+
+**Generalizes beyond QMUL:** any university on `scrape_do_skip_fallbacks`
+(Cardiff, UWL, WLV, HUD) shares the same single Scrape.do account and was
+equally exposed to this burst-failure mode, even though only QMUL happened to
+surface it loudly. No YAML change needed — the semaphore is global.

@@ -115,6 +115,25 @@ class Settings(BaseSettings):
     scrape_do_rate_limit_per_sec: float = 0.0
     gemini_rate_limit_per_sec: float = 0.0
 
+    # In-process hard cap on concurrent Scrape.do HTTP requests (per Celery
+    # worker process).  QMUL job_8221ce960e02 (2026-07-03): with
+    # _MAX_PARALLEL_FETCH=12 course-fetch tasks running concurrently and NO
+    # concurrency limit on fetch_html_scrape_do() (unlike the plain-httpx path,
+    # which has `_sem = asyncio.Semaphore(max_http_concurrency)`), up to 12+
+    # simultaneous render=true requests hit the single shared Scrape.do account
+    # at once. Scrape.do's plan-level concurrent-connection cap then rejects
+    # the overflow (502/429), and because all 12 tasks retry on roughly the
+    # same backoff schedule, the retry ALSO lands in a saturated window —
+    # producing a burst of genuine fetch_failed results (116/409 = 28% in that
+    # run) even though every individual URL fetches fine in isolation
+    # (confirmed by hand). This semaphore bounds real concurrent Scrape.do
+    # requests per worker process independently of _MAX_PARALLEL_FETCH, so a
+    # course-fetch task queues for a slot instead of firing straight into a
+    # saturated pool. Complements (does not replace) scrape_do_rate_limit_per_sec
+    # — that token bucket smooths cross-worker call *rate*, this bounds
+    # simultaneous in-flight *connections* from this process.
+    max_scrape_do_concurrency: int = 5
+
     # Task #233: per-course Gemini primary-extraction timeout (seconds).
     # The full-extraction Gemini call is wrapped in asyncio.wait_for around the
     # SDK call (AFTER the rate-limiter token is acquired, so this measures only

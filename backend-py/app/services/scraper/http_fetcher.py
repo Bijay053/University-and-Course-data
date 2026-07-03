@@ -36,6 +36,13 @@ from app.services.scraper.extractors.curtin_session import cookies_for_url
 
 log = logging.getLogger(__name__)
 _sem = asyncio.Semaphore(settings.max_http_concurrency)
+# In-process cap on concurrent Scrape.do requests — see config.py
+# `max_scrape_do_concurrency` for the QMUL burst-failure rationale.  Without
+# this, up to _MAX_PARALLEL_FETCH (12) course-fetch tasks can each fire a
+# render=true request at the shared Scrape.do account simultaneously, and the
+# retry on failure lands in the same saturated window, producing genuine
+# fetch_failed results for URLs that fetch fine in isolation.
+_scrape_do_sem = asyncio.Semaphore(settings.max_scrape_do_concurrency)
 
 # ---------------------------------------------------------------------------
 # Per-process Cloudflare fast-path cache
@@ -331,8 +338,11 @@ async def fetch_html_scrape_do(
             params["waitFor"] = str(wait_for_ms)
         if geo_code:
             params["geoCode"] = geo_code.upper()
-        async with httpx.AsyncClient(timeout=90, follow_redirects=True) as c:
-            r = await c.get("https://api.scrape.do", params=params)
+        # Bound real concurrent connections to the shared Scrape.do account —
+        # see `_scrape_do_sem` definition for the QMUL burst-failure rationale.
+        async with _scrape_do_sem:
+            async with httpx.AsyncClient(timeout=90, follow_redirects=True) as c:
+                r = await c.get("https://api.scrape.do", params=params)
             if r.status_code == 200 and len(r.text) > 500:
                 log.info(
                     "scrape.do fetch %s render=%s -> 200 (%d chars)",
