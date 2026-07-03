@@ -66,6 +66,63 @@ async def test_flat_sitemap_returns_course_urls(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_fetch_failure_emits_diagnostic_detail(monkeypatch):
+    """Handoff: Ulster job_ec86dc5866cb, 2026-07-03 — the old "done — 0
+    unique candidates" message gave no clue whether the fetch itself
+    failed. A failed/empty fetch must now emit a per-candidate diagnostic
+    with the byte count so a stalled probe is visible in the job log."""
+    _patch_fetch(monkeypatch, {})  # every candidate returns "" (fetch failure)
+
+    emit, sink = _emits_collector()
+    out = await sitemap_mod.discover_from_sitemap(
+        "https://example.edu",
+        emit=emit,
+        sitemap_url="https://example.edu/site-maps/sitemap-courses.xml",
+    )
+
+    assert out == []
+    failed = [s for s in sink if s[2].get("kind") == "sitemap_fetch_failed"]
+    assert failed, "expected a sitemap_fetch_failed diagnostic emit"
+    assert "0 byte" in failed[0][1]
+
+
+@pytest.mark.asyncio
+async def test_fetched_xml_with_no_locs_emits_diagnostic_detail(monkeypatch):
+    xml_no_locs = """<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"></urlset>"""
+    _patch_fetch(monkeypatch, {"https://example.edu/sitemap.xml": xml_no_locs})
+
+    emit, sink = _emits_collector()
+    out = await sitemap_mod.discover_from_sitemap("https://example.edu", emit=emit)
+
+    assert out == []
+    no_locs = [s for s in sink if s[2].get("kind") == "sitemap_no_locs"]
+    assert no_locs, "expected a sitemap_no_locs diagnostic emit"
+    assert str(len(xml_no_locs)) in no_locs[0][1]
+
+
+@pytest.mark.asyncio
+async def test_locs_found_but_all_filtered_emits_sample(monkeypatch):
+    """Locs are present but none pass ``_accept`` (e.g. off-topic sitemap) —
+    a diagnostic with a URL sample must fire so it's clear the filter, not
+    the fetch, is the reason for zero candidates."""
+    xml = """<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://example.edu/news/some-article</loc></url>
+  <url><loc>https://example.edu/about/contact</loc></url>
+</urlset>"""
+    _patch_fetch(monkeypatch, {"https://example.edu/sitemap.xml": xml})
+
+    emit, sink = _emits_collector()
+    out = await sitemap_mod.discover_from_sitemap("https://example.edu", emit=emit)
+
+    assert out == []
+    all_filtered = [s for s in sink if s[2].get("kind") == "sitemap_all_filtered"]
+    assert all_filtered, "expected a sitemap_all_filtered diagnostic emit"
+    assert "example.edu/news/some-article" in all_filtered[0][1]
+
+
+@pytest.mark.asyncio
 async def test_sitemap_index_recurses_one_level(monkeypatch):
     index_xml = """<?xml version="1.0" encoding="UTF-8"?>
 <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">

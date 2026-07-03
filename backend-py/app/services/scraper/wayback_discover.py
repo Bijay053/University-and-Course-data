@@ -130,6 +130,17 @@ _HOST_CDX_URL_PREFIX: dict[str, str] = {
     # allow_url_patterns accepts.
     "www.leeds.ac.uk": "courses.leeds.ac.uk/*",
     "courses.leeds.ac.uk": "courses.leeds.ac.uk/*",
+    # Ulster (www.ulster.ac.uk): real course pages live at /courses/<id>/...
+    # Without a targeted prefix the default www.ulster.ac.uk/* CDX query
+    # returns the alphabetically-first 10 000 archived URLs before reaching
+    # the /courses subtree, so Wayback recovers 0 course candidates — the
+    # same failure mode as UTAS/QUT/Notre Dame above. Backlog item from the
+    # Ulster discovery-stall investigation (job_ec86dc5866cb, 2026-07-03);
+    # not yet verified against a live CDX query — the site's live sitemap +
+    # render_listing_pages funnelback unwrap are the primary discovery path,
+    # this is a defence-in-depth fallback if those regress.
+    "www.ulster.ac.uk": "www.ulster.ac.uk/courses/*",
+    "ulster.ac.uk": "www.ulster.ac.uk/courses/*",
 }
 
 

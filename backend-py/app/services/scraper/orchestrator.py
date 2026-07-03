@@ -21,7 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.database import AsyncSessionLocal
 from app.models import ScrapeRuntimeJob, University
-from app.services.scraper.discovery import discover_course_links
+from app.services.scraper.discovery import discover_course_links, _unwrap_funnelback_redirect
 from app.services.scraper.per_course_vision import (
     VisionImageCache,
     new_vision_image_cache,
@@ -168,6 +168,16 @@ async def _apply_render_listing_pages(
                     _abs = _rlp_base + _h
                 else:
                     continue
+                # Funnelback/Squiz search redirect unwrap (handoff: Ulster
+                # job_ec86dc5866cb, 2026-07-03). Course links on JS-search
+                # listing pages are rendered as
+                # `/s/redirect?collection=...&url=<url-encoded target>`.
+                # Without unwrapping, `_path` below is the bare
+                # `/s/redirect` for every link (the real target is only in
+                # the discarded query string), so allow_url_patterns never
+                # matches and the whole listing page silently yields 0
+                # course links even though the fetch succeeded.
+                _abs = _unwrap_funnelback_redirect(_abs)
                 _p = _urlparse_rlp(_abs)
                 if _p.netloc != _rlp_host:
                     continue

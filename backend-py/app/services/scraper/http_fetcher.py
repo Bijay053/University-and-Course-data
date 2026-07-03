@@ -637,12 +637,33 @@ async def fetch_html(url: str, *, retries: int = 2) -> str | None:
                 from app.services.scraper.snapshot_context import stage_snapshot as _stage
                 _stage(url, _disc_static, "scrape_do_static")
                 return _disc_static
-            # Scrape.do static failed or returned a SPA shell — fall through to
-            # normal httpx so discovery degrades gracefully rather than returning
-            # zero links.
+            # Static failed (None/502) or returned an SPA shell. Before
+            # falling through to plain httpx (which Cloudflare blocks
+            # outright for these hosts), retry once with render=True.
+            # Handoff: Ulster job_ec86dc5866cb, 2026-07-03 — the Ulster
+            # sitemap URL only succeeds through Scrape.do's headless-browser
+            # proxy pool (render=True); static (render=False, including
+            # super=True) always 502s with `ROTATION_FAILED: cannot connect
+            # target url`, which is a proxy-level failure and not a
+            # Cloudflare challenge page, so retrying static harder never
+            # helps. Without this retry, discovery silently degrades to
+            # httpx -> also blocked -> 0 candidates, with no code path ever
+            # trying the one fetch mode that actually works for this URL.
+            log.info(
+                "fetch %s: discovery scrape_do_skip_fallbacks static fast-path"
+                " failed or SPA shell — retrying with render=True before httpx",
+                url,
+            )
+            _disc_rendered = await fetch_html_scrape_do(url, render=True)
+            if _disc_rendered is not None and not _is_spa_shell(_disc_rendered):
+                from app.services.scraper.snapshot_context import stage_snapshot as _stage
+                _stage(url, _disc_rendered, "scrape_do_render")
+                return _disc_rendered
+            # Both Scrape.do modes failed — fall through to normal httpx so
+            # discovery degrades gracefully rather than returning zero links.
             log.warning(
                 "fetch %s: discovery scrape_do_skip_fallbacks fast-path failed"
-                " — falling back to direct httpx",
+                " (static AND render) — falling back to direct httpx",
                 url,
             )
 

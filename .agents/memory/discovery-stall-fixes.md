@@ -82,3 +82,36 @@ Per-probe timeouts (e.g. `asyncio.wait_for` around a single `fetch_html`
 call) are still worth adding separately as a first line of defense, but the
 top-level deadline is the backstop that guarantees the job can never hold a
 worker slot indefinitely regardless of which inner call hangs.
+
+## "N unique candidates" logs need a reason branch, not just a count
+
+A sitemap/discovery step that only ever logs the final candidate count (e.g.
+"done — 0 unique candidates") is indistinguishable across three completely
+different root causes: the fetch itself failed (0 bytes / non-XML), the fetch
+succeeded but the document had no extractable entries, or entries were found
+but every one got filtered out by URL patterns. Each needs a different fix.
+
+**How to apply:** any discovery/collection loop that can legitimately end at
+zero should emit a distinct diagnostic event per failure branch (fetch
+failure vs. empty-parse vs. all-filtered), and the all-filtered branch should
+include a small URL sample so a human can immediately see *which* filter is
+too aggressive without re-running the job with extra logging.
+
+## Search/discovery redirector links must be unwrapped before URL filtering
+
+Some university search/CMS platforms (e.g. Funnelback: `/s/redirect?...&url=<encoded-target>`)
+return real course links wrapped in a redirector query string. If the
+allow/block URL-pattern filters run on the *wrapped* URL, every real link is
+judged against a `/s/redirect` path instead of its actual destination and
+gets rejected — this can look identical to "the site has no course links" in
+the logs. The same unwrap must be applied in every place a raw link is
+observed: server-side link resolution, the orchestrator's listing-page
+render/filter pass, and the browser-side link-extraction JS — missing any
+one of the three reintroduces the bug for that code path only, which is easy
+to miss since the other two paths look fixed.
+
+**How to apply:** write one small `unwrap_x_redirect()` helper (parse the
+query string, `unquote` the target param) and call it at the earliest point
+each code path first sees a raw href, before any pattern/path filtering runs
+against it. Pin the browser-side JS source unwrap logic with a dedicated
+test so a future edit to `_EXTRACT_LINKS_JS` can't silently drop it.

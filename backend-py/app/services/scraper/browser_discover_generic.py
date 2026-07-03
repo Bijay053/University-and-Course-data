@@ -121,12 +121,29 @@ _EXTRACT_LINKS_JS = r"""
 (origin) => {
   const results = [];
   const seen = new Set();
+  // Funnelback/Squiz search widgets render course links as a search
+  // redirect (`/s/redirect?...&url=<encoded target>`) rather than a
+  // direct anchor. Stripping the query string (as below) collapses every
+  // such link to the bare `/s/redirect` path, so the allow-pattern filter
+  // never matches anything and discovery silently returns zero candidates
+  // even though the browser rendered the listing page correctly
+  // (handoff: Ulster job_ec86dc5866cb, 2026-07-03).
+  const unwrapFunnelback = (u) => {
+    try {
+      if (!/\/s\/(redirect|search)\b/i.test(u.pathname)) return u;
+      const inner = u.searchParams.get('url') || u.searchParams.get('URL');
+      if (!inner) return u;
+      const decoded = decodeURIComponent(inner);
+      if (/^https?:\/\//i.test(decoded)) return new URL(decoded);
+    } catch (_) { /* fall through to original url */ }
+    return u;
+  };
   document.querySelectorAll('a[href]').forEach(a => {
     let href = (a.getAttribute('href') || '').trim();
     if (!href || href.startsWith('mailto:') || href.startsWith('tel:') || href.startsWith('#'))
       return;
     let url;
-    try { url = new URL(href, origin).href; } catch (_) { return; }
+    try { url = unwrapFunnelback(new URL(href, origin)).href; } catch (_) { return; }
     const clean = url.split(/[?#]/)[0];
     if (seen.has(clean)) return;
     seen.add(clean);

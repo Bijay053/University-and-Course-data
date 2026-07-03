@@ -345,9 +345,34 @@ async def discover_from_sitemap(
     for sm_url in candidates:
         xml = await _fetch_text(sm_url)
         if not xml or "<" not in xml:
+            # Handoff: Ulster job_ec86dc5866cb, 2026-07-03 — the prior
+            # "done — 0 unique candidates" message gave no way to tell
+            # whether the fetch itself failed (0 bytes / non-XML) vs.
+            # succeeded but yielded no matching <loc> entries. Surface the
+            # fetch outcome per-candidate so a stalled/blocked probe is
+            # diagnosable from the job log instead of only from
+            # DEBUG-level worker logs.
+            if emit:
+                await emit(
+                    "status",
+                    f"[DISCOVER] sitemap {sm_url}: fetch returned "
+                    f"{len(xml or '')} byte(s) — no usable XML, skipping",
+                    phase="discover",
+                    kind="sitemap_fetch_failed",
+                    bytes=len(xml or ""),
+                )
             continue
         all_locs = _LOC_RE.findall(xml)
         if not all_locs:
+            if emit:
+                await emit(
+                    "status",
+                    f"[DISCOVER] sitemap {sm_url}: fetched {len(xml)} byte(s), "
+                    f"0 <loc> entries found",
+                    phase="discover",
+                    kind="sitemap_no_locs",
+                    bytes=len(xml),
+                )
             continue
 
         nested = [loc for loc in all_locs if _is_nested_loc(loc)]
@@ -410,6 +435,22 @@ async def discover_from_sitemap(
                 kind="sitemap_page",
                 added=added,
                 total=len(found),
+            )
+        elif emit and all_locs:
+            # Handoff: Ulster job_ec86dc5866cb, 2026-07-03 — the fetch
+            # succeeded and <loc> entries were present, but every one was
+            # filtered out by `_accept` (host mismatch, non-course
+            # blocklist, or no allow_url_patterns match). Show a sample so
+            # it's obvious from the job log whether the sitemap is simply
+            # not a course sitemap vs. the allow-pattern being too narrow.
+            sample = [_normalize_sitemap_url(loc) for loc in all_locs[:3]]
+            await emit(
+                "status",
+                f"[DISCOVER] sitemap {sm_url}: {len(all_locs)} <loc> entries "
+                f"found, 0 accepted after filtering — sample: {sample}",
+                phase="discover",
+                kind="sitemap_all_filtered",
+                loc_count=len(all_locs),
             )
         # First sitemap that yields candidates wins. Many sites publish
         # both sitemap.xml and sitemap_index.xml with overlapping content;

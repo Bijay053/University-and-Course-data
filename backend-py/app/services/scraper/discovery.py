@@ -15,7 +15,7 @@ import asyncio
 import logging
 import re
 from html.parser import HTMLParser
-from urllib.parse import urljoin, urlparse, urlunparse, urlencode, parse_qsl
+from urllib.parse import urljoin, urlparse, urlunparse, urlencode, parse_qsl, parse_qs, unquote
 
 from app.services.scraper.http_fetcher import fetch_html
 
@@ -511,10 +511,51 @@ class _LinkExtractor(HTMLParser):
             self._current_text = []
 
 
+# Funnelback / Squiz Search widgets (Ulster, and other UK/AU unis whose
+# course search is Funnelback-powered) render course links as a search
+# redirect rather than a direct anchor to the page, e.g.:
+#   https://www.ulster.ac.uk/s/redirect?collection=...&url=<url-encoded target>
+# Every href-collection loop resolves the anchor and then strips the query
+# string for dedup — which collapses every such link to the bare
+# `/s/redirect` path, at which point the allow_url_patterns filter
+# (expecting `/courses/\d{6}/...`) never matches ANY link and discovery
+# silently returns zero course candidates even though the browser
+# successfully rendered the listing page (handoff: Ulster job_ec86dc5866cb,
+# 2026-07-03).
+_FUNNELBACK_REDIRECT_RE = re.compile(r"/s/(?:redirect|search)\b", re.I)
+
+
+def _unwrap_funnelback_redirect(url: str) -> str:
+    """Return the real target URL if ``url`` is a Funnelback/Squiz search
+    redirect link; otherwise return ``url`` unchanged.
+
+    Looks for a ``url=`` (or ``URL=``) query param on a path containing
+    ``/s/redirect`` or ``/s/search`` and URL-decodes it. Falls back to the
+    original URL on any parse error or if the decoded value isn't itself
+    an absolute http(s) URL, so a non-Funnelback link is never mangled.
+    """
+    try:
+        parsed = urlparse(url)
+    except Exception:
+        return url
+    if not _FUNNELBACK_REDIRECT_RE.search(parsed.path):
+        return url
+    qs = parse_qs(parsed.query)
+    inner = (qs.get("url") or qs.get("URL") or [None])[0]
+    if not inner:
+        return url
+    try:
+        inner = unquote(inner)
+    except Exception:
+        return url
+    return inner if inner.startswith(("http://", "https://")) else url
+
+
 def _resolve(href: str, base: str, origin: str) -> str | None:
     if not href or href.startswith(("#", "javascript:", "mailto:", "tel:")):
         return None
     full = urljoin(base, href).split("#")[0]
+    full = _unwrap_funnelback_redirect(full)
     if not full.startswith(origin):
         return None
     return full
