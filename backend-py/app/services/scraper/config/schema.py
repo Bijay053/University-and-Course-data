@@ -567,6 +567,16 @@ class GenericSearchApiConfig(BaseModel):
             "See BodyPaginationConfig for field details."
         ),
     )
+    strip_response_prefix: Optional[str] = Field(
+        default=None,
+        description=(
+            "Literal string to strip from the start of the raw response body before "
+            "JSON-parsing it. Some in-house search APIs (e.g. ColdFusion sites) "
+            "prepend a fixed anti-JSON-hijacking prefix such as '://' that must be "
+            "removed before the rest of the body is valid JSON. None = parse the "
+            "response as-is via the HTTP client's normal JSON decoder."
+        ),
+    )
 
 
 class BodyPaginationConfig(BaseModel):

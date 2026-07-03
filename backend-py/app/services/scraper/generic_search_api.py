@@ -33,6 +33,7 @@ rest blank for the completeness gate to catch.
 """
 from __future__ import annotations
 
+import json
 import logging
 import os
 import re
@@ -1144,7 +1145,14 @@ async def fetch_yaml_api_links(cfg: Any, emit: Callable[..., Any] | None = None)
 
                 # ── Parse JSON ───────────────────────────────────────────────────
                 try:
-                    data = resp.json()
+                    _strip_prefix = getattr(cfg, "strip_response_prefix", None)
+                    if _strip_prefix:
+                        _raw_text = resp.text
+                        if _raw_text.startswith(_strip_prefix):
+                            _raw_text = _raw_text[len(_strip_prefix):]
+                        data = json.loads(_raw_text)
+                    else:
+                        data = resp.json()
                 except Exception as exc:
                     snippet = resp.text[:200].replace("\n", " ")
                     await _emit(
