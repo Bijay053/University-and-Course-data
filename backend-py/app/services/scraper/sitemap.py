@@ -167,12 +167,24 @@ def _is_course_loc(loc: str, *, base_host: str = "") -> bool:
     return True
 
 
-# Hard per-probe timeout (handoff: Ulster job_ec86dc5866cb, 2026-07-03).
+# Hard per-probe timeout (handoff: Ulster job_ec86dc5866cb, 2026-07-03;
+# revised job_85137197b768, 2026-07-03).
 # ``fetch_html`` can walk an httpx -> curl_cffi -> Wayback -> Scrape.do
 # fallback chain with its own internal retries; without an outer bound here
 # a single Cloudflare-blocked probe can stall for minutes with zero log
 # output in between, which from the outside looks like a dead worker.
-_PROBE_TIMEOUT_S: Final = 15.0
+#
+# 15s was too tight for hosts with discovery.scrape_do_skip_fallbacks=True:
+# that fast-path's own internal retry (static -> render on 502/SPA-shell,
+# see http_fetcher.fetch_html) can legitimately need 60-90s end-to-end when
+# Scrape.do's static/residential pool is slow to fail over (observed: Ulster
+# static call alone took ~58s to 502 before the render retry succeeded in
+# ~9s, 66.7s total). At 15s the outer wait_for cancelled the whole chain
+# before the render retry ever ran, so discover_from_sitemap always saw
+# "0 byte(s)" for Ulster even though the fetch would have succeeded given
+# enough time. Raised to give the full static+render retry chain room to
+# complete; still bounded so a genuinely dead sitemap URL can't hang forever.
+_PROBE_TIMEOUT_S: Final = 100.0
 
 
 async def _fetch_text(url: str, *, timeout: float = _PROBE_TIMEOUT_S) -> str:

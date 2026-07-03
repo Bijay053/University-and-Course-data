@@ -45,3 +45,13 @@ Each course takes ~70s end-to-end (page fetch + extraction + AI fallback + snaps
 Plan accordingly — these jobs cannot be monitored within a single session.
 
 **Why:** Celery `--concurrency=8` = 8 worker processes. Each university scrape runs on one process. Within that process the asyncio extraction loop has very low concurrency (effectively ~1-2 courses at a time due to Wayback/Scrape.do rate limits and Gemini AI sequential calls).
+
+## Sitemap probe outer-timeout vs. discovery-fast-path retry chain (2026-07-03)
+
+**Symptom**: discovery.scrape_do_skip_fallbacks=True hosts (Ulster) suddenly regressed from ~987 to ~33 courses — sitemap log showed "fetch returned 0 byte(s)" even though the sitemap URL and YAML config were correct and the discovery fast-path's static→render retry code was in place and running.
+
+**Root cause**: `sitemap.py`'s `_fetch_text()` wraps the whole `fetch_html()` call (which internally does static→502→render-retry) in an outer `asyncio.wait_for(..., timeout=_PROBE_TIMEOUT_S)`. When Scrape.do's static/residential pool is slow to fail over (observed: ~58s to 502 before the render retry succeeds in ~9s, ~67s total), a 15s outer timeout kills the whole chain before the render retry ever runs — so it looks identical to "no sitemap" even though the fetch would succeed given time.
+
+**Fix**: raised `_PROBE_TIMEOUT_S` in `sitemap.py` from 15.0 to 100.0 to give the full static+render retry room to complete.
+
+**How to diagnose this class of bug**: don't trust the browser-facing job log alone — it's built from `emit()` calls only. The `discovery.scrape_do_skip_fallbacks=True` / retry / failure lines are `log.info`/`log.warning` calls to the Python logger, only visible in the raw Celery worker log (or by re-running the fetch in isolation via a one-off script that calls `get_config_for_host()` + `set_uni_config()` + the fetch function directly). Reproducing in isolation is the fastest way to see the true timing breakdown.
