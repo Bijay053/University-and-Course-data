@@ -4801,10 +4801,20 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # Build human-readable skip breakdown for the log line.
         _skip_parts = [f"{k}={v}" for k, v in sorted(skip_reasons.items(), key=lambda x: -x[1])]
         _skip_detail = f" ({', '.join(_skip_parts)})" if _skip_parts else ""
+        # QMUL "no traces" bug (2026-07-06): summary["fetch_failed"] (courses
+        # whose initial HTTP/Scrape.do fetch came back empty and — because
+        # skip_browser_rescue/skip_per_course_browser was set for that uni —
+        # had no browser fallback to recover them) was tracked internally but
+        # never surfaced in this line nor persisted anywhere, so runs like
+        # QMUL's 279/409 vanished courses looked like a clean Errors:0 run.
+        # Always show it explicitly (even when 0) so it can never again be
+        # silently absorbed into "the numbers didn't add up".
+        _fetch_failed_n = summary.get("fetch_failed", 0)
         _done_msg = (
             f"══ DONE ══ Found:{summary.get('discovered', 0)} | "
             f"Staged:{summary.get('staged', 0)} | "
             f"Skipped:{summary.get('skipped', 0)}{_skip_detail} | "
+            f"FetchFailed:{_fetch_failed_n} | "
             f"Errors:{summary.get('errors', 0)}"
         )
         if _ss_filter_stats.get("searchstax_title_excluded", 0):
@@ -4820,6 +4830,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             imported=summary.get("staged", 0),
             skipped=summary.get("skipped", 0),
             errors=summary.get("errors", 0),
+            fetchFailed=_fetch_failed_n,
             skip_reasons=skip_reasons,
             skip_reason_samples=skip_reason_samples,
             searchstax_filter=_ss_filter_stats or None,
