@@ -1223,6 +1223,35 @@ async def discover_course_links(
                 full = _resolve(href, url, origin)
                 if not full or full in found:
                     continue
+                # force_candidate_url_patterns short-circuit: some catalogue
+                # templates (e.g. UWE's search-result cards) wrap the WHOLE
+                # card — badge label + course name + "Course code: …" +
+                # "Duration: …" + "Delivery: …" — inside a single <a>, so the
+                # flattened anchor text is a 200-400 char blob that always
+                # fails both _MAX_COURSE_NAME_LEN and the degree-qualifier
+                # text match in _looks_like_course(), and the URL itself
+                # (e.g. /N4NB/accounting-and-business-management) doesn't
+                # match any _COURSE_URL_HINTS substring or _is_category_landing
+                # shape either — so these links were silently dropped instead
+                # of being queued or staged (UWE: ~100 course links/page,
+                # only 6-17 slipped through by accident). When the operator
+                # has declared the URL SHAPE alone is authoritative via YAML,
+                # trust it outright and derive the name from the URL slug
+                # (never from the noisy card text).
+                if _force_candidate_compiled and any(
+                    cp.search(urlparse(full).path) or cp.search(full)
+                    for _, cp in _force_candidate_compiled
+                ):
+                    _slug_name = (
+                        full.rstrip("/").rsplit("/", 1)[-1]
+                        .replace("-", " ")
+                        .replace("_", " ")
+                        .title()
+                    )
+                    found[full] = _slug_name
+                    if len(found) >= max_courses:
+                        break
+                    continue
                 if _looks_like_course(full, text):
                     if not _JUNK_TEXT.match(text or ""):
                         found[full] = text or full.rsplit("/", 1)[-1]

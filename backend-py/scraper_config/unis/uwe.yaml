@@ -40,6 +40,21 @@ discovery:
   allow_url_patterns:
     - 'courses\.uwe\.ac\.uk/'
 
+  # UWE's search-result cards wrap the ENTIRE card (badge label + course
+  # name + "Course code: …" + "Duration: …" + "Delivery: …") inside a
+  # single <a>. The flattened anchor text is a 200-400 char blob that
+  # always fails _looks_like_course()'s length/degree-qualifier checks,
+  # and the course URL itself (/<CODE>/<slug>, e.g.
+  # /N4NB/accounting-and-business-management) doesn't match any generic
+  # _COURSE_URL_HINTS substring either — so ~85-95 of every 100 course
+  # links per listing page were silently dropped (only ones whose badge
+  # happened to contain a degree word like "BA(Hons)" slipped through).
+  # The URL SHAPE alone (uppercase alphanumeric course code + one lowercase
+  # slug segment, nothing deeper) is unambiguous for this site, so declare
+  # it authoritative here regardless of anchor text.
+  force_candidate_url_patterns:
+    - '^/[A-Z][A-Z0-9]{2,10}/[a-z0-9]+(?:-[a-z0-9]+)*/?$'
+
   block_url_patterns:
     - '/about'
     - '/contact'
