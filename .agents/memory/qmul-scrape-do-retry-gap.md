@@ -216,3 +216,37 @@ resource for a fundamentally different usage shape (sequential + low-volume
 single shared budget is safe for all of them. A budget sized for smoothing
 bursty parallel retries can starve a serial caller with a tight deadline
 even though its own volume never approaches the limit.
+
+## Second Cardiff regression, no concurrent job this time — one stuck page can eat the whole discovery deadline
+
+**Symptom:** a *third* Cardiff discovery stall (job_82781680a1e4, 2026-07-06),
+this time with NO overlapping job running (confirmed via `scrape_runtime_jobs`
+`started_at` — ruled out the rate-limiter-starvation cause above). The BFS
+only got through 2/25 listing pages before the 300s deadline fired, with
+total silence in between (no per-page log lines) — a different failure mode
+from the previous regression's many-small-waits pattern.
+
+**Root cause:** `fetch_html_scrape_do()`'s outbound call uses a 90s
+`httpx.AsyncClient(timeout=90)`. For `scrape_do_skip_fallbacks=True`
+universities, a single `fetch_html()` call can try static-then-render
+sequentially inside that one call — up to 180s. `discovery.py`'s BFS loop
+then calls `fetch_html()` up to 3 times per candidate page (immediate retry
++ bare-URL-without-query-string retry), each with NO independent bound. One
+genuinely slow/hanging page — no error, no exception, just a scrape.do
+response that takes a long time — can singlehandedly consume 360-540s worst
+case, more than the entire `discovery_phase_timeout_s` (300s) budget, and the
+BFS never advances past it.
+
+**Fix:** added `settings.discovery_page_fetch_timeout_s` (default 45s) and
+wrapped every discovery-level `fetch_html()` call in `discovery.py`'s BFS
+loop with `asyncio.wait_for(..., timeout=...)`. A timeout is treated exactly
+like the existing "fetch failed" outcome (log + move to next page/retry tier)
+so one bad page degrades gracefully instead of stalling the whole crawl.
+
+**Generalizes:** any code that wraps a long single-fetch operation in an
+outer retry loop needs BOTH tiers bounded — the outer loop's own retry count
+alone does not cap wall-clock time if the inner call's own timeout is large
+relative to the outer deadline. When adding a hard deadline around a
+multi-step operation (`asyncio.wait_for` at the top), also check every step
+inside it has its own materially-smaller bound, or one step can still eat
+the whole budget alone.

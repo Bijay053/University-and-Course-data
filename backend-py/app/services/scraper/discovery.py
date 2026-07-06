@@ -17,6 +17,7 @@ import re
 from html.parser import HTMLParser
 from urllib.parse import urljoin, urlparse, urlunparse, urlencode, parse_qsl, parse_qs, unquote
 
+from app.config import settings
 from app.services.scraper.http_fetcher import fetch_html
 
 log = logging.getLogger(__name__)
@@ -1042,13 +1043,36 @@ async def discover_course_links(
         # fetch_html(retries=2) [default] would add 3 attempts × 30s timeout
         # inside every discovery-level retry, multiplying total wait time by 9
         # for URLs that ultimately fail (9 HTTP calls instead of 3).
-        html = await fetch_html(url, retries=0)
+        #
+        # Each attempt is bounded by discovery_page_fetch_timeout_s (Cardiff
+        # job_82781680a1e4, 2026-07-06): the scrape_do_skip_fallbacks fast-path
+        # can internally try static-then-render (up to 180s) inside a single
+        # fetch_html() call, and this loop calls fetch_html() up to 3 times per
+        # page — worst case 360-540s, more than the entire discovery deadline,
+        # stalling the whole crawl on one unresponsive page. Timing out here
+        # degrades to the existing "fetch failed" handling (skip this page,
+        # move on) instead of consuming the whole budget.
+        async def _bounded_fetch(_u: str) -> str | None:
+            try:
+                return await asyncio.wait_for(
+                    fetch_html(_u, retries=0),
+                    timeout=settings.discovery_page_fetch_timeout_s,
+                )
+            except asyncio.TimeoutError:
+                log.warning(
+                    "[DISCOVER] fetch timed out after %ss — %s",
+                    settings.discovery_page_fetch_timeout_s,
+                    _u,
+                )
+                return None
+
+        html = await _bounded_fetch(url)
         if not html:
             # Brief pause then one more attempt on the same URL — handles
             # transient 5xx / rate-limit blips on category listing pages
             # (e.g. /nursing-and-midwifery) without compounding delay.
             await asyncio.sleep(1)
-            html = await fetch_html(url, retries=0)
+            html = await _bounded_fetch(url)
         # Issue 3: if still nothing and the URL had a query string (e.g.
         # ?studentType=international), retry with the bare path once — some
         # servers reject the param but serve the page fine without it.
@@ -1056,7 +1080,7 @@ async def discover_course_links(
             _bare_url = url.split("?", 1)[0]
             if _bare_url not in visited:
                 await asyncio.sleep(1)
-                html = await fetch_html(_bare_url, retries=0)
+                html = await _bounded_fetch(_bare_url)
                 if html:
                     log.info(
                         "[DISCOVER] fetch succeeded without query params for %s", url

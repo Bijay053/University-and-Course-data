@@ -95,6 +95,19 @@ class Settings(BaseSettings):
     # scrape_task_soft_time_limit_s ceiling above.
     discovery_phase_timeout_s: int = 300   # 5 min
 
+    # Per-page fetch cap inside the BFS discovery loop (Cardiff job_82781680a1e4,
+    # 2026-07-06): fetch_html_scrape_do uses a 90s httpx timeout, and the
+    # discovery.scrape_do_skip_fallbacks fast-path tries static-then-render
+    # inside ONE fetch_html() call — up to 180s. discovery.py's BFS loop then
+    # calls fetch_html() up to 2-3 times per candidate page (immediate retry +
+    # bare-URL retry), so a single unresponsive page can burn 360-540s worst
+    # case — more than the entire discovery_phase_timeout_s budget above — and
+    # the BFS loop never advances to the next page. Wrapping each discovery-
+    # level fetch_html() call in asyncio.wait_for() at this cap ensures one bad
+    # page degrades to a skipped page (existing "fetch failed" handling)
+    # instead of consuming the whole deadline and stalling the crawl outright.
+    discovery_page_fetch_timeout_s: int = 45
+
     # Resume checkpoint: when True, a re-run of an interrupted large scrape skips
     # course URLs already staged for the university (instead of restarting from
     # course 0), and _clear_stale_dedup preserves an interrupted run's partial

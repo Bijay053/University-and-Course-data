@@ -19,6 +19,8 @@ These tests pin the contract that:
 """
 from __future__ import annotations
 
+import asyncio
+
 import pytest
 
 from app.services.scraper import discovery
@@ -251,4 +253,72 @@ async def test_ait_detail_pages_added_as_self_candidates(monkeypatch):
     # The child course linked from the IT category page must also appear.
     assert "https://ait.edu.au/courses/information-technology/vocational-diploma-of-it" in urls, (
         "Child course linked from a detail page must be harvested"
+    )
+
+
+# ── Cardiff job_82781680a1e4 fix: one stuck page must not stall the whole
+#    discovery-phase deadline ────────────────────────────────────────────
+#
+# fetch_html_scrape_do uses a 90s httpx timeout, and the discovery fast-path
+# can try static-then-render inside ONE fetch_html() call (up to 180s). The
+# BFS loop then calls fetch_html() up to 3 times per candidate page, so a
+# single hanging page could burn 360-540s — more than the entire
+# discovery_phase_timeout_s (300s) budget — leaving the crawl stuck on page
+# 2/25 with the rest of the catalogue never attempted. Each discovery-level
+# fetch_html() call must be individually bounded so a stuck page degrades to
+# a "fetch failed, skip this page" outcome instead of consuming the deadline.
+
+
+@pytest.mark.asyncio
+async def test_slow_page_times_out_and_bfs_continues(monkeypatch):
+    """A page whose fetch_html() call hangs past discovery_page_fetch_timeout_s
+    must be treated as a failed fetch (not block forever), letting the BFS
+    move on and still discover courses from the other pages in the budget.
+    """
+    from app.config import settings as app_settings
+
+    monkeypatch.setattr(app_settings, "discovery_page_fetch_timeout_s", 0.05)
+
+    _pages = {
+        "https://example.edu/": (
+            "<html><body><h1>Programs</h1>"
+            '<ul><li><a href="/courses/stuck-page">Stuck Category</a></li>'
+            '<li><a href="/courses/bachelor-of-business">Bachelor of Business</a></li></ul>'
+            "</body></html>"
+        ),
+    }
+
+    async def fake_fetch_html(url, **kwargs):
+        if url == "https://example.edu/courses/stuck-page":
+            # Simulate a hung scrape.do call that never resolves within the
+            # per-page cap — asyncio.wait_for() must cut this off.
+            await asyncio.sleep(10)
+            return "<html>should never get here</html>"
+        return _pages.get(url, "")
+
+    async def fake_sitemap(origin, *, emit=None):
+        return []
+
+    monkeypatch.setattr(discovery, "fetch_html", fake_fetch_html)
+    import app.services.scraper.sitemap as sm
+
+    monkeypatch.setattr(sm, "discover_from_sitemap", fake_sitemap)
+
+    started = asyncio.get_event_loop().time()
+    out = await discovery.discover_course_links(
+        "https://example.edu/", max_pages=5, max_courses=200
+    )
+    elapsed = asyncio.get_event_loop().time() - started
+
+    urls = {c["url"] for c in out}
+    assert "https://example.edu/courses/bachelor-of-business" in urls, (
+        "Healthy sibling page must still be discovered even though another "
+        "page hung — a stuck page must not stall the whole crawl"
+    )
+    # The stuck page attempted at most 2 bounded fetches (initial + 1s-sleep
+    # retry), each capped at ~0.05s — total should stay well under the 10s
+    # sleep the fake fetch would otherwise take.
+    assert elapsed < 5, (
+        f"discover_course_links took {elapsed:.1f}s — the per-page timeout "
+        "cap did not bound the stuck page's fetch time"
     )
