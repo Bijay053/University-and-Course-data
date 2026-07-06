@@ -33,6 +33,22 @@
 #    the system defaults to AUD and fires annual_fee_too_low_warning for all
 #    valid £15k–£35k fees.  Fixed below.
 #
+#  LEGITIMATE LOW-COST ONLINE PGCERT/MSc FEES FLAGGED critical (fixed 2026-07-06):
+#    Several genuine QMUL online/distance programmes (~£3,150–£5,000/yr) sit
+#    below the AU-tuned crit_min thresholds once converted to AUD, triggering
+#    annual_fee_too_low_critical and blocking otherwise-good rows. Fixed via
+#    extraction.fees.fee_crit_min_aud: 5500 below (downgrades to a warning).
+#
+#  DClinDent / DClinPsy DOCTORATE FEES FALSELY FLAGGED annual_fee_too_high_critical
+#  (fixed 2026-07-06, code-level fix — not a YAML setting):
+#    Clinical doctorate abbreviations (DClinDent, DClinPsy, EngD, DProf, DrPH,
+#    PsyD) don't contain the substring "doctor", so degree_level.py's name
+#    pattern never classified them and degree_level stayed blank. That routed
+#    legitimate ~£66,450/yr clinical fees through the generic default fee
+#    range instead of the doctorate range, producing a false critical-high
+#    flag. Fixed in extractors/degree_level.py (new pattern for fused clinical
+#    doctorate abbreviations) — applies to all universities, not just QMUL.
+#
 #  COURSE COUNT REGRESSION (root cause fixed 2026-06-26):
 #    QMUL course pages contain "online" in navigation and utility text:
 #      - "Apply Online" buttons
@@ -123,6 +139,17 @@ extraction:
     # for valid £15,000–£35,000 annual fees.
     default_currency: "GBP"
     prefer_international: true
+
+    # QMUL has several legitimate low-cost online/distance programmes
+    # (e.g. PGCert International Public Policy (Online) ~£3,150/yr,
+    # some part-time online MSc routes ~£4,420–£5,000/yr). Converted to
+    # AUD (~1.95x) these land at AUD 6,100–9,750, which is below the
+    # AU-tuned crit_min for Master's (12,000) and Graduate Certificate
+    # (8,000), so they were flagged as annual_fee_too_low_critical false
+    # positives. Lowering the crit_min floor to AUD 5,500 (~£2,820) lets
+    # these legitimate fees pass while still catching genuinely broken
+    # near-zero/placeholder fee extractions.
+    fee_crit_min_aud: 5500
 
   filters:
     domestic_only:

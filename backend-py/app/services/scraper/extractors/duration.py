@@ -159,7 +159,23 @@ _DURATION_ANTI_CONTEXT = re.compile(
     # Two consecutive "Year N" occurrences is a reliable tab-selector signal;
     # "select year" as a phrase is a direct match of the tab heading.
     r"select\s+year\b|"
-    r"year\s+\d+\s+year\s+\d+)\b",
+    r"year\s+\d+\s+year\s+\d+|"
+    # International admissions country-equivalency tables: UK universities
+    # publish per-country boilerplate like "We normally consider the
+    # following qualifications for entry to our postgraduate taught
+    # programmes: Bachelor Degree (minimum 5 years) or Master ...". The
+    # "(minimum N years)" here describes the length of the APPLICANT'S
+    # PRIOR qualification for a given country, not this course's duration —
+    # but it satisfied _MINIMUM_DURATION_RE and won the tournament at
+    # Pattern-0 priority (real bug: QMUL — every single course page staged
+    # duration="5 Year" because every page repeats this admissions-country
+    # table, regardless of the course's actual length, e.g. an 8-month
+    # PGCert). Disqualify any sentence that is clearly this entry-requirement
+    # equivalency boilerplate.
+    r"qualifications?\s+for\s+entry|"
+    r"consider\s+the\s+following\s+qualifications|"
+    r"entry\s+to\s+our\b|"
+    r"equivalent\s+(?:to\s+)?(?:a\s+)?(?:UK\s+)?(?:bachelor|honours|master)s?\s+degree)\b",
     re.I,
 )
 
@@ -799,7 +815,12 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
         # the "up to a maximum of N years" clause can enter the tournament — the
         # real program duration must come from a different prose sentence.
         min_m = _MINIMUM_DURATION_RE.search(s)
-        if min_m and not credit_context and not is_placement_sentence:
+        if (
+            min_m
+            and not credit_context
+            and not is_placement_sentence
+            and not anti_duration_context
+        ):
             try:
                 min_amount = float(min_m.group(1))
                 min_unit = _normalise_unit(min_m.group(2))

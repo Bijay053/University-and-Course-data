@@ -53,6 +53,19 @@ _NAME_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
     # ── Doctorate ────────────────────────────────────────────────────────────
     # EdD (Doctor of Education), DBA (Doctor of Business Administration) added.
     (re.compile(r"\b(doctor(ate)?|ph\.?d|d\.?phil|ed\.?d|dba)\b", re.IGNORECASE), "Doctorate"),
+    # UK clinical/professional doctorate abbreviations fused into a single
+    # token — none of these contain the substring "doctor" so the pattern
+    # above never matches them (real bug: QMUL DClinDent / DClinPsy pages
+    # left degree_level blank, which made the fee sanity check fall back to
+    # the generic default range and flag the legitimate ~£66k/yr clinical
+    # doctorate fee as a critical false positive).
+    #   DClinDent   = Doctor of Clinical Dentistry
+    #   DClinPsy(chol) = Doctor of Clinical Psychology
+    #   EngD        = Doctor of Engineering
+    #   DProf       = Doctor of Professional Studies
+    #   DrPH        = Doctor of Public Health
+    #   PsyD        = Doctor of Psychology
+    (re.compile(r"\bd\s*clin\w*\b|\beng\s*d\b|\bd\s*prof\b|\bdr\s*ph\b|\bpsy\s*d\b", re.IGNORECASE), "Doctorate"),
     # ── Graduate Diploma / Certificate ───────────────────────────────────────
     (re.compile(r"\bgraduate\s+diploma\b", re.IGNORECASE), "Graduate Diploma"),
     (re.compile(r"\bgraduate\s+certificate\b", re.IGNORECASE), "Graduate Certificate"),
